@@ -1,7 +1,16 @@
-import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { X, Phone, MessageCircle, Mail } from "lucide-react";
 import type { SimulationSubjectSnapshot } from "@trainers/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   type UnifiedHistoryEntry,
   getModuleBadgeClasses,
@@ -35,7 +44,7 @@ function Metadata({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
       <dd className="mt-1 break-words text-sm font-semibold text-foreground">
@@ -153,7 +162,6 @@ export function ReviewDetailModal({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const onCloseRef = useRef(onClose);
-  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -226,35 +234,20 @@ export function ReviewDetailModal({
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 z-[150] flex items-center justify-center p-3 sm:p-4"
-      role="presentation"
+    <Dialog
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onCloseRef.current();
+      }}
     >
-      <motion.div
-        initial={shouldReduceMotion ? undefined : { opacity: 0 }}
-        animate={shouldReduceMotion ? undefined : { opacity: 1 }}
-        exit={shouldReduceMotion ? undefined : { opacity: 0 }}
-        onClick={() => onCloseRef.current()}
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-      />
-      <motion.div
+      <DialogContent
         ref={dialogRef}
-        initial={
-          shouldReduceMotion ? undefined : { opacity: 0, scale: 0.95, y: 20 }
-        }
-        animate={
-          shouldReduceMotion ? undefined : { opacity: 1, scale: 1, y: 0 }
-        }
-        exit={
-          shouldReduceMotion ? undefined : { opacity: 0, scale: 0.95, y: 20 }
-        }
-        className="relative flex max-h-[90vh] max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl"
-        role="dialog"
-        aria-modal="true"
+        showCloseButton={false}
         aria-labelledby="review-detail-title"
+        className="!w-[calc(100vw-2rem)] !max-w-4xl flex min-h-0 max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden bg-card p-0"
       >
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 border-b border-border bg-foreground/[0.02] shrink-0">
+        <DialogHeader className="flex shrink-0 flex-row flex-wrap items-center justify-between gap-3 border-b border-border bg-foreground/[0.02] px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             {entry.module === "ketik" && (
               <MessageCircle
@@ -278,41 +271,47 @@ export function ReviewDetailModal({
               />
             )}
             <div className="min-w-0">
-              <h2
+              <DialogTitle
                 id="review-detail-title"
-                className="text-sm font-black tracking-tight truncate"
+                className="break-words text-sm font-black tracking-tight"
               >
                 {entry.scenario_title}
-              </h2>
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                Detail sesi simulasi dan hasil penilaiannya.
+              </DialogDescription>
               <div className="flex items-center gap-2 mt-0.5">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] ${getModuleBadgeClasses(entry.module)}`}
+                <Badge
+                  variant="outline"
+                  className={`h-auto rounded-full px-2 py-0.5 text-xs font-black uppercase tracking-[0.08em] ${getModuleBadgeClasses(entry.module)}`}
                 >
                   {entry.module}
-                </span>
+                </Badge>
                 <ReviewStatusBadge status={entry.review_status} />
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {userEmail || "-"}
                 </span>
               </div>
             </div>
           </div>
-          <button
+          <Button
             ref={closeButtonRef}
             type="button"
+            variant="ghost"
+            size="icon-lg"
             aria-label="Tutup detail monitoring"
             onClick={onClose}
-            className="min-h-11 min-w-11 rounded-full hover:bg-foreground/5 flex items-center justify-center transition-colors shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="min-h-11 min-w-11 shrink-0 rounded-full hover:bg-foreground/5"
           >
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </DialogHeader>
 
         {(() => {
           const subject = getSimulationSubjectMeta(simulationSubject);
           return (
             <dl
-              className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-5"
+              className="mx-4 mt-4 grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:mx-6 sm:grid-cols-2 lg:grid-cols-5"
               aria-label="Atribusi simulasi"
             >
               <Metadata
@@ -334,9 +333,9 @@ export function ReviewDetailModal({
           );
         })()}
         {/* Body — Each panel now renders its own content (transcript + AI assessment) */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           <dl
-            className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
+            className="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
             aria-label="Informasi konsumen"
           >
             <Metadata label="Nama konsumen" value={consumerName} />
@@ -415,10 +414,10 @@ export function ReviewDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-foreground/[0.02] px-6 py-4 shrink-0">
+        <DialogFooter className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-none border-t border-border bg-foreground/[0.02] px-6 py-4">
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+              <span className="block text-xs font-black uppercase tracking-widest text-muted-foreground">
                 Durasi
               </span>
               <span className="text-lg font-black">
@@ -428,7 +427,7 @@ export function ReviewDetailModal({
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+              <span className="block text-xs font-black uppercase tracking-widest text-muted-foreground">
                 Skor
               </span>
               <span
@@ -438,7 +437,7 @@ export function ReviewDetailModal({
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+              <span className="block text-xs font-black uppercase tracking-widest text-muted-foreground">
                 Waktu
               </span>
               <span className="text-xs font-bold text-muted-foreground">
@@ -446,16 +445,17 @@ export function ReviewDetailModal({
               </span>
             </div>
           </div>
-          <button
+          <Button
             type="button"
+            size="lg"
             aria-label="Tutup detail monitoring"
             onClick={() => onCloseRef.current()}
-            className="min-h-11 rounded-xl bg-foreground px-5 py-2 text-xs font-black uppercase tracking-widest text-background hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="min-h-11 bg-foreground px-5 text-xs font-black uppercase tracking-widest text-background hover:bg-foreground/90"
           >
             Tutup
-          </button>
-        </div>
-      </motion.div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,4 +1,6 @@
-import { useRef } from "react";
+import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
 
@@ -15,58 +17,74 @@ interface Props {
   onMonthSelect: (month: number) => void;
 }
 
-function scoreBg(score: number): string {
-  if (score >= 85) return "bg-green-500";
-  if (score >= 70) return "bg-amber-500";
-  return "bg-red-500";
+function scoreIndicatorClass(score: number): string {
+  if (score >= 85) return "[&_[data-slot=progress-indicator]]:bg-emerald-600";
+  if (score >= 70) return "[&_[data-slot=progress-indicator]]:bg-amber-600";
+  return "[&_[data-slot=progress-indicator]]:bg-rose-600";
 }
 
 export default function MonthRail({ summaries, selectedMonth, onMonthSelect }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   if (summaries.length === 0) return null;
 
   const sorted = [...summaries].sort((a, b) => a.month - b.month);
+  const hasBelowQaTarget = sorted.some((summary) => summary.finalScore < 95);
 
   return (
     <div className="overflow-x-auto no-scrollbar">
+      {hasBelowQaTarget && (
+        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+          <AlertTriangle className="size-3.5 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+          <span>QA di bawah target 95%</span>
+        </div>
+      )}
       <div className="flex min-w-max items-end gap-1.5 border-b border-border/50 pb-1">
         {sorted.map((p) => {
           const isActive = selectedMonth === p.month;
-           return (
-            <button
+          const monthLabel = `${MONTHS_SHORT[p.month - 1]} ${p.year}`;
+          const isBelowQaTarget = p.finalScore < 95;
+          return (
+            <Button
               key={`${p.month}-${p.year}`}
+              type="button"
+              variant={isActive ? "secondary" : "ghost"}
+              size="lg"
               onClick={() => onMonthSelect(p.month)}
-              className={`group relative min-w-[84px] rounded-lg border px-2 pb-2.5 pt-1.5 text-left transition-colors ${
+              aria-pressed={isActive}
+              aria-label={`Pilih bulan ${monthLabel}, skor ${p.finalScore.toFixed(1)} persen, ${p.findingsCount} temuan${isBelowQaTarget ? ", QA di bawah target 95 persen" : ""}`}
+              className={`group relative min-h-16 min-w-[88px] h-auto items-start rounded-xl border px-2 pb-2.5 pt-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none ${
                 isActive
                   ? "border-border bg-muted/50 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground/80"
+                  : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/30 hover:text-foreground"
               }`}
             >
-              <div className={`text-[10px] font-black tracking-[0.18em] mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+              <div className={`mb-1 text-xs font-semibold ${isActive ? "text-primary" : "text-muted-foreground"}`}>
                 {MONTHS_SHORT[p.month - 1]}
               </div>
 
-              <div className="flex items-end gap-0.5 leading-none">
-                <span className={`text-base font-black tracking-tight ${isActive ? "text-foreground" : "text-muted-foreground/80"}`}>
+              <div className="flex items-end gap-0.5 leading-none tabular-nums">
+                <span className={`text-base font-bold tracking-tight ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
                   {p.finalScore.toFixed(1)}
                 </span>
-                <span className="pb-0.5 text-[10px] font-black text-muted-foreground/40">%</span>
+                <span className="pb-0.5 text-xs font-semibold text-muted-foreground">%</span>
               </div>
 
-              {p.finalScore < 95 && (
-                <div className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
+              {isBelowQaTarget && (
+                <span
+                  role="img"
+                  aria-label="Skor QA di bawah target 95 persen"
+                  title="Skor QA di bawah target 95 persen"
+                  className="ml-1 inline-flex size-4 shrink-0 text-amber-700 dark:text-amber-300"
+                >
+                  <AlertTriangle className="size-4" aria-hidden="true" />
+                </span>
               )}
 
-              <div className="absolute bottom-0 left-2.5 right-2.5 h-[3px] overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full ${scoreBg(p.finalScore)} transition-opacity ${
-                    isActive ? "opacity-100" : "opacity-55 group-hover:opacity-80"
-                  }`}
-                  style={{ width: `${Math.max(20, Math.min(100, p.finalScore))}%` }}
-                />
-              </div>
-            </button>
+              <Progress
+                value={Math.max(20, Math.min(100, p.finalScore))}
+                aria-hidden="true"
+                className={`absolute bottom-0 left-2.5 right-2.5 h-1 gap-0 ${scoreIndicatorClass(p.finalScore)} [&_[data-slot=progress-track]]:h-1 [&_[data-slot=progress-indicator]]:transition-none`}
+              />
+            </Button>
           );
         })}
       </div>

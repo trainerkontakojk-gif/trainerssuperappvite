@@ -1,10 +1,12 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
+  --font-heading: var(--font-display);
   --font-mono: var(--font-mono);
 
   --color-background: var(--background);
@@ -101,13 +103,13 @@
     --destructive-foreground: #fafafa;
     --input: var(--border);
     --ring: var(--fg);
-    
+
     --radius: 0.75rem;
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
-    
+
     --shadow-sm: 0 1px 2px rgba(0,0,0,.05), 0 0 0 1px rgba(0,0,0,.04);
     --shadow-md: 0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06);
     --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.10), 0 4px 6px -2px rgba(0,0,0,.05);
@@ -178,7 +180,7 @@
     --destructive-foreground: #FEF2F2;
     --input: var(--border);
     --ring: var(--fg);
-    
+
     --shadow-sm: 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
     --shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -1px rgba(255,255,255,.05);
     --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.5), 0 4px 6px -2px rgba(255,255,255,.05);
@@ -298,43 +300,43 @@
   }
 
   /* ── 3.2 Typography Scale ──────────────────────────────── */
-  
+
   .text-page-title {
     @apply text-4xl font-bold tracking-tight;
   }
-  
+
   .text-section-title {
     @apply text-3xl font-bold tracking-tight;
   }
-  
+
   .text-card-title {
     @apply text-base font-bold tracking-tight;
   }
-  
+
   .text-label-mono {
     @apply text-[10px] font-bold uppercase tracking-widest text-muted-foreground;
   }
-  
+
   .text-body-custom {
     @apply text-sm font-light text-muted-foreground;
   }
-  
+
   .text-body-bold {
     @apply text-sm font-bold;
   }
-  
+
   .text-stat-value {
     @apply text-3xl font-black tracking-tighter;
   }
-  
+
   .text-stat-label {
     @apply text-[10px] uppercase tracking-[0.2em] font-black text-muted-foreground;
   }
-  
+
   .text-button-custom {
     @apply text-sm font-bold;
   }
-  
+
   .text-tiny-meta {
     @apply text-xs font-light text-muted-foreground;
   }
@@ -367,7 +369,6 @@
   .module-clean-app[data-module='telefun'] {
     --module-clean-accent: var(--module-telefun);
   }
-
 
   .module-clean-stage {
     background:

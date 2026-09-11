@@ -1,7 +1,24 @@
 import type { AgentComparisonTable } from "@trainers/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Props {
   comparisonTable?: AgentComparisonTable;
+  embedded?: boolean;
 }
 
 const MONTHS_SHORT = [
@@ -47,23 +64,31 @@ function deltaTone(value: number | null): string {
   // Positive delta means the agent has MORE findings than the average
   // (worse quality). We surface it as a muted amber/rose neutral tone.
   if (value === null) return "text-muted-foreground";
-  if (value > 0) return "text-rose-600";
-  if (value < 0) return "text-emerald-600";
+  if (value > 0) return "text-rose-700 dark:text-rose-400";
+  if (value < 0) return "text-emerald-700 dark:text-emerald-400";
   return "text-muted-foreground";
 }
 
-export default function AgentComparisonTable({ comparisonTable }: Props) {
+export default function AgentComparisonTable({ comparisonTable, embedded = false }: Props) {
   if (!comparisonTable) return null;
 
   const hasComparison = comparisonTable.rows.some((r) => r.key !== "total");
 
   if (!hasComparison) {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-8">
-        <p className="text-sm text-muted-foreground">
+      <Card
+        className={
+          embedded
+            ? "gap-0 rounded-none border-0 bg-transparent py-6 ring-0"
+            : "border-border bg-surface py-0"
+        }
+      >
+        <CardContent className="px-5 py-6">
+          <p className="text-sm text-muted-foreground">
           Belum ada data pembanding untuk periode ini
-        </p>
-      </div>
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -79,38 +104,45 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
   } agen tim / ${totalRow?.serviceAgentCount ?? 0} agen layanan sama`;
 
   return (
-    <div className="rounded-2xl border border-border bg-surface">
-      <div className="border-b border-border px-5 py-4">
-        <h4 className="font-outfit text-sm font-bold tracking-tight text-foreground">
+    <Card
+      className={
+        embedded
+          ? "gap-0 rounded-none border-0 bg-transparent py-6 ring-0"
+          : "gap-0 border-border bg-surface py-0"
+      }
+    >
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="font-outfit text-lg font-bold tracking-tight text-foreground">
           Perbandingan Temuan
-        </h4>
-        <p className="mt-1 text-[11px] font-medium text-muted-foreground">
+        </CardTitle>
+        <CardDescription className="mt-1 text-sm text-muted-foreground">
           {scopeLine}
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-[10px] font-bold tracking-widest text-muted-foreground">
-              <th className="px-5 py-3 font-bold">Parameter</th>
-              <th className="px-5 py-3 text-right font-bold tabular-nums">
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-0">
+        <Table className="min-w-[720px] text-sm">
+          <TableCaption className="sr-only">Perbandingan temuan agen dengan rata-rata tim dan layanan yang sama</TableCaption>
+          <TableHeader>
+            <TableRow className="border-b border-border text-left text-xs font-semibold text-muted-foreground hover:bg-transparent">
+              <TableHead className="px-5 py-3 font-bold">Parameter</TableHead>
+              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
                 Agen ini
-              </th>
-              <th className="px-5 py-3 text-right font-bold tabular-nums">
+              </TableHead>
+              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
                 Rata-rata tim
-              </th>
-              <th className="px-5 py-3 text-right font-bold tabular-nums">
+              </TableHead>
+              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
                 Rata-rata layanan sama
-              </th>
-              <th className="px-5 py-3 text-right font-bold tabular-nums">
+              </TableHead>
+              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
                 % vs tim
-              </th>
-              <th className="px-5 py-3 text-right font-bold tabular-nums">
+              </TableHead>
+              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
                 % vs layanan sama
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row) => {
               const deltaTeam = calculateDeltaPercent(
                 row.agentCount,
@@ -122,42 +154,40 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
               );
               const isTotal = row.key === "total";
               return (
-                <tr
+                <TableRow
                   key={row.key}
-                  className={`border-b border-border/60 last:border-0 ${
-                    isTotal ? "font-semibold" : ""
-                  }`}
+                  className={isTotal ? "bg-muted/30 font-semibold" : ""}
                 >
-                  <td className="px-5 py-3 text-foreground">{row.label}</td>
-                  <td className="px-5 py-3 text-right text-foreground tabular-nums">
+                  <TableCell className="px-5 py-3 text-foreground">{row.label}</TableCell>
+                  <TableCell className="px-5 py-3 text-right text-foreground tabular-nums">
                     {row.agentCount}
-                  </td>
-                  <td className="px-5 py-3 text-right text-muted-foreground tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-5 py-3 text-right text-muted-foreground tabular-nums">
                     {formatNumber(row.teamAverage)}
-                  </td>
-                  <td className="px-5 py-3 text-right text-muted-foreground tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-5 py-3 text-right text-muted-foreground tabular-nums">
                     {formatNumber(row.serviceAverage)}
-                  </td>
-                  <td
+                  </TableCell>
+                  <TableCell
                     className={`px-5 py-3 text-right tabular-nums ${deltaTone(
                       deltaTeam,
                     )}`}
                   >
                     {formatDeltaPercent(deltaTeam)}
-                  </td>
-                  <td
+                  </TableCell>
+                  <TableCell
                     className={`px-5 py-3 text-right tabular-nums ${deltaTone(
                       deltaService,
                     )}`}
                   >
                     {formatDeltaPercent(deltaService)}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

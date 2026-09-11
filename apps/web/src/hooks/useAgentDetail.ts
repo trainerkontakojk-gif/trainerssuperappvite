@@ -83,9 +83,6 @@ export function useAgentDetail(agentId: string) {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [trendStartMonth, setTrendStartMonth] = useState(1);
   const [trendEndMonth, setTrendEndMonth] = useState(currentMonth);
-  const [activeSection, setActiveSection] = useState("summary");
-  const [trendMounted, setTrendMounted] = useState(false);
-  const [temuanMounted, setTemuanMounted] = useState(false);
   const [editingTemuan, setEditingTemuan] = useState<TemuanDisplayItem | null>(
     null,
   );
@@ -579,8 +576,6 @@ export function useAgentDetail(agentId: string) {
   const handleYearChange = useCallback((year: number) => {
     setSelectedYear(year);
     setSelectedMonth(null);
-    setTrendMounted(false);
-    setTemuanMounted(false);
     const isCurrent = year === new Date().getFullYear();
     setTrendStartMonth(1);
     setTrendEndMonth(isCurrent ? new Date().getMonth() + 1 : 12);
@@ -598,12 +593,6 @@ export function useAgentDetail(agentId: string) {
   const handleTrendRangeChange = useCallback((start: number, end: number) => {
     setTrendStartMonth(start);
     setTrendEndMonth(end);
-  }, []);
-
-  const handleSectionVisible = useCallback((section: string) => {
-    setActiveSection(section);
-    if (section === "trend") setTrendMounted(true);
-    if (section === "temuan") setTemuanMounted(true);
   }, []);
 
   const handleTeamChange = useCallback((team: string) => {
@@ -624,9 +613,6 @@ export function useAgentDetail(agentId: string) {
     selectedMonth,
     trendStartMonth,
     trendEndMonth,
-    activeSection,
-    trendMounted,
-    temuanMounted,
     monthlySummaries,
     latestPeriod,
     previousPeriod,
@@ -652,7 +638,6 @@ export function useAgentDetail(agentId: string) {
     handleServiceChange,
     handleMonthSelect,
     handleTrendRangeChange,
-    handleSectionVisible,
     handleExport,
     handleInputAudit,
     handleEdit,

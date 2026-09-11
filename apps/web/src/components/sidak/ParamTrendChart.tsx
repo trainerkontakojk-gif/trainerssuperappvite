@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { SidakForecastSeries } from "@trainers/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TrendDataset {
   label: string;
@@ -34,7 +35,37 @@ export default function ParamTrendChart({
   forecastResults,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!mounted) return;
+    const element = chartContainerRef.current;
+    if (!element) return;
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
+      setContainerReady(rect.width > 0 && rect.height > 0);
+    };
+
+    if (typeof ResizeObserver === "undefined") {
+      setContainerReady(true);
+      return;
+    }
+
+    const observer = new ResizeObserver(updateSize);
+    updateSize();
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [mounted]);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const normalizedForecastResults = useMemo(
     () =>
@@ -109,34 +140,56 @@ export default function ParamTrendChart({
     [normalizedForecastResults],
   );
 
-  if (!mounted) {
-    return <div className="h-full w-full animate-pulse rounded-[1.5rem] bg-muted/10" />;
+  if (!mounted || !containerReady) {
+    return (
+      <div
+        ref={chartContainerRef}
+        className="h-full w-full rounded-xl bg-muted/10"
+        aria-hidden="true"
+      >
+        <Skeleton className="size-full rounded-xl motion-reduce:animate-none" />
+      </div>
+    );
   }
 
   if (!chartData.length) return null;
 
-  const defaultColors = ["#0F766E", "#D97706", "#2563EB", "#BE123C", "#4338CA", "#0891B2"];
+  const defaultColors = [
+    "var(--chart-green)",
+    "var(--chart-amber)",
+    "var(--chart-blue)",
+    "var(--chart-red)",
+    "var(--chart-violet)",
+    "var(--chart-cyan)",
+  ];
   const getColor = (ds: TrendDataset, i: number) => {
     if (colorMap && colorMap[ds.label]) return colorMap[ds.label];
     return defaultColors[i % defaultColors.length];
   };
+  const animationEnabled = !prefersReducedMotion;
 
   return (
-    <div className="h-full w-full animate-in fade-in duration-700">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+    <div ref={chartContainerRef} className="h-full w-full animate-in fade-in duration-700 motion-reduce:animate-none">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        minHeight={0}
+        initialDimension={{ width: 1, height: 1 }}
+      >
         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.05} />
           <XAxis
             dataKey="name"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.6 }}
+            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.75 }}
             dy={10}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "currentColor", opacity: 0.6 }}
+            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.75 }}
           />
           <Tooltip
             contentStyle={{
@@ -154,7 +207,7 @@ export default function ParamTrendChart({
               if (isForecastSeries && !isForecast) return null;
               return [
                 <span key="val" className="flex items-center gap-1.5">
-                  {value} {isForecast && <span className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary rounded font-bold uppercase">Prediksi</span>}
+                  {value} {isForecast && <span className="rounded bg-primary/20 px-1 py-0.5 text-xs font-bold uppercase text-primary">Prediksi</span>}
                 </span>,
                 name
               ];
@@ -181,7 +234,7 @@ export default function ParamTrendChart({
                     strokeWidth={isFiltered ? 2.5 : 1.5}
                     fill={color}
                     fillOpacity={isFiltered ? 0.15 : 0.05}
-                    isAnimationActive={true}
+                    isAnimationActive={animationEnabled}
                     animationDuration={1000}
                     dot={isFiltered ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
                     connectNulls
@@ -196,7 +249,7 @@ export default function ParamTrendChart({
                       strokeWidth={2.5}
                       strokeDasharray="5 5"
                       fill="transparent"
-                      isAnimationActive={true}
+                      isAnimationActive={animationEnabled}
                       animationDuration={1000}
                       dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: color }}
                     />
@@ -223,7 +276,7 @@ export default function ParamTrendChart({
                   strokeWidth={2.5}
                   fill="var(--primary)"
                   fillOpacity={0.06}
-                  isAnimationActive={true}
+                  isAnimationActive={animationEnabled}
                   animationDuration={1500}
                   dot={{ r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: "var(--primary)" }}
                   activeDot={{ r: 5, strokeWidth: 0, fill: "var(--primary)" }}
@@ -239,7 +292,7 @@ export default function ParamTrendChart({
                     strokeWidth={2.5}
                     strokeDasharray="5 5"
                     fill="transparent"
-                    isAnimationActive={true}
+                    isAnimationActive={animationEnabled}
                     animationDuration={1500}
                     dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: "var(--primary)" }}
                   />

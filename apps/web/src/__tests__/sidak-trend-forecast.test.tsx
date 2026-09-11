@@ -10,7 +10,14 @@ const { tooltipProps } = vi.hoisted(() => ({
 }));
 
 vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
+  ResponsiveContainer: ({ children, initialDimension }: any) => (
+    <div
+      data-testid="responsive-container"
+      data-initial-dimension={JSON.stringify(initialDimension)}
+    >
+      {children}
+    </div>
+  ),
   AreaChart: ({ children, data }: any) => (
     <div data-testid="area-chart" data-chart={JSON.stringify(data)}>
       {children}
@@ -111,6 +118,22 @@ describe("DashboardTrendPanel Forecast", () => {
     vi.mocked(unwrapResponse).mockResolvedValue({
       status: "missing",
       snapshot: null,
+    });
+  });
+
+  it("starts the responsive chart with a positive initial dimension", async () => {
+    render(
+      <ParamTrendChart
+        labels={["Jan", "Feb"]}
+        datasets={[{ label: "Total Temuan", data: [2, 1], isTotal: true }]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("responsive-container")).toHaveAttribute(
+        "data-initial-dimension",
+        JSON.stringify({ width: 1, height: 1 }),
+      );
     });
   });
 

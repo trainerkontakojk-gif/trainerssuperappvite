@@ -14,6 +14,16 @@ import type {
   SidakAgentRankQuickview,
   TiedPeerInfo,
 } from "@trainers/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const RANKING_BASIS_NOTE =
   "Semakin tinggi peringkat, semakin sedikit temuan sepanjang tahun. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah temuan yang sama mendapat peringkat yang sama.";
@@ -24,11 +34,11 @@ const FORECAST_PRESENTATION: Record<
 > = {
   improving: {
     Icon: TrendingDown,
-    className: "text-emerald-600 dark:text-emerald-400",
+    className: "text-emerald-700 dark:text-emerald-400",
   },
   declining: {
     Icon: TrendingUp,
-    className: "text-rose-600 dark:text-rose-400",
+    className: "text-rose-700 dark:text-rose-400",
   },
   stable: {
     Icon: Minus,
@@ -36,7 +46,7 @@ const FORECAST_PRESENTATION: Record<
   },
   insufficient_data: {
     Icon: ShieldAlert,
-    className: "text-amber-600 dark:text-amber-400",
+    className: "text-amber-700 dark:text-amber-400",
   },
 };
 
@@ -44,6 +54,7 @@ interface AgentPerformanceQuickviewProps {
   data: SidakAgentQuickviewResponse | null;
   loading: boolean;
   error: string | null;
+  scopeLabel?: string;
 }
 
 interface RankMetricProps {
@@ -92,8 +103,10 @@ function TieDisclosure({
         Berbagi peringkat {rank} dengan {peers[0].nama} dan {peers.length - 1}{" "}
         agen lain
       </span>
-      <button
+      <Button
         type="button"
+        variant="link"
+        size="lg"
         aria-expanded={open}
         aria-controls={id}
         aria-label={
@@ -102,16 +115,16 @@ function TieDisclosure({
             : `Lihat semua agen yang berbagi peringkat ${rank}`
         }
         onClick={() => setOpen(!open)}
-        className="ml-1 inline-flex items-center gap-0.5 text-xs font-medium text-primary"
+        className="ml-1 min-h-11 gap-0.5 px-1 text-xs font-medium text-primary"
       >
         {open ? "Sembunyikan" : "Lihat"}
         <ChevronDown
           aria-hidden="true"
           className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
         />
-      </button>
+      </Button>
       {open && (
-        <ul id={id} className="mt-1 space-y-0.5 rounded bg-muted/50 px-2 py-1">
+        <ul id={id} className="mt-1 flex flex-col gap-0.5 rounded bg-muted/50 px-2 py-1">
           {peers.map((peer) => (
             <li key={peer.agentId} className="text-xs text-muted-foreground">
               • {peer.nama}
@@ -170,7 +183,7 @@ function RankMetric({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{supportingText}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{supportingText}</p>
       {hasTie && tieCount <= 2 && tieText ? (
         <p className="mt-0.5 text-xs text-muted-foreground">
           {tieText.summary}
@@ -199,7 +212,7 @@ function ForecastMetric({
           <Minus aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
           <span className="text-base font-semibold">—</span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Forecast belum tersedia
         </p>
       </div>
@@ -217,9 +230,11 @@ function ForecastMetric({
       <p className="text-sm font-medium text-foreground">Forecast 3 bulan</p>
       <div className={`mt-2 flex items-center gap-2 ${className}`}>
         <Icon aria-hidden="true" className="h-5 w-5" />
-        <span className="text-base font-semibold">{forecast.label}</span>
+        <Badge variant="outline" className="h-auto px-2 py-1 text-sm font-semibold">
+          {forecast.label}
+        </Badge>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         {forecast.supportingText}
       </p>
     </div>
@@ -243,9 +258,9 @@ function QuickviewSkeleton() {
                 : ""
             }`}
           >
-            <div className="h-4 w-28 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-            <div className="mt-3 h-6 w-20 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-            <div className="mt-2 h-3 w-36 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-28 motion-reduce:animate-none" />
+            <Skeleton className="mt-3 h-6 w-20 motion-reduce:animate-none" />
+            <Skeleton className="mt-2 h-3 w-36 motion-reduce:animate-none" />
           </div>
         ))}
       </section>
@@ -263,6 +278,7 @@ export default function AgentPerformanceQuickview({
   data,
   loading,
   error,
+  scopeLabel,
 }: AgentPerformanceQuickviewProps) {
   if (loading && !data) {
     return <QuickviewSkeleton />;
@@ -270,14 +286,15 @@ export default function AgentPerformanceQuickview({
 
   if (error && !data) {
     return (
-      <div className="border-t border-border px-4 py-4 sm:px-6">
-        <p role="status" className="text-sm font-medium text-foreground">
+      <Alert role="status" className="rounded-none border-0 border-t border-border bg-transparent px-4 py-4 sm:px-6">
+        <ShieldAlert className="text-amber-700 dark:text-amber-400" aria-hidden="true" />
+        <AlertTitle className="text-sm font-medium text-foreground">
           Quickview belum dapat dimuat
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        </AlertTitle>
+        <AlertDescription className="mt-1 text-xs">
           Data ranking dan forecast tidak tersedia untuk sementara.
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -290,8 +307,8 @@ export default function AgentPerformanceQuickview({
     data.combinedTeam?.scopeId !== undefined &&
     data.combinedTeam.scopeId === data.leaderTeam?.scopeId;
 
-  return (
-    <div className="border-t border-border">
+  const quickview = (
+    <CardContent className="border-t border-border p-0">
       <section
         aria-label="Quickview performa agent"
         className="grid grid-cols-1 md:grid-cols-3"
@@ -309,9 +326,23 @@ export default function AgentPerformanceQuickview({
         />
         <ForecastMetric forecast={data.forecast} />
       </section>
-      <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground sm:px-6">
+      <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground sm:px-6">
         {RANKING_BASIS_NOTE}
       </p>
-    </div>
+    </CardContent>
+  );
+
+  if (!scopeLabel) return quickview;
+
+  return (
+    <Card className="gap-0 border-border bg-surface py-0 ring-0">
+      <CardHeader className="border-b border-border px-4 py-4 sm:px-6">
+        <h3 className="font-outfit text-lg font-bold text-foreground">
+          Quickview performa
+        </h3>
+        <CardDescription className="mt-1 text-sm text-muted-foreground">{scopeLabel}</CardDescription>
+      </CardHeader>
+      {quickview}
+    </Card>
   );
 }

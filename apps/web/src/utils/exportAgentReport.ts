@@ -458,9 +458,9 @@ function yearText(value: unknown, fallback = 0): string {
 }
 
 function scoreColor(score: number): string {
-  if (finiteNumber(score) >= 85) return "#22c55e";
-  if (finiteNumber(score) >= 70) return "#f59e0b";
-  return "#ef4444";
+  if (finiteNumber(score) >= 85) return "#047857";
+  if (finiteNumber(score) >= 70) return "#b45309";
+  return "#be123c";
 }
 
 function scoreLabel(score: number): string {
@@ -471,7 +471,7 @@ function scoreLabel(score: number): string {
 
 function deltaStyle(delta: number | null): string {
   if (delta === null) return "color: #6b7280;";
-  return delta >= 0 ? "color: #22c55e;" : "color: #ef4444;";
+  return delta >= 0 ? "color: #047857;" : "color: #be123c;";
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +481,6 @@ function deltaStyle(delta: number | null): string {
 function buildProfileHtml(
   peserta: AgentDetailData["peserta"],
   masaKerja: string,
-  quickviewHtml = "",
   isStaff = true,
 ): string {
   const avatarContent = peserta.foto_url
@@ -499,7 +498,7 @@ function buildProfileHtml(
     '        <div class="profile-avatar-inner">' + avatarContent + '</div>',
     '      </div>',
     '      <div class="profile-info">',
-    '        <div class="profile-name">' + escHtml(peserta.nama) + '</div>',
+    '        <h1 class="profile-name">' + escHtml(peserta.nama) + '</h1>',
     '        <div class="profile-meta">',
     '          <span>&#128101; ' + escHtml(peserta.tim) + '</span>',
     '          <span>&bull;</span>',
@@ -522,12 +521,15 @@ function buildProfileHtml(
       : '',
     '    </div>',
     '  </div>',
-    quickviewHtml,
     '</div>',
   ].join("\n");
 }
 
-function buildQuickviewHtml(quickview: SidakAgentQuickviewResponse | null | undefined): string {
+function buildQuickviewHtml(
+  quickview: SidakAgentQuickviewResponse | null | undefined,
+  selectedYear: number,
+  selectedService: string,
+): string {
   if (!quickview) return "";
   const sameScope = quickview.combinedTeam?.scopeId != null && quickview.combinedTeam.scopeId === quickview.leaderTeam?.scopeId;
   const rankMetric = (label: string, metric: SidakAgentQuickviewResponse["combinedTeam"], sameAsCombined = false): string => {
@@ -543,12 +545,13 @@ function buildQuickviewHtml(quickview: SidakAgentQuickviewResponse | null | unde
   };
   const forecast = quickview.forecast;
   const completeRanking = quickview.combinedTeam?.rank != null && quickview.leaderTeam?.rank != null;
-  return `<div class="quickview-rail" role="region" aria-label="Quickview performa agent">
-    ${rankMetric("Tim Gabungan", quickview.combinedTeam)}
-    ${rankMetric("Tim Leader", quickview.leaderTeam, sameScope)}
-    <div role="group" aria-label="Forecast: ${escHtml(forecast?.label ?? "belum tersedia")}"><strong>Forecast 3 bulan</strong><b>${escHtml(forecast?.label ?? "—")}</b><small>${escHtml(forecast?.supportingText ?? "Forecast belum tersedia")}</small></div>
-    ${completeRanking ? '<p>Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.</p>' : ""}
-  </div>`;
+  const quickviewRail = '<div class="quickview-rail" role="region" aria-label="Quickview performa agent">' +
+    rankMetric("Tim Gabungan", quickview.combinedTeam) +
+    rankMetric("Tim Leader", quickview.leaderTeam, sameScope) +
+    '<div role="group" aria-label="Forecast: ' + escHtml(forecast?.label ?? "belum tersedia") + '"><strong>Forecast 3 bulan</strong><b>' + escHtml(forecast?.label ?? "—") + '</b><small>' + escHtml(forecast?.supportingText ?? "Forecast belum tersedia") + '</small></div>' +
+    (completeRanking ? '<p>Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.</p>' : "") +
+    '</div>';
+  return '<div class="quickview-surface"><div class="quickview-heading"><h3>Quickview performa</h3><p>Tahun ' + yearText(selectedYear) + ' &#8226; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>' + quickviewRail + '</div>';
 }
 
 function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
@@ -643,12 +646,12 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '  <div class="dossier-score-strip">',
     '    <div class="score-section dossier-score-panel">',
     '  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.25rem 0.75rem;margin-bottom:0.25rem;">',
-    '    <span style="font-size:0.625rem;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;">' + escHtml(monthLabel) + '</span>',
-    '    <span style="font-size:0.625rem;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:' + sColor + ';">' + sLabel + '</span>',
+    '    <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#475569;">' + escHtml(monthLabel) + '</span>',
+    '    <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:' + sColor + ';">' + sLabel + '</span>',
     '  </div>',
     '  <div style="display:flex;align-items:baseline;gap:0.375rem;">',
     '    <span style="font-size:2.25rem;font-weight:900;letter-spacing:-0.03em;line-height:1;color:' + sColor + ';">' + safeFinalScore.toFixed(1) + '</span>',
-    '    <span style="font-size:0.875rem;font-weight:900;color:rgba(107,114,128,0.4);">%</span>',
+    '    <span style="font-size:0.875rem;font-weight:800;color:#475569;">%</span>',
     '  </div>',
     '  <div class="score-bar" style="margin-top:0.5rem;">',
     '    <div class="score-bar-fill" style="width:' + pct + '%;background:' + sColor + ';"></div>',
@@ -673,8 +676,8 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '  <div class="dossier-lower-row">',
     '<div class="score-section dossier-ticket-column">',
     '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:0.5rem;">',
-    '    <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Tiket Pengurang Skor Terbesar</h4>',
-    '    <span style="font-size:0.5625rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;">' + topTickets.length + ' Tiket</span>',
+    '    <h4 style="font-family:Outfit, Inter, sans-serif;font-size:1.125rem;font-weight:700;letter-spacing:-0.02em;color:#111827;">Tiket Pengurang Skor Terbesar</h4>',
+    '    <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#475569;">' + topTickets.length + ' Tiket</span>',
     '  </div>',
     '  ' + ticketsHtml,
     '</div>',
@@ -682,10 +685,10 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '<div class="score-section dossier-root-cause-column">',
     '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:1rem;">',
     '    <div>',
-    '      <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Akar Masalah</h4>',
+    '      <h4 style="font-family:Outfit, Inter, sans-serif;font-size:1.125rem;font-weight:700;letter-spacing:-0.02em;color:#111827;">Akar Masalah</h4>',
     '      <p style="font-size:0.75rem;font-weight:500;color:#6b7280;margin-top:0.125rem;">Berdasarkan temuan periode aktif</p>',
     '    </div>',
-    '    <span style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;">' + activeRootCauses.length + ' Pola</span>',
+    '    <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#475569;">' + activeRootCauses.length + ' Pola</span>',
     '  </div>',
     '  ' + causesHtml,
     '</div>',
@@ -731,7 +734,7 @@ function buildComparisonHtml(data: AgentDetailData): string {
   }).join("\n");
 
   return [
-    '<div class="card">',
+    '<div class="trend-comparison">',
     '  <div class="section-header">',
     '    <h4>Perbandingan Temuan</h4>',
     '    <p class="section-subtitle">' + scopeLine + '</p>',
@@ -785,6 +788,7 @@ function comparisonDeltaClass(value: number | null): string {
 
 function buildFindingsHtml(
   temuanDisplayItems: TemuanDisplayItemExport[],
+  variant: AgentHtmlVariant,
 ): string {
   if (temuanDisplayItems.length === 0) {
     return '<p style="text-align:center;padding:2rem 0;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;font-size:0.75rem;">Tidak ada data temuan untuk konteks ini</p>';
@@ -851,7 +855,7 @@ function buildFindingsHtml(
 
       const monthLabel = (MONTHS_FULL[first.month - 1] ?? String(first.month)) +
         " " + first.year;
-      const open = "";
+      const open = variant === "static" ? " open" : "";
       return [
         '<details class="findings-period"' + open + '>',
         '<summary>',
@@ -870,42 +874,52 @@ function buildFindingsHtml(
 // Live page shell
 // ---------------------------------------------------------------------------
 
-function buildLiveShellHtml(data: AgentDetailData): string {
-  return `<header class="page-header">
-    <div class="back-heading"><span class="back-button" aria-hidden="true">←</span><div><p>SIDAK · Profil Agen</p><h1>${escHtml(data.peserta.nama)}</h1></div></div>
-    <span class="shell-refresh" aria-hidden="true">↻ Muat ulang</span>
-  </header>`;
+function buildLiveShellHtml(): string {
+  return '<header class="page-header">' +
+    '<div class="back-heading"><span class="back-button" aria-hidden="true">←</span><p>SIDAK · Profil Agen</p></div>' +
+    '<span class="shell-refresh" aria-hidden="true">↻ Muat ulang</span>' +
+    '</header>';
 }
 
 function buildLiveContextHtml(
   data: AgentDetailData,
   selectedYear: number,
   selectedService: string,
-  context: AgentHtmlExportContext,
+  variant: AgentHtmlVariant,
 ): string {
-  const start = context.trendStartMonth ?? 1;
-  const end = context.trendEndMonth ?? data.initialTrendRange.end;
-  return `<div class="context-control-bar" aria-label="Kontrol konteks audit">
-    <div class="context-primary"><label><span>Tahun</span><select disabled><option>${yearText(selectedYear)}</option></select></label><div class="service-pills"><span class="context-label">Layanan</span><span class="service-pill">${escHtml(selectedService.toUpperCase())}</span></div></div>
-    <label class="trend-control"><span>Trend</span><select disabled><option>${escHtml(MONTHS_SHORT[start - 1] ?? start)}</option></select><b>→</b><select disabled><option>${escHtml(MONTHS_SHORT[end - 1] ?? end)}</option></select></label>
-    <div class="agent-switchers"><select disabled><option>Folder...</option></select><select disabled><option>${escHtml(data.peserta.nama)}</option></select></div>
-  </div><nav class="section-tabs" aria-label="Navigasi bagian laporan">
-    <a href="#section-summary">Ringkasan Skor</a><a href="#section-trend">Grafik Tren</a><a href="#section-temuan">Daftar Temuan</a>
-  </nav>`;
+  const tabItems = [
+    ["summary", "Ringkasan", "section-summary"],
+    ["trend", "Tren", "section-trend"],
+    ["temuan", "Temuan", "section-temuan"],
+  ];
+  const tabs = tabItems.map(([id, label, target]) =>
+    variant === "interactive"
+      ? '<button type="button" id="report-tab-' + id + '" role="tab" tabindex="' + (id === "summary" ? "0" : "-1") + '" data-report-tab="' + id + '" aria-selected="' + (id === "summary" ? "true" : "false") + '" aria-controls="' + target + '">' + label + '</button>'
+      : '<span id="report-tab-' + id + '" role="tab" data-report-tab="' + id + '" aria-selected="true" aria-controls="' + target + '">' + label + '</span>',
+  ).join("");
+  return '<div class="context-control-bar" aria-label="Kontrol konteks audit">' +
+    '<div class="context-primary">' +
+      '<label for="report-year"><span>Tahun audit</span><select id="report-year" disabled aria-label="Tahun audit"><option>' + yearText(selectedYear) + '</option></select></label>' +
+      '<div class="service-pills"><span class="context-label">Layanan audit</span><span class="service-pill">' + escHtml(selectedService.toUpperCase()) + '</span></div>' +
+    '</div>' +
+    '<div class="agent-switchers"><label for="report-folder">Folder</label><select id="report-folder" disabled><option>Folder...</option></select><label for="report-agent">Agen</label><select id="report-agent" disabled><option>' + escHtml(data.peserta.nama) + '</option></select></div>' +
+    '</div><nav class="section-tabs" role="tablist" aria-label="Navigasi bagian laporan">' + tabs + '</nav>';
 }
 
 function buildMonthRailHtml(summaries: AgentPeriodSummary[], selectedMonth: number | null): string {
   if (!summaries.length) return "";
   const activeMonth = selectedMonth ?? summaries[summaries.length - 1].month;
-  return `<div class="month-rail" aria-label="Bulan audit terpilih">${summaries.map((summary) => {
+  return `<div class="month-rail-block"><div class="month-rail-legend"><span class="month-score-indicator" aria-hidden="true">⚠</span><span>QA di bawah target 95%</span></div><div class="month-rail" aria-label="Bulan audit terpilih">${summaries.map((summary) => {
     const active = activeMonth === summary.month;
     const safeScore = finiteNumber(summary.finalScore, 0, 0, 100);
     const width = Math.max(20, Math.min(100, safeScore));
+    const scoreStatus = safeScore < 95 ? ", QA di bawah target 95 persen" : "";
     const scoreMark = safeScore < 95
-      ? '<span class="month-score-indicator" aria-hidden="true"></span>'
+      ? '<span class="month-score-indicator" role="img" aria-label="Skor QA di bawah target 95 persen" title="Skor QA di bawah target 95 persen">⚠</span>'
       : '';
-    return `<span class="month-chip${active ? " active" : ""}" aria-current="${active ? "true" : "false"}"><span>${escHtml(MONTHS_SHORT[summary.month - 1] ?? summary.month)}</span><strong>${safeScore.toFixed(1)}%</strong>${scoreMark}<i style="width:${width}%"></i></span>`;
-  }).join("")}</div>`;
+    const monthLabel = (MONTHS_FULL[summary.month - 1] ?? String(summary.month)) + " " + yearText(summary.year);
+    return `<span class="month-chip${active ? " active" : ""}" aria-current="${active ? "true" : "false"}" aria-label="${escHtml(monthLabel + ", skor " + safeScore.toFixed(1) + " persen" + scoreStatus)}"><span class="month-label">${escHtml(monthLabel)}</span><strong>${safeScore.toFixed(1)}</strong><em>%</em>${scoreMark}<i style="width:${width}%"></i></span>`;
+  }).join("")}</div></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -931,16 +945,20 @@ export function generateHTML(
     hour: "2-digit", minute: "2-digit",
   });
 
-  const quickviewHtml = buildQuickviewHtml(context.quickview);
-  const profileHtml = buildProfileHtml(peserta, masaKerja, quickviewHtml, context.isStaff ?? true);
+  const quickviewHtml = buildQuickviewHtml(
+    context.quickview,
+    selectedYear,
+    selectedService,
+  );
+  const profileHtml = buildProfileHtml(peserta, masaKerja, context.isStaff ?? true);
   const activeMonth = context.selectedMonth ?? monthlySummaries[monthlySummaries.length - 1]?.month ?? null;
   const dossierHtml = buildDossierHtml(monthlySummaries, topTickets, activeRootCauses, variant, activeMonth);
-  const trendHtml = buildTrendReportHtml(data, variant, selectedYear);
   const comparisonHtml = buildComparisonHtml(data);
-  const findingsHtml = buildFindingsHtml(temuanDisplayItems);
+  const trendHtml = buildTrendReportHtml(data, variant, selectedYear, comparisonHtml);
+  const findingsHtml = buildFindingsHtml(temuanDisplayItems, variant);
   const interactiveScript = buildInteractiveReportScript(variant);
-  const liveShellHtml = buildLiveShellHtml(data);
-  const liveContextHtml = buildLiveContextHtml(data, selectedYear, selectedService, context);
+  const liveShellHtml = buildLiveShellHtml();
+  const liveContextHtml = buildLiveContextHtml(data, selectedYear, selectedService, variant);
   const monthRailHtml = buildMonthRailHtml(monthlySummaries, context.selectedMonth ?? null);
   const summaryEmptyHtml = monthlySummaries.length === 0
     ? '<div class="summary-empty"><strong>Data belum tersedia</strong><p>Belum ada ringkasan skor untuk layanan ' + escHtml(selectedService.toUpperCase()) + ' pada tahun ' + yearText(selectedYear) + '.</p></div>'
@@ -964,7 +982,7 @@ export function generateHTML(
     '    overflow-x: hidden;',
     '    padding: clamp(1rem, 3vw, 2.5rem);',
     '  }',
-    '  .container { width: 100%; max-width: 1180px; margin: 0 auto; min-width: 0; }',
+    '  .container { width: 100%; max-width: 1280px; margin: 0 auto; min-width: 0; }',
     '  .card {',
     '    background: #ffffff;',
     '    border: 1px solid #e2e8f0;',
@@ -978,50 +996,50 @@ export function generateHTML(
     '    font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; color: #111827;',
     '  }',
     '  .card-header p {',
-    '    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em;',
+    '    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em;',
     '    text-transform: uppercase; color: #6b7280;',
     '  }',
     '  .report-section { margin: 0 0 2rem; min-width: 0; }',
     '  .report-section-heading { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }',
     '  .report-section-heading h2 { font-size: 1.125rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: #0f172a; }',
-    '  .report-section-heading p { margin-top: 0.25rem; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; }',
+    '  .report-section-heading p { margin-top: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #475569; }',
     '  .section-icon { display: inline-flex; width: 2.5rem; height: 2.5rem; flex: none; align-items: center; justify-content: center; border-radius: 0.5rem; background: #f1f5f9; color: #64748b; }',
     '  .section-icon svg, .findings-month-icon svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }',
     '  .section-header { margin-bottom: 1rem; }',
     '  .section-header h4 {',
     '    font-family: Outfit, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
-    '    font-size: 0.875rem; font-weight: 700; color: #111827;',
+    '    font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; color: #111827;',
     '  }',
-    '  .section-subtitle { font-size: 0.6875rem; font-weight: 500; color: #6b7280; margin-top: 0.25rem; }',
+    '  .section-subtitle { font-size: 0.875rem; font-weight: 500; color: #475569; margin-top: 0.25rem; }',
     '  .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }',
     '  .trend-card { padding: clamp(1.25rem, 3vw, 2rem); }',
     '  .trend-intro { max-width: 48rem; }',
-    '  .trend-kicker { color: #64748b; font-size: 0.625rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; }',
+    '  .trend-kicker { color: #475569; font-size: 0.75rem; font-weight: 700; }',
     '  .trend-intro h3 { margin-top: 0.45rem; color: #0f172a; font-size: clamp(1.35rem, 3vw, 1.875rem); font-weight: 900; line-height: 1.15; letter-spacing: -0.035em; text-wrap: balance; }',
-    '  .trend-intro > p:last-child { margin-top: 0.5rem; max-width: 68ch; color: #64748b; font-size: 0.75rem; font-weight: 500; }',
+    '  .trend-intro > p:last-child { margin-top: 0.5rem; max-width: 68ch; color: #475569; font-size: 0.875rem; font-weight: 500; }',
     '  .trend-chart-shell { margin-top: 1.5rem; padding: clamp(0.5rem, 2vw, 1rem); border: 1px solid #e2e8f0; border-radius: 1rem; background: #fbfdff; }',
     '  .trend-chart { display: block; width: 100%; height: auto; min-width: 0; }',
     '  .trend-figure { width: 100%; min-width: 0; }',
     '  .chart-grid { stroke: #e5e7eb; stroke-width: 1; }',
-    '  .chart-axis-label { fill: #6b7280; font-size: 11px; font-weight: 600; }',
+    '  .chart-axis-label { fill: #475569; font-size: 12px; font-weight: 600; }',
     '  .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.875rem; color: #475569; font-size: 0.75rem; }',
     '  .chart-legend-item { display: inline-flex; align-items: center; gap: 0.375rem; }',
     '  .legend-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex: none; }',
     '  .trend-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.5rem; }',
-    '  .trend-filter { display: inline-flex; min-height: 2.5rem; align-items: center; gap: 0.45rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; background: #fff; color: #475569; padding: 0.5rem 0.8rem; font: inherit; font-size: 0.625rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: transform 160ms ease-out, border-color 160ms ease-out, background 160ms ease-out, color 160ms ease-out; }',
+    '  .trend-filter { display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.45rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; background: #fff; color: #334155; padding: 0.5rem 0.8rem; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: border-color 160ms ease-out, background 160ms ease-out, color 160ms ease-out; }',
     '  .trend-filter:hover { border-color: #94a3b8; color: #0f172a; }',
-    '  .trend-filter[aria-pressed="true"] { border-color: #111827; background: #111827; color: #ffffff; transform: translateY(-1px); }',
+    '  .trend-filter[aria-pressed="true"] { border-color: #111827; background: #111827; color: #ffffff; }',
     '  .trend-filter[aria-pressed="true"] .legend-dot { background: #ffffff !important; }',
     '  .trend-filter:focus-visible { outline: 3px solid rgba(37,99,235,0.3); outline-offset: 2px; }',
 
-    '  .trend-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid #e2e8f0; } .trend-stat, .trend-insight { padding:1.25rem; border:1px solid #e2e8f0; border-radius:1rem; background:#fff; } .trend-insight { grid-column:span 2; display:flex; align-items:center; gap:1rem; background:rgba(37,99,235,.05); border-color:rgba(37,99,235,.1); }',
-    '  .trend-stat span, .trend-insight span { display: block; color: #64748b; font-size: 0.625rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }',
-    '  .trend-stat strong { display: inline-block; margin-top: 0.35rem; color: #0f172a; font-size: 2rem; font-weight: 900; line-height: 1; }',
-    '  .trend-stat small { margin-left: 0.5rem; color: #64748b; font-size: 0.625rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }',
-    '  .trend-insight p { margin-top: 0.5rem; max-width: 68ch; color: #475569; font-size: 0.8125rem; line-height: 1.6; }',
+    '  .trend-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid #e2e8f0; } .trend-stat, .trend-insight { min-width:0; } .trend-insight { grid-column:span 2; display:flex; align-items:flex-start; gap:1rem; }',
+    '  .trend-stat span, .trend-insight span { display: block; color: #475569; font-size: 0.75rem; font-weight: 700; }',
+    '  .trend-stat strong { display: inline-block; margin-top: 0.35rem; color: #0f172a; font-size: 1.75rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }',
+    '  .trend-stat small { margin-left: 0.5rem; color: #475569; font-size: 0.875rem; }',
+    '  .trend-insight p { margin-top: 0.5rem; max-width: 68ch; color: #334155; font-size: 0.875rem; line-height: 1.6; }',
     '  @media (max-width: 640px) { .trend-stats { grid-template-columns:1fr; gap:1rem; } .trend-insight { grid-column:auto; } .trend-filter { width:100%; justify-content:flex-start; } }',
     '  @media (prefers-reduced-motion: reduce) { .trend-filter { transition: none; } }',
-    '  .empty-state { padding: 2rem 0; text-align: center; color: #6b7280; font-size: 0.875rem; } .summary-empty { padding:3rem 1rem; text-align:center; } .summary-empty strong { color:#64748b; font-size:1.125rem; } .summary-empty p { margin-top:0.5rem; color:#64748b; font-size:0.8125rem; }',
+    '  .empty-state { padding: 2rem 0; text-align: center; color: #475569; font-size: 0.875rem; } .summary-empty { padding:3rem 1rem; text-align:center; } .summary-empty strong { color:#475569; font-size:1.125rem; } .summary-empty p { margin-top:0.5rem; color:#475569; font-size:0.875rem; }',
     '  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }',
     '  [hidden] { display: none !important; }',
     '  @media print {',
@@ -1037,20 +1055,20 @@ export function generateHTML(
     '',
     '  /* Profile Bar */',
     '  .profile-bar {',
-    '    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 1rem;',
-    '    padding: 1.5rem 2rem; margin-bottom: 1.5rem; overflow: hidden; position: relative;',
+    '    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem;',
+    '    padding: 1rem 1.25rem; margin-bottom: 1.5rem; overflow: visible; position: relative;',
     '  }',
     '  .profile-inner {',
-    '    display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 1.5rem;',
+    '    display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 1rem;',
     '  }',
     '  .profile-main {',
-    '    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.5rem; min-width: 0;',
+    '    display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1rem; min-width: 0;',
     '  }',
     '  .profile-actions {',
     '    display: flex; flex-direction: column; gap: 0.75rem; width: 100%; align-items: stretch;',
     '  }',
     '  .profile-action {',
-    '    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.5rem; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0 1rem; color: #111827; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; user-select: none;',
+    '    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0 1rem; color: #111827; font-size: 0.875rem; font-weight: 700; white-space: nowrap; user-select: none;',
     '  }',
     '  .profile-action svg { width: 0.875rem; height: 0.875rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }',
     '  .profile-action-icon { display: inline-flex; align-items: center; justify-content: center; }',
@@ -1058,51 +1076,51 @@ export function generateHTML(
     '  .profile-action-primary { background: #111827; color: #ffffff; }',
     '  @media (min-width: 768px) {',
     '    .profile-inner { flex-direction: row; align-items: flex-end; }',
-    '    .profile-main { flex-direction: row; text-align: left; align-items: flex-end; }',
+    '    .profile-main { flex-direction: row; text-align: left; align-items: center; }',
     '    .profile-actions { width: auto; flex-direction: row; align-items: center; justify-content: flex-end; }',
     '  }',
     '  .profile-avatar {',
-    '    width: 6rem; height: 6rem; border-radius: 0.75rem;',
+    '    width: 3rem; height: 3rem; border-radius: 0.75rem;',
     '    border: 1px solid #e5e7eb; padding: 0.25rem; background: #ffffff; flex-shrink: 0;',
     '  }',
     '  .profile-avatar-inner {',
     '    width: 100%; height: 100%; border-radius: calc(0.75rem - 4px);',
     '    background: #f8f9fb; display: flex; align-items: center; justify-content: center;',
-    '    font-size: 2.25rem; font-weight: 900; text-transform: uppercase;',
-    '    color: rgba(0,0,0,0.15); overflow: hidden;',
+    '    font-size: 1.25rem; font-weight: 700; text-transform: uppercase;',
+    '    color: #334155; overflow: hidden;',
     '  }',
     '  .profile-avatar-inner img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(0.75rem - 4px); }',
     '  .profile-name {',
-    '    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;',
-    '    font-size: 1.875rem; font-weight: 900; letter-spacing: -0.02em;',
+    '    font-family: Outfit, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
+    '    font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;',
     '    line-height: 1.2; color: #111827; margin-bottom: 0.75rem;',
     '  }',
     '  .profile-meta {',
     '    display: flex; flex-wrap: wrap; justify-content: center;',
-    '    gap: 0.25rem 1rem; font-size: 0.6875rem; font-weight: 600; color: #6b7280;',
+    '    gap: 0.25rem 1rem; font-size: 0.875rem; font-weight: 600; color: #475569;',
     '  }',
     '  @media (min-width: 768px) { .profile-meta { justify-content: flex-start; } }',
     '',
     '  /* Score Section */',
     '  .score-section { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1.25rem; }',
     '  .audit-dossier { overflow:hidden; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; } .dossier-score-strip { padding:1.25rem; } .dossier-score-panel { border:0; padding:0; } .dossier-lower-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); border-top:1px solid #e5e7eb; } .dossier-lower-row > .score-section { border:0; border-radius:0; margin:0 !important; } .dossier-ticket-column { border-right:1px solid #e5e7eb !important; } .dossier-root-cause-column { min-width:0; }',
-    '  .cause-primary-badges { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; } .cause-primary-badges span { display:inline-flex; align-items:center; border:1px solid #e5e7eb; border-radius:999px; padding:.3rem .6rem; font-size:.625rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; } .cause-primary-badges .critical { border-color:#fecdd3; background:#fff1f2; color:#e11d48; }',
+    '  .cause-primary-badges { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; } .cause-primary-badges span { display:inline-flex; align-items:center; border:1px solid #e5e7eb; border-radius:999px; padding:.3rem .6rem; font-size:.75rem; font-weight:700; } .cause-primary-badges .critical { border-color:#fda4af; background:#fff1f2; color:#be123c; }',
     '  .score-bar {',
     '    height: 0.5rem; border-radius: 9999px; background: #f3f4f6; overflow: hidden;',
     '  }',
     '  .score-bar-fill { height: 100%; border-radius: 9999px; }',
     '  .stat-cell { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }',
     '  .stat-label {',
-    '    font-size: 0.5625rem; font-weight: 900; letter-spacing: 0.1em;',
-    '    text-transform: uppercase; color: #6b7280;',
+    '    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;',
+    '    color: #475569;',
     '  }',
     '  .stat-value { font-size: 1rem; font-weight: 900; line-height: 1; color: #111827; }',
     '',
     '  /* Tables */',
     '  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }',
     '  th {',
-    '    text-align: left; font-size: 0.625rem; font-weight: 700;',
-    '    letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280;',
+    '    text-align: left; font-size: 0.75rem; font-weight: 700;',
+    '    letter-spacing: 0.02em; color: #475569;',
     '    padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb;',
     '  }',
     '  td {',
@@ -1114,43 +1132,43 @@ export function generateHTML(
     '  .delta-favorable { color: #047857; font-weight: 700; }',
     '  .total-row td { font-weight: 600; }',
     '  .badge {',
-    '    display: inline-block; padding: 0.125rem 0.5rem; border-radius: 0.375rem;',
-    '    font-size: 0.625rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;',
+    '    display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.5rem;',
+    '    font-size: 0.75rem; font-weight: 700;',
     '    border: 1px solid;',
     '  }',
-    '  .badge-critical { background: rgba(239,68,68,0.1); color: #ef4444; border-color: rgba(239,68,68,0.2); }',
-    '  .badge-non-critical { background: rgba(59,130,246,0.1); color: #3b82f6; border-color: rgba(59,130,246,0.2); }',
+    '  .badge-critical { background: #fff1f2; color: #be123c; border-color: #fda4af; }',
+    '  .badge-non-critical { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }',
     '',
     '  /* Grouped Findings */',
     '  .findings-period { border-bottom: 1px solid #e2e8f0; }',
     '  .findings-period:last-child { border-bottom: 0; }',
-    '  .findings-period > summary { display: flex; min-height: 4.5rem; align-items: center; gap: 1rem; border-radius: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; list-style: none; transition: background 160ms ease-out; }',
+    '  .findings-period > summary { display: flex; min-height: 2.75rem; align-items: center; gap: 1rem; border-radius: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; list-style: none; transition: background 160ms ease-out; }',
     '  .findings-period > summary::-webkit-details-marker { display: none; }',
     '  .findings-period > summary:hover { background: #f8fafc; }',
     '  .findings-month-icon { display: inline-flex; width: 2.5rem; height: 2.5rem; flex: none; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 0.75rem; color: #64748b; }',
     '  .findings-period-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; }',
-    '  .findings-period-copy strong { color: #0f172a; font-size: 0.9375rem; font-weight: 900; text-transform: uppercase; }',
-    '  .findings-period-copy small { margin-top: 0.2rem; color: #64748b; font-size: 0.625rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }',
+    '  .findings-period-copy strong { color: #0f172a; font-size: 1rem; font-weight: 800; }',
+    '  .findings-period-copy small { margin-top: 0.2rem; color: #475569; font-size: 0.75rem; font-weight: 600; }',
     '  .disclosure-icon { width: 0.55rem; height: 0.55rem; flex: none; border-right: 2px solid #64748b; border-bottom: 2px solid #64748b; transform: rotate(45deg); transition: transform 160ms ease-out; }',
     '  .findings-period[open] .disclosure-icon { transform: rotate(225deg); }',
-    '  .findings-period-content { padding: 0.5rem 1rem 1.75rem 4.5rem; }',
+    '  .findings-period-content { padding: 0.5rem 1rem 1.75rem 1rem; }',
     '  .findings-ticket + .findings-ticket { margin-top: 2rem; }',
     '  .findings-ticket-head { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; }',
     '  .ticket-index { color: #94a3b8; font-size: 0.75rem; font-style: italic; font-weight: 900; }',
     '  .findings-ticket-head div { display: flex; flex-direction: column; }',
-    '  .findings-ticket-head div span { color: #94a3b8; font-size: 0.5rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; }',
-    '  .findings-ticket-head div strong { margin-top: 0.15rem; color: #0f172a; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.6875rem; font-weight: 900; letter-spacing: 0.04em; }',
-    '  .findings-ticket-head small { color: #64748b; font-size: 0.5625rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }',
-    '  .finding-item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 1.5rem; padding: 1.5rem 0 0 2.75rem; }',
+    '  .findings-ticket-head div span { color: #475569; font-size: 0.75rem; font-weight: 600; }',
+    '  .findings-ticket-head div strong { margin-top: 0.15rem; color: #0f172a; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.875rem; font-weight: 800; letter-spacing: 0.04em; overflow-wrap:anywhere; }',
+    '  .findings-ticket-head small { color: #475569; font-size: 0.75rem; font-weight: 600; }',
+    '  .finding-item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 1rem; padding: 1rem 0 0; }',
     '  .finding-score { display: flex; flex-direction: column; align-items: center; padding-top: 0.15rem; }',
     '  .finding-score strong { color: #0f172a; font-size: 1.25rem; font-weight: 900; line-height: 1; }',
-    '  .finding-score span { margin-top: 0.25rem; color: #64748b; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }',
+    '  .finding-score span { margin-top: 0.25rem; color: #475569; font-size: 0.75rem; font-weight: 700; }',
     '  .finding-body h5 { margin-top: 0.45rem; color: #0f172a; font-size: 0.9375rem; font-weight: 900; line-height: 1.35; overflow-wrap: anywhere; }',
     '  .finding-copy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-top: 1rem; }',
-    '  .finding-copy-grid span { color: #64748b; font-size: 0.5625rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }',
-    '  .finding-copy-grid p { margin-top: 0.35rem; color: #64748b; font-size: 0.75rem; line-height: 1.6; overflow-wrap: anywhere; }',
+    '  .finding-copy-grid span { color: #475569; font-size: 0.75rem; font-weight: 700; }',
+    '  .finding-copy-grid p { margin-top: 0.35rem; color: #475569; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }',
     '  .finding-copy-grid .recommendation-label { color: #2563eb; }',
-    '  .finding-copy-grid .recommendation-copy { color: #334155; font-weight: 700; }',
+    '  .finding-copy-grid .recommendation-copy { color: #1e293b; font-weight: 700; }',
     '  @media (max-width: 640px) { .findings-period-content { padding-left: 0.75rem; padding-right: 0.75rem; } .finding-item { grid-template-columns: 2.5rem minmax(0, 1fr); gap: 0.75rem; padding-left: 0; } .finding-copy-grid { grid-template-columns: 1fr; gap: 1rem; } .findings-ticket-head { grid-template-columns: 1.5rem minmax(0, 1fr); } .findings-ticket-head small { grid-column: 2; } }',
     '',
     '  /* Ticket Items */',
@@ -1159,17 +1177,17 @@ export function generateHTML(
     '    gap: 0.625rem; padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6;',
     '  }',
     '  .ticket-item:last-child { border-bottom: none; }',
-    '  .ticket-rank { font-size: 0.75rem; font-weight: 900; font-style: italic; color: rgba(107,114,128,0.4); width: 1.25rem; }',
-    '  .ticket-id-label { font-size: 0.5rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(107,114,128,0.6); }',
+    '  .ticket-rank { font-size: 0.75rem; font-weight: 700; font-style: italic; color: #64748b; width: 1.25rem; }',
+    '  .ticket-id-label { font-size: 0.75rem; font-weight: 700; color: #475569; }',
     '  .ticket-id {',
-    '    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.6875rem;',
+    '    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.875rem;',
     '    font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: #111827;',
     '  }',
-    '  .ticket-param { font-size: 0.625rem; font-weight: 500; color: #6b7280; }',
-    '  .ticket-deduction { color: #f43f5e; }',
+    '  .ticket-param { font-size: 0.875rem; font-weight: 500; color: #475569; overflow-wrap:anywhere; }',
+    '  .ticket-deduction { color: #be123c; }',
     '  .ticket-deduction-value { font-size: 0.75rem; font-weight: 900; }',
-    '  .ticket-deduction-label { font-size: 0.5625rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }',
-    '  .ticket-count { font-size: 0.5rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; }',
+    '  .ticket-deduction-label { font-size: 0.75rem; font-weight: 700; }',
+    '  .ticket-count { font-size: 0.75rem; font-weight: 600; color: #475569; }',
     '',
     '  /* Cause Boxes */',
     '  .cause-box {',
@@ -1180,20 +1198,20 @@ export function generateHTML(
     '  .cause-label { font-size: 0.875rem; font-weight: 900; letter-spacing: -0.01em; color: #111827; margin-bottom: 0.25rem; }',
     '  .cause-stats {',
     '    display: flex; flex-wrap: wrap; gap: 0.5rem;',
-    '    font-size: 0.6875rem; font-weight: 600; color: #6b7280; margin-bottom: 0.5rem;',
+    '    font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;',
     '  }',
     '  .cause-recommendation { font-size: 0.8125rem; line-height: 1.5; color: #374151; }',
-    '  .root-cause-tickets { margin-top:0.75rem; color:#334155; font-size:0.6875rem; } .root-cause-tickets summary { cursor:pointer; font-weight:800; } .root-cause-tickets ul { margin-top:0.5rem; padding-left:1rem; }',
+    '  .root-cause-tickets { margin-top:0.75rem; color:#334155; font-size:0.75rem; } .root-cause-tickets summary { cursor:pointer; font-weight:800; } .root-cause-tickets ul { margin-top:0.5rem; padding-left:1rem; }',
     '  .page-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0 0 1.25rem; }',
     '  .back-heading { display:flex; align-items:center; gap:0.75rem; } .back-button { display:inline-flex; width:2.25rem; height:2.25rem; align-items:center; justify-content:center; border:1px solid #e5e7eb; border-radius:0.75rem; color:#64748b; font-size:1.25rem; }',
-    '  .page-header p, .quickview-rail b { color:#64748b; font-size:0.625rem; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; } .page-header h1 { color:#111827; font-size:0.875rem; font-weight:800; }',
-    '  .context-control-bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 0; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; } .context-primary, .service-pills, .trend-control, .agent-switchers { display:flex; align-items:center; gap:.35rem; } .context-control-bar label, .context-label { color:#64748b; font-size:.5625rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; } .context-control-bar select, .service-pills .service-pill, .agent-switchers select { height:2.25rem; border:1px solid #e5e7eb; border-radius:.5rem; background:#f8fafc; color:#111827; padding:0 .65rem; font:inherit; font-size:.6875rem; font-weight:800; } .service-pills { padding:.25rem; border:1px solid #e5e7eb; border-radius:.5rem; } .service-pills .service-pill { display:inline-flex; align-items:center; justify-content:center; height:1.75rem; background:#fff; color:#111827; } .trend-control { padding:.35rem .55rem; border:1px solid #e5e7eb; border-radius:.5rem; } .trend-control select { border:0; background:transparent; padding:0; height:1.5rem; } .agent-switchers select:first-child { min-width:7rem; } .agent-switchers select:last-child { min-width:10rem; }',
-    '  .quickview-rail { display:grid; grid-template-columns:repeat(3,1fr); margin:1.5rem -2rem -1.5rem; border-top:1px solid #e5e7eb; } .quickview-rail > div { padding:1rem 1.25rem; border-right:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-right:0; } .quickview-rail strong, .quickview-rail small { display:block; color:#64748b; font-size:0.6875rem; } .quickview-rail b { display:block; margin-top:0.35rem; color:#111827; font-size:1.125rem; } .quickview-rail p { grid-column:1/-1; padding:0.5rem 1.25rem; border-top:1px solid #e5e7eb; color:#64748b; font-size:0.6875rem; }',
-    '  .section-tabs { position:sticky; top:0; z-index:2; display:flex; gap:2rem; margin:0 0 3rem; border-bottom:1px solid #e5e7eb; background:rgba(250,250,250,.96); } .section-tabs a { padding:0.75rem 0; border-bottom:2px solid transparent; color:#64748b; font-size:0.6875rem; font-weight:800; letter-spacing:0.06em; text-decoration:none; text-transform:uppercase; } .section-tabs a:hover, .section-tabs a:focus-visible { border-color:#111827; color:#111827; }',
-    '  .month-rail { display:flex; gap:0.375rem; overflow-x:auto; margin-bottom:1.5rem; padding-bottom:0.25rem; } .month-chip { position:relative; min-width:84px; padding:6px 8px 10px; border:1px solid transparent; border-radius:0.5rem; background:transparent; color:#64748b; text-align:left; } .month-chip.active { border-color:#e5e7eb; background:#f5f5f5; color:#111827; } .month-chip span, .month-chip strong { display:block; } .month-chip span { margin-bottom:4px; font-size:10px; font-weight:900; line-height:1; letter-spacing:0.18em; text-transform:uppercase; } .month-chip strong { font-size:16px; font-weight:900; line-height:1; letter-spacing:-0.025em; } .month-chip .month-score-indicator { position:absolute; top:8px; right:8px; width:6px; height:6px; border-radius:9999px; background:#f43f5e; } .month-chip i { position:absolute; bottom:0; left:10px; right:10px; height:3px; border-radius:9999px; background:#f3f4f6; overflow:hidden; } .month-chip i::before { content:""; display:block; width:100%; height:100%; border-radius:9999px; background:#22c55e; opacity:1; transition:opacity 160ms ease-out; } .month-chip:not(.active) { color:#6b7280; } .month-chip:not(.active):hover { color:rgba(17,24,39,0.8); } .month-chip:not(.active) i::before { opacity:0.55; } .month-chip.active i::before { opacity:1; }',
-    '  .shell-refresh { display:inline-flex; align-items:center; justify-content:center; border:1px solid #e5e7eb; border-radius:0.75rem; background:transparent; color:#111827; padding:0.55rem 0.75rem; font:inherit; font-size:0.6875rem; font-weight:700; } .shell-refresh[aria-hidden="true"] { pointer-events:none; }',
-    '  @media (max-width:640px) { .page-header { align-items:flex-start; flex-direction:column; } .profile-bar { padding:1rem; } .profile-main { width:100%; } .profile-actions { width:100%; } .quickview-rail { margin:1.25rem -1rem -1rem; grid-template-columns:1fr; } .quickview-rail > div { border-right:0; border-bottom:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-bottom:0; } .dossier-lower-row { grid-template-columns:1fr; } .dossier-ticket-column { border-right:0 !important; border-bottom:1px solid #e5e7eb !important; } .context-control-bar { justify-content:center; } .context-primary, .trend-control, .agent-switchers { width:100%; justify-content:center; } .agent-switchers select { flex:1; min-width:0 !important; } .section-tabs { gap:1rem; overflow-x:auto; } .section-tabs a { white-space:nowrap; } }',
-    '  @media print { .section-tabs { display:none; } .page-header { padding-bottom:0.5rem; } .quickview-rail { break-inside:avoid; } .month-chip { border-color:#e5e7eb; } }',
+    '  .page-header p { color:#475569; font-size:0.875rem; font-weight:700; } .quickview-rail b { color:#111827; font-size:1.125rem; }',
+    '  .context-control-bar { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1rem; padding:.75rem 0; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; } .context-primary, .service-pills, .trend-control, .agent-switchers { display:flex; align-items:center; gap:.5rem; } .context-control-bar label, .context-label, .trend-control > span, .agent-switchers label { color:#475569; font-size:.75rem; font-weight:700; } .context-control-bar select, .service-pills .service-pill, .agent-switchers select { min-height:2.75rem; border:1px solid #cbd5e1; border-radius:.75rem; background:#f8fafc; color:#111827; padding:0 .75rem; font:inherit; font-size:.875rem; font-weight:700; } .service-pills { padding:.25rem; border:1px solid #cbd5e1; border-radius:.75rem; } .service-pills .service-pill { display:inline-flex; align-items:center; justify-content:center; min-height:2.25rem; background:#fff; color:#111827; } .trend-control { flex-wrap:wrap; padding:.25rem 0; } .trend-control select { min-height:2.75rem; } .agent-switchers select { min-width:0; }',
+    '  .quickview-surface { margin-top:1rem; border-top:1px solid #e5e7eb; } .quickview-heading { padding-top:1rem; } .quickview-heading h3 { color:#111827; font-family:Outfit, Inter, sans-serif; font-size:1rem; font-weight:800; } .quickview-heading p { margin-top:.25rem; color:#475569; font-size:.875rem; } .quickview-rail { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1rem; border-top:1px solid #e5e7eb; } .quickview-rail > div { min-width:0; padding:1rem 1.25rem; border-right:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-right:0; } .quickview-rail strong, .quickview-rail small { display:block; color:#475569; font-size:0.875rem; } .quickview-rail b { display:block; margin-top:0.35rem; } .quickview-rail p { grid-column:1/-1; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; color:#475569; font-size:0.75rem; }',
+    '  .section-tabs { position:sticky; top:0; z-index:2; display:flex; gap:1.5rem; margin:0 0 2rem; border-bottom:1px solid #e5e7eb; background:#f8fafc; } .section-tabs [data-report-tab] { min-height:2.75rem; border:0; border-bottom:2px solid transparent; background:transparent; color:#475569; padding:0.75rem 0; font:inherit; font-size:0.875rem; font-weight:700; cursor:pointer; } .section-tabs [data-report-tab]:hover, .section-tabs [data-report-tab]:focus-visible, .section-tabs [data-report-tab][aria-selected="true"] { border-bottom-color:#111827; color:#111827; outline:none; }',
+    '  .month-rail-block { min-width:0; } .month-rail-legend { display:flex; align-items:center; gap:.375rem; margin-bottom:.5rem; color:#475569; font-size:.75rem; font-weight:700; } .month-rail-legend .month-score-indicator { position:static; display:inline-flex; width:1rem; height:1rem; align-items:center; justify-content:center; color:#b45309; font-size:.9rem; line-height:1; } .month-rail { display:flex; gap:0.375rem; overflow-x:auto; margin-bottom:1.5rem; padding-bottom:0.25rem; } .month-chip { position:relative; min-width:5.5rem; padding:.6rem .7rem .8rem; border:1px solid transparent; border-radius:.75rem; background:transparent; color:#475569; text-align:left; } .month-chip.active { border-color:#cbd5e1; background:#f1f5f9; color:#111827; } .month-chip .month-label, .month-chip strong, .month-chip em { display:block; } .month-chip .month-label { margin-bottom:.35rem; font-size:.75rem; font-weight:700; line-height:1.2; } .month-chip strong { font-size:1rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; } .month-chip em { position:absolute; left:3rem; bottom:.82rem; color:#475569; font-size:.75rem; font-style:normal; font-weight:700; } .month-chip .month-score-indicator { position:absolute; top:.55rem; right:.55rem; display:inline-flex; width:1.25rem; height:1.25rem; align-items:center; justify-content:center; color:#b45309; font-size:.95rem; line-height:1; } .month-chip i { position:absolute; bottom:0; left:.7rem; right:.7rem; height:.25rem; border-radius:9999px; background:#e2e8f0; overflow:hidden; } .month-chip i::before { content:""; display:block; width:100%; height:100%; border-radius:9999px; background:#059669; }',
+    '  .shell-refresh { display:inline-flex; min-height:2.75rem; align-items:center; justify-content:center; border:1px solid #e5e7eb; border-radius:0.75rem; background:transparent; color:#111827; padding:0.55rem 0.75rem; font:inherit; font-size:0.875rem; font-weight:700; } .shell-refresh[aria-hidden="true"] { pointer-events:none; }',
+    '  @media (max-width:640px) { .page-header { align-items:flex-start; flex-direction:column; } .profile-bar { padding:1rem; } .profile-main { width:100%; } .profile-actions { width:100%; } .quickview-rail { grid-template-columns:1fr; } .quickview-rail > div { border-right:0; border-bottom:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-bottom:0; } .dossier-lower-row { grid-template-columns:1fr; } .dossier-ticket-column { border-right:0 !important; border-bottom:1px solid #e5e7eb !important; } .context-control-bar, .context-primary, .trend-control, .agent-switchers { align-items:stretch; flex-direction:column; width:100%; } .context-primary > *, .trend-control > *, .agent-switchers > * { width:100%; } .agent-switchers select { min-width:0 !important; } .section-tabs { gap:1rem; overflow-x:auto; } .section-tabs [data-report-tab] { white-space:nowrap; } }',
+    '  @media print { .section-tabs { display:none; } .page-header { padding-bottom:0.5rem; } .quickview-rail { break-inside:avoid; } .month-chip { border-color:#e5e7eb; } [data-report-panel][hidden] { display:block !important; } }',
     '</style>',
     '</head>',
     '<body>',
@@ -1202,12 +1220,13 @@ export function generateHTML(
     profileHtml,
     liveContextHtml,
     '',
-    '<section class="report-section" data-report-section="performance" id="section-summary">',
+    '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-summary" data-report-section="performance" data-report-panel="summary" id="section-summary">',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>',
     '<div><h2>Ringkasan Skor Bulanan</h2><p>Tahun ' + yearText(selectedYear) + ' &bull; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>',
     '</div>',
-    '<div class="card">',
+    '<div class="card summary-card">',
+    '  ' + quickviewHtml,
     '  ' + monthRailHtml,
     '  ' + summaryEmptyHtml,
     '  ' + dossierHtml,
@@ -1216,9 +1235,8 @@ export function generateHTML(
     '',
     trendHtml,
     '',
-    comparisonHtml,
     '',
-    '<section class="report-section" data-report-section="findings" id="section-temuan">',
+    '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-temuan" data-report-section="findings" data-report-panel="temuan" id="section-temuan"' + (variant === "interactive" ? " hidden" : "") + '>',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>',
     '<div><h2>Riwayat Temuan</h2><p>Temuan dikelompokkan per bulan penilaian</p></div>',
@@ -1228,7 +1246,7 @@ export function generateHTML(
     '</div>',
     '</section>',
     '',
-    '<div style="text-align:center;padding-top:1rem;font-size:0.6875rem;color:#9ca3af;">',
+    '<div style="text-align:center;padding-top:1rem;font-size:0.75rem;color:#64748b;">',
     '  <p>Laporan Audit SIDAK &mdash; Dihasilkan pada ' + escHtml(dateStr) + '</p>',
     '</div>',
     '',

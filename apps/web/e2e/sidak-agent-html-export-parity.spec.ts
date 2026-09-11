@@ -47,10 +47,16 @@ const authProfile = {
   is_deleted: false,
 };
 
+const VISUAL_AGENT_NAME = "Nadia Puspitasari dengan Nama Agen Sangat Panjang <Audit>";
+const LONG_FINDING_TEXT =
+  "Uraian temuan yang panjang untuk memastikan teks ketidaksesuaian membungkus dengan baik pada layar sempit tanpa terpotong.";
+const LONG_RECOMMENDATION_TEXT =
+  "Lengkapi validasi informasi, dokumentasikan langkah perbaikan, dan pastikan konfirmasi diberikan sebelum tiket ditutup.";
+
 const agentFixture: AgentDetailData = {
   peserta: {
     id: "agent-1",
-    nama: "Nadia <Audit>",
+    nama: VISUAL_AGENT_NAME,
     tim: "Tim Email",
     batch_name: "Batch 7",
     jabatan: "Agent",
@@ -110,8 +116,8 @@ const agentFixture: AgentDetailData = {
       service_type: "call",
       no_tiket: "T-099",
       nilai: 2,
-      ketidaksesuaian: "Jawaban kurang detail",
-      sebaiknya: "Lengkapi informasi sebelum penutupan",
+      ketidaksesuaian: LONG_FINDING_TEXT,
+      sebaiknya: LONG_RECOMMENDATION_TEXT,
       tahun: 2026,
       qa_indicators: {
         id: "11111111-1111-1111-1111-111111111111",
@@ -136,8 +142,8 @@ const agentFixture: AgentDetailData = {
       service_type: "call",
       no_tiket: "T-100",
       nilai: 1,
-      ketidaksesuaian: "Data jawaban masih kurang akurat",
-      sebaiknya: "Validasi jawaban sebelum dikirim",
+      ketidaksesuaian: LONG_FINDING_TEXT,
+      sebaiknya: LONG_RECOMMENDATION_TEXT,
       tahun: 2026,
       qa_indicators: {
         id: "11111111-1111-1111-1111-111111111111",
@@ -215,7 +221,7 @@ const agentFixture: AgentDetailData = {
       criticalFindingsCount: 1,
       averageNilai: 1.5,
       matchedKeywords: ["akurasi"],
-      recommendation: "Validasi jawaban sebelum dikirim.",
+      recommendation: LONG_RECOMMENDATION_TEXT,
       evidence: [
         {
           id: "evidence-1",
@@ -241,6 +247,63 @@ const agentFixture: AgentDetailData = {
     } as RootCauseResult,
   ],
 };
+
+const VISUAL_MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
+agentFixture.periodSummaries = VISUAL_MONTH_LABELS.map((_, index) => {
+  const month = index + 1;
+  const score = 80 + month;
+  return {
+    id: `period-${String(month).padStart(2, "0")}`,
+    month,
+    year: 2026,
+    label: `${String(month).padStart(2, "0")}/2026`,
+    serviceType: "call",
+    finalScore: score,
+    nonCriticalScore: score + 1,
+    criticalScore: score - 1,
+    sessionCount: 4,
+    findingsCount: month % 4,
+  };
+});
+agentFixture.scoreHistory = agentFixture.periodSummaries.map((period) => ({
+  month: period.month,
+  year: period.year,
+  finalScore: period.finalScore,
+  nonCriticalScore: period.nonCriticalScore,
+  criticalScore: period.criticalScore,
+  sessionCount: period.sessionCount,
+  service_type: "call",
+}));
+agentFixture.personalTrend = {
+  labels: VISUAL_MONTH_LABELS,
+  datasets: [
+    {
+      label: "Total Temuan",
+      data: [12, 11, 10, 9, 8, 7, 6, 6, 5, 4, 3, 2],
+      isTotal: true,
+    },
+    {
+      label: "Akurasi",
+      data: [4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 1, 0],
+      isTotal: false,
+    },
+  ],
+};
+agentFixture.comparisonTable.scope.endMonth = 12;
 
 const quickviewFixture: SidakAgentQuickviewResponse = {
   context: {
@@ -278,7 +341,7 @@ const quickviewFixture: SidakAgentQuickviewResponse = {
 
 const foldersFixture = [{ id: "folder-tim-email", name: "Tim Email", parent_id: null }];
 const folderAgentsFixture = [
-  { id: "agent-1", nama: "Nadia <Audit>" },
+  { id: "agent-1", nama: VISUAL_AGENT_NAME },
   { id: "agent-2", nama: "Rama Audit" },
 ];
 
@@ -338,9 +401,9 @@ async function prepareArtifacts() {
 
 function buildExportContext() {
   return {
-    selectedMonth: 5,
+    selectedMonth: 12,
     trendStartMonth: 1,
-    trendEndMonth: 5,
+    trendEndMonth: 12,
     quickview: quickviewFixture,
     isStaff: true,
   };
@@ -367,33 +430,94 @@ async function captureViewport(page: Page, width: number, height: number, fileNa
 test.describe.configure({ mode: "serial" });
 
 test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const chartWarnings: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (
+      message.type() === "warning" &&
+      /Recharts|chart should be greater than 0/i.test(message.text())
+    ) {
+      chartWarnings.push(message.text());
+    }
+  });
+
   await prepareArtifacts();
   await mockSupabase(page);
   await mockSidakApi(page);
 
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      pageErrors.push(`console.error: ${message.text()}`);
+    }
+  });
+
   await page.goto("/sidak/agents/agent-1");
 
-  await expect(page.getByRole("heading", { name: "Nadia <Audit>", level: 1 })).toBeVisible();
-  await expect(page.getByText("Analisis Performa Bulanan")).toBeVisible();
-  await expect(page.getByText("Riwayat Temuan Detil")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Nadia Puspitasari dengan Nama Agen Sangat Panjang/, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quickview performa", level: 3 })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Ringkasan" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Tren" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Temuan" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Simulasi" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Grafik Tren" }).click();
-  await page.getByRole("button", { name: "Daftar Temuan" }).click();
+  await page.getByRole("tab", { name: "Tren" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Tren" })).toBeVisible();
+  const trendEndSelect = page.getByRole("combobox", { name: "Bulan akhir tren" });
+  await trendEndSelect.click();
+  await page.getByRole("option", { name: "Mei" }).click();
+  await expect(trendEndSelect).toContainText("Mei");
+
+  await page.getByRole("tab", { name: "Temuan" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Temuan" })).toBeVisible();
+  await page.getByRole("button", { name: /Mei 2026/ }).click();
+  await expect(page.getByText(LONG_FINDING_TEXT)).toBeVisible();
+  await captureViewport(page, 390, 1800, "live-route-temuan-390.png");
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(300);
 
-  await page.locator('select').first().selectOption("2026");
-  const selects = page.locator('select');
-  await selects.nth(2).selectOption("5");
+  const yearSelect = page.getByRole("combobox", { name: "Tahun audit" });
+  await yearSelect.click();
+  await page.getByRole("option", { name: "2026", exact: true }).click();
   await page.waitForTimeout(500);
   await resetScrollState(page);
-  await expect(page.getByText("SIDAK PERSONAL AUDIT")).toBeVisible();
+  await page.getByRole("tab", { name: "Ringkasan" }).click();
+  await expect(page.getByRole("heading", { name: "Ringkasan skor", level: 2 })).toBeVisible();
   await expect(page.getByRole("region", { name: "Quickview performa agent" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "UNDUH LAPORAN" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "INPUT AUDIT" })).toBeVisible();
-  await expect(page.getByText("0 Tiket")).toBeVisible();
-  await captureViewport(page, 1440, 1800, "live-route-1440.png");
-  await captureViewport(page, 390, 1800, "live-route-390.png");
+  await expect(page.getByRole("button", { name: "Unduh Laporan" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Input Audit" })).toBeVisible();
+  await expect(page.getByText("Tiket Pengurang Skor Terbesar")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pilih bulan/ })).toHaveCount(12);
+  await expect(page.getByText("QA di bawah target 95%")).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Skor QA di bawah target 95 persen" }),
+  ).toHaveCount(12);
+
+  for (const width of [320, 390, 768, 1024, 1440]) {
+    await captureViewport(page, width, 1800, `live-route-light-${width}.png`);
+    const horizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+  }
+
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await captureViewport(page, 320, 1800, "live-route-dark-320.png");
+  await captureViewport(page, 1440, 1800, "live-route-dark-1440.png");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).resolves.toBe(true);
+  await captureViewport(page, 390, 1800, "live-route-reduced-motion-390.png");
+
+  await page.evaluate(() => {
+    document.body.style.zoom = "2";
+  });
+  await captureViewport(page, 1440, 1800, "live-route-zoom-200-1440.png");
+  await page.evaluate(() => {
+    document.body.style.zoom = "";
+    document.documentElement.classList.remove("dark");
+  });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 
   const staticHtml = generateHTML(
     agentFixture,
@@ -406,8 +530,8 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
         indicatorName: "Akurasi",
         category: "critical",
         nilai: 2,
-        ketidaksesuaian: "Jawaban kurang detail",
-        sebaiknya: "Lengkapi informasi sebelum penutupan",
+        ketidaksesuaian: LONG_FINDING_TEXT,
+        sebaiknya: LONG_RECOMMENDATION_TEXT,
         no_tiket: "T-099",
       },
       {
@@ -417,8 +541,8 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
         indicatorName: "Akurasi",
         category: "critical",
         nilai: 1,
-        ketidaksesuaian: "Data jawaban masih kurang akurat",
-        sebaiknya: "Validasi jawaban sebelum dikirim",
+        ketidaksesuaian: LONG_FINDING_TEXT,
+        sebaiknya: LONG_RECOMMENDATION_TEXT,
         no_tiket: "T-100",
       },
     ],
@@ -441,8 +565,8 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
         indicatorName: "Akurasi",
         category: "critical",
         nilai: 2,
-        ketidaksesuaian: "Jawaban kurang detail",
-        sebaiknya: "Lengkapi informasi sebelum penutupan",
+        ketidaksesuaian: LONG_FINDING_TEXT,
+        sebaiknya: LONG_RECOMMENDATION_TEXT,
         no_tiket: "T-099",
       },
       {
@@ -452,8 +576,8 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
         indicatorName: "Akurasi",
         category: "critical",
         nilai: 1,
-        ketidaksesuaian: "Data jawaban masih kurang akurat",
-        sebaiknya: "Validasi jawaban sebelum dikirim",
+        ketidaksesuaian: LONG_FINDING_TEXT,
+        sebaiknya: LONG_RECOMMENDATION_TEXT,
         no_tiket: "T-100",
       },
     ],
@@ -472,20 +596,24 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
   await resetScrollState(page);
   await expect(page.locator(".profile-actions")).toHaveCount(1);
   await expect(page.locator(".shell-actions")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Nadia <Audit>", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Nadia Puspitasari dengan Nama Agen Sangat Panjang/, level: 1 })).toBeVisible();
   await expect(page.getByText("0 Tiket")).toBeVisible();
   await captureViewport(page, 1440, 1800, "static-1440.png");
   await captureViewport(page, 390, 1800, "static-390.png");
 
   await page.setContent(interactiveHtml, { waitUntil: "load" });
   await resetScrollState(page);
-  await expect(page.getByRole("heading", { name: "Nadia <Audit>", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Nadia Puspitasari dengan Nama Agen Sangat Panjang/, level: 1 })).toBeVisible();
   await expect(page.getByText("0 Tiket")).toBeVisible();
   await captureViewport(page, 1440, 1800, "interactive-1440.png");
   await captureViewport(page, 390, 1800, "interactive-390.png");
 
+  await page.getByRole("tab", { name: "Tren" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Tren" })).toBeVisible();
   await page.getByRole("button", { name: "Total Temuan" }).click();
   await page.getByRole("button", { name: "Akurasi" }).click();
+  await page.getByRole("tab", { name: "Temuan" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Temuan" })).toBeVisible();
   const findingsDisclosure = page.locator('details.findings-period').first();
   await findingsDisclosure.locator('summary').click();
   await page.waitForTimeout(250);
@@ -495,4 +623,6 @@ test("captures live SIDAK agent detail plus same-fixture export HTML", async ({ 
 
   await expect(page.locator('[data-trend-filter="series-1"][aria-pressed="true"]')).toHaveCount(1);
   await expect(page.locator('details.findings-period[open]')).toHaveCount(1);
+  expect(pageErrors).toEqual([]);
+  expect(chartWarnings).toEqual([]);
 });

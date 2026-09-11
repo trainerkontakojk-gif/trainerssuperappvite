@@ -12,7 +12,7 @@ Setiap *engineer* atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat mel
 
 **Product UI (Dashboard/App)** — Bukan brand landing page. Design **melayani fungsi**, bukan sebaliknya. Prioritas: readability, data density, task completion speed.
 
-**Stack:** React + Vite + TypeScript · Tailwind CSS v4 · shadcn/ui (Radix primitives) · Lucide React · framer-motion · Monorepo pnpm + Turborepo.
+**Stack:** React + Vite + TypeScript · Tailwind CSS v4 · shadcn/ui (Base UI primitives) · Lucide React · framer-motion · Monorepo pnpm + Turborepo.
 
 **Design Principles:**
 1. **Data-first** — Tabel, kartu statistik, dan grafik adalah elemen utama. Setiap pixel harus membantu user memahami data lebih cepat.

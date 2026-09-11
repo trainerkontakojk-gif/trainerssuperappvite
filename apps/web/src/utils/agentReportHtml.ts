@@ -184,19 +184,22 @@ export function buildTrendReportHtml(
   data: AgentDetailData,
   variant: AgentHtmlVariant,
   selectedYear: number,
+  comparisonHtml = "",
 ): string {
   const { labels, series } = normalizeTrend(data);
   const trendRangeLabel = labels.length > 0
     ? labels[0] + " - " + labels[labels.length - 1]
     : "";
+  const panelState = variant === "interactive" ? " hidden" : "";
   if (labels.length === 0 || series.length === 0) {
     return [
-      '<section class="report-section">',
+      '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-trend" data-report-section="trend" data-report-panel="trend"' + panelState + '>',
       '<div class="report-section-heading">',
       '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></span>',
       '<div><h2>Perkembangan Skor</h2><p>Skor per periode penilaian</p></div>',
       "</div>",
       '<div class="card"><p class="empty-state">Data tren belum tersedia untuk konteks ini.</p></div>',
+      comparisonHtml,
       "</section>",
     ].join("");
   }
@@ -303,7 +306,7 @@ export function buildTrendReportHtml(
   const controls = buildFilterControls(series, variant);
 
   return [
-    '<section class="report-section" data-report-section="trend">',
+    '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-trend" data-report-section="trend" data-report-panel="trend"' + panelState + '>',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></span>',
     '<div><h2>Perkembangan Skor</h2><p>Periode: ' +
@@ -334,6 +337,7 @@ export function buildTrendReportHtml(
       labels.length + '</strong><small>periode aktif</small></div>',
     '<div class="trend-insight"><span>Ringkasan Tren</span><p>Gunakan pola naik-turun setiap parameter untuk menentukan fokus coaching pada periode berikutnya.</p></div>',
     "</div>",
+    comparisonHtml,
     "</div>",
     "</section>",
   ].join("");
@@ -350,6 +354,24 @@ export function buildInteractiveReportScript(
   if (!report) return;
   const buttons = Array.from(report.querySelectorAll('[data-trend-filter]'));
   const series = Array.from(report.querySelectorAll('[data-chart-series]'));
+  const tabs = Array.from(report.querySelectorAll('[data-report-tab]'));
+  const panels = Array.from(report.querySelectorAll('[data-report-panel]'));
+  const applyTab = (tab) => {
+    tabs.forEach((button) => {
+      const active = button.getAttribute('data-report-tab') === tab;
+      button.setAttribute(
+        'aria-selected',
+        String(active),
+      );
+      if (button.tagName === 'BUTTON') button.setAttribute('tabindex', active ? '0' : '-1');
+    });
+    panels.forEach((panel) => {
+      panel.toggleAttribute(
+        'hidden',
+        panel.getAttribute('data-report-panel') !== tab,
+      );
+    });
+  };
   const applyFilter = (filter) => {
     series.forEach((node) => {
       const isTotal = node.getAttribute('data-series-total') === 'true';
@@ -375,6 +397,30 @@ export function buildInteractiveReportScript(
       applyFilter(current || filter === 'summary' ? null : filter);
     });
   });
+  tabs.forEach((button) => {
+    button.addEventListener('click', () => {
+      applyTab(button.getAttribute('data-report-tab') || 'summary');
+    });
+  });
+  tabs.forEach((button, index) => {
+    if (button.tagName !== 'BUTTON') return;
+    button.addEventListener('keydown', (event) => {
+      const key = event.key;
+      if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(key)) return;
+      event.preventDefault();
+      const nextIndex = key === 'Home'
+        ? 0
+        : key === 'End'
+          ? tabs.length - 1
+          : (index + (key === 'ArrowRight' || key === 'ArrowDown' ? 1 : -1) + tabs.length) % tabs.length;
+      const next = tabs[nextIndex];
+      if (next && next.tagName === 'BUTTON') {
+        next.focus();
+        applyTab(next.getAttribute('data-report-tab') || 'summary');
+      }
+    });
+  });
+  applyTab('summary');
   applyFilter(null);
 })();
 </script>`;

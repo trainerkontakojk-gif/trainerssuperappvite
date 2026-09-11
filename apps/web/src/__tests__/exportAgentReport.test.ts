@@ -566,6 +566,54 @@ describe("generateHTML", () => {
     expect(html).not.toContain("<script src=");
   });
 
+  it("renders three audit tabs with Ringkasan active and excludes simulations", () => {
+    const html = generateHTML(
+      sampleData(),
+      sampleSummaries,
+      sampleTemuan,
+      sampleTickets,
+      sampleRootCauses,
+      2026,
+      "call",
+      "interactive",
+    );
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+
+    expect(parsed.querySelectorAll("[data-report-tab]")).toHaveLength(3);
+    expect(
+      parsed.querySelector('[data-report-tab="summary"]')?.getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("true");
+    expect(parsed.querySelector('[data-report-panel="summary"]')).not.toBeNull();
+    expect(
+      parsed.querySelector('[data-report-panel="trend"]')?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(
+      parsed.querySelector('[data-report-panel="temuan"]')?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(html).not.toContain("Riwayat Simulasi");
+  });
+
+  it("keeps every audit panel readable in the static export", () => {
+    const html = generateHTML(
+      sampleData(),
+      sampleSummaries,
+      sampleTemuan,
+      sampleTickets,
+      sampleRootCauses,
+      2026,
+      "call",
+      "static",
+    );
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+
+    expect(parsed.querySelectorAll("[data-report-tab]")).toHaveLength(3);
+    expect(parsed.querySelectorAll("[data-report-panel]")).toHaveLength(3);
+    expect(parsed.querySelectorAll("[data-report-panel][hidden]")).toHaveLength(0);
+    expect(html).not.toContain("Riwayat Simulasi");
+  });
+
   it("changes SVG and legend visibility when an interactive parameter is clicked", () => {
     const html = generateHTML(
       sampleData({
@@ -1384,7 +1432,7 @@ describe("generateHTML", () => {
     expect(html).not.toContain("Input Audit");
   });
 
-  it("matches the live MonthRail first-paint chip treatment", () => {
+  it("uses readable MonthRail chip labels and contrast", () => {
     const html = generateHTML(
       sampleData(),
       sampleSummaries,
@@ -1398,12 +1446,13 @@ describe("generateHTML", () => {
         selectedMonth: 5,
       },
     );
-    expect(html).toContain("min-width:84px");
-    expect(html).toContain("padding:6px 8px 10px");
-    expect(html).toContain("font-size:10px");
-    expect(html).toContain("font-size:16px");
-    expect(html).toContain("height:3px");
+    expect(html).toContain("min-width:5.5rem");
+    expect(html).toContain("font-size:.75rem");
+    expect(html).toContain("font-size:1rem");
+    expect(html).toContain("height:.25rem");
     expect(html).toContain("month-score-indicator");
+    expect(html).toContain("month-rail-legend");
+    expect(html).toContain("QA di bawah target 95%");
   });
 
   it("preserves the live connected surfaces and chart semantics", () => {
@@ -1514,16 +1563,15 @@ describe("generateHTML", () => {
       expect(parsed.querySelectorAll(".shell-actions")).toHaveLength(0);
       expect(parsed.querySelectorAll(".profile-actions")).toHaveLength(1);
       expect(parsed.querySelectorAll(".section-tabs")).toHaveLength(1);
-      expect(
-        parsed.querySelectorAll(".profile-bar > .quickview-rail"),
-      ).toHaveLength(1);
-      expect(
-        parsed.querySelector(".profile-bar > .quickview-rail[role='region']"),
-      ).not.toBeNull();
+      expect(parsed.querySelectorAll(".profile-bar > .quickview-rail")).toHaveLength(0);
+      expect(parsed.querySelectorAll(".summary-card .quickview-rail[role='region']")).toHaveLength(1);
       expect(html).toContain("SIDAK · Profil Agen");
-      expect(html).toContain("Ringkasan Skor");
-      expect(html).toContain("Grafik Tren");
-      expect(html).toContain("Daftar Temuan");
+      expect(html).toContain('data-report-tab="summary"');
+      expect(html).toContain('data-report-tab="trend"');
+      expect(html).toContain('data-report-tab="temuan"');
+      expect(html).toContain("Ringkasan");
+      expect(html).toContain("Tren");
+      expect(html).toContain("Temuan");
       expect(html).toContain("Tim Gabungan");
       expect(html).toContain("Mei");
       expect(html.indexOf("SIDAK · Profil Agen")).toBeLessThan(

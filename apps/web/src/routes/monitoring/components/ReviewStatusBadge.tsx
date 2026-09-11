@@ -1,49 +1,44 @@
-import { CheckCircle2, Loader2, XCircle, MinusCircle } from "lucide-react";
+import { CheckCircle2, Loader2, MinusCircle, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { ReviewStatus } from "../utils/formatting";
+
+const baseClassName =
+  "h-auto gap-1 rounded-full bg-muted px-2 py-1 text-xs font-bold uppercase tracking-[0.08em]";
 
 export function ReviewStatusBadge({ status }: { status: ReviewStatus }) {
   switch (status) {
     case "completed":
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] bg-muted text-muted-foreground border border-border">
-          <CheckCircle2
-            size={10}
-            aria-hidden="true"
-            style={{ color: "var(--chart-green)" }}
-          />
+        <Badge variant="outline" className={baseClassName}>
+          <CheckCircle2 className="size-3" aria-hidden="true" style={{ color: "var(--chart-green)" }} />
           <span style={{ color: "var(--chart-green)" }}>Selesai</span>
-        </span>
+        </Badge>
       );
     case "processing":
     case "pending":
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] bg-muted text-muted-foreground border border-border animate-pulse motion-reduce:animate-none">
+        <Badge variant="outline" className={`${baseClassName} animate-pulse motion-reduce:animate-none`}>
           <Loader2
-            size={10}
+            className="size-3 animate-spin motion-reduce:animate-none"
             aria-hidden="true"
-            className="animate-spin motion-reduce:animate-none"
             style={{ color: "var(--chart-amber)" }}
           />
           <span style={{ color: "var(--chart-amber)" }}>Memproses</span>
-        </span>
+        </Badge>
       );
     case "failed":
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] bg-muted text-muted-foreground border border-border">
-          <XCircle
-            size={10}
-            aria-hidden="true"
-            style={{ color: "var(--chart-red)" }}
-          />
+        <Badge variant="outline" className={baseClassName}>
+          <XCircle className="size-3" aria-hidden="true" style={{ color: "var(--chart-red)" }} />
           <span style={{ color: "var(--chart-red)" }}>Gagal</span>
-        </span>
+        </Badge>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] bg-muted text-muted-foreground border border-border">
-          <MinusCircle size={10} aria-hidden="true" />
+        <Badge variant="outline" className={baseClassName}>
+          <MinusCircle className="size-3" aria-hidden="true" />
           Belum Dinilai
-        </span>
+        </Badge>
       );
   }
 }

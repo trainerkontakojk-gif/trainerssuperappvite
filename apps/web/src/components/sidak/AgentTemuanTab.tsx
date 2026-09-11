@@ -1,9 +1,31 @@
 import { useState } from "react";
-import { 
-  BarChart2, ShieldCheck, Pencil, Trash2, Loader2, 
-  AlertCircle, ChevronDown, ChevronUp, Ticket 
+import {
+  AlertCircle,
+  BarChart2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Pencil,
+  ShieldCheck,
+  Ticket,
+  Trash2,
 } from "lucide-react";
-import { titleize } from "../../lib/humanize";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TemuanItem {
   id: string;
@@ -26,192 +48,282 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-function NilaiBadge({ nilai }: { nilai: number }) {
-  const variants: Record<0 | 1 | 2 | 3, { bg: string; text: string; label: string }> = {
-    3: { bg: 'bg-emerald-500', text: 'text-emerald-500', label: 'SESUAI' },
-    2: { bg: 'bg-blue-500',    text: 'text-blue-500',    label: 'PERBAIKAN' },
-    1: { bg: 'bg-amber-500',   text: 'text-amber-500',   label: 'TIDAK SESUAI' },
-    0: { bg: 'bg-rose-500',    text: 'text-rose-500',    label: 'KRITIS' }
-  };
-  const v = variants[nilai as 0 | 1 | 2 | 3] ?? variants[0];
-  
-  return (
-    <div className="flex flex-col items-center gap-1 shrink-0">
-      <div className={`w-10 h-10 rounded-xl ${v.bg} flex items-center justify-center text-white text-lg font-black shadow-sm`}>
-        {nilai}
-      </div>
-      <span className={`text-[7px] font-black tracking-widest ${v.text}`}>{v.label}</span>
-    </div>
-  );
-}
+const MONTHS_FULL = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
-const MONTHS_FULL = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
-
-export default function AgentTemuanTab({ items, loading, deletingId, canEdit, onEdit, onDelete }: Props) {
+export default function AgentTemuanTab({
+  items,
+  loading = false,
+  deletingId,
+  canEdit = false,
+  onEdit,
+  onDelete,
+}: Props) {
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
 
   if (items.length === 0) {
+    if (loading) {
+      return (
+        <Card className="border-border bg-surface ring-0">
+          <CardContent
+            role="status"
+            aria-label="Memuat temuan"
+            className="flex flex-col gap-3 p-6"
+          >
+            <Skeleton className="h-5 w-40 motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-full max-w-md motion-reduce:animate-none" />
+          </CardContent>
+        </Card>
+      );
+    }
+
     return (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-16 text-center shadow-sm">
-        <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-5 text-slate-300">
-          <Ticket className="w-8 h-8" />
-        </div>
-        <h4 className="text-lg font-black text-slate-400 tracking-tight">Belum ada temuan</h4>
-        <p className="text-sm text-slate-500 mt-2">Belum ada temuan untuk layanan atau tahun yang dipilih.</p>
-      </div>
+      <Card className="border-border bg-surface ring-0">
+        <Empty className="border-0 p-8 sm:p-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon" className="size-12 rounded-xl bg-muted text-muted-foreground">
+              <Ticket className="size-6" aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle className="text-lg font-bold">Belum ada temuan</EmptyTitle>
+            <EmptyDescription>
+              Belum ada temuan untuk layanan atau tahun yang dipilih.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </Card>
     );
   }
 
   const grouped = items.reduce<Record<string, TemuanItem[]>>((acc, item) => {
-    const key = `${item.month}-${item.year}`;
+    const key = item.month + "-" + item.year;
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
     return acc;
   }, {});
 
   const sortedKeys = Object.keys(grouped).sort((a, b) => {
-    const [ma, ya] = a.split("-").map(Number);
-    const [mb, yb] = b.split("-").map(Number);
-    return yb - ya || mb - ma;
+    const [monthA, yearA] = a.split("-").map(Number);
+    const [monthB, yearB] = b.split("-").map(Number);
+    return yearB - yearA || monthB - monthA;
   });
 
-  const toggleMonth = (key: string) => {
-    setOpenMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+  const toggleMonth = (key: string, open?: boolean) => {
+    setOpenMonths((current) => {
+      const next = new Set(current);
+      const shouldOpen = open ?? !next.has(key);
+      if (shouldOpen) next.add(key);
+      else next.delete(key);
       return next;
     });
   };
 
   return (
-    <div className={`space-y-4 transition-opacity duration-300 ${loading ? 'opacity-50 pointer-events-none' : ''}`}>
-      {sortedKeys.map((key) => {
-        const [month, year] = key.split("-").map(Number);
-        const monthItems = grouped[key];
-        const isOpen = openMonths.has(key);
+    <Card className="border-border bg-surface py-0 ring-0" aria-busy={loading}>
+      <CardContent className="flex flex-col gap-4 p-4 sm:p-6">
+        {loading ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Memuat pembaruan temuan…
+          </p>
+        ) : null}
+        {sortedKeys.map((key) => {
+          const [month, year] = key.split("-").map(Number);
+          const monthItems = grouped[key];
+          const isOpen = openMonths.has(key);
+          const panelId = "temuan-month-panel-" + key;
+          const headingId = "temuan-month-heading-" + key;
+          const tickets: Record<string, { label: string; items: TemuanItem[] }> = {};
 
-        const tickets: Record<string, { label: string; items: TemuanItem[] }> = {};
-        monthItems.forEach(t => {
-          const rawTicket = (t.no_tiket ?? '').trim();
-          const ticketKey = rawTicket ? rawTicket.toUpperCase() : `audit-${t.id}`;
-          if (!tickets[ticketKey]) {
-            tickets[ticketKey] = {
-              label: rawTicket ? rawTicket.toUpperCase() : 'AUDIT INTERNAL',
-              items: []
-            };
-          }
-          tickets[ticketKey].items.push(t);
-        });
+          monthItems.forEach((item) => {
+            const rawTicket = (item.no_tiket ?? "").trim();
+            const ticketKey = rawTicket ? rawTicket.toUpperCase() : "audit-" + item.id;
+            if (!tickets[ticketKey]) {
+              tickets[ticketKey] = {
+                label: rawTicket ? rawTicket.toUpperCase() : "AUDIT INTERNAL",
+                items: [],
+              };
+            }
+            tickets[ticketKey].items.push(item);
+          });
 
-        const monthLabel = `${MONTHS_FULL[month - 1]} ${year}`;
+          const monthLabel = MONTHS_FULL[month - 1] + " " + year;
 
-        return (
-          <div key={key} className="border-b border-border pb-4 mb-4 last:border-0 last:mb-0 last:pb-0">
-            <button
-              type="button"
-              onClick={() => toggleMonth(key)}
-              className="w-full px-4 py-4 rounded-2xl flex items-center justify-between group transition-all hover:bg-muted/40"
+          return (
+            <Collapsible
+              key={key}
+              open={isOpen}
+              onOpenChange={(open) => toggleMonth(key, open)}
+              className="border-b border-border pb-4 last:border-0 last:pb-0"
             >
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-transparent text-muted-foreground transition-colors group-hover:border-primary/30 group-hover:text-primary">
-                  <BarChart2 className="h-4 w-4" />
-                </div>
-                <div className="text-left">
-                  <h4 className="text-base font-black tracking-tight text-foreground transition-colors">{titleize(monthLabel)}</h4>
-                  <p className="text-[10px] font-bold text-muted-foreground tracking-widest">{monthItems.length} temuan · {Object.keys(tickets).length} tiket</p>
-                </div>
-              </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition-colors group-hover:bg-background">
-                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-              </div>
-            </button>
+              <section aria-labelledby={headingId}>
+                <CollapsibleTrigger
+                  render={
+                    <Button
+                      id={headingId}
+                      variant="ghost"
+                      size="lg"
+                      className="h-auto min-h-11 w-full justify-between rounded-xl px-3 py-3 text-left hover:bg-muted/40"
+                      aria-controls={panelId}
+                    />
+                  }
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+                      <BarChart2 className="size-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block break-words text-base font-bold text-foreground">
+                        {monthLabel}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {monthItems.length} temuan · {Object.keys(tickets).length} tiket
+                      </span>
+                    </span>
+                  </span>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground">
+                    {isOpen ? (
+                      <ChevronUp className="size-5" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown className="size-5" aria-hidden="true" />
+                    )}
+                  </span>
+                </CollapsibleTrigger>
 
-            {isOpen && (
-              <div className="space-y-8 pt-4">
-                {Object.entries(tickets).map(([ticketKey, ticket], ticketIndex) => (
-                  <div key={ticketKey} className="space-y-6">
-                    <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black italic text-muted-foreground/40 w-6">#{ticketIndex + 1}</span>
-                        <Ticket className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-muted-foreground/60 tracking-[0.18em]">No. Tiket</span>
-                          <span className="text-[11px] font-black font-mono text-foreground tracking-wider">
-                            {ticket.label}
+                <CollapsibleContent
+                  id={panelId}
+                  className="flex flex-col gap-6 px-2 pt-4 sm:px-4"
+                >
+                  {Object.entries(tickets).map(([ticketKey, ticket], ticketIndex) => (
+                    <section key={ticketKey} className="flex flex-col gap-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="w-6 shrink-0 text-sm font-semibold text-muted-foreground">
+                            #{ticketIndex + 1}
+                          </span>
+                          <Ticket className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold text-muted-foreground">
+                              No. Tiket
+                            </span>
+                            <span className="mt-0.5 block break-words font-mono text-sm font-bold text-foreground">
+                              {ticket.label}
+                            </span>
                           </span>
                         </div>
+                        <span className="text-xs text-muted-foreground">
+                          {ticket.items.length} parameter
+                        </span>
                       </div>
-                      <span className="text-[9px] font-black text-muted-foreground tracking-[0.2em]">{ticket.items.length} parameter</span>
-                    </div>
 
-                    <div className="space-y-8 pl-9">
-                      {ticket.items.map((t) => {
-                        const isCritical = t.category === 'critical';
-                        
-                        return (
-                          <div key={t.id} className="flex gap-6 items-start relative group/item">
-                            <div className="flex flex-col items-center gap-1 shrink-0 w-12 pt-1">
-                              <span className="text-xl font-black text-foreground">{t.nilai}</span>
-                              <span className="text-[8px] font-bold text-muted-foreground tracking-widest">Poin</span>
-                            </div>
-                            
-                            <div className="flex-1 min-w-0 space-y-4">
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black tracking-widest ${isCritical ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
+                      <div className="flex flex-col gap-6">
+                        {ticket.items.map((item) => {
+                          const isCritical = item.category === "critical";
+                          return (
+                            <article key={item.id} className="flex min-w-0 items-start gap-4">
+                              <div className="flex w-12 shrink-0 flex-col items-center gap-1 pt-1">
+                                <span className="text-xl font-bold leading-none tabular-nums text-foreground">
+                                  {item.nilai}
+                                </span>
+                                <span className="text-xs font-semibold text-muted-foreground">
+                                  Poin
+                                </span>
+                              </div>
+
+                              <div className="flex min-w-0 flex-1 flex-col gap-4">
+                                <div className="flex min-w-0 items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        isCritical
+                                          ? "h-auto rounded-lg border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300"
+                                          : "h-auto rounded-lg border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                                      }
+                                    >
                                       {isCritical ? "Kritis" : "Non-kritis"}
-                                    </span>
+                                    </Badge>
+                                    <h5 className="mt-2 break-words text-base font-bold leading-snug text-foreground">
+                                      {item.indicatorName}
+                                    </h5>
                                   </div>
-                                  <h5 className="text-base font-black text-foreground leading-snug">{t.indicatorName}</h5>
+
+                                  {canEdit ? (
+                                    <div className="flex shrink-0 gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-lg"
+                                        aria-label={"Edit temuan " + item.indicatorName}
+                                        title="Edit temuan"
+                                        onClick={() => onEdit(item)}
+                                        className="min-h-11 min-w-11 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/40"
+                                      >
+                                        <Pencil className="size-4" aria-hidden="true" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-lg"
+                                        aria-label={"Hapus temuan " + item.indicatorName}
+                                        title="Hapus temuan"
+                                        onClick={() => onDelete(item.id)}
+                                        disabled={deletingId === item.id}
+                                        className="min-h-11 min-w-11 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                                      >
+                                        {deletingId === item.id ? (
+                                          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                                        ) : (
+                                          <Trash2 className="size-4" aria-hidden="true" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  ) : null}
                                 </div>
 
-                                {canEdit && (
-                                  <div className="flex gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                    <button onClick={() => onEdit(t)} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-500 rounded-lg transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-                                    <button onClick={() => onDelete(t.id)} disabled={deletingId === t.id} className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-500 rounded-lg transition-colors">
-                                      {deletingId === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                    </button>
+                                <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                                  <div className="flex min-w-0 flex-col gap-2">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+                                      <span className="text-xs font-semibold">Ketidaksesuaian</span>
+                                    </div>
+                                    <p className="break-words text-sm leading-relaxed text-muted-foreground">
+                                      {item.ketidaksesuaian || "—"}
+                                    </p>
                                   </div>
-                                )}
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                                    <AlertCircle className="w-3 h-3" />
-                                    <span className="text-[9px] font-bold tracking-widest">Ketidaksesuaian</span>
+                                  <div className="flex min-w-0 flex-col gap-2">
+                                    <div className="flex items-center gap-2 text-primary">
+                                      <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+                                      <span className="text-xs font-semibold">Rekomendasi</span>
+                                    </div>
+                                    <p className="break-words text-sm font-semibold leading-relaxed text-foreground">
+                                      {item.sebaiknya || "—"}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                                    {t.ketidaksesuaian || '—'}
-                                  </p>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-1.5 text-primary">
-                                    <ShieldCheck className="w-3 h-3" />
-                                    <span className="text-[9px] font-bold tracking-widest">Rekomendasi</span>
-                                  </div>
-                                  <p className="text-xs text-foreground leading-relaxed font-bold italic">
-                                    {t.sebaiknya || '—'}
-                                  </p>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </CollapsibleContent>
+              </section>
+            </Collapsible>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }

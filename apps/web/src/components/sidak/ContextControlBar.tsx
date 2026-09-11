@@ -1,135 +1,300 @@
-import { Calendar, ChevronDown, ArrowLeftRight } from "lucide-react";
+import { Calendar } from "lucide-react";
+import type { ReactNode } from "react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { SidakAgentDetailTab } from "./sidak-agent-detail-tabs.constants";
 
 const MONTHS = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
 ];
+
 const SERVICE_LABELS: Record<string, string> = {
-  call: "Call", chat: "Chat", email: "Email", cso: "CSO",
-  pencatatan: "Pencatatan", bko: "BKO", slik: "SLIK",
+  all: "Semua",
+  call: "Call",
+  chat: "Chat",
+  email: "Email",
+  cso: "CSO",
+  pencatatan: "Pencatatan",
+  bko: "BKO",
+  slik: "SLIK",
 };
 
 interface Props {
+  activeTab: SidakAgentDetailTab;
   selectedYear: number;
   availableYears: number[];
-  onYearChange: (y: number) => void;
+  onYearChange: (year: number) => void;
   selectedService: string;
   availableServices: string[];
-  onServiceChange: (s: string) => void;
+  onServiceChange: (service: string) => void;
   trendStartMonth: number;
   trendEndMonth: number;
-  onTrendRangeChange: (s: number, e: number) => void;
+  onTrendRangeChange: (start: number, end: number) => void;
   role: string;
   teams: { id: string; name: string }[];
   selectedTeam: string;
-  onTeamChange: (t: string) => void;
+  onTeamChange: (team: string) => void;
   agentsInTeam: { id: string; nama: string }[];
   selectedAgentId: string;
   onAgentChange: (id: string) => void;
   loadingAgents?: boolean;
 }
 
+const triggerClassName =
+  "min-h-11 !h-auto w-full min-w-0 whitespace-normal rounded-xl border-border bg-muted/40 px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
+
+interface ContextSelectProps {
+  id: string;
+  label: string;
+  value: string | null;
+  placeholder: string;
+  onValueChange: (value: string | null) => void;
+  items: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+  children: ReactNode;
+}
+
+function ContextSelect({
+  id,
+  label,
+  value,
+  placeholder,
+  onValueChange,
+  items,
+  disabled,
+  children,
+}: ContextSelectProps) {
+  return (
+    <div className="min-w-0">
+      <Label htmlFor={id} className="mb-1.5 text-xs font-semibold text-muted-foreground">
+        {label}
+      </Label>
+      <Select items={items} value={value} onValueChange={onValueChange} disabled={disabled}>
+        <SelectTrigger id={id} className={triggerClassName}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectGroup>{children}</SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function ContextControlBar({
-  selectedYear, availableYears, onYearChange,
-  selectedService, availableServices, onServiceChange,
-  trendStartMonth, trendEndMonth, onTrendRangeChange,
-  role, teams, selectedTeam, onTeamChange,
-  agentsInTeam, selectedAgentId, onAgentChange, loadingAgents,
+  activeTab,
+  selectedYear,
+  availableYears,
+  onYearChange,
+  selectedService,
+  availableServices,
+  onServiceChange,
+  trendStartMonth,
+  trendEndMonth,
+  onTrendRangeChange,
+  role,
+  teams,
+  selectedTeam,
+  onTeamChange,
+  agentsInTeam,
+  selectedAgentId,
+  onAgentChange,
+  loadingAgents,
 }: Props) {
   const isStaff = role === "trainer" || role === "admin" || role === "leader";
+  const showAuditControls = activeTab !== "simulations";
+  const showTrendRange = activeTab === "trend";
 
   return (
-    <div className="bg-background/80 border-b border-border/40 shadow-sm relative z-40 backdrop-blur-md py-3">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto justify-center lg:justify-start">
-          <div className="flex items-center gap-3">
-            {/* Year Selector */}
-            <div className="relative group/year">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar className="w-3.5 h-3.5 text-muted-foreground group-focus-within/year:text-primary transition-colors" />
-              </div>
-              <select
-                value={selectedYear}
-                onChange={(e) => onYearChange(Number(e.target.value))}
-                className="h-9 pl-9 pr-8 bg-muted/50 border border-border/60 rounded-lg text-[11px] font-black focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer hover:bg-muted transition-all"
-              >
-                {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-              </div>
-            </div>
-
-            {/* Service Type Pills */}
-            <div className="flex items-center gap-1 p-1 bg-muted/50 border border-border/60 rounded-lg">
-              {availableServices.map((svc) => (
-                <button
-                  key={svc}
-                  onClick={() => onServiceChange(svc)}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-widest transition-all ${
-                    selectedService === svc
-                      ? "bg-card text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {SERVICE_LABELS[svc] || svc}
-                </button>
+    <div className="relative z-40 border-y border-border bg-background py-4">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-end">
+        {showAuditControls ? (
+          <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(8rem,0.35fr)_minmax(0,1fr)]">
+            <ContextSelect
+              id="sidak-context-year"
+              label="Tahun audit"
+              value={String(selectedYear)}
+              placeholder="Pilih tahun"
+              items={availableYears.map((year) => ({
+                value: String(year),
+                label: String(year),
+              }))}
+              onValueChange={(value) => {
+                if (value !== null) onYearChange(Number(value));
+              }}
+            >
+              {availableYears.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  <span className="inline-flex items-center gap-2">
+                    <Calendar aria-hidden="true" />
+                    {year}
+                  </span>
+                </SelectItem>
               ))}
-            </div>
-          </div>
+            </ContextSelect>
 
-          {/* Trend Range */}
-          <div className="flex items-center gap-2 h-9 px-3 bg-muted/50 border border-border/60 rounded-lg">
-            <span className="text-[10px] font-bold text-muted-foreground tracking-widest">Tren</span>
-            <div className="flex items-center gap-1">
-              <select
-                value={trendStartMonth}
-                onChange={(e) => onTrendRangeChange(Number(e.target.value), trendEndMonth)}
-                className="bg-transparent text-[11px] font-black outline-none cursor-pointer"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i + 1} disabled={i + 1 > trendEndMonth}>{m.slice(0, 3)}</option>
-                ))}
-              </select>
-              <span className="text-muted-foreground font-bold px-1">&rarr;</span>
-              <select
-                value={trendEndMonth}
-                onChange={(e) => onTrendRangeChange(trendStartMonth, Number(e.target.value))}
-                className="bg-transparent text-[11px] font-black outline-none cursor-pointer"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i + 1} disabled={i + 1 < trendStartMonth}>{m.slice(0, 3)}</option>
-                ))}
-              </select>
-            </div>
+            <fieldset className="min-w-0">
+              <legend className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                Layanan audit
+              </legend>
+              <div role="group" aria-label="Pilihan layanan audit">
+                <Select
+                  items={availableServices.map((service) => ({
+                    value: service,
+                    label: SERVICE_LABELS[service] || service,
+                  }))}
+                  value={selectedService}
+                  onValueChange={(value) => {
+                    if (value !== null) onServiceChange(value);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Pilihan layanan audit"
+                    className={triggerClassName}
+                  >
+                    <SelectValue placeholder="Pilih layanan" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectGroup>
+                      {availableServices.map((service) => (
+                        <SelectItem key={service} value={service}>
+                          {SERVICE_LABELS[service] || service}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </fieldset>
           </div>
-        </div>
+        ) : null}
 
-        {/* Team/Agent Switcher (staff only) */}
-        {isStaff && (
-          <div className="flex items-center gap-2 w-full lg:w-auto justify-center">
-            <select
-              value={selectedTeam}
-              onChange={(e) => onTeamChange(e.target.value)}
-              className="h-9 bg-muted/50 border border-border/60 rounded-lg px-3 text-[11px] font-black focus:ring-1 focus:ring-primary outline-none min-w-[120px]"
+        {showTrendRange ? (
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-xs font-semibold text-muted-foreground">
+              Rentang bulan tren
+            </legend>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <ContextSelect
+                id="sidak-trend-start"
+                label="Bulan awal tren"
+                value={String(trendStartMonth)}
+                placeholder="Mulai"
+                items={MONTHS.map((month, index) => ({
+                  value: String(index + 1),
+                  label: month,
+                }))}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    onTrendRangeChange(Number(value), trendEndMonth);
+                  }
+                }}
+              >
+                {MONTHS.map((month, index) => (
+                  <SelectItem
+                    key={month}
+                    value={String(index + 1)}
+                    disabled={index + 1 > trendEndMonth}
+                  >
+                    {month}
+                  </SelectItem>
+                ))}
+              </ContextSelect>
+              <span className="pt-5 text-sm font-semibold text-muted-foreground" aria-hidden="true">
+                sampai
+              </span>
+              <ContextSelect
+                id="sidak-trend-end"
+                label="Bulan akhir tren"
+                value={String(trendEndMonth)}
+                placeholder="Sampai"
+                items={MONTHS.map((month, index) => ({
+                  value: String(index + 1),
+                  label: month,
+                }))}
+                onValueChange={(value) => {
+                  if (value !== null) {
+                    onTrendRangeChange(trendStartMonth, Number(value));
+                  }
+                }}
+              >
+                {MONTHS.map((month, index) => (
+                  <SelectItem
+                    key={month}
+                    value={String(index + 1)}
+                    disabled={index + 1 < trendStartMonth}
+                  >
+                    {month}
+                  </SelectItem>
+                ))}
+              </ContextSelect>
+            </div>
+          </fieldset>
+        ) : null}
+
+        {isStaff ? (
+          <fieldset
+            className={[
+              "grid min-w-0 gap-3",
+              showAuditControls
+                ? "sm:grid-cols-2"
+                : "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+            ].join(" ")}
+          >
+            <legend className="mb-1.5 text-xs font-semibold text-muted-foreground sm:col-span-2">
+              Pindah profil
+            </legend>
+            <ContextSelect
+              id="sidak-context-team"
+              label="Folder agen"
+              value={selectedTeam || null}
+              placeholder="Pilih folder…"
+              items={teams.map((team) => ({ value: team.name, label: team.name }))}
+              onValueChange={(value) => onTeamChange(value ?? "")}
             >
-              <option value="">Pilih folder…</option>
-              {teams.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
-            </select>
-            <select
-              value={selectedAgentId}
-              onChange={(e) => onAgentChange(e.target.value)}
+              {teams.map((team) => (
+                <SelectItem key={team.id} value={team.name}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </ContextSelect>
+            <ContextSelect
+              id="sidak-context-agent"
+              label="Agen"
+              value={selectedAgentId || null}
+              placeholder={loadingAgents ? "Memuat…" : "Pilih agen…"}
+              items={agentsInTeam.map((agent) => ({ value: agent.id, label: agent.nama }))}
               disabled={loadingAgents}
-              className="h-9 bg-muted/50 border border-border/60 rounded-lg px-3 text-[11px] font-black focus:ring-1 focus:ring-primary outline-none min-w-[160px]"
+              onValueChange={(value) => {
+                if (value !== null) onAgentChange(value);
+              }}
             >
-              {loadingAgents ? (
-                <option>Memuat…</option>
-              ) : (
-                agentsInTeam.map((a) => <option key={a.id} value={a.id}>{a.nama}</option>)
-              )}
-            </select>
-          </div>
-        )}
+              {agentsInTeam.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.nama}
+                </SelectItem>
+              ))}
+            </ContextSelect>
+          </fieldset>
+        ) : null}
       </div>
     </div>
   );

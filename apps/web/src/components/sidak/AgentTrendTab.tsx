@@ -1,7 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import type { AgentComparisonTable } from "@trainers/types";
 import { TrendingUp, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import ParamTrendChart from "./ParamTrendChart";
 import QaStatePanel from "./QaStatePanel";
+import AgentComparisonTableView from "./AgentComparisonTable";
 
 interface TrendDataset {
   label: string;
@@ -13,61 +23,58 @@ interface Props {
   labels: string[];
   datasets: TrendDataset[];
   loading?: boolean;
+  comparisonTable?: AgentComparisonTable;
 }
 
 const TREND_COLORS = [
-  "#0F766E", // Teal
-  "#D97706", // Amber
-  "#2563EB", // Blue
-  "#BE123C", // Rose
-  "#4338CA", // Indigo
-  "#0891B2", // Cyan
+  "var(--chart-green)",
+  "var(--chart-amber)",
+  "var(--chart-blue)",
+  "var(--chart-red)",
+  "var(--chart-violet)",
+  "var(--chart-cyan)",
 ];
 
-export default function AgentTrendTab({ labels, datasets, loading }: Props) {
+export default function AgentTrendTab({
+  labels,
+  datasets,
+  loading,
+  comparisonTable,
+}: Props) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted)
-    return <div className="h-[400px] bg-muted/10 animate-pulse rounded-2xl" />;
 
   const trendRangeLabel =
     labels.length > 0 ? `${labels[0]} - ${labels[labels.length - 1]}` : "";
 
   if (loading) {
     return (
-      <div className="bg-card/50 backdrop-blur-sm rounded-[2rem] border border-border/50 p-6 sm:p-8 h-[520px] flex items-center justify-center">
+      <Card className="flex min-h-[24rem] items-center justify-center border-border bg-surface p-4 ring-0 sm:p-6">
         <QaStatePanel
           type="loading"
           title="Memuat tren performa agen"
           description="Riwayat penilaian sedang disiapkan."
           className="w-full max-w-lg"
         />
-      </div>
+      </Card>
     );
   }
 
   if (!labels.length || !datasets.length) {
     return (
-      <div className="bg-card/50 backdrop-blur-sm rounded-[2rem] border border-border/50 p-6 sm:p-8">
+      <Card className="border-border bg-surface p-4 ring-0 sm:p-6">
         <QaStatePanel
           type="empty"
           title="Data tren belum tersedia"
           description="Tren akan muncul setelah ada penilaian pada periode yang dipilih."
         />
-      </div>
+      </Card>
     );
   }
 
   const paramDatasets = datasets.filter((ds) => !ds.isTotal);
-  const totalDataset = datasets.find((ds) => ds.isTotal);
   const isFiltered = activeFilter !== null && activeFilter !== "TOTAL_ONLY";
   const isTotalOnly = activeFilter === "TOTAL_ONLY";
 
-  // Build color map based on ORIGINAL index in full datasets array
   const colorMap: Record<string, string> = {};
   datasets.forEach((ds, i) => {
     if (!ds.isTotal) {
@@ -75,7 +82,6 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
     }
   });
 
-  // Determine which datasets to pass to chart
   const chartDatasets = isFiltered
     ? datasets.filter((ds) => ds.isTotal || ds.label === activeFilter)
     : isTotalOnly
@@ -93,115 +99,134 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
   const showTotal = !isFiltered;
 
   return (
-    <div className="bg-card/50 backdrop-blur-sm rounded-[2rem] border border-border/50 p-5 sm:p-8 shadow-sm">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.24em] text-muted-foreground mb-2">
-            <TrendingUp className="w-3.5 h-3.5" />
-            Tren Kinerja {trendRangeLabel ? `• ${trendRangeLabel}` : ""}
-          </div>
-          <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Pergerakan skor per periode audit
-          </h3>
-          <p className="text-[11px] text-muted-foreground font-medium mt-2">
-            Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.
-          </p>
-        </div>
-      </div>
-
-      {/* Filter Pills */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        <button
-          onClick={() => setActiveFilter(null)}
-          className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 ${
-            activeFilter === null
-              ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
-              : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
-          }`}
-        >
-          Ringkasan
-        </button>
-        <button
-          onClick={() => setActiveFilter(activeFilter === "TOTAL_ONLY" ? null : "TOTAL_ONLY")}
-          className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
-            activeFilter === "TOTAL_ONLY"
-              ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
-              : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
-          }`}
-        >
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: activeFilter === "TOTAL_ONLY" ? "white" : "hsl(var(--primary))" }}
-          />
-          Total Temuan
-        </button>
-        {paramDatasets.map((ds) => {
-          const isActive = activeFilter === ds.label;
-          const color = colorMap[ds.label] || "#888";
-          return (
-            <button
-              key={ds.label}
-              onClick={() => setActiveFilter(isActive ? null : ds.label)}
-              className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
-                isActive
-                  ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
-                  : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
-              }`}
-            >
-              <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: isActive ? "white" : color }}
-              />
-              {ds.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Chart */}
-      <div className="h-[380px] w-full relative rounded-[1.5rem] border border-border/40 bg-background/70 p-3 shadow-inner">
-        <ParamTrendChart
-          labels={labels}
-          datasets={chartDatasets}
-          showParameters={true}
-          hiddenKeys={hiddenKeys}
-          hideTotal={!showTotal}
-          filterLabel={activeFilter || undefined}
-          isFiltered={isFiltered}
-          colorMap={colorMap}
-        />
-      </div>
-
-      {/* Stats Footer */}
-      <div className="mt-8 pt-8 border-t border-border/50 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-foreground/[0.02] border border-border/30">
-          <p className="text-[10px] font-black tracking-widest text-muted-foreground mb-3">
-            Total Periode
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black tracking-tight">
-              {labels.length}
-            </span>
-            <span className="text-[10px] font-bold text-muted-foreground tracking-widest">
-              periode aktif
-            </span>
-          </div>
-        </div>
-        <div className="md:col-span-2 p-5 rounded-2xl bg-primary/5 border border-primary/10 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-            <Zap className="w-6 h-6" />
-          </div>
+    <Card className="gap-0 border-border bg-surface py-0 ring-0">
+      <CardHeader className="border-b border-border p-4 sm:p-6">
+        <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
           <div>
-            <p className="text-[10px] font-black tracking-widest text-primary/40 mb-1">
-              Ringkasan Tren
-            </p>
-            <p className="text-sm font-medium text-foreground/70 leading-relaxed">
-              Gunakan pola naik-turun setiap parameter untuk menentukan fokus
-              coaching pada periode berikutnya.
-            </p>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+              <TrendingUp className="h-4 w-4" aria-hidden="true" />
+              Tren Kinerja {trendRangeLabel ? `• ${trendRangeLabel}` : ""}
+            </div>
+            <CardTitle className="font-outfit text-xl font-bold tracking-tight sm:text-2xl">
+              Pergerakan skor per periode audit
+            </CardTitle>
+            <CardDescription className="mt-2 text-sm text-muted-foreground">
+              Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.
+            </CardDescription>
           </div>
         </div>
-      </div>
-    </div>
+      </CardHeader>
+
+      <CardContent className="p-4 sm:p-6">
+        <div
+          className="mb-6 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Filter seri grafik"
+        >
+          <Button
+            type="button"
+            variant={activeFilter === null ? "default" : "outline"}
+            size="lg"
+            onClick={() => setActiveFilter(null)}
+            aria-pressed={activeFilter === null}
+            className="min-h-11 rounded-xl px-3 text-sm font-semibold motion-reduce:transition-none"
+          >
+            Ringkasan
+          </Button>
+          <Button
+            type="button"
+            variant={activeFilter === "TOTAL_ONLY" ? "default" : "outline"}
+            size="lg"
+            onClick={() =>
+              setActiveFilter(activeFilter === "TOTAL_ONLY" ? null : "TOTAL_ONLY")
+            }
+            aria-pressed={activeFilter === "TOTAL_ONLY"}
+            className="min-h-11 gap-2 rounded-xl px-3 text-sm font-semibold motion-reduce:transition-none"
+          >
+            <span
+              className="size-2 rounded-full"
+              style={{
+                backgroundColor:
+                  activeFilter === "TOTAL_ONLY"
+                    ? "var(--primary-foreground)"
+                    : "var(--primary)",
+              }}
+              aria-hidden="true"
+            />
+            Total Temuan
+          </Button>
+          {paramDatasets.map((ds) => {
+            const isActive = activeFilter === ds.label;
+            const color = colorMap[ds.label] || "var(--chart-blue)";
+            return (
+              <Button
+                key={ds.label}
+                type="button"
+                variant={isActive ? "default" : "outline"}
+                size="lg"
+                onClick={() => setActiveFilter(isActive ? null : ds.label)}
+                aria-pressed={isActive}
+                className="min-h-11 gap-2 rounded-xl px-3 text-sm font-semibold motion-reduce:transition-none"
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{
+                    backgroundColor: isActive
+                      ? "var(--primary-foreground)"
+                      : color,
+                  }}
+                  aria-hidden="true"
+                />
+                {ds.label}
+              </Button>
+            );
+          })}
+        </div>
+
+        <div className="relative h-[22rem] w-full overflow-hidden rounded-xl border border-border bg-background p-2 sm:h-[24rem] sm:p-3">
+          <ParamTrendChart
+            labels={labels}
+            datasets={chartDatasets}
+            showParameters={true}
+            hiddenKeys={hiddenKeys}
+            hideTotal={!showTotal}
+            filterLabel={activeFilter || undefined}
+            isFiltered={isFiltered}
+            colorMap={colorMap}
+          />
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-3">
+          <div className="border-b border-border pb-4 md:col-span-1 md:border-b-0 md:border-r md:pb-0 md:pr-6">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">
+              Total Periode
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight tabular-nums">
+                {labels.length}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                periode aktif
+              </span>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 md:col-span-2 md:pl-2">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-primary">
+              <Zap className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-semibold text-primary">
+                Ringkasan Tren
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Gunakan pola naik-turun setiap parameter untuk menentukan fokus
+                coaching pada periode berikutnya.
+              </p>
+            </div>
+          </div>
+        </div>
+        <AgentComparisonTableView comparisonTable={comparisonTable} embedded />
+      </CardContent>
+    </Card>
   );
 }

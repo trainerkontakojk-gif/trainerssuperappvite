@@ -119,10 +119,15 @@ describe("AgentTemuanTab parity tests", () => {
       />,
     );
 
-    // Now edit/delete actions should exist
-    const editButtonsWithIcons = screen
-      .getAllByRole("button")
-      .filter((btn) => btn.querySelector("svg"));
-    expect(editButtonsWithIcons.length).toBeGreaterThan(0);
+    // Actions stay visible and have accessible names when editing is allowed.
+    expect(
+      screen.getByRole("button", { name: "Edit temuan Indicator A" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hapus temuan Indicator A" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit temuan Indicator A" }),
+    ).toHaveClass("min-h-11");
   });
 });

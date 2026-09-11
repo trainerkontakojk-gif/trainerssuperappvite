@@ -1,49 +1,80 @@
-import { useParams, Link } from "@tanstack/react-router";
+import { useCallback, useState } from "react";
+import { Link, useParams } from "@tanstack/react-router";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  ShieldCheck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAgentDetail } from "../../hooks/useAgentDetail";
 import { useAgentQuickview } from "../../hooks/useAgentQuickview";
-import {
-  ArrowLeft, AlertTriangle, RefreshCw,
-  BarChart2, ShieldCheck, Activity,
-} from "lucide-react";
-import AgentProfileBar from "../../components/sidak/AgentProfileBar";
-import ContextControlBar from "../../components/sidak/ContextControlBar";
-import MonthRail from "../../components/sidak/MonthRail";
 import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
-import AgentTrendTab from "../../components/sidak/AgentTrendTab";
-import AgentComparisonTable from "../../components/sidak/AgentComparisonTable";
+import AgentPerformanceQuickview from "../../components/sidak/AgentPerformanceQuickview";
+import AgentProfileBar from "../../components/sidak/AgentProfileBar";
 import AgentTemuanTab from "../../components/sidak/AgentTemuanTab";
+import AgentTrendTab from "../../components/sidak/AgentTrendTab";
+import ContextControlBar from "../../components/sidak/ContextControlBar";
 import EditTemuanModal from "../../components/sidak/EditTemuanModal";
+import MonthRail from "../../components/sidak/MonthRail";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import SidakAgentDetailTabs from "../../components/sidak/SidakAgentDetailTabs";
+import type { SidakAgentDetailTab } from "../../components/sidak/sidak-agent-detail-tabs.constants";
 import SidakSimulationHistory from "../../components/sidak/SidakSimulationHistory";
-import TabSkeleton from "../../components/sidak/TabSkeleton";
-import { useRef, useEffect } from "react";
-
-const SECTIONS = [
-  { id: "summary", label: "Ringkasan Skor" },
-  { id: "trend", label: "Grafik Tren" },
-  { id: "temuan", label: "Daftar Temuan" },
-];
 
 export default function SidakAgentDetailPage() {
   const { id } = useParams({ from: "/sidak/agents/$id" });
   const {
-    data, loading, refetch, role,
-    selectedYear, selectedService, selectedMonth,
-    trendStartMonth, trendEndMonth,
-    activeSection, trendMounted, temuanMounted,
-    monthlySummaries, latestPeriod, previousPeriod,
-    temuanDisplayItems, topTickets,
+    data,
+    loading,
+    refetch,
+    role,
+    selectedYear,
+    selectedService,
+    selectedMonth,
+    trendStartMonth,
+    trendEndMonth,
+    monthlySummaries,
+    latestPeriod,
+    previousPeriod,
+    temuanDisplayItems,
+    topTickets,
     activeRootCauses,
-    masaKerja: _masaKerja,
-    availableServiceTypes, monthsFull,
-    editingTemuan, editForm, isSubmitting, deletingId,
-    setEditForm, setEditingTemuan,
-    handleYearChange, handleServiceChange, handleMonthSelect,
-    handleTrendRangeChange, handleSectionVisible,
-    handleExport, handleInputAudit,
-    handleEdit, handleEditSave, handleDelete,
-    teams, agentsInTeam, selectedTeam, loadingAgents,
-    handleTeamChange, handleAgentChange,
+    availableServiceTypes,
+    monthsFull,
+    editingTemuan,
+    editForm,
+    isSubmitting,
+    deletingId,
+    setEditForm,
+    setEditingTemuan,
+    handleYearChange,
+    handleServiceChange,
+    handleMonthSelect,
+    handleTrendRangeChange,
+    handleExport,
+    handleInputAudit,
+    handleEdit,
+    handleEditSave,
+    handleDelete,
+    teams,
+    agentsInTeam,
+    selectedTeam,
+    loadingAgents,
+    handleTeamChange,
+    handleAgentChange,
   } = useAgentDetail(id);
   const {
     data: quickviewData,
@@ -51,95 +82,105 @@ export default function SidakAgentDetailPage() {
     error: quickviewError,
     refetch: refetchQuickview,
   } = useAgentQuickview(id, selectedYear, selectedService);
+  const [activeTab, setActiveTab] = useState<SidakAgentDetailTab>("summary");
+  const [mountedTabs, setMountedTabs] = useState<
+    Set<SidakAgentDetailTab>
+  >(() => new Set(["summary"]));
 
-  const handleRefresh = () => {
+  const handleTabChange = useCallback((tab: SidakAgentDetailTab) => {
+    setActiveTab(tab);
+    setMountedTabs((current) => {
+      if (current.has(tab)) return current;
+      return new Set(current).add(tab);
+    });
+  }, []);
+
+  const handleRefresh = useCallback(() => {
     void refetch();
     void refetchQuickview();
-  };
-  const isStaff = role === "trainer" || role === "admin" || role === "leader";
-
-  const summaryRef = useRef<HTMLDivElement>(null);
-  const trendRef = useRef<HTMLDivElement>(null);
-  const temuanRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const section = entry.target.getAttribute("data-section");
-            if (section) handleSectionVisible(section);
-          }
-        }
-      },
-      { rootMargin: "-80px 0px -55% 0px" },
-    );
-
-    const refs = [summaryRef, trendRef, temuanRef];
-    refs.forEach((r) => { if (r.current) observer.observe(r.current); });
-    return () => observer.disconnect();
-  }, [handleSectionVisible, data]);
+  }, [refetch, refetchQuickview]);
 
   if (loading && !data) {
     return (
-      <div className="space-y-6 p-6 lg:p-8">
-        <div className="h-6 w-48 animate-pulse rounded-xl bg-muted" />
-        <div className="h-28 animate-pulse rounded-2xl bg-muted" />
-        <div className="h-14 animate-pulse rounded-2xl bg-muted" />
-        <div className="h-24 animate-pulse rounded-2xl bg-muted" />
-        <div className="grid grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />)}
-        </div>
-        <div className="h-80 animate-pulse rounded-2xl bg-muted" />
+      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6 lg:px-8" role="status" aria-label="Memuat profil agen">
+        <Skeleton className="size-11 rounded-xl motion-reduce:animate-none" />
+        <Skeleton className="h-28 rounded-xl motion-reduce:animate-none" />
+        <Skeleton className="h-20 rounded-xl motion-reduce:animate-none" />
+        <Skeleton className="h-12 rounded-xl motion-reduce:animate-none" />
+        <Skeleton className="min-h-[24rem] rounded-xl motion-reduce:animate-none" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-          <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h2 className="mb-2 text-lg font-bold">Agen tidak ditemukan</h2>
-        <p className="mb-6 text-sm text-muted-foreground">Data agen ini tidak tersedia atau sudah tidak ada.</p>
-        <Link to="/sidak/agents" className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
-          <ArrowLeft className="h-4 w-4" /> Kembali ke daftar agen
-        </Link>
+      <div className="mx-auto flex min-h-full max-w-7xl items-center justify-center px-4 py-16 text-center sm:px-6 lg:px-8">
+        <Empty className="max-w-lg border-0">
+          <EmptyHeader>
+            <EmptyMedia variant="icon" className="size-14 rounded-xl bg-muted text-muted-foreground">
+              <AlertTriangle className="size-7" aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle className="font-outfit text-xl font-bold">Agen tidak ditemukan</EmptyTitle>
+            <EmptyDescription>
+              Data agen ini tidak tersedia atau sudah tidak ada.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button
+            render={<Link to="/sidak/agents" />}
+            nativeButton={false}
+            variant="outline"
+            size="lg"
+            className="min-h-11"
+          >
+            <ArrowLeft data-icon="inline-start" className="size-4" aria-hidden="true" />
+            Kembali ke daftar agen
+          </Button>
+        </Empty>
       </div>
     );
   }
 
-  const activeLabel = latestPeriod && selectedMonth
-    ? `${monthsFull[selectedMonth - 1]?.slice(0, 3) ?? ""} ${selectedYear}`
-    : undefined;
-  const rootCauseScopeLabel = latestPeriod && selectedMonth
-    ? selectedMonth === 1
-      ? activeLabel
-      : `Jan-${monthsFull[selectedMonth - 1]?.slice(0, 3) ?? ""} ${selectedYear}`
-    : undefined;
+  const isStaff = role === "trainer" || role === "admin" || role === "leader";
+  const activeLabel =
+    latestPeriod && selectedMonth
+      ? (monthsFull[selectedMonth - 1]?.slice(0, 3) ?? "") +
+        " " +
+        selectedYear
+      : undefined;
+  const rootCauseScopeLabel =
+    latestPeriod && selectedMonth
+      ? selectedMonth === 1
+        ? activeLabel
+        : "Jan-" +
+          (monthsFull[selectedMonth - 1]?.slice(0, 3) ?? "") +
+          " " +
+          selectedYear
+      : undefined;
+  const quickviewScopeLabel =
+    "Tahun " +
+    selectedYear +
+    " · Layanan " +
+    (selectedService ? selectedService.toUpperCase() : "—");
 
   return (
-    <div className="space-y-6 pb-24 overflow-x-hidden">
-      {/* Back + Header */}
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center px-6 lg:px-8 pt-6">
+    <div className="min-w-0 overflow-x-hidden pb-16">
+      <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-5 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <Link to="/sidak/agents" className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">SIDAK · Profil Agen</p>
-            <h1 className="font-outfit text-sm font-bold tracking-tight text-foreground">{data.peserta.nama}</h1>
-          </div>
+          <Button
+            render={<Link to="/sidak/agents" />}
+            nativeButton={false}
+            variant="outline"
+            size="icon-lg"
+            aria-label="Kembali ke daftar agen"
+            className="min-h-11 min-w-11 shrink-0 text-muted-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+          </Button>
+          <p className="text-sm font-semibold text-muted-foreground">
+            SIDAK · Profil Agen
+          </p>
         </div>
-        <button onClick={handleRefresh} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted text-foreground">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Memuat…" : "Muat ulang"}
-        </button>
-      </div>
 
-      {/* Profile Bar */}
-      <div className="px-6 lg:px-8">
         <AgentProfileBar
           nama={data.peserta.nama}
           tim={data.peserta.tim}
@@ -148,179 +189,153 @@ export default function SidakAgentDetailPage() {
           bergabungDate={data.peserta.bergabung_date}
           fotoUrl={data.peserta.foto_url}
           role={role}
-          onExport={(format) => handleExport(format, {
-            selectedMonth,
-            trendStartMonth,
-            trendEndMonth,
-            quickview: quickviewData,
-            isStaff,
-          })}
+          onRefresh={handleRefresh}
+          refreshing={loading}
+          onExport={(format) =>
+            handleExport(format, {
+              selectedMonth,
+              trendStartMonth,
+              trendEndMonth,
+              quickview: quickviewData,
+              isStaff,
+            })
+          }
           onInputAudit={handleInputAudit}
-          quickviewData={quickviewData}
-          quickviewLoading={quickviewLoading}
-          quickviewError={quickviewError}
         />
-      </div>
 
-      {/* Context Control Bar */}
-      <ContextControlBar
-        selectedYear={selectedYear}
-        availableYears={data.availableYears}
-        onYearChange={handleYearChange}
-        selectedService={selectedService}
-        availableServices={availableServiceTypes}
-        onServiceChange={handleServiceChange}
-        trendStartMonth={trendStartMonth}
-        trendEndMonth={trendEndMonth}
-        onTrendRangeChange={handleTrendRangeChange}
-        role={role}
-        teams={teams}
-        selectedTeam={selectedTeam}
-        onTeamChange={handleTeamChange}
-        agentsInTeam={agentsInTeam}
-        selectedAgentId={id}
-        onAgentChange={handleAgentChange}
-        loadingAgents={loadingAgents}
-      />
+        <ContextControlBar
+          activeTab={activeTab}
+          selectedYear={selectedYear}
+          availableYears={data.availableYears}
+          onYearChange={handleYearChange}
+          selectedService={selectedService}
+          availableServices={availableServiceTypes}
+          onServiceChange={handleServiceChange}
+          trendStartMonth={trendStartMonth}
+          trendEndMonth={trendEndMonth}
+          onTrendRangeChange={handleTrendRangeChange}
+          role={role}
+          teams={teams}
+          selectedTeam={selectedTeam}
+          onTeamChange={handleTeamChange}
+          agentsInTeam={agentsInTeam}
+          selectedAgentId={id}
+          onAgentChange={handleAgentChange}
+          loadingAgents={loadingAgents}
+        />
 
-      {/* Nav Tabs (sticky) */}
-      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="flex gap-4 overflow-x-auto sm:gap-8 no-scrollbar">
-            {SECTIONS.map((sec) => (
-              <button
-                key={sec.id}
-                onClick={() => {
-                  handleSectionVisible(sec.id);
-                  const ref = sec.id === "summary" ? summaryRef : sec.id === "trend" ? trendRef : temuanRef;
-                  ref.current?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`border-b-2 py-3 text-[11px] font-semibold tracking-wide whitespace-nowrap transition-all ${
-                  activeSection === sec.id
-                    ? "border-foreground text-foreground font-bold"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                {sec.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+          <SidakAgentDetailTabs
+          activeTab={activeTab}
+          mountedTabs={mountedTabs}
+          onTabChange={handleTabChange}
+          panels={{
+            summary: (
+              <div className="flex min-w-0 flex-col gap-6">
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="size-10 shrink-0 rounded-xl bg-muted p-0 text-muted-foreground">
+                    <ShieldCheck className="size-5" aria-hidden="true" />
+                  </Badge>
+                  <div className="min-w-0">
+                    <h2 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+                      Ringkasan skor
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Skor, pengurang, dan diagnosis pada periode yang dipilih.
+                    </p>
+                  </div>
+                </div>
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-12">
-        {/* ── SECTION: RINGKASAN SKOR ── */}
-        <div ref={summaryRef} data-section="summary" id="section-summary" className="scroll-mt-24 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Ringkasan Skor Bulanan</h3>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Tahun {selectedYear} &bull; Layanan {selectedService.toUpperCase()}
-              </p>
-            </div>
-          </div>
-
-          {monthlySummaries.length === 0 ? (
-            <div className="rounded-2xl border border-border bg-surface p-12">
-              <QaStatePanel
-                type="empty"
-                title="Data belum tersedia"
-                description={`Belum ada ringkasan skor untuk layanan ${selectedService.toUpperCase()} pada tahun ${selectedYear}.`}
-                className="mx-auto max-w-lg"
-              />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Month Rail */}
-              <MonthRail summaries={monthlySummaries} selectedMonth={selectedMonth} onMonthSelect={handleMonthSelect} />
-
-              {/* Active Detail Panel — Audit Dossier */}
-              {latestPeriod && (
-                <AgentAuditDossier
-                  finalScore={latestPeriod.finalScore}
-                  sessionCount={latestPeriod.sessionCount}
-                  findingsCount={latestPeriod.findingsCount}
-                  previousScore={previousPeriod?.finalScore ?? null}
-                  monthLabel={activeLabel}
-                  tickets={topTickets}
-                  causes={activeRootCauses}
-                  rootCauseMonthLabel={rootCauseScopeLabel}
+                <AgentPerformanceQuickview
+                  data={quickviewData}
+                  loading={quickviewLoading}
+                  error={quickviewError}
+                  scopeLabel={quickviewScopeLabel}
                 />
-              )}
-            </div>
-          )}
-        </div>
 
-        {/* ── SECTION: GRAFIK TREN ── */}
-        <div ref={trendRef} data-section="trend" id="section-trend" className="scroll-mt-20 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <BarChart2 className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Perkembangan Skor</h3>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Periode: {monthsFull[trendStartMonth - 1]?.slice(0, 3)} &ndash; {monthsFull[trendEndMonth - 1]?.slice(0, 3)} {selectedYear}
-              </p>
-            </div>
-          </div>
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-            {trendMounted && selectedService ? (
+                {monthlySummaries.length === 0 ? (
+                  <Card className="border-border bg-surface p-4 ring-0 sm:p-6">
+                    <QaStatePanel
+                      type="empty"
+                      title="Data belum tersedia"
+                      description={
+                        "Belum ada ringkasan skor untuk layanan " +
+                        selectedService.toUpperCase() +
+                        " pada tahun " +
+                        selectedYear +
+                        "."
+                      }
+                      className="mx-auto max-w-lg"
+                    />
+                  </Card>
+                ) : (
+                  <div className="flex flex-col gap-6">
+                    <MonthRail
+                      summaries={monthlySummaries}
+                      selectedMonth={selectedMonth}
+                      onMonthSelect={handleMonthSelect}
+                    />
+                    {latestPeriod && (
+                      <AgentAuditDossier
+                        finalScore={latestPeriod.finalScore}
+                        sessionCount={latestPeriod.sessionCount}
+                        findingsCount={latestPeriod.findingsCount}
+                        previousScore={previousPeriod?.finalScore ?? null}
+                        monthLabel={activeLabel}
+                        tickets={topTickets}
+                        causes={activeRootCauses}
+                        rootCauseMonthLabel={rootCauseScopeLabel}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            ),
+            trend: (
               <AgentTrendTab
                 labels={data.personalTrend.labels}
                 datasets={data.personalTrend.datasets}
-                loading={loading && !trendMounted}
+                loading={loading}
+                comparisonTable={data.comparisonTable}
               />
-            ) : (
-              <TabSkeleton />
-            )}
-          </div>
-
-          <AgentComparisonTable comparisonTable={data.comparisonTable} />
-        </div>
-
-        {/* ── SECTION: DAFTAR TEMUAN ── */}
-        <div ref={temuanRef} data-section="temuan" id="section-temuan" className="scroll-mt-20 space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Riwayat Temuan</h3>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temuan dikelompokkan per bulan penilaian</p>
-            </div>
-          </div>
-          {temuanMounted ? (
-            <AgentTemuanTab
-              key={`${selectedYear}-${selectedService}`}
-              items={temuanDisplayItems}
-              loading={loading}
-              deletingId={deletingId}
-              canEdit={role === "trainer" || role === "admin"}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ) : (
-            <TabSkeleton />
-          )}
-        </div>
+            ),
+            temuan: (
+              <div className="flex min-w-0 flex-col gap-5">
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="size-10 shrink-0 rounded-xl bg-muted p-0 text-muted-foreground">
+                    <Activity className="size-5" aria-hidden="true" />
+                  </Badge>
+                  <div className="min-w-0">
+                    <h2 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+                      Temuan audit
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Temuan dikelompokkan berdasarkan bulan dan tiket.
+                    </p>
+                  </div>
+                </div>
+                <AgentTemuanTab
+                  items={temuanDisplayItems}
+                  loading={loading}
+                  deletingId={deletingId}
+                  canEdit={role === "trainer" || role === "admin"}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ),
+            simulations: <SidakSimulationHistory agentId={id} />,
+          }}
+        />
       </div>
 
-      {/* Simulation history is independent of the audit period and service filters. */}
-      <div className="px-6 lg:px-8">
-        <SidakSimulationHistory key={id} agentId={id} />
-      </div>
-
-      {/* Edit Modal */}
       <EditTemuanModal
         open={!!editingTemuan}
         indicatorName={editingTemuan?.indicatorName ?? ""}
         form={editForm}
         submitting={isSubmitting}
-        onFormChange={(field, value) => setEditForm((prev) => ({ ...prev, [field]: value }))}
+        onFormChange={(field, value) =>
+          setEditForm((previous) => ({ ...previous, [field]: value }))
+        }
         onSave={handleEditSave}
         onClose={() => setEditingTemuan(null)}
       />

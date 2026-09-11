@@ -450,6 +450,27 @@ describe("monitoring completeness regressions", () => {
     expect(outerTrigger).not.toHaveFocus();
   });
 
+  it("keeps the simulation detail dialog wide with a bounded scrolling body", () => {
+    render(
+      <ReviewDetailModal
+        entry={{
+          ...baseEntry("telefun"),
+          scenario_title: "Skenario simulasi dengan judul yang panjang",
+        }}
+        onClose={() => undefined}
+        reviewData={null}
+        reviewLoading={false}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveClass("!w-[calc(100vw-2rem)]");
+    expect(dialog).toHaveClass("!max-w-4xl");
+    expect(dialog).toHaveClass("max-h-[calc(100dvh-2rem)]");
+    expect(dialog.querySelector('[data-slot="dialog-title"]')).toHaveClass("break-words");
+    expect(dialog.querySelector(".overflow-y-auto")).toHaveClass("min-h-0");
+  });
+
   it("uses preloaded SIDAK review metadata in the shared modal", async () => {
     const review: PdktMonitoringReview = {
       module: "pdkt",

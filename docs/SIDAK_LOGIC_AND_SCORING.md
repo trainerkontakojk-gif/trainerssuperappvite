@@ -334,7 +334,13 @@ Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama unt
 
 ## Agent Detail Ranking and Forecast Quickview
 
-Halaman `/sidak/agents/:id` menampilkan rail quickview di dalam surface profil agent (`AgentProfileBar`). Quickview memakai konteks **tahun terpilih + layanan terpilih** dengan mode periode YTD; pilihan bulan aktif dan rentang grafik tren tidak mengubah quickview.
+Halaman `/sidak/agents/:id` menampilkan quickview pada panel **Ringkasan**, di bawah header profil ringkas. Quickview memakai konteks **tahun terpilih + layanan terpilih** dengan mode periode YTD; pilihan bulan aktif dan rentang grafik tren tidak mengubah quickview.
+
+Presentation halaman memakai tab `summary`, `trend`, `temuan`, dan `simulations`. Ringkasan menjadi tab awal; hanya panel aktif yang terlihat, sementara panel yang sudah dibuka tetap mounted untuk mempertahankan state lokal. Tahun dan layanan audit berlaku untuk tiga tab audit, rentang bulan hanya tersedia pada Tren, dan filter history Simulasi tetap independen.
+
+Header profil memakai avatar shadcn/ui berukuran 96px pada mobile dan 112px mulai breakpoint `sm`. Kontrol dan surface pada detail agen menggunakan primitive shadcn/ui dengan token tema aplikasi, target sentuh minimum 44px, label aksesibel, serta nama panjang yang dapat membungkus.
+
+MonthRail memberi ikon peringatan kecil pada setiap skor bulanan di bawah target 95 persen, dengan legenda target yang tetap terlihat sehingga status tidak bergantung pada warna progress bar. Detail dari Riwayat Simulasi memakai modal dengan lebar responsif dan area isi yang menggulir di dalam batas tinggi viewport.
 
 ### Endpoint
 
@@ -520,7 +526,7 @@ Agent di luar akses tidak boleh ikut numerator, denominator, maupun payload scop
 | Route                | `apps/api/src/routes/sidak/dashboard.ts`                      | `GET /agents/:id/quickview` — validasi, guard, delegasi                                 |
 | Re-export            | `apps/api/src/services/sidak-service.ts`                      | `export * from "./sidak/agent-quickview"`                                               |
 | Hook                 | `apps/web/src/hooks/useAgentQuickview.ts`                     | Request, stale context suppression, error/loading management                            |
-| Komponen (container) | `apps/web/src/components/sidak/AgentProfileBar.tsx`           | Pass quickview props ke `AgentPerformanceQuickview`                                     |
+| Komponen (container) | `apps/web/src/routes/sidak/agents.$id.tsx`                   | Menempatkan quickview pada panel Ringkasan dengan scope tahun + layanan                 |
 | Komponen (quickview) | `apps/web/src/components/sidak/AgentPerformanceQuickview.tsx` | Render ranking + forecast rail, skeleton, error, ranking basis note                     |
 
 ### Test Coverage
@@ -531,7 +537,7 @@ Agent di luar akses tidak boleh ikut numerator, denominator, maupun payload scop
 | `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts` | 6     | Route forwarding, 403 guard (inaccessible & empty), 400 validation (year & service_type), 404 envelope                                                                                                                                                 |
 | `apps/web/src/__tests__/useAgentQuickview.test.tsx`          | 5     | Request path, stale context suppression, stale error clearing, empty service, error clear on deselection                                                                                                                                               |
 | `apps/web/src/__tests__/AgentPerformanceQuickview.test.tsx`  | 24    | Full render, skeleton, null rank, unavailable state, partial failure, insufficient forecast, calm error, same-scope label, mobile grid, forecast icons, 1/2/3+ tied peer, empty/null/undefined tiedAgents, disclosure expand, accessibility assertions |
-| `apps/web/src/__tests__/AgentProfileBar.test.tsx`            | 3     | Quickview fixture pass-through, props contract                                                                                                                                                                                                         |
+| `apps/web/src/__tests__/AgentProfileBar.test.tsx`            | 4     | Header H1/metadata, 96/112px avatar contract, four format menu options, clipping-safe menu, and accessible actions                                                                                                                                      |
 
 Skor bulanan halaman agent detail (`GET /sidak/agents/:id`) dihitung dari `qa_temuan` melalui scoring engine aplikasi dengan `PeriodScoringContext` yang spesifik per periode. Tabel `qa_dashboard_agent_period_summary` tidak digunakan sebagai sumber skor agent detail karena row history dapat berisi placeholder hasil migration refresh yang tidak setara dengan formula aplikasi.
 
