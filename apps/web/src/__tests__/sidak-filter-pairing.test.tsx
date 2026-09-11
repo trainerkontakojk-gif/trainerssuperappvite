@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import React from "react";
 
@@ -47,7 +47,12 @@ const mockFolders = [
     name: "Tim Whatsapp",
     parent_id: null,
   },
-  { id: "team-email-id", nama: "Tim Email", name: "Tim Email", parent_id: null },
+  {
+    id: "team-email-id",
+    nama: "Tim Email",
+    name: "Tim Email",
+    parent_id: null,
+  },
   { id: "team-mix-id", nama: "Tim Mix", name: "Tim Mix", parent_id: null },
   { id: "team-bko-id", nama: "Tim BKO", name: "Tim BKO", parent_id: null },
   {
@@ -138,7 +143,14 @@ const chatOnlyDashboardData = {
 // Leader-scoped empty data (triggers "Data Tidak Ditemukan" for reset test)
 const chatOnlyDashboardDataEmpty = {
   ...chatOnlyDashboardData,
-  summary: { totalDefects: 0, avgDefectsPerAudit: 0, avgAgentScore: 0, complianceRate: 0, complianceCount: 0, totalAgents: 0 },
+  summary: {
+    totalDefects: 0,
+    avgDefectsPerAudit: 0,
+    avgAgentScore: 0,
+    complianceRate: 0,
+    complianceCount: 0,
+    totalAgents: 0,
+  },
   folders: [],
 };
 
@@ -165,6 +177,13 @@ const filteredRankingData = {
   folders: [mockFolders[0], mockFolders[5], mockFolders[6]],
 };
 
+function selectOption(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole("combobox", { name: label }));
+  const option = screen.getByRole("option", { name: optionName });
+  fireEvent.pointerDown(option, { pointerType: "mouse" });
+  fireEvent.click(option);
+}
+
 describe("SIDAK leader scope — single allowed service", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -186,15 +205,10 @@ describe("SIDAK leader scope — single allowed service", () => {
 
     render(<SidakDashboardPage />);
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "chat"),
-    )!;
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
 
     expect(serviceSelect).toBeDefined();
-    expect(serviceSelect.options.length).toBe(1);
-    expect(serviceSelect.options[0].value).toBe("chat");
-    expect(serviceSelect.options[0].text).toBe("Chat");
+    expect(serviceSelect).toHaveTextContent("Chat");
     expect(serviceSelect).toBeDisabled();
     expect(screen.queryByText("Data Tidak Ditemukan")).toBeNull();
   });
@@ -257,18 +271,15 @@ describe("SIDAK leader scope — single allowed service", () => {
     const resetBtn = screen.getByText("Reset Filter");
 
     // Service select should still show Chat and be disabled, even before reset
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "chat"),
-    ) as HTMLSelectElement;
-    expect(serviceSelect).toHaveValue("chat");
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
+    expect(serviceSelect).toHaveTextContent("Chat");
     expect(serviceSelect).toBeDisabled();
 
     // Click reset
     fireEvent.click(resetBtn);
 
     // After reset, service should STILL be "chat" (not reset to "call")
-    expect(serviceSelect).toHaveValue("chat");
+    expect(serviceSelect).toHaveTextContent("Chat");
   });
 });
 
@@ -294,32 +305,27 @@ describe("SIDAK default filter pairing", () => {
     }));
 
     render(<SidakDashboardPage />);
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
+    const folderSelect = screen.getByRole("combobox", { name: "Tim" });
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects[0];
-    const folderSelect = selects[1];
+    expect(serviceSelect).toHaveTextContent("Call");
+    expect(folderSelect).toHaveTextContent("Tim Call — Semua batch");
 
-    expect(serviceSelect).toHaveValue("call");
-    expect(folderSelect).toHaveValue("team-call-id");
+    fireEvent.click(folderSelect);
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "team-call-id",
-      )?.text,
-    ).toBe("Tim Call — Semua batch");
+      screen.getByRole("option", { name: "Tim Call — Semua batch" }),
+    ).toBeInTheDocument();
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "batch-anis-id",
-      )?.text,
-    ).toBe("↳ Siti Nur Anisa");
+      screen.getByRole("option", { name: "↳ Siti Nur Anisa" }),
+    ).toBeInTheDocument();
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "team-whatsapp-id",
-      )?.text,
-    ).toBe("Tim Whatsapp — Semua batch");
+      screen.getByRole("option", { name: "Tim Whatsapp — Semua batch" }),
+    ).toBeInTheDocument();
+    fireEvent.click(folderSelect);
 
-    fireEvent.change(serviceSelect, { target: { value: "chat" } });
-    expect(serviceSelect).toHaveValue("chat");
-    expect(folderSelect).toHaveValue("team-whatsapp-id");
+    selectOption("Layanan", "Chat");
+    expect(serviceSelect).toHaveTextContent("Chat");
+    expect(folderSelect).toHaveTextContent("Tim Whatsapp — Semua batch");
   });
 
   it("Ranking: keeps grouped folder options after API shrinks to the selected folder, then switches to the paired root folder", async () => {

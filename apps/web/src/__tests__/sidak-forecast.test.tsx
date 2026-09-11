@@ -32,12 +32,37 @@ vi.mock("../components/sidak/ParamTrendChart", () => ({
   default: paramTrendChartMock,
 }));
 
+function selectOption(label: string, optionName: string) {
+  fireEvent.click(screen.getByRole("combobox", { name: label }));
+  const option = screen.getByRole("option", { name: optionName });
+  fireEvent.pointerDown(option, { pointerType: "mouse" });
+  fireEvent.click(option);
+}
+
 describe("SidakForecastPage", { timeout: 15_000 }, () => {
   const dashboardData = {
     periods: [
-      { id: "p1", month: 1, year: 2026, label: "Jan 26", created_at: "2026-01-01T00:00:00.000Z" },
-      { id: "p2", month: 2, year: 2026, label: "Feb 26", created_at: "2026-02-01T00:00:00.000Z" },
-      { id: "p3", month: 3, year: 2026, label: "Mar 26", created_at: "2026-03-01T00:00:00.000Z" },
+      {
+        id: "p1",
+        month: 1,
+        year: 2026,
+        label: "Jan 26",
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "p2",
+        month: 2,
+        year: 2026,
+        label: "Feb 26",
+        created_at: "2026-02-01T00:00:00.000Z",
+      },
+      {
+        id: "p3",
+        month: 3,
+        year: 2026,
+        label: "Mar 26",
+        created_at: "2026-03-01T00:00:00.000Z",
+      },
     ],
     folders: [
       { id: "folder-call", name: "Tim Call", parent_id: null },
@@ -75,9 +100,24 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
         total: {
           scope: { type: "total", label: "Total Temuan" },
           historical: [
-            { periodId: "p1", label: "Jan 26", date: "2026-01-01T00:00:00.000Z", value: 12 },
-            { periodId: "p2", label: "Feb 26", date: "2026-02-01T00:00:00.000Z", value: 10 },
-            { periodId: "p3", label: "Mar 26", date: "2026-03-01T00:00:00.000Z", value: 8 },
+            {
+              periodId: "p1",
+              label: "Jan 26",
+              date: "2026-01-01T00:00:00.000Z",
+              value: 12,
+            },
+            {
+              periodId: "p2",
+              label: "Feb 26",
+              date: "2026-02-01T00:00:00.000Z",
+              value: 10,
+            },
+            {
+              periodId: "p3",
+              label: "Mar 26",
+              date: "2026-03-01T00:00:00.000Z",
+              value: 8,
+            },
           ],
           forecast: [
             { label: "Apr 26", date: "2026-04-01T00:00:00.000Z", value: 7 },
@@ -352,8 +392,12 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
   it("renders the forecast filter bar, service chart area, and primary agent lanes", async () => {
     render(<SidakForecastPage />);
 
-    expect(screen.getByText("Forecast")).toBeInTheDocument();
-    expect(screen.getByText("Horizon", { selector: "label" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Forecast" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Horizon", { selector: "label" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Keputusan Cepat")).toBeInTheDocument();
     expect(screen.getByText("Confidence & Coverage")).toBeInTheDocument();
 
@@ -363,7 +407,9 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     expect(screen.getByTestId("forecast-insight-panel")).toBeInTheDocument();
 
-    const chartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+    const chartCall = paramTrendChartMock.mock.lastCall as
+      | [unknown]
+      | undefined;
     const chartProps = chartCall?.[0] as
       | {
           labels?: string[];
@@ -390,13 +436,17 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
       chartProps?.forecastResults?.map((series) => series.scope?.type),
     ).toEqual(["total"]);
     expect(
-      chartProps?.forecastResults?.map((series) => series.scope?.parameterId ?? null),
+      chartProps?.forecastResults?.map(
+        (series) => series.scope?.parameterId ?? null,
+      ),
     ).toEqual([null]);
 
     fireEvent.click(screen.getByRole("button", { name: "Greeting" }));
 
     await waitFor(() => {
-      const nextChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+      const nextChartCall = paramTrendChartMock.mock.lastCall as
+        | [unknown]
+        | undefined;
       const nextChartProps = nextChartCall?.[0] as
         | {
             hiddenKeys?: Set<string>;
@@ -406,7 +456,9 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
           }
         | undefined;
 
-      expect(Array.from(nextChartProps?.hiddenKeys ?? [])).toEqual(["Critical"]);
+      expect(Array.from(nextChartProps?.hiddenKeys ?? [])).toEqual([
+        "Critical",
+      ]);
       expect(nextChartProps?.forecastResults).toHaveLength(2);
       expect(
         nextChartProps?.forecastResults?.map(
@@ -420,7 +472,9 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Critical" }));
 
     await waitFor(() => {
-      const nextChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+      const nextChartCall = paramTrendChartMock.mock.lastCall as
+        | [unknown]
+        | undefined;
       const nextChartProps = nextChartCall?.[0] as
         | {
             hiddenKeys?: Set<string>;
@@ -447,16 +501,29 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
     expect(
       screen.getByRole("heading", { name: "Memburuk" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Stabil/Stagnan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Watchlist" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("forecast-agent-board")).toBeInTheDocument();
     expect(screen.getByText("Agent A")).toBeInTheDocument();
     expect(screen.getByText("Agent B")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sembunyikan Prediksi" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sembunyikan Prediksi" }),
+    );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("forecast-insight-panel")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("forecast-insight-panel"),
+      ).not.toBeInTheDocument();
     });
 
-    const toggledChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+    const toggledChartCall = paramTrendChartMock.mock.lastCall as
+      | [unknown]
+      | undefined;
     const toggledChartProps = toggledChartCall?.[0] as
       | {
           forecastResults?: unknown[];
@@ -469,8 +536,9 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
     const { rerender } = render(<SidakForecastPage />);
 
     expect(await screen.findByText("Agent A")).toBeInTheDocument();
-    const initialServiceCallCount =
-      vi.mocked(sidakClient.dashboard.forecast.$post).mock.calls.length;
+    const initialServiceCallCount = vi.mocked(
+      sidakClient.dashboard.forecast.$post,
+    ).mock.calls.length;
 
     rerender(<SidakForecastPage />);
 
@@ -485,10 +553,13 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
       ...dashboardData,
       folders: [{ id: "folder-call", name: "Tim Call", parent_id: null }],
     };
-
     const { rerender } = render(<SidakForecastPage />);
 
-    expect(await screen.findByText("↳ Tim Call - QA")).toBeInTheDocument();
+    const folderSelect = screen.getByRole("combobox", { name: "Tim" });
+    fireEvent.click(folderSelect);
+    expect(
+      await screen.findByRole("option", { name: "↳ Tim Call - QA" }),
+    ).toBeInTheDocument();
 
     vi.mocked(useApi).mockReturnValue({
       data: scopedDashboardData,
@@ -499,7 +570,39 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     rerender(<SidakForecastPage />);
 
-    expect(screen.getByText("↳ Tim Call - QA")).toBeInTheDocument();
+    if (!screen.queryByRole("option", { name: "↳ Tim Call - QA" })) {
+      fireEvent.click(screen.getByRole("combobox", { name: "Tim" }));
+    }
+    expect(
+      screen.getByRole("option", { name: "↳ Tim Call - QA" }),
+    ).toBeInTheDocument();
+  });
+
+  it("searches team and batch options from the Tim combobox", async () => {
+    render(<SidakForecastPage />);
+
+    const folderTrigger = screen.getByRole("combobox", { name: "Tim" });
+    fireEvent.click(folderTrigger);
+
+    const searchInput = screen.getByRole("combobox", { name: "Cari tim" });
+    fireEvent.change(searchInput, { target: { value: "qa" } });
+
+    expect(
+      await screen.findByRole("option", { name: "↳ Tim Call - QA" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "Tim Call — Semua batch" }),
+    ).not.toBeInTheDocument();
+
+    const batchOption = screen.getByRole("option", {
+      name: "↳ Tim Call - QA",
+    });
+    fireEvent.pointerDown(batchOption, { pointerType: "mouse" });
+    fireEvent.click(batchOption);
+
+    await waitFor(() => {
+      expect(folderTrigger).toHaveTextContent("↳ Tim Call - QA");
+    });
   });
 
   it("keeps state labels readable in dark mode", async () => {
@@ -509,7 +612,9 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
     expect(
       await screen.findByRole("heading", { name: "Membaik" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Pantauan", { selector: "span" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Pantauan", { selector: "span" }),
+    ).toBeInTheDocument();
     document.documentElement.classList.remove("dark");
   });
 
@@ -526,23 +631,19 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     render(<SidakForecastPage />);
 
-    const serviceSelect = (screen.getAllByRole("combobox") as HTMLSelectElement[])
-      .find((select) => Array.from(select.options).some((option) => option.value === "chat"))!;
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
+    fireEvent.click(serviceSelect);
 
-    expect(Array.from(serviceSelect.options).map((option) => option.value)).toEqual([
-      "call",
-      "chat",
-      "email",
-    ]);
-    expect(Array.from(serviceSelect.options).map((option) => option.text)).toEqual([
-      "Call",
-      "Chat",
-      "Email",
-    ]);
+    expect(
+      screen.getAllByRole("option").map((option) => option.textContent?.trim()),
+    ).toEqual(["Call", "Chat", "Email"]);
   });
 
   it("resets the folder and forecast requests when switching from Call to Chat", async () => {
-    const callDashboardData = { ...dashboardData, availableServices: ["call", "chat"] };
+    const callDashboardData = {
+      ...dashboardData,
+      availableServices: ["call", "chat"],
+    };
     const chatDashboardData = {
       ...callDashboardData,
       folders: [{ id: "folder-chat", name: "Tim Whatsapp", parent_id: null }],
@@ -556,16 +657,10 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     const { rerender } = render(<SidakForecastPage />);
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "chat"),
-    )!;
-    const folderSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "folder-call"),
-    )!;
+    const folderSelect = screen.getByRole("combobox", { name: "Tim" });
 
-    await waitFor(() => expect(folderSelect.value).toBe("folder-call"));
-    fireEvent.change(serviceSelect, { target: { value: "chat" } });
+    await waitFor(() => expect(folderSelect).toHaveTextContent("Tim Call"));
+    selectOption("Layanan", "Chat");
 
     vi.mocked(useApi).mockReturnValue({
       data: chatDashboardData,
@@ -576,15 +671,17 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
     rerender(<SidakForecastPage />);
 
     await waitFor(() => {
-      expect(folderSelect.value).toBe("folder-chat");
+      expect(screen.getByRole("combobox", { name: "Tim" })).toHaveTextContent(
+        "Tim Whatsapp",
+      );
     });
     await waitFor(() => {
-      const serviceForecastCall = vi.mocked(
-        sidakClient.dashboard.forecast.$post,
-      ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
-      const agentForecastCall = vi.mocked(
-        sidakClient.forecast.agents.$post,
-      ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+      const serviceForecastCall = vi
+        .mocked(sidakClient.dashboard.forecast.$post)
+        .mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+      const agentForecastCall = vi
+        .mocked(sidakClient.forecast.agents.$post)
+        .mock.calls.at(-1)?.[0] as { json?: any } | undefined;
 
       expect(serviceForecastCall?.json?.filters).toMatchObject({
         serviceType: "chat",
@@ -607,28 +704,23 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     render(<SidakForecastPage />);
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "chat"),
-    )!;
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
 
     expect(serviceSelect).toBeDefined();
     expect(serviceSelect).toBeDisabled();
-    expect(serviceSelect.options).toHaveLength(1);
-    expect(serviceSelect.options[0].value).toBe("chat");
-    expect(serviceSelect.options[0].text).toBe("Chat");
+    expect(serviceSelect).toHaveTextContent("Chat");
 
     await waitFor(() => {
       expect(sidakClient.dashboard.forecast.$post).toHaveBeenCalled();
       expect(sidakClient.forecast.agents.$post).toHaveBeenCalled();
     });
 
-    const serviceForecastCall = vi.mocked(
-      sidakClient.dashboard.forecast.$post,
-    ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
-    const agentForecastCall = vi.mocked(
-      sidakClient.forecast.agents.$post,
-    ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+    const serviceForecastCall = vi
+      .mocked(sidakClient.dashboard.forecast.$post)
+      .mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+    const agentForecastCall = vi
+      .mocked(sidakClient.forecast.agents.$post)
+      .mock.calls.at(-1)?.[0] as { json?: any } | undefined;
 
     expect(serviceForecastCall?.json?.filters?.serviceType).toBe("chat");
     expect(agentForecastCall?.json?.serviceType).toBe("chat");

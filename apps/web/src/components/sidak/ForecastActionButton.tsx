@@ -1,6 +1,6 @@
-import React from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import type { SidakForecastLookupStatus } from "@trainers/types";
+import { Button } from "@/components/ui/button";
 
 interface ForecastActionButtonProps {
   status: SidakForecastLookupStatus;
@@ -26,29 +26,30 @@ export function ForecastActionButton({
 
   const isStale = status === "stale" && !loading;
 
-  const baseClasses =
-    "inline-flex min-h-11 items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
-
-  const sizeClasses = compact ? "px-3 text-xs" : "px-4 py-2 text-base";
-
-  const variantClasses = isStale
-    ? "bg-primary text-primary-foreground ring-2 ring-primary/30 shadow-sm animate-pulse motion-reduce:animate-none hover:bg-primary/90"
-    : "bg-primary/10 text-primary hover:bg-primary/20";
-
   return (
-    <button
+    <Button
       type="button"
-      className={`${baseClasses} ${sizeClasses} ${variantClasses}`}
+      variant={isStale ? "default" : "outline"}
+      size={compact ? "sm" : "lg"}
+      className={
+        isStale
+          ? "min-h-11 animate-pulse ring-2 ring-primary/30 motion-reduce:animate-none hover:bg-primary/90"
+          : "min-h-11 border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
+      }
       disabled={disabled || loading}
       onClick={onClick}
       aria-label={loading ? "Sedang memproses..." : label}
     >
       {loading ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Loader2
+          data-icon="inline-start"
+          className="animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
       ) : (
-        <Sparkles className="mr-2 h-4 w-4" />
+        <Sparkles data-icon="inline-start" aria-hidden="true" />
       )}
       {loading ? "Sedang memproses..." : label}
-    </button>
+    </Button>
   );
 }

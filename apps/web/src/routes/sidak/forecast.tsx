@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -7,7 +6,6 @@ import {
   BadgeAlert,
   BarChart3,
   CalendarDays,
-  ChevronRight,
   Eye,
   EyeOff,
   Loader2,
@@ -25,6 +23,29 @@ import type {
   SidakAgentForecastResponse,
   SidakForecastLookupResult,
 } from "@trainers/types";
+import { cn } from "cn";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
@@ -32,10 +53,7 @@ import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
 import DashboardFilters from "../../components/sidak/DashboardFilters";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
-import {
-  DEFAULT_SERVICE_FOLDER_MAP,
-  SERVICE_LABELS,
-} from "../../lib/scoring";
+import { DEFAULT_SERVICE_FOLDER_MAP, SERVICE_LABELS } from "../../lib/scoring";
 import {
   findPrimarySidakFolderByName,
   normalizeSidakFolderOptions,
@@ -90,7 +108,10 @@ function formatSigned(value: number, digits = 1) {
 }
 
 function formatNumber(value: number, digits = 1) {
-  return Number(value).toFixed(digits).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  return Number(value)
+    .toFixed(digits)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*?)0+$/, "$1");
 }
 
 function safeLabel(label?: string | null) {
@@ -111,8 +132,9 @@ function forecastDirectionMeta(direction: "up" | "down" | "stable") {
       label: "Membaik",
       hint: "Temuan diproyeksikan turun",
       icon: TrendingDown,
-      tone: "text-emerald-600 dark:text-emerald-400",
-      badge: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      tone: "text-emerald-700 dark:text-emerald-400",
+      badge:
+        "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
   if (direction === "up") {
@@ -120,8 +142,9 @@ function forecastDirectionMeta(direction: "up" | "down" | "stable") {
       label: "Memburuk",
       hint: "Temuan diproyeksikan naik",
       icon: TrendingUp,
-      tone: "text-rose-600 dark:text-rose-400",
-      badge: "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+      tone: "text-rose-700 dark:text-rose-400",
+      badge:
+        "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
     };
   }
   return {
@@ -138,14 +161,14 @@ function statusMeta(status: SidakAgentForecastEntry["forecastStatus"]) {
     return {
       label: "Membaik",
       icon: ArrowUpRight,
-      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
   if (status === "declining") {
     return {
       label: "Memburuk",
       icon: ArrowDownRight,
-      tone: "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+      tone: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
     };
   }
   if (status === "stable") {
@@ -158,7 +181,7 @@ function statusMeta(status: SidakAgentForecastEntry["forecastStatus"]) {
   return {
     label: "Pantauan",
     icon: ShieldAlert,
-    tone: "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    tone: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   };
 }
 
@@ -166,18 +189,18 @@ function confidenceMeta(confidence: "low" | "medium" | "high") {
   if (confidence === "high") {
     return {
       label: "Tinggi",
-      tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
   if (confidence === "medium") {
     return {
       label: "Sedang",
-      tone: "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      tone: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
     };
   }
   return {
     label: "Rendah",
-    tone: "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    tone: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-400",
   };
 }
 
@@ -191,14 +214,14 @@ function ForecastMetric({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-bg px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
+    <div className="rounded-lg border border-border bg-background px-4 py-3">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold tracking-tight text-foreground tabular-nums">
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -220,41 +243,52 @@ function ForecastLane({
 }) {
   const titleTone =
     tone === "emerald"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-emerald-700 dark:text-emerald-400"
       : tone === "rose"
-        ? "text-rose-600 dark:text-rose-400"
+        ? "text-rose-700 dark:text-rose-400"
         : tone === "amber"
-          ? "text-amber-600 dark:text-amber-400"
+          ? "text-amber-700 dark:text-amber-400"
           : "text-foreground";
 
-  const iconTone =
-    tone === "emerald"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "rose"
-        ? "text-rose-600 dark:text-rose-400"
-        : tone === "amber"
-          ? "text-amber-600 dark:text-amber-400"
-          : "text-foreground";
+  const dotTone =
+    tone === "rose"
+      ? "bg-destructive"
+      : tone === "slate"
+        ? "bg-muted-foreground"
+        : "bg-primary";
 
   return (
-    <section className="rounded-2xl border border-border bg-surface">
-      <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-5">
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background">
+      <div className="flex min-h-24 items-start justify-between gap-3 border-b border-border p-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Users className={`h-4 w-4 ${iconTone}`} />
-            <h3 className={`font-outfit text-base font-bold tracking-tight ${titleTone}`}>
+            <span
+              aria-hidden="true"
+              className={cn("size-2.5 rounded-full", dotTone)}
+            />
+            <h3
+              className={cn(
+                "truncate font-heading text-sm font-semibold tracking-tight sm:text-base",
+                titleTone,
+              )}
+            >
               {title}
             </h3>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1 text-xs leading-4 text-muted-foreground">
+            {description}
+          </p>
         </div>
-        <div className="shrink-0 rounded-full border border-border bg-bg px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <Badge
+          variant="secondary"
+          className="min-w-6 shrink-0 justify-center tabular-nums"
+        >
           {entries.length}
-        </div>
+        </Badge>
       </div>
 
       {entries.length === 0 ? (
-        <div className="px-4 py-6 sm:px-5">
+        <div className="flex min-h-48 items-center p-3">
           <QaStatePanel
             type="empty"
             compact={compact}
@@ -263,11 +297,18 @@ function ForecastLane({
           />
         </div>
       ) : (
-        <div className="divide-y divide-border">
-          {entries.map((entry, index) => (
-            <AgentRow key={entry.agentId} entry={entry} rank={index + 1} />
-          ))}
-        </div>
+        <ScrollArea className="h-[21rem] sm:h-[23rem]">
+          <div className="divide-y divide-border">
+            {entries.map((entry, index) => (
+              <AgentRow
+                key={entry.agentId}
+                entry={entry}
+                rank={index + 1}
+                compact={compact}
+              />
+            ))}
+          </div>
+        </ScrollArea>
       )}
     </section>
   );
@@ -276,34 +317,48 @@ function ForecastLane({
 function AgentRow({
   entry,
   rank,
+  compact = false,
 }: {
   entry: SidakAgentForecastEntry;
   rank: number;
+  compact?: boolean;
 }) {
   const meta = statusMeta(entry.forecastStatus);
   const StatusIcon = meta.icon;
   return (
-    <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
-      <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-bg text-xs font-bold text-foreground">
+    <article
+      className={cn(
+        "flex items-start p-4 sm:p-5",
+        compact ? "gap-2.5 p-3" : "gap-4",
+      )}
+    >
+      <Avatar
+        size={compact ? "sm" : "lg"}
+        className="rounded-lg bg-muted after:rounded-lg"
+      >
         {entry.foto_url ? (
-          <img
+          <AvatarImage
             src={entry.foto_url}
             alt={entry.nama}
-            className="h-full w-full rounded-xl object-cover"
+            className="rounded-lg"
           />
-        ) : (
-          agentInitials(entry.nama)
-        )}
-      </div>
+        ) : null}
+        <AvatarFallback className="rounded-lg font-heading text-xs font-semibold text-foreground">
+          {agentInitials(entry.nama)}
+        </AvatarFallback>
+      </Avatar>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border bg-bg px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Badge
+                variant="outline"
+                className="h-5 px-1.5 text-[11px] tabular-nums"
+              >
                 #{rank}
-              </span>
-              <h4 className="truncate font-outfit text-sm font-bold tracking-tight text-foreground">
+              </Badge>
+              <h4 className="truncate font-heading text-sm font-semibold tracking-tight text-foreground">
                 {entry.nama}
               </h4>
             </div>
@@ -313,63 +368,125 @@ function AgentRow({
             </p>
           </div>
 
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.tone}`}>
-            <StatusIcon className="h-3.5 w-3.5" />
-            {meta.label}
-          </span>
+          <Badge
+            variant="outline"
+            className={cn("h-auto py-1", compact && "h-5 px-1.5", meta.tone)}
+          >
+            <StatusIcon data-icon="inline-start" aria-hidden="true" />
+            <span className={compact ? "sr-only" : undefined}>
+              {meta.label}
+            </span>
+          </Badge>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <dl
+          className={cn(
+            "grid gap-3",
+            compact
+              ? "mt-3 grid-cols-2 gap-x-3 gap-y-2 border-t border-border/70 pt-3"
+              : "mt-4 grid-cols-1 sm:grid-cols-3",
+          )}
+        >
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Skor
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
+            <dt className="text-xs font-medium text-muted-foreground">Skor</dt>
+            <dd
+              className={cn(
+                "mt-1 font-semibold tabular-nums text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
               {formatNumber(entry.latestScore, 1)}
-              <span className="mx-1 text-muted-foreground">→</span>
+              <span className="mx-1 text-muted-foreground" aria-hidden="true">
+                →
+              </span>
               {formatNumber(entry.projectedScore, 1)}
-            </p>
+            </dd>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Tren Temuan
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
+            <dt className="text-xs font-medium text-muted-foreground">
+              Tren temuan
+            </dt>
+            <dd
+              className={cn(
+                "mt-1 font-semibold tabular-nums text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
               {formatSigned(entry.findingsSlope, 2)}/periode
-            </p>
+            </dd>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <dt className="text-xs font-medium text-muted-foreground">
               Confidence
-            </p>
-            <p className="mt-1 text-sm font-semibold text-foreground">
+            </dt>
+            <dd
+              className={cn(
+                "mt-1 font-semibold text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
               {confidenceMeta(entry.confidence).label}
-            </p>
+            </dd>
           </div>
-        </div>
+          {compact ? (
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">
+                Data
+              </dt>
+              <dd className="mt-1 text-xs font-semibold tabular-nums text-foreground">
+                {entry.sourcePointCount} titik
+              </dd>
+            </div>
+          ) : null}
+        </dl>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            {entry.latestPeriodLabel}
-          </span>
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            {entry.sourcePointCount} titik data
-          </span>
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            Skor akhir {formatNumber(entry.latestScore, 1)}
-          </span>
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            Temuan akhir {formatNumber(entry.latestFindingsCount, 0)}
-          </span>
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            Tren temuan {formatSigned(entry.findingsSlope, 2)}/periode
-          </span>
-          <span className="rounded-full border border-border bg-bg px-2 py-1">
-            Prediksi temuan {formatNumber(entry.projectedFindings, 1)}
-          </span>
-        </div>
+        {compact ? (
+          <p className="mt-3 truncate border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
+            {entry.latestPeriodLabel} · Prediksi{" "}
+            {formatNumber(entry.projectedFindings, 1)} temuan
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              {entry.latestPeriodLabel}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              {entry.sourcePointCount} titik data
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              Skor akhir {formatNumber(entry.latestScore, 1)}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              Temuan akhir {formatNumber(entry.latestFindingsCount, 0)}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              Tren temuan {formatSigned(entry.findingsSlope, 2)}/periode
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-auto py-1 text-xs font-normal"
+            >
+              Prediksi temuan {formatNumber(entry.projectedFindings, 1)}
+            </Badge>
+          </div>
+        )}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -424,7 +541,10 @@ export default function SidakForecastPage() {
   );
   useEffect(() => {
     if (data?.folders) {
-      if (selectedFolder === "ALL" || normalizedFolders.length > allFolders.length) {
+      if (
+        selectedFolder === "ALL" ||
+        normalizedFolders.length > allFolders.length
+      ) {
         setAllFolders(normalizedFolders);
       }
     }
@@ -479,7 +599,8 @@ export default function SidakForecastPage() {
   );
   const visibleSeriesCount =
     visibleParameterDatasets.length + (showTotalTrend ? 1 : 0);
-  const canActivateMoreParams = visibleSeriesCount < MAX_VISIBLE_PARAMETER_SERIES;
+  const canActivateMoreParams =
+    visibleSeriesCount < MAX_VISIBLE_PARAMETER_SERIES;
   const canShowTotalTrend =
     showTotalTrend || visibleSeriesCount < MAX_VISIBLE_PARAMETER_SERIES;
   const shouldHideTotalLine = !showTotalTrend;
@@ -489,10 +610,13 @@ export default function SidakForecastPage() {
     }
 
     const parameterSeries = visibleParameterDatasets
-      .map((dataset) =>
-        serviceForecastSnapshot.series.parameters[dataset.label] ?? null,
+      .map(
+        (dataset) =>
+          serviceForecastSnapshot.series.parameters[dataset.label] ?? null,
       )
-      .filter((series): series is NonNullable<typeof series> => series !== null);
+      .filter(
+        (series): series is NonNullable<typeof series> => series !== null,
+      );
 
     return showTotalTrend
       ? [serviceForecastSnapshot.series.total, ...parameterSeries]
@@ -572,7 +696,14 @@ export default function SidakForecastPage() {
       endMonth: endMonth ?? undefined,
       horizonMonths: selectedHorizon,
     }),
-    [selectedYear, effectiveService, selectedFolder, startMonth, endMonth, selectedHorizon],
+    [
+      selectedYear,
+      effectiveService,
+      selectedFolder,
+      startMonth,
+      endMonth,
+      selectedHorizon,
+    ],
   );
 
   const serviceLookupKey = useMemo(
@@ -600,7 +731,11 @@ export default function SidakForecastPage() {
 
   const requestServiceForecast = useCallback(
     async (options: { forceRefresh?: boolean; cacheOnly?: boolean }) => {
-      if (!data || (data.paramTrend.labels?.length ?? 0) < 2 || !activeTotalDataset) {
+      if (
+        !data ||
+        (data.paramTrend.labels?.length ?? 0) < 2 ||
+        !activeTotalDataset
+      ) {
         setServiceForecastLookup(null);
         return null;
       }
@@ -677,7 +812,13 @@ export default function SidakForecastPage() {
     void requestServiceForecast({ cacheOnly: true }).catch((err: any) => {
       console.error("Service forecast lookup error:", err);
     });
-  }, [serviceLookupKey, loading, data, activeTotalDataset, requestServiceForecast]);
+  }, [
+    serviceLookupKey,
+    loading,
+    data,
+    activeTotalDataset,
+    requestServiceForecast,
+  ]);
 
   useEffect(() => {
     setAgentForecastResult(null);
@@ -728,165 +869,245 @@ export default function SidakForecastPage() {
       (agentForecastResult?.summary.stableCount ?? 0) ===
       0 &&
     (agentForecastResult?.summary.watchlistCount ?? 0) > 0;
+  const isRefreshing = serviceForecastLoading || agentForecastLoading;
+  const selectedFolderLabel =
+    selectedFolder === "ALL"
+      ? "Semua tim"
+      : safeLabel(folders.find((folder) => folder.id === selectedFolder)?.name);
 
   return (
     <main className="min-h-dvh bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="flex flex-col gap-2"
-          >
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <BarChart3 className="h-3.5 w-3.5" />
-              SIDAK / Forecast
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <BarChart3 aria-hidden="true" className="size-4" />
+            <span>SIDAK</span>
+            <span aria-hidden="true">/</span>
+            <span className="text-foreground">Forecast</span>
+          </div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                Forecast
+              </h1>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Lihat proyeksi layanan, baca sinyal cepat untuk coaching, dan
+                prioritaskan agent yang akan membaik atau memburuk dalam horizon
+                yang dipilih.
+              </p>
             </div>
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-              <div className="min-w-0">
-                <h1 className="font-outfit text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-                  Forecast
-                </h1>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Lihat proyeksi layanan, baca sinyal cepat untuk coaching, dan
-                  prioritaskan agent yang akan membaik atau memburuk dalam horizon
-                  yang dipilih.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Perbarui
-              </button>
-            </div>
-          </motion.div>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              <RefreshCw
+                data-icon="inline-start"
+                className={cn(
+                  isRefreshing && "animate-spin motion-reduce:animate-none",
+                )}
+                aria-hidden="true"
+              />
+              Perbarui
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: "easeOut", delay: 0.05 }}
-          className="rounded-2xl border border-border bg-surface p-4 sm:p-5"
-        >
-          <DashboardFilters
-            selectedService={selectedService}
-            onServiceChange={(value) => {
-              const nextFolderName = DEFAULT_SERVICE_FOLDER_MAP[value] ?? null;
-              const matchedFolder = findPrimarySidakFolderByName(
-                folders,
-                nextFolderName,
-              );
-              setSelectedService(value);
-              setSelectedFolder(matchedFolder?.id ?? "ALL");
-              initialFolderSetRef.current = Boolean(matchedFolder);
-            }}
-            selectedFolder={selectedFolder}
-            onFolderChange={setSelectedFolder}
-            selectedYear={selectedYear}
-            onYearChange={setSelectedYear}
-            startMonth={startMonth}
-            endMonth={endMonth}
-            onMonthRangeChange={(start, end) => {
-              setStartMonth(start);
-              setEndMonth(end);
-            }}
-            folders={folders}
-            availableYears={availableYears}
-            leaderLockedService={leaderLockedService}
-            availableServices={availableServices as string[]}
-          />
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Horizon
-              </label>
-              <select
-                value={selectedHorizon}
-                onChange={(e) => setSelectedHorizon(Number(e.target.value))}
-                className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground outline-none transition-colors focus:border-foreground"
-              >
-                {MONTH_OPTIONS.map((month) => (
-                  <option key={month} value={month}>
-                    {month} bulan
-                  </option>
-                ))}
-              </select>
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <Card className="gap-0 border border-border bg-card py-0 ring-0">
+          <CardHeader className="border-b border-border p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <CalendarDays aria-hidden="true" className="size-4" />
+              </div>
+              <div>
+                <CardTitle
+                  role="heading"
+                  aria-level={2}
+                  className="font-heading text-base font-semibold tracking-tight"
+                >
+                  Konteks forecast
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Pilih layanan, tim, periode, dan horizon sebelum membaca
+                  proyeksi.
+                </CardDescription>
+              </div>
             </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
+            <DashboardFilters
+              selectedService={selectedService}
+              onServiceChange={(value) => {
+                const nextFolderName =
+                  DEFAULT_SERVICE_FOLDER_MAP[value] ?? null;
+                const matchedFolder = findPrimarySidakFolderByName(
+                  folders,
+                  nextFolderName,
+                );
+                setSelectedService(value);
+                setSelectedFolder(matchedFolder?.id ?? "ALL");
+                initialFolderSetRef.current = Boolean(matchedFolder);
+              }}
+              selectedFolder={selectedFolder}
+              onFolderChange={setSelectedFolder}
+              selectedYear={selectedYear}
+              onYearChange={setSelectedYear}
+              startMonth={startMonth}
+              endMonth={endMonth}
+              onMonthRangeChange={(start, end) => {
+                setStartMonth(start);
+                setEndMonth(end);
+              }}
+              folders={folders}
+              availableYears={availableYears}
+              leaderLockedService={leaderLockedService}
+              availableServices={availableServices as string[]}
+            />
 
-            <div className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-sm text-muted-foreground">
-              <ChevronRight className="h-4 w-4 rotate-90" />
-              <span>{selectedServiceLabel}</span>
-            </div>
-
-            <div className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>
-                {selectedFolder === "ALL"
-                  ? "Semua tim"
-                  : safeLabel(
-                      folders.find((folder) => folder.id === selectedFolder)?.name,
-                    )}
-              </span>
-            </div>
-          </div>
-        </motion.section>
-
-        <div className="mt-6 space-y-6">
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut", delay: 0.08 }}
-            className="grid gap-4 lg:grid-cols-2"
-          >
-            <section className="rounded-2xl border border-border bg-surface">
-              <div className="border-b border-border px-4 py-4 sm:px-5">
-                <div className="flex items-center gap-2">
-                  <BadgeAlert className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="font-outfit text-base font-bold tracking-tight text-foreground">
-                    Keputusan Cepat
-                  </h2>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {serviceDirection?.hint ??
-                    "Gunakan panel ini untuk membaca arah layanan dalam satu layar."}
-                </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex min-w-40 flex-col gap-1.5">
+                <Label
+                  htmlFor="sidak-forecast-horizon"
+                  className="text-xs font-semibold text-muted-foreground [&_svg]:size-3.5"
+                >
+                  <CalendarDays aria-hidden="true" />
+                  Horizon
+                </Label>
+                <Select
+                  items={MONTH_OPTIONS.map((month) => ({
+                    value: String(month),
+                    label: `${month} bulan`,
+                  }))}
+                  value={String(selectedHorizon)}
+                  onValueChange={(value) => {
+                    if (value !== null) setSelectedHorizon(Number(value));
+                  }}
+                >
+                  <SelectTrigger
+                    id="sidak-forecast-horizon"
+                    aria-label="Horizon"
+                    className="min-h-11 w-full rounded-lg border-border bg-background text-sm font-medium hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+                  >
+                    <SelectValue placeholder="Pilih horizon" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectGroup>
+                      {MONTH_OPTIONS.map((month) => (
+                        <SelectItem key={month} value={String(month)}>
+                          {month} bulan
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-4 px-4 py-4 sm:px-5">
+              <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Layanan
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="max-w-48 truncate font-medium"
+                >
+                  {selectedServiceLabel}
+                </Badge>
+              </div>
+
+              <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-muted/20 px-3">
+                <Users
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground"
+                />
+                <span className="text-xs font-medium text-muted-foreground">
+                  Tim
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="max-w-56 truncate font-medium"
+                >
+                  {selectedFolderLabel}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <Card className="gap-0 border border-border bg-card py-0 ring-0">
+              <CardHeader className="border-b border-border p-4 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <BadgeAlert
+                    aria-hidden="true"
+                    className="size-4 text-muted-foreground"
+                  />
+                  <CardTitle
+                    role="heading"
+                    aria-level={2}
+                    className="font-heading text-base font-semibold tracking-tight"
+                  >
+                    Keputusan Cepat
+                  </CardTitle>
+                </div>
+                <CardDescription className="mt-1">
+                  {serviceDirection?.hint ??
+                    "Gunakan panel ini untuk membaca arah layanan dalam satu layar."}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs font-medium text-muted-foreground">
                       Rekomendasi
                     </p>
-                    <p className={`mt-1 flex items-center gap-2 text-sm font-semibold ${serviceDirection?.tone ?? "text-foreground"}`}>
+                    <p
+                      className={cn(
+                        "mt-1 flex items-center gap-2 text-sm font-semibold",
+                        serviceDirection?.tone ?? "text-foreground",
+                      )}
+                    >
                       {ServiceDirectionIcon ? (
-                        <ServiceDirectionIcon className="h-4 w-4" />
+                        <ServiceDirectionIcon
+                          aria-hidden="true"
+                          className="size-4"
+                        />
                       ) : (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2
+                          aria-hidden="true"
+                          className="size-4 animate-spin motion-reduce:animate-none"
+                        />
                       )}
                       {serviceDirection?.label ?? "Menunggu data"}
                     </p>
                   </div>
                   {confidence ? (
-                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${confidence.tone}`}>
+                    <Badge
+                      variant="outline"
+                      className={cn("h-auto py-1", confidence.tone)}
+                    >
                       Confidence {confidence.label}
-                    </span>
+                    </Badge>
                   ) : null}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <ForecastMetric
                     label="Periode"
-                    value={serviceForecastSeries?.summary.sourcePointCount?.toString() ?? "0"}
-                    hint={serviceForecastSeries?.summary.method ?? "linear-regression"}
+                    value={
+                      serviceForecastSeries?.summary.sourcePointCount?.toString() ??
+                      "0"
+                    }
+                    hint={
+                      serviceForecastSeries?.summary.method ??
+                      "linear-regression"
+                    }
                   />
                   <ForecastMetric
                     label="Horizon"
@@ -895,9 +1116,9 @@ export default function SidakForecastPage() {
                   />
                 </div>
 
-                <div className="rounded-xl border border-border bg-bg px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Status Snapshot
+                <div className="rounded-lg border border-border bg-muted/20 px-4 py-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Status snapshot
                   </p>
                   <p className="mt-1 text-sm font-semibold text-foreground">
                     {serviceForecastLookup?.status === "fresh"
@@ -914,95 +1135,127 @@ export default function SidakForecastPage() {
                       : "Belum ada series forecast."}
                   </p>
                 </div>
-              </div>
-            </section>
+              </CardContent>
+            </Card>
 
-            <section className="rounded-2xl border border-border bg-surface">
-              <div className="border-b border-border px-4 py-4 sm:px-5">
+            <Card className="gap-0 border border-border bg-card py-0 ring-0">
+              <CardHeader className="border-b border-border p-4 sm:p-5">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="font-outfit text-base font-bold tracking-tight text-foreground">
-                    Confidence & Coverage
-                  </h2>
+                  <AlertTriangle
+                    aria-hidden="true"
+                    className="size-4 text-muted-foreground"
+                  />
+                  <CardTitle
+                    role="heading"
+                    aria-level={2}
+                    className="font-heading text-base font-semibold tracking-tight"
+                  >
+                    Confidence &amp; Coverage
+                  </CardTitle>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Coverage menilai seberapa banyak agent yang bisa diproyeksikan.
-                </p>
-              </div>
+                <CardDescription className="mt-1">
+                  Coverage menilai seberapa banyak agent yang bisa
+                  diproyeksikan.
+                </CardDescription>
+              </CardHeader>
 
-              <div className="grid gap-3 px-4 py-4 sm:px-5">
+              <CardContent className="grid gap-3 p-4 sm:p-5">
                 <ForecastMetric
-                  label="Agent Eligible"
-                  value={String(agentForecastResult?.summary.totalEligible ?? 0)}
+                  label="Agent eligible"
+                  value={String(
+                    agentForecastResult?.summary.totalEligible ?? 0,
+                  )}
                   hint={`Horizon ${selectedHorizon} bulan · ${agentForecastResult?.summary.latestPeriodLabel ?? "N/A"}`}
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <ForecastMetric
                     label="Membaik"
-                    value={String(agentForecastResult?.summary.improvingCount ?? 0)}
+                    value={String(
+                      agentForecastResult?.summary.improvingCount ?? 0,
+                    )}
                   />
                   <ForecastMetric
                     label="Memburuk"
-                    value={String(agentForecastResult?.summary.decliningCount ?? 0)}
+                    value={String(
+                      agentForecastResult?.summary.decliningCount ?? 0,
+                    )}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <ForecastMetric
-                    label="Stabil/Stagnan"
-                    value={String(agentForecastResult?.summary.stableCount ?? 0)}
+                    label="Stabil/stagnan"
+                    value={String(
+                      agentForecastResult?.summary.stableCount ?? 0,
+                    )}
                   />
                   <ForecastMetric
                     label="Pantauan"
-                    value={String(agentForecastResult?.summary.watchlistCount ?? 0)}
+                    value={String(
+                      agentForecastResult?.summary.watchlistCount ?? 0,
+                    )}
                   />
                 </div>
-              </div>
-            </section>
-          </motion.section>
+              </CardContent>
+            </Card>
+          </div>
 
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut", delay: 0.08 }}
-            className="rounded-2xl border border-border bg-surface"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-5">
+          <Card className="gap-0 border border-border bg-card py-0 ring-0">
+            <CardHeader className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="font-outfit text-base font-bold tracking-tight text-foreground">
+                  <Sparkles
+                    aria-hidden="true"
+                    className="size-4 text-muted-foreground"
+                  />
+                  <CardTitle
+                    role="heading"
+                    aria-level={2}
+                    className="font-heading text-base font-semibold tracking-tight"
+                  >
                     Forecast Layanan
-                  </h2>
+                  </CardTitle>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Reuse trendline dashboard untuk layanan terpilih. Penurunan temuan
-                  dibaca sebagai perbaikan.
-                </p>
+                <CardDescription className="mt-1 max-w-2xl">
+                  Reuse trendline dashboard untuk layanan terpilih. Penurunan
+                  temuan dibaca sebagai perbaikan.
+                </CardDescription>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <CardAction className="static col-auto row-auto flex flex-wrap items-center gap-2">
                 {serviceForecastSnapshot ? (
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => setShowForecastPrediction((current) => !current)}
+                    variant="outline"
+                    size="lg"
+                    onClick={() =>
+                      setShowForecastPrediction((current) => !current)
+                    }
                     aria-pressed={showForecastPrediction}
-                    className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    className="min-h-11 w-full sm:w-auto"
                   >
                     {showForecastPrediction ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeOff data-icon="inline-start" aria-hidden="true" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye data-icon="inline-start" aria-hidden="true" />
                     )}
-                    {showForecastPrediction ? "Sembunyikan Prediksi" : "Tampilkan Prediksi"}
-                  </button>
+                    {showForecastPrediction
+                      ? "Sembunyikan Prediksi"
+                      : "Tampilkan Prediksi"}
+                  </Button>
                 ) : null}
-              </div>
+              </CardAction>
+            </CardHeader>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <div className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2">
-                  <ChevronRight className="h-4 w-4 rotate-90 text-muted-foreground" />
-                  <button
+            <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Tampilkan
+                  </span>
+                  <Button
                     type="button"
+                    variant={showTotalTrend ? "default" : "outline"}
+                    size="lg"
                     onClick={() => {
                       if (!canShowTotalTrend) return;
                       if (
@@ -1021,11 +1274,7 @@ export default function SidakForecastPage() {
                     }}
                     aria-pressed={showTotalTrend}
                     disabled={!canShowTotalTrend}
-                    className={`rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-                      showTotalTrend
-                        ? "bg-foreground text-background"
-                        : "text-foreground hover:bg-muted"
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    className="min-h-10"
                     title={
                       !canShowTotalTrend
                         ? "Maksimal 2 data tampil. Nonaktifkan salah satu parameter terlebih dahulu."
@@ -1033,21 +1282,22 @@ export default function SidakForecastPage() {
                     }
                   >
                     {showTotalTrend ? "Total Temuan" : "Per Parameter"}
-                  </button>
-                </div>
+                  </Button>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">
                     Parameter
                   </span>
                   {serviceParameterDatasets.map((dataset) => {
                     const isHidden = activeHiddenParams.has(dataset.label);
-                    const disableActivation = isHidden && !canActivateMoreParams;
+                    const disableActivation =
+                      isHidden && !canActivateMoreParams;
 
                     return (
-                      <button
+                      <Button
                         key={dataset.label}
                         type="button"
+                        variant={isHidden ? "outline" : "default"}
+                        size="lg"
                         disabled={disableActivation}
                         onClick={() => {
                           if (disableActivation) return;
@@ -1061,35 +1311,28 @@ export default function SidakForecastPage() {
                             return next;
                           });
                         }}
-                        className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
-                          isHidden
-                            ? disableActivation
-                              ? "border-border/60 bg-bg text-muted-foreground/60 opacity-60"
-                              : "border-border bg-bg text-muted-foreground hover:bg-muted"
-                            : "border-foreground bg-foreground text-background"
-                        }`}
+                        aria-pressed={!isHidden}
+                        className="min-h-10 max-w-48"
                         title={
                           disableActivation
                             ? "Maksimal 2 data tampil. Nonaktifkan salah satu terlebih dahulu."
                             : undefined
                         }
                       >
-                        <span className="max-w-[150px] truncate">
-                          {dataset.label}
-                        </span>
-                      </button>
+                        <span className="truncate">{dataset.label}</span>
+                      </Button>
                     );
                   })}
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs leading-5 text-muted-foreground">
                 Total aktif menampilkan satu parameter. Matikan total untuk
                 membandingkan dua parameter sekaligus.
               </p>
-            </div>
+            </CardContent>
 
-            <div className="space-y-4 px-4 py-4 sm:px-5">
+            <CardContent className="flex flex-col gap-4 border-t border-border p-4 sm:p-5">
               {loading && !data ? (
                 <QaStatePanel
                   type="loading"
@@ -1102,34 +1345,40 @@ export default function SidakForecastPage() {
                   title="Data dashboard gagal dimuat"
                   description="Periksa koneksi atau scope akses Anda."
                   action={
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="lg"
                       onClick={() => void refetch()}
-                      className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      className="min-h-11"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw data-icon="inline-start" aria-hidden="true" />
                       Coba lagi
-                    </button>
+                    </Button>
                   }
                 />
-              ) : (data?.paramTrend.labels?.length ?? 0) < 2 || !activeTotalDataset ? (
+              ) : (data?.paramTrend.labels?.length ?? 0) < 2 ||
+                !activeTotalDataset ? (
                 <QaStatePanel
                   type="empty"
                   title="Data historis minimal 2 periode diperlukan."
                   description="Service forecast belum bisa dihitung untuk filter ini."
                 />
               ) : serviceForecastLoading && !serviceForecastLookup ? (
-                <div className="animate-pulse space-y-3">
-                  <div className="h-[320px] rounded-2xl border border-border bg-bg" />
+                <div
+                  className="flex flex-col gap-3"
+                  aria-label="Memuat grafik forecast"
+                >
+                  <Skeleton className="h-[320px] rounded-lg motion-reduce:animate-none" />
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="h-20 rounded-xl border border-border bg-bg" />
-                    <div className="h-20 rounded-xl border border-border bg-bg" />
-                    <div className="h-20 rounded-xl border border-border bg-bg" />
+                    <Skeleton className="h-20 rounded-lg motion-reduce:animate-none" />
+                    <Skeleton className="h-20 rounded-lg motion-reduce:animate-none" />
+                    <Skeleton className="h-20 rounded-lg motion-reduce:animate-none" />
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="h-[320px] rounded-2xl border border-border bg-bg p-2">
+                  <div className="h-[320px] rounded-lg border border-border bg-background p-2 sm:h-[360px]">
                     <ParamTrendChart
                       labels={data?.paramTrend.labels ?? []}
                       datasets={serviceTrendDatasets}
@@ -1187,88 +1436,91 @@ export default function SidakForecastPage() {
                   </div>
                 </>
               )}
-            </div>
-          </motion.section>
+            </CardContent>
+          </Card>
+
+          <Card className="gap-0 border border-border bg-card py-0 ring-0">
+            <CardHeader className="border-b border-border p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <Users
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground"
+                />
+                <CardTitle
+                  role="heading"
+                  aria-level={2}
+                  className="font-heading text-base font-semibold tracking-tight"
+                >
+                  Forecast Agent
+                </CardTitle>
+              </div>
+              <CardDescription className="mt-1">
+                Agent dengan tren positif diprioritaskan untuk scaling. Tren
+                negatif diprioritaskan untuk coaching.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-4 sm:p-5">
+              {agentForecastLoading && !agentForecastResult ? (
+                <QaStatePanel
+                  type="loading"
+                  title="Memproses proyeksi agent"
+                  description="Menghitung regresi skor, temuan, dan critical findings per agent."
+                />
+              ) : agentForecastError ? (
+                <QaStatePanel
+                  type="error"
+                  title="Forecast agent gagal dimuat"
+                  description={agentForecastError}
+                />
+              ) : onlyWatchlist ? (
+                <QaStatePanel
+                  type="empty"
+                  title="Belum cukup periode audit untuk memproyeksikan agent."
+                  description="Semua agent saat ini masuk watchlist karena jumlah periode yang tersedia masih terlalu sedikit."
+                />
+              ) : (
+                <div
+                  data-testid="forecast-agent-board"
+                  className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                >
+                  <ForecastLane
+                    title="Membaik"
+                    description="Skor naik atau temuan turun."
+                    entries={improvementLane}
+                    emptyMessage="Belum ada agent yang diproyeksikan membaik."
+                    tone="emerald"
+                    compact
+                  />
+                  <ForecastLane
+                    title="Memburuk"
+                    description="Skor turun atau temuan naik."
+                    entries={decliningLane}
+                    emptyMessage="Belum ada agent yang diproyeksikan memburuk."
+                    tone="rose"
+                    compact
+                  />
+                  <ForecastLane
+                    title="Stabil/Stagnan"
+                    description="Perubahan belum signifikan."
+                    entries={stableLane}
+                    emptyMessage="Belum ada agent yang stabil/stagnan pada filter ini."
+                    tone="slate"
+                    compact
+                  />
+                  <ForecastLane
+                    title="Watchlist"
+                    description="Data belum cukup untuk proyeksi."
+                    entries={watchlistLane}
+                    emptyMessage="Belum ada agent watchlist."
+                    tone="amber"
+                    compact
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-
-        <section className="mt-6 rounded-2xl border border-border bg-surface">
-          <div className="border-b border-border px-4 py-4 sm:px-5">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <h2 className="font-outfit text-base font-bold tracking-tight text-foreground">
-                Forecast Agent
-              </h2>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Agent dengan tren positif diprioritaskan untuk scaling. Tren negatif
-              diprioritaskan untuk coaching.
-            </p>
-          </div>
-
-          {agentForecastLoading && !agentForecastResult ? (
-            <div className="px-4 py-5 sm:px-5">
-              <QaStatePanel
-                type="loading"
-                title="Memproses proyeksi agent"
-                description="Menghitung regresi skor, temuan, dan critical findings per agent."
-              />
-            </div>
-          ) : agentForecastError ? (
-            <div className="px-4 py-5 sm:px-5">
-              <QaStatePanel
-                type="error"
-                title="Forecast agent gagal dimuat"
-                description={agentForecastError}
-              />
-            </div>
-          ) : onlyWatchlist ? (
-            <div className="px-4 py-5 sm:px-5">
-              <QaStatePanel
-                type="empty"
-                title="Belum cukup periode audit untuk memproyeksikan agent."
-                description="Semua agent saat ini masuk watchlist karena jumlah periode yang tersedia masih terlalu sedikit."
-              />
-            </div>
-          ) : (
-            <div className="space-y-6 p-4 sm:p-5">
-              <div className="grid gap-6 xl:grid-cols-2">
-                <ForecastLane
-                  title="Membaik"
-                  description="Agent dengan skor naik atau temuan turun."
-                  entries={improvementLane}
-                  emptyMessage="Belum ada agent yang diproyeksikan membaik."
-                  tone="emerald"
-                />
-                <ForecastLane
-                  title="Memburuk"
-                  description="Agent dengan skor turun, temuan naik, atau critical naik."
-                  entries={decliningLane}
-                  emptyMessage="Belum ada agent yang diproyeksikan memburuk."
-                  tone="rose"
-                />
-              </div>
-
-              <div className="grid gap-6 xl:grid-cols-2">
-                <ForecastLane
-                  title="Stabil/Stagnan"
-                  description="Perubahan belum cukup kuat untuk masuk lane prioritas."
-                  entries={stableLane}
-                  emptyMessage="Belum ada agent yang stabil/stagnan pada filter ini."
-                  tone="slate"
-                  compact
-                />
-                <ForecastLane
-                  title="Watchlist"
-                  description="Agent dengan data kurang dari 2 periode."
-                  entries={watchlistLane}
-                  emptyMessage="Belum ada agent watchlist."
-                  tone="amber"
-                  compact
-                />
-              </div>
-            </div>
-          )}
-        </section>
       </div>
     </main>
   );
