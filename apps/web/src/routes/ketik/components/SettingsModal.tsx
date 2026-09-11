@@ -1,6 +1,9 @@
 import { useRef } from "react";
-import type { KetikAppSettings } from "@trainers/types";
-import { useKetikSettingsDraft } from "./settings/useKetikSettingsDraft";
+import type { KetikAppSettings, KetikQuickTemplate } from "@trainers/types";
+import {
+  getKetikTemplateLayers,
+  useKetikSettingsDraft,
+} from "./settings/useKetikSettingsDraft";
 import { KetikSystemTab } from "./settings/KetikSystemTab";
 import { KetikScenariosTab } from "./settings/KetikScenariosTab";
 import { KetikConsumersTab } from "./settings/KetikConsumersTab";
@@ -23,6 +26,8 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: KetikAppSettings;
   onSave: (newSettings: KetikAppSettings) => Promise<void>;
+  canManageTemplates?: boolean;
+  onSaveTemplates?: (templates: KetikQuickTemplate[]) => Promise<void>;
 }
 
 export function SettingsModal({
@@ -30,6 +35,8 @@ export function SettingsModal({
   onClose,
   settings,
   onSave,
+  canManageTemplates = false,
+  onSaveTemplates,
 }: SettingsModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +48,8 @@ export function SettingsModal({
     scenarioForm,
     consumerForm,
     templateForm,
+    templateScope,
+    setTemplateScope,
     customInputValue,
     durationValidationError,
     durationMode,
@@ -52,7 +61,14 @@ export function SettingsModal({
     handleSave,
     handleResetDefaults,
     isSaving,
-  } = useKetikSettingsDraft({ settings, isOpen, onSave, onClose });
+  } = useKetikSettingsDraft({
+    settings,
+    isOpen,
+    onSave,
+    canManageTemplates,
+    onSaveTemplates,
+    onClose,
+  });
 
   const requestClose = () => {
     if (isSaving) return;
@@ -66,6 +82,7 @@ export function SettingsModal({
     { id: "template", label: "Template", icon: MessageSquare },
     { id: "system", label: "Sistem", icon: Settings },
   ] as const;
+  const templateLayers = getKetikTemplateLayers(localSettings);
 
   return (
     <AnimatePresence>
@@ -167,9 +184,13 @@ export function SettingsModal({
 
                     {activeTab === "template" && (
                       <KetikTemplateTab
-                        quickTemplates={localSettings.quickTemplates || []}
+                        globalTemplates={templateLayers.global}
+                        personalTemplates={templateLayers.personal}
                         templateForm={templateForm}
+                        templateScope={templateScope}
+                        setTemplateScope={setTemplateScope}
                         setLocalSettings={setLocalSettings}
+                        canManageTemplates={canManageTemplates}
                       />
                     )}
 

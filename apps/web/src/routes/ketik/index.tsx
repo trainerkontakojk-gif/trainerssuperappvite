@@ -10,6 +10,7 @@ import type {
   KetikSessionReview,
   KetikTypoFinding,
   KetikReviewDetail,
+  KetikQuickTemplate,
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import { ketikApi } from "./ketikApi";
@@ -39,6 +40,7 @@ export default function KetikLanding() {
   const userId = session?.user?.id;
   const profile = useAuthStore((s) => s.profile);
   const normalizedRole = profile?.role?.trim().toLowerCase() || "";
+  const canManageTemplates = normalizedRole === "admin";
   const canStartReview = ["admin", "trainer", "qa"].includes(normalizedRole);
   const accountKey = userId ?? null;
   const canPickParticipant = ["admin", "trainer"].includes(normalizedRole);
@@ -113,6 +115,10 @@ export default function KetikLanding() {
       console.error("[Ketik] Failed to save settings:", e);
       throw e;
     }
+  };
+
+  const handleSaveTemplates = async (templates: KetikQuickTemplate[]) => {
+    await ketikApi.saveTemplates(templates);
   };
 
   const handleClearHistory = async () => {
@@ -834,6 +840,8 @@ export default function KetikLanding() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSave={handleSaveSettings}
+        canManageTemplates={canManageTemplates}
+        onSaveTemplates={handleSaveTemplates}
       />
       <HistoryModal
         isOpen={isHistoryOpen}

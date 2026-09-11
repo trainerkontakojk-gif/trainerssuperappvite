@@ -102,6 +102,7 @@ erDiagram
 | `20260811044655_fix_telefun_realtime_lease_renewal.sql`                   | Repair ambiguous lease-expiry reference and add bounded renewal rejection reasons; hosted production canonical verified      |
 | `20260904150000_telefun_scoring_claim_fencing.sql`                        | Embedded API scoring worker lease 300s, claim-token fencing, and additive RPC compatibility signatures                       |
 | `20260910000000_simulation_subject_attribution.sql`                       | Persist immutable simulation-subject snapshots across KETIK/PDKT/Telefun and extend the authenticated PDKT mailbox batch RPC |
+| `20260910120000_ketik_global_quick_templates.sql`                         | Singleton template cepat KETIK standar, backfill dari admin pertama, dan service-role-only persistence                       |
 
 ### 1. `public.profiles`
 
@@ -134,7 +135,8 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`pdkt_mailbox_items`**: Kotak masuk simulasi PDKT yang persisten. Menyimpan inbound email, status (`open`, `replied`, `deleted`).
 - **`telefun_history`**: Riwayat sesi TELEFUN per user, termasuk skenario, durasi, URL/path rekaman, skor, feedback, dan Phase 4 recording/scoring readiness state.
 - **`telefun_replay_annotations`**: Anotasi AI dan manual untuk fitur Replay Telefun.
-- **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN.
+- **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN. Untuk KETIK, `quickTemplates` pada namespace tersimpan menjadi daftar template pribadi pemilik; API menggabungkannya dengan template standar global saat membaca settings.
+- **`ketik_global_settings`**: Singleton (`key = 'default'`) yang menyimpan `quick_templates` standar KETIK untuk seluruh user. Tabel memakai RLS deny-by-default, mencabut grant dari `anon`/`authenticated`, dan hanya memberi akses ke `service_role`; endpoint API membatasi mutasi ke role `admin`. Migration melakukan backfill satu kali dari template KETIK milik admin pertama yang memiliki row settings, tanpa menghapus row `user_settings` lama.
 
 #### Phase 4 Telefun WebRTC durable schema (hosted contract and repository artifact)
 

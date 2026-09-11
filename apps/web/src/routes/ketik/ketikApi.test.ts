@@ -4,6 +4,7 @@ import type { KetikAppSettings } from "@trainers/types";
 const apiMocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   putSettings: vi.fn(),
+  putTemplates: vi.fn(),
   unwrapResponse: vi.fn(),
 }));
 
@@ -16,6 +17,9 @@ vi.mock("../../lib/api", async () => {
       settings: {
         $get: apiMocks.getSettings,
         $put: apiMocks.putSettings,
+      },
+      templates: {
+        $put: apiMocks.putTemplates,
       },
     },
     unwrapResponse: apiMocks.unwrapResponse,
@@ -49,6 +53,7 @@ describe("ketik settings persistence boundary", () => {
   beforeEach(() => {
     apiMocks.getSettings.mockReset();
     apiMocks.putSettings.mockReset();
+    apiMocks.putTemplates.mockReset();
     apiMocks.unwrapResponse.mockReset();
     vi.unstubAllGlobals();
   });
@@ -118,6 +123,33 @@ describe("ketik settings persistence boundary", () => {
       message: expect.stringMatching(/muat ulang.*sinkron/i),
     });
     expect(apiMocks.putSettings).not.toHaveBeenCalled();
+  });
+
+  it("sends the global template version and captures the new version", async () => {
+    apiMocks.getSettings.mockResolvedValue({
+      headers: new Headers({
+        "x-settings-version": "2026-07-29T08:19:09.000Z",
+        "x-ketik-templates-version": "2026-09-10T10:00:00.000Z",
+      }),
+    });
+    apiMocks.unwrapResponse.mockResolvedValue(settings);
+    apiMocks.putTemplates.mockResolvedValue({
+      headers: new Headers({
+        "x-ketik-templates-version": "2026-09-10T10:01:00.000Z",
+      }),
+    });
+
+    await ketikApi.getSettings("account-a");
+    await expect(ketikApi.saveTemplates(settings.quickTemplates)).resolves.toBeUndefined();
+
+    expect(apiMocks.putTemplates).toHaveBeenCalledWith(
+      { json: { templates: settings.quickTemplates } },
+      {
+        headers: {
+          "x-ketik-templates-version": "2026-09-10T10:00:00.000Z",
+        },
+      },
+    );
   });
 });
 

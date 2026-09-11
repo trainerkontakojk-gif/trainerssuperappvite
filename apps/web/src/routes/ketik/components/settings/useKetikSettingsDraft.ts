@@ -5,7 +5,10 @@ import type {
   KetikConsumerType,
   KetikQuickTemplate,
 } from "@trainers/types";
-import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import {
+  DEFAULT_KETIK_SETTINGS,
+  mergeKetikQuickTemplates,
+} from "@trainers/types";
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
@@ -20,6 +23,8 @@ export interface UseKetikSettingsDraftProps {
   settings: KetikAppSettings;
   isOpen: boolean;
   onSave: (newSettings: KetikAppSettings) => Promise<void>;
+  canManageTemplates?: boolean;
+  onSaveTemplates?: (templates: KetikQuickTemplate[]) => Promise<void>;
   onClose: () => void;
 }
 
@@ -44,14 +49,23 @@ export function buildKetikSettingsForSave(params: {
   scenarios: KetikScenario[];
   consumerTypes: KetikConsumerType[];
   quickTemplates: KetikQuickTemplate[];
+  globalQuickTemplates?: KetikQuickTemplate[];
+  personalQuickTemplates?: KetikQuickTemplate[];
 }): KetikAppSettings {
-  return {
+  const nextSettings: KetikAppSettings = {
     ...params.localSettings,
     selectedModel: coerceKetikModelId(params.localSettings.selectedModel),
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
     quickTemplates: params.quickTemplates,
   };
+  if (params.globalQuickTemplates !== undefined) {
+    nextSettings.globalQuickTemplates = params.globalQuickTemplates;
+  }
+  if (params.personalQuickTemplates !== undefined) {
+    nextSettings.personalQuickTemplates = params.personalQuickTemplates;
+  }
+  return nextSettings;
 }
 
 type DurationMode = "preset" | "custom";
@@ -59,6 +73,61 @@ type DurationMode = "preset" | "custom";
 const PRESET_DURATIONS = [5, 10, 15] as const;
 const MIN_DURATION = 1;
 const MAX_DURATION = 60;
+
+function areQuickTemplatesEqual(
+  left: KetikQuickTemplate[],
+  right: KetikQuickTemplate[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (template, index) =>
+        template.id === right[index]?.id &&
+        template.keyword === right[index]?.keyword &&
+        template.content === right[index]?.content,
+    )
+  );
+}
+
+export function getKetikTemplateLayers(settings: KetikAppSettings): {
+  global: KetikQuickTemplate[];
+  personal: KetikQuickTemplate[];
+} {
+  const storedPersonal = settings.personalQuickTemplates || [];
+  const storedPersonalIds = new Set(
+    storedPersonal.map((template) => template.id),
+  );
+  const global =
+    settings.globalQuickTemplates ||
+    (settings.quickTemplates || []).filter(
+      (template) => !storedPersonalIds.has(template.id),
+    );
+  const globalIds = new Set(global.map((template) => template.id));
+  const globalKeywords = new Set(
+    global.map((template) => template.keyword.trim().toLowerCase()),
+  );
+  const personal = storedPersonal.filter(
+    (template) =>
+      !globalIds.has(template.id) &&
+      !globalKeywords.has(template.keyword.trim().toLowerCase()),
+  );
+  return {
+    global,
+    personal,
+  };
+}
+
+export function getKetikHiddenPersonalTemplates(
+  settings: KetikAppSettings,
+): KetikQuickTemplate[] {
+  const storedPersonal = settings.personalQuickTemplates || [];
+  const visiblePersonalIds = new Set(
+    getKetikTemplateLayers(settings).personal.map((template) => template.id),
+  );
+  return storedPersonal.filter(
+    (template) => !visiblePersonalIds.has(template.id),
+  );
+}
 
 const classifyDurationMode = (val: number | undefined): DurationMode => {
   const duration = Number(val);
@@ -77,18 +146,29 @@ export function useKetikSettingsDraft({
   settings,
   isOpen,
   onSave,
+  canManageTemplates = false,
+  onSaveTemplates,
   onClose,
 }: UseKetikSettingsDraftProps) {
+  const initialTemplateLayers = getKetikTemplateLayers(settings);
+  const initialStoredPersonalTemplates = settings.personalQuickTemplates || [];
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system" | "template"
   >("scenarios");
   const [isSaving, setIsSaving] = useState(false);
   const saveInFlightRef = useRef(false);
+  const [templateScope, setTemplateScope] = useState<"global" | "personal">(
+    "global",
+  );
   const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() => ({
     ...settings,
     selectedModel: coerceKetikModelId(settings.selectedModel),
-    quickTemplates:
-      settings.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates || [],
+    globalQuickTemplates: initialTemplateLayers.global,
+    quickTemplates: mergeKetikQuickTemplates(
+      initialTemplateLayers.global,
+      initialStoredPersonalTemplates,
+    ),
+    personalQuickTemplates: initialStoredPersonalTemplates,
   }));
 
   const [customInputValue, setCustomInputValue] = useState("");
@@ -209,13 +289,16 @@ export function useKetikSettingsDraft({
 
   useEffect(() => {
     if (isOpen) {
+      const nextTemplateLayers = getKetikTemplateLayers(settings);
       setLocalSettings({
         ...settings,
         selectedModel: coerceKetikModelId(settings.selectedModel),
-        quickTemplates:
-          settings.quickTemplates ||
-          DEFAULT_KETIK_SETTINGS.quickTemplates ||
-          [],
+        globalQuickTemplates: nextTemplateLayers.global,
+        quickTemplates: mergeKetikQuickTemplates(
+          nextTemplateLayers.global,
+          settings.personalQuickTemplates || [],
+        ),
+        personalQuickTemplates: settings.personalQuickTemplates || [],
       });
       const nextDurationMode = classifyDurationMode(
         settings.simulationDuration,
@@ -230,6 +313,7 @@ export function useKetikSettingsDraft({
       scenarioForm.close();
       consumerForm.close();
       templateForm.close();
+      setTemplateScope("global");
     }
   }, [isOpen, settings]);
 
@@ -237,9 +321,14 @@ export function useKetikSettingsDraft({
     if (saveInFlightRef.current) return;
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
-    const templateDirty = templateForm.isDirty(
-      localSettings.quickTemplates || [],
-    );
+    const localTemplateLayers = getKetikTemplateLayers(localSettings);
+    const savedTemplateLayers = getKetikTemplateLayers(settings);
+    const savedPersonalTemplates = settings.personalQuickTemplates || [];
+    const templateList =
+      templateScope === "global"
+        ? localTemplateLayers.global
+        : localTemplateLayers.personal;
+    const templateFormDirty = templateForm.isDirty(templateList);
 
     if (scenarioDirty && !scenarioForm.isValid()) {
       setActiveTab("scenarios");
@@ -265,7 +354,7 @@ export function useKetikSettingsDraft({
       );
       return;
     }
-    if (templateDirty && !templateForm.isValid()) {
+    if (templateFormDirty && !templateForm.isValid()) {
       setActiveTab("template");
       setTimeout(() => {
         document
@@ -284,24 +373,59 @@ export function useKetikSettingsDraft({
     const nextConsumerTypes = consumerDirty
       ? consumerForm.save(localSettings.consumerTypes)
       : localSettings.consumerTypes;
-    const nextQuickTemplates = templateDirty
-      ? templateForm.save(localSettings.quickTemplates || [])
-      : localSettings.quickTemplates || [];
+    const nextGlobalTemplates =
+      templateScope === "global" && templateFormDirty
+        ? templateForm.save(localTemplateLayers.global)
+        : localTemplateLayers.global;
+    const currentStoredPersonalTemplates =
+      localSettings.personalQuickTemplates || [];
+    const nextPersonalEditableTemplates =
+      templateScope === "personal" && templateFormDirty
+        ? templateForm.save(localTemplateLayers.personal)
+        : localTemplateLayers.personal;
+    const hiddenPersonalTemplates =
+      getKetikHiddenPersonalTemplates(localSettings);
+    const nextPersonalTemplates =
+      templateScope === "personal"
+        ? [...hiddenPersonalTemplates, ...nextPersonalEditableTemplates]
+        : currentStoredPersonalTemplates;
+    const globalTemplatesChanged =
+      canManageTemplates &&
+      !areQuickTemplatesEqual(nextGlobalTemplates, savedTemplateLayers.global);
+    const personalTemplatesChanged = !areQuickTemplatesEqual(
+      nextPersonalTemplates,
+      savedPersonalTemplates,
+    );
+    const nextQuickTemplates = mergeKetikQuickTemplates(
+      nextGlobalTemplates,
+      nextPersonalTemplates,
+    );
 
     const settingsToSave = buildKetikSettingsForSave({
       localSettings,
       scenarios: nextScenarios,
       consumerTypes: nextConsumerTypes,
       quickTemplates: nextQuickTemplates,
+      globalQuickTemplates: nextGlobalTemplates,
+      personalQuickTemplates: nextPersonalTemplates,
     });
 
     saveInFlightRef.current = true;
     setIsSaving(true);
     try {
+      if (globalTemplatesChanged && onSaveTemplates) {
+        await onSaveTemplates(nextGlobalTemplates);
+      }
       await onSave(settingsToSave);
       if (scenarioDirty) scenarioForm.close();
       if (consumerDirty) consumerForm.close();
-      if (templateDirty) templateForm.close();
+      if (
+        templateFormDirty ||
+        globalTemplatesChanged ||
+        personalTemplatesChanged
+      ) {
+        templateForm.close();
+      }
       onClose();
     } catch (e) {
       console.error(e);
@@ -324,8 +448,20 @@ export function useKetikSettingsDraft({
       saveInFlightRef.current = true;
       setIsSaving(true);
       try {
-        await onSave(DEFAULT_KETIK_SETTINGS);
-        setLocalSettings(DEFAULT_KETIK_SETTINGS);
+        const resetTemplateLayers = getKetikTemplateLayers(localSettings);
+        const resetPersonalTemplates =
+          localSettings.personalQuickTemplates || [];
+        const resetSettings: KetikAppSettings = {
+          ...DEFAULT_KETIK_SETTINGS,
+          globalQuickTemplates: resetTemplateLayers.global,
+          quickTemplates: mergeKetikQuickTemplates(
+            resetTemplateLayers.global,
+            resetPersonalTemplates,
+          ),
+          personalQuickTemplates: resetPersonalTemplates,
+        };
+        await onSave(resetSettings);
+        setLocalSettings(resetSettings);
         scenarioForm.close();
         consumerForm.close();
         templateForm.close();
@@ -350,6 +486,8 @@ export function useKetikSettingsDraft({
     scenarioForm,
     consumerForm,
     templateForm,
+    templateScope,
+    setTemplateScope,
     customInputValue,
     setCustomInputValue,
     durationValidationError,

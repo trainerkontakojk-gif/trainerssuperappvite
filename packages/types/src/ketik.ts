@@ -26,6 +26,25 @@ export interface KetikQuickTemplate {
   content: string;
 }
 
+export function mergeKetikQuickTemplates(
+  globalTemplates: KetikQuickTemplate[],
+  personalTemplates: KetikQuickTemplate[],
+): KetikQuickTemplate[] {
+  const globalIds = new Set(globalTemplates.map((template) => template.id));
+  const globalKeywords = new Set(
+    globalTemplates.map((template) => template.keyword.trim().toLowerCase()),
+  );
+
+  return [
+    ...globalTemplates,
+    ...personalTemplates.filter(
+      (template) =>
+        !globalIds.has(template.id) &&
+        !globalKeywords.has(template.keyword.trim().toLowerCase()),
+    ),
+  ];
+}
+
 export interface KetikIdentitySettings {
   displayName: string;
   signatureName: string;
@@ -37,6 +56,8 @@ export interface KetikAppSettings {
   scenarios: KetikScenario[];
   consumerTypes: KetikConsumerType[];
   quickTemplates: KetikQuickTemplate[];
+  globalQuickTemplates?: KetikQuickTemplate[];
+  personalQuickTemplates?: KetikQuickTemplate[];
   activeConsumerTypeId: string;
   identitySettings: KetikIdentitySettings;
   selectedModel: string;
@@ -400,6 +421,8 @@ export const ketikAppSettingsSchema: z.ZodType<KetikAppSettings> = z.object({
   scenarios: z.array(ketikScenarioSchema).min(1),
   consumerTypes: z.array(ketikConsumerTypeSchema).min(1),
   quickTemplates: z.array(ketikQuickTemplateSchema),
+  globalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
+  personalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
   activeConsumerTypeId: z.string(),
   identitySettings: ketikIdentitySettingsSchema,
   selectedModel: z.string().min(1),

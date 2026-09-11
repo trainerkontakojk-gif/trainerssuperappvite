@@ -1,5 +1,6 @@
 import type {
   KetikAppSettings,
+  KetikQuickTemplate,
   KetikSessionHistoryItem,
   KetikReviewDetail,
   KetikScenario,
@@ -14,10 +15,12 @@ import {
 } from "../../lib/settings-contract";
 
 const settingsVersion = createSettingsVersionStore();
+const templatesVersion = createSettingsVersionStore("x-ketik-templates-version");
 let settingsVersionUserId: string | undefined;
 
 function prepareSettingsVersion(userId: string | undefined): void {
   settingsVersion.clear();
+  templatesVersion.clear();
   settingsVersionUserId = userId;
 }
 
@@ -52,6 +55,7 @@ export const ketikApi = {
       const res = await ketikClient.settings.$get();
       const settings = (await unwrapResponse(res)) as KetikAppSettings;
       settingsVersion.capture(res);
+      templatesVersion.capture(res);
       const version = settingsVersion.current();
       if (version) {
         safeWriteKetikSettingsBackup(undefined, userId, version, settings);
@@ -87,6 +91,14 @@ export const ketikApi = {
     if (version) {
       safeWriteKetikSettingsBackup(undefined, userId, version, settings);
     }
+  },
+  saveTemplates: async (templates: KetikQuickTemplate[]) => {
+    const res = await ketikClient.templates.$put(
+      { json: { templates } },
+      templatesVersion.requiredRequestOptions(),
+    );
+    await unwrapResponse(res);
+    templatesVersion.capture(res);
   },
   getHistory: async () => {
     const res = await ketikClient.history.$get();

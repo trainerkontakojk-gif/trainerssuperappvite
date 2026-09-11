@@ -61,18 +61,19 @@ Setiap halaman atau aksi sensitif dilindungi dengan pengecekan role di backend:
 
 Role enforcement coverage per module (Phase B hardening):
 
-| Module            | Endpoints | Read Roles                                     | Write Roles                                    |
-| ----------------- | --------- | ---------------------------------------------- | ---------------------------------------------- |
-| **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                             |
-| **Profiler**      | 23        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                             |
-| **PDKT**          | 16        | admin, trainer, qa                             | admin, trainer, qa (AI)                        |
-| **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history)   | admin, trainer (pricing)                       |
-| **KETIK**         | 4         | admin, trainer, leader, qa, tl, spv, om, agent | admin, trainer, leader, qa, tl, spv, om, agent |
-| **Admin**         | 8         | admin only                                     | admin only                                     |
+| Module            | Endpoints | Read Roles                                     | Write Roles                                                                               |
+| ----------------- | --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                                                                        |
+| **Profiler**      | 23        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                                                                        |
+| **PDKT**          | 16        | admin, trainer, qa                             | admin, trainer, qa (AI)                                                                   |
+| **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history)   | admin, trainer (pricing)                                                                  |
+| **KETIK**         | 5         | admin, trainer, leader, qa, tl, spv, om, agent | own settings & personal quick templates: akun pemilik; shared quick templates: admin only |
+| **Admin**         | 8         | admin only                                     | admin only                                                                                |
 
 Catatan:
 
 - `POST /ketik/generate` dapat dipakai oleh `leader`, sedangkan `POST /ketik/review` tetap dibatasi `admin`, `trainer`, dan `qa`.
+- `GET /ketik/settings` mengembalikan gabungan template cepat standar dari singleton global dan template pribadi akun pemanggil. `PUT /ketik/templates` hanya dapat dipanggil role `admin`; `PUT /ketik/settings` menyimpan namespace settings akun pemanggil, termasuk daftar `personalQuickTemplates`.
 
 ### 3. Profile Read Contract & Recovery
 

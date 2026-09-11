@@ -24,13 +24,14 @@ describe("app onError CORS safety net", () => {
     throw new HTTPException(409, { message: "Triggered handled conflict" });
   });
 
-  it("allows x-settings-version on matching-origin preflight requests", async () => {
+  it("allows settings version headers on matching-origin preflight requests", async () => {
     const res = await app.request("/api/health", {
       method: "OPTIONS",
       headers: {
         Origin: "http://localhost:3000",
         "Access-Control-Request-Method": "GET",
-        "Access-Control-Request-Headers": "content-type,x-settings-version",
+        "Access-Control-Request-Headers":
+          "content-type,x-settings-version,x-ketik-templates-version",
       },
     });
 
@@ -42,9 +43,12 @@ describe("app onError CORS safety net", () => {
     expect(res.headers.get("Access-Control-Allow-Headers")).toContain(
       "x-settings-version",
     );
+    expect(res.headers.get("Access-Control-Allow-Headers")).toContain(
+      "x-ketik-templates-version",
+    );
   });
 
-  it("exposes x-settings-version on normal and handled conflict responses", async () => {
+  it("exposes settings version headers on normal and handled conflict responses", async () => {
     const normal = await app.request("/api/health", {
       headers: { Origin: "http://localhost:3000" },
     });
@@ -56,9 +60,15 @@ describe("app onError CORS safety net", () => {
     expect(normal.headers.get("Access-Control-Expose-Headers")).toContain(
       "x-settings-version",
     );
+    expect(normal.headers.get("Access-Control-Expose-Headers")).toContain(
+      "x-ketik-templates-version",
+    );
     expect(handled.status).toBe(409);
     expect(handled.headers.get("Access-Control-Expose-Headers")).toContain(
       "x-settings-version",
+    );
+    expect(handled.headers.get("Access-Control-Expose-Headers")).toContain(
+      "x-ketik-templates-version",
     );
   });
 
@@ -76,6 +86,9 @@ describe("app onError CORS safety net", () => {
     expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     expect(res.headers.get("Access-Control-Expose-Headers")).toContain(
       "x-settings-version",
+    );
+    expect(res.headers.get("Access-Control-Expose-Headers")).toContain(
+      "x-ketik-templates-version",
     );
     expectSecurityHeaders(res);
 

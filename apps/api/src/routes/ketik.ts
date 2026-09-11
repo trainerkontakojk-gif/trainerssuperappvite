@@ -4,6 +4,7 @@ import { User } from "@supabase/supabase-js";
 import {
   chatMessageSchema,
   generateMessageSchema,
+  ketikQuickTemplateSchema,
   ketikAppSettingsSchema,
   simulationSubjectSelectionSchema,
 } from "@trainers/types";
@@ -105,6 +106,7 @@ ketik.get("/settings", async (c) => {
   try {
     const snapshot = await ketikService.getSettingsSnapshot(user.id);
     c.header("x-settings-version", snapshot.version);
+    c.header("x-ketik-templates-version", snapshot.globalTemplatesVersion);
     return c.json({ success: true, data: snapshot.settings });
   } catch (err: any) {
     return c.json(
@@ -116,6 +118,48 @@ ketik.get("/settings", async (c) => {
     );
   }
 });
+
+ketik.put(
+  "/templates",
+  requireRole("admin"),
+  zValidator(
+    "json",
+    z.object({ templates: z.array(ketikQuickTemplateSchema) }),
+  ),
+  async (c) => {
+    const body = c.req.valid("json");
+    try {
+      const version = c.req.header("x-ketik-templates-version");
+      const newVersion = await ketikService.saveGlobalKetikQuickTemplates(
+        body.templates,
+        version,
+      );
+      c.header("x-ketik-templates-version", newVersion);
+      return c.json({
+        success: true,
+        message: "Template standar berhasil disimpan.",
+      });
+    } catch (err: unknown) {
+      if (isSettingsConflictError(err)) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "SETTINGS_CONFLICT", message: err.message },
+          },
+          409,
+        );
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 ketik.put(
   "/settings",

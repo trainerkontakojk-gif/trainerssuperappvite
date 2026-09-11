@@ -3,6 +3,7 @@ import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import {
   buildKetikSettingsForSave,
   coerceKetikModelId,
+  getKetikTemplateLayers,
 } from "../routes/ketik/components/settings/useKetikSettingsDraft";
 import { coercePdktModelId } from "../routes/pdkt/pdktSettings";
 import { buildPdktSettingsForSave } from "../routes/pdkt/components/settings/usePdktSettingsDraft";
@@ -30,6 +31,36 @@ describe("settings draft commit helpers", () => {
     expect(result).not.toBe(original);
     expect(result.scenarios[0].title).toBe("Changed");
     expect(original.scenarios[0].title).toBe("Original");
+  });
+
+  it("separates active personal templates from legacy copies of global templates", () => {
+    const globalTemplate = {
+      id: "qt-selesai",
+      keyword: "selesai",
+      content: "Template standar terbaru",
+    };
+    const legacyCopy = {
+      id: "qt-selesai",
+      keyword: "selesai",
+      content: "Template personal lama",
+    };
+    const personalTemplate = {
+      id: "personal-1",
+      keyword: "personal",
+      content: "Template pribadi",
+    };
+
+    expect(
+      getKetikTemplateLayers({
+        ...DEFAULT_KETIK_SETTINGS,
+        quickTemplates: [globalTemplate, personalTemplate],
+        globalQuickTemplates: [globalTemplate],
+        personalQuickTemplates: [legacyCopy, personalTemplate],
+      }),
+    ).toEqual({
+      global: [globalTemplate],
+      personal: [personalTemplate],
+    });
   });
 
   it("buildKetikSettingsForSave normalizes legacy model selections to GPT 5.4 Mini", () => {

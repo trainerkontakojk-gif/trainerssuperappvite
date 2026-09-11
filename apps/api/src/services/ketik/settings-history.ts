@@ -5,12 +5,15 @@ import {
 } from "@trainers/types";
 import {
   KetikAppSettings,
+  KetikQuickTemplate,
   KetikSessionHistoryItem,
   KetikReviewDetail,
   KetikSessionReview,
   KetikTypoFinding,
   ChatMessage,
   DEFAULT_KETIK_SETTINGS,
+  ketikQuickTemplateSchema,
+  mergeKetikQuickTemplates,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
 import { buildKetikEducation } from "./review-policy";
@@ -24,6 +27,7 @@ import {
   guardedUserSettingsWrite,
   isSettingsConflictError,
 } from "../../lib/guarded-user-settings";
+import { getGlobalKetikQuickTemplatesSnapshot } from "./global-templates";
 
 const coerceKetikModelId = (modelId?: string) => {
   const normalized = normalizeModelId(modelId);
@@ -36,6 +40,37 @@ const coerceDuration = (duration?: number) => {
   if (typeof duration !== "number" || isNaN(duration)) return 5;
   return Math.max(1, Math.min(60, duration));
 };
+
+function parseKetikQuickTemplates(value: unknown): KetikQuickTemplate[] {
+  const parsed = ketikQuickTemplateSchema.array().safeParse(value);
+  return parsed.success ? parsed.data : [];
+}
+
+function preserveGlobalKeyPersonalTemplates(
+  existingTemplates: KetikQuickTemplate[],
+  globalTemplates: KetikQuickTemplate[],
+): KetikQuickTemplate[] {
+  const globalIds = new Set(globalTemplates.map((template) => template.id));
+  const globalKeywords = new Set(
+    globalTemplates.map((template) => template.keyword.trim().toLowerCase()),
+  );
+  return existingTemplates.filter(
+    (template) =>
+      globalIds.has(template.id) ||
+      globalKeywords.has(template.keyword.trim().toLowerCase()),
+  );
+}
+
+function dedupeKetikQuickTemplates(
+  templates: KetikQuickTemplate[],
+): KetikQuickTemplate[] {
+  const seenIds = new Set<string>();
+  return templates.filter((template) => {
+    if (seenIds.has(template.id)) return false;
+    seenIds.add(template.id);
+    return true;
+  });
+}
 
 function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
   const mergedScenarios = DEFAULT_KETIK_SETTINGS.scenarios.map(
@@ -67,8 +102,7 @@ function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
   return {
     scenarios: [...mergedScenarios, ...customScenarios],
     consumerTypes: [...mergedConsumers, ...customConsumers],
-    quickTemplates:
-      stored.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates,
+    quickTemplates: parseKetikQuickTemplates(stored.quickTemplates),
     activeConsumerTypeId: stored.activeConsumerTypeId || "random",
     identitySettings: {
       displayName: stored.identitySettings?.displayName || "",
@@ -82,9 +116,49 @@ function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
   };
 }
 
+function buildPersonalKetikSettings(
+  settings: KetikAppSettings,
+  existingSettings: unknown,
+): Record<string, unknown> {
+  const {
+    globalQuickTemplates,
+    personalQuickTemplates,
+    ...settingsWithoutMetadata
+  } = settings;
+  const existingKetik =
+    existingSettings && typeof existingSettings === "object"
+      ? (existingSettings as { ketik?: unknown }).ketik
+      : undefined;
+  const existingPersonalTemplates =
+    existingKetik && typeof existingKetik === "object"
+      ? parseKetikQuickTemplates(
+          (existingKetik as { quickTemplates?: unknown }).quickTemplates,
+        )
+      : [];
+  const templatesToPersist = Array.isArray(personalQuickTemplates)
+    ? dedupeKetikQuickTemplates([
+        ...(Array.isArray(globalQuickTemplates)
+          ? preserveGlobalKeyPersonalTemplates(
+              existingPersonalTemplates,
+              parseKetikQuickTemplates(globalQuickTemplates),
+            )
+          : []),
+        ...personalQuickTemplates,
+      ])
+    : existingKetik && typeof existingKetik === "object"
+      ? existingPersonalTemplates
+      : parseKetikQuickTemplates(settings.quickTemplates);
+
+  return {
+    ...settingsWithoutMetadata,
+    quickTemplates: templatesToPersist,
+  };
+}
+
 export type KetikSettingsSnapshot = {
   settings: KetikAppSettings;
   version: string;
+  globalTemplatesVersion: string;
 };
 
 export async function getSettingsSnapshot(
@@ -99,15 +173,33 @@ export async function getSettingsSnapshot(
 
   if (error) throw error;
 
+  const globalTemplates = await getGlobalKetikQuickTemplatesSnapshot();
+  const storedKetik =
+    data?.settings?.ketik && typeof data.settings.ketik === "object"
+      ? (data.settings.ketik as Partial<KetikAppSettings>)
+      : undefined;
+  const personalQuickTemplates = storedKetik
+    ? parseKetikQuickTemplates(storedKetik.quickTemplates)
+    : [];
+  const baseSettings = storedKetik
+    ? parseSettings(storedKetik)
+    : DEFAULT_KETIK_SETTINGS;
+
   return {
-    settings:
-      data?.settings?.ketik && typeof data.settings.ketik === "object"
-        ? parseSettings(data.settings.ketik as Partial<KetikAppSettings>)
-        : DEFAULT_KETIK_SETTINGS,
+    settings: {
+      ...baseSettings,
+      quickTemplates: mergeKetikQuickTemplates(
+        globalTemplates.templates,
+        personalQuickTemplates,
+      ),
+      globalQuickTemplates: globalTemplates.templates,
+      personalQuickTemplates,
+    },
     version:
       typeof data?.updated_at === "string"
         ? data.updated_at
         : ABSENT_SETTINGS_VERSION,
+    globalTemplatesVersion: globalTemplates.version,
   };
 }
 
@@ -134,7 +226,7 @@ export async function saveSettings(
         ...(existingSettings && typeof existingSettings === "object"
           ? existingSettings
           : {}),
-        ketik: settings,
+        ketik: buildPersonalKetikSettings(settings, existingSettings),
       }),
       expectedVersion,
     );

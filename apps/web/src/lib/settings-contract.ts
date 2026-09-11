@@ -24,12 +24,14 @@ export function isTrustworthySettingsVersion(value: unknown): value is string {
   );
 }
 
-export function createSettingsVersionStore(): SettingsVersionStore {
+export function createSettingsVersionStore(
+  versionHeader = SETTINGS_VERSION_HEADER,
+): SettingsVersionStore {
   let version: string | undefined;
 
   return {
     capture(response) {
-      const nextVersion = response.headers?.get(SETTINGS_VERSION_HEADER);
+      const nextVersion = response.headers?.get(versionHeader);
       version = isTrustworthySettingsVersion(nextVersion)
         ? nextVersion
         : undefined;
@@ -44,7 +46,7 @@ export function createSettingsVersionStore(): SettingsVersionStore {
     },
     current: () => version,
     requestOptions: () =>
-      version ? { headers: { [SETTINGS_VERSION_HEADER]: version } } : {},
+      version ? { headers: { [versionHeader]: version } } : {},
     requiredRequestOptions: () => {
       if (!version) {
         throw new ApiError(
@@ -56,7 +58,7 @@ export function createSettingsVersionStore(): SettingsVersionStore {
           },
         );
       }
-      return { headers: { [SETTINGS_VERSION_HEADER]: version } };
+      return { headers: { [versionHeader]: version } };
     },
   };
 }

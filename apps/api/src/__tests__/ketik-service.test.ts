@@ -58,6 +58,7 @@ describe("KETIK Service - Settings", () => {
           selectedModel: "gemini-3.8-flash",
         }),
         version: "absent",
+        globalTemplatesVersion: "absent",
       });
     });
 
@@ -82,6 +83,290 @@ describe("KETIK Service - Settings", () => {
       expect(settings.selectedModel).toBe("gpt-5.4-mini");
       expect(settings.simulationDuration).toBe(10);
       expect(settings.responsePacingMode).toBe("training_fast");
+    });
+
+    it("merges global quick templates with a user's personal template list", async () => {
+      const userQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            settings: {
+              ketik: {
+                quickTemplates: [
+                  {
+                    id: "personal-1",
+                    keyword: "personal",
+                    content: "Template pribadi",
+                  },
+                ],
+              },
+            },
+          },
+          error: null,
+        }),
+      };
+      const globalQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            quick_templates: [
+              {
+                id: "admin-1",
+                keyword: "standar",
+                content: "Template standar admin",
+              },
+            ],
+            updated_at: "2026-09-10T10:00:00.000Z",
+          },
+          error: null,
+        }),
+      };
+      mockFrom.mockImplementation((table: string) =>
+        table === "user_settings" ? userQuery : globalQuery,
+      );
+
+      const snapshot = await ketikService.getSettingsSnapshot("user1");
+
+      expect(snapshot.settings.quickTemplates).toEqual([
+        {
+          id: "admin-1",
+          keyword: "standar",
+          content: "Template standar admin",
+        },
+        {
+          id: "personal-1",
+          keyword: "personal",
+          content: "Template pribadi",
+        },
+      ]);
+      expect(snapshot.settings.personalQuickTemplates).toEqual([
+        {
+          id: "personal-1",
+          keyword: "personal",
+          content: "Template pribadi",
+        },
+      ]);
+      expect(snapshot.settings.globalQuickTemplates).toEqual([
+        {
+          id: "admin-1",
+          keyword: "standar",
+          content: "Template standar admin",
+        },
+      ]);
+      expect(snapshot.globalTemplatesVersion).toBe("2026-09-10T10:00:00.000Z");
+    });
+
+    it("keeps legacy personal copies from shadowing global templates", async () => {
+      const globalTemplate = {
+        id: "qt-selesai",
+        keyword: "selesai",
+        content: "Template standar terbaru",
+      };
+      const legacyCopy = {
+        id: "qt-selesai",
+        keyword: "selesai",
+        content: "Template personal lama",
+      };
+      const personalTemplate = {
+        id: "personal-1",
+        keyword: "personal",
+        content: "Template pribadi",
+      };
+      const userQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            settings: {
+              ketik: { quickTemplates: [legacyCopy, personalTemplate] },
+            },
+          },
+          error: null,
+        }),
+      };
+      const globalQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            quick_templates: [globalTemplate],
+            updated_at: "2026-09-10T10:00:00.000Z",
+          },
+          error: null,
+        }),
+      };
+      mockFrom.mockImplementation((table: string) =>
+        table === "user_settings" ? userQuery : globalQuery,
+      );
+
+      const snapshot = await ketikService.getSettingsSnapshot("user1");
+
+      expect(snapshot.settings.quickTemplates).toEqual([
+        globalTemplate,
+        personalTemplate,
+      ]);
+      expect(snapshot.settings.personalQuickTemplates).toEqual([
+        legacyCopy,
+        personalTemplate,
+      ]);
+      expect(snapshot.settings.globalQuickTemplates).toEqual([globalTemplate]);
+    });
+
+    it("preserves a user's stored template list when saving other settings", async () => {
+      const personalTemplates = [
+        {
+          id: "personal-1",
+          keyword: "personal",
+          content: "Template pribadi",
+        },
+      ];
+      const update = vi.fn().mockReturnThis();
+      const query = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi
+          .fn()
+          .mockResolvedValueOnce({
+            data: {
+              settings: {
+                ketik: { quickTemplates: personalTemplates },
+              },
+              updated_at: "2026-09-10T10:00:00.000Z",
+            },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { updated_at: "2026-09-10T10:01:00.000Z" },
+            error: null,
+          }),
+        update,
+      };
+      mockFrom.mockReturnValue(query);
+
+      await ketikService.saveSettings("user1", DEFAULT_KETIK_SETTINGS);
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            ketik: expect.objectContaining({
+              quickTemplates: personalTemplates,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it("persists the submitted personal template list without storing transport metadata", async () => {
+      const personalTemplates = [
+        {
+          id: "personal-2",
+          keyword: "follow-up",
+          content: "Saya bantu cek kembali ya.",
+        },
+      ];
+      const insert = vi.fn().mockReturnThis();
+      const select = vi.fn().mockReturnThis();
+      const single = vi.fn().mockResolvedValue({
+        data: { user_id: "user1", updated_at: "2026-09-10T10:02:00.000Z" },
+        error: null,
+      });
+      mockFrom.mockReturnValue({
+        select,
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        insert,
+        single,
+      });
+
+      await ketikService.saveSettings("user1", {
+        ...DEFAULT_KETIK_SETTINGS,
+        quickTemplates: [
+          ...DEFAULT_KETIK_SETTINGS.quickTemplates,
+          ...personalTemplates,
+        ],
+        personalQuickTemplates: personalTemplates,
+      });
+
+      expect(insert).toHaveBeenCalledWith({
+        user_id: "user1",
+        settings: {
+          ketik: {
+            ...DEFAULT_KETIK_SETTINGS,
+            quickTemplates: personalTemplates,
+          },
+        },
+        updated_at: expect.any(String),
+      });
+    });
+
+    it("preserves legacy global-key copies when saving new personal templates", async () => {
+      const legacyCopy = {
+        id: "qt-selesai",
+        keyword: "selesai",
+        content: "Template personal lama",
+      };
+      const globalTemplate = {
+        id: "qt-selesai",
+        keyword: "selesai",
+        content: "Template standar terbaru",
+      };
+      const personalTemplate = {
+        id: "personal-3",
+        keyword: "pribadi-baru",
+        content: "Template pribadi baru",
+      };
+      const update = vi.fn().mockReturnThis();
+      const query = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi
+          .fn()
+          .mockResolvedValueOnce({
+            data: {
+              settings: { ketik: { quickTemplates: [legacyCopy] } },
+              updated_at: "2026-09-10T10:00:00.000Z",
+            },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { updated_at: "2026-09-10T10:03:00.000Z" },
+            error: null,
+          }),
+        update,
+      };
+      const globalQuery = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            quick_templates: [globalTemplate],
+            updated_at: "2026-09-10T10:00:00.000Z",
+          },
+          error: null,
+        }),
+      };
+      mockFrom.mockImplementation((table: string) =>
+        table === "user_settings" ? query : globalQuery,
+      );
+
+      await ketikService.saveSettings("user1", {
+        ...DEFAULT_KETIK_SETTINGS,
+        quickTemplates: [globalTemplate, personalTemplate],
+        globalQuickTemplates: [globalTemplate],
+        personalQuickTemplates: [personalTemplate],
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            ketik: expect.objectContaining({
+              quickTemplates: [legacyCopy, personalTemplate],
+            }),
+          }),
+        }),
+      );
     });
   });
 

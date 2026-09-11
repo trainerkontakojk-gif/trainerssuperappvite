@@ -42,6 +42,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Monitoring detail**: `/monitoring` menampilkan `consumer_name`, `consumer_phone`, `consumer_city`, `simulationDuration`, transcript lengkap, dan score native; jika `consumer_name` hilang, API tetap null dan UI menampilkan unavailable, bukan placeholder buatan.
   - **Usage Bulanan**: Quick-view `Usage Bulan Ini` dengan indikator kenaikan biaya sesi (`+Rp`).
   - **Scenario Image Safety**: Lampiran gambar diakumulasi secara functional; FileReader yang terlambat, pending, atau gagal tidak bisa menimpa draft yang sudah ditutup atau dibuka ulang.
+  - **Template Cepat Standar + Pribadi**: Daftar template standar KETIK dikelola admin dan dibaca sama oleh seluruh user. Setiap user juga dapat menambah, mengubah, dan menghapus template pribadi yang hanya aktif di akunnya; shortcut `/` menampilkan keduanya.
 - **Akses**: `admin`, `trainer`, `leader`, `qa`, `tl`, `spv`, `om`, dan `agent` dapat memakai simulasi KETIK; analisis AI tetap dibatasi `admin`, `trainer`, dan `qa`.
 - **Catatan Teknis**: KETIK menyimpan history chat di `ketik_history`. Review AI bersifat manual — user memicu review setelah sesi selesai. Backend API di `/api/v1/ketik/` menangani chat, review, history, dan settings.
   - **Manual-only review**: Analisis AI hanya dimulai dari tombol "Mulai Analisis" oleh user, bukan otomatis saat sesi selesai.
@@ -50,9 +51,10 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Scenario image safety**: Lampiran gambar ditambah dengan akumulasi functional; callback FileReader yang terlambat, pending, atau errored diabaikan, dan save tidak jalan sampai pembacaan selesai.
   - **Save & reset safety**: Save scenario, save settings, dan reset settings menunggu request selesai; state draf tetap terbuka bila persisten gagal atau konflik.
   - **Settings versioning**: GET/PUT settings membaca dan mengirim `x-settings-version`. Save wajib membawa header itu; backend memakai optimistic compare-and-swap pada `user_settings.updated_at`. Jika versi stale, respons `409 SETTINGS_CONFLICT` minta user memuat ulang/sinkronisasi lalu retry.
+  - **Global quick-template versioning**: GET settings juga mengembalikan `x-ketik-templates-version`. Admin menyimpan perubahan template melalui `PUT /api/v1/ketik/templates` dengan optimistic compare-and-swap pada singleton `ketik_global_settings.updated_at`; versi stale menghasilkan `409 SETTINGS_CONFLICT`.
+  - **Template ownership**: Migration `20260910120000_ketik_global_quick_templates.sql` menyalin daftar template dari admin pertama yang memiliki settings ke singleton global. Row `user_settings` lama tidak dihapus; `PUT /api/v1/ketik/settings` menyimpan `personalQuickTemplates` milik user, dan GET menggabungkan template standar global dengan template pribadi. Konflik shortcut standar ditolak/diabaikan agar user tidak dapat menimpa template global.
   - **Best-effort backup**: Recovery cache KETIK memakai `localStorage` per user (`ketik_settings_backup:<userId>`). Backup hanya ditulis setelah GET/save berhasil, dan kegagalan storage/quota diabaikan karena server tetap sumber kebenaran.
-  - **CORS exposure**: CORS API mengekspos `x-settings-version` agar browser dapat membaca versi terbaru.
-  - **No migration/storage redesign**: Perubahan ini tidak menambah migrasi atau merombak storage; guard hanya memakai row `user_settings` yang sudah ada.
+  - **CORS exposure**: CORS API mengekspos `x-settings-version` dan `x-ketik-templates-version` agar browser dapat membaca versi terbaru untuk masing-masing resource.
   - **Provider fallback**: Review AI mencoba Gemini terlebih dahulu, lalu fallback langsung ke OpenAI Responses API (`gpt-5.4-mini`) jika Gemini gagal atau key tidak tersedia.
   - **Role restriction**: Hanya role `admin`, `trainer`, dan `qa` yang dapat menjalankan analisis AI. Role lain melihat tombol disabled dengan pesan akses.
   - **Sanitizer safety**: Structured JSON response tidak disanitasi sebelum parsing. Sanitasi hanya diterapkan ke field string setelah parse untuk mencegah corrupt JSON.

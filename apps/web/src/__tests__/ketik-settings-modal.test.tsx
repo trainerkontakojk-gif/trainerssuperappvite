@@ -58,6 +58,14 @@ describe(
         content: "Halo, ada yang bisa dibantu?",
       },
     ],
+      globalQuickTemplates: [
+        {
+          id: "qt-1",
+          keyword: "salam",
+          content: "Halo, ada yang bisa dibantu?",
+        },
+      ],
+      personalQuickTemplates: [],
     activeConsumerTypeId: "random",
     identitySettings: {
       displayName: "Jane Doe",
@@ -75,6 +83,7 @@ describe(
     onClose: vi.fn(),
     settings: initialSettings,
     onSave: vi.fn().mockResolvedValue(undefined),
+      canManageTemplates: true,
   };
 
   it("opens settings modal and selects a different model", async () => {
@@ -437,7 +446,9 @@ describe(
       await user.click(templateTabButton);
 
       // Click "Tambah Template"
-      const addTemplateBtn = screen.getByText(/tambah template/i);
+        const addTemplateBtn = screen.getByRole("button", {
+          name: /tambah template standar/i,
+        });
       await user.click(addTemplateBtn);
 
       // Fill form
@@ -471,4 +482,137 @@ describe(
       );
     },
   );
+
+    it("shows standard templates and personal-template controls for non-admin users", async () => {
+      const user = userEvent.setup();
+      render(<SettingsModal {...defaultProps} canManageTemplates={false} />);
+
+      await user.click(screen.getByText("Template"));
+
+      expect(
+        screen.getByText(/dikelola admin dan berlaku untuk semua user/i),
+      ).toBeDefined();
+      expect(screen.getByText("/salam")).toBeDefined();
+      expect(
+        screen.getByRole("button", { name: /tambah template pribadi/i }),
+      ).toBeDefined();
+      expect(screen.queryByText(/tambah template standar/i)).toBeNull();
 });
+
+    it("saves a non-admin personal template without calling the global callback", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      const onSaveTemplates = vi.fn().mockResolvedValue(undefined);
+      render(
+        <SettingsModal
+          {...defaultProps}
+          canManageTemplates={false}
+          onSave={onSave}
+          onSaveTemplates={onSaveTemplates}
+        />,
+      );
+
+      await user.click(screen.getByText("Template"));
+      await user.click(
+        screen.getByRole("button", { name: /tambah template pribadi/i }),
+      );
+      await user.type(
+        screen.getByPlaceholderText("contoh: salam"),
+        "follow-up-pribadi",
+      );
+      await user.type(
+        screen.getByPlaceholderText(
+          "Masukkan isi pesan yang akan muncul saat shortcut dipanggil...",
+        ),
+        "Saya bantu cek kembali ya.",
+      );
+      await user.click(screen.getByRole("button", { name: "Simpan" }));
+      await user.click(
+        screen.getByRole("button", { name: /simpan perubahan/i }),
+      );
+
+      expect(onSaveTemplates).not.toHaveBeenCalled();
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quickTemplates: expect.arrayContaining([
+            expect.objectContaining({ keyword: "follow-up-pribadi" }),
+          ]),
+          personalQuickTemplates: expect.arrayContaining([
+            expect.objectContaining({ keyword: "follow-up-pribadi" }),
+          ]),
+        }),
+      );
+    });
+
+    it("saves admin template changes through the global template callback", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      const onSaveTemplates = vi.fn().mockResolvedValue(undefined);
+      render(
+        <SettingsModal
+          {...defaultProps}
+          onSave={onSave}
+          onSaveTemplates={onSaveTemplates}
+        />,
+      );
+
+      await user.click(screen.getByText("Template"));
+      await user.click(
+        screen.getByRole("button", { name: /tambah template standar/i }),
+      );
+      await user.type(
+        screen.getByPlaceholderText("contoh: salam"),
+        "standar-admin",
+      );
+      await user.type(
+        screen.getByPlaceholderText(
+          "Masukkan isi pesan yang akan muncul saat shortcut dipanggil...",
+        ),
+        "Pesan standar untuk semua user.",
+      );
+      await user.click(screen.getByRole("button", { name: "Simpan" }));
+      await user.click(
+        screen.getByRole("button", { name: /simpan perubahan/i }),
+      );
+
+      expect(onSaveTemplates).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: "standar-admin",
+            content: "Pesan standar untuk semua user.",
+          }),
+        ]),
+      );
+      expect(onSave).toHaveBeenCalled();
+    });
+
+    it("keeps standard templates when a non-admin resets personal settings", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      try {
+        render(
+          <SettingsModal
+            {...defaultProps}
+            canManageTemplates={false}
+            onSave={onSave}
+          />,
+        );
+
+        await user.click(
+          screen.getByRole("button", { name: /reset default/i }),
+        );
+
+        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+        expect(onSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            quickTemplates: initialSettings.quickTemplates,
+          }),
+        );
+      } finally {
+        confirm.mockRestore();
+      }
+    });
+  },
+);

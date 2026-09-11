@@ -25,6 +25,18 @@ describe("settings contract helpers", () => {
     );
   });
 
+  it("captures and sends a custom version header", () => {
+    const store = createSettingsVersionStore("x-ketik-templates-version");
+    const version = "2026-09-10T10:00:00.000Z";
+    store.capture({
+      headers: new Headers({ "x-ketik-templates-version": version }),
+    });
+
+    expect(store.requiredRequestOptions()).toEqual({
+      headers: { "x-ketik-templates-version": version },
+    });
+  });
+
   it("fails closed with Indonesian reload and sync guidance when no version exists", () => {
     const store = createSettingsVersionStore();
 

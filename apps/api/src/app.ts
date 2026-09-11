@@ -46,7 +46,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-    exposeHeaders: ["x-settings-version"],
+    exposeHeaders: ["x-settings-version", "x-ketik-templates-version"],
   }),
 );
 app.use(requestLogger);
@@ -64,7 +64,10 @@ app.onError((err, c) => {
   if (matchedOrigin) {
     c.header("Access-Control-Allow-Origin", matchedOrigin);
     c.header("Access-Control-Allow-Credentials", "true");
-    c.header("Access-Control-Expose-Headers", "x-settings-version");
+    c.header(
+      "Access-Control-Expose-Headers",
+      "x-settings-version, x-ketik-templates-version",
+    );
     c.header("Vary", "Origin", { append: true });
   } else {
     c.res.headers.delete("Access-Control-Allow-Origin");
