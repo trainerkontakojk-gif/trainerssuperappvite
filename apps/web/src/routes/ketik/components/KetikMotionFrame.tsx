@@ -1,17 +1,33 @@
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
+const OJK_LOGO_URL = "https://ojk.go.id/SiteAssets/logo2.png?rev=44";
+const WHATSAPP_EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const DEMO_STEP_DURATIONS = [2200, 2300, 1200, 3000, 550] as const;
 
 export function KetikMotionFrame() {
   const shouldReduceMotion = useReducedMotion();
+  const [demoStep, setDemoStep] = useState(0);
+  const [hasOjkLogo, setHasOjkLogo] = useState(true);
+
+  useEffect(() => {
+    if (shouldReduceMotion) return;
+
+    const stepDuration = DEMO_STEP_DURATIONS[demoStep];
+    const timeoutId = window.setTimeout(() => {
+      setDemoStep((currentStep) => (currentStep + 1) % 5);
+    }, stepDuration);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [demoStep, shouldReduceMotion]);
+
+  const visibleStep = shouldReduceMotion ? 3 : demoStep;
 
   return (
     <div
       aria-hidden="true"
-      className="relative flex h-full min-h-[380px] items-center justify-center overflow-hidden rounded-[2rem] border border-border/50 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-6 backdrop-blur-xl lg:min-h-[520px] lg:p-8 dark:from-emerald-950/30 dark:via-card dark:to-teal-950/20"
+      className="relative flex h-full min-h-[380px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-module-ketik/5 p-6 lg:min-h-[520px] lg:p-8 dark:bg-module-ketik/10"
     >
-      <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-800/20" />
-      <div className="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-teal-200/30 blur-3xl dark:bg-teal-800/10" />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-100/50 blur-2xl dark:bg-emerald-900/10" />
-
       <motion.div
         animate={shouldReduceMotion ? undefined : { y: [-6, 6, -6] }}
         transition={
@@ -21,7 +37,7 @@ export function KetikMotionFrame() {
         }
         className="relative"
       >
-        {/* HP miring */}
+        {/* Posisi HP dipertahankan seperti mockup sebelumnya. */}
         <motion.div
           animate={
             shouldReduceMotion ? undefined : { rotate: [-2.5, -4, -2.5] }
@@ -38,114 +54,238 @@ export function KetikMotionFrame() {
           <div className="absolute bottom-0 left-1/2 h-6 w-[180px] -translate-x-1/2 rounded-full bg-black/10 blur-xl" />
 
           {/* body HP */}
-          <div className="relative flex h-[420px] w-[244px] flex-col rounded-[2.2rem] border-[7px] border-slate-900 bg-slate-900 p-2 shadow-2xl shadow-black/20 sm:h-[440px] sm:w-[260px]">
+          <div className="relative flex h-[420px] w-[244px] flex-col overflow-hidden rounded-[2rem] border-[7px] border-foreground bg-foreground p-2 shadow-xl shadow-black/20 sm:h-[440px] sm:w-[260px]">
             {/* notch */}
-            <div className="absolute left-1/2 top-0 z-20 h-5 w-20 -translate-x-1/2 rounded-b-2xl bg-slate-900" />
+            <div className="absolute left-1/2 top-0 z-20 h-5 w-20 -translate-x-1/2 rounded-b-2xl bg-foreground" />
             {/* speaker */}
-            <div className="absolute left-1/2 top-2 z-20 h-1 w-8 -translate-x-1/2 rounded-full bg-slate-700" />
+            <div className="absolute left-1/2 top-2 z-20 h-1 w-8 -translate-x-1/2 rounded-full bg-muted-foreground" />
 
             {/* layar */}
-            <div className="flex h-full flex-col overflow-hidden rounded-[1.7rem] bg-[#f8fafc]">
+            <div className="flex h-full flex-col overflow-hidden rounded-[1.7rem] bg-background">
               {/* header chat */}
-              <div className="flex items-center gap-2.5 bg-white px-3.5 py-3 shadow-sm">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">
-                  OJK
+              <div className="flex shrink-0 items-center gap-2.5 border-b border-border/70 bg-card px-3.5 py-3">
+                <div className="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-white p-1">
+                  {hasOjkLogo ? (
+                    <img
+                      src={OJK_LOGO_URL}
+                      alt="Logo OJK"
+                      className="max-h-full max-w-full object-contain"
+                      decoding="async"
+                      loading="eager"
+                      onError={() => setHasOjkLogo(false)}
+                    />
+                  ) : (
+                    <span className="text-[11px] font-bold text-module-ketik">
+                      OJK
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold leading-none text-slate-900">
+                  <p className="text-[12px] font-semibold leading-none text-foreground">
                     Kontak OJK 157
                   </p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[10px] leading-none text-emerald-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <p className="mt-0.5 flex items-center gap-1 text-[11px] leading-none text-module-ketik">
+                    <span className="h-1.5 w-1.5 rounded-full bg-module-ketik" />
                     Online
                   </p>
                 </div>
-                <span className="text-[10px] text-slate-400">09:41</span>
+                <span className="text-[11px] text-muted-foreground">09:41</span>
               </div>
 
               {/* area chat */}
-              <div className="flex-1 space-y-3 overflow-hidden bg-[#eef2f7] px-3 py-4">
-                <p className="text-center text-[9px] font-medium uppercase tracking-widest text-slate-400">
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/50 px-3 py-3">
+                <p className="shrink-0 text-center text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                   Hari ini
                 </p>
 
-                {/* bubble Rojak - kiri (agent) */}
-                <motion.div
-                  initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
-                  animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-                  transition={shouldReduceMotion ? undefined : { delay: 0.3, duration: 0.4 }}
-                  className="flex justify-start"
-                >
-                  <div className="max-w-[86%] rounded-2xl rounded-bl-md bg-emerald-600 px-3.5 py-2.5 shadow-sm">
-                    <p className="text-[11px] leading-relaxed text-white">
-                      Anda telah terhubung dengan Layanan Kontak OJK 157. Selamat pagi. Saya
-                      <span className="font-semibold text-white"> Rojak</span> dengan senang hati
-                      memberikan informasi yang Bapak/Ibu butuhkan seputar Sektor Jasa Keuangan.
-                      Perihal apa yang dapat kami bantu?
-                    </p>
-                    <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-emerald-100">
-                      09:41 <span className="text-[10px]">✓✓</span>
-                    </p>
-                  </div>
-                </motion.div>
+                <div className="relative min-h-0 flex-1 overflow-hidden pt-2">
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2">
+                    <AnimatePresence initial={false}>
+                      {visibleStep <= 3 && (
+                        <motion.div
+                          key="agent-intro"
+                          layout="position"
+                          initial={
+                            shouldReduceMotion ? false : { opacity: 0, y: 10 }
+                          }
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={
+                            shouldReduceMotion
+                              ? undefined
+                              : { opacity: 0, y: -6 }
+                          }
+                          transition={
+                            shouldReduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.36, ease: WHATSAPP_EASE }
+                          }
+                          className="flex justify-end"
+                        >
+                          <div className="max-w-[86%] rounded-2xl rounded-br-md bg-module-ketik px-3.5 py-2.5 shadow-sm">
+                            <p className="text-[11px] leading-relaxed text-white">
+                              Anda telah terhubung dengan Layanan Kontak OJK
+                              157. Selamat pagi. Saya
+                              <span className="font-semibold text-white">
+                                {" "}
+                                Rojak
+                              </span>{" "}
+                              dengan senang hati memberikan informasi yang
+                              Bapak/Ibu butuhkan seputar Sektor Jasa Keuangan.
+                              Perihal apa yang dapat kami bantu?
+                            </p>
+                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-white/75">
+                              09:41 <span className="text-[10px]">✓✓</span>
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
 
-                {/* bubble konsumen - kanan */}
-                <motion.div
-                  initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
-                  animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-                  transition={shouldReduceMotion ? undefined : { delay: 0.7, duration: 0.4 }}
-                  className="flex justify-end"
-                >
-                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-white px-3.5 py-2.5 shadow-sm">
-                    <p className="text-[11px] leading-relaxed text-slate-700">
-                      Pagi kak Rojak, saya butuh bantuan terkait pinjaman online saya. Saya
-                      tiba-tiba ditagih padahal sudah lunas.
-                    </p>
-                    <p className="mt-1 text-right text-[9px] text-slate-400">09:42</p>
-                  </div>
-                </motion.div>
+                      {visibleStep >= 1 && visibleStep <= 3 && (
+                        <motion.div
+                          key="consumer-message"
+                          layout="position"
+                          initial={
+                            shouldReduceMotion ? false : { opacity: 0, y: 10 }
+                          }
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={
+                            shouldReduceMotion
+                              ? undefined
+                              : { opacity: 0, y: -6 }
+                          }
+                          transition={
+                            shouldReduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.36, ease: WHATSAPP_EASE }
+                          }
+                          className="flex justify-start"
+                        >
+                          <div className="max-w-[82%] rounded-2xl rounded-bl-md border border-border bg-card px-3.5 py-2.5 shadow-sm">
+                            <p className="text-[11px] leading-relaxed text-foreground">
+                              Pagi kak Rojak, saya butuh bantuan terkait
+                              pinjaman online saya. Saya tiba-tiba ditagih
+                              padahal sudah lunas.
+                            </p>
+                            <p className="mt-1 text-right text-[9px] text-muted-foreground">
+                              09:42
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
 
-                {/* typing indicator - konsumen lagi ngetik (kanan) */}
-                <motion.div
-                  initial={shouldReduceMotion ? undefined : { opacity: 0 }}
-                  animate={shouldReduceMotion ? undefined : { opacity: 1 }}
-                  transition={shouldReduceMotion ? undefined : { delay: 1.1, duration: 0.3 }}
-                  className="flex justify-end"
-                >
-                  <div className="flex items-center gap-1 rounded-full bg-white px-3 py-2 shadow-sm">
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
+                      {visibleStep === 2 && (
+                        <motion.div
+                          key="typing-indicator"
+                          layout="position"
+                          initial={
+                            shouldReduceMotion ? false : { opacity: 0, y: 8 }
+                          }
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={
+                            shouldReduceMotion
+                              ? undefined
+                              : { opacity: 0, y: -6 }
+                          }
+                          transition={
+                            shouldReduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.28, ease: WHATSAPP_EASE }
+                          }
+                          className="flex justify-end"
+                        >
+                          <div className="flex items-center gap-1 rounded-full border border-module-ketik/30 bg-module-ketik/10 px-3 py-2">
+                            {[0, 1, 2].map((dot) => (
+                              <motion.span
+                                key={dot}
+                                animate={
+                                  shouldReduceMotion
+                                    ? undefined
+                                    : { y: [0, -2, 0] }
+                                }
+                                transition={
+                                  shouldReduceMotion
+                                    ? undefined
+                                    : {
+                                        repeat: Infinity,
+                                        duration: 0.7,
+                                        delay: dot * 0.14,
+                                      }
+                                }
+                                className="size-1.5 rounded-full bg-module-ketik"
+                              />
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {visibleStep === 3 && (
+                        <motion.div
+                          key="agent-reply"
+                          layout="position"
+                          initial={
+                            shouldReduceMotion ? false : { opacity: 0, y: 10 }
+                          }
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={
+                            shouldReduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.36, ease: WHATSAPP_EASE }
+                          }
+                          className="flex justify-end"
+                        >
+                          <div className="max-w-[86%] rounded-2xl rounded-br-md bg-module-ketik px-3.5 py-2.5 shadow-sm">
+                            <p className="text-[11px] leading-relaxed text-white">
+                              Baik, saya bantu cek dulu status pelunasannya.
+                              Mohon kirim nama pinjaman online yang dimaksud.
+                            </p>
+                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-white/75">
+                              09:43 <span className="text-[10px]">✓✓</span>
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </motion.div>
+                </div>
               </div>
 
               {/* input bar */}
-              <div className="flex items-center gap-2 bg-white px-3 py-2.5">
-                <div className="flex flex-1 items-center rounded-full bg-slate-100 px-3.5 py-2">
-                  <span className="text-[11px] text-slate-400">Ketik pesan...</span>
+              <div className="flex shrink-0 items-center gap-2 border-t border-border/70 bg-card px-3 py-2.5">
+                <div className="flex flex-1 items-center rounded-full bg-muted px-3.5 py-2">
+                  <span className="text-[12px] text-muted-foreground">
+                    Ketik pesan...
+                  </span>
                   <motion.span
-                    animate={shouldReduceMotion ? undefined : { opacity: [1, 0, 1] }}
-                    transition={
-                      shouldReduceMotion ? undefined : { duration: 0.9, repeat: Infinity }
+                    animate={
+                      shouldReduceMotion ? undefined : { opacity: [1, 0, 1] }
                     }
-                    className="ml-0.5 text-slate-400"
+                    transition={
+                      shouldReduceMotion
+                        ? undefined
+                        : { duration: 0.9, repeat: Infinity }
+                    }
+                    className="ml-0.5 text-muted-foreground"
                   >
                     |
                   </motion.span>
                 </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-module-ketik text-white">
+                  <svg
+                    className="size-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden
+                  >
                     <path
                       d="M22 2L11 13"
-                      stroke="white"
+                      stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                     <path
                       d="M22 2L15 22L11 13L2 9L22 2Z"
-                      stroke="white"
+                      stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -155,8 +295,8 @@ export function KetikMotionFrame() {
               </div>
 
               {/* home indicator */}
-              <div className="flex justify-center bg-white pb-2 pt-1">
-                <div className="h-1 w-12 rounded-full bg-slate-300" />
+              <div className="flex shrink-0 justify-center bg-card pb-2 pt-1">
+                <div className="h-1 w-12 rounded-full bg-border" />
               </div>
             </div>
           </div>

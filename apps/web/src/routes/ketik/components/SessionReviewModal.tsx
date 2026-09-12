@@ -1,5 +1,3 @@
-import React from "react";
-import { motion } from "framer-motion";
 import {
   X,
   Award,
@@ -24,52 +22,60 @@ import {
   KetikDimensionGuidanceList,
   KetikPriorityFixes,
 } from "../../../components/KetikEducationSections";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Progress } from "../../../components/ui/progress";
+import { Separator } from "../../../components/ui/separator";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 
 function getScoreGrade(score: number) {
   if (score >= 90)
     return {
       label: "Sangat Baik",
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/25",
-      bar: "bg-emerald-500",
+      color: "text-chart-green",
+      bg: "bg-chart-green/10",
+      border: "border-chart-green/25",
+      bar: "bg-chart-green",
     };
   if (score >= 75)
     return {
       label: "Baik",
-      color: "text-sky-600",
-      bg: "bg-sky-500/10",
-      border: "border-sky-500/25",
-      bar: "bg-sky-500",
+      color: "text-chart-blue",
+      bg: "bg-chart-blue/10",
+      border: "border-chart-blue/25",
+      bar: "bg-chart-blue",
     };
   if (score >= 60)
     return {
       label: "Cukup",
-      color: "text-amber-600",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/25",
-      bar: "bg-amber-500",
+      color: "text-chart-amber",
+      bg: "bg-chart-amber/10",
+      border: "border-chart-amber/25",
+      bar: "bg-chart-amber",
     };
   return {
     label: "Perlu Coaching",
-    color: "text-rose-600",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/25",
-    bar: "bg-rose-500",
+    color: "text-chart-red",
+    bg: "bg-chart-red/10",
+    border: "border-chart-red/25",
+    bar: "bg-chart-red",
   };
 }
 
 function ScoreBar({ score }: { score: number }) {
   return (
-    <div className="w-full h-1.5 bg-foreground/5 rounded-full overflow-hidden mt-1">
-      <motion.div
-        className={`h-full rounded-full ${getScoreGrade(score).bar}`}
-        initial={{ width: 0 }}
-        animate={{ width: `${score}%` }}
-        transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-      />
-    </div>
+    <Progress
+      value={score}
+      aria-label={`Skor ${score} dari 100`}
+      className={`mt-1 h-1.5 ${getScoreGrade(score).bar}`}
+    />
   );
 }
 
@@ -116,8 +122,6 @@ export function SessionReviewModal({
     ["starting", "processing", "delayed", "loading-result"].includes(
       progress.status,
     );
-
-  if (!isOpen) return null;
 
   const handleAnalyze = async () => {
     if (!onStartReview || isProcessing) return;
@@ -194,43 +198,45 @@ export function SessionReviewModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-3xl rounded-[2rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl shadow-black/10 bg-card border border-border/50"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        data-module="ketik"
+        className="!w-[calc(100vw-2rem)] !max-w-4xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
       >
-        <header className="px-5 py-4 sm:px-6 sm:py-5 border-b flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-              <BrainCircuit className="w-5 h-5 text-primary" />
+        <DialogHeader className="shrink-0 border-b px-5 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-module-ketik/10">
+                <BrainCircuit className="size-5 text-module-ketik" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="line-clamp-1 text-lg tracking-tight sm:text-xl">
+                  Hasil Review AI
+                </DialogTitle>
+                <DialogDescription className="mt-1 line-clamp-1">
+                  Sesi: {session.scenarioTitle}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight line-clamp-1">
-                Hasil Review AI
-              </h2>
-              <p className="text-xs text-muted-foreground font-medium">
-                Sesi: {session.scenarioTitle}
-              </p>
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              onClick={onClose}
+              aria-label="Tutup hasil review"
+            >
+              <X data-icon="inline" />
+            </Button>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center hover:bg-foreground/5 rounded-xl transition-all border border-transparent hover:border-foreground/10"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </header>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
           {(() => {
             const peserta = formatSimulationSubjectLabel(
               session.simulationSubject,
@@ -499,14 +505,16 @@ export function SessionReviewModal({
                   : "Gunakan AI untuk menilai empati, teknik probing, kepatuhan prosedur, dan tata tulis pada sesi chat Anda."}
               </p>
 
-              <button
+              <Button
+                type="button"
+                size="lg"
                 onClick={handleAnalyze}
                 disabled={isProcessing || !canStartReview}
-                className="inline-flex h-14 w-full max-w-sm items-center justify-center gap-3 rounded-2xl bg-primary px-8 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
+                className="h-14 w-full max-w-sm rounded-2xl px-8 text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100"
               >
                 {isProcessing ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                    <div className="size-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
                     <span>{getStatusText()}</span>
                     <span className="opacity-60 tabular-nums">
                       {Math.round(progress.percent)}%
@@ -514,7 +522,7 @@ export function SessionReviewModal({
                   </>
                 ) : (
                   <>
-                    <BrainCircuit className="w-5 h-5" />
+                    <BrainCircuit data-icon="inline-start" />
                     <span>
                       {!canStartReview
                         ? "Tidak Memiliki Akses"
@@ -524,18 +532,15 @@ export function SessionReviewModal({
                     </span>
                   </>
                 )}
-              </button>
+              </Button>
 
               {isProcessing && (
-                <div className="w-full max-w-sm mt-5 space-y-3">
-                  <div className="h-2.5 bg-foreground/5 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-primary rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress.percent}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    />
-                  </div>
+                <div className="mt-5 flex w-full max-w-sm flex-col gap-3">
+                  <Progress
+                    value={progress.percent}
+                    aria-label={`Progress analisis ${Math.round(progress.percent)}%`}
+                    className="h-2.5"
+                  />
                   {progress.etaSeconds > 0 && (
                     <p className="text-[10px] text-muted-foreground text-center tabular-nums">
                       Estimasi: ~{progress.etaSeconds} detik lagi
@@ -551,7 +556,7 @@ export function SessionReviewModal({
               )}
 
               {!canStartReview && reviewAccessMessage && (
-                <p className="mt-4 text-[11px] text-orange-500 font-medium text-center">
+                <p className="mt-4 text-center text-[11px] font-medium text-chart-orange">
                   {reviewAccessMessage}
                 </p>
               )}
@@ -559,22 +564,28 @@ export function SessionReviewModal({
           )}
         </div>
 
-        <footer className="p-5 sm:p-6 border-t flex flex-col sm:flex-row gap-3 shrink-0">
-          <button
+        <Separator />
+        <DialogFooter className="!mx-0 !mb-0 shrink-0 flex-col gap-3 rounded-none border-0 bg-card p-5 sm:flex-row sm:p-6">
+          <Button
+            type="button"
+            size="lg"
             onClick={onReplay}
-            className="flex-1 h-14 bg-primary text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+            className="h-14 flex-1 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Play className="w-4 h-4 fill-current" />
+            <Play data-icon="inline-start" fill="currentColor" />
             Tonton Replay
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
             onClick={onClose}
-            className="h-14 px-8 border border-foreground/10 hover:bg-foreground/5 text-foreground font-black uppercase tracking-widest text-xs rounded-2xl transition-all"
+            className="h-14 rounded-2xl px-8 text-xs font-black uppercase tracking-widest"
           >
             Tutup
-          </button>
-        </footer>
-      </motion.div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

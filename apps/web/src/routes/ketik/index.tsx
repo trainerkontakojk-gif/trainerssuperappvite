@@ -31,9 +31,8 @@ import {
 } from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { resolveKetikSessionIdentity } from "./ketikIdentity";
-
-const accentClassName = "text-emerald-600";
-const accentSoftClassName = "bg-emerald-100";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
@@ -712,99 +711,116 @@ export default function KetikLanding() {
             exit={{ opacity: 0, y: -12 }}
             className="relative z-10"
           >
-            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
+            <main className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
               <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                {/* Kiri — HP motion frame */}
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col">
                   <div className="flex flex-1 flex-col">
                     <KetikMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah
+                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah,
                     dan skor langsung tersedia.
                   </p>
                 </div>
 
-                {/* Kanan — 1 card */}
-                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                <section className="flex min-w-0 flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
                   <div className="space-y-4">
-                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                       Latih percakapan chat. Balas lebih tepat dan empatik.
                     </h1>
-                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                    <p className="max-w-xl text-[16px] leading-7 text-muted-foreground">
                       Ketik — singkatan dari{" "}
                       <span className="font-semibold text-foreground">
                         Kelas Etika &amp; Trik Komunikasi
                       </span>{" "}
                       — adalah simulasi percakapan chat berbasis AI untuk
                       melatih ketepatan, empati, dan kepatuhan prosedur. Pilih
-                      skenario, jalankan simulasi, lalu tinjau telaah secara
-                      langsung.
+                      skenario, jalankan simulasi, lalu tinjau hasilnya.
                     </p>
                   </div>
 
                   <div className="mt-8 border-t border-border/40 pt-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Mulai latihan
-                    </p>
-                    <div className="mt-5 space-y-3">
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                        Mulai latihan
+                      </p>
+                      <span className="text-[13px] font-medium text-muted-foreground">
+                        {
+                          settings.scenarios.filter(
+                            (scenario) => scenario.isActive,
+                          ).length
+                        }{" "}
+                        skenario aktif
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex flex-col gap-3">
+                      <Button
+                        type="button"
+                        size="lg"
                         onClick={requestStartSimulation}
                         disabled={isLoading}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-emerald-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
+                        className="min-h-12 w-full justify-start bg-module-ketik px-3 text-[15px] text-white hover:bg-module-ketik/90"
                       >
                         {isLoading ? (
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          <span
+                            className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                            aria-hidden="true"
+                          />
                         ) : (
-                          <Play className="h-4 w-4 fill-current" />
+                          <Play data-icon="inline-start" fill="currentColor" />
                         )}
-                        <span>
-                          {isLoading ? "Memulai..." : "Mulai simulasi"}
-                        </span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        {isLoading ? "Memulai..." : "Mulai simulasi"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
                         onClick={() => setIsSettingsOpen(true)}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="min-h-11 w-full justify-start px-3 text-[15px]"
                       >
-                        <Settings className="h-4 w-4 opacity-60" />
-                        <span>Pengaturan</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        <Settings data-icon="inline-start" />
+                        Pengaturan
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
                         onClick={() => setIsHistoryOpen(true)}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="min-h-11 w-full justify-start px-3 text-[15px]"
                       >
-                        <History className="h-4 w-4 opacity-60" />
-                        <span>Riwayat</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        <History data-icon="inline-start" />
+                        Riwayat
+                        {history.length > 0 ? (
+                          <Badge variant="secondary" className="ml-auto">
+                            {history.length}
+                          </Badge>
+                        ) : null}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="ghost"
                         onClick={() => setIsUsageOpen(true)}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="min-h-11 w-full justify-start px-3 text-[15px] text-muted-foreground"
                       >
-                        <BarChart3 className="h-4 w-4 opacity-60" />
-                        <span>Pemakaian bulan ini</span>
+                        <BarChart3 data-icon="inline-start" />
+                        Pemakaian bulan ini
                         {sessionDelta &&
                           (sessionDelta.costIdr > 0 ||
                             sessionDelta.totalTokens > 0 ||
                             sessionDelta.totalCalls > 0) && (
-                            <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            <Badge variant="secondary" className="ml-auto">
                               {formatUsageDeltaLabel(sessionDelta)} sesi
                               terakhir
-                            </span>
+                            </Badge>
                           )}
-                      </motion.button>
+                      </Button>
                     </div>
                   </div>
                 </section>
               </div>
-            </div>
+            </main>
           </motion.div>
         ) : (
           <motion.div
@@ -826,8 +842,9 @@ export default function KetikLanding() {
                   authReady={true}
                   currentUserId=""
                   templates={settings.quickTemplates}
-                  signatureName={settings.identitySettings.signatureName}
-                  simulationSubject={selectedSessionForReview?.simulationSubject}
+                  simulationSubject={
+                    selectedSessionForReview?.simulationSubject
+                  }
                 />
               )}
             </div>

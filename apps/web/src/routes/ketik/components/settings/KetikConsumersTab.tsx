@@ -1,6 +1,25 @@
-import React from "react";
 import { ArrowLeft, Edit2, Trash2, Plus } from "lucide-react";
-import { KetikAppSettings, KetikConsumerType } from "@trainers/types";
+import type { Dispatch, SetStateAction } from "react";
+import type { KetikAppSettings, KetikConsumerType } from "@trainers/types";
+import { Badge } from "../../../../components/ui/badge";
+import { Button } from "../../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../../components/ui/select";
+import { Textarea } from "../../../../components/ui/textarea";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { normalizeKetikConsumerDraft } from "./ketikDraftNormalizers";
 
@@ -8,7 +27,7 @@ interface KetikConsumersTabProps {
   consumerTypes: KetikConsumerType[];
   activeConsumerTypeId: string;
   consumerForm: ReturnType<typeof useCrudForm<KetikConsumerType>>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
+  setLocalSettings: Dispatch<SetStateAction<KetikAppSettings>>;
 }
 
 export function KetikConsumersTab({
@@ -17,7 +36,6 @@ export function KetikConsumersTab({
   consumerForm,
   setLocalSettings,
 }: KetikConsumersTabProps) {
-
   const handleSelectConsumerType = (id: string) =>
     setLocalSettings((prev) => ({ ...prev, activeConsumerTypeId: id }));
 
@@ -64,212 +82,243 @@ export function KetikConsumersTab({
 
   if (consumerForm.isOpen) {
     return (
-      <div className="space-y-6 pb-10">
-        <div className="flex items-center gap-2 border-b border-border pb-4">
-          <button
+      <div className="flex flex-col gap-6 pb-10">
+        <div className="border-b border-border pb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={handleCancelConsumerForm}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            className="-ml-2 text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft data-icon="inline-start" />
             Kembali ke Daftar Karakter
-          </button>
+          </Button>
         </div>
-        <div className="bg-card border border-border rounded-xl overflow-hidden relative">
-          <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
-            <h3 className="font-bold text-foreground text-base tracking-tight">
-              {consumerForm.editingId ? "Edit Karakter" : "Tambah Karakter Baru"}
-            </h3>
-          </div>
-          <div className="p-6 space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+        <Card>
+          <CardHeader className="border-b bg-muted/20 px-6 py-4">
+            <CardTitle className="text-base tracking-tight">
+              {consumerForm.editingId
+                ? "Edit Karakter"
+                : "Tambah Karakter Baru"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5 p-6">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Nama Karakter
-              </label>
-              <input
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+              </Label>
+              <Input
+                className="bg-background"
                 value={consumerForm.draft.name || ""}
-                onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
+                onChange={(e) =>
+                  consumerForm.setDraft({ name: e.target.value })
+                }
                 placeholder="Contoh: Pelanggan Marah"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Tingkat Kesulitan
-              </label>
-              <div className="relative">
-                <select
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none appearance-none transition-colors"
-                  value={consumerForm.draft.difficulty || "Sedang"}
-                  onChange={(e) =>
-                    consumerForm.setDraft({
-                      difficulty: e.target.value as KetikConsumerType["difficulty"],
-                    })
-                  }
-                >
-                  <option value="Mudah">Mudah</option>
-                  <option value="Sedang">Sedang</option>
-                  <option value="Sulit">Sulit</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                  <svg
-                    width="10"
-                    height="6"
-                    viewBox="0 0 10 6"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 1L5 5L9 1"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
+              </Label>
+              <Select
+                value={consumerForm.draft.difficulty || "Sedang"}
+                onValueChange={(value) => {
+                  if (!value) return;
+                  consumerForm.setDraft({
+                    difficulty: value as KetikConsumerType["difficulty"],
+                  });
+                }}
+              >
+                <SelectTrigger className="h-10 w-full bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mudah">Mudah</SelectItem>
+                  <SelectItem value="Sedang">Sedang</SelectItem>
+                  <SelectItem value="Sulit">Sulit</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Deskripsi / AI Prompt
-              </label>
-              <textarea
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30"
+              </Label>
+              <Textarea
+                className="min-h-24 resize-none bg-background"
                 rows={4}
                 value={consumerForm.draft.description || ""}
-                onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
+                onChange={(e) =>
+                  consumerForm.setDraft({ description: e.target.value })
+                }
                 placeholder="Deskripsikan bagaimana karakter ini berperilaku..."
               />
             </div>
-            <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-              <button
-                onClick={handleCancelConsumerForm}
-                className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveConsumer}
-                disabled={!consumerForm.draft.name || !consumerForm.draft.description}
-                className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+          <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelConsumerForm}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveConsumer}
+              disabled={
+                !consumerForm.draft.name || !consumerForm.draft.description
+              }
+            >
+              Simpan
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-10 mt-2">
-      <div className="border-b border-border pb-4">
-        <h3 className="font-bold text-foreground text-lg tracking-tight">
+    <div className="mt-2 flex flex-col gap-6 pb-10">
+      <div className="flex flex-col gap-2 border-b border-border pb-4">
+        <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
           Pilih Karakter Pelanggan
         </h3>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Pilih satu kepribadian pelanggan yang akan Anda hadapi. Karakter ini akan digunakan untuk <span className="text-foreground font-medium">semua skenario</span> yang aktif.
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Pilih satu kepribadian pelanggan yang akan Anda hadapi. Karakter ini
+          akan digunakan untuk{" "}
+          <span className="font-medium text-foreground">semua skenario</span>{" "}
+          yang aktif.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Button
+          type="button"
+          variant={activeConsumerTypeId === "random" ? "secondary" : "outline"}
+          aria-pressed={activeConsumerTypeId === "random"}
           onClick={() => handleSelectConsumerType("random")}
-          className={`cursor-pointer p-5 rounded-xl border transition-all flex flex-col justify-between ${
+          className={`h-auto min-h-32 w-full flex-col items-stretch justify-between whitespace-normal rounded-xl p-5 text-left ${
             activeConsumerTypeId === "random"
-              ? "border-primary bg-primary/5"
-              : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+              ? "border-primary bg-primary/5 hover:bg-primary/10"
+              : "border-border bg-card/45 hover:bg-muted/40"
           }`}
         >
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-semibold text-foreground tracking-tight text-sm">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold tracking-tight text-foreground">
               Acak
-            </h4>
-            <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${activeConsumerTypeId === "random" ? "border-primary" : "border-border"}`}>
+            </span>
+            <span
+              className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${activeConsumerTypeId === "random" ? "border-primary" : "border-border"}`}
+              aria-hidden="true"
+            >
               {activeConsumerTypeId === "random" && (
-                <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                <span className="size-2.5 rounded-full bg-primary" />
               )}
-            </div>
+            </span>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-            Sistem akan memilih salah satu karakter secara acak setiap kali sesi simulasi dimulai.
-          </p>
-        </div>
+          <span className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            Sistem akan memilih salah satu karakter secara acak setiap kali sesi
+            simulasi dimulai.
+          </span>
+        </Button>
 
         {consumerTypes.map((c) => (
-          <div
+          <Card
             key={c.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Pilih karakter ${c.name}`}
             onClick={() => handleSelectConsumerType(c.id)}
-            className={`cursor-pointer p-5 rounded-xl border transition-all relative group flex flex-col justify-between ${
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleSelectConsumerType(c.id);
+              }
+            }}
+            className={`cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
               activeConsumerTypeId === c.id
                 ? "border-primary bg-primary/5"
-                : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+                : "border-border bg-card/45 hover:bg-muted/40"
             }`}
           >
-            <div className="flex justify-between items-start mb-2 gap-2">
-              <div className="flex flex-col gap-1 min-w-0">
-                <h4 className="font-semibold text-foreground tracking-tight text-sm truncate">
-                  {c.name}
-                </h4>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span
-                    className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${
-                      c.difficulty === "Mudah"
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+            <CardContent className="flex min-h-32 flex-col justify-between gap-4 p-5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <h4 className="truncate text-sm font-semibold tracking-tight text-foreground">
+                    {c.name}
+                  </h4>
+                  <Badge
+                    variant={
+                      c.difficulty === "Sulit"
+                        ? "destructive"
                         : c.difficulty === "Sedang"
-                        ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                        : "bg-destructive/10 text-destructive border-destructive/20"
-                    }`}
+                          ? "outline"
+                          : "secondary"
+                    }
+                    className="text-[11px]"
                   >
                     {c.difficulty}
-                  </span>
+                  </Badge>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {activeConsumerTypeId === c.id ? (
+                    <span
+                      className="flex size-4 items-center justify-center rounded-full border border-primary"
+                      aria-label="Karakter aktif"
+                    >
+                      <span className="size-2.5 rounded-full bg-primary" />
+                    </span>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-lg"
+                        aria-label={`Edit karakter ${c.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(c);
+                        }}
+                      >
+                        <Edit2 data-icon="inline" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-lg"
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label={`Hapus karakter ${c.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConsumer(c.id);
+                        }}
+                      >
+                        <Trash2 data-icon="inline" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center shrink-0">
-                {activeConsumerTypeId === c.id ? (
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${activeConsumerTypeId === c.id ? "border-primary" : "border-border"}`}>
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditClick(c);
-                      }}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors border border-border"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteConsumer(c.id);
-                      }}
-                      className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors border border-transparent hover:border-destructive/20"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed mt-2">
-              {c.description}
-            </p>
-          </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {c.description}
+              </p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {!consumerForm.isOpen && (
-        <button
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
           onClick={handleAddClick}
-          className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group"
+          className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
         >
-          <Plus className="w-5 h-5" />
+          <Plus data-icon="inline" />
           <span className="text-sm font-medium">Buat Karakteristik Baru</span>
-        </button>
+        </Button>
       )}
     </div>
   );

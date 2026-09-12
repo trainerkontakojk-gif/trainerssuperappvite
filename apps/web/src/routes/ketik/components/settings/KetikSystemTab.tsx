@@ -1,6 +1,11 @@
 import { useEffect } from "react";
 import type { KetikAppSettings } from "@trainers/types";
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels"; // Shared model registry
+import { Badge } from "../../../../components/ui/badge";
+import { Button } from "../../../../components/ui/button";
+import { Card, CardContent } from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
 
 export interface KetikSystemTabProps {
   localSettings: KetikAppSettings;
@@ -40,181 +45,202 @@ export function KetikSystemTab({
   }, [durationMode, inputRef]);
 
   return (
-    <div className="space-y-8 pb-10 mt-2">
+    <div className="mt-2 flex flex-col gap-8 pb-10">
       {/* Model Selection */}
-      <section className="space-y-4">
-        <div className="border-b border-border pb-3">
-          <h3 className="font-bold text-foreground text-base tracking-tight">
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 border-b border-border pb-3">
+          <h3 className="font-heading text-base font-semibold tracking-tight text-foreground">
             Pilih Model AI
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground">
             Pilih model AI yang akan menggerakkan karakter pelanggan.
           </p>
         </div>
-        <div className="grid gap-3">
+        <div className="grid gap-3" role="group" aria-label="Model AI">
           {TEXT_MODELS.map((model) => {
             const isSelected = localSettings.selectedModel === model.id;
             return (
-              <div
+              <Button
                 key={model.id}
+                type="button"
+                variant={isSelected ? "secondary" : "outline"}
+                aria-pressed={isSelected}
                 onClick={() =>
                   setLocalSettings((prev) => ({
                     ...prev,
                     selectedModel: model.id,
                   }))
                 }
-                className={`cursor-pointer p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
+                className={`h-auto min-h-20 w-full justify-between gap-4 whitespace-normal rounded-xl p-4 text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
+                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h4 className="font-semibold text-foreground text-sm truncate">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h4 className="truncate text-sm font-semibold text-foreground">
                       {model.name}
                     </h4>
-                    <span className="px-1.5 py-0.5 rounded border text-[11px] font-medium bg-foreground/[0.03] text-foreground/70 border-border">
+                    <Badge variant="outline" className="text-[11px]">
                       {model.provider === "gemini" ? "Gemini" : "OpenAI"}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <p className="text-xs leading-relaxed text-muted-foreground">
                     {model.description}
                   </p>
                 </div>
-                <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-primary" : "border-border"}`}>
+                <div
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${isSelected ? "border-primary" : "border-border"}`}
+                  aria-hidden="true"
+                >
                   {isSelected && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    <div className="size-2.5 rounded-full bg-primary" />
                   )}
                 </div>
-              </div>
+              </Button>
             );
           })}
         </div>
       </section>
 
       {/* Duration Configuration */}
-      <section className="space-y-4">
-        <div className="border-b border-border pb-3">
-          <h3 className="font-bold text-foreground text-base tracking-tight">
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 border-b border-border pb-3">
+          <h3 className="font-heading text-base font-semibold tracking-tight">
             Durasi Simulasi
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground">
             Tentukan batas waktu maksimal untuk setiap sesi simulasi.
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {PRESET_DURATIONS.map((d) => {
             const isSelected =
               durationMode === "preset" &&
               localSettings.simulationDuration === d;
             return (
-              <button
+              <Button
                 key={d}
                 type="button"
+                size="lg"
+                variant={isSelected ? "secondary" : "outline"}
                 onClick={() => handlePresetClick(d)}
-                className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
+                className={`min-h-11 ${
                   isSelected
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border bg-card/45 hover:bg-foreground/[0.02] text-foreground"
+                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
+                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
                 }`}
               >
                 {d} Menit
-              </button>
+              </Button>
             );
           })}
-          <button
+          <Button
             type="button"
+            size="lg"
+            variant={durationMode === "custom" ? "secondary" : "outline"}
             onClick={handleCustomClick}
-            className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
+            className={`min-h-11 ${
               durationMode === "custom"
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-border bg-card/45 hover:bg-foreground/[0.02] text-foreground"
+                ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
+                : "border-border bg-card/45 text-foreground hover:bg-muted/40"
             }`}
           >
             Kustom
-          </button>
+          </Button>
         </div>
         {durationMode === "custom" && (
-          <div className="p-4 rounded-xl border border-border bg-card/20 flex flex-col sm:flex-row sm:items-center gap-4 justify-between mt-2">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-0.5">
-                Masukkan Durasi Kustom
-              </label>
-              <p className="text-[11px] text-muted-foreground">
-                Tentukan durasi simulasi antara {MIN_DURATION} hingga {MAX_DURATION} menit.
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              <div className="relative w-36">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="5"
-                  value={customInputValue}
-                  onChange={handleDurationInputChange}
-                  onBlur={handleDurationBlur}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 pr-12 text-sm text-foreground focus:border-foreground outline-none transition-colors text-right"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-muted-foreground pointer-events-none">
-                  Menit
-                </span>
+          <Card>
+            <CardContent className="flex flex-col justify-between gap-4 bg-card/20 p-4 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs font-semibold text-foreground">
+                  Masukkan Durasi Kustom
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Tentukan durasi simulasi antara {MIN_DURATION} hingga{" "}
+                  {MAX_DURATION} menit.
+                </p>
               </div>
-              {durationValidationError && (
-                <span className="text-[11px] font-medium text-destructive mt-0.5">
-                  {durationValidationError}
-                </span>
-              )}
-            </div>
-          </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="relative w-36">
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="5"
+                    value={customInputValue}
+                    onChange={handleDurationInputChange}
+                    onBlur={handleDurationBlur}
+                    className="bg-background pr-12 text-right"
+                  />
+                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11px] font-medium text-muted-foreground">
+                    Menit
+                  </span>
+                </div>
+                {durationValidationError && (
+                  <span className="mt-0.5 text-[11px] font-medium text-destructive">
+                    {durationValidationError}
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </section>
 
       {/* Response Pacing Mode */}
-      <section className="space-y-4">
-        <div className="border-b border-border pb-3">
-          <h3 className="font-bold text-foreground text-base tracking-tight">
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1 border-b border-border pb-3">
+          <h3 className="font-heading text-base font-semibold tracking-tight">
             Tempo Balasan Konsumen
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground">
             Pengaturan ini memengaruhi kecepatan balasan konsumen ditampilkan.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {(["realistic", "training_fast"] as const).map((mode) => {
             const isSelected = localSettings.responsePacingMode === mode;
             return (
-              <div
+              <Button
                 key={mode}
+                type="button"
+                variant={isSelected ? "secondary" : "outline"}
+                aria-pressed={isSelected}
                 onClick={() =>
                   setLocalSettings((prev) => ({
                     ...prev,
                     responsePacingMode: mode,
                   }))
                 }
-                className={`cursor-pointer p-4 rounded-xl border transition-colors flex items-start justify-between gap-4 ${
+                className={`h-auto min-h-24 w-full items-start justify-between gap-4 whitespace-normal rounded-xl p-4 text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
+                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <span className={`text-sm font-semibold block ${isSelected ? "text-primary" : "text-foreground"}`}>
+                <div className="min-w-0 flex-1">
+                  <span
+                    className={`block text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}
+                  >
                     {mode === "realistic" ? "Realistis" : "Cepat Latihan"}
                   </span>
-                  <span className="text-xs text-muted-foreground block mt-1 leading-relaxed">
+                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
                     {mode === "realistic"
                       ? "Variasi tempo seperti manusia asli."
                       : "Balasan lebih cepat, cocok untuk latihan."}
                   </span>
                 </div>
-                <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${isSelected ? "border-primary" : "border-border"}`}>
+                <div
+                  className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${isSelected ? "border-primary" : "border-border"}`}
+                  aria-hidden="true"
+                >
                   {isSelected && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    <div className="size-2.5 rounded-full bg-primary" />
                   )}
                 </div>
-              </div>
+              </Button>
             );
           })}
         </div>

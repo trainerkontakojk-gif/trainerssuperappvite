@@ -1,4 +1,6 @@
-import React from "react";
+import { Card, CardContent } from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
 
 interface KetikIdentityTabProps {
   identitySettings: {
@@ -15,25 +17,30 @@ export function KetikIdentityTab({
   handleIdentityChange,
 }: KetikIdentityTabProps) {
   return (
-    <div className="space-y-6 pb-10 mt-2">
-      <div className="border-b border-border pb-4">
-        <h3 className="font-bold text-foreground text-lg tracking-tight">
+    <div className="mt-2 flex flex-col gap-6 pb-10">
+      <div className="flex flex-col gap-2 border-b border-border pb-4">
+        <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
           Identitas &amp; Greeting
         </h3>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Konfigurasi profil konsumen dan identitas agen untuk salam pembuka yang lebih personal.
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Konfigurasi profil konsumen dan identitas agen untuk salam pembuka
+          yang lebih personal.
         </p>
       </div>
 
-      <div className="p-6 rounded-xl border border-border bg-card">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+      <Card>
+        <CardContent className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="ketik-identity-display-name"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Nama Konsumen
-            </label>
-            <input
+            </Label>
+            <Input
+              id="ketik-identity-display-name"
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+              className="bg-background"
               placeholder="Contoh: Agus Setiawan"
               value={identitySettings.displayName || ""}
               onChange={(e) =>
@@ -41,13 +48,17 @@ export function KetikIdentityTab({
               }
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="ketik-identity-signature-name"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Nama Agen (Greeting)
-            </label>
-            <input
+            </Label>
+            <Input
+              id="ketik-identity-signature-name"
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+              className="bg-background"
               placeholder="Contoh: Fajar"
               value={identitySettings.signatureName || ""}
               onChange={(e) =>
@@ -55,13 +66,17 @@ export function KetikIdentityTab({
               }
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="ketik-identity-phone"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Nomor Telepon
-            </label>
-            <input
+            </Label>
+            <Input
+              id="ketik-identity-phone"
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+              className="bg-background"
               placeholder="Contoh: 0812..."
               value={identitySettings.phoneNumber || ""}
               onChange={(e) =>
@@ -69,22 +84,24 @@ export function KetikIdentityTab({
               }
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="ketik-identity-city"
+              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Kota Asal
-            </label>
-            <input
+            </Label>
+            <Input
+              id="ketik-identity-city"
               type="text"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+              className="bg-background"
               placeholder="Contoh: Jakarta"
               value={identitySettings.city || ""}
-              onChange={(e) =>
-                handleIdentityChange("city", e.target.value)
-              }
+              onChange={(e) => handleIdentityChange("city", e.target.value)}
             />
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

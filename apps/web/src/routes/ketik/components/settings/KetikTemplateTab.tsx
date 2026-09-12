@@ -1,10 +1,22 @@
-import React from "react";
 import { ArrowLeft, Edit2, Trash2, Plus } from "lucide-react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   KetikAppSettings,
   KetikQuickTemplate,
   mergeKetikQuickTemplates,
 } from "@trainers/types";
+import { Badge } from "../../../../components/ui/badge";
+import { Button } from "../../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import { Textarea } from "../../../../components/ui/textarea";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { normalizeKetikQuickTemplateDraft } from "./ketikDraftNormalizers";
@@ -18,8 +30,8 @@ interface KetikTemplateTabProps {
   personalTemplates: KetikQuickTemplate[];
   templateForm: ReturnType<typeof useCrudForm<KetikQuickTemplate>>;
   templateScope: "global" | "personal";
-  setTemplateScope: React.Dispatch<React.SetStateAction<"global" | "personal">>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
+  setTemplateScope: Dispatch<SetStateAction<"global" | "personal">>;
+  setLocalSettings: Dispatch<SetStateAction<KetikAppSettings>>;
   canManageTemplates?: boolean;
 }
 
@@ -135,19 +147,22 @@ export function KetikTemplateTab({
 
   if (templateForm.isOpen) {
     return (
-      <div className="space-y-6 pb-10">
-        <div className="flex items-center gap-2 border-b border-border pb-4">
-          <button
+      <div className="flex flex-col gap-6 pb-10">
+        <div className="border-b border-border pb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={handleCancelTemplateForm}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            className="-ml-2 text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft data-icon="inline-start" />
             Kembali ke Daftar Template
-          </button>
+          </Button>
         </div>
-        <div className="bg-card border border-border rounded-xl overflow-hidden relative">
-          <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
-            <h3 className="font-bold text-foreground text-base tracking-tight">
+        <Card>
+          <CardHeader className="border-b bg-muted/20 px-6 py-4">
+            <CardTitle className="text-base tracking-tight">
               {templateForm.editingId
                 ? templateScope === "global"
                   ? "Edit Template Standar"
@@ -155,19 +170,19 @@ export function KetikTemplateTab({
                 : templateScope === "global"
                   ? "Tambah Template Standar"
                   : "Tambah Template Pribadi"}
-            </h3>
-          </div>
-          <div className="p-6 space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5 p-6">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Shortcut Keyword (Tanpa Spasi)
-              </label>
+              </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold text-sm">
+                <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
                   /
                 </span>
-                <input
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 pl-6 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+                <Input
+                  className="bg-background pl-7"
                   value={templateForm.draft.keyword || ""}
                   onChange={(e) =>
                     templateForm.setDraft({
@@ -180,12 +195,12 @@ export function KetikTemplateTab({
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Isi Template
-              </label>
-              <textarea
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30 leading-relaxed font-normal"
+              </Label>
+              <Textarea
+                className="min-h-32 resize-none bg-background leading-relaxed"
                 rows={5}
                 value={templateForm.draft.content || ""}
                 onChange={(e) =>
@@ -194,25 +209,26 @@ export function KetikTemplateTab({
                 placeholder="Masukkan isi pesan yang akan muncul saat shortcut dipanggil..."
               />
             </div>
-            <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-              <button
-                onClick={handleCancelTemplateForm}
-                className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveTemplate}
-                disabled={
-                  !templateForm.draft.keyword || !templateForm.draft.content
-                }
-                className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+          <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelTemplateForm}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveTemplate}
+              disabled={
+                !templateForm.draft.keyword || !templateForm.draft.content
+              }
+            >
+              Simpan
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
@@ -223,60 +239,70 @@ export function KetikTemplateTab({
   ) => {
     const canEdit = scope === "personal" || canManageTemplates;
     return (
-      <div
+      <Card
         key={`${scope}-${template.id}`}
-        className="p-4 rounded-xl border border-border bg-card/45 hover:bg-foreground/[0.02] transition-colors group flex items-start justify-between gap-4"
+        className="group transition-colors hover:bg-muted/30"
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-md text-[11px] font-medium">
-              /{template.keyword}
-            </span>
+        <CardContent className="flex items-start justify-between gap-4 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-primary/20 bg-primary/10 text-[11px] text-primary"
+              >
+                /{template.keyword}
+              </Badge>
+            </div>
+            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+              {template.content}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-            {template.content}
-          </p>
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button
-              onClick={() => handleEditClick(scope, template)}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors border border-border"
-              aria-label={`Edit template ${template.keyword}`}
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => handleDeleteTemplate(scope, template.id)}
-              className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors border border-transparent hover:border-destructive/20"
-              aria-label={`Hapus template ${template.keyword}`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
+          {canEdit && (
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                onClick={() => handleEditClick(scope, template)}
+                aria-label={`Edit template ${template.keyword}`}
+              >
+                <Edit2 data-icon="inline" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => handleDeleteTemplate(scope, template.id)}
+                aria-label={`Hapus template ${template.keyword}`}
+              >
+                <Trash2 data-icon="inline" />
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   };
 
   return (
-    <div className="space-y-6 pb-10 mt-2">
-      <div className="border-b border-border pb-4">
-        <h3 className="font-bold text-foreground text-lg tracking-tight">
+    <div className="mt-2 flex flex-col gap-6 pb-10">
+      <div className="flex flex-col gap-2 border-b border-border pb-4">
+        <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
           Template Cepat
         </h3>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Template standar dikelola admin dan berlaku untuk semua user. Template
           pribadi hanya tersedia untuk akun Anda.
         </p>
       </div>
 
-      <section className="space-y-3">
-        <div>
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
           <h4 className="text-sm font-semibold text-foreground">
             Template Standar
           </h4>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground">
             {canManageTemplates
               ? "Template ini digunakan oleh seluruh user KETIK."
               : "Template ini dapat digunakan, tetapi tidak dapat diubah dari akun Anda."}
@@ -288,22 +314,25 @@ export function KetikTemplateTab({
           )}
         </div>
         {canManageTemplates && (
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
             onClick={() => handleAddClick("global")}
-            className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group"
+            className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
           >
-            <Plus className="w-5 h-5" />
+            <Plus data-icon="inline" />
             <span className="text-sm font-medium">Tambah Template Standar</span>
-          </button>
+          </Button>
         )}
       </section>
 
-      <section className="space-y-3 border-t border-border pt-6">
-        <div>
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <div className="flex flex-col gap-1">
           <h4 className="text-sm font-semibold text-foreground">
             Template Pribadi
           </h4>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground">
             Tambahkan shortcut yang hanya ingin Anda gunakan sendiri.
           </p>
         </div>
@@ -312,13 +341,16 @@ export function KetikTemplateTab({
             renderTemplateCard(template, "personal"),
           )}
         </div>
-        <button
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
           onClick={() => handleAddClick("personal")}
-          className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group"
+          className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
         >
-          <Plus className="w-5 h-5" />
+          <Plus data-icon="inline" />
           <span className="text-sm font-medium">Tambah Template Pribadi</span>
-        </button>
+        </Button>
       </section>
     </div>
   );

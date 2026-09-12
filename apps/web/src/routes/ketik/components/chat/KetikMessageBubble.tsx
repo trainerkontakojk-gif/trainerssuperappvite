@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Check, CheckCheck } from "lucide-react";
 import type { ChatMessage } from "@trainers/types";
 
@@ -31,7 +31,9 @@ export function renderKetikMessageContent(
       const imgSrc = scenarioImages[imgIndex];
 
       if (imgSrc) {
-        const altText = scenarioImageAlts?.[imgIndex]?.trim() || `Lampiran skenario ${imgIndex}`;
+        const altText =
+          scenarioImageAlts?.[imgIndex]?.trim() ||
+          `Lampiran skenario ${imgIndex}`;
         return (
           <motion.button
             key={index}
@@ -52,7 +54,7 @@ export function renderKetikMessageContent(
         );
       }
       return (
-        <span key={index} className="text-sm italic text-muted-foreground">
+        <span key={index} className="text-[15px] italic text-muted-foreground">
           Lampiran gambar
         </span>
       );
@@ -68,17 +70,23 @@ export function KetikMessageBubble({
   onImageClick,
 }: KetikMessageBubbleProps) {
   const isAgent = message.sender === "agent";
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <motion.div
       key={message.id}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      layout="position"
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={
+        shouldReduceMotion
+          ? { duration: 0 }
+          : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+      }
       className={`flex w-full ${isAgent ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`relative max-w-[88%] px-4 py-3 text-[15px] leading-7 sm:max-w-[76%] sm:px-5
+        className={`relative max-w-[88%] px-4 py-3 text-lg leading-7 sm:max-w-[76%] sm:px-5
           ${
             isAgent
               ? "rounded-2xl rounded-tr-md bg-module-ketik text-white"
@@ -94,7 +102,7 @@ export function KetikMessageBubble({
           )}
         </div>
         <div
-          className={`mt-2 flex items-center justify-end gap-2 text-xs font-medium tabular-nums ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
+          className={`mt-2 flex items-center justify-end gap-2 text-[13px] font-medium tabular-nums ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
         >
           <span>
             {message.timestamp

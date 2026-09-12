@@ -18,6 +18,7 @@ vi.mock("../routes/ketik/ketikApi", () => ({
 }));
 
 import { ChatInterface } from "../routes/ketik/components/ChatInterface";
+import { getKetikConsumerAvatarUrl } from "../routes/ketik/lib/ketik-avatar";
 
 const scenario: KetikScenario = {
   id: "scenario-1",
@@ -245,6 +246,15 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     mockGenerate.mockReset();
   });
 
+  it("keeps composer text at the same readable scale as chat bubbles", () => {
+    renderChat();
+
+    expect(screen.getByLabelText("Tulis pesan KETIK")).toHaveClass(
+      "text-lg",
+      "md:text-lg",
+    );
+  });
+
   it("keeps textarea enabled (not disabled) when isLoading is true", async () => {
     // Make generate() return a promise that never settles so isLoading stays true
     mockGenerate.mockReturnValue(new Promise<{ text: string }>(() => {}));
@@ -279,7 +289,9 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     });
 
     // While consumer is "typing" (isLoading true), user should be able to type
-    fireEvent.change(input, { target: { value: "Second message during loading" } });
+    fireEvent.change(input, {
+      target: { value: "Second message during loading" },
+    });
     expect(input).toHaveValue("Second message during loading");
   });
 
@@ -363,5 +375,46 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     // Enter should trigger handleSend -> generate should be called again
     expect(mockGenerate).toHaveBeenCalledTimes(2);
     expect(input).toHaveValue("");
+  });
+});
+
+describe("KETIK ChatInterface consumer avatar", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    mockGenerate.mockReset();
+  });
+
+  it("uses a deterministic Random User photo with an initials fallback", () => {
+    const { container } = renderChat();
+
+    const avatar = container.querySelector('[data-slot="avatar"]');
+    const avatarUrl = getKetikConsumerAvatarUrl(config.identity);
+
+    expect(avatar).toBeTruthy();
+    expect(avatar).toHaveAttribute("data-size", "lg");
+    expect(avatar).toHaveClass("!size-14", "md:!size-16");
+    expect(avatar).toHaveTextContent("J");
+    expect(avatarUrl).toMatch(
+      /^https:\/\/randomuser\.me\/api\/portraits\/(men|women)\/\d+\.jpg$/,
+    );
+    expect(getKetikConsumerAvatarUrl(config.identity)).toBe(avatarUrl);
+  });
+
+  it("matches known feminine consumer names to women portraits", () => {
+    const avatarUrl = getKetikConsumerAvatarUrl({
+      ...config.identity,
+      name: "Indah Permatasari",
+    });
+
+    expect(avatarUrl).toContain("/women/");
+  });
+
+  it("removes the redundant greeting template button", () => {
+    renderChat();
+
+    expect(
+      screen.queryByRole("button", { name: "Gunakan Template Salam" }),
+    ).not.toBeInTheDocument();
   });
 });

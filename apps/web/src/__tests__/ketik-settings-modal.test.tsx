@@ -204,6 +204,17 @@ describe(
     expect(screen.getByDisplayValue("20")).toBeDefined();
   });
 
+  it("keeps the random character choice arranged as a vertical card", async () => {
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} />);
+
+    await user.click(screen.getByRole("tab", { name: "Karakter" }));
+
+    const randomChoice = screen.getByRole("button", { name: /Acak/ });
+    expect(randomChoice.className).toContain("flex-col");
+    expect(randomChoice).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("shows and updates the KETIK scenario description character counter", async () => {
     const user = userEvent.setup();
     const { container } = render(<SettingsModal {...defaultProps} />);

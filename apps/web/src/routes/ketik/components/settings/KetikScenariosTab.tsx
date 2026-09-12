@@ -8,6 +8,18 @@ import {
   Image as ImageIcon,
   X,
 } from "lucide-react";
+import { Badge } from "../../../../components/ui/badge";
+import { Button } from "../../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import { Textarea } from "../../../../components/ui/textarea";
 import {
   KetikAppSettings,
   KetikScenario,
@@ -199,7 +211,9 @@ export function KetikScenariosTab({
   const handleRemoveImage = (indexToRemove: number) => {
     scenarioForm.setDraft((previous) => ({
       images: (previous.images || []).filter((_, idx) => idx !== indexToRemove),
-      imageAlts: (previous.imageAlts || []).filter((_, idx) => idx !== indexToRemove),
+      imageAlts: (previous.imageAlts || []).filter(
+        (_, idx) => idx !== indexToRemove,
+      ),
     }));
   };
 
@@ -217,76 +231,60 @@ export function KetikScenariosTab({
 
   if (scenarioForm.isOpen) {
     return (
-      <div className="space-y-6 pb-10">
-        <div className="flex items-center gap-2 border-b border-border pb-4">
-          <button
+      <div className="flex flex-col gap-6 pb-10">
+        <div className="border-b border-border pb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={closeEditor}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            className="-ml-2 text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft data-icon="inline-start" />
             Kembali ke Daftar Skenario
-          </button>
+          </Button>
         </div>
-        <div className="bg-card border border-border rounded-xl overflow-hidden relative">
-          <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
-            <h3 className="font-bold text-foreground text-base tracking-tight">
+        <Card>
+          <CardHeader className="border-b bg-muted/20 px-6 py-4">
+            <CardTitle className="text-base tracking-tight">
               {scenarioForm.editingId
                 ? "Edit Skenario"
                 : "Tambah Skenario Baru"}
-            </h3>
-          </div>
-          <div className="p-6 space-y-6">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6 p-6">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Kategori
-              </label>
+              </Label>
               {!isNewCategoryInput ? (
-                <div className="relative">
-                  <select
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none appearance-none transition-colors"
-                    value={scenarioForm.draft.category || ""}
-                    onChange={(e) => {
-                      if (e.target.value === "NEW") {
-                        setIsNewCategoryInput(true);
-                        setNewScenarioCategory("");
-                        scenarioForm.setDraft({ category: "" });
-                      } else {
-                        setNewScenarioCategory(e.target.value);
-                        scenarioForm.setDraft({ category: e.target.value });
-                      }
-                    }}
-                  >
-                    <option value="">Pilih Kategori</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                    <option value="NEW">+ Tambah Kategori Lainnya</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                    <svg
-                      width="10"
-                      height="6"
-                      viewBox="0 0 10 6"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M1 1L5 5L9 1"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                </div>
+                <select
+                  className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  value={scenarioForm.draft.category || ""}
+                  onChange={(event) => {
+                    if (event.target.value === "NEW") {
+                      setIsNewCategoryInput(true);
+                      setNewScenarioCategory("");
+                      scenarioForm.setDraft({ category: "" });
+                    } else {
+                      setNewScenarioCategory(event.target.value);
+                      scenarioForm.setDraft({ category: event.target.value });
+                    }
+                  }}
+                >
+                  <option value="">Pilih Kategori</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                  <option value="NEW">+ Tambah Kategori Lainnya</option>
+                </select>
               ) : (
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="text"
-                    className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors"
+                    className="flex-1 bg-background"
                     placeholder="Kategori Baru"
                     value={newScenarioCategory}
                     onChange={(e) => {
@@ -294,22 +292,24 @@ export function KetikScenariosTab({
                       scenarioForm.setDraft({ category: e.target.value });
                     }}
                   />
-                  <button
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsNewCategoryInput(false)}
-                    className="px-3.5 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 border border-transparent rounded-md transition-colors"
+                    className="text-destructive hover:text-destructive"
                   >
                     Batal
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Judul Masalah
-              </label>
-              <input
+              </Label>
+              <Input
                 type="text"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
+                className="bg-background"
                 placeholder="Contoh: Gagal Transfer"
                 value={scenarioForm.draft.title || ""}
                 onChange={(e) =>
@@ -317,16 +317,16 @@ export function KetikScenariosTab({
                 }
               />
             </div>
-            <div>
-              <label
+            <div className="flex flex-col gap-2">
+              <Label
                 htmlFor="ketik-scenario-description"
-                className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2"
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
               >
                 Deskripsi Masalah
-              </label>
-              <textarea
+              </Label>
+              <Textarea
                 id="ketik-scenario-description"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors"
+                className="min-h-20 resize-none bg-background"
                 rows={3}
                 value={scenarioDescription}
                 maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
@@ -343,13 +343,16 @@ export function KetikScenariosTab({
                 {formattedScenarioDescriptionLimit}
               </p>
             </div>
-            <div>
-              <div className="flex items-center justify-between gap-4 mb-2">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Skrip Percakapan
-                </label>
-                <button
+                </Label>
+                <Button
                   type="button"
+                  variant={isScenarioScriptEnabled ? "secondary" : "outline"}
+                  size="sm"
+                  aria-pressed={isScenarioScriptEnabled}
                   onClick={() => {
                     setIsScenarioScriptEnabled((prev) => {
                       if (prev) {
@@ -358,25 +361,13 @@ export function KetikScenariosTab({
                       return !prev;
                     });
                   }}
-                  className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                    isScenarioScriptEnabled
-                      ? "bg-primary/10 text-primary border-primary/20"
-                      : "bg-transparent text-muted-foreground border-border hover:bg-foreground/[0.02]"
-                  }`}
+                  className="text-xs"
                 >
-                  <span
-                    className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                      isScenarioScriptEnabled
-                        ? "bg-primary border-primary text-primary-foreground"
-                        : "border-border bg-transparent text-transparent"
-                    }`}
-                  >
-                    <Check className="w-2.5 h-2.5 stroke-[3]" />
-                  </span>
+                  <Check data-icon="inline-start" />
                   {isScenarioScriptEnabled ? "Ikuti Skrip" : "Sangat Kreatif"}
-                </button>
+                </Button>
               </div>
-              <textarea
+              <Textarea
                 className={`w-full rounded-md border p-3 text-sm outline-none resize-none transition-colors ${
                   isScenarioScriptEnabled
                     ? "border-border bg-background text-foreground focus:border-foreground"
@@ -400,17 +391,17 @@ export function KetikScenariosTab({
                 skenario.
               </p>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Lampiran Gambar
-              </label>
-              <label className="flex flex-col items-center justify-center w-full h-32 border border-dashed border-border rounded-md cursor-pointer hover:bg-foreground/[0.02] hover:border-foreground/30 transition-colors">
+              </Label>
+              <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-muted/30">
                 <div className="flex flex-col items-center justify-center py-4">
-                  <ImageIcon className="w-5 h-5 text-muted-foreground mb-2" />
+                  <ImageIcon className="mb-2 size-5 text-muted-foreground" />
                   <p className="text-xs font-medium text-foreground">
                     Pilih gambar untuk dilampirkan
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
                     PNG, JPG (Maksimal 500KB)
                   </p>
                 </div>
@@ -429,162 +420,190 @@ export function KetikScenariosTab({
               )}
               {scenarioForm.draft.images &&
                 scenarioForm.draft.images.length > 0 && (
-                  <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
+                  <div className="mt-2 flex gap-3 overflow-x-auto pb-2">
                     {scenarioForm.draft.images.map((img, idx) => (
-                      <div key={idx} className="flex flex-col gap-1.5 shrink-0 w-28">
-                        <div className="relative w-28 h-20 group">
+                      <div
+                        key={idx}
+                        className="flex w-28 shrink-0 flex-col gap-1.5"
+                      >
+                        <div className="group relative h-20 w-28">
                           <img
                             src={img}
-                            alt={scenarioForm.draft.imageAlts?.[idx] || `Preview ${idx + 1}`}
-                            className="object-cover w-full h-full rounded-md border border-border"
+                            alt={
+                              scenarioForm.draft.imageAlts?.[idx] ||
+                              `Preview ${idx + 1}`
+                            }
+                            className="h-full w-full rounded-md border border-border object-cover"
                           />
-                          <button
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon-sm"
                             onClick={() => handleRemoveImage(idx)}
-                            className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow transition-opacity"
+                            className="absolute -top-2 -right-2 rounded-full shadow"
                             aria-label={`Hapus gambar ${idx + 1}`}
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                          <span className="absolute bottom-1 left-1 bg-foreground/75 text-background text-[10px] font-medium px-1.5 py-0.5 rounded">
+                            <X data-icon="inline" />
+                          </Button>
+                          <Badge className="absolute bottom-1 left-1 bg-foreground/75 text-[10px] text-background hover:bg-foreground/75">
                             #{idx}
-                          </span>
+                          </Badge>
                         </div>
-                        <input
+                        <Input
                           type="text"
                           value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
                           onChange={(e) => handleAltChange(idx, e.target.value)}
                           placeholder="Keterangan gambar..."
                           maxLength={KETIK_PROMPT_LIMITS.imageAlt}
                           aria-label={`Keterangan gambar ${idx + 1}`}
-                          className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-foreground outline-none placeholder:text-muted-foreground/40"
+                          className="h-8 bg-background px-2 text-xs"
                         />
                       </div>
                     ))}
                   </div>
                 )}
             </div>
-            <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-              <button
-                onClick={closeEditor}
-                className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveScenario}
-                disabled={
-                  pendingImageReads > 0 ||
-                  !scenarioForm.draft.title ||
-                  !scenarioForm.draft.description
-                }
-                className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+          <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-0 py-4">
+            <Button type="button" variant="outline" onClick={closeEditor}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveScenario}
+              disabled={
+                pendingImageReads > 0 ||
+                !scenarioForm.draft.title ||
+                !scenarioForm.draft.description
+              }
+            >
+              Simpan
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-10 mt-2">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <h3 className="font-bold text-foreground text-lg tracking-tight">
+    <div className="mt-2 flex flex-col gap-6 pb-10">
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
             Daftar Skenario
           </h3>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-primary mt-0.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
             {activeCount} / {totalScenarios} AKTIF
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={handleSelectAll}
             disabled={allSelected}
-            className="px-3.5 py-1.5 border border-border rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors disabled:opacity-30"
           >
             Pilih Semua
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={handleUnselectAll}
             disabled={noneSelected}
-            className="px-3.5 py-1.5 border border-border rounded-md text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+            className="text-destructive hover:text-destructive"
           >
             Hapus Semua
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3">
         {scenarios.map((scenario) => (
-          <div
+          <Card
             key={scenario.id}
-            className={`flex items-start p-4 rounded-xl border transition-all ${
+            className={`transition-colors ${
               scenario.isActive
-                ? "bg-card border-border/80"
-                : "bg-card/40 border-border/30 opacity-60 hover:opacity-100"
+                ? "border-border/80 bg-card"
+                : "border-border/30 bg-card/40 opacity-60 hover:opacity-100"
             }`}
           >
-            <div className="pt-0.5 mr-3 shrink-0">
-              <button
-                onClick={() => handleToggleScenario(scenario.id)}
-                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                  scenario.isActive
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "border-border hover:border-foreground/30 bg-transparent text-transparent"
-                }`}
-              >
-                <Check className="w-3.5 h-3.5 stroke-[3]" />
-              </button>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[11px] font-medium">
-                  {scenario.category}
-                </span>
-                <h4 className="text-sm font-semibold text-foreground truncate">
-                  {scenario.title}
-                </h4>
+            <CardContent className="flex items-start gap-3 p-4">
+              <div className="pt-0.5">
+                <Button
+                  type="button"
+                  variant={scenario.isActive ? "default" : "outline"}
+                  size="icon-lg"
+                  aria-label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} skenario ${scenario.title}`}
+                  aria-pressed={scenario.isActive}
+                  onClick={() => handleToggleScenario(scenario.id)}
+                  className="size-11 shrink-0 rounded-md"
+                >
+                  <Check data-icon="inline" />
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                {scenario.description}
-              </p>
-              {scenario.images && scenario.images.length > 0 && (
-                <div className="mt-2.5">
-                  <span className="text-[11px] bg-foreground/5 text-muted-foreground px-2 py-1 rounded-md inline-flex items-center gap-1.5 font-medium border border-border/50">
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    {scenario.images.length} Lampiran
-                  </span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="border-primary/20 bg-primary/10 text-[11px] text-primary"
+                  >
+                    {scenario.category}
+                  </Badge>
+                  <h4 className="truncate text-sm font-semibold text-foreground">
+                    {scenario.title}
+                  </h4>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-1 ml-3 shrink-0">
-              <button
-                onClick={() => handleEditClick(scenario)}
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors border border-transparent hover:border-border"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleDeleteScenario(scenario.id)}
-                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors border border-transparent hover:border-destructive/20"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+                <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                  {scenario.description}
+                </p>
+                {scenario.images && scenario.images.length > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="mt-2.5 gap-1.5 text-[11px]"
+                  >
+                    <ImageIcon data-icon="inline-start" />
+                    {scenario.images.length} Lampiran
+                  </Badge>
+                )}
+              </div>
+              <div className="ml-3 flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label={`Edit skenario ${scenario.title}`}
+                  onClick={() => handleEditClick(scenario)}
+                >
+                  <Edit2 data-icon="inline" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  className="text-muted-foreground hover:text-destructive"
+                  aria-label={`Hapus skenario ${scenario.title}`}
+                  onClick={() => handleDeleteScenario(scenario.id)}
+                >
+                  <Trash2 data-icon="inline" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
         onClick={handleAddClick}
-        className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group"
+        className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
       >
-        <Plus className="w-5 h-5" />
+        <Plus data-icon="inline" />
         <span className="text-sm font-medium">Tambah Skenario Baru</span>
-      </button>
+      </Button>
     </div>
   );
 }

@@ -143,6 +143,25 @@ describe("KETIK Landing Page", () => {
     ).toBeDefined();
   });
 
+  it("aligns workspace action labels to the same left edge", async () => {
+    render(<KetikLanding />);
+
+    await screen.findByText(/Mulai simulasi/i);
+
+    expect(
+      screen.getByRole("button", { name: /Mulai simulasi/i }),
+    ).toHaveClass("justify-start");
+    expect(screen.getByRole("button", { name: "Pengaturan" })).toHaveClass(
+      "justify-start",
+    );
+    expect(screen.getByRole("button", { name: "Riwayat" })).toHaveClass(
+      "justify-start",
+    );
+    expect(
+      screen.getByRole("button", { name: /Pemakaian bulan ini/i }),
+    ).toHaveClass("justify-start");
+  });
+
   it("shows SettingsModal when Pengaturan is clicked", async () => {
     const user = userEvent.setup();
     render(<KetikLanding />);

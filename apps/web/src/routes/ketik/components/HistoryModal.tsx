@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import {
   X,
   History,
@@ -13,6 +12,32 @@ import {
   Download,
 } from "lucide-react";
 import type { KetikSessionHistoryItem } from "@trainers/types";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../../../components/ui/empty";
+import { Separator } from "../../../components/ui/separator";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { useAuthStore } from "../../../store/authStore";
 import { notify } from "../../../lib/toast";
@@ -105,240 +130,269 @@ export function HistoryModal({
   const [replaySession, setReplaySession] =
     useState<KetikSessionHistoryItem | null>(null);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-2xl lg:max-w-3xl rounded-[2rem] overflow-hidden flex flex-col max-h-[86vh] shadow-2xl shadow-black/10 bg-card border border-border/50"
+    <>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
       >
-        <header className="px-5 py-4 sm:px-6 sm:py-5 border-b flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-              <History className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight">
-                Riwayat Simulasi
-              </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground font-medium">
-                Tinjau kembali percakapan sebelumnya.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {history.length > 0 && (
-              <>
-                <button
-                  onClick={() => {
-                    history.forEach(downloadTranscript);
-                  }}
-                  className="w-10 h-10 flex items-center justify-center hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500 rounded-xl transition-all border border-transparent hover:border-emerald-500/20"
-                  title="Download Semua"
-                >
-                  <Download className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Hapus semua riwayat?")) onClear();
-                  }}
-                  className="w-10 h-10 flex items-center justify-center hover:bg-red-500/10 text-red-500/60 hover:text-red-500 rounded-xl transition-all border border-transparent hover:border-red-500/20"
-                  title="Hapus Semua"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </>
-            )}
-            <button
-              onClick={onClose}
-              className="w-10 h-10 flex items-center justify-center hover:bg-foreground/5 rounded-xl transition-all border border-transparent hover:border-foreground/10"
-            >
-              <X className="w-5 h-5 text-muted-foreground" />
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
-          {history.length === 0 ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-              <div className="w-24 h-24 bg-foreground/5 rounded-[2rem] flex items-center justify-center mb-6">
-                <Database className="w-12 h-12 text-foreground/10" />
+        <DialogContent
+          showCloseButton={false}
+          data-module="ketik"
+          className="!w-[calc(100vw-2rem)] !max-w-3xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
+        >
+          <DialogHeader className="shrink-0 border-b px-5 py-4 sm:px-6 sm:py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-module-ketik/10">
+                  <History className="size-5 text-module-ketik" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-lg tracking-tight sm:text-xl">
+                    Riwayat Simulasi
+                  </DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Tinjau kembali percakapan sebelumnya.
+                  </DialogDescription>
+                </div>
               </div>
-              <p className="text-xl font-black text-muted-foreground tracking-tight italic">
-                Belum ada riwayat simulasi.
-              </p>
-              <p className="text-sm text-foreground/10 font-medium mt-2">
-                Mulai sesi simulasi baru untuk melihat riwayat di sini.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {history.map((session) => (
-                <motion.div
-                  key={session.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="relative hover:border-emerald-400/40 rounded-[1.5rem] p-5 sm:p-6 transition-all cursor-pointer overflow-hidden border border-border/50 bg-card hover:bg-foreground/5"
-                  onClick={() => onReview(session)}
+              <div className="flex shrink-0 items-center gap-1">
+                {history.length > 0 && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-lg"
+                      onClick={() => history.forEach(downloadTranscript)}
+                      aria-label="Download semua transcript"
+                      title="Download Semua"
+                    >
+                      <Download data-icon="inline" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-lg"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (confirm("Hapus semua riwayat?")) onClear();
+                      }}
+                      aria-label="Hapus semua riwayat"
+                      title="Hapus Semua"
+                    >
+                      <Trash2 data-icon="inline" />
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onClose}
+                  aria-label="Tutup riwayat simulasi"
                 >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                  <div className="flex items-start justify-between relative z-10">
-                    <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <MessageSquare className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-base sm:text-lg text-foreground tracking-tight">
-                          {session.scenarioTitle}
-                        </h3>
-                        <p className="mt-1 max-w-[42ch] truncate text-xs font-medium text-muted-foreground">
-                          Target: Peserta: {formatSimulationSubjectLabel(session.simulationSubject, { includeParticipantDetails: true })}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                            <Calendar className="w-3.5 h-3.5" />
-                            {new Date(session.date).toLocaleDateString(
-                              "id-ID",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                            <Clock className="w-3.5 h-3.5" />
-                            {new Date(session.date).toLocaleTimeString(
-                              "id-ID",
-                              { hour: "2-digit", minute: "2-digit" },
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadTranscript(session);
-                        }}
-                        className="w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500 rounded-xl transition-all"
-                        title="Download Transcript"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReplaySession(session);
-                        }}
-                        className="w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary/10 text-primary/60 hover:text-primary rounded-xl transition-all"
-                        title="Replay Sesi"
-                      >
-                        <Play className="w-4 h-4 fill-current" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(session.id);
-                        }}
-                        className="w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-red-500/60 hover:text-red-500 rounded-xl transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-between relative z-10">
-                    <div className="flex gap-5 sm:gap-7">
-                      <div className="space-y-1.5">
-                        <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">
-                          Konsumen
-                        </div>
-                        <div className="text-xs font-bold text-foreground flex items-center gap-2">
-                          {session.consumerName}
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">
-                          Intensitas
-                        </div>
-                        <div className="text-xs font-bold text-foreground flex items-center gap-2">
-                          {session.messages.length} Chat
-                        </div>
-                      </div>
-                      {session.simulationDuration && (
-                        <div className="space-y-1.5">
-                          <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">
-                            Durasi
-                          </div>
-                          <div className="text-xs font-bold text-foreground flex items-center gap-2">
-                            {session.simulationDuration} mnt
-                          </div>
-                        </div>
-                      )}
-                      {session.reviewStatus && (
-                        <div className="space-y-1.5">
-                          <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">
-                            Review AI
-                          </div>
-                          <div
-                            className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1.5 w-fit ${
-                              session.reviewStatus === "completed"
-                                ? "bg-emerald-500/10 text-emerald-500"
-                                : session.reviewStatus === "pending" ||
-                                    session.reviewStatus === "processing"
-                                  ? "bg-amber-500/10 text-amber-500 animate-pulse"
-                                  : "bg-rose-500/10 text-rose-500"
-                            }`}
-                          >
-                            <div
-                              className={`w-1 h-1 rounded-full ${
-                                session.reviewStatus === "completed"
-                                  ? "bg-emerald-500"
-                                  : session.reviewStatus === "pending" ||
-                                      session.reviewStatus === "processing"
-                                    ? "bg-amber-500"
-                                    : "bg-rose-500"
-                              }`}
-                            />
-                            {session.reviewStatus === "completed"
-                              ? "Selesai"
-                              : session.reviewStatus === "pending" ||
-                                  session.reviewStatus === "processing"
-                                ? "Proses"
-                                : "Gagal"}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="w-9 h-9 bg-foreground/5 rounded-lg flex items-center justify-center">
-                      <ChevronRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  <X data-icon="inline" />
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
+          </DialogHeader>
 
-        <footer className="px-5 sm:px-6 py-4 border-t text-center shrink-0">
-          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2">
-            <Database className="w-3 h-3" />
-            Data lokal terenkripsi di browser Anda
-          </p>
-        </footer>
-      </motion.div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+            {history.length === 0 ? (
+              <Empty className="min-h-80 border-0 py-16">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon" className="size-16 rounded-2xl">
+                    <Database className="size-8 text-muted-foreground" />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-lg">
+                    Belum ada riwayat simulasi.
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    Mulai sesi simulasi baru untuk melihat riwayat di sini.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div className="grid gap-4">
+                {history.map((session) => {
+                  const reviewStatusLabel =
+                    session.reviewStatus === "completed"
+                      ? "Selesai"
+                      : session.reviewStatus === "pending" ||
+                          session.reviewStatus === "processing"
+                        ? "Proses"
+                        : "Gagal";
+                  const reviewStatusVariant =
+                    session.reviewStatus === "completed"
+                      ? "secondary"
+                      : session.reviewStatus === "pending" ||
+                          session.reviewStatus === "processing"
+                        ? "outline"
+                        : "destructive";
+
+                  return (
+                    <Card
+                      key={session.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Lihat sesi ${session.scenarioTitle}`}
+                      className="group cursor-pointer transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => onReview(session)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onReview(session);
+                        }
+                      }}
+                    >
+                      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-4">
+                          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-module-ketik/10">
+                            <MessageSquare className="size-5 text-module-ketik" />
+                          </div>
+                          <div className="min-w-0">
+                            <CardTitle className="text-base sm:text-lg">
+                              {session.scenarioTitle}
+                            </CardTitle>
+                            <CardDescription className="mt-1 break-words text-xs">
+                              Target: Peserta:{" "}
+                              {formatSimulationSubjectLabel(
+                                session.simulationSubject,
+                                { includeParticipantDetails: true },
+                              )}
+                            </CardDescription>
+                            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Calendar className="size-3.5" />
+                                {new Date(session.date).toLocaleDateString(
+                                  "id-ID",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <Clock className="size-3.5" />
+                                {new Date(session.date).toLocaleTimeString(
+                                  "id-ID",
+                                  { hour: "2-digit", minute: "2-digit" },
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              downloadTranscript(session);
+                            }}
+                            aria-label="Download transcript"
+                            title="Download Transcript"
+                          >
+                            <Download data-icon="inline" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setReplaySession(session);
+                            }}
+                            aria-label="Replay sesi"
+                            title="Replay Sesi"
+                          >
+                            <Play data-icon="inline" fill="currentColor" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            className="text-destructive hover:text-destructive"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDelete(session.id);
+                            }}
+                            aria-label="Hapus sesi"
+                            title="Hapus Sesi"
+                          >
+                            <Trash2 data-icon="inline" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+
+                      <Separator />
+                      <CardContent className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                            Konsumen
+                          </span>
+                          <span className="break-words text-xs font-medium text-foreground">
+                            {session.consumerName}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                            Intensitas
+                          </span>
+                          <span className="text-xs font-medium text-foreground">
+                            {session.messages.length} Chat
+                          </span>
+                        </div>
+                        {session.simulationDuration && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              Durasi
+                            </span>
+                            <span className="text-xs font-medium text-foreground">
+                              {session.simulationDuration} mnt
+                            </span>
+                          </div>
+                        )}
+                        {session.reviewStatus && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              Review AI
+                            </span>
+                            <Badge
+                              variant={reviewStatusVariant}
+                              className="animate-none uppercase"
+                            >
+                              {reviewStatusLabel}
+                            </Badge>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="justify-end py-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                          Buka detail
+                          <ChevronRight className="size-4" />
+                        </span>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <Separator />
+          <DialogFooter className="!mx-0 !mb-0 shrink-0 justify-center rounded-none border-0 bg-card px-5 py-4 sm:px-6">
+            <p className="inline-flex items-center gap-2 text-center text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <Database className="size-3" />
+              Data lokal terenkripsi di browser Anda
+            </p>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SessionReplayModal
         isOpen={!!replaySession}
@@ -347,6 +401,6 @@ export function HistoryModal({
         scenarioTitle={replaySession?.scenarioTitle}
         consumerName={replaySession?.consumerName}
       />
-    </div>
+    </>
   );
 }

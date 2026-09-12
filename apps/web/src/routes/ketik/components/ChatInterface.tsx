@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Send, Phone, MapPin, X, ArrowLeft, Download } from "lucide-react";
+import { Alert, AlertDescription } from "../../../components/ui/alert";
 import {
-  Send,
-  Phone,
-  MapPin,
-  X,
-  ArrowLeft,
-  Download,
-  Sparkles,
-} from "lucide-react";
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../../components/ui/avatar";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Textarea } from "../../../components/ui/textarea";
 import type {
   ChatMessage,
   KetikSessionConfig,
@@ -19,6 +20,7 @@ import type {
 } from "@trainers/types";
 import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
+import { getKetikConsumerAvatarUrl } from "../lib/ketik-avatar";
 import { shouldLogKetikGenerationError } from "../lib/ketik-error";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import {
@@ -58,12 +60,8 @@ interface ChatInterfaceProps {
   authReady?: boolean;
   currentUserId?: string;
   templates?: KetikQuickTemplate[];
-  signatureName?: string;
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
-
-const MAINTENANCE_TEMPLATE =
-  "Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?";
 
 function csvCell(value: unknown): string {
   const text = String(value ?? "");
@@ -81,7 +79,6 @@ export function ChatInterface({
   authReady = true,
   currentUserId,
   templates = [],
-  signatureName = "",
   simulationSubject = null,
 }: ChatInterfaceProps) {
   const durationMinutes = config.simulationDuration || 5;
@@ -99,8 +96,6 @@ export function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [hasTemplateBeenClicked, setHasTemplateBeenClicked] = useState(false);
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const pendingTimeoutsRef = useRef<number[]>([]);
   const sessionPhaseRef = useRef<SessionPhase>(
     isReviewMode ? "closed" : "active",
@@ -316,9 +311,6 @@ export function ChatInterface({
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    if (hasTemplateBeenClicked && !isMaintenanceMode) {
-      setIsMaintenanceMode(true);
-    }
     setInputText("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
@@ -488,22 +480,6 @@ export function ChatInterface({
     }
   };
 
-  const applyTemplate = () => {
-    const hour = new Date().getHours();
-    let greeting = "Pagi";
-    if (hour >= 11 && hour < 15) greeting = "Siang";
-    else if (hour >= 15) greeting = "Sore";
-
-    const agentName = signatureName || "Petugas";
-    const consumerName = config.identity.name;
-
-    const template = `Anda telah terhubung dengan Layanan Kontak OJK 157. Selamat ${greeting}. Saya ${agentName} dengan senang hati memberikan informasi yang Bapak/Ibu ${consumerName} butuhkan seputar Sektor Jasa Keuangan. Perihal apa yang dapat kami bantu?`;
-
-    setHasTemplateBeenClicked(true);
-    setInputText(template);
-    textareaRef.current?.focus();
-  };
-
   const insertTemplate = (tmpl: { content: string }) => {
     const lastSlashIndex = inputText.lastIndexOf("/");
     const beforeSlash = inputText.substring(0, lastSlashIndex);
@@ -540,11 +516,6 @@ export function ChatInterface({
     }
   };
 
-  const applyMaintenance = () => {
-    setInputText(MAINTENANCE_TEMPLATE);
-    textareaRef.current?.focus();
-  };
-
   return (
     <div
       data-module="ketik"
@@ -554,72 +525,94 @@ export function ChatInterface({
       <div className="module-clean-toolbar relative z-50 flex w-full shrink-0 items-center justify-between gap-3 border-b px-3 py-3 sm:px-4 md:px-6 md:py-4">
         <div className="flex w-auto shrink-0 items-center gap-3 md:w-1/4">
           {isReviewMode && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="lg"
               onClick={() => onEndSession(messages)}
-              className="group flex items-center gap-2 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="group gap-2 px-2 text-muted-foreground hover:text-foreground"
               aria-label="Kembali dari mode review"
             >
-              <div className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition">
-                <ArrowLeft className="h-5 w-5" />
-              </div>
-              <span className="hidden text-xs font-semibold sm:inline">
+              <ArrowLeft data-icon="inline-start" />
+              <span className="hidden text-sm font-semibold sm:inline">
                 Kembali
               </span>
-            </button>
+            </Button>
           )}
           {!isReviewMode && (
-            <div className="module-clean-panel relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl md:h-12 md:w-12">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-module-ketik/15 text-base font-bold text-module-ketik md:h-12 md:w-12 md:text-lg">
+            <Avatar
+              size="lg"
+              className="!size-14 !rounded-xl md:!size-16 after:!rounded-xl"
+            >
+              <AvatarImage
+                src={getKetikConsumerAvatarUrl(config.identity)}
+                alt={`Foto profil ${config.identity.name}`}
+                className="!rounded-xl"
+                referrerPolicy="no-referrer"
+              />
+              <AvatarFallback className="!rounded-xl bg-module-ketik/15 text-base font-bold text-module-ketik md:text-lg">
                 {config.identity.name.charAt(0).toUpperCase()}
-              </div>
-            </div>
+              </AvatarFallback>
+            </Avatar>
           )}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-1 md:w-2/4">
-          <h1 className="max-w-full truncate text-center text-base font-semibold text-foreground md:text-lg">
+          <h1 className="max-w-full truncate text-center text-lg font-semibold text-foreground md:text-xl">
             {config.identity.name}
           </h1>
           <div className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-1.5 md:gap-2">
-            <div className="module-clean-panel flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 md:px-3">
-              <Phone className="h-3 w-3 text-module-ketik" />
-              <span className="text-xs font-medium text-muted-foreground">
+            <Badge
+              variant="outline"
+              className="h-7 shrink-0 gap-1.5 px-2.5 md:px-3"
+            >
+              <Phone data-icon="inline-start" className="text-module-ketik" />
+              <span className="text-[13px] font-medium text-muted-foreground">
                 {config.identity.phone}
               </span>
-            </div>
-            <div className="module-clean-panel flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 md:px-3">
-              <MapPin className="h-3 w-3 shrink-0 text-module-ketik" />
-              <span className="truncate text-xs font-medium text-muted-foreground">
+            </Badge>
+            <Badge
+              variant="outline"
+              className="h-7 min-w-0 gap-1.5 px-2.5 md:px-3"
+            >
+              <MapPin
+                data-icon="inline-start"
+                className="shrink-0 text-module-ketik"
+              />
+              <span className="truncate text-[13px] font-medium text-muted-foreground">
                 {config.identity.city}
               </span>
-            </div>
+            </Badge>
           </div>
           {!isReviewMode ? (
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-xs font-semibold text-module-ketik">
-                Online
-              </span>
-              <span className="text-xs font-medium tabular-nums text-muted-foreground">
+            <Badge
+              variant="secondary"
+              className="mt-1 h-6 gap-2 bg-module-ketik/10 text-module-ketik"
+            >
+              <span className="text-[13px] font-semibold">Online</span>
+              <span className="text-[13px] font-medium tabular-nums text-muted-foreground">
                 {formatTime(elapsedSeconds)}
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-module-ketik" />
-            </div>
+              <span className="size-1.5 rounded-full bg-module-ketik" />
+            </Badge>
           ) : (
-            <div className="mt-1 flex items-center gap-2">
-              <X className="h-3.5 w-3.5 text-orange-500" />
-              <span className="text-xs font-semibold text-orange-500">
-                Review Mode
-              </span>
-            </div>
+            <Badge
+              variant="outline"
+              className="mt-1 h-6 gap-2 border-chart-orange/30 text-chart-orange"
+            >
+              <X data-icon="inline-start" />
+              <span className="text-[13px] font-semibold">Review Mode</span>
+            </Badge>
           )}
         </div>
 
         <div className="flex w-auto shrink-0 items-center justify-end gap-2 md:w-1/4">
           {isReviewMode ? (
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-lg"
                 onClick={() => {
                   const subject = simulationSubject;
                   const targetLabel = formatSimulationSubjectLabel(subject);
@@ -681,25 +674,29 @@ export function ChatInterface({
                     URL.revokeObjectURL(url);
                   }
                 }}
-                className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="text-muted-foreground hover:text-foreground"
                 title="Download CSV"
                 aria-label="Download transcript CSV"
               >
-                <Download className="h-5 w-5" />
-              </button>
-              <button
+                <Download data-icon="inline" />
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-lg"
                 onClick={() => onEndSession([])}
-                className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="text-muted-foreground hover:text-destructive"
                 title="Tutup Review"
                 aria-label="Tutup mode review"
               >
-                <X className="h-5 w-5" />
-              </button>
+                <X data-icon="inline" />
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="destructive"
+              size="lg"
               onClick={() => {
                 clearPendingTimeouts();
                 if (!isLoading && !isEnding && authReady) {
@@ -707,29 +704,24 @@ export function ChatInterface({
                 }
               }}
               disabled={isLoading || isEnding || !authReady}
-              className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition md:px-5 md:py-2.5
-                ${
-                  isLoading || isEnding || !authReady
-                    ? "bg-red-400 cursor-not-allowed opacity-80"
-                    : "bg-red-500 hover:bg-red-600 active:scale-95 cursor-pointer"
-                }`}
+              className="min-h-11 rounded-xl px-4 text-[15px] font-semibold md:px-5"
               aria-label="Akhiri sesi KETIK"
             >
               {isEnding || !authReady ? (
                 <>
-                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  <div className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
                   <span>Memproses...</span>
                 </>
               ) : (
                 "Selesai"
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="module-clean-stage custom-scrollbar z-10 flex flex-1 flex-col space-y-2 overflow-y-auto scroll-smooth px-3 py-4 sm:px-4 md:px-6">
+      <div className="module-clean-stage custom-scrollbar z-10 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scroll-smooth px-3 py-4 sm:px-4 md:px-6">
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
             if (msg.sender === "system") {
@@ -748,7 +740,7 @@ export function ChatInterface({
                 >
                   <div className="flex flex-col items-center gap-2">
                     {systemTextWithoutTag ? (
-                      <p className="max-w-[75ch] text-center text-xs font-medium text-muted-foreground">
+                      <p className="max-w-[75ch] text-center text-[14px] font-medium text-muted-foreground">
                         {systemTextWithoutTag}
                       </p>
                     ) : null}
@@ -779,35 +771,40 @@ export function ChatInterface({
           })}
         </AnimatePresence>
 
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            className="flex justify-start"
-            aria-live="polite"
-          >
-            <div className="module-clean-panel rounded-2xl rounded-tl-md px-4 py-3">
-              <div className="flex space-x-1">
-                <motion.div
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.6 }}
-                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
-                />
-                <motion.div
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
-                />
-                <motion.div
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
-                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
-                />
+        <AnimatePresence initial={false}>
+          {isLoading && (
+            <motion.div
+              key="consumer-typing"
+              layout="position"
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              className="flex justify-start"
+              aria-live="polite"
+            >
+              <div className="module-clean-panel rounded-2xl rounded-tl-md px-4 py-3">
+                <div className="flex gap-1">
+                  <motion.div
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.6 }}
+                    className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
+                  />
+                  <motion.div
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                    className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
+                  />
+                  <motion.div
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                    className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
+                  />
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div ref={messagesEndRef} />
       </div>
 
@@ -817,37 +814,22 @@ export function ChatInterface({
         <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
           <div className="absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
 
-          <div className="mb-3 flex justify-center md:mb-4">
-            <button
-              type="button"
-              onClick={isMaintenanceMode ? applyMaintenance : applyTemplate}
-              className="module-clean-button-secondary group flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-module-ketik transition hover:text-module-ketik focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:px-5"
-            >
-              <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
-              <span>
-                {isMaintenanceMode
-                  ? "Gunakan Maintenance"
-                  : "Gunakan Template Salam"}
-              </span>
-            </button>
-          </div>
-
           <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
             <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
               <label
                 htmlFor="ketik-message-input"
-                className="mb-1 ml-1 select-none text-xs font-semibold text-muted-foreground"
+                className="mb-1 ml-1 select-none text-[14px] font-semibold text-muted-foreground"
               >
                 Pesan Baru
               </label>
-              <textarea
+              <Textarea
                 id="ketik-message-input"
                 ref={textareaRef}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Tulis pesan Anda..."
-                className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
+                className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-lg font-medium text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 md:text-lg"
                 rows={1}
                 aria-label="Tulis pesan KETIK"
                 aria-describedby="ketik-char-counter"
@@ -857,8 +839,8 @@ export function ChatInterface({
               {/* Character Counter */}
               <div
                 id="ketik-char-counter"
-                className={`flex items-center justify-end gap-1 px-1 pt-1 text-xs font-medium tabular-nums ${
-                  isOverLimit ? "text-red-500" : "text-muted-foreground"
+                className={`flex items-center justify-end gap-1 px-1 pt-1 text-[14px] font-medium tabular-nums ${
+                  isOverLimit ? "text-destructive" : "text-muted-foreground"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -871,16 +853,16 @@ export function ChatInterface({
 
               {/* Over-limit error */}
               {isOverLimit && (
-                <div
-                  className="flex items-center gap-1.5 px-1 pb-1 text-xs font-semibold text-red-500"
-                  role="alert"
+                <Alert
+                  variant="destructive"
+                  className="mt-1 px-2 py-1"
                   aria-live="assertive"
                 >
-                  <span>
+                  <AlertDescription className="text-[14px] font-semibold">
                     Pesan terlalu panjang ({charCount.toLocaleString()}{" "}
                     karakter). Maksimum {maxChars.toLocaleString()} karakter.
-                  </span>
-                </div>
+                  </AlertDescription>
+                </Alert>
               )}
 
               {/* Floating Template Popup */}
@@ -897,10 +879,10 @@ export function ChatInterface({
                     aria-label="Pilihan template cepat"
                   >
                     <div className="mb-1 flex items-center justify-between border-b border-border px-3 py-2">
-                      <span className="text-xs font-semibold text-muted-foreground">
+                      <span className="text-[13px] font-semibold text-muted-foreground">
                         Pilih Template
                       </span>
-                      <span className="text-xs font-medium text-muted-foreground">
+                      <span className="text-[13px] font-medium text-muted-foreground">
                         ↑↓ Navigasi
                       </span>
                     </div>
@@ -920,18 +902,18 @@ export function ChatInterface({
                           aria-selected={i === selectedTemplateIndex}
                         >
                           <span
-                            className={`text-xs font-semibold ${i === selectedTemplateIndex ? "text-module-ketik" : "text-muted-foreground"}`}
+                            className={`text-[13px] font-semibold ${i === selectedTemplateIndex ? "text-module-ketik" : "text-muted-foreground"}`}
                           >
                             /{t.keyword}
                           </span>
-                          <span className="text-xs text-foreground font-medium line-clamp-1 opacity-80">
+                          <span className="text-[14px] text-foreground font-medium line-clamp-1 opacity-80">
                             {t.content}
                           </span>
                         </button>
                       ))
                     ) : (
                       <div className="px-4 py-3 text-center">
-                        <span className="text-xs text-muted-foreground font-medium">
+                        <span className="text-[14px] text-muted-foreground font-medium">
                           Tidak ada template yang cocok
                         </span>
                       </div>
@@ -940,34 +922,42 @@ export function ChatInterface({
                 )}
               </AnimatePresence>
             </div>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
+            <Button
+              variant={
+                inputText.trim() && !isOverLimit ? "default" : "secondary"
+              }
+              size="icon-lg"
               onClick={handleSend}
               disabled={!inputText.trim() || isOverLimit}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-14 md:w-14 ${
+              className={`h-12 w-12 shrink-0 rounded-2xl transition-transform active:scale-95 md:h-14 md:w-14 ${
                 inputText.trim() && !isOverLimit
-                  ? "module-clean-button-primary text-white cursor-pointer"
-                  : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
+                  ? "module-clean-button-primary text-white"
+                  : "bg-foreground/5 text-muted-foreground"
               }`}
               type="button"
               aria-label="Kirim pesan"
             >
               <Send
-                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() && !isOverLimit ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                data-icon="inline"
+                className={
+                  inputText.trim() && !isOverLimit
+                    ? "translate-x-0.5 -translate-y-0.5"
+                    : ""
+                }
               />
-            </motion.button>
+            </Button>
           </div>
         </div>
       ) : !isReviewMode ? (
         <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
-          <span className="text-sm font-semibold text-muted-foreground">
+          <span className="text-[15px] font-semibold text-muted-foreground">
             Sesi Telah Berakhir
           </span>
         </div>
       ) : (
         <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
           <X className="h-4 w-4 text-orange-500/70" />
-          <span className="text-sm font-semibold text-muted-foreground">
+          <span className="text-[15px] font-semibold text-muted-foreground">
             Mode Review &bull; Hanya Baca
           </span>
         </div>
