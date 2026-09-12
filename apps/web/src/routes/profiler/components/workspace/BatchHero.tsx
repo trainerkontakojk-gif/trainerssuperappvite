@@ -1,7 +1,15 @@
-'use client';
+import { Layers, Plus, UserPlus } from "lucide-react";
 
-import React from 'react';
-import { UserPlus, Plus, Loader2, Layers } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 interface BatchHeroProps {
   name: string;
@@ -18,59 +26,86 @@ export default function BatchHero({
   loading = false,
   isReadOnly = false,
   onAddPeserta,
-  onPickPeserta
+  onPickPeserta,
 }: BatchHeroProps) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-surface p-8 md:p-10 text-fg border border-border shadow-sm">
-      <div className="relative z-10 flex flex-col md:flex-row items-start md:items-end justify-between gap-8">
-        <div className="space-y-6 max-w-xl">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-background border border-border">
-            <Layers size={11} className="text-fg2" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">Active Workspace</span>
-          </div>
-          
-          <h2 className="text-4xl md:text-5xl font-outfit font-bold tracking-tight text-fg leading-none">
-            {name}
-          </h2>
-          
-          <div className="flex flex-wrap items-center gap-8">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Registered Data</span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-4xl md:text-5xl font-mono font-bold tracking-tight">{count}</span>
-                <span className="text-xs font-medium text-fg2">Participants</span>
-                {loading && <Loader2 size={12} className="animate-spin text-fg3" />}
-              </div>
-            </div>
-            <div className="hidden sm:block w-px h-10 bg-border" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Access Mode</span>
-              <span className="text-xs font-semibold text-fg mt-1">
-                {isReadOnly ? 'Read Only' : 'Full Control'}
+    <Card className="overflow-hidden border-border bg-card py-0 ring-0">
+      <CardHeader className="gap-5 border-b border-border bg-muted/20 p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                <Layers data-icon="inline-start" aria-hidden="true" />
+                Workspace aktif
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Data peserta terpilih
               </span>
             </div>
+            <CardTitle className="mt-3 break-words font-outfit text-2xl font-bold tracking-tight sm:text-3xl">
+              {name}
+            </CardTitle>
+            <CardDescription className="mt-1 max-w-2xl leading-relaxed">
+              Kelola data, buka analisis, dan siapkan laporan untuk batch ini.
+            </CardDescription>
+          </div>
+
+          {!isReadOnly && (
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <Button
+                type="button"
+                size="lg"
+                onClick={onPickPeserta}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                <UserPlus data-icon="inline-start" aria-hidden="true" />
+                Tambah peserta
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={onAddPeserta}
+                className="min-h-11 w-full sm:w-auto"
+              >
+                <Plus data-icon="inline-start" aria-hidden="true" />
+                Input manual
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:p-6">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">
+            Peserta terdaftar
+          </p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="font-mono text-3xl font-bold tabular-nums tracking-tight text-foreground">
+              {count}
+            </span>
+            <span className="text-sm text-muted-foreground">peserta</span>
           </div>
         </div>
 
-        {!isReadOnly && (
-          <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full md:w-auto">
-            <button
-              onClick={onPickPeserta}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-inv-bg text-inv-fg rounded-lg text-xs font-medium hover:opacity-90 transition-all duration-150"
-            >
-              <UserPlus size={16} />
-              Import Context
-            </button>
-            <button
-              onClick={onAddPeserta}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-transparent text-fg border border-border rounded-lg text-xs font-medium hover:bg-background transition-colors duration-150"
-            >
-              <Plus size={16} />
-              New Entry
-            </button>
-          </div>
+        <Separator orientation="vertical" className="hidden h-10 sm:block" />
+
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">
+            Mode akses
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {isReadOnly ? "Hanya baca" : "Akses penuh"}
+          </p>
+        </div>
+
+        {loading && (
+          <span className="text-xs text-muted-foreground" role="status">
+            Memuat peserta...
+          </span>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -28,6 +28,7 @@ honor its STOP conditions, and update your row when done.
 | 019  | Fix image-size Advisory (audit 2026-08-23) | P1 | S   | —          | BLOCKED (upstream: patched 2.0.3 never published; dep unreachable — see plan) |
 | 018  | Unify Spreadsheet Lib (audit 2026-08-23)   | P2 | M   | —          | DONE   |
 | 020  | Unify AI Pricing Constants (audit 2026-08-23) | P1 | M | —          | DONE   |
+| 021  | Profiler Subroutes shadcn Alignment | P1 | L | 001p | DONE |
 
 ## Dependency notes
 

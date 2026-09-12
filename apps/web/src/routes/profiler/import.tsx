@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Upload,
   FileSpreadsheet,
@@ -12,8 +12,20 @@ import {
 } from "lucide-react";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { profilerApi } from "../../lib/profilerService";
-import { generateProfilerTemplate, readWorkbookRaw } from "../../lib/excel-utils";
-import PageHeroHeader from "../../components/PageHeroHeader";
+import {
+  generateProfilerTemplate,
+  readWorkbookRaw,
+} from "../../lib/excel-utils";
+import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
 import type { ProfilerPeserta } from "@trainers/types";
 import { supabase } from "../../lib/supabase";
 import { labelJabatan } from "@trainers/types";
@@ -26,12 +38,7 @@ type RowResult = {
 
 const DEFAULT_TIMS = ["Telepon", "Chat", "Email"];
 
-const HUBUNGAN_KONTAK_DARURAT = [
-  "Orang Tua",
-  "Saudara",
-  "Pasangan",
-  "Teman",
-];
+const HUBUNGAN_KONTAK_DARURAT = ["Orang Tua", "Saudara", "Pasangan", "Teman"];
 
 const JENIS_KELAMIN_OPTIONS = ["Laki-laki", "Perempuan"];
 
@@ -272,6 +279,7 @@ export default function ProfilerImport() {
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<RowResult[]>([]);
   const [done, setDone] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     profilerApi
@@ -417,7 +425,9 @@ export default function ProfilerImport() {
 
   const handleFile = (file: File) => {
     if (!file.name.match(/\.(xlsx|csv)$/i)) {
-      alert("Format file harus .xlsx atau .csv (untuk .xls, simpan ulang sebagai .xlsx)");
+      alert(
+        "Format file harus .xlsx atau .csv (untuk .xls, simpan ulang sebagai .xlsx)",
+      );
       return;
     }
     processFile(file);
@@ -435,10 +445,10 @@ export default function ProfilerImport() {
   const skippedCount = results.filter((r) => r.status === "skipped").length;
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground">
-      <main className="relative h-full overflow-y-auto">
-        <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10 lg:py-10">
-          <PageHeroHeader
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <ProfilerPageHeader
             backHref={`/profiler/table?batch=${encodeURIComponent(batchName)}`}
             backLabel="Kembali ke tabel batch"
             eyebrow="Profiler import"
@@ -447,165 +457,196 @@ export default function ProfilerImport() {
             icon={<FileUp className="h-3.5 w-3.5" />}
           />
 
-          <div className="mb-5 rounded-[1.75rem] border border-border/60 bg-card/75 px-5 py-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-              Batch tujuan
-            </p>
-            <p className="mt-2 text-sm font-semibold">{batchName}</p>
-          </div>
+          <Card size="sm" className="shadow-none">
+            <CardContent className="flex flex-wrap items-center gap-2 px-4 py-3">
+              <Badge variant="secondary">Batch tujuan</Badge>
+              <span className="font-medium">
+                {batchName || "Belum dipilih"}
+              </span>
+            </CardContent>
+          </Card>
 
-          <div className="space-y-5">
-            <div className="rounded-[2rem] border border-border/50 bg-card/80 p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="mb-1 text-sm font-semibold text-foreground">
-                    Langkah 1 — Download Template
-                  </p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Template Excel dengan{" "}
-                    <strong className="text-foreground">
-                      dropdown otomatis
-                    </strong>{" "}
-                    untuk kolom pilihan dan format tanggal yang benar.
-                  </p>
-                </div>
-                <button
-                  onClick={downloadTemplate}
-                  className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-110"
-                >
-                  <Download className="w-4 h-4" />
-                  Download .xlsx
-                </button>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {[
-                  { label: "Identitas Utama", items: "Nama, Tim, Jabatan" },
-                  {
-                    label: "Data Kerja",
-                    items: "NIP, Bergabung, Email, Telepon",
-                  },
-                  {
-                    label: "Data Pribadi",
-                    items: "JK, Agama, Lahir, Pendidikan",
-                  },
-                  {
-                    label: "Data Sensitif",
-                    items: "KTP, NPWP, Rekening, Bank",
-                  },
-                ].map((g) => (
-                  <div
-                    key={g.label}
-                    className="rounded-xl border border-border/60 bg-background/75 px-3 py-2"
+          <div className="grid gap-5">
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Langkah 1 — Download template
+                </CardTitle>
+                <CardDescription>
+                  Template Excel dengan dropdown otomatis dan format tanggal
+                  yang benar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between gap-4">
+                  <Button
+                    type="button"
+                    onClick={downloadTemplate}
+                    size="lg"
+                    className="min-h-11 shrink-0"
                   >
-                    <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                      {g.label}
-                    </p>
-                    <p className="text-[11px] leading-snug text-muted-foreground">
-                      {g.items}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    <Download data-icon="inline-start" aria-hidden="true" />
+                    Download .xlsx
+                  </Button>
+                </div>
 
-            {!done && (
-              <div className="rounded-[2rem] border border-border/50 bg-card/80 p-5 shadow-sm">
-                <p className="mb-4 text-sm font-semibold text-foreground">
-                  Langkah 2 — Upload File
-                </p>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={onDrop}
-                  className={`rounded-[1.75rem] border-2 border-dashed p-10 text-center transition-colors ${
-                    dragging
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background/75"
-                  }`}
-                >
-                  {processing ? (
-                    <div className="space-y-3">
-                      <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">
-                        Memproses data...
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {[
+                    { label: "Identitas Utama", items: "Nama, Tim, Jabatan" },
+                    {
+                      label: "Data Kerja",
+                      items: "NIP, Bergabung, Email, Telepon",
+                    },
+                    {
+                      label: "Data Pribadi",
+                      items: "JK, Agama, Lahir, Pendidikan",
+                    },
+                    {
+                      label: "Data Sensitif",
+                      items: "KTP, NPWP, Rekening, Bank",
+                    },
+                  ].map((g) => (
+                    <div
+                      key={g.label}
+                      className="rounded-xl border border-border/60 bg-background/75 px-3 py-2"
+                    >
+                      <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                        {g.label}
+                      </p>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {g.items}
                       </p>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Drag & drop file Excel di sini
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Format: .xlsx, .xls, atau .csv
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {!done && (
+              <Card className="shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Langkah 2 — Upload file
+                  </CardTitle>
+                  <CardDescription>
+                    Seret file ke area ini atau pilih file dari perangkat.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={onDrop}
+                    className={`rounded-lg border-2 border-dashed p-10 text-center transition-colors ${
+                      dragging
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-background/75"
+                    }`}
+                  >
+                    {processing ? (
+                      <div className="grid gap-3">
+                        <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">
+                          Memproses data...
                         </p>
                       </div>
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-110">
-                        <Upload className="w-4 h-4" />
-                        Pilih File
+                    ) : (
+                      <div className="grid gap-4">
+                        <FileSpreadsheet className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Drag & drop file Excel di sini
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Format: .xlsx, .xls, atau .csv
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="lg"
+                          className="min-h-11"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload data-icon="inline-start" aria-hidden="true" />
+                          Pilih file
+                        </Button>
                         <input
+                          ref={fileInputRef}
                           type="file"
                           accept=".xlsx,.csv"
-                          className="hidden"
+                          className="sr-only"
                           onChange={(e) => {
                             const f = e.target.files?.[0];
                             if (f) handleFile(f);
                           }}
                         />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {done && (
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <div className="flex-1 rounded-2xl border border-green-200/50 bg-green-50 p-4 text-center dark:border-green-500/20 dark:bg-green-500/10">
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                      {successCount}
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-green-600 dark:text-green-400">
-                      Berhasil
-                    </p>
-                  </div>
+              <div className="grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Card
+                    size="sm"
+                    className="border-chart-green/30 bg-chart-green/5 shadow-none"
+                  >
+                    <CardContent className="p-4 text-center">
+                      <p className="text-3xl font-bold text-chart-green">
+                        {successCount}
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-chart-green">
+                        Berhasil
+                      </p>
+                    </CardContent>
+                  </Card>
                   {skippedCount > 0 && (
-                    <div className="flex-1 rounded-2xl border border-yellow-200/50 bg-yellow-50 p-4 text-center dark:border-yellow-500/20 dark:bg-yellow-500/10">
-                      <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-                        {skippedCount}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-yellow-600 dark:text-yellow-400">
-                        Duplikat
-                      </p>
-                    </div>
+                    <Card
+                      size="sm"
+                      className="border-chart-amber/30 bg-chart-amber/5 shadow-none"
+                    >
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-chart-amber">
+                          {skippedCount}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-chart-amber">
+                          Duplikat
+                        </p>
+                      </CardContent>
+                    </Card>
                   )}
                   {errorCount > 0 && (
-                    <div className="flex-1 rounded-2xl border border-red-200/50 bg-red-50 p-4 text-center dark:border-red-500/20 dark:bg-red-500/10">
-                      <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                        {errorCount}
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
-                        Gagal
-                      </p>
-                    </div>
+                    <Card
+                      size="sm"
+                      className="border-destructive/30 bg-destructive/5 shadow-none"
+                    >
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-destructive">
+                          {errorCount}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-destructive">
+                          Gagal
+                        </p>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
 
-                <div className="max-h-64 divide-y divide-border overflow-hidden overflow-y-auto rounded-2xl border border-border/60 bg-card/85 shadow-sm">
+                <div className="max-h-64 divide-y divide-border overflow-hidden overflow-y-auto rounded-lg border border-border bg-card">
                   {results.map((r, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-3">
                       {r.status === "success" ? (
-                        <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
+                        <CheckCircle className="h-4 w-4 flex-shrink-0 text-chart-green" />
                       ) : r.status === "skipped" ? (
-                        <MinusCircle className="h-4 w-4 flex-shrink-0 text-yellow-500" />
+                        <MinusCircle className="h-4 w-4 flex-shrink-0 text-chart-amber" />
                       ) : (
-                        <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                        <AlertCircle className="h-4 w-4 flex-shrink-0 text-destructive" />
                       )}
                       <span
                         className={`flex-1 truncate text-sm ${
@@ -620,8 +661,8 @@ export default function ProfilerImport() {
                         <span
                           className={`max-w-[180px] flex-shrink-0 truncate text-xs ${
                             r.status === "skipped"
-                              ? "text-yellow-500"
-                              : "text-red-400"
+                              ? "text-chart-amber"
+                              : "text-destructive"
                           }`}
                         >
                           {r.message}
@@ -632,26 +673,31 @@ export default function ProfilerImport() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
+                  <Button
+                    type="button"
                     onClick={() => {
                       setDone(false);
                       setResults([]);
                     }}
-                    className="flex-1 rounded-2xl bg-muted/70 py-3 text-sm font-semibold text-foreground transition hover:bg-muted"
+                    variant="outline"
+                    size="lg"
+                    className="min-h-11 flex-1"
                   >
                     Import Lagi
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    type="button"
                     onClick={() =>
                       navigate({
                         to: "/profiler/table",
                         search: { batch: batchName },
                       })
                     }
-                    className="flex-1 rounded-2xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-110"
+                    size="lg"
+                    className="min-h-11 flex-1"
                   >
                     Lihat Tabel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

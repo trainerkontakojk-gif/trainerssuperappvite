@@ -1,113 +1,200 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Save, Upload, Plus, X, UserPlus } from "lucide-react";
+import { Lock, Plus, Save, Trash2, Upload, UserPlus } from "lucide-react";
 import type { ProfilerPeserta } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
 import { profilerApi } from "../../lib/profilerService";
 import { supabase } from "../../lib/supabase";
 import { useQueryParams } from "../../hooks/useQueryParams";
-import PageHeroHeader from "../../components/PageHeroHeader";
+import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import { Badge } from "../../components/ui/badge";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 const DEFAULT_TIMS = ["Telepon", "Chat", "Email"];
 
-const inputClass =
-  "w-full px-4 py-3 rounded-xl border border-border/40 bg-background text-sm text-foreground placeholder-foreground/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
-const labelClass =
-  "block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 px-1";
-const sectionClass =
-  "bg-card border border-border/40 rounded-[2rem] p-8 space-y-6 shadow-sm";
+function Field({
+  label,
+  id,
+  children,
+  className = "",
+}: {
+  label: string;
+  id?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`grid gap-2 ${className}`}>
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  id,
+  value,
+  options,
+  onChange,
+  allowEmpty = true,
+}: {
+  label: string;
+  id: string;
+  value?: string | null;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  allowEmpty?: boolean;
+}) {
+  return (
+    <Field label={label} id={id}>
+      <Select
+        value={value || null}
+        onValueChange={(nextValue) => {
+          if (nextValue === "__empty__") onChange("");
+          else if (nextValue) onChange(nextValue);
+        }}
+      >
+        <SelectTrigger id={id} className="min-h-11 w-full bg-background">
+          <SelectValue placeholder="Pilih" />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectGroup>
+            {allowEmpty ? (
+              <SelectItem value="__empty__">Pilih</SelectItem>
+            ) : null}
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
+      </CardHeader>
+      <CardContent className="grid gap-5">{children}</CardContent>
+    </Card>
+  );
+}
 
 export default function ProfilerAdd() {
   const navigate = useNavigate();
   const { batch } = useQueryParams();
   const batchName = batch || "Batch 1";
-
   const [loading, setLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
-  const [fotoPreview, setFotoPreview] = useState<string>("");
-
+  const [fotoPreview, setFotoPreview] = useState("");
   const [timList, setTimList] = useState<string[]>(DEFAULT_TIMS);
-  const [selectedTim, setSelectedTim] = useState<string>("Telepon");
+  const [selectedTim, setSelectedTim] = useState("Telepon");
   const [showAddTim, setShowAddTim] = useState(false);
   const [newTimName, setNewTimName] = useState("");
   const [timLoading, setTimLoading] = useState(false);
-
+  const fotoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Partial<ProfilerPeserta>>({
     batch_name: batchName,
     tim: selectedTim,
     jabatan: "cca",
   });
 
-  const set = (key: keyof ProfilerPeserta, value: any) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
+  const set = (key: keyof ProfilerPeserta, value: any) =>
+    setForm((previous) => ({ ...previous, [key]: value }));
 
   useEffect(() => {
     profilerApi
       .getTeams()
       .then((teams) => {
         if (teams.length > 0) {
-          const names = teams.map((t) => t.nama);
+          const names = teams.map((team) => team.nama);
           setTimList(names);
           setSelectedTim(names[0]);
           set("tim", names[0]);
         }
       })
-      .catch((err) => console.error("Gagal memuat tim", err));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch((error) => console.error("Gagal memuat tim", error));
   }, []);
 
   const handleSelectTim = (tim: string) => {
     setSelectedTim(tim);
     set("tim", tim);
   };
-
   const handleAddTim = async () => {
     const name = newTimName.trim();
     if (!name || timList.includes(name)) return;
     setTimLoading(true);
     try {
       await profilerApi.createTeam(name);
-      setTimList((prev) => [...prev, name]);
+      setTimList((previous) => [...previous, name]);
       handleSelectTim(name);
       setNewTimName("");
       setShowAddTim(false);
-    } catch (err: any) {
-      alert("Gagal tambah tim: " + err.message);
+    } catch (error: any) {
+      alert("Gagal tambah tim: " + error.message);
     } finally {
       setTimLoading(false);
     }
   };
-
-  const handleRemoveTim = async (tim: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleRemoveTim = async (tim: string) => {
     if (DEFAULT_TIMS.includes(tim)) return;
     if (!confirm(`Hapus tim "${tim}"?`)) return;
     setTimLoading(true);
     try {
-      // Find the team id
       const teams = await profilerApi.getTeams();
-      const teamObj = teams.find((t) => t.nama === tim);
-      if (teamObj) {
-        await profilerApi.deleteTeam(teamObj.id);
-      }
-      const updated = timList.filter((t) => t !== tim);
+      const team = teams.find((item) => item.nama === tim);
+      if (team) await profilerApi.deleteTeam(team.id);
+      const updated = timList.filter((item) => item !== tim);
       setTimList(updated);
       if (selectedTim === tim) handleSelectTim(updated[0] || "Telepon");
-    } catch (err: any) {
-      alert("Gagal hapus tim: " + err.message);
+    } catch (error: any) {
+      alert("Gagal hapus tim: " + error.message);
     } finally {
       setTimLoading(false);
     }
   };
-
-  const handleFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     setFotoFile(file);
     setFotoPreview(URL.createObjectURL(file));
   };
-
   const handleSubmit = async () => {
     if (!form.nama?.trim()) {
       alert("Nama wajib diisi.");
@@ -116,10 +203,9 @@ export default function ProfilerAdd() {
     setLoading(true);
     try {
       const newId = crypto.randomUUID();
-      let foto_url = "";
-      if (fotoFile) {
-        foto_url = await profilerApi.uploadFoto(fotoFile, newId);
-      }
+      const foto_url = fotoFile
+        ? await profilerApi.uploadFoto(fotoFile, newId)
+        : "";
       const { data: userData } = await supabase.auth.getUser();
       await profilerApi.createPeserta({
         ...form,
@@ -128,506 +214,465 @@ export default function ProfilerAdd() {
         trainer_id: userData?.user?.id || undefined,
       } as Partial<ProfilerPeserta>);
       navigate({ to: "/profiler/table", search: { batch: batchName } });
-    } catch (err: any) {
-      alert("Gagal menyimpan: " + err.message);
+    } catch (error: any) {
+      alert("Gagal menyimpan: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   const heroAction = (
-    <button
+    <Button
+      type="button"
+      size="lg"
+      className="min-h-11"
       onClick={handleSubmit}
       disabled={loading}
-      className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-110 disabled:opacity-50"
     >
-      <Save className="h-4 w-4" />
-      {loading ? "Menyimpan..." : "Simpan"}
-    </button>
+      <Save data-icon="inline-start" aria-hidden="true" />
+      {loading ? "Menyimpan..." : "Simpan peserta"}
+    </Button>
   );
+  const jabatanOptions = Object.entries(labelJabatan).map(([value, label]) => ({
+    value,
+    label,
+  }));
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground">
-      <main className="relative h-full overflow-y-auto">
-        <div className="mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
-          <PageHeroHeader
-            backHref={`/profiler/table?batch=${encodeURIComponent(batchName)}`}
-            backLabel="Kembali ke tabel batch"
-            eyebrow="Profiler workspace"
-            title="Tambah data peserta ke batch aktif."
-            description="Lengkapi identitas, tim, dan data kerja peserta melalui formulir yang konsisten dengan standar visual workspace KTP."
-            icon={<UserPlus className="h-3.5 w-3.5" />}
-            actions={heroAction}
-          />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <ProfilerPageHeader
+        backHref={`/profiler/table?batch=${encodeURIComponent(batchName)}`}
+        backLabel="Kembali ke tabel batch"
+        eyebrow="Profiler add"
+        title="Tambah data peserta ke batch aktif."
+        description="Lengkapi identitas, tim, dan data kerja menggunakan formulir yang konsisten dengan workspace Profiler."
+        icon={<UserPlus className="size-3.5" aria-hidden="true" />}
+        actions={heroAction}
+      />
+      <main className="flex-1">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <Card size="sm" className="shadow-none">
+            <CardContent className="flex flex-wrap items-center gap-2 p-4">
+              <Badge variant="secondary">Batch aktif</Badge>
+              <span className="font-medium">{batchName}</span>
+            </CardContent>
+          </Card>
 
-          <div className="mb-6 rounded-[1.75rem] border border-border/60 bg-card/75 px-5 py-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-              Batch aktif
-            </p>
-            <p className="mt-2 text-sm font-semibold">{batchName}</p>
-          </div>
-
-          <div className="space-y-8">
-            {/* Identitas Utama */}
-            <div className={sectionClass}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Plus className="w-4 h-4 text-primary" />
-                </div>
-                <h2 className="text-sm font-bold tracking-tight text-foreground">
-                  Identitas Utama
-                </h2>
-              </div>
-
-              {/* Foto */}
-              <div className="flex items-center gap-6 p-6 rounded-2xl bg-foreground/[0.02] border border-border/50">
-                <div className="w-24 h-24 rounded-2xl bg-background border border-border overflow-hidden flex items-center justify-center shrink-0 shadow-inner relative">
+          <Section
+            title="Identitas utama"
+            description="Data wajib untuk mengenali peserta di dalam batch."
+          >
+            <div className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-[7rem_1fr]">
+              <div className="grid place-items-center gap-2">
+                <div className="grid size-24 place-items-center overflow-hidden rounded-lg border border-border bg-background sm:size-28">
                   {fotoPreview ? (
                     <img
                       src={fotoPreview}
-                      alt="Preview"
-                      className="object-cover w-full h-full"
+                      alt="Preview foto peserta"
+                      className="h-full w-full object-cover"
                     />
                   ) : (
-                    <Upload className="w-8 h-8 text-foreground/10" />
+                    <Upload
+                      className="size-6 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   )}
                 </div>
-                <div className="space-y-3">
-                  <label className="inline-flex cursor-pointer px-4 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-sm">
-                    Pilih Foto
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFoto}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
-                    JPG/PNG, maks 5MB. Auto-compress.
+              </div>
+              <div className="flex flex-col justify-center gap-3">
+                <div>
+                  <p className="font-medium">Foto peserta</p>
+                  <p className="text-sm text-muted-foreground">
+                    JPG/PNG, maksimal 5MB. Foto akan dikompres otomatis.
                   </p>
                 </div>
-              </div>
-
-              {/* Nama */}
-              <div>
-                <label className={labelClass}>Nama Lengkap *</label>
-                <input
-                  type="text"
-                  placeholder="Nama lengkap peserta"
-                  className={inputClass}
-                  value={form.nama || ""}
-                  onChange={(e) => set("nama", e.target.value)}
-                />
-              </div>
-
-              {/* Tim */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={labelClass + " mb-0"}>Tim *</label>
-                  <button
-                    onClick={() => setShowAddTim(!showAddTim)}
-                    disabled={timLoading}
-                    className="flex items-center gap-1 text-[10px] text-primary hover:opacity-70 font-bold uppercase tracking-widest disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded p-1"
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="min-h-11"
+                    onClick={() => fotoInputRef.current?.click()}
                   >
-                    <Plus className="w-3 h-3" /> Tim Baru
-                  </button>
+                    <Upload data-icon="inline-start" aria-hidden="true" /> Pilih
+                    foto
+                  </Button>
+                  <input
+                    ref={fotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFoto}
+                    className="sr-only"
+                  />
                 </div>
-                {showAddTim && (
-                  <div className="flex gap-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <input
+              </div>
+            </div>
+            <Field label="Nama lengkap *" id="add-nama">
+              <Input
+                id="add-nama"
+                placeholder="Nama lengkap peserta"
+                value={form.nama || ""}
+                onChange={(event) => set("nama", event.target.value)}
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Tim *
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-9"
+                    onClick={() => setShowAddTim((value) => !value)}
+                    disabled={timLoading}
+                  >
+                    <Plus data-icon="inline-start" aria-hidden="true" /> Tim
+                    baru
+                  </Button>
+                </div>
+                {showAddTim ? (
+                  <div className="mb-3 flex gap-2">
+                    <Input
                       autoFocus
-                      type="text"
                       value={newTimName}
-                      onChange={(e) => setNewTimName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddTim();
-                        if (e.key === "Escape") setShowAddTim(false);
+                      onChange={(event) => setNewTimName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void handleAddTim();
+                        if (event.key === "Escape") setShowAddTim(false);
                       }}
-                      placeholder="Nama tim baru..."
-                      className={inputClass}
+                      placeholder="Nama tim baru"
                     />
-                    <button
-                      onClick={handleAddTim}
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="min-h-11"
+                      onClick={() => void handleAddTim()}
                       disabled={timLoading}
-                      className="px-6 py-2 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 rounded-xl text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {timLoading ? "..." : "Tambah"}
-                    </button>
+                    </Button>
                   </div>
-                )}
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   {timList.map((tim) => (
-                    <button
-                      key={tim}
-                      type="button"
-                      onClick={() => handleSelectTim(tim)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background ${
-                        selectedTim === tim
-                          ? "bg-primary border-primary text-primary-foreground shadow-md shadow-primary/10"
-                          : "bg-background border-border/40 text-muted-foreground hover:border-primary/30"
-                      }`}
-                    >
-                      {tim}
-                      {!DEFAULT_TIMS.includes(tim) && (
-                        <span
-                          onClick={(e) => handleRemoveTim(tim, e)}
-                          className={`ml-1 hover:opacity-70 ${selectedTim === tim ? "text-primary-foreground" : "text-muted-foreground"}`}
+                    <div key={tim} className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant={selectedTim === tim ? "default" : "outline"}
+                        size="lg"
+                        className="min-h-11"
+                        onClick={() => handleSelectTim(tim)}
+                      >
+                        {tim}
+                      </Button>
+                      {!DEFAULT_TIMS.includes(tim) ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-8 text-muted-foreground hover:text-destructive"
+                          aria-label={`Hapus tim ${tim}`}
+                          onClick={() => void handleRemoveTim(tim)}
                         >
-                          <X className="w-3 h-3" />
-                        </span>
-                      )}
-                    </button>
+                          <Trash2 aria-hidden="true" />
+                        </Button>
+                      ) : null}
+                    </div>
                   ))}
                 </div>
               </div>
+              <SelectField
+                label="Jabatan *"
+                id="add-jabatan"
+                value={form.jabatan}
+                options={jabatanOptions}
+                onChange={(value) => set("jabatan", value)}
+                allowEmpty={false}
+              />
+            </div>
+          </Section>
 
-              {/* Jabatan */}
-              <div>
-                <label className={labelClass}>Jabatan *</label>
-                <select
-                  className={inputClass}
-                  value={form.jabatan}
-                  onChange={(e) =>
-                    set("jabatan", e.target.value as "cca" | "tl" | "qa" | "spv")
+          <Section title="Data kerja">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="NIK OJK" id="add-nik">
+                <Input
+                  id="add-nik"
+                  value={form.nik_ojk || ""}
+                  onChange={(event) => set("nik_ojk", event.target.value)}
+                  placeholder="NIK OJK"
+                />
+              </Field>
+              <Field label="Bergabung di 157" id="add-join">
+                <Input
+                  id="add-join"
+                  type="date"
+                  value={form.bergabung_date || ""}
+                  onChange={(event) =>
+                    set("bergabung_date", event.target.value)
                   }
-                >
-                  {Object.entries(labelJabatan).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Data Kerja */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                Data Kerja
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                    <label className={labelClass}>NIK OJK</label>
-                    <input
-                      type="text"
-                      className={inputClass}
-                      value={form.nik_ojk || ""}
-                      onChange={(e) => set("nik_ojk", e.target.value)}
-                      placeholder="NIK OJK"
-                    />
-                </div>
-                <div>
-                  <label className={labelClass}>Bergabung di 157</label>
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={form.bergabung_date || ""}
-                    onChange={(e) => set("bergabung_date", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelClass}>Alamat Email OJK</label>
-                  <input
-                    type="email"
-                    placeholder="nama@ojk.go.id"
-                    className={inputClass}
-                    value={form.email_ojk || ""}
-                    onChange={(e) => set("email_ojk", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>No. Telepon Aktif</label>
-                  <input
-                    type="text"
-                    placeholder="0812xxxxxxxx"
-                    className={inputClass}
-                    value={form.no_telepon || ""}
-                    onChange={(e) => set("no_telepon", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>No. Telepon Darurat</label>
-                  <input
-                    type="text"
-                    placeholder="0812xxxxxxxx"
-                    className={inputClass}
-                    value={form.no_telepon_darurat || ""}
-                    onChange={(e) => set("no_telepon_darurat", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Nama Kontak Darurat</label>
-                  <input
-                    type="text"
-                    placeholder="Nama lengkap"
-                    className={inputClass}
-                    value={form.nama_kontak_darurat || ""}
-                    onChange={(e) => set("nama_kontak_darurat", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Hubungan Kontak Darurat</label>
-                  <select
-                    className={inputClass}
-                    value={form.hubungan_kontak_darurat || ""}
-                    onChange={(e) =>
-                      set("hubungan_kontak_darurat", e.target.value)
-                    }
-                  >
-                    <option value="">Pilih</option>
-                    <option value="Orang Tua">Orang Tua</option>
-                    <option value="Saudara">Saudara</option>
-                    <option value="Pasangan">Pasangan</option>
-                    <option value="Teman">Teman</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Data Pribadi */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                Data Pribadi
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Jenis Kelamin</label>
-                  <select
-                    className={inputClass}
-                    value={form.jenis_kelamin || ""}
-                    onChange={(e) => set("jenis_kelamin", e.target.value)}
-                  >
-                    <option value="">Pilih</option>
-                    <option value="Laki-laki">Laki-laki</option>
-                    <option value="Perempuan">Perempuan</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Agama</label>
-                  <select
-                    className={inputClass}
-                    value={form.agama || ""}
-                    onChange={(e) => set("agama", e.target.value)}
-                  >
-                    <option value="">Pilih</option>
-                    {["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"].map(
-                      (a) => (
-                        <option key={a} value={a}>
-                          {a}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Tanggal Lahir</label>
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={form.tgl_lahir || ""}
-                    onChange={(e) => set("tgl_lahir", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Status Perkawinan</label>
-                  <select
-                    className={inputClass}
-                    value={form.status_perkawinan || ""}
-                    onChange={(e) => set("status_perkawinan", e.target.value)}
-                  >
-                    <option value="">Pilih</option>
-                    <option value="Belum Menikah">Belum Menikah</option>
-                    <option value="Menikah">Menikah</option>
-                    <option value="Cerai">Cerai</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Pendidikan</label>
-                  <select
-                    className={inputClass}
-                    value={form.pendidikan || ""}
-                    onChange={(e) => set("pendidikan", e.target.value)}
-                  >
-                    <option value="">Pilih</option>
-                    {["SMA", "D3", "S1", "S2", "S3"].map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Data Sensitif */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                🔒 Data Sensitif
-              </h2>
-              <p className="text-xs text-muted-foreground font-medium">
-                Data ini tidak tampil di slide PPTX secara default.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className={labelClass}>No. KTP</label>
-                  <input
-                    type="text"
-                    placeholder="16 digit NIK"
-                    maxLength={16}
-                    className={inputClass}
-                    value={form.no_ktp || ""}
-                    onChange={(e) => set("no_ktp", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>No. NPWP</label>
-                  <input
-                    type="text"
-                    placeholder="xx.xxx.xxx.x-xxx.xxx"
-                    className={inputClass}
-                    value={form.no_npwp || ""}
-                    onChange={(e) => set("no_npwp", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Nomor Rekening</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    value={form.nomor_rekening || ""}
-                    onChange={(e) => set("nomor_rekening", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Nama Bank</label>
-                  <input
-                    type="text"
-                    placeholder="BCA, BRI, Mandiri..."
-                    className={inputClass}
-                    value={form.nama_bank || ""}
-                    onChange={(e) => set("nama_bank", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelClass}>Alamat Tempat Tinggal</label>
-                  <textarea
-                    rows={2}
-                    className={inputClass}
-                    value={form.alamat_tinggal || ""}
-                    onChange={(e) => set("alamat_tinggal", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelClass}>Status Tempat Tinggal</label>
-                  <select
-                    className={inputClass}
-                    value={form.status_tempat_tinggal || ""}
-                    onChange={(e) =>
-                      set("status_tempat_tinggal", e.target.value)
-                    }
-                  >
-                    <option value="">Pilih</option>
-                    <option value="Milik Sendiri">
-                      Rumah/Apartemen Milik Sendiri
-                    </option>
-                    <option value="Milik Orang Tua">
-                      Rumah/Apartemen Milik Orang Tua
-                    </option>
-                    <option value="Kost/Sewa">Kost/Sewa Apartemen</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Latar Belakang */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                Latar Belakang
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClass}>Nama Lembaga Pendidikan</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    value={form.nama_lembaga || ""}
-                    onChange={(e) => set("nama_lembaga", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>Jurusan</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    value={form.jurusan || ""}
-                    onChange={(e) => set("jurusan", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelClass}>Previous Company</label>
-                  <input
-                    type="text"
-                    className={inputClass}
-                    value={form.previous_company || ""}
-                    onChange={(e) => set("previous_company", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className={labelClass}>Pengalaman Contact Center</label>
-                  <select
-                    className={inputClass}
-                    value={form.pengalaman_cc || ""}
-                    onChange={(e) => set("pengalaman_cc", e.target.value)}
-                  >
-                    <option value="">Pilih</option>
-                    <option value="Pernah">Pernah</option>
-                    <option value="Tidak Pernah">Tidak Pernah</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Catatan Tambahan */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                ⭐ Catatan Tambahan
-              </h2>
-              <p className="text-xs text-muted-foreground font-medium">
-                Prestasi, bakat, hobi, atau hal unik lainnya.
-              </p>
-              <textarea
-                rows={3}
-                placeholder="Contoh: 🏆 Juara 1 Public Speaking 2024&#10;🎸 Hobi: Bermain gitar&#10;💡 Bakat: Desain grafis"
-                className={inputClass}
-                value={form.catatan_tambahan || ""}
-                onChange={(e) => set("catatan_tambahan", e.target.value)}
+                />
+              </Field>
+              <Field
+                label="Alamat email OJK"
+                id="add-email"
+                className="sm:col-span-2"
+              >
+                <Input
+                  id="add-email"
+                  type="email"
+                  value={form.email_ojk || ""}
+                  onChange={(event) => set("email_ojk", event.target.value)}
+                  placeholder="nama@ojk.go.id"
+                />
+              </Field>
+              <Field label="No. telepon aktif" id="add-phone">
+                <Input
+                  id="add-phone"
+                  value={form.no_telepon || ""}
+                  onChange={(event) => set("no_telepon", event.target.value)}
+                  placeholder="0812xxxxxxxx"
+                />
+              </Field>
+              <Field label="No. telepon darurat" id="add-emergency-phone">
+                <Input
+                  id="add-emergency-phone"
+                  value={form.no_telepon_darurat || ""}
+                  onChange={(event) =>
+                    set("no_telepon_darurat", event.target.value)
+                  }
+                  placeholder="0812xxxxxxxx"
+                />
+              </Field>
+              <Field label="Nama kontak darurat" id="add-emergency-name">
+                <Input
+                  id="add-emergency-name"
+                  value={form.nama_kontak_darurat || ""}
+                  onChange={(event) =>
+                    set("nama_kontak_darurat", event.target.value)
+                  }
+                />
+              </Field>
+              <SelectField
+                label="Hubungan kontak darurat"
+                id="add-emergency-relation"
+                value={form.hubungan_kontak_darurat}
+                options={["Orang Tua", "Saudara", "Pasangan", "Teman"].map(
+                  (value) => ({ value, label: value }),
+                )}
+                onChange={(value) => set("hubungan_kontak_darurat", value)}
               />
             </div>
+          </Section>
 
-            {/* Keterangan */}
-            <div className={sectionClass}>
-              <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                Keterangan
-              </h2>
-              <textarea
-                rows={2}
-                placeholder="Catatan umum lainnya..."
-                className={inputClass}
-                value={form.keterangan || ""}
-                onChange={(e) => set("keterangan", e.target.value)}
+          <Section title="Data pribadi">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Jenis kelamin"
+                id="add-gender"
+                value={form.jenis_kelamin}
+                options={["Laki-laki", "Perempuan"].map((value) => ({
+                  value,
+                  label: value,
+                }))}
+                onChange={(value) => set("jenis_kelamin", value)}
               />
+              <SelectField
+                label="Agama"
+                id="add-religion"
+                value={form.agama}
+                options={[
+                  "Islam",
+                  "Kristen",
+                  "Katolik",
+                  "Hindu",
+                  "Buddha",
+                  "Konghucu",
+                ].map((value) => ({ value, label: value }))}
+                onChange={(value) => set("agama", value)}
+              />
+              <Field label="Tanggal lahir" id="add-birth">
+                <Input
+                  id="add-birth"
+                  type="date"
+                  value={form.tgl_lahir || ""}
+                  onChange={(event) => set("tgl_lahir", event.target.value)}
+                />
+              </Field>
+              <SelectField
+                label="Status perkawinan"
+                id="add-marital"
+                value={form.status_perkawinan}
+                options={["Belum Menikah", "Menikah", "Cerai"].map((value) => ({
+                  value,
+                  label: value,
+                }))}
+                onChange={(value) => set("status_perkawinan", value)}
+              />
+              <div className="sm:col-span-2">
+                <SelectField
+                  label="Pendidikan"
+                  id="add-education"
+                  value={form.pendidikan}
+                  options={["SMA", "D3", "S1", "S2", "S3"].map((value) => ({
+                    value,
+                    label: value,
+                  }))}
+                  onChange={(value) => set("pendidikan", value)}
+                />
+              </div>
             </div>
+          </Section>
 
-            {/* Tombol Simpan */}
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full py-4 bg-primary hover:opacity-90 hover:shadow-lg disabled:opacity-50 text-primary-foreground rounded-2xl text-base font-bold shadow-md shadow-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-            >
-              {loading ? "Menyimpan..." : "✓ Simpan Data"}
-            </button>
-          </div>
+          <Section
+            title="Data sensitif"
+            description="Data ini tidak tampil di slide secara default."
+          >
+            <Alert>
+              <Lock aria-hidden="true" />
+              <AlertDescription>
+                Pastikan data sensitif hanya diisi sesuai kebutuhan administrasi
+                dan akses yang berlaku.
+              </AlertDescription>
+            </Alert>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="No. KTP" id="add-ktp" className="sm:col-span-2">
+                <Input
+                  id="add-ktp"
+                  maxLength={16}
+                  value={form.no_ktp || ""}
+                  onChange={(event) => set("no_ktp", event.target.value)}
+                  placeholder="16 digit NIK"
+                />
+              </Field>
+              <Field label="No. NPWP" id="add-npwp">
+                <Input
+                  id="add-npwp"
+                  value={form.no_npwp || ""}
+                  onChange={(event) => set("no_npwp", event.target.value)}
+                />
+              </Field>
+              <Field label="Nomor rekening" id="add-account">
+                <Input
+                  id="add-account"
+                  value={form.nomor_rekening || ""}
+                  onChange={(event) =>
+                    set("nomor_rekening", event.target.value)
+                  }
+                />
+              </Field>
+              <Field label="Nama bank" id="add-bank">
+                <Input
+                  id="add-bank"
+                  value={form.nama_bank || ""}
+                  onChange={(event) => set("nama_bank", event.target.value)}
+                  placeholder="BCA, BRI, Mandiri"
+                />
+              </Field>
+              <SelectField
+                label="Status tempat tinggal"
+                id="add-housing"
+                value={form.status_tempat_tinggal}
+                options={[
+                  { value: "Milik Sendiri", label: "Rumah milik sendiri" },
+                  { value: "Milik Orang Tua", label: "Rumah milik orang tua" },
+                  { value: "Kost/Sewa", label: "Kost/Sewa" },
+                  { value: "Lainnya", label: "Lainnya" },
+                ]}
+                onChange={(value) => set("status_tempat_tinggal", value)}
+              />
+              <Field
+                label="Alamat tempat tinggal"
+                id="add-address"
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  id="add-address"
+                  rows={3}
+                  value={form.alamat_tinggal || ""}
+                  onChange={(event) =>
+                    set("alamat_tinggal", event.target.value)
+                  }
+                />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Latar belakang">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nama lembaga pendidikan" id="add-institution">
+                <Input
+                  id="add-institution"
+                  value={form.nama_lembaga || ""}
+                  onChange={(event) => set("nama_lembaga", event.target.value)}
+                />
+              </Field>
+              <Field label="Jurusan" id="add-major">
+                <Input
+                  id="add-major"
+                  value={form.jurusan || ""}
+                  onChange={(event) => set("jurusan", event.target.value)}
+                />
+              </Field>
+              <Field
+                label="Previous company"
+                id="add-company"
+                className="sm:col-span-2"
+              >
+                <Input
+                  id="add-company"
+                  value={form.previous_company || ""}
+                  onChange={(event) =>
+                    set("previous_company", event.target.value)
+                  }
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <SelectField
+                  label="Pengalaman contact center"
+                  id="add-cc"
+                  value={form.pengalaman_cc}
+                  options={["Pernah", "Tidak Pernah"].map((value) => ({
+                    value,
+                    label: value,
+                  }))}
+                  onChange={(value) => set("pengalaman_cc", value)}
+                />
+              </div>
+            </div>
+          </Section>
+
+          <Section
+            title="Catatan tambahan"
+            description="Prestasi, bakat, hobi, atau hal unik lainnya."
+          >
+            <Textarea
+              rows={4}
+              placeholder="Tulis catatan tambahan..."
+              value={form.catatan_tambahan || ""}
+              onChange={(event) => set("catatan_tambahan", event.target.value)}
+            />
+          </Section>
+          <Section title="Keterangan">
+            <Textarea
+              rows={3}
+              placeholder="Catatan umum lainnya..."
+              value={form.keterangan || ""}
+              onChange={(event) => set("keterangan", event.target.value)}
+            />
+          </Section>
+          <Button
+            type="button"
+            size="lg"
+            className="min-h-12 w-full"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            <Save data-icon="inline-start" aria-hidden="true" />
+            {loading ? "Menyimpan..." : "Simpan data peserta"}
+          </Button>
         </div>
       </main>
     </div>

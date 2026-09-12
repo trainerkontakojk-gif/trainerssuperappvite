@@ -1,11 +1,19 @@
-import React from 'react';
-import { FilterX, Plus } from 'lucide-react';
-import type { ProfilerPeserta } from '@trainers/types';
-import QaStatePanel from '../../../../components/ui/QaStatePanel';
-import { ProfilerParticipantCard } from './ProfilerParticipantCard';
+import React from "react";
+import { FilterX, Plus } from "lucide-react";
+import type { ProfilerPeserta } from "@trainers/types";
+import { Button } from "../../../../components/ui/button";
+import { Card } from "../../../../components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../../../../components/ui/empty";
+import { ProfilerParticipantCard } from "./ProfilerParticipantCard";
 
 const selectableId = (p: ProfilerPeserta): string | null =>
-  typeof p.id === 'string' && p.id.length > 0 ? p.id : null;
+  typeof p.id === "string" && p.id.length > 0 ? p.id : null;
 
 interface ProfilerParticipantGridProps {
   displayList: ProfilerPeserta[];
@@ -13,7 +21,7 @@ interface ProfilerParticipantGridProps {
   selectMode: boolean;
   selectedIds: Set<string>;
   toggleSelect: (id: string) => void;
-  density: 'comfortable' | 'compact';
+  density: "comfortable" | "compact";
   isReadOnly: boolean;
   hasActiveFilters: boolean;
   resetFilters: () => void;
@@ -28,7 +36,9 @@ interface ProfilerParticipantGridProps {
   handleDragEnd: () => void;
 }
 
-export const ProfilerParticipantGrid: React.FC<ProfilerParticipantGridProps> = ({
+export const ProfilerParticipantGrid: React.FC<
+  ProfilerParticipantGridProps
+> = ({
   displayList,
   sortMode,
   selectMode,
@@ -50,59 +60,64 @@ export const ProfilerParticipantGrid: React.FC<ProfilerParticipantGridProps> = (
 }) => {
   if (displayList.length === 0) {
     return (
-      <div className="bg-card rounded-[2rem] p-4 sm:p-8 border border-border/40 shadow-sm">
-        {hasActiveFilters ? (
-          <QaStatePanel
-            type="empty"
-            title="Data sesuai filter belum ditemukan"
-            description="Tidak ada peserta yang cocok dengan filter atau kata kunci saat ini. Sesuaikan filter untuk melanjutkan."
-            action={
-              <button
-                onClick={resetFilters}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-background hover:bg-muted border border-border/40 text-foreground rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <FilterX className="w-4 h-4" /> Reset Semua Filter
-              </button>
-            }
-          />
-        ) : (
-          <QaStatePanel
-            type="empty"
-            title="Folder ini belum memiliki peserta"
-            description="Tambahkan peserta pertama untuk mulai menyusun profil batch."
-            action={
-              !isReadOnly && (
-                <button
-                  onClick={onAddPeserta}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary hover:opacity-90 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Plus className="w-4 h-4" /> Tambah Peserta Pertama
-                </button>
-              )
-            }
-          />
-        )}
-      </div>
+      <Card className="shadow-none">
+        <Empty className="border-0 py-16">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FilterX aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>
+              {hasActiveFilters
+                ? "Data sesuai filter belum ditemukan"
+                : "Folder ini belum memiliki peserta"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {hasActiveFilters
+                ? "Sesuaikan pencarian atau filter tim untuk melanjutkan."
+                : "Tambahkan peserta pertama untuk mulai menyusun profil batch."}
+            </EmptyDescription>
+          </EmptyHeader>
+          {hasActiveFilters ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="min-h-11"
+              onClick={resetFilters}
+            >
+              <FilterX data-icon="inline-start" aria-hidden="true" />
+              Reset filter
+            </Button>
+          ) : !isReadOnly ? (
+            <Button
+              type="button"
+              size="lg"
+              className="min-h-11"
+              onClick={onAddPeserta}
+            >
+              <Plus data-icon="inline-start" aria-hidden="true" />
+              Tambah peserta pertama
+            </Button>
+          ) : null}
+        </Empty>
+      </Card>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-full">
-      {displayList.map((p, i) => {
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {displayList.map((p, index) => {
         const rowId = selectableId(p);
-        const isSelected = rowId ? selectedIds.has(rowId) : false;
-        const isDragging = sortMode && dragIndex === i;
-
         return (
           <ProfilerParticipantCard
             key={rowId || p.id}
             p={p}
-            index={i}
+            index={index}
             sortMode={sortMode}
             selectMode={selectMode}
-            isSelected={isSelected}
-            isDragging={isDragging}
-            isDragOver={dragOverIndex === i}
+            isSelected={rowId ? selectedIds.has(rowId) : false}
+            isDragging={sortMode && dragIndex === index}
+            isDragOver={dragOverIndex === index}
             density={density}
             toggleSelect={toggleSelect}
             setSelectedPeserta={setSelectedPeserta}

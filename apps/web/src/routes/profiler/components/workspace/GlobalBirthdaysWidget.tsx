@@ -1,12 +1,39 @@
 import { useEffect, useState } from "react";
-import { Cake, RefreshCw } from "lucide-react";
-import { profilerApi } from "../../../../lib/profilerService";
+import { Cake, RefreshCw, X } from "lucide-react";
 import type { ProfilerUpcomingBirthday } from "@trainers/types";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "cn";
+
+import { profilerApi } from "../../../../lib/profilerService";
 import { formatDate } from "../../utils/birthday";
 
 type Status = "loading" | "error" | "ready";
 
-export default function GlobalBirthdaysWidget() {
+interface GlobalBirthdaysWidgetProps {
+  className?: string;
+}
+
+export default function GlobalBirthdaysWidget({
+  className,
+}: GlobalBirthdaysWidgetProps) {
   const [status, setStatus] = useState<Status>("loading");
   const [data, setData] = useState<ProfilerUpcomingBirthday[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
@@ -20,8 +47,10 @@ export default function GlobalBirthdaysWidget() {
         setData(res ?? []);
         setStatus("ready");
       })
-      .catch((err: any) => {
-        setErrorMsg(err?.message || "Gagal memuat data ulang tahun.");
+      .catch((err: unknown) => {
+        setErrorMsg(
+          err instanceof Error ? err.message : "Gagal memuat data ulang tahun.",
+        );
         setStatus("error");
       });
   };
@@ -34,178 +63,214 @@ export default function GlobalBirthdaysWidget() {
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="lg"
         onClick={() => setOpen(true)}
-        className="group flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-3.5 text-left transition-all duration-150 hover:border-fg3 hover:bg-surface/80"
+        aria-label="Lihat ulang tahun terdekat"
+        className={cn(
+          "h-auto min-h-24 w-full justify-start gap-3 p-3.5 text-left whitespace-normal",
+          className,
+        )}
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-fg2 transition-colors duration-150">
-          <Cake size={16} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Cake aria-hidden="true" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+          <span className="text-xs font-medium text-muted-foreground">
             Ulang Tahun Terdekat
           </span>
-          <p className="mt-0.5 text-[10px] font-medium text-fg3">
+          <span className="text-[11px] text-muted-foreground">
             Seluruh data
-          </p>
-          {status === "loading" && (
-            <div className="mt-1.5 h-3 w-2/3 animate-pulse rounded bg-surface" />
-          )}
+          </span>
+          {status === "loading" && <Skeleton className="mt-1 h-4 w-2/3" />}
           {status === "error" && (
-            <p className="mt-1 truncate text-xs font-medium text-destructive">
+            <span className="mt-1 max-w-full truncate text-xs font-medium text-destructive">
               {errorMsg}
-            </p>
+            </span>
           )}
           {status === "ready" &&
             (nearest ? (
-              <div className="mt-0.5">
-                <p className="truncate text-sm font-outfit font-semibold tracking-tight text-fg">
+              <span className="mt-1 flex min-w-0 flex-col items-start">
+                <span className="max-w-full truncate font-outfit text-sm font-semibold tracking-tight text-foreground">
                   {nearest.nama}
-                </p>
-                <p className="text-[11px] text-fg2">
+                </span>
+                <span className="text-xs text-muted-foreground">
                   {nearest.daysUntil === 0
                     ? "Hari ini!"
                     : `${nearest.daysUntil} hari lagi`}
-                </p>
-              </div>
+                </span>
+              </span>
             ) : (
-              <p className="mt-1 text-xs italic text-fg3">No data available</p>
+              <span className="mt-1 text-xs text-muted-foreground">
+                No data available
+              </span>
             ))}
-        </div>
-      </button>
+        </span>
+      </Button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6 backdrop-blur-md"
-          onClick={() => setOpen(false)}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-md gap-0 overflow-hidden bg-card p-0"
         >
-          <div
-            className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-surface shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-border p-6">
-              <h3 className="flex items-center gap-2 font-outfit text-lg font-bold text-fg">
-                <Cake size={20} className="text-fg" />
-                Ulang Tahun Terdekat
-              </h3>
-              <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-fg3">
-                Acara mendatang · Seluruh data
-              </p>
-            </div>
+          <DialogHeader className="relative border-b border-border p-5 pr-16 sm:p-6 sm:pr-16">
+            <DialogTitle className="flex items-center gap-2 font-outfit text-lg font-bold">
+              <Cake aria-hidden="true" />
+              Ulang Tahun Terdekat
+            </DialogTitle>
+            <DialogDescription>
+              Acara mendatang dari seluruh data peserta.
+            </DialogDescription>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              onClick={() => setOpen(false)}
+              aria-label="Tutup daftar ulang tahun"
+              title="Tutup"
+              className="absolute top-3 right-3 min-h-11 min-w-11"
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </DialogHeader>
 
-            <div className="max-h-[300px] space-y-2 overflow-y-auto p-4 custom-scrollbar">
-              {status === "loading" && (
-                <>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
-                    >
-                      <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-surface" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-3 w-2/3 animate-pulse rounded bg-surface" />
-                        <div className="h-2.5 w-1/3 animate-pulse rounded bg-surface" />
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {status === "error" && (
-                <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-                  <p className="text-xs font-medium text-destructive">
-                    {errorMsg}
-                  </p>
-                  <button
-                    onClick={load}
-                    className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-fg2 transition-colors hover:bg-surface hover:text-fg"
+          <div className="max-h-[min(70vh,24rem)] overflow-y-auto p-4 custom-scrollbar sm:p-5">
+            {status === "loading" && (
+              <div
+                className="flex flex-col gap-3"
+                role="status"
+                aria-label="Memuat ulang tahun"
+              >
+                {[0, 1, 2, 3, 4].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 rounded-lg border border-border p-3"
                   >
-                    <RefreshCw size={12} />
-                    Coba lagi
-                  </button>
-                </div>
-              )}
-
-              {status === "ready" && data.length === 0 && (
-                <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-fg3">
-                    <Cake size={18} />
+                    <Skeleton className="size-10 shrink-0 rounded-lg" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
                   </div>
-                  <p className="text-xs font-medium italic text-fg3">
-                    Tidak ada data ulang tahun.
-                  </p>
-                </div>
-              )}
+                ))}
+              </div>
+            )}
 
-              {status === "ready" &&
-                data.map((b) => {
-                  const isToday = b.daysUntil === 0;
+            {status === "error" && (
+              <Alert variant="destructive">
+                <AlertDescription className="flex flex-col items-start gap-3">
+                  <span>{errorMsg}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={load}
+                    className="min-h-11"
+                  >
+                    <RefreshCw data-icon="inline-start" aria-hidden="true" />
+                    Coba lagi
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {status === "ready" && data.length === 0 && (
+              <Empty className="min-h-48 p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Cake aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Tidak ada data ulang tahun.</EmptyTitle>
+                  <EmptyDescription>
+                    Data ulang tahun peserta akan muncul di sini.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+
+            {status === "ready" && data.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {data.map((birthday) => {
+                  const isToday = birthday.daysUntil === 0;
                   return (
                     <div
-                      key={b.id}
-                      className={`flex items-center gap-3 rounded-xl border p-3 transition-all ${
+                      key={birthday.id}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg border p-3",
                         isToday
-                          ? "border-transparent bg-inv-bg text-inv-fg"
-                          : "border-border bg-background"
-                      }`}
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-muted/20",
+                      )}
                     >
-                      <div
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                      <span
+                        className={cn(
+                          "flex size-10 shrink-0 items-center justify-center rounded-lg",
                           isToday
-                            ? "border-transparent bg-inv-fg/15 text-inv-fg"
-                            : "border-border bg-surface text-fg2"
-                        }`}
+                            ? "bg-primary-foreground/15"
+                            : "bg-muted text-muted-foreground",
+                        )}
                       >
-                        <Cake size={16} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`truncate text-sm font-semibold ${
-                            isToday ? "text-inv-fg" : "text-fg"
-                          }`}
+                        <Cake aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            "block truncate text-sm font-semibold",
+                            isToday
+                              ? "text-primary-foreground"
+                              : "text-foreground",
+                          )}
                         >
-                          {b.nama}
-                        </p>
-                        <p
-                          className={`mt-0.5 truncate text-[10px] ${
-                            isToday ? "text-inv-fg/80" : "text-fg3"
-                          }`}
+                          {birthday.nama}
+                        </span>
+                        <span
+                          className={cn(
+                            "mt-0.5 block truncate text-xs",
+                            isToday
+                              ? "text-primary-foreground/80"
+                              : "text-muted-foreground",
+                          )}
                         >
-                          {formatDate(b.tgl_lahir)} · {b.age} TAHUN
-                        </p>
-                        <p
-                          className={`truncate text-[10px] font-medium ${
-                            isToday ? "text-inv-fg/70" : "text-fg3"
-                          }`}
+                          {formatDate(birthday.tgl_lahir)} · {birthday.age}{" "}
+                          tahun
+                        </span>
+                        <span
+                          className={cn(
+                            "block truncate text-xs",
+                            isToday
+                              ? "text-primary-foreground/80"
+                              : "text-muted-foreground",
+                          )}
                         >
-                          {b.batch_name}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p
-                          className={`text-[10px] font-medium tracking-wide ${
-                            isToday ? "animate-pulse text-inv-fg" : "text-fg3"
-                          }`}
-                        >
-                          {isToday ? "HARI INI" : `${b.daysUntil} HARI LAGI`}
-                        </p>
-                      </div>
+                          {birthday.batch_name}
+                        </span>
+                      </span>
+                      <Badge
+                        variant={isToday ? "secondary" : "outline"}
+                        className="shrink-0"
+                      >
+                        {isToday
+                          ? "HARI INI"
+                          : `${birthday.daysUntil} HARI LAGI`}
+                      </Badge>
                     </div>
                   );
                 })}
-            </div>
-
-            {status === "ready" && data.length > 0 && (
-              <div className="border-t border-border px-6 pb-4 pt-3">
-                <p className="text-center text-[10px] font-medium text-fg3">
-                  Menampilkan 5 data terdekat
-                </p>
               </div>
             )}
           </div>
-        </div>
-      )}
+
+          {status === "ready" && data.length > 0 && (
+            <div className="border-t border-border px-5 py-3">
+              <p className="text-center text-xs text-muted-foreground">
+                Menampilkan 5 data terdekat
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

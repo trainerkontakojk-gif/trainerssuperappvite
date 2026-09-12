@@ -1,15 +1,12 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Check,
-  Search,
-  X,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, GalleryHorizontal } from "lucide-react";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { profilerApi } from "../../lib/profilerService";
 import type {
@@ -17,16 +14,50 @@ import type {
   ProfilerYear,
   ProfilerFolder,
 } from "@trainers/types";
-
 import { labelJabatan } from "@trainers/types";
+import { timTheme } from "./utils/profilerFormatters";
 import {
-  labelTim,
-  timTheme,
-} from "./utils/profilerFormatters";
-
-import { SlideModeControls, type SlideMode } from "./components/slides/SlideModeControls";
+  SlideModeControls,
+  type SlideMode,
+} from "./components/slides/SlideModeControls";
 import { ParticipantSlide } from "./components/slides/ParticipantSlide";
-import { SlideCanvas, type SlideCanvasRef } from "./components/slides/SlideCanvas";
+import {
+  SlideCanvas,
+  type SlideCanvasRef,
+} from "./components/slides/SlideCanvas";
+import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
+import { ProfilerRouteNav } from "./components/ProfilerRouteNav";
+import { ProfilerFolderSelect } from "./components/ProfilerFolderSelect";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from "../../components/ui/combobox";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../../components/ui/empty";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
+
+type ParticipantOption = {
+  value: string;
+  label: string;
+  participant: ProfilerPeserta;
+};
 
 export default function ProfilerSlides() {
   const navigate = useNavigate();
@@ -36,21 +67,12 @@ export default function ProfilerSlides() {
   const [initialPeserta, setPeserta] = useState<ProfilerPeserta[]>([]);
   const [initialYears, setInitialYears] = useState<ProfilerYear[]>([]);
   const [initialFolders, setInitialFolders] = useState<ProfilerFolder[]>([]);
-
   const [index, setIndex] = useState(0);
   const [fade, setFade] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPdf, setSavingPdf] = useState(false);
-  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
-  const [showParticipantPicker, setShowParticipantPicker] = useState(false);
   const [slideMode, setSlideMode] = useState<SlideMode>("original");
-
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<SlideCanvasRef>(null);
-
-  const activeTab: string = "slides";
 
   useEffect(() => {
     Promise.all([
@@ -59,7 +81,9 @@ export default function ProfilerSlides() {
       profilerApi.getPesertaByBatch(batchName),
     ])
       .then(([y, f, pList]) => {
-        const folderNames = new Set(f.map((folder: any) => folder.name));
+        const folderNames = new Set(
+          f.map((folder: ProfilerFolder) => folder.name),
+        );
         if (batchName && f.length > 0 && !folderNames.has(batchName)) {
           const firstFolder = f[0];
           if (firstFolder?.name) {
@@ -78,7 +102,7 @@ export default function ProfilerSlides() {
         setPeserta(pList);
       })
       .catch(console.error);
-  }, [batchName]);
+  }, [batchName, navigate]);
 
   useEffect(() => {
     if (initialPeserta.length === 0) {
@@ -108,20 +132,20 @@ export default function ProfilerSlides() {
         search: { batch: batchName, participant: id },
       });
     },
-    [navigate, batchName]
+    [navigate, batchName],
   );
 
   const goTo = useCallback(
-    (i: number) => {
-      if (i < 0 || i >= initialPeserta.length) return;
+    (nextIndex: number) => {
+      if (nextIndex < 0 || nextIndex >= initialPeserta.length) return;
       setFade(false);
-      setTimeout(() => {
-        setIndex(i);
+      window.setTimeout(() => {
+        setIndex(nextIndex);
         setFade(true);
-        updateUrl(initialPeserta[i].id);
+        updateUrl(initialPeserta[nextIndex].id);
       }, 110);
     },
-    [initialPeserta, updateUrl]
+    [initialPeserta, updateUrl],
   );
 
   const prev = useCallback(() => {
@@ -133,33 +157,14 @@ export default function ProfilerSlides() {
   }, [goTo, index, initialPeserta.length]);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (document.activeElement?.tagName === "INPUT") return;
-      if (e.key === "ArrowRight") next();
-      if (e.key === "ArrowLeft") prev();
+      if (event.key === "ArrowRight") next();
+      if (event.key === "ArrowLeft") prev();
     };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [next, prev]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowFolderDropdown(false);
-      }
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(event.target as Node)
-      ) {
-        setShowParticipantPicker(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const saveAsImage = async () => {
     if (saving || savingPdf || !initialPeserta[index]) return;
@@ -185,326 +190,219 @@ export default function ProfilerSlides() {
     }
   };
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const filteredPeserta = useMemo(() => {
-    if (!searchQuery.trim()) return initialPeserta;
-    const q = searchQuery.toLowerCase();
-    return initialPeserta.filter(
-      (p) =>
-        p.nama?.toLowerCase().includes(q) ||
-        p.tim?.toLowerCase().includes(q) ||
-        labelTim[p.tim || ""]?.toLowerCase().includes(q) ||
-        p.jabatan?.toLowerCase().includes(q) ||
-        labelJabatan[p.jabatan || ""]?.toLowerCase().includes(q)
-    );
-  }, [initialPeserta, searchQuery]);
-
   const p = initialPeserta[index];
   const theme = p ? timTheme(p.tim || "") : timTheme("");
   const isA4Portrait = slideMode === "portraitA4";
+  const participantOptions = useMemo<ParticipantOption[]>(
+    () =>
+      initialPeserta.map((peserta) => ({
+        value: peserta.id,
+        label: peserta.nama || "Tanpa nama",
+        participant: peserta,
+      })),
+    [initialPeserta],
+  );
+  const selectedParticipant = p
+    ? (participantOptions.find((option) => option.value === p.id) ?? null)
+    : null;
+
+  const headerActions = (
+    <>
+      <ProfilerFolderSelect
+        years={initialYears}
+        folders={initialFolders}
+        value={batchName}
+        label="Batch"
+        hideLabel
+        className="w-44 sm:w-52"
+        onChange={(nextBatch) =>
+          navigate({ to: "/profiler/slides", search: { batch: nextBatch } })
+        }
+      />
+      <div className="w-52 sm:w-64">
+        <Combobox
+          items={participantOptions}
+          value={selectedParticipant}
+          autoHighlight
+          isItemEqualToValue={(itemValue, nextValue) =>
+            itemValue?.value === nextValue?.value
+          }
+          itemToStringLabel={(option) => option?.label ?? ""}
+          itemToStringValue={(option) => option?.value ?? ""}
+          filter={(option, query) => {
+            const search = query.trim().toLocaleLowerCase("id-ID");
+            return `${option.label} ${option.participant.tim ?? ""} ${
+              labelJabatan[option.participant.jabatan || ""] || ""
+            }`
+              .toLocaleLowerCase("id-ID")
+              .includes(search);
+          }}
+          onValueChange={(nextValue) => {
+            if (nextValue) {
+              const nextIndex = initialPeserta.findIndex(
+                (item) => item.id === nextValue.value,
+              );
+              if (nextIndex !== -1) goTo(nextIndex);
+            }
+          }}
+        >
+          <ComboboxTrigger
+            aria-label="Pilih peserta"
+            render={
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={initialPeserta.length === 0}
+                className="min-h-11 w-full min-w-0 justify-between bg-background"
+              />
+            }
+          >
+            <span className="min-w-0 flex-1 truncate text-left">
+              {selectedParticipant?.label ??
+                (initialPeserta.length > 0
+                  ? "Pilih peserta"
+                  : "Belum ada peserta")}
+            </span>
+            {initialPeserta.length > 0 ? (
+              <Badge variant="secondary" className="shrink-0 tabular-nums">
+                {index + 1}/{initialPeserta.length}
+              </Badge>
+            ) : null}
+          </ComboboxTrigger>
+          <ComboboxContent
+            align="start"
+            className="min-w-[min(24rem,calc(100vw-2rem))]"
+          >
+            <div className="border-b border-border p-1">
+              <ComboboxInput
+                aria-label="Cari peserta"
+                placeholder="Cari nama, tim, jabatan..."
+              />
+            </div>
+            <ComboboxEmpty>Tidak ada peserta yang cocok.</ComboboxEmpty>
+            <ComboboxList>
+              {(option: ParticipantOption) => (
+                <ComboboxItem key={option.value} value={option}>
+                  <Avatar size="sm">
+                    {option.participant.foto_url ? (
+                      <AvatarImage
+                        src={option.participant.foto_url}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
+                    <AvatarFallback>
+                      {option.label.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {option.label}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {option.participant.tim || "Tanpa tim"} ·{" "}
+                      {labelJabatan[option.participant.jabatan || ""] ||
+                        option.participant.jabatan ||
+                        "Tanpa jabatan"}
+                    </span>
+                  </span>
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      </div>
+      <SlideModeControls
+        slideMode={slideMode}
+        setSlideMode={setSlideMode}
+        onSaveImage={saveAsImage}
+        onSavePDF={saveAsPDF}
+        saving={saving}
+        savingPdf={savingPdf}
+        disabled={!p}
+      />
+    </>
+  );
 
   return (
-    <div className="bg-background flex min-h-screen flex-col">
-      {/* ── Tabs Navigation ── */}
-      <div className="flex justify-center p-4 pb-0">
-        <div className="bg-muted/30 border-border/40 flex w-fit items-center gap-1 rounded-2xl border p-1">
-          <button
-            onClick={() =>
-              navigate({ to: "/profiler/table", search: { batch: batchName } })
-            }
-            className={`focus-visible:ring-ring rounded-xl px-6 py-2 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 ${
-              activeTab === "table"
-                ? "bg-background text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Daftar Peserta
-          </button>
-          <button
-            className={`focus-visible:ring-ring rounded-xl px-6 py-2 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 ${
-              activeTab === "slides"
-                ? "bg-background text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Tampilan Slide
-          </button>
-        </div>
-      </div>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <ProfilerPageHeader
+        backHref={`/profiler?batch=${encodeURIComponent(batchName)}`}
+        backLabel="Kembali ke workspace KTP"
+        compact
+        actions={headerActions}
+      />
 
-      {/* Top Bar */}
-      <div className="bg-background/80 border-border/40 sticky top-0 z-[60] flex items-center justify-between border-b px-5 py-3 shadow-sm backdrop-blur-xl">
-        <button
-          onClick={() => navigate({ to: "/profiler" })}
-          className="text-primary focus-visible:ring-ring -ml-2 flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2"
-        >
-          <ArrowLeft size={15} /> Kembali
-        </button>
-
-        <div className="flex items-center gap-2">
-          {/* Batch Selector */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-              className="bg-muted/50 hover:bg-muted border-border/40 focus-visible:ring-ring flex h-10 items-center gap-2 rounded-xl border px-4 transition-all focus-visible:outline-none focus-visible:ring-2"
+      <main className="flex min-h-0 flex-1 flex-col">
+        <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-6 lg:px-8">
+          <ProfilerRouteNav active="slides" batchName={batchName} />
+          <Card className="min-h-[28rem] flex-1 shadow-none">
+            <CardContent
+              className={`flex min-h-[28rem] flex-1 flex-col items-center justify-center p-3 sm:p-5 ${
+                isA4Portrait ? "overflow-auto" : "overflow-hidden"
+              }`}
             >
-              <span className="text-foreground max-w-[120px] truncate text-xs font-black tracking-tight">
-                {batchName}
-              </span>
-              <ChevronDown
-                className={`text-primary h-3.5 w-3.5 transition-transform duration-300 ${
-                  showFolderDropdown ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            <AnimatePresence>
-              {showFolderDropdown && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="bg-card border-border/40 absolute left-0 top-full z-[100] mt-2 w-[calc(100vw-2.5rem)] overflow-hidden rounded-3xl border shadow-2xl md:w-64"
-                >
-                  <div className="custom-scrollbar max-h-80 space-y-4 overflow-y-auto p-3">
-                    {initialYears.map((year) => {
-                      const yearFolders = initialFolders.filter(
-                        (f) => f.year_id === year.id
-                      );
-                      if (yearFolders.length === 0) return null;
-                      return (
-                        <div key={year.id} className="space-y-1">
-                          <p className="text-muted-foreground px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em]">
-                            {year.label}
-                          </p>
-                          <div className="space-y-0.5">
-                            {yearFolders.map((folder) => (
-                              <button
-                                key={folder.id}
-                                onClick={() => {
-                                  navigate({
-                                    to: "/profiler/slides",
-                                    search: { batch: folder.name },
-                                  });
-                                  setShowFolderDropdown(false);
-                                }}
-                                className={`focus-visible:ring-ring flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs transition-all focus-visible:outline-none focus-visible:ring-2 ${
-                                  folder.name === batchName
-                                    ? "bg-primary text-primary-foreground font-bold"
-                                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                                }`}
-                              >
-                                <span className="truncate">{folder.name}</span>
-                                {folder.name === batchName && (
-                                  <Check className="h-3 w-3" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Participant Picker (Combobox) */}
-          <div className="relative" ref={pickerRef}>
-            <button
-              onClick={() => {
-                setShowParticipantPicker(!showParticipantPicker);
-                if (!showParticipantPicker) {
-                  setSearchQuery("");
-                  setTimeout(() => searchInputRef.current?.focus(), 100);
-                }
-              }}
-              disabled={initialPeserta.length === 0}
-              className="bg-muted/50 hover:bg-muted border-border/40 focus-visible:ring-ring flex min-w-[180px] h-10 flex-col items-center justify-center rounded-xl border px-4 transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-foreground max-w-[150px] truncate text-xs font-bold">
-                  {initialPeserta.length > 0
-                    ? p?.nama || "Pilih Peserta"
-                    : "Belum ada peserta"}
-                </span>
-                <ChevronDown
-                  className={`text-primary h-3.5 w-3.5 transition-transform duration-300 ${
-                    showParticipantPicker ? "rotate-180" : ""
+              {!p ? (
+                <Empty className="min-h-[24rem] border-0">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <GalleryHorizontal aria-hidden="true" />
+                    </EmptyMedia>
+                    <EmptyTitle>Belum ada peserta</EmptyTitle>
+                    <EmptyDescription>
+                      Tambahkan peserta pada batch ini untuk menampilkan slide.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <div
+                  className={`flex w-full flex-1 justify-center ${
+                    isA4Portrait ? "min-h-full items-start" : "items-center"
                   }`}
-                />
-              </div>
-              {initialPeserta.length > 0 && (
-                <p className="text-muted-foreground text-[9px] font-black uppercase tracking-tighter">
-                  {index + 1} / {initialPeserta.length}
-                </p>
-              )}
-            </button>
-
-            <AnimatePresence>
-              {showParticipantPicker && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="bg-card border-border/40 absolute left-1/2 top-full z-[100] mt-2 flex w-[calc(100vw-2.5rem)] -translate-x-1/2 flex-col overflow-hidden rounded-3xl border shadow-2xl md:w-80"
                 >
-                  <div className="border-border/40 relative border-b p-3">
-                    <Search
-                      className="text-muted-foreground absolute left-6 top-1/2 -translate-y-1/2"
-                      size={14}
-                    />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      placeholder="Cari nama, tim, jabatan..."
-                      className="bg-muted/50 border-border/40 focus:ring-primary/20 w-full rounded-xl border py-2 pl-9 pr-4 text-xs transition-all focus:outline-none focus:ring-2"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        className="text-muted-foreground hover:text-foreground absolute right-6 top-1/2 -translate-y-1/2"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="custom-scrollbar max-h-80 overflow-y-auto p-2">
-                    {filteredPeserta.length === 0 ? (
-                      <div className="text-muted-foreground py-8 text-center">
-                        <p className="text-xs font-medium">
-                          Tidak ada peserta ditemukan
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {filteredPeserta.map((peserta) => {
-                          const isActive = peserta.id === p?.id;
-                          return (
-                            <button
-                              key={peserta.id}
-                              onClick={() => {
-                                const newIndex = initialPeserta.findIndex(
-                                  (item) => item.id === peserta.id
-                                );
-                                if (newIndex !== -1) goTo(newIndex);
-                                setShowParticipantPicker(false);
-                              }}
-                              className={`hover:bg-muted group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition-all ${
-                                isActive ? "bg-primary/5 ring-primary/20 ring-1" : ""
-                              }`}
-                            >
-                              <div className="bg-muted border-border/40 relative h-10 w-10 shrink-0 overflow-hidden rounded-full border">
-                                {peserta.foto_url ? (
-                                  <img
-                                    src={peserta.foto_url}
-                                    alt={peserta.nama || ""}
-                                    className="h-full w-full object-cover"
-                                    crossOrigin="anonymous"
-                                  />
-                                ) : (
-                                  <div className="bg-primary/10 text-primary flex h-full w-full items-center justify-center text-sm font-bold">
-                                    {peserta.nama?.charAt(0)}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  className={`truncate text-xs font-bold ${
-                                    isActive ? "text-primary" : "text-foreground"
-                                  }`}
-                                >
-                                  {peserta.nama}
-                                </p>
-                                <p className="text-muted-foreground truncate text-[10px] uppercase tracking-tighter">
-                                  {peserta.tim} •{" "}
-                                  {labelJabatan[peserta.jabatan || ""] ||
-                                    peserta.jabatan}
-                                </p>
-                              </div>
-                              {isActive && (
-                                <Check className="text-primary h-4 w-4 shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
+                  <SlideCanvas
+                    ref={canvasRef}
+                    slideMode={slideMode}
+                    fade={fade}
+                    theme={theme}
+                  >
+                    <ParticipantSlide participant={p} slideMode={slideMode} />
+                  </SlideCanvas>
+                </div>
               )}
-            </AnimatePresence>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
-        <SlideModeControls
-          slideMode={slideMode}
-          setSlideMode={setSlideMode}
-          onSaveImage={saveAsImage}
-          onSavePDF={saveAsPDF}
-          saving={saving}
-          savingPdf={savingPdf}
-          disabled={!p}
-        />
-      </div>
-
-      {/* Slide Stage */}
-      <div
-        className={`flex min-h-0 flex-1 flex-col items-center p-4 ${
-          isA4Portrait ? "justify-start overflow-auto" : "justify-center overflow-hidden"
-        }`}
-      >
-        {!p ? (
-          <p className="text-muted-foreground text-sm font-medium tracking-tight">
-            Belum ada peserta.
-          </p>
-        ) : (
-          <div
-            className={`relative flex w-full justify-center ${
-              isA4Portrait ? "min-h-full items-start" : "h-full items-center"
-            }`}
-          >
-            <SlideCanvas
-              ref={canvasRef}
-              slideMode={slideMode}
-              fade={fade}
-              theme={theme}
+          <div className="flex items-center justify-center gap-3 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              className="size-11"
+              onClick={prev}
+              disabled={!p || index === 0}
+              aria-label="Peserta sebelumnya"
             >
-              <ParticipantSlide participant={p} slideMode={slideMode} />
-            </SlideCanvas>
+              <ChevronLeft aria-hidden="true" />
+            </Button>
+            <Badge variant="secondary" className="min-h-9 px-3 tabular-nums">
+              {initialPeserta.length > 0 ? index + 1 : 0} /{" "}
+              {initialPeserta.length}
+            </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              className="size-11"
+              onClick={next}
+              disabled={!p || index === initialPeserta.length - 1}
+              aria-label="Peserta berikutnya"
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <div className="bg-background/60 border-border/40 flex items-center justify-center gap-4 border-t py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] backdrop-blur-xl">
-        <button
-          onClick={prev}
-          disabled={index === 0}
-          className="bg-card border-border/40 text-primary focus-visible:ring-ring flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition-all hover:bg-muted disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <div className="bg-muted/30 border-border/40 flex items-center gap-2 rounded-full border px-4 py-1.5">
-          <span className="text-foreground text-sm font-bold tracking-tight tabular-nums">
-            {index + 1}
-          </span>
-          <span className="text-muted-foreground text-xs font-bold">/</span>
-          <span className="text-muted-foreground text-xs font-bold tracking-tight tabular-nums">
-            {initialPeserta.length}
-          </span>
         </div>
-        <button
-          onClick={next}
-          disabled={index === initialPeserta.length - 1}
-          className="bg-card border-border/40 text-primary focus-visible:ring-ring flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition-all hover:bg-muted disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
+      </main>
     </div>
   );
 }

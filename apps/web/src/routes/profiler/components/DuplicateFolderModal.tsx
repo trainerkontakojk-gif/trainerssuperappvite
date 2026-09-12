@@ -1,7 +1,30 @@
-import React, { useState } from "react";
-import { X, Copy, Loader2, CheckCircle2 } from "lucide-react";
-import { motion } from "framer-motion";
-import type { ProfilerYear, ProfilerFolder, ProfilerPeserta } from "@trainers/types";
+import { useState } from "react";
+import { CheckCircle2, Copy, Loader2, X } from "lucide-react";
+import type {
+  ProfilerFolder,
+  ProfilerPeserta,
+  ProfilerYear,
+} from "@trainers/types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { cn } from "cn";
+
 import { profilerApi } from "../../../lib/profilerService";
 import { notify } from "../../../lib/toast";
 
@@ -20,122 +43,163 @@ export default function DuplicateFolderModal({
   years,
   onSuccess,
 }: DuplicateFolderModalProps) {
-  const [targetYearId, setTargetYearId] = useState<string>("");
+  const [targetYearId, setTargetYearId] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  if (!isOpen || !folder) return null;
+  if (!folder) return null;
 
   const handleDuplicate = async () => {
     if (!targetYearId || !folder) return;
     setLoading(true);
     try {
-      const result = await profilerApi.duplicateFolder(
-        folder.id,
-        targetYearId,
-      );
+      const result = await profilerApi.duplicateFolder(folder.id, targetYearId);
       setSuccess(true);
       setTimeout(() => {
         onSuccess(result.folder, result.participants);
         onClose();
       }, 1500);
-    } catch (err: any) {
-      notify.error("Gagal menduplikat folder: " + err.message);
+    } catch (err: unknown) {
+      notify.error(
+        "Gagal menduplikat folder: " +
+          (err instanceof Error ? err.message : "Terjadi kesalahan."),
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const otherYears = years.filter((y) => y.id !== folder.year_id);
+  const otherYears = years.filter((year) => year.id !== folder.year_id);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-card w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden border border-border/40"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md gap-0 overflow-hidden bg-card p-0"
       >
-        <div className="p-6 border-b border-border/40 flex items-center justify-between bg-accent/20">
-          <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
-            <Copy size={20} className="text-primary" />
-            Duplikat Folder
-          </h3>
-          <button
+        <DialogHeader className="relative border-b border-border p-5 pr-16 sm:p-6 sm:pr-16">
+          <DialogTitle className="flex items-center gap-2 font-outfit text-lg font-bold">
+            <Copy aria-hidden="true" />
+            Duplikat folder
+          </DialogTitle>
+          <DialogDescription>
+            Salin struktur dan peserta folder ke tahun lain.
+          </DialogDescription>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+            aria-label="Tutup duplikat folder"
+            title="Tutup"
+            className="absolute top-3 right-3 min-h-11 min-w-11"
           >
-            <X size={20} />
-          </button>
-        </div>
+            <X aria-hidden="true" />
+          </Button>
+        </DialogHeader>
 
-        <div className="p-6 space-y-4">
-          <div className="p-3 bg-primary/5 rounded-xl border border-primary/10">
-            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">
-              Folder Asal
+        <div className="flex flex-col gap-5 p-5 sm:p-6">
+          <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/20 p-4">
+            <Badge variant="outline" className="w-fit">
+              Folder asal
+            </Badge>
+            <p className="break-words text-sm font-semibold text-foreground">
+              {folder.name}
             </p>
-            <p className="font-semibold text-foreground">{folder.name}</p>
           </div>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground">
-              Pilih Tahun Tujuan:
-            </p>
-            {otherYears.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">
-                Tidak ada tahun lain yang tersedia. Silakan tambah tahun baru
-                terlebih dahulu.
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Tahun tujuan
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pilih arsip tempat folder baru akan dibuat.
+              </p>
+            </div>
+
+            {otherYears.length === 0 ? (
+              <Empty className="min-h-32 border border-dashed border-border p-5">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Copy aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Belum ada tahun tujuan</EmptyTitle>
+                  <EmptyDescription>
+                    Tambahkan tahun baru terlebih dahulu.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {otherYears.map((year) => (
-                  <label
-                    key={year.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                      targetYearId === year.id
-                        ? "bg-primary/10 border-primary ring-1 ring-primary"
-                        : "bg-accent/30 border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <span className="font-medium text-foreground">
-                      {year.label}
-                    </span>
-                    <input
-                      type="radio"
-                      name="targetYear"
-                      className="accent-primary"
-                      checked={targetYearId === year.id}
-                      onChange={() => setTargetYearId(year.id)}
-                    />
-                  </label>
-                ))}
+              <div
+                className="flex flex-col gap-2"
+                role="radiogroup"
+                aria-label="Tahun tujuan"
+              >
+                {otherYears.map((year) => {
+                  const isSelected = targetYearId === year.id;
+                  return (
+                    <Button
+                      key={year.id}
+                      type="button"
+                      variant={isSelected ? "secondary" : "outline"}
+                      size="lg"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setTargetYearId(year.id)}
+                      className={cn(
+                        "min-h-11 w-full justify-between px-3 text-left",
+                        isSelected &&
+                          "border-primary/40 ring-2 ring-primary/20",
+                      )}
+                    >
+                      <span>{year.label}</span>
+                      {isSelected && <CheckCircle2 aria-hidden="true" />}
+                    </Button>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-6 border-t border-border/40 bg-accent/20 flex gap-3">
-          <button
+        <DialogFooter className="border-t border-border bg-muted/20 p-5 sm:p-6">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
             onClick={onClose}
-            className="flex-1 px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-xl transition-all border border-border/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+            className="min-h-11"
           >
             Batal
-          </button>
-          <button
+          </Button>
+          <Button
+            type="button"
+            size="lg"
             onClick={handleDuplicate}
             disabled={!targetYearId || loading || success}
-            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-md shadow-primary/10 hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+            className="min-h-11"
           >
             {loading ? (
-              <Loader2 className="animate-spin" size={18} />
+              <Loader2
+                data-icon="inline-start"
+                aria-hidden="true"
+                className="motion-reduce:animate-none"
+              />
             ) : success ? (
-              <CheckCircle2 size={18} />
+              <CheckCircle2 data-icon="inline-start" aria-hidden="true" />
             ) : (
-              <Copy size={18} />
+              <Copy data-icon="inline-start" aria-hidden="true" />
             )}
             {success ? "Berhasil!" : "Duplikat"}
-          </button>
-        </div>
-      </motion.div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

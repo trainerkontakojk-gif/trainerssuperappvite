@@ -1,15 +1,28 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ProfilerYear, ProfilerFolder } from "@trainers/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ProfilerFolder, ProfilerYear } from "@trainers/types";
+import { CalendarDays, Layers, Plus, Sparkles, Users } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+
+import { Badge } from "@/components/ui/badge";
 import {
-  CalendarDays,
-  Users,
-  Layers,
-  Plus,
-  Sparkles,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { getDynamicIcon, cleanYearLabel } from "./workspace-utils";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { cn } from "cn";
+
 import GlobalBirthdaysWidget from "./GlobalBirthdaysWidget";
+import { cleanYearLabel, getDynamicIcon } from "./workspace-utils";
 
 interface WorkspaceNavigatorProps {
   years: ProfilerYear[];
@@ -36,6 +49,7 @@ export default function WorkspaceNavigator({
   onAddFolder,
   counts,
 }: WorkspaceNavigatorProps) {
+  const prefersReducedMotion = useReducedMotion();
   const teams = useMemo(
     () =>
       selectedYearId
@@ -49,7 +63,7 @@ export default function WorkspaceNavigator({
   const selectedTeam = useMemo(
     () =>
       selectedTeamId
-        ? folders.find((folder) => folder.id === selectedTeamId) ?? null
+        ? (folders.find((folder) => folder.id === selectedTeamId) ?? null)
         : null,
     [folders, selectedTeamId],
   );
@@ -68,7 +82,7 @@ export default function WorkspaceNavigator({
   }, [folders]);
 
   const batches = useMemo(
-    () => (selectedTeamId ? batchesByTeam.get(selectedTeamId) ?? [] : []),
+    () => (selectedTeamId ? (batchesByTeam.get(selectedTeamId) ?? []) : []),
     [batchesByTeam, selectedTeamId],
   );
 
@@ -78,13 +92,13 @@ export default function WorkspaceNavigator({
     useState(false);
   const batchSectionId = "profiler-batch-section";
 
-  const focusBatchSection = () => {
+  const focusBatchSection = useCallback(() => {
     setIsBatchSectionHighlighted(true);
     batchSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
       block: "start",
     });
-  };
+  }, [prefersReducedMotion]);
 
   useEffect(() => {
     if (
@@ -97,7 +111,7 @@ export default function WorkspaceNavigator({
 
     focusBatchSection();
     shouldScrollToBatchesRef.current = false;
-  }, [batches.length, selectedTeamId]);
+  }, [batches.length, focusBatchSection, selectedTeamId]);
 
   useEffect(() => {
     if (!isBatchSectionHighlighted) return;
@@ -109,88 +123,151 @@ export default function WorkspaceNavigator({
     return () => window.clearTimeout(timeoutId);
   }, [isBatchSectionHighlighted]);
 
+  const contentTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.2, ease: "easeOut" as const };
+
   return (
-    <div className="relative z-10 h-full overflow-y-auto p-6 custom-scrollbar md:p-8">
-      <div className="mx-auto max-w-5xl space-y-8">
-        {/* Intro */}
-        <section className="flex items-start justify-between gap-6">
-          <div className="space-y-3">
+    <div className="relative z-10 h-full overflow-y-auto custom-scrollbar">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+        <section className="flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg">
-                <Sparkles size={14} className="text-fg2" />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">
-                Operational Studio
-              </span>
+              <Badge variant="outline">
+                <Sparkles data-icon="inline-start" aria-hidden="true" />
+                Ruang kerja operasional
+              </Badge>
             </div>
-            <h1 className="font-outfit text-3xl font-bold leading-tight tracking-tight text-fg md:text-4xl">
-              Profiler <span className="font-light text-fg3">Workspace</span>
+            <h1 className="mt-3 break-words font-outfit text-3xl font-bold leading-tight tracking-tight text-foreground sm:text-4xl">
+              Kotak Tool Profil
             </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Pilih tahun dan tim untuk melihat data peserta, analisis, dan
+              laporan yang tersedia.
+            </p>
           </div>
-          <div className="hidden shrink-0 lg:block w-64 pt-1">
-            <GlobalBirthdaysWidget />
-          </div>
+
+          <GlobalBirthdaysWidget className="w-full lg:w-72" />
         </section>
 
-        {/* Year Selection */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-3.5 w-3.5 text-fg3" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
-              Pilih Tahun
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[...years].sort((left, right) => right.year - left.year).map((year) => (
-              <button
-                key={year.id}
-                onClick={() => onSelectYear(year.id)}
-                className={`rounded-lg border px-3.5 py-1.5 text-xs font-medium transition-all duration-150 ease-out ${
-                  selectedYearId === year.id
-                    ? "border-transparent bg-inv-bg font-semibold text-inv-fg shadow-sm"
-                    : "border-border bg-surface text-fg hover:bg-background"
-                }`}
+        <Card className="border-border bg-card py-0 ring-0">
+          <CardHeader className="gap-1 border-b border-border p-5 sm:p-6">
+            <CardTitle className="font-outfit text-base font-semibold">
+              Pilih tahun data
+            </CardTitle>
+            <CardDescription>
+              Gunakan arsip tahun untuk memfilter tim dan batch.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5 sm:p-6">
+            {years.length === 0 ? (
+              <Empty className="min-h-32 border border-dashed border-border p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <CalendarDays aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Belum ada arsip tahun</EmptyTitle>
+                  <EmptyDescription>
+                    Tambahkan tahun baru melalui panel hierarki di sebelah
+                    kanan.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label="Pilih tahun"
               >
-                {cleanYearLabel(year.label)}
-              </button>
-            ))}
-          </div>
-        </section>
+                {[...years]
+                  .sort((left, right) => right.year - left.year)
+                  .map((year) => {
+                    const isSelected = selectedYearId === year.id;
+                    return (
+                      <Button
+                        key={year.id}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="lg"
+                        aria-pressed={isSelected}
+                        onClick={() => onSelectYear(year.id)}
+                        className="min-h-11"
+                      >
+                        {cleanYearLabel(year.label)}
+                      </Button>
+                    );
+                  })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Team Grid */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-fg3" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
-              Tim Aktif
-            </span>
+        <section
+          className="flex flex-col gap-4"
+          aria-labelledby="profiler-teams-title"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Users
+                  aria-hidden="true"
+                  className="size-4 text-muted-foreground"
+                />
+                <h2
+                  id="profiler-teams-title"
+                  className="font-outfit text-lg font-semibold tracking-tight text-foreground"
+                >
+                  Tim aktif
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pilih tim untuk membuka daftar batch yang tersedia.
+              </p>
+            </div>
+            {selectedYearId && teams.length > 0 && (
+              <Badge variant="secondary" className="tabular-nums">
+                {teams.length} tim
+              </Badge>
+            )}
           </div>
 
           {!selectedYearId ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border border-dashed bg-surface p-8 text-center">
-              <p className="text-xs font-medium text-fg3">
-                Pilih tahun terlebih dahulu
-              </p>
-            </div>
+            <Empty className="min-h-40 border border-dashed border-border p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <CalendarDays aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Pilih tahun terlebih dahulu</EmptyTitle>
+                <EmptyDescription>
+                  Tim dan batch akan muncul setelah tahun dipilih.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : teams.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border border-dashed bg-surface p-12 text-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-fg2">
-                <Users size={18} />
-              </div>
-              <p className="text-xs font-medium text-fg2">
-                Belum ada tim terdaftar di tahun ini.
-              </p>
+            <Empty className="min-h-48 border border-dashed border-border p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Users aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Belum ada tim di tahun ini</EmptyTitle>
+                <EmptyDescription>
+                  Buat tim untuk mulai mengelola data peserta.
+                </EmptyDescription>
+              </EmptyHeader>
               {!isReadOnly && (
-                <button
+                <Button
+                  type="button"
+                  size="lg"
                   onClick={() => onAddFolder(selectedYearId)}
-                  className="rounded-lg bg-inv-bg px-4 py-2 text-xs font-medium text-inv-fg transition-opacity hover:opacity-90"
+                  className="min-h-11"
                 >
-                  Buat Tim Pertama
-                </button>
+                  <Plus data-icon="inline-start" aria-hidden="true" />
+                  Buat tim pertama
+                </Button>
               )}
-            </div>
+            </Empty>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {teams.map((team) => {
                 const teamBatches = batchesByTeam.get(team.id) ?? [];
                 const batchCount = teamBatches.length;
@@ -198,9 +275,11 @@ export default function WorkspaceNavigator({
                 const hasSubfolders = batchCount > 0;
 
                 return (
-                  <button
+                  <Button
                     key={team.id}
                     type="button"
+                    variant={isActive ? "default" : "outline"}
+                    size="lg"
                     aria-expanded={hasSubfolders ? isActive : undefined}
                     aria-controls={hasSubfolders ? batchSectionId : undefined}
                     onClick={() => {
@@ -216,54 +295,33 @@ export default function WorkspaceNavigator({
                       }
                       onSelectBatch(team.id, team.name);
                     }}
-                    className={`group relative overflow-hidden rounded-lg border p-4 text-left transition-all duration-150 ease-out ${
-                      isActive
-                        ? "border-fg bg-surface ring-1 ring-fg/10"
-                        : "border-border bg-surface text-fg hover:border-fg3 hover:bg-surface/80"
-                    }`}
+                    className="group h-auto min-h-32 w-full flex-col items-stretch justify-start gap-4 p-4 text-left whitespace-normal"
                   >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-lg border bg-background transition-all duration-150 ${
-                          isActive
-                            ? "border-fg text-fg"
-                            : "border-border text-fg2 group-hover:border-fg3"
-                        }`}
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        {getDynamicIcon(team.name, 17)}
+                      </span>
+                      <Badge
+                        variant={isActive ? "secondary" : "outline"}
+                        className="shrink-0 tabular-nums"
                       >
-                        {getDynamicIcon(team.name, 16)}
-                      </div>
-                      <div
-                        className={`flex items-center gap-1.5 text-[10px] font-medium ${
-                          isActive ? "text-fg" : "text-fg3"
-                        }`}
-                      >
-                        {hasSubfolders && (
-                          <Layers
-                            size={10}
-                            className={isActive ? "text-fg" : "text-fg3"}
-                          />
-                        )}
-                        <span className="tabular-nums">
-                          {hasSubfolders
-                            ? `${batchCount} batch`
-                            : counts[team.name] > 0
-                              ? `${counts[team.name]} subjek`
-                              : "Kosong"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <h3 className="truncate font-outfit text-sm font-semibold tracking-tight text-fg">
+                        {hasSubfolders
+                          ? `${batchCount} batch`
+                          : counts[team.name] > 0
+                            ? `${counts[team.name]} subjek`
+                            : "Kosong"}
+                      </Badge>
+                    </span>
+                    <span className="break-words font-outfit text-base font-semibold tracking-tight">
                       {team.name}
-                    </h3>
-                  </button>
+                    </span>
+                  </Button>
                 );
               })}
             </div>
           )}
         </section>
 
-        {/* Batch Selection (Dock) */}
         <AnimatePresence>
           {selectedTeam && (
             <motion.section
@@ -272,96 +330,122 @@ export default function WorkspaceNavigator({
               data-focus-state={
                 isBatchSectionHighlighted ? "highlighted" : "idle"
               }
-              initial={{ opacity: 0, y: 10 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className={`space-y-4 border-t pt-8 scroll-mt-24 transition-all duration-200 ${
-                isBatchSectionHighlighted
-                  ? "border-fg/30"
-                  : "border-border"
-              }`}
+              exit={prefersReducedMotion ? undefined : { opacity: 0, y: 4 }}
+              transition={contentTransition}
+              className="scroll-mt-24"
             >
-              <div
-                className={`flex flex-col gap-2 rounded-2xl border p-4 transition-all md:flex-row md:items-center md:justify-between ${
-                  isBatchSectionHighlighted
-                    ? "border-fg/20 bg-background shadow-sm ring-1 ring-fg/10"
-                    : "border-border bg-surface/80"
-                }`}
+              <Card
+                className={cn(
+                  "border-border bg-card py-0 ring-0 transition-colors duration-200",
+                  isBatchSectionHighlighted && "border-foreground/40",
+                )}
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Layers className="h-3.5 w-3.5 text-fg3" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">
-                      Navigator Batch <span className="mx-2 text-border">/</span>{" "}
-                      {selectedTeam.name}
-                    </span>
+                <CardHeader className="gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Layers
+                        aria-hidden="true"
+                        className="size-4 text-muted-foreground"
+                      />
+                      <CardTitle className="font-outfit text-base font-semibold">
+                        Batch di {selectedTeam.name}
+                      </CardTitle>
+                      {batches.length > 0 && (
+                        <Badge variant="secondary" className="tabular-nums">
+                          {batches.length} batch
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription className="mt-1">
+                      Pilih batch untuk membuka workspace peserta.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     {batches.length > 0 && (
-                      <span className="text-[10px] font-medium tabular-nums text-fg3">
-                        {batches.length} batch
-                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
+                        onClick={focusBatchSection}
+                        className="min-h-11"
+                      >
+                        Fokus daftar
+                      </Button>
+                    )}
+                    {!isReadOnly && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
+                        onClick={() =>
+                          onAddFolder(selectedTeam.year_id!, selectedTeam.id)
+                        }
+                        className="min-h-11"
+                      >
+                        <Plus data-icon="inline-start" aria-hidden="true" />
+                        Batch baru
+                      </Button>
                     )}
                   </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {batches.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={focusBatchSection}
-                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-fg2 transition-colors hover:bg-surface hover:text-fg"
-                    >
-                      Fokus Ulang Daftar
-                    </button>
-                  )}
-                  {!isReadOnly && (
-                    <button
-                      onClick={() => onAddFolder(selectedTeam.year_id!, selectedTeam.id)}
-                      className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg2 transition-colors hover:bg-background hover:text-fg"
-                    >
-                      <Plus size={12} />
-                      Batch Baru
-                    </button>
-                  )}
-                </div>
-              </div>
+                </CardHeader>
 
-              {batches.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border border-dashed bg-surface p-8 text-center">
-                  <p className="text-xs font-medium text-fg3">
-                    Belum ada batch aktif di tim ini.
-                  </p>
-                  <button
-                    onClick={() => onSelectBatch(selectedTeam.id, selectedTeam.name)}
-                    className="text-[11px] font-medium text-fg2 hover:underline"
-                  >
-                    Gunakan tim sebagai batch tunggal?
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {batches.map((batch) => (
-                    <button
-                      key={batch.id}
-                      onClick={() => onSelectBatch(batch.id, batch.name)}
-                      className="group flex flex-col gap-2.5 rounded-xl border border-border bg-surface p-4 text-left text-fg transition-all duration-150 ease-out hover:border-fg3 hover:bg-surface/80"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-fg2 transition-all duration-150 ease-out group-hover:border-fg3">
-                          {getDynamicIcon(batch.name, 14)}
-                        </div>
-                        {counts[batch.name] > 0 && (
-                          <span className="text-[10px] font-mono text-fg3">
-                            {counts[batch.name]} Subjek
+                <CardContent className="p-5 sm:p-6">
+                  {batches.length === 0 ? (
+                    <Empty className="min-h-32 border border-dashed border-border p-6">
+                      <EmptyHeader>
+                        <EmptyTitle>Belum ada batch aktif</EmptyTitle>
+                        <EmptyDescription>
+                          Tambahkan batch baru atau gunakan tim ini sebagai
+                          batch tunggal.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="lg"
+                        onClick={() =>
+                          onSelectBatch(selectedTeam.id, selectedTeam.name)
+                        }
+                        className="min-h-11"
+                      >
+                        Gunakan tim sebagai batch
+                      </Button>
+                    </Empty>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {batches.map((batch) => (
+                        <Button
+                          key={batch.id}
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          onClick={() => onSelectBatch(batch.id, batch.name)}
+                          className="group h-auto min-h-28 w-full flex-col items-stretch justify-start gap-4 p-4 text-left whitespace-normal"
+                        >
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                              {getDynamicIcon(batch.name, 15)}
+                            </span>
+                            {counts[batch.name] > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="tabular-nums"
+                              >
+                                {counts[batch.name]} subjek
+                              </Badge>
+                            )}
                           </span>
-                        )}
-                      </div>
-                      <span className="truncate text-sm font-semibold tracking-tight text-fg">
-                        {batch.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                          <span className="break-words text-sm font-semibold tracking-tight">
+                            {batch.name}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </motion.section>
           )}
         </AnimatePresence>

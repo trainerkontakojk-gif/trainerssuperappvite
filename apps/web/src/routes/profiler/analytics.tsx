@@ -1,16 +1,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  PieChart as PieChartIcon,
   BarChart3,
-  Users,
   Briefcase,
   GraduationCap,
-  ChevronDown,
+  PieChart as PieChartIcon,
+  Users,
   X,
-  Folder,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   PieChart,
   Pie,
@@ -24,7 +21,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import PageHeroHeader from "../../components/PageHeroHeader";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { useProfilerAccess } from "../../hooks/useProfilerAccess";
 import { profilerApi } from "../../lib/profilerService";
@@ -34,38 +30,64 @@ import type {
   ProfilerFolder,
 } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
+import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
+import { ProfilerFolderSelect } from "./components/ProfilerFolderSelect";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Badge } from "../../components/ui/badge";
+import { Skeleton } from "../../components/ui/skeleton";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../../components/ui/empty";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
 
 const COLORS = [
-  "#0088FE",
-  "#00C49F",
-  "#FFBB28",
-  "#FF8042",
-  "#8884d8",
-  "#82ca9d",
-  "#ffc658",
-  "#ff7300",
+  "var(--chart-blue)",
+  "var(--chart-green)",
+  "var(--chart-amber)",
+  "var(--chart-orange)",
+  "var(--chart-violet)",
+  "var(--chart-cyan)",
+  "var(--chart-red)",
 ];
 
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const item = payload[0];
-  // Recharts payload structure varies slightly between Pie and Bar
   const color = item.payload?.fill || item.color || item.fill;
   const name = item.payload?.name || label || item.name || "Data";
-  const value = item.value;
-  const suffix = typeof value === "number" ? "peserta" : "";
-
   return (
-    <div className="bg-card border border-border/40 rounded-xl px-4 py-2.5 shadow-lg text-sm transition-all duration-200">
-      <div className="flex items-center gap-2 min-w-[140px]">
-        <div
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0 animate-pulse"
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md">
+      <div className="flex min-w-36 items-center gap-2">
+        <span
+          className="size-2.5 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <span className="font-bold text-foreground">{name}</span>
-        <span className="text-muted-foreground font-medium ml-auto pl-2">
-          {value}
-          {suffix ? ` ${suffix}` : ""}
+        <span className="font-medium">{name}</span>
+        <span className="ml-auto pl-2 tabular-nums text-muted-foreground">
+          {item.value} peserta
         </span>
       </div>
     </div>
@@ -76,25 +98,21 @@ export default function ProfilerAnalytics() {
   const navigate = useNavigate();
   const { batch } = useQueryParams();
   const selectedBatch = batch || "";
-
   const [peserta, setPeserta] = useState<ProfilerPeserta[]>([]);
   const [years, setYears] = useState<ProfilerYear[]>([]);
   const [folders, setFolders] = useState<ProfilerFolder[]>([]);
-
-  const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalData, setModalData] = useState<{
     title: string;
     participants: ProfilerPeserta[];
   } | null>(null);
-
   const { isReadOnly } = useProfilerAccess();
 
   useEffect(() => {
     Promise.all([profilerApi.getYears(), profilerApi.getFolders()])
-      .then(([y, f]) => {
-        setYears(y);
-        setFolders(f);
+      .then(([nextYears, nextFolders]) => {
+        setYears(nextYears);
+        setFolders(nextFolders);
       })
       .catch(console.error);
   }, []);
@@ -105,9 +123,8 @@ export default function ProfilerAnalytics() {
       setLoading(false);
       return;
     }
-
     if (folders.length > 0) {
-      const folderNames = new Set(folders.map((f) => f.name));
+      const folderNames = new Set(folders.map((folder) => folder.name));
       if (!folderNames.has(selectedBatch)) {
         const firstFolder = folders[0];
         if (firstFolder?.name) {
@@ -122,603 +139,452 @@ export default function ProfilerAnalytics() {
         return;
       }
     }
-
     setLoading(true);
     profilerApi
       .getPesertaByBatch(selectedBatch)
       .then(setPeserta)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [selectedBatch, folders]);
-
-  const handleBatchChange = (newBatch: string) => {
-    if (newBatch === selectedBatch) {
-      setShowPicker(false);
-      return;
-    }
-
-    setShowPicker(false);
-    navigate({
-      to: "/profiler/analytics",
-      search: { batch: newBatch },
-    });
-  };
+  }, [selectedBatch, folders, navigate]);
 
   const stats = useMemo(() => {
     if (!peserta.length) return null;
-
-    const jabatanCount: Record<string, number> = {};
-    const genderCount: Record<string, number> = {};
-    const pendidikanCount: Record<string, number> = {};
-    const timCount: Record<string, number> = {};
-
+    const counts = {
+      jabatan: {} as Record<string, number>,
+      gender: {} as Record<string, number>,
+      pendidikan: {} as Record<string, number>,
+      tim: {} as Record<string, number>,
+    };
     peserta.forEach((p) => {
-      const jab = labelJabatan[p.jabatan || ""] || p.jabatan || "Tidak Diketahui";
-      jabatanCount[jab] = (jabatanCount[jab] || 0) + 1;
-
+      const jabatan =
+        labelJabatan[p.jabatan || ""] || p.jabatan || "Tidak Diketahui";
       const gender = p.jenis_kelamin || "Tidak Diketahui";
-      genderCount[gender] = (genderCount[gender] || 0) + 1;
-
-      const pend = p.pendidikan || "Tidak Diketahui";
-      pendidikanCount[pend] = (pendidikanCount[pend] || 0) + 1;
-
+      const pendidikan = p.pendidikan || "Tidak Diketahui";
       const tim = p.tim || "Tidak Diketahui";
-      timCount[tim] = (timCount[tim] || 0) + 1;
+      counts.jabatan[jabatan] = (counts.jabatan[jabatan] || 0) + 1;
+      counts.gender[gender] = (counts.gender[gender] || 0) + 1;
+      counts.pendidikan[pendidikan] = (counts.pendidikan[pendidikan] || 0) + 1;
+      counts.tim[tim] = (counts.tim[tim] || 0) + 1;
     });
-
-    const formatData = (data: Record<string, number>, colorOffset = 0) =>
+    const formatData = (data: Record<string, number>, offset = 0) =>
       Object.entries(data)
         .map(([name, value], index) => ({
           name,
           value,
-          fill: COLORS[(index + colorOffset) % COLORS.length],
+          fill: COLORS[(index + offset) % COLORS.length],
         }))
         .sort((a, b) => b.value - a.value);
-
     return {
-      jabatan: formatData(jabatanCount, 0),
-      gender: Object.entries(genderCount)
+      jabatan: formatData(counts.jabatan),
+      gender: Object.entries(counts.gender)
         .map(([name, value]) => ({
           name,
           value,
           fill:
             name === "Laki-laki"
-              ? "#0088FE"
+              ? "var(--chart-blue)"
               : name === "Perempuan"
-                ? "#FF8042"
-                : "#FFBB28",
+                ? "var(--chart-orange)"
+                : "var(--chart-amber)",
         }))
         .sort((a, b) => b.value - a.value),
-      pendidikan: formatData(pendidikanCount, 6),
-      tim: formatData(timCount, 4),
+      pendidikan: formatData(counts.pendidikan, 5),
+      tim: formatData(counts.tim, 3),
       total: peserta.length,
     };
   }, [peserta]);
 
-  const handleChartClick = (
+  const showParticipants = (
     category: string,
     value: string,
-    filterFn: (p: ProfilerPeserta) => boolean
+    filter: (participant: ProfilerPeserta) => boolean,
   ) => {
-    const matched = peserta.filter(filterFn);
     setModalData({
       title: `${category}: ${value}`,
-      participants: matched,
+      participants: peserta.filter(filter),
     });
   };
 
+  const chartCard = (
+    title: string,
+    description: string,
+    children: React.ReactNode,
+  ) => (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="h-80">{children}</CardContent>
+    </Card>
+  );
+
   return (
-    <div className="h-full overflow-hidden bg-background">
-      <main className="relative h-full overflow-y-auto custom-scrollbar">
-        <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10 lg:py-10">
-          <PageHeroHeader
-            backHref={`/profiler?batch=${encodeURIComponent(selectedBatch)}`}
-            backLabel="Kembali ke workspace KTP"
-            eyebrow="Profiler analytics"
-            title="Baca komposisi batch tanpa keluar dari ritme workspace yang sama."
-            description="Statistik peserta, distribusi tim, jabatan, dan pendidikan disajikan dengan hierarki visual yang lebih rapi dan mudah dipindai."
-            icon={<BarChart3 className="h-3.5 w-3.5" />}
-            actions={
-              <div className="relative w-full min-w-[260px] max-w-sm">
-                <button
-                  onClick={() => setShowPicker((v) => !v)}
-                  className="w-full flex items-center gap-3 px-4 py-2 bg-card border border-border rounded-xl hover:bg-accent/50 transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Folder className="w-4 h-4 text-primary" />
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="text-[10px] text-foreground/50 font-bold uppercase tracking-widest">
-                      Filter Folder
-                    </p>
-                    <p className="text-sm font-bold text-foreground truncate mt-0.5">
-                      {selectedBatch || "Pilih folder..."}
-                    </p>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-foreground/50 flex-shrink-0 transition-transform duration-200 ${
-                      showPicker ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                <AnimatePresence>
-                  {showPicker && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50 max-h-96 flex flex-col"
-                    >
-                      <div className="p-3 border-b border-border bg-muted/10">
-                        <p className="text-xs font-bold text-foreground/50 uppercase tracking-widest">
-                          Pilih Folder Batch
-                        </p>
-                      </div>
-                      <div className="overflow-y-auto p-2 space-y-4 custom-scrollbar">
-                        {years.length === 0 ? (
-                          <p className="text-sm text-foreground/50 text-center py-4">
-                            Tidak ada data tahun.
-                          </p>
-                        ) : (
-                          years.map((year) => {
-                            const yearFolders = folders.filter(
-                              (f) => f.year_id === year.id && !f.parent_id
-                            );
-                            if (yearFolders.length === 0) return null;
-
-                            return (
-                              <div key={year.id} className="space-y-2">
-                                <p className="text-[10px] font-bold text-foreground/50 uppercase tracking-widest px-2">
-                                  {year.label}
-                                </p>
-                                <div className="space-y-1">
-                                  {yearFolders.map((folder) => {
-                                    const subFolders = folders.filter(
-                                      (f) => f.parent_id === folder.id
-                                    );
-                                    return (
-                                      <div
-                                        key={folder.id}
-                                        className="space-y-1"
-                                      >
-                                        <button
-                                          onClick={() =>
-                                            handleBatchChange(folder.name)
-                                          }
-                                          className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl transition-colors ${
-                                            folder.name === selectedBatch
-                                              ? "bg-primary/10 text-primary font-bold"
-                                              : "text-foreground/80 hover:bg-accent"
-                                          }`}
-                                        >
-                                          <span className="truncate">
-                                            {folder.name}
-                                          </span>
-                                        </button>
-                                        {subFolders.length > 0 && (
-                                          <div className="pl-4 space-y-1 border-l-2 border-border/50 ml-3 mt-1">
-                                            {subFolders.map((sub) => (
-                                              <button
-                                                key={sub.id}
-                                                onClick={() =>
-                                                  handleBatchChange(sub.name)
-                                                }
-                                                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl transition-colors ${
-                                                  sub.name === selectedBatch
-                                                    ? "bg-primary/10 text-primary font-bold"
-                                                    : "text-foreground/80 hover:bg-accent"
-                                                }`}
-                                              >
-                                                <span className="truncate">
-                                                  {sub.name}
-                                                </span>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <ProfilerPageHeader
+        backHref={`/profiler?batch=${encodeURIComponent(selectedBatch)}`}
+        backLabel="Kembali ke workspace KTP"
+        eyebrow="Profiler analytics"
+        title="Baca komposisi batch dengan cepat."
+        description="Distribusi tim, jabatan, gender, dan pendidikan disajikan dalam kartu yang mudah dipindai."
+        icon={<BarChart3 className="size-3.5" aria-hidden="true" />}
+        actions={
+          <ProfilerFolderSelect
+            years={years}
+            folders={folders}
+            value={selectedBatch}
+            label="Filter folder"
+            className="w-full sm:w-64"
+            onChange={(nextBatch) =>
+              navigate({
+                to: "/profiler/analytics",
+                search: { batch: nextBatch },
+              })
             }
           />
+        }
+      />
 
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-[1.75rem] border border-border/60 bg-card/75 px-5 py-4 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-                Batch aktif
-              </p>
-              <p className="mt-2 text-sm font-semibold">{selectedBatch}</p>
-            </div>
-            <div className="rounded-[1.75rem] border border-border/60 bg-card/75 px-5 py-4 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-                Total peserta
-              </p>
-              <p className="mt-2 text-sm font-semibold">
-                {peserta.length} orang
-              </p>
-            </div>
-            <div className="rounded-[1.75rem] border border-border/60 bg-card/75 px-5 py-4 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-                Mode akses
-              </p>
-              <p className="mt-2 text-sm font-semibold">
-                {isReadOnly ? "Read only leader" : "Interactive analytics"}
-              </p>
-            </div>
+      <main className="flex-1">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card size="sm" className="shadow-none">
+              <CardContent className="grid gap-1 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Batch aktif
+                </p>
+                <p className="truncate font-semibold">
+                  {selectedBatch || "Belum dipilih"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card size="sm" className="shadow-none">
+              <CardContent className="grid gap-1 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Total peserta
+                </p>
+                <p className="font-semibold tabular-nums">
+                  {peserta.length} orang
+                </p>
+              </CardContent>
+            </Card>
+            <Card size="sm" className="shadow-none">
+              <CardContent className="grid gap-1 p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Mode akses
+                </p>
+                <p className="font-semibold">
+                  {isReadOnly ? "Read only leader" : "Interactive analytics"}
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="w-full space-y-8">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-                <p className="text-foreground/50 text-sm font-medium">
-                  Memuat data statistik...
-                </p>
-              </div>
-            ) : !stats ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-card rounded-[2rem] border border-border shadow-sm">
-                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                  <BarChart3 className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <p className="text-foreground/50 font-medium">
-                  Tidak ada data peserta untuk folder ini.
-                </p>
-                {!isReadOnly && (
-                  <button
+          {loading ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-96 rounded-xl" />
+              ))}
+            </div>
+          ) : !stats ? (
+            <Card className="shadow-none">
+              <Empty className="border-0 py-16">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <BarChart3 aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Belum ada data peserta</EmptyTitle>
+                  <EmptyDescription>
+                    Tidak ada data peserta untuk folder ini.
+                  </EmptyDescription>
+                </EmptyHeader>
+                {!isReadOnly ? (
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="min-h-11"
                     onClick={() =>
                       navigate({
                         to: "/profiler/add",
                         search: { batch: selectedBatch },
                       })
                     }
-                    className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-sm hover:opacity-90"
                   >
-                    Tambah Data Pertama
-                  </button>
+                    Tambah peserta pertama
+                  </Button>
+                ) : null}
+              </Empty>
+            </Card>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "Total peserta", value: stats.total, icon: Users },
+                  {
+                    label: "Total jabatan",
+                    value: stats.jabatan.length,
+                    icon: Briefcase,
+                  },
+                  {
+                    label: "Total pendidikan",
+                    value: stats.pendidikan.length,
+                    icon: GraduationCap,
+                  },
+                  {
+                    label: "Total tim",
+                    value: stats.tim.length,
+                    icon: PieChartIcon,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Card key={item.label} size="sm" className="shadow-none">
+                      <CardContent className="flex items-center gap-3 p-4">
+                        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                          <Icon aria-hidden="true" className="size-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {item.label}
+                          </p>
+                          <p className="text-2xl font-semibold tabular-nums">
+                            {item.value}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {chartCard(
+                  "Distribusi jabatan",
+                  "Klik batang untuk melihat peserta.",
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={stats.jabatan}
+                      layout="vertical"
+                      margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        horizontal={false}
+                        stroke="var(--border)"
+                      />
+                      <XAxis type="number" />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={100}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="value"
+                        radius={[0, 4, 4, 0]}
+                        cursor="pointer"
+                        onClick={(data) =>
+                          showParticipants(
+                            "Jabatan",
+                            data.name || "",
+                            (p) =>
+                              (labelJabatan[p.jabatan || ""] ||
+                                p.jabatan ||
+                                "Tidak Diketahui") === (data.name || ""),
+                          )
+                        }
+                      >
+                        {stats.jabatan.map((entry, index) => (
+                          <Cell key={index} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>,
+                )}
+                {chartCard(
+                  "Distribusi tim",
+                  "Klik potongan untuk melihat peserta.",
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.tim}
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        cursor="pointer"
+                        onClick={(data) =>
+                          showParticipants(
+                            "Tim",
+                            data.name || "",
+                            (p) =>
+                              (p.tim || "Tidak Diketahui") ===
+                              (data.name || ""),
+                          )
+                        }
+                      >
+                        {stats.tim.map((entry, index) => (
+                          <Cell key={index} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={32}
+                        iconType="circle"
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>,
+                )}
+                {chartCard(
+                  "Distribusi gender",
+                  "Klik potongan untuk melihat peserta.",
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.gender}
+                        cx="50%"
+                        cy="45%"
+                        outerRadius={100}
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name} ${((percent || 0) * 100).toFixed(0)}%`
+                        }
+                        cursor="pointer"
+                        onClick={(data) =>
+                          showParticipants(
+                            "Gender",
+                            data.name || "",
+                            (p) =>
+                              (p.jenis_kelamin || "Tidak Diketahui") ===
+                              (data.name || ""),
+                          )
+                        }
+                      >
+                        {stats.gender.map((entry, index) => (
+                          <Cell key={index} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={32}
+                        iconType="circle"
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>,
+                )}
+                {chartCard(
+                  "Tingkat pendidikan",
+                  "Klik batang untuk melihat peserta.",
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={stats.pendidikan}
+                      margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--border)"
+                      />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar
+                        dataKey="value"
+                        radius={[4, 4, 0, 0]}
+                        cursor="pointer"
+                        onClick={(data) =>
+                          showParticipants(
+                            "Pendidikan",
+                            data.name || "",
+                            (p) =>
+                              (p.pendidikan || "Tidak Diketahui") ===
+                              (data.name || ""),
+                          )
+                        }
+                      >
+                        {stats.pendidikan.map((entry, index) => (
+                          <Cell key={index} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>,
                 )}
               </div>
-            ) : (
-              <>
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {[
-                    {
-                      label: "Total Peserta",
-                      value: stats.total,
-                      icon: Users,
-                      color: "text-blue-500",
-                      bg: "bg-blue-500/10",
-                    },
-                    {
-                      label: "Total Jabatan",
-                      value: stats.jabatan.length,
-                      icon: Briefcase,
-                      color: "text-emerald-500",
-                      bg: "bg-emerald-500/10",
-                    },
-                    {
-                      label: "Total Pendidikan",
-                      value: stats.pendidikan.length,
-                      icon: GraduationCap,
-                      color: "text-purple-500",
-                      bg: "bg-purple-500/10",
-                    },
-                    {
-                      label: "Total Tim",
-                      value: stats.tim.length,
-                      icon: PieChartIcon,
-                      color: "text-orange-500",
-                      bg: "bg-orange-500/10",
-                    },
-                  ].map((item, i) => (
-                    <div
-                      key={i}
-                      className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4"
-                    >
-                      <div
-                        className={`w-12 h-12 rounded-2xl ${item.bg} flex items-center justify-center ${item.color}`}
-                      >
-                        <item.icon size={24} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                          {item.label}
-                        </p>
-                        <p className="text-3xl font-black">{item.value}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Jabatan Chart */}
-                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col h-[400px]">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                      Distribusi Jabatan
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Klik batang grafik untuk melihat detail peserta
-                    </p>
-                    <div className="flex-1 min-h-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={stats.jabatan}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            horizontal={false}
-                            stroke="rgba(255,255,255,0.1)"
-                          />
-                          <XAxis type="number" />
-                          <YAxis
-                            dataKey="name"
-                            type="category"
-                            width={100}
-                            tick={{ fontSize: 12 }}
-                          />
-                          <Tooltip
-                            content={<ChartTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                          />
-                          <Bar
-                            dataKey="value"
-                            radius={[0, 4, 4, 0]}
-                            cursor="pointer"
-                            onClick={(data) =>
-                              handleChartClick(
-                                "Jabatan",
-                                (data.name || ""),
-                                (p) =>
-                                  (labelJabatan[p.jabatan || ""] || p.jabatan || "Tidak Diketahui") ===
-                                  (data.name || "")
-                              )
-                            }
-                          >
-                            {stats.jabatan.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Tim Chart */}
-                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col h-[400px]">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                      Distribusi Tim
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Klik potongan pie untuk melihat detail peserta
-                    </p>
-                    <div className="flex-1 min-h-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.tim}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={80}
-                            outerRadius={120}
-                            paddingAngle={5}
-                            dataKey="value"
-                            cursor="pointer"
-                            onClick={(data) =>
-                              handleChartClick(
-                                "Tim",
-                                (data.name || ""),
-                                (p) =>
-                                  (p.tim || "Tidak Diketahui") === (data.name || "")
-                              )
-                            }
-                          >
-                            {stats.tim.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                          </Pie>
-                          <Tooltip content={<ChartTooltip />} />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            iconType="circle"
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Gender Chart */}
-                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col h-[400px]">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                      Distribusi Gender
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Klik potongan pie untuk melihat detail peserta
-                    </p>
-                    <div className="flex-1 min-h-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.gender}
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={120}
-                            dataKey="value"
-                            label={({ name, percent }) =>
-                              `${name} ${((percent || 0) * 100).toFixed(0)}%`
-                            }
-                            cursor="pointer"
-                            onClick={(data) =>
-                              handleChartClick(
-                                "Gender",
-                                (data.name || ""),
-                                (p) =>
-                                  (p.jenis_kelamin || "Tidak Diketahui") ===
-                                  (data.name || "")
-                              )
-                            }
-                          >
-                            {stats.gender.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                          </Pie>
-                          <Tooltip content={<ChartTooltip />} />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            iconType="circle"
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Pendidikan Chart */}
-                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col h-[400px]">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">
-                      Tingkat Pendidikan
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Klik batang grafik untuk melihat detail peserta
-                    </p>
-                    <div className="flex-1 min-h-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={stats.pendidikan}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke="rgba(255,255,255,0.1)"
-                          />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip
-                            content={<ChartTooltip />}
-                            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                          />
-                          <Bar
-                            dataKey="value"
-                            radius={[4, 4, 0, 0]}
-                            cursor="pointer"
-                            onClick={(data) =>
-                              handleChartClick(
-                                "Pendidikan",
-                                (data.name || ""),
-                                (p) =>
-                                  (p.pendidikan || "Tidak Diketahui") ===
-                                  (data.name || "")
-                              )
-                            }
-                          >
-                            {stats.pendidikan.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </main>
 
-      {/* Modal Popup */}
-      <AnimatePresence>
-        {modalData && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-            onClick={() => setModalData(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-card w-full max-w-lg rounded-3xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[80vh]"
-            >
-              <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-muted/10">
-                <div>
-                  <h3 className="font-black text-lg tracking-tight">
-                    {modalData.title}
-                  </h3>
-                  <p className="text-xs text-foreground/50 font-bold uppercase tracking-widest mt-1">
-                    {modalData.participants.length} Peserta
-                  </p>
-                </div>
-                <button
-                  onClick={() => setModalData(null)}
-                  className="p-2 hover:bg-accent rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-4 overflow-y-auto custom-scrollbar flex-1 bg-background/50">
+      <Dialog
+        open={Boolean(modalData)}
+        onOpenChange={(open) => !open && setModalData(null)}
+      >
+        <DialogContent className="max-h-[80vh] max-w-lg overflow-hidden p-0">
+          {modalData ? (
+            <>
+              <DialogHeader className="border-b border-border px-5 py-5 pr-12 sm:px-6">
+                <DialogTitle>{modalData.title}</DialogTitle>
+                <DialogDescription>
+                  {modalData.participants.length} peserta
+                </DialogDescription>
+              </DialogHeader>
+              <div className="min-h-0 overflow-y-auto p-4 sm:p-5">
                 {modalData.participants.length > 0 ? (
-                  <ul className="space-y-2">
-                    {modalData.participants.map((p, i) => (
-                      <li
-                        key={p.id || i}
-                        className="p-3 rounded-2xl bg-card border border-border flex items-center gap-4 hover:border-primary/30 transition-colors"
+                  <div className="grid gap-2">
+                    {modalData.participants.map((participant, index) => (
+                      <div
+                        key={participant.id || index}
+                        className="flex min-w-0 items-center gap-3 rounded-lg border border-border p-3"
                       >
-                        {p.foto_url ? (
-                          <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border">
-                            <img
-                              src={p.foto_url}
-                              alt={p.nama || ""}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-sm border border-primary/20">
-                            {p.nama?.charAt(0) || "?"}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold truncate">
-                            {p.nama}
+                        <Avatar>
+                          <AvatarImage
+                            src={participant.foto_url || undefined}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                          />
+                          <AvatarFallback>
+                            {participant.nama?.charAt(0)?.toUpperCase() || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {participant.nama || "Tanpa nama"}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold text-foreground/50 uppercase tracking-widest bg-accent px-2 py-0.5 rounded-md truncate">
-                              {p.tim}
-                            </span>
-                            <span className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded-md truncate">
-                              {labelJabatan[p.jabatan || ""] || p.jabatan}
-                            </span>
+                          <div className="mt-1 flex min-w-0 gap-2">
+                            <Badge
+                              variant="secondary"
+                              className="max-w-[45%] truncate"
+                            >
+                              {participant.tim || "Tanpa tim"}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="max-w-[50%] truncate"
+                            >
+                              {labelJabatan[participant.jabatan || ""] ||
+                                participant.jabatan ||
+                                "Tanpa jabatan"}
+                            </Badge>
                           </div>
                         </div>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground text-sm font-medium">
-                      Tidak ada data peserta.
-                    </p>
                   </div>
+                ) : (
+                  <Alert>
+                    <X aria-hidden="true" />
+                    <AlertDescription>Tidak ada data peserta.</AlertDescription>
+                  </Alert>
                 )}
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

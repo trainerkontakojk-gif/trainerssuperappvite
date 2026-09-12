@@ -1,7 +1,14 @@
-'use client';
+import { Cake, Info, PieChart } from "lucide-react";
 
-import React from 'react';
-import { Cake, PieChart, Info } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Birthday {
   nama: string;
@@ -21,72 +28,85 @@ export default function InsightPanel({
   upcomingBirthdays,
   totalPeserta,
   batchName,
-  onShowBirthdays
+  onShowBirthdays,
 }: InsightPanelProps) {
   const nearestBirthday = upcomingBirthdays[0] ?? null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Birthday Widget */}
-      <button
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
         onClick={onShowBirthdays}
-        className="group flex items-center gap-5 p-5 bg-surface border border-border rounded-xl text-left hover:border-fg3 hover:bg-surface/80 transition-all duration-150 shadow-sm"
+        className="h-full min-h-28 w-full justify-start gap-4 whitespace-normal p-5 text-left"
       >
-        <div className="w-12 h-12 rounded-lg border border-border flex items-center justify-center text-fg2 bg-background transition-colors duration-150 shrink-0">
-          <Cake size={22} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
-            Upcoming Birthdays
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Cake aria-hidden="true" />
+        </span>
+        <span className="flex min-w-0 flex-col items-start gap-1">
+          <span className="text-xs font-medium text-muted-foreground">
+            Ulang tahun terdekat
           </span>
           {nearestBirthday ? (
-            <div className="mt-1">
-              <p className="text-base font-outfit font-bold tracking-tight text-fg truncate leading-tight">
+            <>
+              <span className="max-w-full truncate font-outfit text-base font-semibold tracking-tight text-foreground">
                 {nearestBirthday.nama}
-              </p>
-              <p className="text-[11px] text-fg2 mt-0.5">
-                {nearestBirthday.days === 0 ? 'Celebrate Today!' : `In ${nearestBirthday.days} days`}
-              </p>
-            </div>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {nearestBirthday.days === 0
+                  ? "Hari ini"
+                  : `${nearestBirthday.days} hari lagi`}
+              </span>
+            </>
           ) : (
-            <p className="mt-1 text-xs text-fg3 italic">No data available</p>
+            <span className="text-xs text-muted-foreground">
+              Belum ada data ulang tahun
+            </span>
           )}
-        </div>
-      </button>
+        </span>
+      </Button>
 
-      {/* Stats Quick Insight */}
-      <div className="flex items-center gap-5 p-5 bg-surface border border-border rounded-xl shadow-sm">
-        <div className="w-12 h-12 rounded-lg border border-border flex items-center justify-center text-fg2 bg-background shrink-0">
-          <PieChart size={22} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
-            Quick Analysis
+      <Card className="min-h-28 border-border bg-card ring-0">
+        <CardHeader className="flex-row items-start gap-3 p-5 pb-0">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <PieChart aria-hidden="true" />
           </span>
-          <div className="mt-0.5 flex items-baseline gap-1.5">
-            <span className="text-2xl font-mono font-bold tracking-tight text-fg">{totalPeserta}</span>
-            <span className="text-xs font-medium text-fg2">Profiles</span>
+          <div className="min-w-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">
+              Ringkasan batch
+            </CardTitle>
+            <CardDescription className="mt-1 truncate text-xs">
+              {batchName}
+            </CardDescription>
           </div>
-          <p className="text-[10px] text-fg3 truncate mt-0.5">
-            {batchName}
+        </CardHeader>
+        <CardContent className="p-5 pt-3">
+          <p className="font-mono text-2xl font-bold tabular-nums tracking-tight text-foreground">
+            {totalPeserta}
+            <span className="ml-2 font-sans text-sm font-normal text-muted-foreground">
+              peserta
+            </span>
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Action Prompt / Tip */}
-      <div className="hidden lg:flex items-center gap-5 p-5 bg-surface border border-dashed border-border rounded-xl">
-        <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center text-fg3 bg-background shrink-0">
-          <Info size={22} />
-        </div>
-        <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">
-            Workspace Tip
+      <Card className="hidden min-h-28 border-dashed border-border bg-card ring-0 xl:flex">
+        <CardContent className="flex items-start gap-4 p-5">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Info aria-hidden="true" />
           </span>
-          <p className="mt-1 text-xs text-fg2 leading-relaxed">
-            Gunakan fitur filter tim di hierarchy panel untuk navigasi yang lebih cepat.
-          </p>
-        </div>
-      </div>
+          <div className="min-w-0">
+            <Badge variant="outline" className="mb-2">
+              Tips navigasi
+            </Badge>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Gunakan panel hierarki untuk berpindah antar tahun, tim, dan batch
+              dengan cepat.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

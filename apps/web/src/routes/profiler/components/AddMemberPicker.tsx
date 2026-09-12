@@ -1,7 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { Search, X, UserPlus, UserCheck, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Search, UserCheck, UserPlus, X } from "lucide-react";
 import type { ProfilerPeserta } from "@trainers/types";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "cn";
+
 import { profilerApi } from "../../../lib/profilerService";
 import { notify } from "../../../lib/toast";
 
@@ -25,7 +47,7 @@ export default function AddMemberPicker({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const loadPool = async () => {
+  const loadPool = useCallback(async () => {
     setLoading(true);
     try {
       const data = await profilerApi.getGlobalPesertaPool(targetBatch);
@@ -35,7 +57,7 @@ export default function AddMemberPicker({
     } finally {
       setLoading(false);
     }
-  };
+  }, [targetBatch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,18 +65,33 @@ export default function AddMemberPicker({
       setSelectedIds([]);
       setSuccess(false);
     }
-  }, [isOpen]);
+  }, [isOpen, loadPool]);
 
-  const filteredPool = pool.filter(
-    (p) =>
-      p.nama.toLowerCase().includes(search.toLowerCase()) ||
-      p.batch_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.tim.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredPool = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return pool;
+
+    return pool.filter(
+      (participant) =>
+        participant.nama.toLowerCase().includes(query) ||
+        participant.batch_name.toLowerCase().includes(query) ||
+        participant.tim.toLowerCase().includes(query),
+    );
+  }, [pool, search]);
+
+  const groupedPool = useMemo(() => {
+    const groups = new Map<string, ProfilerPeserta[]>();
+    for (const participant of filteredPool) {
+      const current = groups.get(participant.batch_name) ?? [];
+      current.push(participant);
+      groups.set(participant.batch_name, current);
+    }
+    return [...groups.entries()];
+  }, [filteredPool]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -71,147 +108,216 @@ export default function AddMemberPicker({
         onSuccess(newPeserta as ProfilerPeserta[]);
         onClose();
       }, 1500);
-    } catch (err: any) {
-      notify.error("Gagal menambahkan anggota: " + err.message);
+    } catch (err: unknown) {
+      notify.error(
+        "Gagal menambahkan anggota: " +
+          (err instanceof Error ? err.message : "Terjadi kesalahan."),
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-card w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden border border-border/40 flex flex-col max-h-[85vh]"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="!w-[calc(100vw-2rem)] !max-w-2xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
       >
-        <div className="p-6 bg-gradient-to-br from-violet-600 to-indigo-700 text-white relative">
-          <button
+        <DialogHeader className="relative shrink-0 border-b border-border p-5 pr-16 sm:p-6 sm:pr-16">
+          <DialogTitle className="flex items-center gap-2 font-outfit text-lg font-bold">
+            <UserPlus aria-hidden="true" />
+            Tambah anggota
+          </DialogTitle>
+          <DialogDescription>
+            Pilih peserta dari folder lain untuk ditambahkan ke batch{" "}
+            {targetBatch}.
+          </DialogDescription>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors"
+            aria-label="Tutup tambah anggota"
+            title="Tutup"
+            className="absolute top-3 right-3 min-h-11 min-w-11"
           >
-            <X size={20} />
-          </button>
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <UserPlus size={24} />
-            Tambah Anggota
-          </h3>
-          <p className="text-white/70 text-sm mt-1">
-            Salin peserta dari folder lain ke {targetBatch}
-          </p>
+            <X aria-hidden="true" />
+          </Button>
 
-          <div className="mt-6 relative">
+          <div className="relative mt-4">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/80"
-              size={18}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
             />
-            <input
-              type="text"
+            <Input
+              type="search"
               placeholder="Cari nama, folder, atau tim..."
-              className="w-full bg-white/10 border border-white/20 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
+              aria-label="Cari peserta"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
+              className="h-11 pl-10"
               autoFocus
             />
           </div>
-        </div>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar sm:p-6">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-              <Loader2 className="animate-spin" size={32} />
-              <p>Memuat database peserta...</p>
-            </div>
-          ) : filteredPool.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <p>Tidak ada peserta yang ditemukan.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {Array.from(new Set(filteredPool.map((p) => p.batch_name))).map(
-                (batch) => (
-                  <div key={batch} className="space-y-2">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">
-                      {batch}
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {filteredPool
-                        .filter((p) => p.batch_name === batch)
-                        .map((peserta) => (
-                          <div
-                            key={peserta.id}
-                            onClick={() => toggleSelect(peserta.id!)}
-                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                              selectedIds.includes(peserta.id!)
-                                ? "bg-primary/10 border-primary ring-1 ring-primary"
-                                : "bg-accent/30 border-border hover:border-primary/50"
-                            }`}
-                          >
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                              {peserta.nama.charAt(0)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-foreground truncate text-sm">
-                                {peserta.nama}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground truncate uppercase tracking-tight">
-                                {peserta.tim} &bull;{" "}
-                                {peserta.jabatan.replace(/_/g, " ")}
-                              </p>
-                            </div>
-                            <div
-                              className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                selectedIds.includes(peserta.id!)
-                                  ? "bg-primary border-primary text-white"
-                                  : "border-muted-foreground/30"
-                              }`}
-                            >
-                              {selectedIds.includes(peserta.id!) && (
-                                <UserCheck size={12} />
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                    </div>
+            <div
+              className="flex flex-col gap-3"
+              role="status"
+              aria-label="Memuat peserta"
+            >
+              {[0, 1, 2, 3, 4].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-3 rounded-lg border border-border p-3"
+                >
+                  <Skeleton className="size-10 shrink-0 rounded-full" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
                   </div>
-                ),
-              )}
+                </div>
+              ))}
+            </div>
+          ) : groupedPool.length === 0 ? (
+            <Empty className="min-h-56 border border-dashed border-border p-8">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <UserPlus aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Tidak ada peserta ditemukan</EmptyTitle>
+                <EmptyDescription>
+                  Coba ubah kata kunci pencarian atau pilih batch lain.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="flex flex-col gap-6">
+              {groupedPool.map(([batch, participants]) => (
+                <section
+                  key={batch}
+                  className="flex flex-col gap-2"
+                  aria-labelledby={`batch-${batch}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3
+                      id={`batch-${batch}`}
+                      className="min-w-0 truncate text-sm font-semibold text-foreground"
+                    >
+                      {batch}
+                    </h3>
+                    <Badge variant="outline" className="shrink-0 tabular-nums">
+                      {participants.length} peserta
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {participants.map((participant) => {
+                      const isSelected = selectedIds.includes(participant.id);
+                      const initials = participant.nama
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase();
+
+                      return (
+                        <Button
+                          key={participant.id}
+                          type="button"
+                          variant={isSelected ? "secondary" : "outline"}
+                          size="lg"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleSelect(participant.id)}
+                          className={cn(
+                            "h-auto min-h-16 w-full justify-start gap-3 p-3 text-left whitespace-normal",
+                            isSelected &&
+                              "border-primary/40 ring-2 ring-primary/20",
+                          )}
+                        >
+                          <Avatar size="lg" className="size-10">
+                            <AvatarFallback className="text-sm font-semibold">
+                              {initials || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-foreground">
+                              {participant.nama}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {participant.tim} ·{" "}
+                              {participant.jabatan.replace(/_/g, " ")}
+                            </span>
+                          </span>
+                          {isSelected && (
+                            <Badge variant="default" className="shrink-0">
+                              <UserCheck
+                                data-icon="inline-start"
+                                aria-hidden="true"
+                              />
+                              Dipilih
+                            </Badge>
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t border-border/40 bg-accent/20 flex items-center justify-between">
+        <DialogFooter className="shrink-0 border-t border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <p className="text-sm text-muted-foreground">
-            {selectedIds.length} peserta dipilih
+            <span className="font-semibold tabular-nums text-foreground">
+              {selectedIds.length}
+            </span>{" "}
+            peserta dipilih
           </p>
-          <div className="flex gap-3">
-            <button
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background rounded-xl"
+              className="min-h-11"
             >
               Batal
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              size="lg"
               onClick={handleAdd}
               disabled={selectedIds.length === 0 || saving || success}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-md shadow-primary/10 hover:shadow-lg disabled:opacity-50 transition-all flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+              className="min-h-11"
             >
               {saving ? (
-                <Loader2 className="animate-spin" size={18} />
+                <Loader2
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                  className="motion-reduce:animate-none"
+                />
               ) : success ? (
-                <UserCheck size={18} />
+                <UserCheck data-icon="inline-start" aria-hidden="true" />
               ) : (
-                <UserPlus size={18} />
+                <UserPlus data-icon="inline-start" aria-hidden="true" />
               )}
               {success
                 ? "Berhasil!"
-                : `Tambahkan ${selectedIds.length} Anggota`}
-            </button>
+                : `Tambahkan ${selectedIds.length} anggota`}
+            </Button>
           </div>
-        </div>
-      </motion.div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

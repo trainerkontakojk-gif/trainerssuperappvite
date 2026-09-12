@@ -6,8 +6,12 @@ import { ProfilerExportGrid } from "./components/export/ProfilerExportGrid";
 import { useProfilerExport } from "./hooks/useProfilerExport";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { profilerApi } from "../../lib/profilerService";
-import type { ProfilerPeserta, ProfilerYear, ProfilerFolder } from "@trainers/types";
-import PageHeroHeader from "../../components/PageHeroHeader";
+import type {
+  ProfilerPeserta,
+  ProfilerYear,
+  ProfilerFolder,
+} from "@trainers/types";
+import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
 
 export default function ProfilerExport() {
   const navigate = useNavigate();
@@ -19,14 +23,8 @@ export default function ProfilerExport() {
   const [peserta, setPeserta] = useState<ProfilerPeserta[]>([]);
 
   const [selectedBatch, setSelectedBatch] = useState(batchName);
-  const [showPicker, setShowPicker] = useState(false);
-  const {
-    generating,
-    orientation,
-    setOrientation,
-    options,
-    disabled,
-  } = useProfilerExport({ peserta, selectedBatch });
+  const { generating, orientation, setOrientation, options, disabled } =
+    useProfilerExport({ peserta, selectedBatch });
 
   useEffect(() => {
     Promise.all([
@@ -54,47 +52,39 @@ export default function ProfilerExport() {
         setPeserta(p);
       })
       .catch(console.error);
-  }, [selectedBatch]);
+  }, [navigate, selectedBatch]);
 
   const handleBatchChange = (newBatch: string) => {
     setSelectedBatch(newBatch);
-    setShowPicker(false);
     navigate({ to: "/profiler/export", search: { batch: newBatch } });
   };
 
-
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground">
-      <main className="relative h-full overflow-y-auto">
-        <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10 lg:py-10">
-          <PageHeroHeader
-            backHref="/profiler"
-            backLabel="Kembali ke workspace KTP"
-            eyebrow="Profiler export"
-            title="Unduh batch aktif ke format yang siap dipakai lintas kebutuhan."
-            description="Pilih folder, cek jumlah peserta, tentukan orientasi presentasi, lalu ekspor ke format yang paling sesuai."
-            icon={<FileDown className="h-3.5 w-3.5" />}
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <ProfilerPageHeader
+        backHref={`/profiler?batch=${encodeURIComponent(selectedBatch)}`}
+        backLabel="Kembali ke workspace KTP"
+        eyebrow="Profiler export"
+        title="Unduh batch aktif ke format yang siap dipakai."
+        description="Pilih folder, cek jumlah peserta, tentukan orientasi, lalu ekspor ke format yang sesuai."
+        icon={<FileDown className="size-3.5" aria-hidden="true" />}
+      />
+      <main className="flex-1">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <ProfilerExportToolbar
+            selectedBatch={selectedBatch}
+            initialYears={initialYears}
+            initialFolders={initialFolders}
+            handleBatchChange={handleBatchChange}
+            pesertaCount={peserta.length}
+            orientation={orientation}
+            setOrientation={setOrientation}
           />
-
-          <div className="space-y-4">
-            <ProfilerExportToolbar
-              selectedBatch={selectedBatch}
-              showPicker={showPicker}
-              setShowPicker={setShowPicker}
-              initialYears={initialYears}
-              initialFolders={initialFolders}
-              handleBatchChange={handleBatchChange}
-              pesertaCount={peserta.length}
-              orientation={orientation}
-              setOrientation={setOrientation}
-            />
-
-            <ProfilerExportGrid
-              options={options}
-              disabled={disabled}
-              generating={generating}
-            />
-          </div>
+          <ProfilerExportGrid
+            options={options}
+            disabled={disabled}
+            generating={generating}
+          />
         </div>
       </main>
     </div>

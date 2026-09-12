@@ -1,15 +1,37 @@
+import { useEffect, useState, type ReactNode } from "react";
+import type { ProfilerFolder, ProfilerYear } from "@trainers/types";
+import {
+  CalendarDays,
+  ChevronRight,
+  Copy,
+  Layers,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { cn } from "cn";
 
-import React from 'react';
-import type { ProfilerYear, ProfilerFolder } from '@trainers/types';
-import { 
-  Plus, ChevronRight, 
-  Pencil, Trash2, Copy, 
-  Layers, CalendarDays
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { getDynamicIcon, cleanYearLabel } from './workspace-utils';
+import { cleanYearLabel, getDynamicIcon } from "./workspace-utils";
 
 interface HierarchyPanelProps {
   years: ProfilerYear[];
@@ -26,6 +48,7 @@ interface HierarchyPanelProps {
   counts: Record<string, number>;
   role?: string;
   isMobile?: boolean;
+  onClose?: () => void;
 }
 
 export default function HierarchyPanel({
@@ -41,221 +64,385 @@ export default function HierarchyPanel({
   onDeleteFolder,
   onDuplicateFolder,
   counts,
-  role = 'trainer',
-  isMobile = false
+  role = "trainer",
+  isMobile = false,
+  onClose,
 }: HierarchyPanelProps) {
-  const isReadOnly = role === 'leader';
-  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({});
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const isReadOnly = role === "leader";
+  const prefersReducedMotion = useReducedMotion();
+  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [expandedFolders, setExpandedFolders] = useState<
+    Record<string, boolean>
+  >({});
 
-  // Auto-expand current year
   useEffect(() => {
     if (years.length > 0) {
       const currentYear = new Date().getFullYear();
-      const yearToExpand = years.find(y => y.year === currentYear);
+      const yearToExpand = years.find((year) => year.year === currentYear);
       if (yearToExpand) {
-        setExpandedYears(prev => ({ ...prev, [yearToExpand.id]: true }));
+        setExpandedYears((prev) => ({ ...prev, [yearToExpand.id]: true }));
       } else if (selectedYearId) {
-        setExpandedYears(prev => ({ ...prev, [selectedYearId]: true }));
+        setExpandedYears((prev) => ({ ...prev, [selectedYearId]: true }));
       }
     }
   }, [years, selectedYearId]);
 
   const toggleYear = (id: string) => {
-    setExpandedYears(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedYears((prev) => ({ ...prev, [id]: !prev[id] }));
     onSelectYear(id);
   };
 
   const toggleFolder = (id: string) => {
-    setExpandedFolders(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedFolders((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const rootFolders = (yearId: string) => 
-    folders.filter(f => f.year_id === yearId && !f.parent_id);
-  
-  const subFolders = (parentId: string) => 
-    folders.filter(f => f.parent_id === parentId);
+  const rootFolders = (yearId: string) =>
+    folders.filter((folder) => folder.year_id === yearId && !folder.parent_id);
+
+  const subFolders = (parentId: string) =>
+    folders.filter((folder) => folder.parent_id === parentId);
+
+  const disclosureTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.18, ease: "easeOut" as const };
 
   return (
-    <div className={`
-      flex flex-col h-full overflow-hidden relative z-20 
-      ${isMobile ? 'w-full' : 'w-72 border-l border-border bg-surface shrink-0'}
-    `}>
-      <div className="p-5 border-b border-border flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Navigator</span>
-          <h2 className="text-sm font-outfit font-bold text-fg">Hierarki</h2>
+    <div
+      className={cn(
+        "relative z-20 flex h-full flex-col overflow-hidden",
+        isMobile ? "w-full" : "w-72 shrink-0 border-l border-border bg-card",
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Navigator
+          </p>
+          <h2 className="mt-1 font-outfit text-base font-semibold tracking-tight text-foreground">
+            Hierarki data
+          </h2>
         </div>
-        {!isReadOnly && (
-          <button 
-            onClick={onAddYear}
-            className="w-7 h-7 flex items-center justify-center bg-transparent text-fg2 hover:text-fg hover:bg-background rounded-md transition-all duration-150 border border-border focus-visible:outline-none"
-            title="Tambah Tahun"
-          >
-            <Plus size={14} />
-          </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {!isReadOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-lg"
+              onClick={onAddYear}
+              aria-label="Tambah tahun"
+              title="Tambah tahun"
+              className="min-h-11 min-w-11"
+            >
+              <Plus aria-hidden="true" />
+            </Button>
+          )}
+          {isMobile && onClose && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              onClick={onClose}
+              aria-label="Tutup navigasi hierarki"
+              title="Tutup navigasi hierarki"
+              className="min-h-11 min-w-11"
+            >
+              <X aria-hidden="true" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 custom-scrollbar sm:p-4">
+        {years.length === 0 ? (
+          <Empty className="min-h-40 border border-dashed border-border p-6">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <CalendarDays aria-hidden="true" />
+              </EmptyMedia>
+              <EmptyTitle>Arsip tidak ditemukan</EmptyTitle>
+              <EmptyDescription>
+                Tambahkan tahun baru untuk mulai membuat struktur data.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {[...years]
+              .sort((left, right) => right.year - left.year)
+              .map((year) => {
+                const isYearSelected = selectedYearId === year.id;
+                const yearRootFolders = rootFolders(year.id);
+                const yearPanelId = `profiler-year-${year.id}`;
+
+                return (
+                  <div key={year.id} className="flex flex-col gap-1">
+                    <Button
+                      type="button"
+                      variant={isYearSelected ? "default" : "ghost"}
+                      size="lg"
+                      aria-expanded={expandedYears[year.id] ?? false}
+                      aria-controls={yearPanelId}
+                      onClick={() => toggleYear(year.id)}
+                      className={cn(
+                        "min-h-11 w-full justify-start gap-2 px-3 text-left",
+                        !isYearSelected && "text-foreground",
+                      )}
+                    >
+                      <ChevronRight
+                        aria-hidden="true"
+                        className={cn(
+                          "shrink-0 transition-transform duration-200",
+                          expandedYears[year.id] && "rotate-90",
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate font-semibold">
+                        {cleanYearLabel(year.label)}
+                      </span>
+                      {isYearSelected && (
+                        <Badge variant="secondary" className="shrink-0">
+                          Aktif
+                        </Badge>
+                      )}
+                    </Button>
+
+                    <AnimatePresence initial={!prefersReducedMotion}>
+                      {expandedYears[year.id] && (
+                        <motion.div
+                          id={yearPanelId}
+                          initial={
+                            prefersReducedMotion
+                              ? false
+                              : { height: 0, opacity: 0 }
+                          }
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={
+                            prefersReducedMotion
+                              ? undefined
+                              : { height: 0, opacity: 0 }
+                          }
+                          transition={disclosureTransition}
+                          className="ml-3 flex flex-col gap-1 overflow-hidden border-l border-border pl-3"
+                        >
+                          {yearRootFolders.length === 0 ? (
+                            <p className="px-2 py-3 text-xs text-muted-foreground">
+                              Belum ada tim terdaftar.
+                            </p>
+                          ) : (
+                            yearRootFolders.map((folder) => (
+                              <FolderRow
+                                key={folder.id}
+                                folder={folder}
+                                selectedFolderId={selectedFolderId}
+                                isReadOnly={isReadOnly}
+                                isMobile={isMobile}
+                                counts={counts}
+                                hasChildren={subFolders(folder.id).length > 0}
+                                expanded={expandedFolders[folder.id] ?? false}
+                                onSelect={() => {
+                                  onSelectFolder(folder.id);
+                                  if (subFolders(folder.id).length > 0) {
+                                    toggleFolder(folder.id);
+                                  }
+                                }}
+                                onAdd={() => onAddFolder(year.id, folder.id)}
+                                onDuplicate={() => onDuplicateFolder(folder)}
+                                onRename={() => onRenameFolder(folder)}
+                                onDelete={() => onDeleteFolder(folder)}
+                              >
+                                {expandedFolders[folder.id] && (
+                                  <div className="ml-3 flex flex-col gap-1 border-l border-border pl-3">
+                                    {subFolders(folder.id).map((subFolder) => (
+                                      <FolderRow
+                                        key={subFolder.id}
+                                        folder={subFolder}
+                                        selectedFolderId={selectedFolderId}
+                                        isReadOnly={isReadOnly}
+                                        isMobile={isMobile}
+                                        counts={counts}
+                                        hasChildren={false}
+                                        expanded={false}
+                                        onSelect={() =>
+                                          onSelectFolder(subFolder.id)
+                                        }
+                                        onRename={() =>
+                                          onRenameFolder(subFolder)
+                                        }
+                                        onDelete={() =>
+                                          onDeleteFolder(subFolder)
+                                        }
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </FolderRow>
+                            ))
+                          )}
+
+                          {!isReadOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onAddFolder(year.id)}
+                              className="mt-1 min-h-10 w-full justify-start border border-dashed border-border px-3 text-xs text-muted-foreground"
+                            >
+                              <Plus
+                                data-icon="inline-start"
+                                aria-hidden="true"
+                              />
+                              Tim baru
+                            </Button>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+          </div>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-        {years.length === 0 && (
-          <div className="p-8 text-center flex flex-col items-center gap-3 border border-dashed border-border rounded-xl bg-background">
-            <div className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-fg3 bg-surface">
-              <CalendarDays size={20} />
-            </div>
-            <p className="text-xs text-fg2 font-medium">
-              Arsip tidak ditemukan.
+      <div className="border-t border-border p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Layers aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Total node</p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
+              {folders.length}
             </p>
           </div>
-        )}
-
-        {[...years].sort((a,b) => b.year - a.year).map(year => (
-          <div key={year.id} className="space-y-1">
-            <button
-              onClick={() => toggleYear(year.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-150 ease-out group focus-visible:outline-none border ${
-                selectedYearId === year.id 
-                  ? 'bg-inv-bg text-inv-fg border-transparent font-semibold' 
-                  : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
-              }`}
-            >
-              <div className={`transition-transform duration-300 ${expandedYears[year.id] ? 'rotate-90' : ''}`}>
-                <ChevronRight size={12} className={selectedYearId === year.id ? 'text-inv-fg/80' : 'text-fg3'} />
-              </div>
-              <span className="flex-1 text-left text-xs font-semibold tracking-wide">
-                {cleanYearLabel(year.label)}
-              </span>
-              {selectedYearId === year.id && (
-                <motion.div layoutId="activeYearIndicator" className="w-1.5 h-1.5 rounded-full bg-inv-fg" />
-              )}
-            </button>
-
-            <AnimatePresence>
-              {expandedYears[year.id] && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="ml-3 mt-0.5 space-y-1 overflow-hidden pl-3 border-l border-border"
-                >
-                  {rootFolders(year.id).length === 0 ? (
-                    <div className="py-2 pl-2 text-[10px] text-fg3 font-medium italic">
-                      Belum ada tim terdaftar.
-                    </div>
-                  ) : (
-                    rootFolders(year.id).map(folder => (
-                      <div key={folder.id} className="space-y-1">
-                        <div className="group flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              onSelectFolder(folder.id);
-                              if (subFolders(folder.id).length > 0) toggleFolder(folder.id);
-                            }}
-                            className={`flex-1 flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150 ease-out focus-visible:outline-none border ${
-                              selectedFolderId === folder.id
-                                ? 'bg-inv-bg text-inv-fg font-semibold border-transparent'
-                                : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
-                            }`}
-                          >
-                            <div className="flex-shrink-0">
-                              {subFolders(folder.id).length > 0 ? (
-                                <div className={`transition-transform duration-300 ${expandedFolders[folder.id] ? 'rotate-90' : ''}`}>
-                                  <ChevronRight size={12} className={selectedFolderId === folder.id ? 'text-inv-fg/80' : 'text-fg3'} />
-                                </div>
-                              ) : (
-                                <div className={selectedFolderId === folder.id ? 'text-inv-fg/80' : 'text-fg3'}>
-                                  {getDynamicIcon(folder.name, 12)}
-                                </div>
-                              )}
-                            </div>
-                            <span className="flex-1 text-left truncate font-medium">{folder.name}</span>
-                            {counts[folder.name] > 0 && (
-                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border ${
-                                selectedFolderId === folder.id ? 'bg-surface text-fg border-border' : 'bg-background border-border text-fg2'
-                              }`}>
-                                {counts[folder.name]}
-                              </span>
-                            )}
-                          </button>
-                          
-                          {!isReadOnly && (
-                            <div className={`
-                              ${isMobile && selectedFolderId === folder.id ? 'flex' : 'hidden group-hover:flex'} 
-                              items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-2 duration-150
-                            `}>
-                              <button onClick={(e) => { e.stopPropagation(); onAddFolder(year.id, folder.id); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Tambah Batch"><Plus size={11} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDuplicateFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Duplikat"><Copy size={11} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onRenameFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Rename"><Pencil size={11} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-destructive/10 text-destructive transition-colors" title="Hapus"><Trash2 size={11} /></button>
-                            </div>
-                          )}
-                        </div>
-
-                        {expandedFolders[folder.id] && (
-                          <div className="ml-3 space-y-1 border-l border-border pl-3 mt-0.5">
-                            {subFolders(folder.id).map(sub => (
-                              <div key={sub.id} className={`group flex items-center gap-1`}>
-                                  <button
-                                    onClick={() => onSelectFolder(sub.id)}
-                                    className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-xs transition-all duration-150 ease-out focus-visible:outline-none border ${
-                                      selectedFolderId === sub.id
-                                        ? 'bg-inv-bg text-inv-fg font-semibold border-transparent'
-                                        : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
-                                    }`}
-                                  >
-                                    <div className={selectedFolderId === sub.id ? 'text-inv-fg/80' : 'text-fg3'}>
-                                      {getDynamicIcon(sub.name, 11)}
-                                    </div>
-                                    <span className="flex-1 text-left truncate font-medium">{sub.name}</span>
-                                    {counts[sub.name] > 0 && (
-                                      <span className="text-[10px] font-mono text-fg3">({counts[sub.name]})</span>
-                                    )}
-                                  </button>
-                                  {!isReadOnly && (
-                                    <div className={`
-                                      ${isMobile && selectedFolderId === sub.id ? 'flex' : 'hidden group-hover:flex'} 
-                                      items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-1 duration-150
-                                    `}>
-                                      <button onClick={(e) => { e.stopPropagation(); onRenameFolder(sub); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Rename"><Pencil size={11} /></button>
-                                      <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(sub); }} className="p-1 border border-border rounded-md hover:bg-destructive/10 text-destructive transition-colors" title="Hapus"><Trash2 size={11} /></button>
-                                    </div>
-                                  )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                  
-                  {!isReadOnly && (
-                    <button
-                      onClick={() => onAddFolder(year.id)}
-                      className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-fg2 hover:text-fg hover:bg-background transition-all duration-150 ease-out border border-dashed border-border mt-2 focus-visible:outline-none"
-                    >
-                      <Plus size={11} />
-                      <span>Tim Baru</span>
-                    </button>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
-      </div>
-
-      <div className="p-5 border-t border-border bg-surface">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-fg2 bg-background">
-            <Layers size={14} />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-medium text-fg3 uppercase tracking-wide">Total Data</span>
-            <span className="text-xs font-semibold text-fg">{folders.length} Node</span>
-          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FolderRow({
+  folder,
+  selectedFolderId,
+  isReadOnly,
+  isMobile,
+  counts,
+  hasChildren,
+  expanded,
+  onSelect,
+  onAdd,
+  onDuplicate,
+  onRename,
+  onDelete,
+  children,
+}: {
+  folder: ProfilerFolder;
+  selectedFolderId: string | null;
+  isReadOnly: boolean;
+  isMobile: boolean;
+  counts: Record<string, number>;
+  hasChildren: boolean;
+  expanded: boolean;
+  onSelect: () => void;
+  onAdd?: () => void;
+  onDuplicate?: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  children?: ReactNode;
+}) {
+  const isSelected = selectedFolderId === folder.id;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 items-center gap-1">
+        <Button
+          type="button"
+          variant={isSelected ? "default" : "ghost"}
+          size="lg"
+          onClick={onSelect}
+          aria-expanded={hasChildren ? expanded : undefined}
+          className={cn(
+            "h-auto min-h-10 min-w-0 flex-1 justify-start gap-2 px-2 py-2 text-left whitespace-normal",
+            !isSelected && "text-foreground",
+          )}
+        >
+          <span className="flex size-5 shrink-0 items-center justify-center">
+            {hasChildren ? (
+              <ChevronRight
+                aria-hidden="true"
+                className={cn(
+                  "transition-transform duration-200",
+                  expanded && "rotate-90",
+                )}
+              />
+            ) : (
+              getDynamicIcon(folder.name, 14)
+            )}
+          </span>
+          <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug">
+            {folder.name}
+          </span>
+          {counts[folder.name] > 0 && (
+            <Badge
+              variant={isSelected ? "secondary" : "outline"}
+              className="shrink-0 tabular-nums"
+            >
+              {counts[folder.name]}
+            </Badge>
+          )}
+        </Button>
+
+        {!isReadOnly && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Aksi ${folder.name}`}
+                  title="Aksi folder"
+                  className={cn(
+                    "min-h-10 min-w-10 shrink-0",
+                    isMobile ? "" : "opacity-70 hover:opacity-100",
+                  )}
+                />
+              }
+            >
+              <MoreHorizontal aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {hasChildren && onAdd && (
+                <DropdownMenuItem onClick={onAdd} className="min-h-10">
+                  <Plus aria-hidden="true" />
+                  Tambah batch
+                </DropdownMenuItem>
+              )}
+              {hasChildren && onDuplicate && (
+                <DropdownMenuItem onClick={onDuplicate} className="min-h-10">
+                  <Copy aria-hidden="true" />
+                  Duplikat folder
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onRename} className="min-h-10">
+                <Pencil aria-hidden="true" />
+                Ubah nama
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={onDelete}
+                variant="destructive"
+                className="min-h-10"
+              >
+                <Trash2 aria-hidden="true" />
+                Hapus folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      {children}
     </div>
   );
 }

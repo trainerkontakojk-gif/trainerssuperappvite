@@ -1,4 +1,12 @@
 import React from "react";
+import { Loader2 } from "lucide-react";
+import { Button } from "../../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../../../components/ui/card";
 
 export interface ExportOption {
   id: string;
@@ -21,30 +29,37 @@ export function ProfilerExportCard({
   isGenerating,
 }: ProfilerExportCardProps) {
   return (
-    <button
-      onClick={option.action}
-      disabled={disabled}
-      className={`flex flex-col items-start rounded-[2rem] border border-border/40 bg-card p-6 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-        disabled
-          ? "cursor-not-allowed opacity-50"
-          : `${option.hover} hover:shadow-md hover:-translate-y-0.5`
-      }`}
-    >
-      <div className="mb-4 flex items-center justify-between w-full">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50">
+    <Card className="flex h-full shadow-none">
+      <CardHeader className="flex flex-row items-start gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
           {isGenerating ? (
-            <div className="animate-spin rounded-full border-b-2 border-primary h-8 w-8" />
+            <Loader2
+              className="size-5 animate-spin text-primary"
+              aria-label="Menyiapkan ekspor"
+            />
           ) : (
             option.icon
           )}
         </div>
-      </div>
-      <h3 className="mb-1 text-base font-bold text-foreground">
-        {option.title}
-      </h3>
-      <p className="text-xs font-medium leading-relaxed text-muted-foreground">
-        {option.desc}
-      </p>
-    </button>
+        <CardTitle className="min-w-0 break-words text-base">
+          {option.title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-4">
+        <p className="flex-1 text-sm leading-6 text-muted-foreground">
+          {option.desc}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="min-h-11 w-full"
+          onClick={option.action}
+          disabled={disabled}
+        >
+          {isGenerating ? "Menyiapkan..." : "Unduh"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

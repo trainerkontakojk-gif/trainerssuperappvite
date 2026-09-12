@@ -1,5 +1,8 @@
-import React from 'react';
-import { Inbox, FilterX, X } from 'lucide-react';
+import React from "react";
+import { FilterX, Inbox, X } from "lucide-react";
+import { Button } from "../../../../components/ui/button";
+import { Card, CardContent } from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
 
 interface ProfilerTableFiltersProps {
   searchQuery: string;
@@ -21,56 +24,69 @@ export const ProfilerTableFilters: React.FC<ProfilerTableFiltersProps> = ({
   sortMode,
   hasActiveFilters,
   resetFilters,
-}) => {
-  return (
-    <div className="bg-card border border-border/40 rounded-2xl p-4 space-y-3 shadow-sm">
-      <div className="relative group">
-        <Inbox className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        <input
-          type="text"
-          placeholder="Cari nama, NIP, atau email..."
-          className="w-full pl-11 pr-12 py-2.5 bg-background border border-border/40 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+}) => (
+  <Card className="shadow-none">
+    <CardContent className="grid gap-3 p-3 sm:p-4">
+      <div className="relative">
+        <Inbox
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         />
-        {hasActiveFilters && (
-          <button
+        <Input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Cari nama, NIK, atau email..."
+          aria-label="Cari peserta"
+          className="h-11 pl-10 pr-12"
+        />
+        {hasActiveFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-1 top-1/2 min-h-9 -translate-y-1/2 gap-1.5 text-xs"
             onClick={resetFilters}
-            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-            title="Reset semua filter"
           >
-            <FilterX className="w-3 h-3" /> Reset
-          </button>
-        )}
-        {!hasActiveFilters && searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-muted rounded-lg transition-colors"
+            <FilterX data-icon="inline-start" aria-hidden="true" />
+            Reset
+          </Button>
+        ) : searchQuery ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute right-1 top-1/2 -translate-y-1/2"
+            onClick={() => setSearchQuery("")}
+            aria-label="Hapus pencarian"
           >
-            <X className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        )}
+            <X aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
 
-      {!sortMode && allTims.length > 1 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {allTims.map((tim) => (
-            <button
-              key={tim}
-              onClick={() => setFilterTim(tim)}
-              className={`px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                tim === 'all'
-                  ? filterTim === 'all'
-                  : filterTim.toLowerCase() === tim.toLowerCase()
-                  ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/10'
-                  : 'bg-background text-muted-foreground hover:text-foreground border-border/40 hover:border-primary/30'
-              }`}
-            >
-              {tim === 'all' ? 'Semua Tim' : tim}
-            </button>
-          ))}
+      {!sortMode && allTims.length > 1 ? (
+        <div className="flex flex-wrap gap-2" aria-label="Filter tim">
+          {allTims.map((tim) => {
+            const selected =
+              tim === "all"
+                ? filterTim === "all"
+                : filterTim.toLowerCase() === tim.toLowerCase();
+            return (
+              <Button
+                key={tim}
+                type="button"
+                size="lg"
+                variant={selected ? "default" : "outline"}
+                className="min-h-11 text-xs"
+                onClick={() => setFilterTim(tim)}
+              >
+                {tim === "all" ? "Semua tim" : tim}
+              </Button>
+            );
+          })}
         </div>
-      )}
-    </div>
-  );
-};
+      ) : null}
+    </CardContent>
+  </Card>
+);

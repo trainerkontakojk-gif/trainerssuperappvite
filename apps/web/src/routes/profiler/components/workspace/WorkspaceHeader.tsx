@@ -1,9 +1,10 @@
+import React from "react";
+import { ChevronRight, Moon, PanelRight, Sun } from "lucide-react";
+import { motion } from "framer-motion";
 
-
-import React from 'react';
-import { ChevronLeft, Moon, Sun, Sidebar } from 'lucide-react';
-import { useThemeMode } from '../../../../hooks/useThemeMode';
-import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { useThemeMode } from "../../../../hooks/useThemeMode";
 
 interface WorkspaceHeaderProps {
   onToggleSidebar?: () => void;
@@ -16,61 +17,87 @@ export default function WorkspaceHeader({
   onToggleSidebar,
   activeBatch,
   activeTeam,
-  activeYearLabel
+  activeYearLabel,
 }: WorkspaceHeaderProps) {
   const { theme, setTheme } = useThemeMode();
 
   return (
-    <header className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-6 py-3">
-      <div className="flex items-center gap-4">
-        <div className="flex flex-col leading-none">
-          <span className="text-[9px] font-medium uppercase tracking-wider text-fg3">Module</span>
-          <span className="mt-0.5 text-xs font-outfit font-bold tracking-tight uppercase text-fg">
+    <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-4 border-b border-border bg-background px-4 py-3 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            KTP / Profiler
+          </span>
+          <span className="truncate font-outfit text-sm font-semibold tracking-tight text-foreground">
             Kotak Tool Profile
           </span>
         </div>
 
-        <div className="h-4 w-px bg-border hidden md:block" />
+        <Separator orientation="vertical" className="hidden h-7 sm:block" />
 
-        <nav className="hidden md:flex items-center gap-2">
+        <nav
+          aria-label="Lokasi workspace"
+          className="hidden min-w-0 items-center gap-2 text-xs md:flex"
+        >
           {activeYearLabel && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium tracking-wide text-fg3">{activeYearLabel}</span>
-              <ChevronLeft size={10} className="rotate-180 text-fg3" />
-            </div>
+            <span className="shrink-0 text-muted-foreground">
+              {activeYearLabel}
+            </span>
           )}
           {activeTeam && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-medium tracking-wide text-fg2">{activeTeam}</span>
-              {activeBatch && <ChevronLeft size={10} className="rotate-180 text-fg3" />}
-            </div>
+            <ChevronRight
+              aria-hidden="true"
+              className="size-3 text-muted-foreground"
+            />
+          )}
+          {activeTeam && (
+            <span className="max-w-40 truncate text-muted-foreground">
+              {activeTeam}
+            </span>
           )}
           {activeBatch && (
-            <motion.span 
-              initial={{ opacity: 0, x: -5 }}
+            <motion.span
+              initial={{ opacity: 0, x: -4 }}
               animate={{ opacity: 1, x: 0 }}
-              className="text-[10px] font-semibold tracking-wide text-fg"
+              className="max-w-52 truncate font-medium text-foreground"
             >
               {activeBatch}
             </motion.span>
           )}
         </nav>
       </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label={
+            theme === "dark" ? "Gunakan tema terang" : "Gunakan tema gelap"
+          }
+          title={
+            theme === "dark" ? "Gunakan tema terang" : "Gunakan tema gelap"
+          }
+          className="min-h-11 min-w-11"
+        >
+          {theme === "dark" ? (
+            <Sun aria-hidden="true" />
+          ) : (
+            <Moon aria-hidden="true" />
+          )}
+        </Button>
 
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="w-8 h-8 flex items-center justify-center rounded-lg bg-surface text-fg2 hover:text-fg hover:bg-background transition-all duration-150 ease-out border border-border focus-visible:outline-none"
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
-        
-        <button
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
           onClick={onToggleSidebar}
-          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-surface text-fg2 hover:text-fg hover:bg-background transition-all duration-150 ease-out border border-border"
+          aria-label="Buka navigasi hierarki"
+          title="Buka navigasi hierarki"
+          className="min-h-11 min-w-11 md:hidden"
         >
-          <Sidebar size={14} />
-        </button>
+          <PanelRight aria-hidden="true" />
+        </Button>
       </div>
     </header>
   );

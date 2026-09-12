@@ -1,15 +1,18 @@
+import {
+  Download,
+  PieChart,
+  Plus,
+  Settings2,
+  SlidersHorizontal,
+  Table2,
+  Upload,
+} from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "framer-motion";
 
-
-import React from 'react';
-import BatchHero from './BatchHero';
-import InsightPanel from './InsightPanel';
-import ActionToolTile from './ActionToolTile';
-import { 
-  Plus, Upload, Table2, SlidersHorizontal, 
-  Download, PieChart, Settings2 
-} from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
-import { motion } from 'framer-motion';
+import ActionToolTile from "./ActionToolTile";
+import BatchHero from "./BatchHero";
+import InsightPanel from "./InsightPanel";
 
 interface Birthday {
   nama: string;
@@ -35,144 +38,212 @@ export default function WorkspaceActiveBatch({
   isReadOnly,
   onPickPeserta,
   upcomingBirthdays,
-  onShowBirthdays
+  onShowBirthdays,
 }: WorkspaceActiveBatchProps) {
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const hasPeserta = count > 0;
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
+  const animationTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.2, ease: "easeOut" as const };
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar relative z-10">
-      <div className="max-w-7xl mx-auto p-8 md:p-12 space-y-12">
-        {/* Hero Section */}
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-          <BatchHero 
+    <div className="relative z-10 h-full overflow-y-auto custom-scrollbar">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 p-4 sm:p-6 lg:p-8">
+        <motion.div
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={animationTransition}
+        >
+          <BatchHero
             name={batchName}
             count={count}
             loading={loadingPeserta}
             isReadOnly={isReadOnly}
-            onAddPeserta={() => navigate({ to: `/profiler/add`, search: { batch: batchName } })}
+            onAddPeserta={() =>
+              navigate({ to: "/profiler/add", search: { batch: batchName } })
+            }
             onPickPeserta={onPickPeserta}
           />
         </motion.div>
 
-        {/* Insight Section */}
         {hasPeserta && (
-          <motion.div variants={item} initial="hidden" animate="show">
-            <InsightPanel 
+          <motion.section
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              ...animationTransition,
+              delay: prefersReducedMotion ? 0 : 0.04,
+            }}
+            aria-labelledby="profiler-batch-insights"
+          >
+            <h2 id="profiler-batch-insights" className="sr-only">
+              Ringkasan batch
+            </h2>
+            <InsightPanel
               upcomingBirthdays={upcomingBirthdays}
               totalPeserta={count}
               batchName={batchName}
               onShowBirthdays={onShowBirthdays}
             />
-          </motion.div>
+          </motion.section>
         )}
 
-        <motion.div 
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-12"
-        >
-          {/* Data Management Section */}
+        <div className="flex flex-col gap-10">
           {!isReadOnly && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-outfit font-bold text-fg">Manajemen Data</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <ActionToolTile 
-                  icon={<Plus size={20} />}
+            <section
+              className="flex flex-col gap-4"
+              aria-labelledby="profiler-data-management"
+            >
+              <SectionHeading
+                id="profiler-data-management"
+                title="Manajemen data"
+                description="Tambahkan peserta baru ke batch aktif."
+              />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <ActionToolTile
+                  icon={<Plus aria-hidden="true" />}
                   accent="primary"
-                  title="Input Manual"
-                  desc="Antarmuka input manual untuk pendaftaran peserta baru satu per satu."
-                  onClick={() => navigate({ to: `/profiler/add`, search: { batch: batchName } })}
+                  title="Input manual"
+                  desc="Isi profil peserta satu per satu melalui formulir."
+                  onClick={() =>
+                    navigate({
+                      to: "/profiler/add",
+                      search: { batch: batchName },
+                    })
+                  }
                 />
-                <ActionToolTile 
-                  icon={<Upload size={20} />}
+                <ActionToolTile
+                  icon={<Upload aria-hidden="true" />}
                   accent="telefun"
-                  title="Impor Data"
-                  desc="Unggah dataset eksternal (Excel) untuk integrasi data massal."
-                  onClick={() => navigate({ to: `/profiler/import`, search: { batch: batchName } })}
+                  title="Impor data"
+                  desc="Unggah file Excel untuk menambahkan banyak peserta sekaligus."
+                  onClick={() =>
+                    navigate({
+                      to: "/profiler/import",
+                      search: { batch: batchName },
+                    })
+                  }
                 />
               </div>
             </section>
           )}
 
-          {/* Analysis & Export Section */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-outfit font-bold text-fg">Analisis & Ekspor</h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <ActionToolTile 
+          <section
+            className="flex flex-col gap-4"
+            aria-labelledby="profiler-analysis"
+          >
+            <SectionHeading
+              id="profiler-analysis"
+              title="Analisis & ekspor"
+              description={
+                hasPeserta
+                  ? "Pilih tampilan yang dibutuhkan untuk batch ini."
+                  : "Tambahkan peserta terlebih dahulu untuk membuka analisis."
+              }
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <ActionToolTile
                 disabled={!hasPeserta}
-                icon={<Table2 size={20} />}
+                icon={<Table2 aria-hidden="true" />}
                 accent="primary"
                 title="Database"
-                desc="Tabel database interaktif untuk audit dan manajemen data."
-                onClick={() => navigate({ to: `/profiler/table`, search: { batch: batchName } })}
+                desc="Kelola dan tinjau data peserta dalam tabel interaktif."
+                onClick={() =>
+                  navigate({
+                    to: "/profiler/table",
+                    search: { batch: batchName },
+                  })
+                }
               />
-              <ActionToolTile 
+              <ActionToolTile
                 disabled={!hasPeserta}
-                icon={<SlidersHorizontal size={20} />}
+                icon={<SlidersHorizontal aria-hidden="true" />}
                 accent="pdkt"
-                title="Slide Profil"
-                desc="Visualisasi profil dalam format slide presentasi otomatis."
-                onClick={() => navigate({ to: `/profiler/slides`, search: { batch: batchName } })}
+                title="Slide profil"
+                desc="Tampilkan profil peserta dalam format presentasi."
+                onClick={() =>
+                  navigate({
+                    to: "/profiler/slides",
+                    search: { batch: batchName },
+                  })
+                }
               />
-              <ActionToolTile 
+              <ActionToolTile
                 disabled={!hasPeserta}
-                icon={<Download size={20} />}
+                icon={<Download aria-hidden="true" />}
                 accent="sidak"
-                title="Ekspor Laporan"
-                desc="Generate dokumen PDF/Excel untuk laporan resmi."
-                onClick={() => navigate({ to: `/profiler/export`, search: { batch: batchName } })}
+                title="Ekspor laporan"
+                desc="Buat laporan PDF atau Excel untuk dibagikan."
+                onClick={() =>
+                  navigate({
+                    to: "/profiler/export",
+                    search: { batch: batchName },
+                  })
+                }
               />
-              <ActionToolTile 
+              <ActionToolTile
                 disabled={!hasPeserta}
-                icon={<PieChart size={20} />}
+                icon={<PieChart aria-hidden="true" />}
                 accent="telefun"
-                title="Statistik Batch"
-                desc="Distribusi data dan statistik demografi batch aktif."
-                onClick={() => navigate({ to: `/profiler/analytics`, search: { batch: batchName } })}
+                title="Statistik batch"
+                desc="Lihat distribusi demografi peserta batch aktif."
+                onClick={() =>
+                  navigate({
+                    to: "/profiler/analytics",
+                    search: { batch: batchName },
+                  })
+                }
               />
             </div>
           </section>
 
-          {/* Configuration Section */}
           {!isReadOnly && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-outfit font-bold text-fg">Konfigurasi</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ActionToolTile 
-                  icon={<Settings2 size={20} />}
+            <section
+              className="flex flex-col gap-4"
+              aria-labelledby="profiler-configuration"
+            >
+              <SectionHeading
+                id="profiler-configuration"
+                title="Konfigurasi"
+                description="Atur struktur tim yang tersedia di Profiler."
+              />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <ActionToolTile
+                  icon={<Settings2 aria-hidden="true" />}
                   accent="slate"
-                  title="Manajemen Tim"
-                  desc="Atur daftar tim dan parameter organisasi modul."
-                  onClick={() => navigate({ to: '/profiler/teams' })}
+                  title="Manajemen tim"
+                  desc="Kelola daftar tim dan struktur organisasi."
+                  onClick={() => navigate({ to: "/profiler/teams" })}
                 />
               </div>
             </section>
           )}
-        </motion.div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function SectionHeading({
+  id,
+  title,
+  description,
+}: {
+  id: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <h2
+        id={id}
+        className="font-outfit text-lg font-semibold tracking-tight text-foreground"
+      >
+        {title}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
