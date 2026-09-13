@@ -6,8 +6,18 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { Phone, Settings, History, Play, BarChart3 } from "lucide-react";
+import { BarChart3, History, LoaderCircle, Play, Settings } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Separator } from "../../components/ui/separator";
 import type { TelefunAppSettings } from "./telefunSettings";
 import {
   DEFAULT_TELEFUN_SETTINGS,
@@ -67,19 +77,18 @@ import {
   reconcileTelefunRecordingQueue,
 } from "./services/telefun-recording-reconciliation";
 
-const accentClassName = "text-violet-600";
-const accentSoftClassName = "bg-violet-100";
-
 const ReviewModal = lazy(() =>
   import("./components/ReviewModal").then((m) => ({ default: m.ReviewModal })),
 );
 
 function TelefunReviewModalFallback() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="rounded-xl border border-border/60 bg-background px-5 py-4 text-sm font-semibold text-muted-foreground shadow-xl">
-        Memuat review...
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
+      <Card className="w-full max-w-sm border-border py-0">
+        <CardContent className="px-5 py-4 text-sm font-semibold text-muted-foreground">
+          Memuat review...
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -813,102 +822,115 @@ export default function TelefunLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="relative z-10"
+            className="relative"
           >
-            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
-              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                {/* Kiri — HP dial 157 */}
-                <div className="flex flex-col">
-                  <div className="flex flex-1 flex-col">
-                    <TelefunMotionFrame />
-                  </div>
-                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi panggilan mirip kondisi nyata. Sesi singkat,
-                    evaluasi terstruktur setelah selesai.
-                  </p>
+            <main className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2 lg:items-stretch lg:px-8 lg:py-10">
+              <div className="flex min-w-0 flex-col">
+                <div className="flex flex-1 flex-col">
+                  <TelefunMotionFrame />
                 </div>
+                <p className="mt-4 text-center text-sm leading-6 text-fg2">
+                  Lihat alur panggilan sebelum memilih skenario latihan.
+                </p>
+              </div>
 
-                {/* Kanan — 1 card */}
-                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
-                  <div className="space-y-4">
-                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
-                      Latih percakapan telepon. Hadapi keluhan dengan lebih
-                      siap.
-                    </h1>
-                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                      Telefun — singkatan dari{" "}
-                      <span className="font-semibold text-foreground">
-                        Telephone Fun
-                      </span>{" "}
-                      — adalah simulasi percakapan telepon berbasis AI untuk
-                      melatih penanganan keluhan secara terarah. Pilih skenario,
-                      lakukan panggilan, lalu tinjau umpan balik setelah sesi.
-                    </p>
-                  </div>
+              <Card className="flex min-w-0 flex-1 flex-col border-border bg-card py-0">
+                <CardHeader className="gap-4 px-7 pt-7 lg:px-8 lg:pt-8">
+                  <CardTitle className="max-w-xl text-3xl font-semibold tracking-tight text-balance">
+                    Latih percakapan telepon. Tanggapi lebih tenang dan terarah.
+                  </CardTitle>
+                  <CardDescription className="max-w-xl text-base leading-7 text-fg2">
+                    Pilih skenario, lakukan panggilan dengan konsumen virtual,
+                    lalu tinjau hasilnya.
+                  </CardDescription>
+                </CardHeader>
 
-                  <div className="mt-8 border-t border-border/40 pt-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Mulai latihan
-                    </p>
-                    <div className="mt-5 space-y-3">
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                <CardContent className="flex flex-1 flex-col px-7 pb-7 lg:px-8 lg:pb-8">
+                  <Separator className="mt-8" />
+                  <div className="pt-6">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <h2 className="text-sm font-semibold text-foreground">
+                        Mulai latihan
+                      </h2>
+                      <span className="text-sm text-fg2">
+                        {
+                          settings.scenarios.filter(
+                            (scenario) => scenario.isActive,
+                          ).length
+                        }{" "}
+                        skenario aktif
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex flex-col gap-3">
+                      <Button
+                        type="button"
+                        size="lg"
                         onClick={requestStartCall}
                         disabled={settingsLoading}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-violet-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-600/20"
+                        className="h-12 w-full justify-start gap-2 bg-module-telefun px-3 text-base font-semibold text-white hover:bg-module-telefun/90"
                       >
                         {settingsLoading ? (
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                          <LoaderCircle
+                            data-icon="inline-start"
+                            className="motion-safe:animate-spin motion-reduce:animate-none"
+                          />
                         ) : (
-                          <Play className="h-4 w-4 fill-current" />
+                          <Play data-icon="inline-start" fill="currentColor" />
                         )}
-                        <span>
-                          {settingsLoading ? "Memulai..." : "Mulai panggilan"}
-                        </span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        {settingsLoading ? "Memulai..." : "Mulai simulasi"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
                         onClick={() => setIsSettingsOpen(true)}
                         disabled={settingsLoading}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="h-12 w-full justify-start gap-2 px-3 text-base"
                       >
-                        <Settings className="h-4 w-4 opacity-60" />
-                        <span>Pengaturan</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        <Settings data-icon="inline-start" />
+                        Pengaturan
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
                         onClick={() => setIsHistoryOpen(true)}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="h-12 w-full justify-start gap-2 px-3 text-base"
                       >
-                        <History className="h-4 w-4 opacity-60" />
-                        <span>Riwayat</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        <History data-icon="inline-start" />
+                        Riwayat
+                        {history.length > 0 ? (
+                          <Badge variant="secondary" className="ml-auto">
+                            {history.length}
+                          </Badge>
+                        ) : null}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="ghost"
                         onClick={() => setIsUsageOpen(true)}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                        className="h-12 w-full justify-start gap-2 px-3 text-base text-foreground"
+                        aria-label="Buka pemakaian bulan ini"
                       >
-                        <BarChart3 className="h-4 w-4 opacity-60" />
-                        <span>Pemakaian bulan ini</span>
+                        <BarChart3 data-icon="inline-start" />
+                        Pemakaian bulan ini
                         {sessionDelta &&
                           (sessionDelta.costIdr > 0 ||
                             sessionDelta.totalTokens > 0 ||
                             sessionDelta.totalCalls > 0) && (
-                            <span className="ml-auto text-xs font-bold text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">
+                            <Badge variant="secondary" className="ml-auto">
                               {formatUsageDeltaLabel(sessionDelta)} sesi
                               terakhir
-                            </span>
+                            </Badge>
                           )}
-                      </motion.button>
+                      </Button>
                     </div>
                   </div>
-                </section>
-              </div>
-            </div>
+                </CardContent>
+              </Card>
+            </main>
           </motion.div>
         )}
 
@@ -918,7 +940,7 @@ export default function TelefunLanding() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950"
+            className="fixed inset-0 z-[100] bg-background"
           >
             <PhoneInterface
               config={activeSessionConfig}

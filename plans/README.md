@@ -30,6 +30,7 @@ honor its STOP conditions, and update your row when done.
 | 020  | Unify AI Pricing Constants (audit 2026-08-23) | P1 | M | —          | DONE   |
 | 021  | Profiler Subroutes shadcn Alignment | P1 | L | 001p | DONE |
 | 022  | KETIK shadcn Alignment | P1 | L | 001 | DONE |
+| 023  | Telefun Readability + UsageModal shadcn | P1 | M | 021, 022 | DONE |
 
 ## Dependency notes
 

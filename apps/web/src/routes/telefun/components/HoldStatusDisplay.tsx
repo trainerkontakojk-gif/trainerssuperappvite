@@ -30,23 +30,23 @@ export function HoldStatusDisplay({
 
   return (
     <div
-      className="flex h-full w-full items-center justify-center rounded-full border-4 border-amber-400 bg-black/65 backdrop-blur-sm"
+      className="flex h-full w-full items-center justify-center rounded-full border-4 border-chart-amber bg-background"
       role="status"
       aria-live={isOvertime ? "assertive" : "polite"}
       aria-label={`Hold ke-${sequence}`}
     >
       <div className="text-center">
         {isOvertime ? (
-          <AlertTriangle className="mx-auto h-7 w-7 text-red-400" />
+          <AlertTriangle className="mx-auto size-7 text-destructive" />
         ) : (
-          <Pause className="mx-auto h-7 w-7 fill-current text-amber-300" />
+          <Pause className="mx-auto size-7 fill-current text-chart-amber" />
         )}
-        <span className="mt-1 block text-xs font-bold text-amber-300">
+        <span className="mt-1 block text-xs font-bold text-chart-amber">
           {isOvertime ? "HOLD MELEWATI BATAS" : "HOLD"}
         </span>
         <div
-          className={`mt-1 text-xl font-mono font-bold ${
-            isOvertime ? "text-red-400" : "text-white"
+          className={`mt-1 font-mono text-xl font-bold ${
+            isOvertime ? "text-destructive" : "text-foreground"
           }`}
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
@@ -54,7 +54,7 @@ export function HoldStatusDisplay({
             ? `+${formatMs(clock.overtimeMs)}`
             : formatMs(clock.remainingMs)}
         </div>
-        <span className="block text-[10px] text-amber-200/70">
+        <span className="block text-xs text-muted-foreground">
           {isOvertime
             ? "Kembali ke konsumen sekarang"
             : isWarning

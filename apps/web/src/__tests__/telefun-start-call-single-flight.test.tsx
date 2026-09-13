@@ -107,7 +107,7 @@ describe("Telefun start-call single-flight", () => {
 
     render(<TelefunLanding />);
     const startButton = await screen.findByRole("button", {
-      name: /Mulai panggilan/i,
+      name: /Mulai simulasi/i,
     });
     await waitFor(() => expect(startButton).not.toBeDisabled());
     await act(async () => {
@@ -137,7 +137,7 @@ describe("Telefun start-call single-flight", () => {
     render(<TelefunLanding />);
 
     const startButton = await screen.findByRole("button", {
-      name: /Mulai panggilan/i,
+      name: /Mulai simulasi/i,
     });
     await waitFor(() => expect(startButton).not.toBeDisabled());
 

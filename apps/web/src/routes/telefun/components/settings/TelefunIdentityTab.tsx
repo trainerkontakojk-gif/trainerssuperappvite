@@ -57,7 +57,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             <h3 className="mb-0.5 text-sm font-bold tracking-tight text-foreground">
               Atur Identitas Simulasi
             </h3>
-            <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+            <p className="text-sm text-muted-foreground font-medium leading-relaxed">
               Konfigurasi identitas persona dan suara untuk model Telefun yang
               dipilih.
             </p>
@@ -68,7 +68,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
       <div className="p-5 rounded-xl border border-border/40 bg-muted/10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
               Nama Konsumen (Lengkap)
             </label>
             <input
@@ -82,7 +82,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             />
           </div>
           <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
               Jenis Kelamin
             </label>
             <div className="relative group">
@@ -120,7 +120,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             </div>
           </div>
           <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
               Pilihan Suara
             </label>
             <div className="relative group">
@@ -162,14 +162,14 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
               </div>
             </div>
             {voiceSelectionDisabled ? (
-              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
                 Suara akan diacak otomatis sesuai hasil penentuan gender saat
                 simulasi.
               </p>
             ) : null}
           </div>
           <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
               Nomor Telepon Konsumen
             </label>
             <input
@@ -183,7 +183,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             />
           </div>
           <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+            <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
               Kota Konsumen
             </label>
             <input

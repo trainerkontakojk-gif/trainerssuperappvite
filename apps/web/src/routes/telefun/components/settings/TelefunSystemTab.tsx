@@ -46,7 +46,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
               <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
                 Model AI untuk Telefun
               </h3>
-              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
                 Pilih model AI yang akan digunakan untuk simulasi voice call.
               </p>
             </div>
@@ -79,14 +79,14 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                       {model.name}
                     </h4>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
+                      className={`px-1.5 py-0.5 rounded text-sm font-bold uppercase tracking-wider border ${
                         "bg-blue-500/10 text-blue-500 border-blue-500/20"
                       }`}
                     >
                       Gemini Live
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground font-medium">
+                  <p className="text-sm text-muted-foreground font-medium">
                     {model.description}
                   </p>
 
@@ -108,7 +108,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         {localSettings.telefunModelWarningReason ? (
           <p
             role="status"
-            className="flex items-start gap-2 text-xs font-medium text-amber-600 dark:text-amber-400"
+            className="flex items-start gap-2 text-sm font-medium text-amber-600 dark:text-amber-400"
           >
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
@@ -137,7 +137,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
               <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
                 Durasi Simulasi
               </h3>
-              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
                 Tentukan batas waktu maksimal untuk setiap sesi simulasi.
               </p>
             </div>
@@ -166,7 +166,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
               <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
                 Tempo Respons Konsumen
               </h3>
-              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
                 Atur kecepatan bicara konsumen: Natural (tempo normal) atau
                 Cepat (respons lebih cepat).
               </p>
@@ -218,7 +218,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                 >
                   {option.label}
                 </span>
-                <span className="text-xs font-medium leading-relaxed text-muted-foreground">
+                <span className="text-sm font-medium leading-relaxed text-muted-foreground">
                   {option.description}
                 </span>
                 <span
@@ -246,7 +246,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
               <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
                 Tantangan Percakapan (Opsional)
               </h3>
-              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
                 Pilih maksimal 3 tantangan. AI akan menggunakannya hanya saat
                 sesuai konteks, sehingga kemunculannya tidak selalu dijamin.
               </p>
@@ -277,7 +277,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                     };
                   });
                 }}
-                className={`flex items-center gap-2 px-3 py-2.5 min-h-11 rounded-lg border text-xs font-semibold transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                className={`flex items-center gap-2 px-3 py-2.5 min-h-11 rounded-lg border text-sm font-semibold transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   isSelected
                     ? "border-primary bg-primary/5 text-primary"
                     : isDisabled
@@ -299,7 +299,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             );
           })}
         </div>
-        <p className="mt-2.5 text-xs text-muted-foreground font-medium">
+        <p className="mt-2.5 text-sm text-muted-foreground font-medium">
           {(localSettings.simulationChallengeTypes || []).length}/3 tantangan
           dipilih
         </p>

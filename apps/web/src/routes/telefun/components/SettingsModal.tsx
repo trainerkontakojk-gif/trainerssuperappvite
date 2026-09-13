@@ -146,7 +146,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Pengaturan Simulasi
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-medium text-foreground/75 uppercase tracking-wide">
+                  <span className="text-sm font-medium text-foreground/75 uppercase tracking-wide">
                     Module Telefun
                   </span>
                 </div>
@@ -174,7 +174,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
+                      className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
                         isActive
                           ? "bg-foreground/5 text-foreground border border-border/50"
                           : "text-foreground/75 hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
@@ -266,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   {isSaving ? "Menyimpan…" : "Simpan Perubahan"}

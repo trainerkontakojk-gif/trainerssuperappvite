@@ -6,7 +6,7 @@ import {
   Pause,
   PhoneOff,
   Play,
-  UserRound,
+  Volume2,
 } from "lucide-react";
 import type { SessionMetrics } from "@trainers/types";
 import {
@@ -29,6 +29,15 @@ import {
 } from "./MicrophoneActivityWaveform";
 import { useMicrophoneActivity } from "./useMicrophoneActivity";
 import { HoldStatusDisplay } from "./HoldStatusDisplay";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../../components/ui/avatar";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent } from "../../../components/ui/card";
+import { getKetikConsumerAvatarUrl } from "../../ketik/lib/ketik-avatar";
 
 type TelefunEndSessionReason = "completed" | "failed" | "timeout";
 
@@ -542,23 +551,36 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
 
   const getVolumeStatus = (volume: number) => {
     if (volume <= 0)
-      return { color: "bg-gray-700/50", label: "Senyap", width: "2%" };
+      return {
+        color: "bg-muted-foreground/30",
+        textColor: "text-muted-foreground",
+        label: "Senyap",
+        width: "2%",
+      };
     if (volume < 10)
-      return { color: "bg-gray-700", label: "Senyap", width: "5%" };
+      return {
+        color: "bg-muted-foreground/60",
+        textColor: "text-muted-foreground",
+        label: "Senyap",
+        width: "5%",
+      };
     if (volume < 35)
       return {
-        color: "bg-emerald-600",
+        color: "bg-module-telefun",
+        textColor: "text-module-telefun",
         label: "Tenang/Netral",
         width: `${Math.max(10, volume)}%`,
       };
     if (volume < 65)
       return {
-        color: "bg-yellow-500",
+        color: "bg-chart-amber",
+        textColor: "text-chart-amber",
         label: "Tegas/Peringatan",
         width: `${volume}%`,
       };
     return {
-      color: "bg-red-500",
+      color: "bg-destructive",
+      textColor: "text-destructive",
       label: "Tinggi/Urgensi",
       width: `${Math.min(100, volume)}%`,
     };
@@ -579,88 +601,94 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         : displayVolume < 65
           ? "warning"
           : "danger";
-  const initials = getInitials(config.consumerName);
   const displayName = config.resolvedIdentity?.name || config.consumerName;
   const displayPhone = config.resolvedIdentity?.phone || "08123456789";
   const displayCity = config.resolvedIdentity?.city || "Jakarta";
+  const initials = getInitials(displayName);
+  const avatarUrl = getKetikConsumerAvatarUrl({
+    name: displayName,
+    phone: displayPhone,
+    city: displayCity,
+    gender: config.resolvedIdentity?.gender,
+  });
 
   // Status card per-state
   let statusText = "Menghubungkan...";
-  let statusBg = "bg-gray-800";
-  let statusTextColor = "text-gray-400";
-  let statusBorder = "border-white/5";
+  let statusBg = "bg-card";
+  let statusTextColor = "text-muted-foreground";
+  let statusBorder = "border-border";
+  let statusIsSpeaking = false;
 
   if (isDisconnecting) {
     statusText = "Mengakhiri panggilan...";
-    statusBg = "bg-red-900/40";
-    statusTextColor = "text-red-400";
-    statusBorder = "border-red-500/30";
+    statusBg = "bg-destructive/10";
+    statusTextColor = "text-destructive";
+    statusBorder = "border-destructive/30";
   } else if (isOnHold) {
     statusText = "Panggilan di-HOLD";
-    statusBg = "bg-yellow-900/40";
-    statusTextColor = "text-yellow-400";
-    statusBorder = "border-yellow-500/30";
+    statusBg = "bg-chart-amber/10";
+    statusTextColor = "text-chart-amber";
+    statusBorder = "border-chart-amber/30";
   } else if (isRinging) {
     statusText = "Memanggil...";
-    statusBg = "bg-blue-900/40";
-    statusTextColor = "text-blue-400";
-    statusBorder = "border-blue-500/30";
+    statusBg = "bg-module-telefun/10";
+    statusTextColor = "text-module-telefun";
+    statusBorder = "border-module-telefun/30";
   } else if (connectionState === "Tersambung" && !terminalFailure && !error) {
     if (isAiSpeaking) {
       statusText = "Konsumen sedang berbicara...";
-      statusBg = "bg-green-900/40";
-      statusTextColor = "text-green-400";
-      statusBorder = "border-green-500/30";
+      statusBg = "bg-module-telefun/10";
+      statusTextColor = "text-module-telefun";
+      statusBorder = "border-module-telefun/30";
+      statusIsSpeaking = true;
     } else {
       statusText = "Konsumen sedang menunggu respon dari anda";
-      statusBg = "bg-[#0f1e18]";
-      statusTextColor = "text-[#4ade80]";
-      statusBorder = "border-[#4ade80]/20";
+      statusBg = "bg-muted";
+      statusTextColor = "text-foreground";
+      statusBorder = "border-border";
     }
   } else if (connectionState === "Selesai") {
     statusText = "Selesai";
-    statusBg = "bg-gray-800";
-    statusTextColor = "text-gray-300";
-    statusBorder = "border-white/10";
+    statusBg = "bg-muted";
+    statusTextColor = "text-foreground";
+    statusBorder = "border-border";
   } else if (terminalFailure || connectionState === "Gagal" || error) {
     statusText = error || connectionState || "Gagal";
-    statusBg = "bg-red-900/50";
-    statusTextColor = "text-red-400";
-    statusBorder = "border-red-500/30";
+    statusBg = "bg-destructive/10";
+    statusTextColor = "text-destructive";
+    statusBorder = "border-destructive/30";
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-[#f7faf8] text-slate-950 transition-colors duration-300 dark:bg-[#06110d] dark:text-white md:flex-row">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(16,185,129,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.78),transparent_44%)] dark:bg-[radial-gradient(circle_at_50%_20%,rgba(16,185,129,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.05),transparent_44%)]" />
-
-      <div className="relative z-10 flex h-full w-full flex-1 flex-col">
-        {/* Timer Badge */}
-        <div className="relative flex shrink-0 items-center justify-between p-4 md:p-8">
-          <div className="flex items-center gap-3 rounded-full border border-emerald-900/10 bg-white/80 px-4 py-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
-            <div
-              className={`h-2.5 w-2.5 rounded-full ${
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background text-foreground md:flex-row">
+      <div className="relative flex h-full w-full flex-1 flex-col">
+        {/* Timer */}
+        <div className="relative flex shrink-0 items-center justify-between border-b border-border px-4 py-3 md:px-8">
+          <Badge
+            variant="outline"
+            className="h-9 gap-2 rounded-lg px-3 text-sm"
+          >
+            <span
+              className={`size-2 rounded-full ${
                 connectionState === "Tersambung"
-                  ? "animate-pulse bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]"
-                  : "bg-rose-500"
+                  ? "bg-module-telefun motion-safe:animate-pulse motion-reduce:animate-none"
+                  : "bg-destructive"
               }`}
             />
-            <Clock3 className="h-4 w-4 text-slate-500 dark:text-white/45" />
-            <span className="font-mono text-sm font-semibold tracking-wide text-slate-700 dark:text-white/80">
+            <Clock3 className="size-4 text-muted-foreground" />
+            <span className="font-mono font-semibold tabular-nums text-foreground">
               {formatTime(callDuration)}
             </span>
-          </div>
+          </Badge>
         </div>
 
         {/* Center Content */}
-        <div className="relative mx-auto flex w-full flex-1 overflow-y-auto px-4 pb-10 md:px-12">
-          <div className="flex min-h-full w-full flex-col items-center justify-center py-6">
+        <div className="relative mx-auto flex w-full flex-1 overflow-y-auto px-4 pb-8 md:px-12">
+          <div className="flex min-h-full w-full flex-col items-center justify-center py-8">
             {/* Avatar */}
-            <div className="relative mb-8">
+            <div className="relative mb-6">
               {isRinging && (
-                <>
-                  <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
-                  <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/10 delay-150" />
-                </>
+                <div className="absolute inset-0 rounded-full border border-module-telefun/30 motion-safe:animate-ping motion-reduce:animate-none" />
               )}
 
               {activeHold && (
@@ -675,53 +703,54 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               )}
 
               <div
-                className={`absolute inset-0 scale-110 rounded-full bg-emerald-500/20 transition-transform duration-300 ${
+                className={`absolute inset-0 scale-110 rounded-full bg-module-telefun/15 transition-[opacity] duration-200 motion-reduce:transition-none ${
                   isAiSpeaking && !isOnHold
-                    ? "animate-ping opacity-40"
+                    ? "opacity-100 motion-safe:animate-pulse motion-reduce:animate-none"
                     : "opacity-0"
                 }`}
               />
 
-              <div
-                className={`relative z-10 flex h-48 w-48 items-center justify-center overflow-hidden rounded-full border border-emerald-950/10 bg-gradient-to-br from-emerald-50 via-white to-teal-100 shadow-[0_28px_90px_rgba(15,23,42,0.16)] transition-all dark:border-white/10 dark:from-emerald-950 dark:via-slate-950 dark:to-teal-950 md:h-72 md:w-72 ${
-                  isOnHold ? "grayscale blur-[1px]" : ""
+              <Avatar
+                size="lg"
+                className={`relative z-10 !size-40 border border-border bg-muted after:!rounded-full sm:!size-48 md:!size-56 ${
+                  isOnHold
+                    ? "grayscale opacity-60"
+                    : "transition-[filter,opacity] duration-200"
                 }`}
               >
-                <div className="absolute inset-5 rounded-full border border-emerald-500/15" />
-                <div className="absolute bottom-0 h-2/5 w-4/5 rounded-t-full bg-emerald-900/10 dark:bg-white/5" />
-                <UserRound className="absolute top-10 h-20 w-20 text-emerald-700/30 dark:text-emerald-200/20 md:top-16 md:h-28 md:w-28" />
-                <span className="relative mt-14 text-5xl font-black tracking-normal text-emerald-900 dark:text-emerald-100 md:mt-20 md:text-7xl">
+                <AvatarImage
+                  src={avatarUrl}
+                  alt={`Foto profil ${displayName}`}
+                  referrerPolicy="no-referrer"
+                />
+                <AvatarFallback className="!rounded-full bg-module-telefun/10 text-4xl font-semibold text-module-telefun md:text-5xl">
                   {initials}
-                </span>
-              </div>
+                </AvatarFallback>
+              </Avatar>
             </div>
 
             {/* Consumer Info */}
-            <h1 className="mb-2 text-center text-3xl font-bold tracking-normal text-slate-950 dark:text-white md:text-5xl">
+            <h1 className="mb-1 max-w-full truncate text-center text-2xl font-semibold text-foreground md:text-4xl">
               {displayName}
             </h1>
-            <p className="mb-8 text-center text-base font-medium text-slate-500 dark:text-white/55 md:text-xl">
-              {displayPhone} / {displayCity}
+            <p className="mb-6 max-w-full truncate text-center text-sm text-muted-foreground md:text-base">
+              {displayPhone} <span aria-hidden="true">·</span> {displayCity}
             </p>
 
             {/* Volume Indicator */}
             {!isOnHold && connectionState === "Tersambung" && (
-              <div className="mb-8 flex w-full max-w-sm flex-col gap-1 md:max-w-md">
-                <div className="mb-1 flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/45">
+              <div className="mb-6 flex w-full max-w-sm flex-col gap-2 md:max-w-md">
+                <div className="flex items-center justify-between gap-3 text-sm font-medium text-muted-foreground">
                   <span>Indikator Input Suara Anda</span>
-                  <span
-                    className={volStatus.color
-                      .replace("bg-", "text-")
-                      .replace("/50", "")}
-                  >
+                  <span className={volStatus.textColor}>
                     {isMuted ? "Mic Mute" : volStatus.label}
                   </span>
                 </div>
-                <div className="relative h-2 overflow-hidden rounded-full border border-emerald-950/10 bg-slate-950/10 dark:border-white/10 dark:bg-white/10">
-                  <div className="absolute bottom-0 left-[33%] top-0 w-px bg-white/25" />
-                  <div className="absolute bottom-0 left-[66%] top-0 w-px bg-white/25" />
+                <div className="relative h-2 overflow-hidden rounded-full border border-border bg-muted">
+                  <div className="absolute bottom-0 left-[33%] top-0 w-px bg-border" />
+                  <div className="absolute bottom-0 left-[66%] top-0 w-px bg-border" />
                   <div
-                    className={`h-full rounded-full shadow-[0_0_14px_rgba(16,185,129,0.25)] transition-all duration-100 ease-out ${volStatus.color}`}
+                    className={`h-full rounded-full transition-[width] duration-100 ease-out motion-reduce:transition-none ${volStatus.color}`}
                     style={{
                       width: isMuted ? "5%" : volStatus.width,
                     }}
@@ -736,39 +765,44 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             )}
 
             {/* Status Card */}
-            <div
-              className={`w-full max-w-md rounded-3xl border px-8 py-6 text-center shadow-lg backdrop-blur-md transition-all duration-300 md:max-w-2xl ${statusBg} ${statusBorder}`}
+            <Card
+              className={`w-full max-w-xl border py-0 transition-colors duration-200 ${statusBg} ${statusBorder}`}
             >
-              <p
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-                className={`text-base md:text-xl font-semibold ${statusTextColor} animate-pulse`}
-              >
-                {statusText}
-              </p>
-              {playbackBlocked && !isDisconnecting && (
-                <button
-                  type="button"
-                  onClick={() => void retryAudioPlayback()}
-                  className="mt-3 rounded-md border border-current px-3 py-2 text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+              <CardContent className="flex flex-col items-center gap-3 px-5 py-4 text-center md:px-6 md:py-5">
+                <p
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className={`text-sm font-semibold md:text-base ${statusTextColor} ${statusIsSpeaking ? "motion-safe:animate-pulse motion-reduce:animate-none" : ""}`}
                 >
-                  Aktifkan audio
-                </button>
-              )}
-              {cleanupRetryable && (
-                <button
-                  ref={cleanupRetryButtonRef}
-                  type="button"
-                  onClick={() => void handleEndCall()}
-                  disabled={isDisconnecting}
-                  aria-busy={isDisconnecting}
-                  className="mt-3 min-h-11 rounded-md border border-current px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Coba lagi mengakhiri panggilan
-                </button>
-              )}
-            </div>
+                  {statusText}
+                </p>
+                {playbackBlocked && !isDisconnecting && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void retryAudioPlayback()}
+                  >
+                    <Volume2 data-icon="inline-start" />
+                    Aktifkan audio
+                  </Button>
+                )}
+                {cleanupRetryable && (
+                  <Button
+                    ref={cleanupRetryButtonRef}
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => void handleEndCall()}
+                    disabled={isDisconnecting}
+                    aria-busy={isDisconnecting}
+                  >
+                    Coba lagi mengakhiri panggilan
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Hold warnings are handled by HoldStatusDisplay phase */}
           </div>
@@ -776,91 +810,80 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       </div>
 
       {/* Control Bar */}
-      <div
-        className="
-        shrink-0 z-20
-        bg-white/88 dark:bg-slate-950/82 backdrop-blur-md border-t border-slate-950/10 dark:border-white/10 md:border-t-0 md:border-l
-        flex
-        flex-row justify-center items-center gap-6 md:gap-8 py-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]
-        md:flex-col md:justify-center md:px-6 md:py-0 md:w-32 md:pb-6
-      "
-      >
+      <div className="z-20 flex shrink-0 flex-row items-center justify-center gap-6 border-t border-border bg-card px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:w-28 md:flex-col md:gap-7 md:border-l md:border-t-0 md:px-4 md:py-6 md:pb-6">
         {/* Hold Button */}
         <div className="flex flex-col items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant={isOnHold ? "secondary" : "outline"}
+            size="icon-lg"
             onClick={toggleHold}
             disabled={isRinging || isDisconnecting}
-            className={`rounded-full border p-4 shadow-lg transition-all duration-200 md:p-5 ${
-              isOnHold
-                ? "border-amber-400 bg-amber-400 text-black hover:bg-amber-300"
-                : "border-slate-950/10 bg-slate-950/5 text-slate-900 hover:bg-slate-950/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
-            }`}
             title={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
             aria-label={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
             aria-pressed={isOnHold}
+            className="size-14 rounded-full border-foreground/20 text-foreground hover:border-foreground/40 disabled:opacity-80 md:size-16"
           >
             {isOnHold ? (
-              <Play className="h-6 w-6 fill-current md:h-7 md:w-7" />
+              <Play data-icon="inline" className="fill-current" />
             ) : (
-              <Pause className="h-6 w-6 md:h-7 md:w-7" />
+              <Pause data-icon="inline" />
             )}
-          </button>
-          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground hidden md:block">
+          </Button>
+          <span className="hidden text-sm font-medium text-foreground md:block">
             {isOnHold ? "Kembali" : "Hold"}
           </span>
         </div>
 
         {/* Mic Button */}
         <div className="flex flex-col items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant={isMuted ? "secondary" : "outline"}
+            size="icon-lg"
             onClick={() => {
               if (!isDisconnectingRef.current) {
                 setIsMuted((muted) => !muted);
               }
             }}
             disabled={isOnHold || isRinging || isDisconnecting}
-            className={`rounded-full border p-4 shadow-lg transition-all duration-200 md:p-5 ${
-              isMuted
-                ? "border-slate-950 bg-slate-950 text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-slate-950"
-                : "border-slate-950/10 bg-slate-950/5 text-slate-900 hover:bg-slate-950/10 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
-            }`}
             title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
             aria-label={isMuted ? "Unmute Microphone" : "Mute Microphone"}
             aria-pressed={isMuted}
+            className="size-14 rounded-full border-foreground/20 text-foreground hover:border-foreground/40 disabled:opacity-80 md:size-16"
           >
             {isMuted ? (
-              <MicOff className="h-6 w-6 md:h-7 md:w-7" />
+              <MicOff data-icon="inline" />
             ) : (
-              <Mic className="h-6 w-6 md:h-7 md:w-7" />
+              <Mic data-icon="inline" />
             )}
-          </button>
-          <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground hidden md:block">
+          </Button>
+          <span className="hidden text-sm font-medium text-foreground md:block">
             Mic
           </span>
         </div>
 
         {/* End Call Button */}
         <div className="flex flex-col items-center gap-2">
-          <button
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon-lg"
             onClick={() => !isDisconnecting && handleEndCall()}
             disabled={isDisconnecting}
-            className={`rounded-full border p-5 text-white shadow-xl shadow-red-900/30 transition-all md:p-6 ${
-              isDisconnecting
-                ? "cursor-not-allowed border-red-700 bg-red-800 opacity-50"
-                : "border-red-500 bg-red-600 hover:scale-105 hover:bg-red-700"
-            }`}
             title={isDisconnecting ? "Mengakhiri panggilan..." : "End Call"}
             aria-label={
               isDisconnecting
                 ? "Mengakhiri panggilan, harap tunggu"
                 : "Akhiri panggilan"
             }
+            className="size-16 rounded-full disabled:opacity-80 md:size-[4.5rem]"
           >
-            <PhoneOff className="h-8 w-8 md:h-9 md:w-9" />
-          </button>
+            <PhoneOff data-icon="inline" />
+          </Button>
           <span
-            className={`block text-xs uppercase font-bold tracking-wider ${
-              isDisconnecting ? "text-red-400" : "text-red-500/70"
+            className={`block text-sm font-medium ${
+              isDisconnecting ? "text-fg2" : "text-destructive"
             }`}
           >
             {isDisconnecting ? "Mengakhiri..." : "Hangup"}

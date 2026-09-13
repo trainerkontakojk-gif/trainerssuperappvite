@@ -81,7 +81,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
         <div className="flex items-center gap-2 border-b border-border pb-4">
           <button
             onClick={handleCancelScenarioForm}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Kembali ke Daftar Skenario
@@ -97,7 +97,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
           </div>
           <div className="p-6 space-y-5">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Kategori</label>
+              <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Kategori</label>
               {!isNewCategoryInput ? (
                 <div className="relative group">
                   <select
@@ -134,12 +134,12 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                       scenarioForm.setDraft({ category: e.target.value });
                     }}
                   />
-                  <button onClick={() => setIsNewCategoryInput(false)} className="px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors cursor-pointer">Batal</button>
+                  <button onClick={() => setIsNewCategoryInput(false)} className="px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors cursor-pointer">Batal</button>
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Judul Masalah</label>
+              <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Judul Masalah</label>
               <input
                 type="text"
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
@@ -149,7 +149,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Deskripsi Masalah</label>
+              <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Deskripsi Masalah</label>
               <textarea
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30"
                 rows={3}
@@ -161,8 +161,8 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             <div>
               <div className="flex items-center justify-between gap-4 mb-2">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Skrip Percakapan</label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                  <label className="block text-sm font-medium text-muted-foreground uppercase tracking-wide">Skrip Percakapan</label>
+                  <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">
                     Centang "Ikuti Skrip" agar AI menggunakan draf dialog/alur yang Anda tentukan di bawah.
                   </p>
                 </div>
@@ -176,7 +176,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                       return !prev;
                     });
                   }}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold uppercase tracking-widest transition-all cursor-pointer ${
                     isScenarioScriptEnabled
                       ? 'bg-primary/5 text-primary border-primary/20'
                       : 'bg-transparent text-muted-foreground border-border hover:bg-foreground/5 hover:text-foreground'
@@ -214,11 +214,11 @@ Awal:
               />
             </div>
             <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
-              <button onClick={handleCancelScenarioForm} className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors cursor-pointer">Batal</button>
+              <button onClick={handleCancelScenarioForm} className="px-4 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-foreground/5 transition-colors cursor-pointer">Batal</button>
               <button
                 onClick={handleSaveScenario}
                 disabled={!scenarioForm.draft.title || !scenarioForm.draft.instruction || !(isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category)}
-                className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-5 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 Simpan
               </button>
@@ -236,7 +236,7 @@ Awal:
           <h3 className="font-bold text-foreground text-lg tracking-tight">
             Daftar Skenario
           </h3>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-primary mt-0.5">
+          <p className="text-sm font-medium uppercase tracking-wide text-primary mt-0.5">
             {activeCount} / {totalScenarios} AKTIF
           </p>
         </div>
@@ -245,14 +245,14 @@ Awal:
           <button
             onClick={handleSelectAll}
             disabled={allSelected}
-            className="px-3 py-1.5 border border-border rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            className="px-3 py-1.5 border border-border rounded-md text-sm font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           >
             Pilih Semua
           </button>
           <button
             onClick={handleUnselectAll}
             disabled={noneSelected}
-            className="px-3 py-1.5 border border-border rounded-md text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            className="px-3 py-1.5 border border-border rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           >
             Hapus Semua
           </button>
@@ -288,7 +288,7 @@ Awal:
             {/* Content */}
             <div className="flex-1 min-w-0 relative z-10">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[11px] font-medium">
+                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-xs font-medium">
                   {scenario.category}
                 </span>
                 <h4 className="text-sm font-semibold text-foreground truncate">
