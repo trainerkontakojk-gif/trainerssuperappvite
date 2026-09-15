@@ -56,8 +56,8 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-hidden p-0">
-        <DialogHeader className="border-b border-border px-5 py-5 sm:px-6">
+      <DialogContent className="max-w-lg !flex h-[min(92dvh,52rem)] max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-5 sm:px-6">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <FolderInput className="size-5 text-primary" aria-hidden="true" />
             Pindah folder
@@ -67,7 +67,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-5 py-4 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
           {otherFolders.length === 0 ? (
             <Empty className="border-0 py-10">
               <EmptyHeader>
@@ -159,7 +159,7 @@ export const MoveFolderModal: React.FC<MoveFolderModalProps> = ({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button
             type="button"
             variant="outline"
