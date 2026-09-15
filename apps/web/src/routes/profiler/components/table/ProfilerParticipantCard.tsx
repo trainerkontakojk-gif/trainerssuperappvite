@@ -86,7 +86,7 @@ export const ProfilerParticipantCard: React.FC<
       tabIndex={sortMode ? -1 : 0}
       role="button"
       aria-label={`Buka profil ${p.nama || "peserta"}`}
-      className={`min-w-0 cursor-pointer shadow-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      className={`h-full min-w-0 cursor-pointer shadow-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isDragging
           ? "border-primary/50 bg-primary/5 opacity-50"
           : isDragOver
@@ -96,7 +96,11 @@ export const ProfilerParticipantCard: React.FC<
               : "hover:border-primary/40"
       } ${sortMode ? "cursor-grab" : ""}`}
     >
-      <CardContent className={density === "compact" ? "p-3" : "p-4"}>
+      <CardContent
+        className={`flex flex-1 flex-col ${
+          density === "compact" ? "p-3" : "p-4"
+        }`}
+      >
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             {sortMode ? (
@@ -163,10 +167,14 @@ export const ProfilerParticipantCard: React.FC<
           ) : null}
         </div>
 
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar
             size={density === "compact" ? "default" : "lg"}
-            className={density === "compact" ? undefined : "!size-16"}
+            className={
+              density === "compact"
+                ? "overflow-hidden"
+                : "!size-16 overflow-hidden"
+            }
           >
             {p.foto_url ? (
               <AvatarImage

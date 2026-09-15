@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProfilerPeserta } from "@trainers/types";
 
@@ -45,6 +45,30 @@ describe("ProfilerParticipantCard", () => {
 
     expect(document.querySelector('[data-slot="avatar"]')).not.toHaveClass(
       "!size-16",
+    );
+  });
+
+  it("memotong foto berbingkai agar lingkaran avatar selalu sama ukuran", () => {
+    // Tanpa overflow-hidden, transform scale(zoom) dari photo frame membuat
+    // lingkaran avatar melebar keluar kotak (ada yang besar, ada yang kecil).
+    render(<ProfilerParticipantCard {...defaultProps} density="comfortable" />);
+    expect(document.querySelector('[data-slot="avatar"]')).toHaveClass(
+      "overflow-hidden",
+    );
+    cleanup();
+
+    render(<ProfilerParticipantCard {...defaultProps} density="compact" />);
+    expect(document.querySelector('[data-slot="avatar"]')).toHaveClass(
+      "overflow-hidden",
+    );
+  });
+
+  it("mengisi tinggi grid & menempelkan footer ke dasar kartu", () => {
+    render(<ProfilerParticipantCard {...defaultProps} density="comfortable" />);
+
+    expect(document.querySelector('[data-slot="card"]')).toHaveClass("h-full");
+    expect(document.querySelector('[data-slot="card-content"]')).toHaveClass(
+      "flex-1",
     );
   });
 });

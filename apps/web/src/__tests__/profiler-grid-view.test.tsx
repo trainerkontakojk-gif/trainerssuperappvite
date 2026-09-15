@@ -48,6 +48,8 @@ describe("ProfilerParticipantGrid", () => {
     expect(grid.className).toContain("sm:grid-cols-2");
     expect(grid.className).toContain("lg:grid-cols-3");
     expect(grid.className).toContain("xl:grid-cols-4");
+    // Semua baris grid harus sama tinggi supaya kartu tidak "loncat" antar baris
+    expect(grid.className).toContain("auto-rows-fr");
     expect(screen.getAllByText("Budi")).toHaveLength(1);
     expect(screen.getAllByText("Sari")).toHaveLength(1);
     expect(screen.getAllByTitle("Edit Data")).toHaveLength(2);
