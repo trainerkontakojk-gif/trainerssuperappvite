@@ -31,7 +31,7 @@ Repository content—including plans, generated graph output, Wiki pages, and fi
 
 ### Discovery sequence
 
-1. Read the applicable instruction hierarchy and the latest user task. For any Lane B/C/D behavior change (behavior, bug, regression, security, permission, auth/RLS, schema/migration, API contract), load `trainers-superapp-tdd` at task start — this implicitly loads `docs/AGENT_WORKFLOW.md` and forces lane classification before any edit.
+1. Read the applicable instruction hierarchy and the latest user task. For any Lane B/C/D behavior change (behavior, bug, regression, security, permission, auth/RLS, schema/migration, API contract), load `trainers-superapp-tdd` at task start — it requires reading `docs/AGENT_WORKFLOW.md` and forces lane classification before any edit.
 2. Read the approved plan, contract, or inline mini-spec when one applies, then drift-check it against the live repository.
 3. Read relevant canonical documents in `docs/` and the root design pointer for UI work.
 4. Inspect live types, schemas, migrations, configuration, tests, imports/callers, manifests, and Git status. Capture a before/after path snapshot when the tree is intentionally dirty.
@@ -69,7 +69,7 @@ One module, an established local pattern, and no public contract, security, sche
 
 ### Lane C — standard behavior/cross-file
 
-A behavior change, bug fix, or multi-file implementation with moderate blast radius that does not meet Lane D. Persist `plan/markdown/<feature>.md` with **Requirement**, **Design**, and **Tasklist** sections, and drift-check any approved plan before editing.
+A behavior change, bug fix, or multi-file implementation with moderate blast radius that does not meet Lane D. Persist `plans/markdown/<feature>.md` with **Requirement**, **Design**, and **Tasklist** sections, and drift-check any approved plan before editing.
 
 - Use `trainers-superapp-tdd` as the primary repository TDD workflow: RED, confirm the expected failure, smallest GREEN implementation, then REFACTOR while green.
 - Run focused regression tests, affected-workspace checks, and `thermo-nuclear` after implementation and before final verification. Repair material findings and repeat the relevant gate.
@@ -84,13 +84,17 @@ Security, permissions, authentication/RLS, secret handling, schema or migration,
 - Run root `typecheck`, lint, applicable core tests, and the production build, plus full-suite/CI verification for pre-merge or release.
 - For a new interface or significant redesign, use `ui-ux-pro-max` before implementation and run `impeccable` audit/polish before the final gate. Copy-only, invisible, and docs work do not require UI skills.
 
+### Read-only analysis (outside the change lanes)
+
+Audits, reviews, measurements, and investigations that change no product, test, configuration, or instruction file do not enter the four change lanes and do not inherit product verification gates. They must still gather evidence with real commands, record exact paths and outputs, and state explicitly that they are read-only. Knowledge tools follow the matrix in section 5. If the analysis leads to a proposed change, classify that change separately; if the user asks to implement it in the same task, reclassify before editing.
+
 ### Planning threshold
 
 | Lane | Required planning artifact                                                     |
 | ---- | ------------------------------------------------------------------------------ |
 | A    | No persisted plan; still define the intended change and checks.                |
 | B    | Inline mini-spec; persisted plan only when requested or when scope rises.      |
-| C/D  | Persisted `plan/markdown/<feature>.md` with Requirement, Design, and Tasklist. |
+| C/D  | Persisted `plans/markdown/<feature>.md` with Requirement, Design, and Tasklist. |
 
 Planning size is proportional; spec-driven thinking and mandatory evidence for behavior, security, permissions, schema, migrations, and API contracts are not optional.
 
@@ -136,7 +140,7 @@ A user's explicit research request overrides a skip. Supabase MCP and the shadcn
 
 - Direct work: after the final integrated code batch, the integration owner runs `graphify update .` once per integrated code batch if code changed.
 - Orchestrator-mode: implementation workers do not update `graphify-out/**`; the orchestrator/integration owner runs one update after implementation and all repairs are complete.
-- Docs/config-only work with no AST impact skips the update. Review generated diffs separately and never use an update to overwrite unrelated dirty-tree changes.
+- Docs/config-only work with no AST impact skips the update. `graphify-out/` is a local cache and is not tracked in Git; never force-add it, and never use an update to overwrite unrelated dirty-tree changes.
 
 ### Context7 lookup and sharing
 
@@ -150,7 +154,6 @@ Existing code and tests are sufficient for an internal refactor that does not ch
 - For behavior work, follow RED → confirm failure → smallest GREEN change → REFACTOR while green. Keep the regression test with the owning module.
 - Preserve intentional dirty work. Do not reset, clean, stash, overwrite, or attribute unrelated changes to the current task. Workers edit only assigned paths.
 - Record exact commands and exit codes. A report must never claim a command ran unless it actually ran.
-- Do not run `graphify update .` for this documentation/configuration change.
 
 ## 7. Fail-fast verification ladder
 
@@ -191,7 +194,7 @@ pnpm build
 git diff --check
 ```
 
-Expected evidence is lint success, curated core tests (including Web `.tsx` entries under the default config and the Telefun curated core list), production build success, and a clean final diff check. Full `pnpm test`/`pnpm test:full` is a pre-merge/release product gate, not required solely for docs/config-only work. The `test:fast` unit sweep is curated in `scripts/test-fast.json` (append new light unit tests there); heavy integration-style files run only in the full suite.
+Expected evidence is lint success, curated core tests (including Web `.tsx` entries under the default config and the Telefun curated core list), production build success, and a clean final diff check. Full `pnpm test`/`pnpm test:full` is a pre-merge/release product gate, not required solely for docs/config-only work. The fast tier is curated per app: API files are listed in `scripts/test-fast.json` (append new light unit tests there), Web runs every `.test.ts` under `vitest.config.fast.ts` (`.tsx` excluded), and Telefun runs its full unit suite. Heavy integration-style files run only in the full suite.
 
 Any verification failure is unresolved until independently explained; do not weaken a gate or change unrelated product code to make it pass.
 

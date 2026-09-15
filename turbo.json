@@ -34,11 +34,9 @@
       "cache": true
     },
     "test:core": {
-      "dependsOn": ["^build"],
       "cache": false
     },
     "test:fast": {
-      "dependsOn": ["^build"],
       "cache": true
     },
     "test:full": {

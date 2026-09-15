@@ -33,34 +33,10 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 
 ## Verification navigation
 
-### Focused versus Git-affected tests
+Command meanings only; tier definitions, the fail-fast ladder, and lane exceptions live in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) §7.
 
-A focused loop invokes Vitest with an explicit file and runs that file only. For a Web `.tsx` test, use the default Web config rather than the fast config:
-
-```bash
-pnpm --filter @trainers/api exec vitest run src/__tests__/<file>.test.ts
-pnpm --filter @trainers/web exec vitest run src/__tests__/<file>.test.tsx
-pnpm --filter @trainers/telefun exec vitest run src/<file>.test.ts
-```
-
-The `--changed` task is different: it selects Git-affected work through Turbo. Its scope and duration depend on the breadth of the dirty tree and task graph, so it is not a promise that one named file or a fixed short interval will run.
-
-### Root tooling contract
-
-The root manifests provide these commands without changing the existing test tiers:
-
-```json
-"typecheck": "turbo typecheck",
-"test:affected": "turbo test:targeted"
-```
-
-Use `pnpm test:affected` for the Git-affected loop. `pnpm test:targeted` remains a compatibility name for the same Turbo task, so do not run both as separate evidence; neither replaces an explicit-file focused command. Workspace typechecking uses `tsc --noEmit`, and there is no workspace-level `test:affected` task.
-
-### Common verification references
-
-- `pnpm lint` — root lint gate when the selected lane requires it.
-- `pnpm test:core` — curated cross-module contracts; Web `.tsx` entries must execute under the default configuration.
-- `pnpm build` — production build gate for applicable behavior/release work.
-- `git diff --check` — whitespace and patch hygiene.
-
-The complete fail-fast ladder and lane exceptions are defined only in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md).
+- **Focused** — an explicit Vitest file path runs that file only; use the default Web config for `.tsx`.
+- **`pnpm test:affected`** (`turbo test:targeted`) — Git-affected loop; `test:targeted` is a compatibility name for the same task, so do not run both as separate evidence.
+- **`pnpm test:core`** — curated cross-module contract gate; Web `.tsx` entries execute under the default configuration.
+- **`pnpm test:fast`** — API curated list in `scripts/test-fast.json`, Web fast config, Telefun full unit suite.
+- **`pnpm lint` / `pnpm typecheck` / `pnpm build` / `git diff --check`** — root gates when the selected lane requires them.
