@@ -28,6 +28,9 @@ import {
   isPdfAttachment,
 } from "../utils/detectMimeType";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { Alert, AlertDescription } from "../../../components/ui/alert";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 
 interface EmailDetailPaneProps {
   item: PdktMailboxItem;
@@ -221,7 +224,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   })();
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[var(--surface)] text-[var(--fg)] relative h-full">
+    <section
+      aria-label="Detail email"
+      className="relative flex h-full min-w-0 flex-1 flex-col bg-card text-foreground"
+    >
       {/* Zoomed Image Modal */}
       {zoomedImage && (
         <div
@@ -238,15 +244,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             alt="Zoomed Attachment"
             className="max-w-full max-h-full rounded-xl object-contain ring-1 ring-white/10"
           />
-          <button
+          <Button
             ref={zoomCloseButtonRef}
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setZoomedImage(null)}
             aria-label="Tutup pratinjau lampiran"
-            className="absolute top-6 right-6 min-h-11 min-w-11 text-white/80 hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="absolute right-6 top-6 min-h-11 min-w-11 text-white/80 hover:bg-white/10 hover:text-white"
           >
-            <X className="w-8 h-8" />
-          </button>
+            <X aria-hidden="true" className="size-8" />
+          </Button>
         </div>
       )}
 
@@ -254,15 +262,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       <div className="px-6 py-3 border-b border-[var(--border)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           {onBackToList && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onBackToList}
-              className="min-w-11 min-h-11 -ml-2 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-colors md:hidden mr-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+              className="-ml-2 mr-1 min-h-11 min-w-11 md:hidden"
               title="Kembali ke Daftar Email"
               aria-label="Kembali ke Daftar Email"
             >
-              <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
-            </button>
+              <ArrowLeft aria-hidden="true" />
+            </Button>
           )}
           <div className="flex flex-col">
             <span className="text-xs font-semibold text-[var(--fg3)]">
@@ -284,18 +294,22 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
         <div className="flex items-center gap-2">
           {item.status === "open" && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onReply}
-              className="min-w-11 min-h-11 text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--bg)] rounded-lg transition-all flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+              className="min-h-11 min-w-11"
               title="Balas"
               aria-label="Balas"
             >
-              <Reply className="w-4 h-4" />
-            </button>
+              <Reply aria-hidden="true" />
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={onDelete}
             disabled={item.permissions?.can_delete === false}
             aria-label={
@@ -303,19 +317,15 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                 ? "Tidak memiliki izin menghapus"
                 : "Hapus email"
             }
-            className={`min-h-11 min-w-11 p-2 rounded-xl transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)] ${
-              item.permissions?.can_delete === false
-                ? "text-[var(--fg3)] opacity-40 cursor-not-allowed"
-                : "text-[var(--fg2)] hover:bg-[var(--bg)] hover:text-[var(--destructive)]"
-            }`}
+            className="min-h-11 min-w-11 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
             title={
               item.permissions?.can_delete === false
                 ? "Hanya pembuat email, admin, atau trainer yang bisa menghapus"
                 : "Hapus"
             }
           >
-            <Trash2 className="w-4 h-4" />
-          </button>
+            <Trash2 aria-hidden="true" />
+          </Button>
         </div>
       </div>
 
@@ -394,7 +404,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
         {/* Attachments */}
         {inboundAttachments.length > 0 && (
-          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+          <Card className="rounded-xl border-border bg-muted/30 p-4">
             <div className="flex items-center gap-2 mb-3">
               <Paperclip className="w-3.5 h-3.5 text-[var(--fg2)]" />
               <span className="text-xs font-semibold text-[var(--fg2)]">
@@ -413,47 +423,53 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                 />
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Evaluation Results (if replied) */}
         {item.status === "replied" && (
           <div className="mt-8 pt-6 border-t border-[var(--border)]">
             {isEvaluationProcessing ? (
-              <div className="flex flex-col items-center justify-center p-8 bg-[var(--bg)] rounded-xl border border-[var(--border)]">
-                <Loader2 className="w-8 h-8 text-[var(--module-pdkt)] animate-spin motion-reduce:animate-none mb-3" />
-                <p className="text-xs font-semibold text-[var(--module-pdkt)] animate-pulse motion-reduce:animate-none">
+              <Card
+                className="flex flex-col items-center justify-center border-border bg-muted/30 p-8"
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 className="mb-3 size-8 animate-spin text-primary motion-reduce:animate-none" />
+                <p className="text-xs font-semibold text-primary">
                   Menganalisis Jawaban...
                 </p>
-              </div>
+              </Card>
             ) : isEvaluationNotStarted ? (
-              <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
-                <p className="text-xs font-medium text-[var(--fg2)]">
+              <Card className="border-border bg-muted/30 p-6">
+                <p className="text-xs font-medium text-muted-foreground">
                   Evaluasi belum dimulai.
                 </p>
-              </div>
+              </Card>
             ) : isEvaluationFailed ? (
-              <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-[var(--destructive)]" />
-                    <h3 className="text-xs font-semibold text-[var(--fg)]">
+              <Alert variant="destructive" className="items-start">
+                <AlertCircle aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <h3 className="text-xs font-semibold text-foreground">
                       Evaluasi Gagal
                     </h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRetryEval}
+                      className="min-h-11 gap-1.5 px-3 text-xs font-medium"
+                    >
+                      <RotateCcw aria-hidden="true" />
+                      Coba Lagi
+                    </Button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRetryEval}
-                    className="flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-[var(--border)] text-xs font-medium text-[var(--fg)] hover:bg-[var(--surface)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Coba Lagi
-                  </button>
+                  <AlertDescription className="text-xs leading-relaxed font-medium">
+                    {evalError ||
+                      "Terjadi gangguan saat memproses evaluasi AI."}
+                  </AlertDescription>
                 </div>
-                <p className="text-xs text-[var(--fg2)] leading-relaxed font-medium">
-                  {evalError || "Terjadi gangguan saat memproses evaluasi AI."}
-                </p>
-              </div>
+              </Alert>
             ) : evalData ? (
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
@@ -601,20 +617,21 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             {/* Thread History */}
             {historyEmails.length > 0 && (
               <div className="mt-8 pt-6 border-t border-[var(--border)]">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setShowHistory(!showHistory)}
                   aria-expanded={showHistory}
                   aria-controls="pdkt-thread-history"
-                  className="flex min-h-11 items-center gap-2 text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] transition-colors mb-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+                  className="mb-4 min-h-11 gap-2 px-0 text-xs font-semibold text-muted-foreground hover:text-foreground"
                 >
                   Riwayat Percakapan ({historyEmails.length})
                   {showHistory ? (
-                    <ChevronUp className="w-3.5 h-3.5" />
+                    <ChevronUp aria-hidden="true" />
                   ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
+                    <ChevronDown aria-hidden="true" />
                   )}
-                </button>
+                </Button>
 
                 {showHistory && (
                   <div id="pdkt-thread-history" className="space-y-4">
@@ -656,16 +673,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       {/* Reply Button */}
       {item.status === "open" && !isComposerOpen && (
         <div className="px-6 py-3 border-t border-[var(--border)] shrink-0 bg-[var(--bg)]">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onReply}
-            className="flex min-h-11 items-center gap-2 px-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--fg)] hover:bg-[var(--bg)] active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            className="min-h-11 gap-2 px-4 text-xs font-semibold"
           >
-            <Reply className="w-3.5 h-3.5" />
+            <Reply aria-hidden="true" />
             Balas
-          </button>
+          </Button>
         </div>
       )}
-    </div>
+    </section>
   );
 };

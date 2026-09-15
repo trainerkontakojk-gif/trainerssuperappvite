@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   X,
   User,
@@ -8,7 +8,23 @@ import {
   Save,
   RotateCcw,
 } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { cn } from "cn";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Separator } from "../../../components/ui/separator";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../../../components/ui/tabs";
 import { usePdktSettingsDraft } from "./settings/usePdktSettingsDraft";
 import { PdktSystemTab } from "./settings/PdktSystemTab";
 import { PdktScenariosTab } from "./settings/PdktScenariosTab";
@@ -34,6 +50,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   defaultScenarios,
   defaultConsumerTypes,
 }) => {
+  const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
+
   const {
     activeTab,
     setActiveTab,
@@ -73,60 +93,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     defaultConsumerTypes,
   });
 
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const shouldReduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const frame = requestAnimationFrame(() => {
-      dialogRef.current
-        ?.querySelector<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        )
-        ?.focus();
-    });
-    const getFocusableElements = () => {
-      if (!dialogRef.current) return [] as HTMLElement[];
-      return Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.closest("[hidden]"));
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      const focusableElements = getFocusableElements();
-      if (focusableElements.length === 0) return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (
-        event.shiftKey &&
-        (!active || active === first || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (
-        !event.shiftKey &&
-        (!active || active === last || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
-    };
-  }, [isOpen]);
-
   const requestClose = () => {
     if (isSaving) return;
     if (
@@ -138,16 +104,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") requestClose();
-    };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  });
-
   if (!isOpen) return null;
+
+  // Wizard skenario memakai seluruh area modal, sehingga header, navigasi tab,
+  // dan footer pengaturan disembunyikan selama wizard terbuka.
+  const wizardOpen = scenarioForm.isOpen;
 
   const tabs = [
     { id: "scenarios" as const, label: "Masalah", icon: FileText },
@@ -157,228 +118,184 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ];
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={requestClose}
-            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-          />
-          <motion.div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
-            aria-labelledby={
-              scenarioForm.isOpen
-                ? "scenario-wizard-title"
-                : "settings-modal-title"
-            }
-            initial={
-              shouldReduceMotion
-                ? { opacity: 1 }
-                : { opacity: 0, scale: 0.95, y: 20 }
-            }
-            animate={
-              shouldReduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, scale: 1, y: 0 }
-            }
-            exit={
-              shouldReduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: 0.95, y: 20 }
-            }
-            transition={shouldReduceMotion ? { duration: 0 } : undefined}
-            className={`relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border ${scenarioForm.isOpen ? "fixed inset-0 max-w-none max-h-none min-h-dvh h-dvh rounded-none pb-[env(safe-area-inset-bottom)] sm:relative sm:inset-auto sm:max-w-5xl sm:max-h-[86vh] sm:min-h-0 sm:h-[90vh] sm:rounded-2xl" : ""}`}
-          >
-            {/* Modal Header */}
-            <div
-              hidden={scenarioForm.isOpen}
-              className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card"
-            >
-              <div>
-                <h2
-                  id="settings-modal-title"
-                  className="text-lg sm:text-xl font-bold text-foreground tracking-tight"
-                >
-                  Pengaturan Simulasi
-                </h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-medium text-foreground/75 uppercase tracking-wide">
-                    Module PDKT
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={requestClose}
-                disabled={isSaving}
-                aria-label="Tutup pengaturan"
-                className="min-h-11 min-w-11 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-              {/* Sidebar Navigation */}
-              <div
-                hidden={scenarioForm.isOpen}
-                className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide"
-              >
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      aria-current={isActive ? "page" : undefined}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
-                        isActive
-                          ? "bg-foreground/5 text-foreground border border-border/50"
-                          : "text-foreground/75 hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
-                      }`}
-                    >
-                      <tab.icon className="w-4 h-4 shrink-0" />
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Modal Body */}
-              <div
-                className={`flex-1 overflow-y-auto ${scenarioForm.isOpen ? "flex flex-col p-0" : "px-5 py-6 sm:px-6 bg-background/20"}`}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeTab}
-                    initial={
-                      shouldReduceMotion
-                        ? { opacity: 1 }
-                        : { opacity: 0, y: 10 }
-                    }
-                    animate={
-                      shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
-                    }
-                    exit={
-                      shouldReduceMotion
-                        ? { opacity: 0 }
-                        : { opacity: 0, y: -10 }
-                    }
-                    transition={
-                      shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }
-                    }
+    <div ref={setDialogContainer} className="contents">
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) requestClose();
+        }}
+      >
+        <DialogContent
+          container={dialogContainer}
+          showCloseButton={false}
+          aria-labelledby={
+            wizardOpen ? "scenario-wizard-title" : "settings-modal-title"
+          }
+          className="w-[calc(100vw-2rem)] max-w-5xl sm:max-w-5xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
+        >
+          {wizardOpen ? null : (
+            <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <DialogTitle
+                    id="settings-modal-title"
+                    className="text-lg tracking-tight sm:text-xl"
                   >
-                    {activeTab === "scenarios" && (
-                      <PdktScenariosTab
-                        scenarios={localSettings.scenarios}
-                        consumerTypes={localSettings.consumerTypes}
-                        scenarioForm={scenarioForm}
-                        enableImageGeneration={enableImageGeneration}
-                        setEnableImageGeneration={setEnableImageGeneration}
-                        customIdentity={{
-                          senderName: customSenderName,
-                          bodyName: customBodyName,
-                          email: customEmail,
-                          city: customCity,
-                        }}
-                        globalConsumerTypeId={globalConsumerTypeId}
-                        setGlobalConsumerTypeId={setGlobalConsumerTypeId}
-                        consumerNameMentionPattern={consumerNameMentionPattern}
-                        setConsumerNameMentionPattern={
-                          setConsumerNameMentionPattern
-                        }
-                        selectedModel={selectedModel}
-                        setSelectedModel={setSelectedModel}
-                        writingStyleMode={writingStyleMode}
-                        setWritingStyleMode={setWritingStyleMode}
-                        setLocalSettings={setLocalSettings}
-                      />
-                    )}
-
-                    {activeTab === "consumers" && (
-                      <PdktConsumersTab
-                        consumerTypes={localSettings.consumerTypes}
-                        globalConsumerTypeId={globalConsumerTypeId}
-                        setGlobalConsumerTypeId={setGlobalConsumerTypeId}
-                        consumerForm={consumerForm}
-                        setLocalSettings={setLocalSettings}
-                      />
-                    )}
-
-                    {activeTab === "identity" && (
-                      <PdktIdentityTab
-                        customSenderName={customSenderName}
-                        setCustomSenderName={setCustomSenderName}
-                        customBodyName={customBodyName}
-                        setCustomBodyName={setCustomBodyName}
-                        customEmail={customEmail}
-                        setCustomEmail={setCustomEmail}
-                        customCity={customCity}
-                        setCustomCity={setCustomCity}
-                        consumerNameMentionPattern={consumerNameMentionPattern}
-                        setConsumerNameMentionPattern={
-                          setConsumerNameMentionPattern
-                        }
-                        handleResetDefaults={handleResetDefaults}
-                      />
-                    )}
-
-                    {activeTab === "system" && (
-                      <PdktSystemTab
-                        writingStyleMode={writingStyleMode}
-                        setWritingStyleMode={setWritingStyleMode}
-                        selectedModel={selectedModel}
-                        setSelectedModel={setSelectedModel}
-                      />
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-            </div>
-
-            <div
-              hidden={scenarioForm.isOpen}
-              className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0"
-            >
-              <button
-                type="button"
-                onClick={handleResetDefaults}
-                disabled={isSaving}
-                className="flex items-center gap-2 text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset Default
-              </button>
-              <div className="flex gap-3">
-                <button
+                    Pengaturan Simulasi
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 text-sm">
+                    Module PDKT
+                  </DialogDescription>
+                </div>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-lg"
                   onClick={requestClose}
                   disabled={isSaving}
-                  className="min-h-11 px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Tutup pengaturan"
                 >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="min-h-11 px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
-                </button>
+                  <X data-icon="inline" />
+                </Button>
               </div>
+            </DialogHeader>
+          )}
+
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              if (value) {
+                setActiveTab(value as typeof activeTab);
+              }
+            }}
+            orientation="vertical"
+            className="min-h-0 flex-1 flex-col md:flex-row"
+          >
+            <TabsList
+              variant="line"
+              className={cn(
+                "w-full shrink-0 justify-start overflow-x-auto rounded-none border-b bg-muted/20 p-2 md:w-52 md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:p-3",
+                wizardOpen && "hidden",
+              )}
+            >
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className="min-h-11 justify-start px-3 py-2.5 text-left"
+                >
+                  <tab.icon aria-hidden="true" className="size-4 shrink-0" />
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <div
+              className={cn(
+                "min-h-0 flex-1",
+                wizardOpen
+                  ? "flex flex-col overflow-hidden"
+                  : "overflow-y-auto px-5 py-6 sm:px-6",
+              )}
+            >
+              <TabsContent value="scenarios">
+                <PdktScenariosTab
+                  scenarios={localSettings.scenarios}
+                  consumerTypes={localSettings.consumerTypes}
+                  scenarioForm={scenarioForm}
+                  enableImageGeneration={enableImageGeneration}
+                  setEnableImageGeneration={setEnableImageGeneration}
+                  customIdentity={{
+                    senderName: customSenderName,
+                    bodyName: customBodyName,
+                    email: customEmail,
+                    city: customCity,
+                  }}
+                  globalConsumerTypeId={globalConsumerTypeId}
+                  setGlobalConsumerTypeId={setGlobalConsumerTypeId}
+                  consumerNameMentionPattern={consumerNameMentionPattern}
+                  setConsumerNameMentionPattern={setConsumerNameMentionPattern}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  writingStyleMode={writingStyleMode}
+                  setWritingStyleMode={setWritingStyleMode}
+                  setLocalSettings={setLocalSettings}
+                />
+              </TabsContent>
+
+              <TabsContent value="consumers">
+                <PdktConsumersTab
+                  consumerTypes={localSettings.consumerTypes}
+                  globalConsumerTypeId={globalConsumerTypeId}
+                  setGlobalConsumerTypeId={setGlobalConsumerTypeId}
+                  consumerForm={consumerForm}
+                  setLocalSettings={setLocalSettings}
+                />
+              </TabsContent>
+
+              <TabsContent value="identity">
+                <PdktIdentityTab
+                  customSenderName={customSenderName}
+                  setCustomSenderName={setCustomSenderName}
+                  customBodyName={customBodyName}
+                  setCustomBodyName={setCustomBodyName}
+                  customEmail={customEmail}
+                  setCustomEmail={setCustomEmail}
+                  customCity={customCity}
+                  setCustomCity={setCustomCity}
+                  consumerNameMentionPattern={consumerNameMentionPattern}
+                  setConsumerNameMentionPattern={setConsumerNameMentionPattern}
+                />
+              </TabsContent>
+
+              <TabsContent value="system">
+                <PdktSystemTab
+                  writingStyleMode={writingStyleMode}
+                  setWritingStyleMode={setWritingStyleMode}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                />
+              </TabsContent>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+          </Tabs>
+
+          {wizardOpen ? null : (
+            <>
+              <Separator />
+              <DialogFooter className="mx-0 mb-0 shrink-0 flex-row items-center justify-between rounded-none border-0 bg-card px-5 py-4 sm:justify-between sm:px-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleResetDefaults}
+                  disabled={isSaving}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <RotateCcw data-icon="inline-start" />
+                  Reset Default
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={requestClose}
+                    disabled={isSaving}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                  >
+                    <Save data-icon="inline-start" />
+                    {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };

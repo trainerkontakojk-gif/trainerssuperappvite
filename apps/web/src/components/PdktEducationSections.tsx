@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { ListChecks, FileEdit, Copy, Check } from "lucide-react";
-import type {
-  PdktDimensionKey,
-  PdktEvaluationEdu,
-} from "@trainers/types";
+import type { PdktDimensionKey, PdktEvaluationEdu } from "@trainers/types";
+import { Button } from "./ui/button";
 
 /**
  * Evaluasi Edukatif PDKT — action items (priorityRank dari backend),
@@ -15,8 +13,9 @@ import type {
 function CopyInlineButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       aria-label={copied ? "Tersalin" : "Salin"}
       onClick={async () => {
         try {
@@ -27,7 +26,7 @@ function CopyInlineButton({ text }: { text: string }) {
           // clipboard unavailable
         }
       }}
-      className="inline-flex items-center gap-1 h-9 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg)] text-[10px] font-bold uppercase tracking-wider text-[var(--fg3)] hover:text-[var(--fg)] transition-colors"
+      className="min-h-11 gap-1 rounded-md px-2.5 text-[10px] font-bold uppercase tracking-wider"
     >
       {copied ? (
         <Check className="w-3 h-3 text-emerald-500" />
@@ -35,7 +34,7 @@ function CopyInlineButton({ text }: { text: string }) {
         <Copy className="w-3 h-3" />
       )}
       {copied ? "Tersalin" : "Salin"}
-    </button>
+    </Button>
   );
 }
 
@@ -57,7 +56,10 @@ export function PdktActionItemsCard({
       </h4>
       <ol className="space-y-2">
         {ranked.map((item) => (
-          <li key={`${item.priorityRank}-${item.dimension}`} className="flex gap-2.5 items-start">
+          <li
+            key={`${item.priorityRank}-${item.dimension}`}
+            className="flex gap-2.5 items-start"
+          >
             <span className="mt-0.5 w-5 h-5 shrink-0 rounded-md bg-amber-500 text-white flex items-center justify-center text-[10px] font-black">
               {item.priorityRank}
             </span>
@@ -66,7 +68,7 @@ export function PdktActionItemsCard({
                 {item.text}
               </p>
               {item.example && (
-                <blockquote className="mt-1 text-xs italic text-[var(--fg2)] bg-emerald-500/5 border-l-2 border-emerald-500/50 pl-2 py-1 rounded-r">
+                <blockquote className="mt-1 rounded-md border border-emerald-500/30 bg-emerald-500/5 py-1 pl-2 text-xs italic text-[var(--fg2)]">
                   {item.example}
                 </blockquote>
               )}
@@ -103,7 +105,10 @@ export function PdktSuggestedRewriteCard({
       </p>
       <div className="mt-3">
         <CopyInlineButton
-          text={[rewrite.subject ? `Subjek: ${rewrite.subject}` : "", rewrite.body]
+          text={[
+            rewrite.subject ? `Subjek: ${rewrite.subject}` : "",
+            rewrite.body,
+          ]
             .filter(Boolean)
             .join("\n")}
         />

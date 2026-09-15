@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
 import type { PricingEntry } from "./PricingTab";
 
 const REALTIME_RATE_FIELDS = [
@@ -109,24 +111,26 @@ export function PricingRow({
         <td className="px-6 py-3.5 text-center">
           {editing && !isHistorical ? (
             <div className="flex justify-center gap-1.5">
-              <button
+              <Button
                 type="button"
                 onClick={save}
-                className="min-h-11 rounded-md bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="min-h-11 px-3 text-[11px]"
               >
                 Simpan
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
                 onClick={cancel}
-                className="min-h-11 rounded-md bg-muted px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="min-h-11 px-3 text-[11px]"
               >
                 Batal
-              </button>
+              </Button>
             </div>
           ) : isHistorical ? null : (
-            <button
+            <Button
               type="button"
+              variant="secondary"
               aria-expanded={isRealtime ? editing : undefined}
               aria-controls={
                 isRealtime
@@ -134,10 +138,10 @@ export function PricingRow({
                   : undefined
               }
               onClick={() => setEditing(true)}
-              className="min-h-11 rounded-md bg-secondary px-3 text-[11px] font-semibold text-foreground hover:bg-secondary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-h-11 px-3 text-[11px]"
             >
               Edit
-            </button>
+            </Button>
           )}
         </td>
       </tr>
@@ -186,14 +190,14 @@ function RateInput({
   fullWidth?: boolean;
 }) {
   return (
-    <input
+    <Input
       aria-label={label}
       type="number"
       min={0}
       step="any"
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}
-      className={`min-h-11 rounded-md border border-border bg-background px-2 text-right text-xs font-semibold outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/30 ${fullWidth ? "w-full" : "w-24"}`}
+      className={`min-h-11 rounded-lg border-input bg-background px-2 text-right text-xs font-semibold ${fullWidth ? "w-full" : "w-24"}`}
     />
   );
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { Check, Edit2, Trash2, Plus, Image as ImageIcon } from "lucide-react";
-import { motion } from "framer-motion";
 import { PdktScenario } from "@trainers/types";
+import { Button } from "../../../../../components/ui/button";
 
 interface ScenarioListProps {
   scenarios: PdktScenario[];
@@ -37,138 +37,131 @@ export function ScenarioList({
   onAdd,
 }: ScenarioListProps) {
   return (
-    <div className="space-y-6">
-      {/* Control Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4 mt-2">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 border-b border-border pb-4">
         <div>
-          <h3 className="font-bold text-foreground text-lg tracking-tight">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Daftar Skenario
           </h3>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-primary mt-0.5">
-            {activeCount} / {totalScenarios} AKTIF
+          <p className="mt-1 text-xs text-muted-foreground">
+            {activeCount} dari {totalScenarios} skenario aktif dipakai saat
+            membuat email baru.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleImageGeneration}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                enableImageGeneration
-                  ? "bg-primary border-primary/20 text-primary-foreground"
-                  : "bg-transparent border-border text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-              }`}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={enableImageGeneration ? "secondary" : "outline"}
+            aria-pressed={enableImageGeneration}
+            onClick={onToggleImageGeneration}
+          >
+            <ImageIcon data-icon="inline-start" />
+            {enableImageGeneration ? "Gambar AI aktif" : "Gambar AI nonaktif"}
+          </Button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSelectAll}
+              disabled={allSelected}
             >
-              <ImageIcon className="w-3.5 h-3.5" />
-              {enableImageGeneration ? "AI Gambar Aktif" : "AI Gambar Mati"}
-            </button>
-            {enableImageGeneration && (
-              <span className="text-[11px] text-muted-foreground hidden lg:inline max-w-[200px] leading-tight">
-                AI generate gambar jika tidak ada lampiran manual.
-              </span>
-            )}
+              Aktifkan Semua
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onUnselectAll}
+              disabled={noneSelected}
+            >
+              Nonaktifkan Semua
+            </Button>
           </div>
-          <div className="h-4 w-px bg-border hidden sm:block" />
-          <button
-            onClick={onSelectAll}
-            disabled={allSelected}
-            className="px-3 py-1.5 border border-border rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          >
-            Pilih Semua
-          </button>
-          <button
-            onClick={onUnselectAll}
-            disabled={noneSelected}
-            className="px-3 py-1.5 border border-border rounded-md text-[13px] font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          >
-            Hapus Semua
-          </button>
         </div>
       </div>
 
-      {/* Scenario List */}
-      <div className="grid grid-cols-1 gap-3">
+      <ul className="flex flex-col gap-3">
         {scenarios.map((scenario) => (
-          <motion.div
-            layout
+          <li
             key={scenario.id}
-            className={`flex items-start p-4 rounded-xl border transition-all relative overflow-hidden ${
-              scenario.isActive
-                ? "bg-card border-border/80"
-                : "bg-card/40 border-border/30 opacity-85 hover:opacity-100"
-            }`}
+            className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20"
           >
-            {/* Checkbox Toggle */}
-            <div className="pt-0.5 mr-3 shrink-0">
-              <button
-                onClick={() => onToggleScenario(scenario.id)}
-                className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
-                  scenario.isActive
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "border-border hover:border-foreground/30 bg-transparent text-transparent"
-                }`}
-              >
-                {scenario.isActive && (
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                )}
-              </button>
-            </div>
+            <Button
+              type="button"
+              variant={scenario.isActive ? "default" : "outline"}
+              size="icon-lg"
+              aria-pressed={scenario.isActive}
+              aria-label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} skenario ${scenario.title}`}
+              onClick={() => onToggleScenario(scenario.id)}
+              className={scenario.isActive ? "" : "text-muted-foreground"}
+            >
+              {scenario.isActive ? (
+                <Check data-icon="inline" />
+              ) : (
+                <span aria-hidden="true" className="size-4" />
+              )}
+            </Button>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0 relative z-10">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 text-[11px] font-medium">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                   {scenario.category}
                 </span>
-                <h4 className="text-sm font-semibold text-foreground truncate">
+                <h4 className="truncate text-sm font-medium text-foreground">
                   {scenario.title}
                 </h4>
               </div>
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+              <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                 {scenario.description}
               </p>
-              {scenario.attachmentImages && scenario.attachmentImages.length > 0 && (
-                <div className="mt-2.5">
-                  <span className="text-[11px] bg-foreground/5 text-muted-foreground px-2 py-1 rounded-md inline-flex items-center gap-1.5 font-medium border border-border/50">
-                    <ImageIcon className="w-3.5 h-3.5 text-primary" />
-                    {scenario.attachmentImages?.length} Lampiran
-                  </span>
-                </div>
-              )}
+              {scenario.attachmentImages &&
+                scenario.attachmentImages.length > 0 && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ImageIcon aria-hidden="true" className="size-3.5" />
+                    {scenario.attachmentImages.length} lampiran
+                  </p>
+                )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-1 ml-3 shrink-0">
-              <button
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
                 onClick={() => onEdit(scenario)}
-                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors border border-transparent hover:border-border cursor-pointer"
+                className="text-muted-foreground hover:text-foreground"
                 title="Edit"
+                aria-label={`Edit ${scenario.title}`}
               >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-              <button
+                <Edit2 data-icon="inline" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
                 onClick={() => onDelete(scenario.id)}
-                className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors border border-transparent hover:border-destructive/20 cursor-pointer"
+                className="text-muted-foreground hover:text-destructive"
                 title="Hapus"
+                aria-label={`Hapus ${scenario.title}`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                <Trash2 data-icon="inline" />
+              </Button>
             </div>
-          </motion.div>
+          </li>
         ))}
+      </ul>
 
-        {!isOpen && (
-          <button
-            onClick={onAdd}
-            className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-sm font-medium">
-              Tambah Skenario Baru
-            </span>
-          </button>
-        )}
-      </div>
+      {!isOpen && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onAdd}
+          className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
+        >
+          <Plus data-icon="inline" />
+          <span className="text-sm font-medium">Tambah Skenario Baru</span>
+        </Button>
+      )}
     </div>
   );
 }

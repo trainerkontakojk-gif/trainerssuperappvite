@@ -1,6 +1,23 @@
-import React, { useEffect, useRef } from "react";
-import { X, Play, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { X, AlertCircle, Loader2 } from "lucide-react";
 import type { PdktScenario } from "@trainers/types";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import { Separator } from "../../../components/ui/separator";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "../../../components/ui/empty";
 
 interface CreateEmailModalProps {
   isOpen: boolean;
@@ -17,193 +34,143 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
   onCreate,
   isLoading,
 }) => {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
-    const getFocusableElements = () => {
-      if (!dialogRef.current) return [] as HTMLElement[];
-      return Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.closest("[hidden]"));
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      const focusableElements = getFocusableElements();
-      if (focusableElements.length === 0) return;
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (
-        event.shiftKey &&
-        (!active || active === first || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (
-        !event.shiftKey &&
-        (!active || active === last || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
-    };
-  }, [isOpen]);
+  const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   if (!isOpen) return null;
 
   const activeScenarios = scenarios.filter((s) => s.isActive);
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-      />
-
-      {/* Dialog content */}
-      <div
-        ref={dialogRef}
-        className="relative w-full max-w-lg bg-[var(--surface)] rounded-xl overflow-hidden border border-[var(--border)] transition-all transform scale-100"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pdkt-create-email-title"
-        aria-busy={isLoading}
+    <div ref={setDialogContainer} className="contents">
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
       >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
-          <h3
-            id="pdkt-create-email-title"
-            className="text-sm font-bold text-[var(--fg)]"
-          >
-            Buat Email Baru
-          </h3>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Tutup buat email baru"
-            className="min-h-11 min-w-11 p-2 hover:bg-[var(--bg)] rounded-xl transition-all text-[var(--fg2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {activeScenarios.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <AlertCircle className="w-12 h-12 text-[var(--fg3)] mb-3" />
-              <p className="text-xs text-[var(--fg2)] leading-loose">
-                Tidak ada skenario aktif.
-                <br />
-                Harap aktifkan skenario di Pengaturan.
-              </p>
+        <DialogContent
+          container={dialogContainer}
+          aria-labelledby="pdkt-create-email-title"
+          aria-busy={isLoading}
+          showCloseButton={false}
+          className="w-[calc(100vw-2rem)] max-w-lg sm:max-w-lg flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
+        >
+          <DialogHeader className="shrink-0 gap-1 border-b border-border px-5 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle
+                  id="pdkt-create-email-title"
+                  className="text-lg tracking-tight"
+                >
+                  Buat Email Baru
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm">
+                  Setiap skenario aktif dibuat sebagai email terpisah. Pilih
+                  satu skenario untuk memulai sesi.
+                </DialogDescription>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                onClick={onClose}
+                aria-label="Tutup buat email baru"
+              >
+                <X data-icon="inline" />
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold text-[var(--fg3)] uppercase tracking-wider mb-4">
-                Pilih Skenario Sesuai Masalah
-              </p>
-              <p className="text-[10px] text-[var(--fg2)] leading-relaxed mb-3">
-                Setiap skenario aktif dibuat sebagai email terpisah. Pilih satu
-                skenario saat Create Email.
-              </p>
-              {activeScenarios.map((scenario) => {
-                const isAlways =
-                  (scenario as any).alwaysUseSampleEmail &&
-                  (scenario as any).sampleEmailTemplate?.body;
-                const hasTemplate = (scenario as any).sampleEmailTemplate?.body;
+          </DialogHeader>
 
-                return (
-                  <button
-                    key={scenario.id}
-                    type="button"
-                    onClick={() => onCreate(scenario)}
-                    disabled={isLoading}
-                    className="w-full flex items-start gap-4 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--module-pdkt)] hover:bg-[var(--bg)] text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    <div className="shrink-0 w-10 h-10 rounded-xl bg-[var(--module-pdkt-bg)] flex items-center justify-center text-[var(--module-pdkt)] group-hover:bg-[var(--module-pdkt)] group-hover:text-[var(--inv-fg)] transition-colors">
-                      <Play className="w-4 h-4 fill-current" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="text-xs font-bold text-[var(--fg)] truncate">
-                          {scenario.title}
-                        </div>
-                        {isAlways ? (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[7px] font-bold uppercase tracking-wider shrink-0">
-                            Always use
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            {activeScenarios.length === 0 ? (
+              <Empty className="border">
+                <EmptyHeader>
+                  <AlertCircle aria-hidden="true" />
+                  <EmptyTitle>Tidak ada skenario aktif</EmptyTitle>
+                  <EmptyDescription>
+                    Aktifkan minimal satu skenario pada menu Pengaturan sebelum
+                    membuat email baru.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ul className="flex flex-col gap-2.5">
+                {activeScenarios.map((scenario) => {
+                  const hasTemplate = Boolean(
+                    (scenario as any).sampleEmailTemplate?.body,
+                  );
+                  const alwaysUsesTemplate =
+                    Boolean((scenario as any).alwaysUseSampleEmail) &&
+                    hasTemplate;
+
+                  return (
+                    <li key={scenario.id}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => onCreate(scenario)}
+                        disabled={isLoading}
+                        className="h-auto min-h-20 w-full flex-col items-stretch justify-start gap-1.5 whitespace-normal px-4 py-3 text-left"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-foreground">
+                            {scenario.title}
                           </span>
-                        ) : hasTemplate ? (
-                          <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 text-[7px] font-bold uppercase tracking-wider shrink-0">
-                            Template tersedia
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-[7px] font-bold uppercase tracking-wider shrink-0">
-                            AI generated
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[var(--fg2)] line-clamp-2 leading-relaxed">
-                        {scenario.description}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                          <Badge
+                            variant={
+                              alwaysUsesTemplate ? "secondary" : "outline"
+                            }
+                            className="shrink-0"
+                          >
+                            {alwaysUsesTemplate
+                              ? "Template tetap"
+                              : hasTemplate
+                                ? "Template tersedia"
+                                : "Dibuat AI"}
+                          </Badge>
+                        </span>
+                        <span className="line-clamp-2 text-xs leading-relaxed font-normal text-muted-foreground">
+                          {scenario.description}
+                        </span>
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <Separator />
+          <DialogFooter className="mx-0 mb-0 shrink-0 flex-row items-center justify-end rounded-none border-0 bg-card px-5 py-4 sm:px-6">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
+              className="min-h-11"
+            >
+              Batal
+            </Button>
+          </DialogFooter>
+
+          {isLoading && (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/80"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2
+                aria-hidden="true"
+                className="size-6 animate-spin text-module-pdkt motion-reduce:animate-none"
+              />
+              <span className="text-sm font-medium text-foreground">
+                Menghasilkan email...
+              </span>
             </div>
           )}
-        </div>
-
-        <div className="px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)] flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-11 px-6 py-2 rounded-xl text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--surface)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-          >
-            Batal
-          </button>
-        </div>
-
-        {isLoading && (
-          <div
-            className="absolute inset-0 bg-[var(--surface)]/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-10"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="h-8 w-8 animate-spin motion-reduce:animate-none rounded-full border-2 border-[var(--module-pdkt)]/30 border-t-[var(--module-pdkt)] mb-3" />
-            <span className="text-xs font-bold text-[var(--module-pdkt)] animate-pulse motion-reduce:animate-none">
-              Menghasilkan Email...
-            </span>
-          </div>
-        )}
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

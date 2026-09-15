@@ -11,6 +11,8 @@ import {
   CheckSquare,
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
 
 function formatCreatorLabel(item: PdktMailboxItem) {
   const creator = item.created_by_user;
@@ -91,90 +93,106 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   return (
     <aside
       aria-label="Mailbox"
-      className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0"
+      className="w-full shrink-0 border-r border-border bg-card md:w-80"
     >
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-[var(--border)] space-y-4">
+      <div className="space-y-4 border-b border-border p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[var(--fg)] flex items-center gap-2">
-            <Inbox className="w-4 h-4 text-[var(--fg2)]" />
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Inbox
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
             Mailbox
           </h2>
           <div className="flex items-center gap-1">
             {isBulkMode ? (
               <div className="flex items-center gap-1">
                 {selectedBulkIds.size > 0 && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={onBulkDelete}
-                    className="min-w-11 min-h-11 rounded-lg border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--destructive)] flex items-center justify-center transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+                    className="min-h-11 min-w-11 text-destructive hover:bg-destructive/10"
                     title={`Hapus ${selectedBulkIds.size} email terpilih`}
                     aria-label={`Hapus ${selectedBulkIds.size} email terpilih`}
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <Trash2 aria-hidden="true" />
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={onToggleBulkMode}
-                  className="min-h-11 px-3 text-xs font-semibold border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--fg)] rounded-lg transition-all"
+                  className="min-h-11 px-3 text-xs font-semibold"
                 >
                   Batal
-                </button>
+                </Button>
               </div>
             ) : (
               <>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={onToggleBulkMode}
-                  className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                  className="min-h-11 min-w-11"
                   title="Pilih Banyak"
                   aria-label="Pilih Banyak"
                 >
-                  <CheckSquare className="w-4 h-4" />
-                </button>
+                  <CheckSquare aria-hidden="true" />
+                </Button>
                 {onSettings && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={onSettings}
-                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-h-11 min-w-11"
                     title="Pengaturan"
                     aria-label="Pengaturan"
                   >
-                    <Settings className="w-4 h-4" />
-                  </button>
+                    <Settings aria-hidden="true" />
+                  </Button>
                 )}
                 {onHistory && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={onHistory}
-                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-h-11 min-w-11"
                     title="Riwayat"
                     aria-label="Riwayat"
                   >
-                    <History className="w-4 h-4" />
-                  </button>
+                    <History aria-hidden="true" />
+                  </Button>
                 )}
                 {onUsage && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={onUsage}
-                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-h-11 min-w-11"
                     title="Usage Bulan Ini"
                     aria-label="Usage Bulan Ini"
                   >
-                    <BarChart3 className="w-4 h-4" />
-                  </button>
+                    <BarChart3 aria-hidden="true" />
+                  </Button>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="icon"
                   onClick={onNew}
-                  className="min-w-11 min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] flex items-center justify-center transition-all hover:bg-[var(--bg)] active:scale-95 ml-1"
+                  className="ml-1 min-h-11 min-w-11"
                   title="Buat Simulasi"
                   aria-label="Buat Simulasi"
                 >
-                  <Plus className="w-4 h-4" />
-                </button>
+                  <Plus aria-hidden="true" />
+                </Button>
               </>
             )}
           </div>
@@ -182,36 +200,39 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
 
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--fg3)] group-focus-within:text-[var(--fg)] transition-colors" />
-          <input
+          <Input
             type="text"
             aria-label="Cari email"
             placeholder="Cari email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full min-h-11 bg-[var(--bg)] border border-[var(--border)] rounded-lg py-2.5 pl-9 pr-4 text-xs text-[var(--fg)] focus:border-[var(--fg)] outline-none transition-all placeholder:text-[var(--fg3)]"
+            className="min-h-11 rounded-lg border-input bg-background pl-9 text-xs"
           />
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex p-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
+        <div
+          role="group"
+          aria-label="Filter mailbox"
+          className="flex w-full rounded-lg border border-border bg-muted p-1"
+        >
           {[
             { id: "all", label: "Semua" },
             { id: "open", label: "Belum Dibalas" },
             { id: "replied", label: "Terbalas" },
           ].map((tab) => (
-            <button
+            <Button
               key={tab.id}
               type="button"
-              onClick={() => onFilterChange(tab.id as any)}
+              variant={filter === tab.id ? "secondary" : "ghost"}
               aria-pressed={filter === tab.id}
-              className={`flex-1 min-h-11 py-1.5 text-[11px] font-medium rounded-md transition-all ${
-                filter === tab.id
-                  ? "bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)]"
-                  : "text-[var(--fg2)] hover:text-[var(--fg)]"
-              }`}
+              onClick={() =>
+                onFilterChange(tab.id as "all" | "open" | "replied")
+              }
+              className="min-h-11 flex-1 rounded-md px-1.5 text-[11px]"
             >
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -227,13 +248,14 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                 : "Kotak Masuk Kosong"}
             </p>
             {!(search || filter !== "all") && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onNew}
-                className="mt-4 min-h-11 px-3 text-xs font-medium text-[var(--fg)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition-all"
+                className="mt-4 min-h-11 text-xs"
               >
                 Buat Email Pertama
-              </button>
+              </Button>
             )}
           </div>
         ) : (

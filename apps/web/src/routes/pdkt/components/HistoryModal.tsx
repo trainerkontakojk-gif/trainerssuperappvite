@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   X,
   Trash2,
@@ -6,8 +6,6 @@ import {
   Clock,
   History as HistoryIcon,
   Eye,
-  User,
-  Tag,
   Loader2,
   AlertTriangle,
   Download,
@@ -19,6 +17,22 @@ import type {
   SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "../../../components/ui/empty";
 
 export interface SessionHistory {
   id: string;
@@ -30,8 +44,8 @@ export interface SessionHistory {
     scenarios: PdktScenario[];
     consumerType: PdktConsumerType;
     writingStyleMode?: "realistic" | "training";
-  };
-  emails: PdktMailboxItem[];
+  } | null;
+  emails: Array<PdktMailboxItem | { subject?: string | null } | null> | null;
   evaluation: any;
   evaluationStatus:
     | "not_started"
@@ -42,6 +56,43 @@ export interface SessionHistory {
   evaluationError?: string | null;
   timeTaken?: number | null;
   simulationSubject?: SimulationSubjectSnapshot | null;
+}
+
+function getSessionEmails(
+  session: SessionHistory,
+): Array<{ subject?: unknown }> {
+  return Array.isArray(session.emails)
+    ? (session.emails.filter(Boolean) as Array<{ subject?: unknown }>)
+    : [];
+}
+
+function getSessionScenarios(session: SessionHistory): PdktScenario[] {
+  const scenarios = (session.config as { scenarios?: unknown } | null)
+    ?.scenarios;
+  return Array.isArray(scenarios) ? (scenarios as PdktScenario[]) : [];
+}
+
+function getSessionConsumerName(session: SessionHistory): string {
+  const name = (
+    session.config as { consumerType?: { name?: unknown } | null } | null
+  )?.consumerType?.name;
+  return typeof name === "string" && name.trim() ? name : "Konsumen";
+}
+
+function statusBadgeClass(session: SessionHistory): string {
+  if (
+    session.evaluationStatus === "processing" ||
+    session.evaluationStatus === "pending"
+  ) {
+    return "border-[var(--chart-amber)]/30 text-[var(--chart-amber)]";
+  }
+  if (session.evaluationStatus === "failed") {
+    return "border-destructive/30 text-destructive";
+  }
+  if (session.evaluationStatus === "completed") {
+    return "border-[var(--chart-green)]/30 text-[var(--chart-green)]";
+  }
+  return "border-border text-muted-foreground";
 }
 
 function csvCell(value: unknown): string {
@@ -71,9 +122,10 @@ function downloadHistory(history: SessionHistory[]): void {
     ],
     ...history.map((session) => {
       const subject = session.simulationSubject;
+      const emails = getSessionEmails(session);
       return [
         new Date(session.timestamp).toISOString(),
-        session.emails.at(-1)?.subject ?? "",
+        String(emails.at(-1)?.subject ?? ""),
         formatSimulationSubjectLabel(subject),
         subject?.type === "participant" ? (subject.batchName ?? "") : "",
         subject?.type === "participant" ? (subject.team ?? "") : "",
@@ -114,326 +166,251 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   onDeleteSession,
   onClearHistory,
 }) => {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const onCloseRef = useRef(onClose);
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
-    const getFocusableElements = () => {
-      if (!dialogRef.current) return [] as HTMLElement[];
-      return Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.closest("[hidden]"));
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      const focusableElements = getFocusableElements();
-      const dialog = dialogRef.current;
-      if (focusableElements.length === 0 || !dialog) return;
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (
-        event.shiftKey &&
-        (!active || active === first || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        last.focus();
-      } else if (
-        !event.shiftKey &&
-        (!active || active === last || !dialog.contains(active))
-      ) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
-    };
-  }, [isOpen]);
+  const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        onClick={() => onCloseRef.current()}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-      />
-
-      {/* Dialog Shell */}
-      <div
-        ref={dialogRef}
-        className="relative w-full max-w-3xl bg-[var(--surface)] rounded-2xl overflow-hidden border border-[var(--border)] flex flex-col h-[85vh] max-h-dvh transition-all transform scale-100"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pdkt-history-title"
+    <div ref={setDialogContainer} className="contents">
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
       >
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-[var(--module-pdkt-bg)] flex items-center justify-center border border-[var(--border)]">
-              <HistoryIcon className="w-5 h-5 text-[var(--module-pdkt)]" />
-            </div>
-            <div>
-              <h3
-                id="pdkt-history-title"
-                className="text-sm font-bold text-[var(--fg)]"
-              >
-                Riwayat Simulasi PDKT
-              </h3>
-              <p className="text-[10px] text-[var(--fg2)] mt-0.5 uppercase tracking-widest font-semibold">
-                {history.length} Sesi PDKT Tersimpan
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-            {history.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => downloadHistory(history)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border)] px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--fg2)] transition-all hover:bg-[var(--bg)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-                  aria-label="Unduh riwayat PDKT CSV"
+        <DialogContent
+          container={dialogContainer}
+          aria-labelledby="pdkt-history-title"
+          showCloseButton={false}
+          className="w-[calc(100vw-2rem)] max-w-3xl sm:max-w-3xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
+        >
+          <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <DialogTitle
+                  id="pdkt-history-title"
+                  className="text-lg tracking-tight"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  Export CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Apakah Anda yakin ingin menghapus semua riwayat?",
-                      )
-                    )
-                      onClearHistory();
-                  }}
-                  className="min-h-11 rounded-lg border border-red-500/20 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-red-700 transition-all hover:bg-red-500/10 hover:border-red-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:text-red-300"
-                >
-                  Hapus Semua
-                </button>
-              </>
-            )}
-            <button
-              ref={closeButtonRef}
-              type="button"
-              onClick={() => onCloseRef.current()}
-              className="min-h-11 min-w-11 rounded-xl p-2 text-[var(--fg2)] transition-all hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-              aria-label="Tutup riwayat PDKT"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 bg-[var(--bg)]">
-          {history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 bg-[var(--bg)] rounded-full flex items-center justify-center mb-4 border border-[var(--border)]">
-                <Clock className="w-8 h-8 text-[var(--fg3)]" />
+                  Riwayat Simulasi PDKT
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm">
+                  {history.length} Sesi PDKT Tersimpan
+                </DialogDescription>
               </div>
-              <h3 className="text-sm font-bold text-[var(--fg)]">
-                Belum Ada Riwayat
-              </h3>
-              <p className="text-[var(--fg2)] text-xs max-w-xs mx-auto mt-1 leading-relaxed">
-                Selesaikan simulasi pertama Anda untuk melihat riwayatnya di
-                sini.
-              </p>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {history.length > 0 && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => downloadHistory(history)}
+                      className="min-h-11"
+                      aria-label="Unduh riwayat PDKT CSV"
+                    >
+                      <Download data-icon="inline-start" />
+                      Export CSV
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            "Apakah Anda yakin ingin menghapus semua riwayat?",
+                          )
+                        )
+                          onClearHistory();
+                      }}
+                      className="min-h-11"
+                    >
+                      Hapus Semua
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={onClose}
+                  aria-label="Tutup riwayat PDKT"
+                >
+                  <X data-icon="inline" />
+                </Button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {history.map((session) => {
-                const score = session.evaluation?.score || 0;
-                const scoreColor =
-                  score >= 80
-                    ? "text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/20"
-                    : score >= 60
-                      ? "text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20"
-                      : "text-red-700 dark:text-red-300 bg-red-500/10 border-red-500/20";
+          </DialogHeader>
 
-                const statusBadge =
-                  session.evaluationStatus === "processing" ||
-                  session.evaluationStatus === "pending"
-                    ? "text-sky-700 dark:text-sky-300 bg-sky-500/10 border-sky-500/20"
-                    : session.evaluationStatus === "failed"
-                      ? "text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/20"
-                      : scoreColor;
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            {history.length === 0 ? (
+              <Empty className="border">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <HistoryIcon aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyTitle>Belum Ada Riwayat</EmptyTitle>
+                  <EmptyDescription>
+                    Selesaikan simulasi pertama Anda untuk melihat riwayatnya di
+                    sini.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {history.map((session) => {
+                  const emails = getSessionEmails(session);
+                  const scenarios = getSessionScenarios(session);
+                  const consumerName = getSessionConsumerName(session);
+                  const score =
+                    typeof session.evaluation?.score === "number"
+                      ? session.evaluation.score
+                      : 0;
+                  const lastEmail = emails[emails.length - 1];
+                  const emailSubject =
+                    typeof lastEmail?.subject === "string" &&
+                    lastEmail.subject.trim()
+                      ? lastEmail.subject
+                      : "Tanpa Subjek";
+                  const simulationSubject = session.simulationSubject;
+                  const subjectLabel =
+                    formatSimulationSubjectLabel(simulationSubject);
+                  const timestamp = new Date(session.timestamp);
 
-                const lastEmail = session.emails[session.emails.length - 1];
-                const emailSubject = lastEmail?.subject || "Tanpa Subjek";
-                const simulationSubject = session.simulationSubject;
-                const subjectLabel = formatSimulationSubjectLabel(simulationSubject);
-
-                return (
-                  <article
-                    key={session.id}
-                    className="relative group bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 transition-all hover:border-[var(--module-pdkt)] overflow-hidden flex flex-col justify-between"
-                  >
-                    <div className="flex justify-between items-start gap-4 mb-3">
-                      <div className="space-y-1.5 min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div
-                            className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border flex items-center gap-1 shrink-0 ${statusBadge}`}
-                          >
-                            {session.evaluationStatus === "processing" ||
-                            session.evaluationStatus === "pending" ? (
-                              <>
-                                <Loader2 className="w-2.5 h-2.5 animate-spin motion-reduce:animate-none" />
-                                Evaluasi
-                              </>
-                            ) : session.evaluationStatus === "failed" ? (
-                              <>
-                                <AlertTriangle className="w-2.5 h-2.5" />
-                                Gagal
-                              </>
-                            ) : session.evaluationStatus === "completed" ? (
-                              <>Skor: {score}</>
-                            ) : (
-                              <>Belum dinilai</>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-[9px] text-[var(--fg3)] font-medium">
-                            <Calendar className="w-3 h-3 shrink-0" />
-                            {new Date(session.timestamp).toLocaleDateString(
-                              "id-ID",
-                              {
+                  return (
+                    <li
+                      key={session.id}
+                      className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <Badge
+                              variant="outline"
+                              className={statusBadgeClass(session)}
+                            >
+                              {session.evaluationStatus === "processing" ||
+                              session.evaluationStatus === "pending" ? (
+                                <>
+                                  <Loader2
+                                    aria-hidden="true"
+                                    className="animate-spin motion-reduce:animate-none"
+                                    data-icon="inline-start"
+                                  />
+                                  Evaluasi berjalan
+                                </>
+                              ) : session.evaluationStatus === "failed" ? (
+                                <>
+                                  <AlertTriangle
+                                    aria-hidden="true"
+                                    data-icon="inline-start"
+                                  />
+                                  Gagal
+                                </>
+                              ) : session.evaluationStatus === "completed" ? (
+                                <>Skor: {score}</>
+                              ) : (
+                                <>Belum dinilai</>
+                              )}
+                            </Badge>
+                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Calendar
+                                aria-hidden="true"
+                                className="size-3.5 shrink-0"
+                              />
+                              {timestamp.toLocaleDateString("id-ID", {
                                 day: "numeric",
                                 month: "short",
                                 year: "numeric",
-                              },
-                            )}
-                            <span className="mx-1">•</span>
-                            {new Date(session.timestamp).toLocaleTimeString(
-                              "id-ID",
-                              { hour: "2-digit", minute: "2-digit" },
-                            )}
+                              })}
+                              <span aria-hidden="true">·</span>
+                              {timestamp.toLocaleTimeString("id-ID", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
                           </div>
-                        </div>
-                        <h4 className="text-xs font-bold leading-tight transition-colors line-clamp-1 text-[var(--fg)] pr-24 sm:pr-12">
+
                           <button
                             type="button"
                             onClick={() => onSelectSession(session)}
-                            className="block max-w-full truncate text-left text-[var(--fg)] hover:text-[var(--module-pdkt)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+                            className="mt-2 block max-w-full truncate text-left text-sm font-medium text-foreground underline-offset-4 outline-none transition-colors hover:text-module-pdkt hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                           >
                             {emailSubject}
                           </button>
-                        </h4>
-                      </div>
 
-                      <div className="absolute right-4 top-4 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                        <button
-                          type="button"
-                          onClick={() => onSelectSession(session)}
-                          className="min-h-11 min-w-11 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-1.5 text-[var(--fg2)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-                          title="Lihat Detail"
-                          aria-label={`Lihat detail ${emailSubject}`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteSession(session.id)}
-                          className="min-h-11 min-w-11 rounded-lg border border-red-500/20 bg-red-500/10 p-1.5 text-red-700 transition-colors hover:bg-red-500/20 hover:text-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 dark:text-red-300 dark:hover:text-red-200"
-                          title="Hapus"
-                          aria-label={`Hapus ${emailSubject}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div
-                      className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border)] min-w-0"
-                      aria-label="Ringkasan sesi"
-                    >
-                      <div className="flex items-center gap-1 text-[9px] text-[var(--fg2)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border)] max-w-[150px] shrink-0">
-                        <User className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">
-                          {session.config.consumerType.name}
-                        </span>
-                      </div>
-                      {session.config.scenarios.slice(0, 2).map((s) => (
-                        <div
-                          key={s.id}
-                          className="flex items-center gap-1 text-[9px] text-[var(--fg2)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border)] max-w-[150px] shrink-0"
-                        >
-                          <Tag className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate">{s.title}</span>
-                        </div>
-                      ))}
-                      {session.config.scenarios.length > 2 && (
-                        <div className="text-[9px] text-[var(--fg3)] font-semibold px-1 py-0.5 shrink-0">
-                          +{session.config.scenarios.length - 2} lainnya
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1 text-[9px] text-[var(--fg2)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border)] max-w-[220px] shrink-0">
-                        <User className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">Target: {subjectLabel}</span>
-                      </div>
-                      {simulationSubject?.type === "participant" && (
-                        <>
-                          {simulationSubject.batchName && (
-                            <span className="text-[9px] text-[var(--fg2)]">
-                              Batch: {simulationSubject.batchName}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span className="truncate">{consumerName}</span>
+                            {scenarios.slice(0, 2).map((scenario) => (
+                              <span key={scenario.id} className="truncate">
+                                {scenario.title}
+                              </span>
+                            ))}
+                            {scenarios.length > 2 && (
+                              <span>+{scenarios.length - 2} lainnya</span>
+                            )}
+                            <span className="truncate">
+                              Target: {subjectLabel}
                             </span>
-                          )}
-                          {simulationSubject.team && (
-                            <span className="text-[9px] text-[var(--fg2)]">
-                              Tim: {simulationSubject.team}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {(session.user_email || session.user_role) && (
-                        <span className="text-[9px] text-[var(--fg2)]">
-                          Pelaksana: {session.user_email || "-"}
-                          {session.user_role ? ` · ${session.user_role}` : ""}
-                        </span>
-                      )}
-                      {session.evaluationStatus === "failed" &&
-                        session.evaluationError && (
-                          <div className="text-[9px] text-red-700 dark:text-red-300 font-semibold max-w-xs truncate shrink-0">
-                            {session.evaluationError}
+                            {(session.user_email || session.user_role) && (
+                              <span className="truncate">
+                                Pelaksana: {session.user_email || "-"}
+                                {session.user_role
+                                  ? ` · ${session.user_role}`
+                                  : ""}
+                              </span>
+                            )}
+                            {session.timeTaken != null && (
+                              <span className="flex items-center gap-1.5">
+                                <Clock
+                                  aria-hidden="true"
+                                  className="size-3.5 shrink-0"
+                                />
+                                {Math.floor(session.timeTaken / 60)}m{" "}
+                                {session.timeTaken % 60}s
+                              </span>
+                            )}
                           </div>
-                        )}
-                      {session.timeTaken != null && (
-                        <div className="flex items-center gap-1 text-[9px] text-[var(--fg2)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border)] ml-auto shrink-0">
-                          <Clock className="w-2.5 h-2.5 shrink-0" />
-                          {Math.floor(session.timeTaken / 60)}m{" "}
-                          {session.timeTaken % 60}s
+
+                          {session.evaluationStatus === "failed" &&
+                            session.evaluationError && (
+                              <p className="mt-2 text-xs text-destructive">
+                                {session.evaluationError}
+                              </p>
+                            )}
                         </div>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onSelectSession(session)}
+                            className="min-h-11"
+                            aria-label={`Lihat detail ${emailSubject}`}
+                          >
+                            <Eye data-icon="inline-start" />
+                            Buka
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            onClick={() => onDeleteSession(session.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label={`Hapus ${emailSubject}`}
+                          >
+                            <Trash2 data-icon="inline" />
+                          </Button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

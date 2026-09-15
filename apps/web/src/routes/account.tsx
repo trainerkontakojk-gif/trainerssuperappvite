@@ -1,5 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { LogOut } from "lucide-react";
+import { AlertCircle, LogOut } from "lucide-react";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Button } from "../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../store/authStore";
 import { accountApi } from "../lib/accountApi";
@@ -21,7 +32,9 @@ export default function AccountPage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revokingSessions, setRevokingSessions] = useState(false);
-  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     async function loadUser() {
@@ -127,126 +140,137 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
-      <header className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-wider text-fg2">
+    <main className="mx-auto w-full max-w-3xl space-y-6">
+      <header className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Akun
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-fg">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Pengaturan profil
         </h1>
-        <p className="mt-2 text-sm text-fg2">
+        <p className="text-sm text-muted-foreground">
           Kelola nama tampilan dan password akun Anda dari satu halaman.
         </p>
       </header>
 
       {error && (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
+        <Alert variant="destructive" className="items-start">
+          <AlertCircle aria-hidden="true" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <section className="rounded-2xl border bg-surface p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-fg">
-          Profil pengguna
-        </h2>
-        <p className="mt-1 text-xs text-fg2">
-          Email login: {loadingProfile ? "Memuat..." : email || "-"}
-        </p>
-        <form onSubmit={handleSaveName} className="mt-5 space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
-              Nama tampil
-            </span>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Masukkan nama"
-              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={savingName || loadingProfile}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+      <Card>
+        <CardHeader>
+          <CardTitle>Profil pengguna</CardTitle>
+          <CardDescription>
+            Email login: {loadingProfile ? "Memuat..." : email || "-"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveName} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-full-name">Nama tampil</Label>
+              <Input
+                id="account-full-name"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Masukkan nama"
+                className="min-h-11"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={savingName || loadingProfile}
+              className="min-h-11"
+            >
+              {savingName ? "Menyimpan..." : "Simpan nama"}
+            </Button>
+            {nameMessage && (
+              <p className="text-sm text-emerald-600" role="status">
+                {nameMessage}
+              </p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ganti password</CardTitle>
+          <CardDescription>
+            Gunakan minimal 6 karakter agar akun tetap aman.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSavePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-new-password">Password baru</Label>
+              <Input
+                id="account-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                className="min-h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-confirm-password">
+                Konfirmasi password
+              </Label>
+              <Input
+                id="account-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="min-h-11"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={savingPassword}
+              className="min-h-11"
+            >
+              {savingPassword ? "Menyimpan..." : "Perbarui password"}
+            </Button>
+            {passwordMessage && (
+              <p className="text-sm text-emerald-600" role="status">
+                {passwordMessage}
+              </p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Keamanan sesi</CardTitle>
+          <CardDescription>
+            Keluar dari browser ini sekarang. Perangkat lain akan diminta login
+            ulang saat sesi mereka dipakai kembali.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleRevokeAllSessions}
+            disabled={revokingSessions}
+            className="min-h-11"
           >
-            {savingName ? "Menyimpan..." : "Simpan nama"}
-          </button>
-          {nameMessage && (
-            <p className="text-sm text-emerald-600">{nameMessage}</p>
-          )}
-        </form>
-      </section>
-
-      <section className="mt-6 rounded-2xl border bg-surface p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-fg">
-          Ganti password
-        </h2>
-        <p className="mt-1 text-xs text-fg2">
-          Gunakan minimal 6 karakter agar akun tetap aman.
-        </p>
-        <form onSubmit={handleSavePassword} className="mt-5 space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
-              Password baru
-            </span>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
-              Konfirmasi password
-            </span>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-          >
-            {savingPassword ? "Menyimpan..." : "Perbarui password"}
-          </button>
-          {passwordMessage && (
-            <p className="text-sm text-emerald-600">{passwordMessage}</p>
-          )}
-        </form>
-      </section>
-
-      <section className="mt-6 rounded-2xl border bg-surface p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-fg">
-          Keamanan sesi
-        </h2>
-        <p className="mt-1 text-xs text-fg2">
-          Keluar dari browser ini sekarang. Perangkat lain akan diminta login
-          ulang saat sesi mereka dipakai kembali.
-        </p>
-
-        <button
-          type="button"
-          onClick={handleRevokeAllSessions}
-          disabled={revokingSessions}
-          className="mt-5 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
-        >
-          <LogOut className="h-4 w-4" />
-          {revokingSessions ? "Memproses..." : "Logout dari Semua Perangkat"}
-        </button>
-
-        {sessionActionError ? (
-          <p className="mt-3 text-sm text-red-600">{sessionActionError}</p>
-        ) : null}
-      </section>
-    </div>
+            <LogOut aria-hidden="true" />
+            {revokingSessions ? "Memproses..." : "Logout dari Semua Perangkat"}
+          </Button>
+          {sessionActionError ? (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              {sessionActionError}
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+    </main>
   );
 }

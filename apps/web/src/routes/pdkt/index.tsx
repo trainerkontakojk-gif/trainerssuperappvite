@@ -3,6 +3,16 @@ import { SimulationSubjectPicker } from "../../components/simulation/SimulationS
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Play, Settings, History, BarChart3 } from "lucide-react";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Separator } from "../../components/ui/separator";
 import { PdktMotionFrame } from "./components/PdktMotionFrame";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
@@ -268,6 +278,7 @@ export default function PdktLanding() {
     await captureUsageBaseline();
     setSessionDelta(null);
     setSessionDeltaPending(true);
+    setReplaySession(null);
     setView("mailbox");
   };
 
@@ -320,12 +331,12 @@ export default function PdktLanding() {
                 </div>
 
                 {/* Kanan — 1 card */}
-                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
-                  <div className="space-y-4">
-                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                <Card className="flex min-w-0 flex-1 flex-col border-border bg-card py-0">
+                  <CardHeader className="gap-4 p-7 lg:p-8">
+                    <CardTitle className="max-w-xl text-3xl tracking-tight text-balance lg:text-4xl">
                       Latih balasan email. Pahami dulu, baru tanggapi.
-                    </h1>
-                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                    </CardTitle>
+                    <CardDescription className="max-w-xl text-base leading-7">
                       PDKT — singkatan dari{" "}
                       <span className="font-semibold text-foreground">
                         Paham Dulu, Kasih Tanggapan
@@ -333,90 +344,69 @@ export default function PdktLanding() {
                       — adalah simulasi balasan email berbasis AI untuk melatih
                       pemahaman, analisa, dan ketepatan solusi. Pilih skenario,
                       susun balasan, lalu tinjau telaah secara langsung.
-                    </p>
-                  </div>
+                    </CardDescription>
+                  </CardHeader>
 
-                  <div className="mt-8 border-t border-border/40 pt-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Mulai latihan
-                    </p>
-                    <div className="mt-5 space-y-3">
-                      <motion.button
-                        whileHover={
-                          shouldReduceMotion
-                            ? undefined
-                            : { scale: 1.01, y: -1 }
-                        }
-                        whileTap={
-                          shouldReduceMotion ? undefined : { scale: 0.99 }
-                        }
-                        type="button"
-                        onClick={handleStartSimulation}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-purple-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/20"
-                      >
-                        <Play className="h-4 w-4 fill-current" />
-                        <span>Mulai simulasi</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={
-                          shouldReduceMotion
-                            ? undefined
-                            : { scale: 1.01, y: -1 }
-                        }
-                        whileTap={
-                          shouldReduceMotion ? undefined : { scale: 0.99 }
-                        }
-                        type="button"
-                        onClick={handleOpenSettings}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                      >
-                        <Settings className="h-4 w-4 opacity-60" />
-                        <span>Pengaturan</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={
-                          shouldReduceMotion
-                            ? undefined
-                            : { scale: 1.01, y: -1 }
-                        }
-                        whileTap={
-                          shouldReduceMotion ? undefined : { scale: 0.99 }
-                        }
-                        type="button"
-                        onClick={handleOpenHistory}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                      >
-                        <History className="h-4 w-4 opacity-60" />
-                        <span>Riwayat</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={
-                          shouldReduceMotion
-                            ? undefined
-                            : { scale: 1.01, y: -1 }
-                        }
-                        whileTap={
-                          shouldReduceMotion ? undefined : { scale: 0.99 }
-                        }
-                        type="button"
-                        onClick={handleOpenUsage}
-                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                      >
-                        <BarChart3 className="h-4 w-4 opacity-60" />
-                        <span>Pemakaian bulan ini</span>
-                        {sessionDelta &&
-                          (sessionDelta.costIdr > 0 ||
-                            sessionDelta.totalTokens > 0 ||
-                            sessionDelta.totalCalls > 0) && (
-                            <span className="ml-auto text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi
-                              terakhir
-                            </span>
-                          )}
-                      </motion.button>
+                  <CardContent className="flex flex-1 flex-col p-7 pt-0 lg:p-8 lg:pt-0">
+                    <Separator className="mt-2" />
+                    <div className="pt-6">
+                      <h3 className="text-sm font-medium text-foreground">
+                        Mulai latihan
+                      </h3>
+                      <div className="mt-4 space-y-3">
+                        <Button
+                          type="button"
+                          size="lg"
+                          onClick={handleStartSimulation}
+                          className="min-h-12 w-full justify-start gap-2.5 bg-module-pdkt px-3 text-sm font-semibold text-white hover:bg-module-pdkt/90"
+                        >
+                          <Play data-icon="inline-start" fill="currentColor" />
+                          Mulai simulasi
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          onClick={handleOpenSettings}
+                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
+                        >
+                          <Settings data-icon="inline-start" />
+                          Pengaturan
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="outline"
+                          onClick={handleOpenHistory}
+                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
+                        >
+                          <History data-icon="inline-start" />
+                          Riwayat
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          variant="ghost"
+                          onClick={handleOpenUsage}
+                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm text-muted-foreground"
+                          aria-label="Buka pemakaian bulan ini"
+                        >
+                          <BarChart3 data-icon="inline-start" />
+                          Pemakaian bulan ini
+                          {sessionDelta &&
+                            (sessionDelta.costIdr > 0 ||
+                              sessionDelta.totalTokens > 0 ||
+                              sessionDelta.totalCalls > 0) && (
+                              <Badge variant="secondary" className="ml-auto">
+                                {formatUsageDeltaLabel(sessionDelta)} sesi
+                                terakhir
+                              </Badge>
+                            )}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </section>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </motion.div>
@@ -432,9 +422,14 @@ export default function PdktLanding() {
             <div className="w-full h-full relative flex flex-col bg-card">
               <PdktSimulation
                 simulationSubject={simulationSubject}
-                onBack={() => setView("home")}
+                onBack={() => {
+                  setView("home");
+                  setReplaySession(null);
+                }}
                 onBeforeActivity={captureUsageBaseline}
                 onAfterActivity={computeUsageDeltaNow}
+                initialReplaySession={replaySession}
+                onConsumeReplaySession={() => setReplaySession(null)}
               />
             </div>
           </motion.div>

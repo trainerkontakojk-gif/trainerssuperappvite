@@ -2,6 +2,16 @@ import { useMemo, useState } from "react";
 import { BarChart3, Search, Clock } from "lucide-react";
 import { formatIdr } from "../utils/formatting";
 import { MODULE_OPTIONS } from "./constants";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/select";
 
 export type UsageAggregation = {
   user_id: string;
@@ -113,7 +123,7 @@ export function UsageTab({
       {/* KPI Summary - Unified 4 Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Aktivitas AI */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+        <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
               Aktivitas AI
@@ -133,10 +143,10 @@ export function UsageTab({
             />
             {aggregation.length} Pengguna Aktif
           </p>
-        </div>
+        </Card>
 
         {/* Card 2: Konsumsi Token */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+        <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
               Konsumsi Token
@@ -148,10 +158,10 @@ export function UsageTab({
           <p className="text-[11px] text-muted-foreground/80 mt-2.5">
             Total Input & Output Tokens
           </p>
-        </div>
+        </Card>
 
         {/* Card 3: Biaya Simulasi */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+        <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Simulasi
@@ -166,10 +176,10 @@ export function UsageTab({
           <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Chat, email, & suara
           </p>
-        </div>
+        </Card>
 
         {/* Card 4: Biaya Penilaian AI */}
-        <div className="bg-card rounded-2xl border border-border/50 p-6 flex flex-col justify-between shadow-sm">
+        <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Penilaian AI
@@ -184,60 +194,80 @@ export function UsageTab({
           <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Evaluasi & analisis AI
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Sleek Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30 p-2 rounded-xl border border-border/40">
+      <Card className="flex flex-col justify-between gap-4 rounded-xl border-border bg-muted/30 p-2 md:flex-row md:items-center">
         <div className="flex items-center gap-2 flex-wrap">
           <label htmlFor="monitoring-usage-month" className="sr-only">
             Bulan
           </label>
-          <select
-            id="monitoring-usage-month"
-            aria-label="Bulan penggunaan"
-            value={month}
-            onChange={(e) => onMonthChange(Number(e.target.value))}
-            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+          <Select
+            value={String(month)}
+            onValueChange={(value) => onMonthChange(Number(value))}
           >
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {new Date(0, i).toLocaleString("id", { month: "long" })}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="monitoring-usage-month"
+              aria-label="Bulan penggunaan"
+              className="min-h-11 min-w-[8rem] rounded-lg border-border bg-background text-xs font-semibold"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => (
+                <SelectItem key={i + 1} value={String(i + 1)}>
+                  {new Date(0, i).toLocaleString("id", { month: "long" })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <label htmlFor="monitoring-usage-year" className="sr-only">
             Tahun
           </label>
-          <select
-            id="monitoring-usage-year"
-            aria-label="Tahun penggunaan"
-            value={year}
-            onChange={(e) => onYearChange(Number(e.target.value))}
-            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+          <Select
+            value={String(year)}
+            onValueChange={(value) => onYearChange(Number(value))}
           >
-            {[2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="monitoring-usage-year"
+              aria-label="Tahun penggunaan"
+              className="min-h-11 min-w-[6.5rem] rounded-lg border-border bg-background text-xs font-semibold"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2025, 2026, 2027].map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <label htmlFor="monitoring-usage-module" className="sr-only">
             Modul
           </label>
-          <select
-            id="monitoring-usage-module"
-            aria-label="Modul penggunaan"
+          <Select
             value={module}
-            onChange={(e) => onModuleChange(e.target.value)}
-            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+            onValueChange={(value) => {
+              if (value) onModuleChange(value);
+            }}
           >
-            {MODULE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="monitoring-usage-module"
+              aria-label="Modul penggunaan"
+              className="min-h-11 min-w-[8rem] rounded-lg border-border bg-background text-xs font-semibold"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODULE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -247,29 +277,30 @@ export function UsageTab({
               aria-hidden="true"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <Input
               type="search"
               aria-label="Cari pengguna penggunaan AI"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari pengguna..."
-              className="min-h-11 w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="min-h-11 w-full rounded-lg border-input bg-background pl-9 pr-3 py-2 text-xs"
             />
           </div>
           {selectedUser && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => setSelectedUser(null)}
-              className="min-h-11 px-2 text-xs text-primary font-semibold hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="min-h-11 px-2 text-xs font-semibold text-primary"
             >
               Semua User
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </Card>
 
       {/* Usage Table */}
-      <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
+      <Card className="overflow-hidden rounded-xl border-border bg-card p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <caption className="sr-only">
@@ -391,11 +422,11 @@ export function UsageTab({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       {/* Per-User Breakdown */}
       {selectedUser && (
-        <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm animate-fade-in">
+        <Card className="animate-fade-in overflow-hidden rounded-xl border-border bg-card p-0">
           <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
             <span className="text-xs font-semibold tracking-tight text-foreground">
               Rincian Per Model untuk User Terpilih
@@ -494,12 +525,12 @@ export function UsageTab({
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* All Models Overview */}
       {!selectedUser && allModels.length > 0 && (
-        <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
+        <Card className="overflow-hidden rounded-xl border-border bg-card p-0">
           <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
             <span className="text-xs font-semibold tracking-tight text-foreground">
               Keseluruhan Penggunaan Per Model AI
@@ -587,7 +618,7 @@ export function UsageTab({
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

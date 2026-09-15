@@ -40,20 +40,20 @@
   --color-inv-fg: var(--inv-fg);
 
   /* Module colors */
-  --color-module-ketik:    var(--module-ketik);
-  --color-module-pdkt:     var(--module-pdkt);
-  --color-module-telefun:  var(--module-telefun);
+  --color-module-ketik: var(--module-ketik);
+  --color-module-pdkt: var(--module-pdkt);
+  --color-module-telefun: var(--module-telefun);
   --color-module-profiler: var(--module-profiler);
-  --color-module-sidak:    var(--module-sidak);
+  --color-module-sidak: var(--module-sidak);
 
   /* Chart colors */
-  --color-chart-blue:      var(--chart-blue);
-  --color-chart-orange:    var(--chart-orange);
-  --color-chart-red:       var(--chart-red);
-  --color-chart-green:     var(--chart-green);
-  --color-chart-amber:     var(--chart-amber);
-  --color-chart-violet:    var(--chart-violet);
-  --color-chart-cyan:      var(--chart-cyan);
+  --color-chart-blue: var(--chart-blue);
+  --color-chart-orange: var(--chart-orange);
+  --color-chart-red: var(--chart-red);
+  --color-chart-green: var(--chart-green);
+  --color-chart-amber: var(--chart-amber);
+  --color-chart-violet: var(--chart-violet);
+  --color-chart-cyan: var(--chart-cyan);
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -70,9 +70,9 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-display: 'Outfit', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+    --font-display: "Outfit", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
 
     /* ── Canonical tokens (from docs/design.md) ──── */
     --bg: #fafafa;
@@ -91,7 +91,7 @@
     --card-foreground: var(--fg);
     --popover: var(--surface);
     --popover-foreground: var(--fg);
-    --primary: var(--inv-bg);          /* Primary action = inverted bg */
+    --primary: var(--inv-bg); /* Primary action = inverted bg */
     --primary-foreground: var(--inv-fg);
     --secondary: var(--surface);
     --secondary-foreground: var(--fg);
@@ -99,7 +99,7 @@
     --muted-foreground: var(--fg3);
     --accent: var(--surface);
     --accent-foreground: var(--fg);
-    --destructive: #DC2626;
+    --destructive: #dc2626;
     --destructive-foreground: #fafafa;
     --input: var(--border);
     --ring: var(--fg);
@@ -110,44 +110,46 @@
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
 
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.05), 0 0 0 1px rgba(0,0,0,.04);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.10), 0 4px 6px -2px rgba(0,0,0,.05);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    --shadow-md:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg:
+      0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 
     /* Custom tokens */
-    --ivory: #FAFAF9;
-    --navy: #1E293B;
+    --ivory: #fafaf9;
+    --navy: #1e293b;
 
     /* ── New Layout Tokens ── */
     --sidebar-width: 280px;
     --sidebar-collapsed-width: 72px;
     --header-height: 56px;
     --content-max-width: 1400px;
-    --surface-elevated: #FFFFFF;
-    --surface-sunken: #F0F0EF;
+    --surface-elevated: #ffffff;
+    --surface-sunken: #f0f0ef;
 
     /* ── Module Identity Colors ──────────────────────── */
     /* Dipakai di dashboard card dan header modul          */
-    --module-ketik:          #3B82F6;   /* blue-500    */
-    --module-ketik-bg:       #3B82F610; /* blue-500/10 */
-    --module-pdkt:           #A855F7;   /* purple-500  */
-    --module-pdkt-bg:        #A855F710;
-    --module-telefun:        #10B981;   /* emerald-500 */
-    --module-telefun-bg:     #10B98110;
-    --module-profiler:       #8B5CF6;   /* violet-500  */
-    --module-profiler-bg:    #8B5CF610;
-    --module-sidak:          #F43F5E;   /* rose-500    */
-    --module-sidak-bg:       #F43F5E10;
+    --module-ketik: #3b82f6; /* blue-500    */
+    --module-ketik-bg: #3b82f610; /* blue-500/10 */
+    --module-pdkt: #a855f7; /* purple-500  */
+    --module-pdkt-bg: #a855f710;
+    --module-telefun: #10b981; /* emerald-500 */
+    --module-telefun-bg: #10b98110;
+    --module-profiler: #8b5cf6; /* violet-500  */
+    --module-profiler-bg: #8b5cf610;
+    --module-sidak: #f43f5e; /* rose-500    */
+    --module-sidak-bg: #f43f5e10;
 
     /* ── Semantic Chart/Status Colors ───────────────────── */
     /* Dipakai di SIDAK charts, section bars, status badges  */
-    --chart-blue:      #3B82F6;
-    --chart-orange:    #F97316;
-    --chart-red:       #EF4444;
-    --chart-green:     #10B981;
-    --chart-amber:     rgb(245, 158, 11);
-    --chart-violet:    #8B5CF6;
-    --chart-cyan:      #06B6D4;
+    --chart-blue: #3b82f6;
+    --chart-orange: #f97316;
+    --chart-red: #ef4444;
+    --chart-green: #10b981;
+    --chart-amber: rgb(245, 158, 11);
+    --chart-violet: #8b5cf6;
+    --chart-cyan: #06b6d4;
   }
 
   .dark {
@@ -170,49 +172,54 @@
     --popover-foreground: var(--fg);
     --primary: var(--inv-bg);
     --primary-foreground: var(--inv-fg);
-    --secondary: #27272A;
+    --secondary: #27272a;
     --secondary-foreground: var(--fg);
     --muted: var(--surface);
     --muted-foreground: var(--fg2);
-    --accent: #27272A;
+    --accent: #27272a;
     --accent-foreground: var(--fg);
-    --destructive: #DC2626;
-    --destructive-foreground: #FEF2F2;
+    --destructive: #dc2626;
+    --destructive-foreground: #fef2f2;
     --input: var(--border);
     --ring: var(--fg);
 
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -1px rgba(255,255,255,.05);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.5), 0 4px 6px -2px rgba(255,255,255,.05);
+    --shadow-sm:
+      0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-md:
+      0 4px 6px -1px rgba(0, 0, 0, 0.4),
+      0 2px 4px -1px rgba(255, 255, 255, 0.05);
+    --shadow-lg:
+      0 10px 15px -3px rgba(0, 0, 0, 0.5),
+      0 4px 6px -2px rgba(255, 255, 255, 0.05);
 
     /* Custom tokens */
     --gold: rgb(245, 158, 11);
-    --gold-muted: #D97706;
+    --gold-muted: #d97706;
 
     /* ── New Layout Tokens ── */
-    --surface-elevated: #1F1F23;
+    --surface-elevated: #1f1f23;
     --surface-sunken: #111113;
 
     /* ── Module Identity Colors (dark) ────────────────── */
-    --module-ketik:          #3B82F6;
-    --module-ketik-bg:       #3B82F615;
-    --module-pdkt:           #A855F7;
-    --module-pdkt-bg:        #A855F715;
-    --module-telefun:        #10B981;
-    --module-telefun-bg:     #10B98115;
-    --module-profiler:       #8B5CF6;
-    --module-profiler-bg:    #8B5CF615;
-    --module-sidak:          #F43F5E;
-    --module-sidak-bg:       #F43F5E15;
+    --module-ketik: #3b82f6;
+    --module-ketik-bg: #3b82f615;
+    --module-pdkt: #a855f7;
+    --module-pdkt-bg: #a855f715;
+    --module-telefun: #10b981;
+    --module-telefun-bg: #10b98115;
+    --module-profiler: #8b5cf6;
+    --module-profiler-bg: #8b5cf615;
+    --module-sidak: #f43f5e;
+    --module-sidak-bg: #f43f5e15;
 
     /* ── Semantic Chart/Status Colors ────────────────── */
-    --chart-blue:      #3B82F6;
-    --chart-orange:    #F97316;
-    --chart-red:       #EF4444;
-    --chart-green:     #10B981;
-    --chart-amber:     rgb(245, 158, 11);
-    --chart-violet:    #8B5CF6;
-    --chart-cyan:      #06B6D4;
+    --chart-blue: #3b82f6;
+    --chart-orange: #f97316;
+    --chart-red: #ef4444;
+    --chart-green: #10b981;
+    --chart-amber: rgb(245, 158, 11);
+    --chart-violet: #8b5cf6;
+    --chart-cyan: #06b6d4;
   }
 }
 
@@ -228,14 +235,16 @@
     color: var(--foreground);
     @apply antialiased;
     font-family: var(--font-sans), system-ui, sans-serif;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 }
 
 @layer utilities {
   /* ── Sidebar Rail ──────────────── */
   .sidebar-rail {
-    width: var(--sidebar-collapsed-width);  /* 72px from Plan 001 */
+    width: var(--sidebar-collapsed-width); /* 72px from Plan 001 */
     background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex;
@@ -281,7 +290,7 @@
     overflow: hidden;
     background: var(--bg);
     border-right: 1px solid var(--border);
-    transition: width 0.2s ease, opacity 0.15s ease;
+    transition: opacity 0.15s ease;
     opacity: 0;
     z-index: 19;
   }
@@ -343,62 +352,77 @@
 
   .module-clean-app {
     --module-clean-accent: var(--primary);
-    --module-clean-accent-soft: color-mix(in srgb, var(--module-clean-accent) 12%, transparent);
-    --module-clean-accent-border: color-mix(in srgb, var(--module-clean-accent) 24%, var(--border));
-    --module-clean-surface: color-mix(in srgb, var(--card) 94%, var(--background));
-    --module-clean-surface-muted: color-mix(in srgb, var(--card) 82%, var(--background));
-    --module-clean-shadow: color-mix(in srgb, var(--module-clean-accent) 10%, rgba(15, 23, 42, 0.14));
+    --module-clean-accent-soft: color-mix(
+      in srgb,
+      var(--module-clean-accent) 12%,
+      transparent
+    );
+    --module-clean-accent-border: color-mix(
+      in srgb,
+      var(--module-clean-accent) 24%,
+      var(--border)
+    );
+    --module-clean-surface: color-mix(
+      in srgb,
+      var(--card) 94%,
+      var(--background)
+    );
+    --module-clean-surface-muted: color-mix(
+      in srgb,
+      var(--card) 82%,
+      var(--background)
+    );
   }
 
-  .module-clean-app[data-module='ketik'] {
+  .module-clean-app[data-module="ketik"] {
     --module-clean-accent: var(--module-ketik);
   }
 
-  .module-clean-app[data-module='pdkt'] {
+  .module-clean-app[data-module="pdkt"] {
     --module-clean-accent: var(--module-pdkt);
   }
 
-  .module-clean-app[data-module='profiler'] {
+  .module-clean-app[data-module="profiler"] {
     --module-clean-accent: var(--module-profiler);
   }
 
-  .module-clean-app[data-module='qa-analyzer'] {
+  .module-clean-app[data-module="qa-analyzer"] {
     --module-clean-accent: var(--module-sidak);
   }
 
-  .module-clean-app[data-module='telefun'] {
+  .module-clean-app[data-module="telefun"] {
     --module-clean-accent: var(--module-telefun);
   }
 
   .module-clean-stage {
-    background:
-      radial-gradient(circle at top right, color-mix(in srgb, var(--module-clean-accent) 10%, transparent), transparent 34%),
-      linear-gradient(180deg, color-mix(in srgb, var(--background) 82%, white 18%), var(--background));
+    background: var(--background);
   }
 
   .dark .module-clean-stage {
-    background:
-      radial-gradient(circle at top right, color-mix(in srgb, var(--module-clean-accent) 18%, transparent), transparent 36%),
-      linear-gradient(180deg, color-mix(in srgb, var(--background) 92%, white 8%), var(--background));
+    background: var(--background);
   }
 
   .module-clean-shell {
     background: var(--module-clean-surface);
-    border: 1px solid color-mix(in srgb, var(--border) 88%, var(--module-clean-accent) 12%);
-    box-shadow:
-      0 24px 60px -24px rgba(15, 23, 42, 0.28),
-      0 8px 24px -18px var(--module-clean-shadow);
+    border: 1px solid var(--border);
   }
 
   .module-clean-panel {
     background: var(--module-clean-surface-muted);
-    border: 1px solid color-mix(in srgb, var(--border) 90%, var(--module-clean-accent) 10%);
-    box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.18);
+    border: 1px solid var(--border);
   }
 
   .module-clean-toolbar {
-    background: color-mix(in srgb, var(--module-clean-surface) 92%, var(--background));
-    border-color: color-mix(in srgb, var(--border) 90%, var(--module-clean-accent) 10%);
+    background: color-mix(
+      in srgb,
+      var(--module-clean-surface) 92%,
+      var(--background)
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--border) 90%,
+      var(--module-clean-accent) 10%
+    );
   }
 
   .module-clean-chip {
@@ -410,44 +434,52 @@
   .module-clean-button-primary {
     background: var(--module-clean-accent);
     color: white;
-    box-shadow: 0 18px 35px -24px color-mix(in srgb, var(--module-clean-accent) 60%, black 40%);
   }
 
   .module-clean-button-secondary {
-    background: color-mix(in srgb, var(--module-clean-surface-muted) 92%, var(--background));
-    color: color-mix(in srgb, var(--foreground) 72%, var(--module-clean-accent) 28%);
-    border: 1px solid color-mix(in srgb, var(--border) 88%, var(--module-clean-accent) 12%);
+    background: color-mix(
+      in srgb,
+      var(--module-clean-surface-muted) 92%,
+      var(--background)
+    );
+    color: color-mix(
+      in srgb,
+      var(--foreground) 72%,
+      var(--module-clean-accent) 28%
+    );
+    border: 1px solid
+      color-mix(in srgb, var(--border) 88%, var(--module-clean-accent) 12%);
   }
 
   .module-clean-input-shell {
-    background: color-mix(in srgb, var(--module-clean-surface) 86%, var(--background));
-    border: 1px solid color-mix(in srgb, var(--border) 86%, var(--module-clean-accent) 14%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+    background: var(--module-clean-surface);
+    border: 1px solid var(--border);
   }
 
   .module-clean-modal {
     --tw-backdrop-blur: initial;
   }
 
-  .module-clean-modal [style*='backdrop-filter'],
-  .module-clean-modal [class*='backdrop-blur'] {
+  .module-clean-modal [style*="backdrop-filter"],
+  .module-clean-modal [class*="backdrop-blur"] {
     backdrop-filter: none !important;
   }
 
   .module-clean-modal-shell {
     background: var(--module-clean-surface);
-    border: 1px solid color-mix(in srgb, var(--border) 86%, var(--module-clean-accent) 14%);
-    box-shadow: 0 32px 80px -34px rgba(15, 23, 42, 0.35);
+    border: 1px solid var(--border);
   }
 
   .module-clean-overlay {
-    background: color-mix(in srgb, var(--background) 66%, rgba(15, 23, 42, 0.45));
+    background: color-mix(
+      in srgb,
+      var(--background) 66%,
+      rgba(15, 23, 42, 0.45)
+    );
   }
 
   .module-clean-hero-icon {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--module-clean-accent) 92%, white 8%), color-mix(in srgb, var(--module-clean-accent) 82%, black 18%));
-    box-shadow: 0 20px 44px -28px color-mix(in srgb, var(--module-clean-accent) 60%, black 40%);
+    background: var(--module-clean-accent-soft);
   }
 
   /* ── Bento Grid Layout ── */
@@ -470,28 +502,17 @@
   }
 
   .bento-card {
-    background-color: var(--surface);
-    border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-    border-radius: 1.5rem;
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 1.5rem;
     position: relative;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 24px -12px rgba(0, 0, 0, 0.05);
-  }
-
-  .bento-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
-    pointer-events: none;
+    transition: border-color 150ms ease;
   }
 
   .bento-card:hover {
-    border-color: color-mix(in srgb, var(--fg) 15%, var(--border));
-    box-shadow: 0 8px 32px -12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    border-color: var(--foreground);
   }
 
   .bento-col-span-2 {
@@ -516,11 +537,32 @@
 }
 
 /* Custom Scrollbar for a premium feel */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); opacity: 0.5; }
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  opacity: 0.5;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

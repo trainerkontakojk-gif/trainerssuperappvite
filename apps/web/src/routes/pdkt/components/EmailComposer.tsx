@@ -1,5 +1,6 @@
 import React from "react";
 import { ReplyComposer } from "./ReplyComposer";
+import { Card } from "../../../components/ui/card";
 
 interface EmailComposerProps {
   mailboxId: string;
@@ -23,7 +24,7 @@ export const EmailComposer: React.FC<EmailComposerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 bg-[var(--surface)] border-t border-[var(--border)] pt-3 transform translate-y-0 transition-transform duration-300 ease-in-out">
+    <Card className="absolute inset-x-0 bottom-0 z-30 rounded-none border-x-0 border-b-0 border-border bg-card pt-3 transition-transform duration-300 ease-in-out">
       <ReplyComposer
         mailboxId={mailboxId}
         recipient={recipient}
@@ -32,6 +33,6 @@ export const EmailComposer: React.FC<EmailComposerProps> = ({
         onClose={onClose}
         isLoading={isLoading}
       />
-    </div>
+    </Card>
   );
 };

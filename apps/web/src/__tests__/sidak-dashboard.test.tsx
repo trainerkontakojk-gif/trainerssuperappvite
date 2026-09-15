@@ -186,12 +186,21 @@ describe("SIDAK dashboard legacy parity", () => {
 
     render(<SidakDashboardPage />);
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    expect(selects[0]).toHaveValue("call");
-    expect(selects[1]).toHaveValue("ALL");
-    expect(selects[2]).toHaveValue("2026");
-    expect(selects[3]).toHaveValue("1");
-    expect(selects[4]).toHaveValue("5");
+    expect(screen.getByRole("combobox", { name: "Layanan" })).toHaveTextContent(
+      "Call",
+    );
+    expect(screen.getByRole("combobox", { name: "Tim" })).toHaveTextContent(
+      "Semua Tim",
+    );
+    expect(screen.getByRole("combobox", { name: "Tahun" })).toHaveTextContent(
+      "2026",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Bulan awal" }),
+    ).toHaveTextContent("Januari");
+    expect(
+      screen.getByRole("combobox", { name: "Bulan akhir" }),
+    ).toHaveTextContent("Mei");
 
     const leaderboardLink = screen.getByRole("link", { name: "Lihat Semua" });
     expect(leaderboardLink).toHaveAttribute(

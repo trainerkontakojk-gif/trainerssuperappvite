@@ -155,7 +155,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     renderModal();
 
-    await user.click(screen.getByRole("button", { name: "Sistem" }));
+    await user.click(screen.getByRole("tab", { name: "Sistem" }));
 
     [
       "Gemini 3.8 Flash",
@@ -457,7 +457,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(
       screen.getByRole("button", { name: "Tutup wizard skenario" }),
     );
-    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    await user.click(screen.getByRole("tab", { name: "Identitas" }));
     expect(screen.getByLabelText(/Nama Pengirim \(Header\)/)).toHaveValue(
       "Jane Doe",
     );
@@ -562,8 +562,8 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
       settings: { ...initialSettings, scenarios: [legacyScenario] },
     });
 
-    await user.click(screen.getByRole("button", { name: "Sistem" }));
-    await user.click(screen.getByText("Realistis", { selector: "h4" }));
+    await user.click(screen.getByRole("tab", { name: "Sistem" }));
+    await user.click(screen.getByRole("radio", { name: /^Realistis/ }));
     await user.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
 
     expect(onSave).toHaveBeenCalled();
@@ -956,7 +956,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderModal({ onSave });
 
-    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    await user.click(screen.getByRole("tab", { name: "Identitas" }));
     const sender = screen.getByLabelText(/Nama Pengirim \(Header\)/);
     await user.clear(sender);
     await user.type(sender, "Draft yang harus dipertahankan");
@@ -980,11 +980,11 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderModal();
-    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    await user.click(screen.getByRole("tab", { name: "Identitas" }));
     const sender = screen.getByLabelText(/Nama Pengirim \(Header\)/);
     await user.clear(sender);
     await user.type(sender, "Edit sebelum wizard");
-    await user.click(screen.getByRole("button", { name: "Masalah" }));
+    await user.click(screen.getByRole("tab", { name: "Masalah" }));
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
@@ -996,7 +996,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     expect(confirm).toHaveBeenCalledWith(
       "Perubahan belum disimpan. Yakin ingin keluar?",
     );
-    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    await user.click(screen.getByRole("tab", { name: "Identitas" }));
     expect(screen.getByDisplayValue("Edit sebelum wizard")).toBeDefined();
   });
 

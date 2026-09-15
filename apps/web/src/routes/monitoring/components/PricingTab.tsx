@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import { Button } from "../../../components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../../components/ui/card";
+import { Input } from "../../../components/ui/input";
 import { aiClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 import { PricingRow } from "./PricingRow";
@@ -77,32 +85,30 @@ export function PricingTab({
   return (
     <div className="space-y-6" aria-label="Pengaturan harga AI">
       {/* Billing / Kurs Editor */}
-      <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
-          <h2 className="text-xs font-semibold tracking-tight text-foreground">
-            Kurs USD ke IDR
-          </h2>
-        </div>
-        <div className="p-6">
+      <Card className="border-border bg-card py-0">
+        <CardHeader className="border-b border-border bg-muted/30 px-6 py-4">
+          <CardTitle className="text-sm">Kurs USD ke IDR</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
           <div className="flex items-center gap-3 max-w-sm">
             <label htmlFor="monitoring-billing-rate" className="sr-only">
               Kurs USD ke IDR
             </label>
-            <input
+            <Input
               id="monitoring-billing-rate"
               type="number"
               value={localRate}
               onChange={(e) => setLocalRate(Number(e.target.value))}
-              className="min-h-11 w-40 px-3 bg-background border border-border rounded-md text-xs font-semibold outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary transition-all"
+              className="min-h-11 w-40 rounded-lg text-xs font-semibold"
               min={1}
             />
-            <button
+            <Button
               type="button"
               onClick={handleSaveBilling}
-              className="min-h-11 px-4 px-4 bg-primary text-primary-foreground rounded-md text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer flex items-center justify-center"
+              className="min-h-11 text-xs font-semibold"
             >
               Simpan Kurs
-            </button>
+            </Button>
           </div>
           <p className="text-[11px] text-muted-foreground/70 mt-3 font-medium">
             Kurs aktif:{" "}
@@ -111,16 +117,16 @@ export function PricingTab({
             </span>{" "}
             per USD
           </p>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Pricing Editor */}
-      <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
-        <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
-          <h2 className="text-xs font-semibold tracking-tight text-foreground">
+      <Card className="border-border bg-card py-0">
+        <CardHeader className="border-b border-border bg-muted/30 px-6 py-4">
+          <CardTitle className="text-sm">
             Harga per Model (USD / 1M tokens)
-          </h2>
-        </div>
+          </CardTitle>
+        </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <caption className="sr-only">Harga model AI</caption>
@@ -154,7 +160,7 @@ export function PricingTab({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

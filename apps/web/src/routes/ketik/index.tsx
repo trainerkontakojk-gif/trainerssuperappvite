@@ -33,6 +33,7 @@ import { fetchUsageSummary } from "../../lib/usage-summary";
 import { resolveKetikSessionIdentity } from "./ketikIdentity";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
 
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
@@ -723,7 +724,7 @@ export default function KetikLanding() {
                   </p>
                 </div>
 
-                <section className="flex min-w-0 flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                <Card className="flex min-w-0 flex-1 flex-col rounded-xl border-border bg-card p-7 py-7 lg:p-8">
                   <div className="space-y-4">
                     <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                       Latih percakapan chat. Balas lebih tepat dan empatik.
@@ -818,7 +819,7 @@ export default function KetikLanding() {
                       </Button>
                     </div>
                   </div>
-                </section>
+                </Card>
               </div>
             </main>
           </motion.div>
@@ -830,7 +831,7 @@ export default function KetikLanding() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-colors duration-500 bg-background"
           >
-            <div className="w-full max-w-5xl h-full md:max-h-[92vh] md:rounded-[2rem] overflow-hidden relative flex flex-col shadow-2xl shadow-black/10 border border-border/50 bg-card">
+            <Card className="h-full w-full max-w-5xl overflow-hidden border-border bg-card p-0 md:max-h-[92vh] md:rounded-xl">
               {currentConfig && currentScenario && (
                 <ChatInterface
                   config={currentConfig}
@@ -847,7 +848,7 @@ export default function KetikLanding() {
                   }
                 />
               )}
-            </div>
+            </Card>
           </motion.div>
         )}
       </AnimatePresence>

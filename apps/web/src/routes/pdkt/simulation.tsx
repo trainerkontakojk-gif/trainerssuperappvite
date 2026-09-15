@@ -17,6 +17,10 @@ import type {
 } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
 import { Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 import { notify } from "../../lib/toast";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
 import {
@@ -77,6 +81,8 @@ interface PdktSimulationProps {
   onBack?: () => void;
   onBeforeActivity?: () => Promise<void>;
   onAfterActivity?: () => void;
+  initialReplaySession?: SessionHistory | null;
+  onConsumeReplaySession?: () => void;
 }
 
 export default function PdktSimulation({
@@ -84,6 +90,8 @@ export default function PdktSimulation({
   onBack,
   onBeforeActivity,
   onAfterActivity,
+  initialReplaySession = null,
+  onConsumeReplaySession,
 }: PdktSimulationProps = {}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
@@ -529,8 +537,14 @@ export default function PdktSimulation({
         setFilter(matchingMailbox.status);
       }
       setSelectedId(matchingMailbox.id);
-    } else if (session.config && session.emails && session.emails.length > 0) {
-      const firstInbound = session.emails.find((e: any) => !e.isAgent);
+      setIsHistoryOpen(false);
+      return;
+    }
+    const sessionEmails = Array.isArray(session.emails)
+      ? (session.emails.filter(Boolean) as any[])
+      : [];
+    if (sessionEmails.length > 0) {
+      const firstInbound = sessionEmails.find((e: any) => !e?.isAgent);
       const syntheticId = "replay_" + session.id;
       const ts =
         typeof session.timestamp === "string"
@@ -538,7 +552,7 @@ export default function PdktSimulation({
           : session.timestamp instanceof Date
             ? session.timestamp.toISOString()
             : new Date().toISOString();
-      const cfg = session.config as any;
+      const cfg = (session.config ?? {}) as any;
       const syntheticItem: PdktMailboxItem = {
         id: syntheticId,
         user_id: "",
@@ -546,9 +560,14 @@ export default function PdktSimulation({
         created_at: ts,
         sender_name: cfg.identity?.name || "Konsumen",
         sender_email: cfg.identity?.email || "",
-        subject: (firstInbound as any)?.subject || "",
+        subject:
+          (typeof (firstInbound as any)?.subject === "string"
+            ? (firstInbound as any).subject
+            : "") || "Tanpa Subjek",
         snippet:
-          ((firstInbound as any)?.body as string)?.substring(0, 100) || "",
+          (typeof (firstInbound as any)?.body === "string"
+            ? ((firstInbound as any).body as string).substring(0, 100)
+            : "") || "",
         scenario_snapshot: cfg.scenarios?.[0] || ({} as PdktScenario),
         config_snapshot: cfg as any,
         inbound_email: (firstInbound || {
@@ -560,7 +579,7 @@ export default function PdktSimulation({
           timestamp: new Date().toISOString(),
           isAgent: false,
         }) as any,
-        emails_thread: session.emails as any,
+        emails_thread: sessionEmails as any,
         history_id: session.id,
         last_activity_at: ts,
         time_taken: session.timeTaken ?? null,
@@ -585,7 +604,19 @@ export default function PdktSimulation({
       setSelectedId(syntheticId);
     }
     setIsHistoryOpen(false);
-  }; // Start new simulation session
+  };
+
+  const appliedReplayIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialReplaySession) return;
+    if (appliedReplayIdRef.current === initialReplaySession.id) return;
+    // Tunggu mailbox selesai load agar pencocokan history_id akurat.
+    if (loading) return;
+    appliedReplayIdRef.current = initialReplaySession.id;
+    handleSelectSession(initialReplaySession);
+    onConsumeReplaySession?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialReplaySession, loading, visibleMailboxItems.length]); // Start new simulation session
   const handleRetryMailboxSave = async () => {
     if (!pendingMailboxRetry) return;
     setIsRetryingMailboxSave(true);
@@ -871,7 +902,7 @@ export default function PdktSimulation({
 
   if (loading && !mailboxItems) {
     return (
-      <div className="flex flex-col h-screen w-full bg-[var(--bg)] text-[var(--fg)] relative">
+      <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)] shrink-0 z-10">
           <div className="flex items-center gap-3">
@@ -916,7 +947,7 @@ export default function PdktSimulation({
                     <div className="w-7 h-7 bg-[var(--border)] rounded-lg"></div>
                   </div>
                 </div>
-                <div className="h-8 bg-[var(--bg)] rounded-lg w-full"></div>
+                <Skeleton className="h-8 w-full rounded-lg" />
                 <div className="h-6 bg-[var(--bg)] rounded-lg w-full"></div>
               </div>
 
@@ -975,32 +1006,32 @@ export default function PdktSimulation({
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (error && !mailboxItems) {
     return (
-      <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
-          <div className="w-14 h-14 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center">
-            <AlertCircle className="w-7 h-7 text-[var(--chart-amber)]" />
-          </div>
+      <div className="flex h-[calc(100vh-10rem)] items-center justify-center px-4">
+        <Alert variant="destructive" className="max-w-md items-start">
+          <AlertCircle aria-hidden="true" />
           <div>
-            <p className="text-sm font-bold text-[var(--fg)] mb-1">
+            <AlertDescription className="font-semibold text-foreground">
               Gagal Memuat Email
+            </AlertDescription>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {error}
             </p>
-            <p className="text-xs text-[var(--fg2)] leading-relaxed">{error}</p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={refetch}
-            className="inline-flex min-h-11 items-center gap-2 px-5 py-2.5 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            className="ml-auto min-h-11 gap-2 text-xs"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw aria-hidden="true" />
             Coba Lagi
-          </button>
-        </div>
+          </Button>
+        </Alert>
       </div>
     );
   }
@@ -1026,7 +1057,7 @@ export default function PdktSimulation({
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[var(--bg)] text-[var(--fg)] relative">
+    <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
       {/* Top Header Bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)] shrink-0 z-10">
         <div className="flex items-center gap-3">
@@ -1057,46 +1088,52 @@ export default function PdktSimulation({
       </div>
 
       {pendingMailboxRetry && (
-        <div
-          className="flex shrink-0 flex-col gap-3 border-b border-[var(--chart-amber)]/30 bg-[var(--surface)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
+        <Alert
+          variant="destructive"
+          className="flex shrink-0 flex-col gap-3 rounded-none border-x-0 border-t-0 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="min-w-0">
-            <p className="font-semibold text-[var(--fg)]">
+            <AlertDescription className="font-semibold text-foreground">
               Email belum tersimpan
-            </p>
-            <p className="truncate text-xs text-[var(--fg2)]">
+            </AlertDescription>
+            <p className="truncate text-xs text-muted-foreground">
               {pendingMailboxRetry.subjectLabel || "Email yang dibuat"} — tidak
               ada AI generation ulang saat retry.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => void handleRetryMailboxSave()}
               disabled={isRetryingMailboxSave}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--inv-bg)] px-3.5 text-xs font-semibold text-[var(--inv-fg)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+              className="min-h-11 gap-2 text-xs"
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${isRetryingMailboxSave ? "animate-spin motion-reduce:animate-none" : ""}`}
+                aria-hidden="true"
+                className={
+                  isRetryingMailboxSave
+                    ? "animate-spin motion-reduce:animate-none"
+                    : ""
+                }
               />
               {isRetryingMailboxSave ? "Menyimpan..." : "Coba simpan lagi"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setPendingMailboxRetry(null)}
               disabled={isRetryingMailboxSave}
-              className="min-h-11 rounded-lg border border-[var(--border)] px-3 text-xs font-medium text-[var(--fg2)] hover:bg-[var(--bg)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+              className="min-h-11 text-xs"
             >
               Tutup
-            </button>
+            </Button>
           </div>
-        </div>
+        </Alert>
       )}
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden p-4 gap-4">
-        <div className="flex-1 flex bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden gap-4 p-4">
+        <Card className="flex min-h-0 flex-1 overflow-hidden rounded-xl border-border bg-card p-0">
           <div
             className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-80 md:shrink-0`}
           >
@@ -1162,20 +1199,21 @@ export default function PdktSimulation({
                   Pilih email atau buat simulasi baru
                 </p>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setIsNewModalOpen(true)}
-                    className="mt-4 min-h-11 px-4 py-2 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+                    className="mt-4 min-h-11 text-xs"
                   >
                     Simulasi Baru
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setIsSettingsOpen(true)}
-                    className="mt-4 min-h-11 px-4 py-2 border border-[var(--border)] text-[var(--fg)] rounded-lg text-xs font-semibold hover:bg-[var(--bg)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+                    className="mt-4 min-h-11 text-xs"
                   >
                     Pengaturan
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -1208,8 +1246,8 @@ export default function PdktSimulation({
             onDeleteSession={handleDeleteSession}
             onClearHistory={handleClearHistory}
           />
-        </div>
+        </Card>
       </div>
-    </div>
+    </main>
   );
 }

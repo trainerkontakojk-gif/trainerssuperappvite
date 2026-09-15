@@ -1,5 +1,6 @@
 import React from "react";
-import { Plus, Trash2, Mail } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { Button } from "../../../../../components/ui/button";
 import { PdktScenario } from "@trainers/types";
 import {
   findInvalidPdktRecipientEmails,
@@ -52,164 +53,134 @@ export function ScenarioRecipientsField({
   };
 
   return (
-    <div
-      id="scenario-recipient-targets"
-      className="col-span-2 space-y-4 pb-5"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Mail className="w-4 h-4 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold text-foreground tracking-tight">
-            Email Tujuan
-          </h4>
-          <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-            Atur alamat tujuan per skenario. Alamat fallback sistem tetap selalu
-            tersedia.
-          </p>
-        </div>
+    <div id="scenario-recipient-targets" className="flex flex-col gap-4">
+      <div>
+        <h4 className="text-sm font-medium text-foreground">Email Tujuan</h4>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Arahkan email simulasi ke lawan bicara utama. Alamat fallback sistem{" "}
+          <span className="font-medium text-foreground">
+            {FALLBACK_RECIPIENT}
+          </span>{" "}
+          selalu ikut terkirim.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
-        <div className="space-y-4">
-          <SettingsField
-            label="Penerima Utama"
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <SettingsField
+          label="Penerima Utama"
+          id="pdkt-primary-recipient-type"
+          helperText="Menentukan lawan bicara utama dan arah narasi sesi."
+        >
+          <SettingsSelect
             id="pdkt-primary-recipient-type"
-            helperText="Kunci lawan bicara utama dan arah narasi saat sesi dibuat."
+            value={primaryRecipientType}
+            onChange={(e) =>
+              onDraftChange({
+                primaryRecipientType:
+                  e.target.value === "ojk" ? "ojk" : "reported_company",
+              })
+            }
           >
-            <SettingsSelect
-              id="pdkt-primary-recipient-type"
-              value={primaryRecipientType}
-              onChange={(e) =>
-                onDraftChange({
-                  primaryRecipientType:
-                    e.target.value === "ojk" ? "ojk" : "reported_company",
-                })
-              }
-            >
-              <option value="reported_company">Perusahaan terlapor</option>
-              <option value="ojk">OJK 157</option>
-            </SettingsSelect>
-          </SettingsField>
+            <option value="reported_company">Perusahaan terlapor</option>
+            <option value="ojk">OJK 157</option>
+          </SettingsSelect>
+        </SettingsField>
 
-          <SettingsField
-            label="Mode Penerima"
+        <SettingsField
+          label="Mode Penerima"
+          id="pdkt-recipient-mode"
+          helperText="Hanya mengatur alamat tambahan; fallback OJK tetap dipakai."
+        >
+          <SettingsSelect
             id="pdkt-recipient-mode"
-            helperText="Fallback OJK tetap ikut; mode ini hanya mengatur alamat tambahan."
+            value={recipientMode}
+            onChange={(e) =>
+              onDraftChange({
+                recipientMode:
+                  e.target.value === "multiple" ? "multiple" : "single",
+              })
+            }
           >
-            <SettingsSelect
-              id="pdkt-recipient-mode"
-              value={recipientMode}
-              onChange={(e) =>
-                onDraftChange({
-                  recipientMode:
-                    e.target.value === "multiple" ? "multiple" : "single",
-                })
-              }
-            >
-              <option value="single">Pilih satu alamat</option>
-              <option value="multiple">Kirim ke beberapa alamat</option>
-            </SettingsSelect>
-          </SettingsField>
-        </div>
+            <option value="single">Pilih satu alamat</option>
+            <option value="multiple">Kirim ke beberapa alamat</option>
+          </SettingsSelect>
+        </SettingsField>
+      </div>
 
-        <div className="space-y-3">
-          <div className="border-b border-border pb-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Alamat Fallback Sistem
+      <div className="flex flex-col gap-3 border-t border-border pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium text-foreground">
+              Alamat Tambahan
             </div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {FALLBACK_RECIPIENT}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold text-foreground">
-                  Alamat Tambahan
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Tambahkan alamat custom untuk skenario ini. Email invalid akan
-                  diblok saat simpan.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddEmail}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/5 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Tambah alamat
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {recipientEmails.length === 0 ? (
-                <div className="border-l-2 border-border px-3 py-2 text-xs text-muted-foreground">
-                  Belum ada alamat tambahan. Fallback sistem akan dipakai
-                  otomatis.
-                </div>
-              ) : (
-                recipientEmails.map((email, index) => {
-                  const trimmed = normalizePdktRecipientEmail(email);
-                  const isInvalid =
-                    trimmed.length > 0 && invalidEmails.has(trimmed);
-                  return (
-                    <div key={index} className="flex items-start gap-2">
-                      <div className="flex-1 space-y-1">
-                        <SettingsInput
-                          id={`scenario-recipient-email-${index}`}
-                          type="email"
-                          placeholder="alamat.tujuan@domain.com"
-                          aria-label={`Alamat email tambahan ${index + 1}`}
-                          value={email}
-                          onChange={(e) =>
-                            handleChangeEmail(index, e.target.value)
-                          }
-                          aria-invalid={isInvalid}
-                          aria-describedby={
-                            isInvalid
-                              ? `scenario-recipient-email-${index}-error`
-                              : undefined
-                          }
-                        />
-                        {isInvalid && (
-                          <p
-                            id={`scenario-recipient-email-${index}-error`}
-                            className="text-[11px] text-destructive"
-                            role="alert"
-                          >
-                            Format email tidak valid.
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveEmail(index)}
-                        className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                        aria-label={`Hapus alamat ${index + 1}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Mode{" "}
-              <span className="font-medium text-foreground">satu alamat</span>{" "}
-              membatasi alamat tambahan aktif. Mode{" "}
-              <span className="font-medium text-foreground">
-                beberapa alamat
-              </span>{" "}
-              memakai semua alamat tambahan sekaligus.
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              Alamat custom untuk skenario ini. Alamat yang tidak lolos validasi
+              akan ditolak saat menyimpan.
             </p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddEmail}
+            className="shrink-0"
+          >
+            <Plus data-icon="inline-start" />
+            Tambah alamat
+          </Button>
         </div>
+
+        {recipientEmails.length === 0 ? (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Belum ada alamat tambahan. Fallback sistem dipakai otomatis.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {recipientEmails.map((email, index) => {
+              const trimmed = normalizePdktRecipientEmail(email);
+              const isInvalid =
+                trimmed.length > 0 && invalidEmails.has(trimmed);
+              return (
+                <li key={index} className="flex items-start gap-2">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <SettingsInput
+                      id={`scenario-recipient-email-${index}`}
+                      type="email"
+                      placeholder="alamat.tujuan@domain.com"
+                      aria-label={`Alamat email tambahan ${index + 1}`}
+                      value={email}
+                      onChange={(e) => handleChangeEmail(index, e.target.value)}
+                      aria-invalid={isInvalid}
+                      aria-describedby={
+                        isInvalid
+                          ? `scenario-recipient-email-${index}-error`
+                          : undefined
+                      }
+                    />
+                    {isInvalid && (
+                      <p
+                        id={`scenario-recipient-email-${index}-error`}
+                        className="text-xs text-destructive"
+                        role="alert"
+                      >
+                        Format email tidak valid.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={() => handleRemoveEmail(index)}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label={`Hapus alamat ${index + 1}`}
+                  >
+                    <Trash2 data-icon="inline" />
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </div>
   );

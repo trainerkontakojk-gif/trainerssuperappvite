@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send, X, Loader2, Reply } from "lucide-react";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
+import { Textarea } from "../../../components/ui/textarea";
 
 interface ReplyComposerProps {
   mailboxId: string;
@@ -73,8 +76,8 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
   };
 
   return (
-    <div
-      className="mx-3 mb-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden"
+    <Card
+      className="mx-3 mb-3 overflow-hidden rounded-lg border-border bg-card p-0"
       role="region"
       aria-label="Form balasan email"
       aria-busy={isLoading}
@@ -84,14 +87,16 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
           <Reply className="w-4 h-4 text-[var(--module-pdkt)]" />
           <span className="text-xs font-semibold text-[var(--fg)]">Balas</span>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={handleClose}
-          className="min-w-11 min-h-11 flex items-center justify-center hover:bg-[var(--surface)] rounded-lg transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+          className="min-h-11 min-w-11 text-muted-foreground"
           aria-label="Tutup form balasan"
         >
-          <X className="w-4 h-4" />
-        </button>
+          <X aria-hidden="true" />
+        </Button>
       </div>
 
       <div className="px-4 md:px-6 py-2.5 space-y-2 border-b border-[var(--border)] text-xs">
@@ -125,21 +130,21 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         </div>
       </div>
 
-      <textarea
+      <Textarea
         value={replyText}
         onChange={(e) => setReplyText(e.target.value)}
-        className="w-full h-32 md:h-48 p-4 outline-none text-[var(--fg)] bg-[var(--surface)] resize-none font-sans text-sm leading-relaxed placeholder:text-[var(--fg3)] focus:bg-[var(--bg)] transition-colors"
+        className="min-h-32 resize-none rounded-none border-0 bg-card p-4 text-sm leading-relaxed focus-visible:ring-0 md:min-h-48"
         placeholder="Tulis balasan Anda..."
         aria-label="Isi balasan"
         autoFocus
       />
 
       <div className="px-4 md:px-6 py-3 flex justify-end items-center border-t border-[var(--border)] bg-[var(--bg)]">
-        <button
+        <Button
           type="button"
           onClick={handleSend}
           disabled={!replyText.trim() || isLoading}
-          className="bg-[var(--inv-bg)] hover:opacity-90 text-[var(--inv-fg)] min-h-10 px-5 rounded-lg font-semibold text-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+          className="min-h-11 px-5 text-xs"
         >
           {isLoading ? (
             <>
@@ -152,8 +157,8 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
               <span>Kirim</span>
             </>
           )}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 };

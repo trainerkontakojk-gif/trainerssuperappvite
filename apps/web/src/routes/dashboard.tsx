@@ -2,15 +2,10 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
-  Sparkles,
   Activity,
   Users,
-  BarChart3,
   Shield,
   History,
-  TrendingUp,
-  TrendingDown,
-  Target,
   Clock,
   Trash2,
   PlusCircle,
@@ -28,7 +23,11 @@ import {
 } from "../lib/app-config";
 import { notify } from "../lib/toast";
 import { sidakClient, adminClient, unwrapResponse } from "../lib/api";
-import { FadeIn, StaggerList, StaggerItem } from "../components/motion";
+import { StaggerList, StaggerItem } from "../components/motion";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import { Skeleton } from "../components/ui/skeleton";
 
 const DashboardTrendPanel = lazy(
   () => import("./dashboard/DashboardTrendPanel"),
@@ -159,12 +158,33 @@ export default function DashboardPage() {
     async function initDashboard() {
       setTrendLoading(true);
 
-      try { const years = await (unwrapResponse(await sidakClient.dashboard["available-years"].$get()) as any); setAvailableYears(years || []); } catch (_) { /* degrade gracefully */ }
-      try { const trends = await (unwrapResponse(await sidakClient.dashboard.trend.$get()) as any); setServiceTrendMap(trends.trendMap); } catch (_) { /* degrade gracefully */ }
+      try {
+        const years = await (unwrapResponse(
+          await sidakClient.dashboard["available-years"].$get(),
+        ) as any);
+        setAvailableYears(years || []);
+      } catch (_) {
+        /* degrade gracefully */
+      }
+      try {
+        const trends = await (unwrapResponse(
+          await sidakClient.dashboard.trend.$get(),
+        ) as any);
+        setServiceTrendMap(trends.trendMap);
+      } catch (_) {
+        /* degrade gracefully */
+      }
 
       if (isManager) {
         setLogsLoading(true);
-        try { const logs = await (unwrapResponse(await (adminClient["activity-logs"] as any).$get()) as any); setActivityLogs(logs || []); } catch (_) { /* degrade gracefully */ }
+        try {
+          const logs = await (unwrapResponse(
+            await (adminClient["activity-logs"] as any).$get(),
+          ) as any);
+          setActivityLogs(logs || []);
+        } catch (_) {
+          /* degrade gracefully */
+        }
         setLogsLoading(false);
       }
 
@@ -182,13 +202,15 @@ export default function DashboardPage() {
   ) => {
     setTrendLoading(true);
     try {
-      const data = await unwrapResponse(await sidakClient.dashboard.trend.$get({
-        query: {
-          year: String(year),
-          ...(start !== null ? { startMonth: String(start) } : {}),
-          ...(end !== null ? { endMonth: String(end) } : {}),
-        },
-      }));
+      const data = await unwrapResponse(
+        await sidakClient.dashboard.trend.$get({
+          query: {
+            year: String(year),
+            ...(start !== null ? { startMonth: String(start) } : {}),
+            ...(end !== null ? { endMonth: String(end) } : {}),
+          },
+        }),
+      );
       setLocalTrendData(data as any);
     } catch (err) {
       console.error("Fetch trend range error:", err);
@@ -232,8 +254,14 @@ export default function DashboardPage() {
   const handleDeleteActivity = async (id: string) => {
     if (confirm("Hapus log aktivitas ini?")) {
       try {
-        await unwrapResponse(await (adminClient["activity-logs"] as any)[":id"].$delete({ param: { id } }));
-        const logs = await (unwrapResponse(await (adminClient["activity-logs"] as any).$get()) as any);
+        await unwrapResponse(
+          await (adminClient["activity-logs"] as any)[":id"].$delete({
+            param: { id },
+          }),
+        );
+        const logs = await (unwrapResponse(
+          await (adminClient["activity-logs"] as any).$get(),
+        ) as any);
         setActivityLogs(logs || []);
       } catch (err) {
         console.error("Delete activity error:", err);
@@ -327,33 +355,34 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-12 px-6 py-10 lg:px-10 lg:py-14">
-      {/* Background Radial Glow */}
-      <div className="pointer-events-none absolute left-1/2 top-0 h-[36rem] w-full max-w-[1200px] -translate-x-1/2 rounded-full bg-primary/5 blur-[140px]" />
-
+    <main className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-6 py-8 lg:px-10 lg:py-12">
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800/30">
-          <AlertCircle size={14} />
-          <span>{error}</span>
-          <button
-            className="ml-auto text-xs underline font-medium"
+        <Alert variant="destructive" className="items-center">
+          <AlertCircle aria-hidden="true" />
+          <AlertDescription>{error}</AlertDescription>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setError(null)}
+            className="ml-auto min-h-11"
           >
             Tutup
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
-      <StaggerList className="flex flex-col gap-12" stagger={0.05}>
-        
+      <StaggerList className="flex flex-col gap-10" stagger={0.05}>
         {/* Section 1: Hero & Quick Stats */}
         <StaggerItem className="flex flex-col lg:flex-row justify-between items-start gap-8 lg:gap-12">
-          <div className="flex-1 max-w-2xl">
-            <h2 className="font-display text-4xl font-bold tracking-tight text-fg mb-3">
+          <div className="max-w-2xl flex-1">
+            <h2 className="mb-3 text-4xl font-semibold tracking-tight text-foreground">
               Halo, {displayName}.
             </h2>
-            <p className="text-base text-fg2 font-normal leading-relaxed">
-              Anda masuk sebagai <span className="font-semibold text-fg">{roleLabel}</span>.{" "}
+            <p className="text-base font-normal leading-relaxed text-muted-foreground">
+              Anda masuk sebagai{" "}
+              <span className="font-semibold text-foreground">{roleLabel}</span>
+              .{" "}
               {roleLabel === "Agent"
                 ? "Pelajari skenario latihan baru, ikuti simulasi interaktif, dan validasi skor capaian bulanan secara komprehensif."
                 : "Pantau tren performa layanan utama, mengevaluasi aktivitas harian staf, dan kelola operasional dalam satu platform."}
@@ -361,59 +390,73 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Stats right aligned */}
-          <div className="flex shrink-0 gap-6 lg:gap-10 p-6 rounded-2xl bg-surface border border-border">
-            {showAnalytics && serviceTrendMap ? (
-              <>
-                <div className="flex flex-col">
-                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                    {localTrendData?.totalSummary.auditedAgents ?? serviceTrendMap.all.totalSummary.auditedAgents ?? 0}
-                  </span>
-                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                    Agen Diaudit
+          <Card className="shrink-0 border-border bg-card py-0">
+            <CardContent className="flex gap-6 p-5 lg:gap-10 lg:p-6">
+              {showAnalytics && serviceTrendMap ? (
+                <>
+                  <div className="flex flex-col">
+                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                      {localTrendData?.totalSummary.auditedAgents ??
+                        serviceTrendMap.all.totalSummary.auditedAgents ??
+                        0}
+                    </span>
+                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                      Agen Diaudit
+                    </span>
+                  </div>
+                  <div className="w-px bg-border"></div>
+                  <div className="flex flex-col">
+                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                      {localTrendData?.totalSummary.totalDefects ??
+                        serviceTrendMap.all.totalSummary.totalDefects ??
+                        0}
+                    </span>
+                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                      Temuan
+                    </span>
+                  </div>
+                  <div className="w-px bg-border"></div>
+                  <div className="flex flex-col">
+                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                      {localTrendData?.totalSummary.activeServiceCount ??
+                        serviceTrendMap.all.totalSummary.activeServiceCount ??
+                        0}
+                    </span>
+                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                      Layanan
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 text-fg2">
+                  <Clock className="w-5 h-5 text-fg3" />
+                  <span className="text-sm font-medium">
+                    Sesi latihan Anda siap dimulai
                   </span>
                 </div>
-                <div className="w-px bg-border"></div>
-                <div className="flex flex-col">
-                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                    {localTrendData?.totalSummary.totalDefects ?? serviceTrendMap.all.totalSummary.totalDefects ?? 0}
-                  </span>
-                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                    Temuan
-                  </span>
-                </div>
-                <div className="w-px bg-border"></div>
-                <div className="flex flex-col">
-                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                    {localTrendData?.totalSummary.activeServiceCount ?? serviceTrendMap.all.totalSummary.activeServiceCount ?? 0}
-                  </span>
-                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                    Layanan
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-3 text-fg2">
-                <Clock className="w-5 h-5 text-fg3" />
-                <span className="text-sm font-medium">Sesi latihan Anda siap dimulai</span>
-              </div>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </StaggerItem>
 
         {/* Section 2: Trainer Shortcuts (Prominent Top Placement) */}
         {isManager && (
           <StaggerItem>
             <div className="mb-4">
-              <h3 className="text-sm font-bold text-fg tracking-tight">Pintasan Cepat</h3>
+              <h3 className="text-sm font-bold text-fg tracking-tight">
+                Pintasan Cepat
+              </h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {trainerShortcuts.slice(0, 3).map((shortcut) => (
                 <Link
                   key={shortcut.href}
                   to={shortcut.href}
-                  className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-all hover:border-fg/30 hover:bg-surface"
+                  className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30 hover:bg-muted/40"
                 >
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${shortcut.accentSoftClassName} ${shortcut.accentClassName}`}>
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${shortcut.accentSoftClassName} ${shortcut.accentClassName}`}
+                  >
                     <shortcut.icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -424,7 +467,7 @@ export default function DashboardPage() {
                       {shortcut.description}
                     </p>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground" />
                 </Link>
               ))}
             </div>
@@ -434,8 +477,12 @@ export default function DashboardPage() {
         {/* Section 3: Workspace Terpadu */}
         <StaggerItem>
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-fg tracking-tight">Workspace Terpadu</h3>
-            <p className="text-xs text-fg2 mt-1">Akses modul utama untuk pelatihan dan penilaian</p>
+            <h3 className="text-sm font-bold text-fg tracking-tight">
+              Workspace Terpadu
+            </h3>
+            <p className="text-xs text-fg2 mt-1">
+              Akses modul utama untuk pelatihan dan penilaian
+            </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {visibleModules.map((module) => {
@@ -444,7 +491,7 @@ export default function DashboardPage() {
                 <Link
                   key={module.id}
                   to={module.href}
-                  className="group flex flex-col justify-between rounded-xl border border-border bg-surface p-5 transition-all hover:border-fg/30 hover:shadow-sm"
+                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/30 hover:bg-muted/40"
                   onClick={(e) => {
                     if (module.id === "telefun" && !hasTelefunAccess) {
                       e.preventDefault();
@@ -454,7 +501,9 @@ export default function DashboardPage() {
                 >
                   <div>
                     <div className="mb-5 flex items-center justify-between">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.soft} ${colors.text}`}>
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.soft} ${colors.text}`}
+                      >
                         <module.icon className="h-5 w-5" />
                       </div>
                       <ArrowRight className="h-4 w-4 text-fg3 transition-transform group-hover:translate-x-1 group-hover:text-fg" />
@@ -477,32 +526,39 @@ export default function DashboardPage() {
           <StaggerItem>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-fg tracking-tight">Tren Performa Kualitas</h3>
-                <p className="text-xs text-fg2 mt-1">Visualisasi deviasi temuan bulanan</p>
+                <h3 className="text-sm font-bold text-fg tracking-tight">
+                  Tren Performa Kualitas
+                </h3>
+                <p className="text-xs text-fg2 mt-1">
+                  Visualisasi deviasi temuan bulanan
+                </p>
               </div>
             </div>
-            
-            <div className="rounded-2xl border border-border bg-surface p-1 min-h-[360px]">
-              <Suspense
-                fallback={
-                  <div className="w-full h-[360px] flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-fg3" />
-                  </div>
-                }
-              >
-                <DashboardTrendPanel
-                  serviceTrendMap={serviceTrendMap}
-                  availableYears={availableYears}
-                  selectedYear={selectedYear}
-                  trendStartMonth={trendStartMonth}
-                  trendEndMonth={trendEndMonth}
-                  trendLoading={trendLoading}
-                  localTrendData={localTrendData}
-                  onYearChange={handleYearChange}
-                  onRangeChange={handleRangeChange}
-                />
-              </Suspense>
-            </div>
+
+            <Card className="min-h-[360px] border-border bg-card p-1 py-1">
+              <CardContent className="p-0">
+                <Suspense
+                  fallback={
+                    <div className="flex h-[360px] w-full items-center justify-center">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                      <span className="sr-only">Memuat tren performa</span>
+                    </div>
+                  }
+                >
+                  <DashboardTrendPanel
+                    serviceTrendMap={serviceTrendMap}
+                    availableYears={availableYears}
+                    selectedYear={selectedYear}
+                    trendStartMonth={trendStartMonth}
+                    trendEndMonth={trendEndMonth}
+                    trendLoading={trendLoading}
+                    localTrendData={localTrendData}
+                    onYearChange={handleYearChange}
+                    onRangeChange={handleRangeChange}
+                  />
+                </Suspense>
+              </CardContent>
+            </Card>
           </StaggerItem>
         )}
 
@@ -513,7 +569,9 @@ export default function DashboardPage() {
             <StaggerItem className="lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-bold text-fg tracking-tight">Aktivitas Terakhir</h3>
+                  <h3 className="text-sm font-bold text-fg tracking-tight">
+                    Aktivitas Terakhir
+                  </h3>
                 </div>
                 <Link
                   to="/dashboard/activities"
@@ -523,95 +581,116 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <div className="rounded-xl border border-border bg-surface overflow-hidden">
-                {logsLoading ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="w-5 h-5 animate-spin text-fg3" />
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {formattedLogs.length > 0 ? (
-                      formattedLogs.slice(0, 5).map((log) => {
-                        const isLogin = log.type === "login";
-                        const isEdit = log.type === "edit";
-                        const isAdd = log.type === "add";
+              <Card className="overflow-hidden border-border bg-card py-0">
+                <CardContent className="p-0">
+                  {logsLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="w-5 h-5 animate-spin text-fg3" />
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {formattedLogs.length > 0 ? (
+                        formattedLogs.slice(0, 5).map((log) => {
+                          const isLogin = log.type === "login";
+                          const isEdit = log.type === "edit";
+                          const isAdd = log.type === "add";
 
-                        return (
-                          <div
-                            key={log.id}
-                            className="flex items-center justify-between p-4 hover:bg-surface-sunken transition-colors group"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="relative flex items-center justify-center shrink-0">
-                                <span className={`w-2 h-2 rounded-full ${
-                                  isLogin ? "bg-blue-500" : isEdit ? "bg-purple-500" : isAdd ? "bg-emerald-500" : "bg-amber-500"
-                                }`} />
+                          return (
+                            <div
+                              key={log.id}
+                              className="flex items-center justify-between p-4 hover:bg-surface-sunken transition-colors group"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="relative flex items-center justify-center shrink-0">
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      isLogin
+                                        ? "bg-blue-500"
+                                        : isEdit
+                                          ? "bg-purple-500"
+                                          : isAdd
+                                            ? "bg-emerald-500"
+                                            : "bg-amber-500"
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-fg">
+                                    {log.user}
+                                  </div>
+                                  <div className="text-xs text-fg2 mt-0.5">
+                                    {log.action}
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="text-sm font-medium text-fg">
-                                  {log.user}
-                                </div>
-                                <div className="text-xs text-fg2 mt-0.5">
-                                  {log.action}
-                                </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-[11px] font-mono text-fg3">
+                                  {log.time}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleDeleteActivity(log.id.toString())
+                                  }
+                                  className="min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
+                                  title="Hapus Log"
+                                  aria-label="Hapus log aktivitas"
+                                >
+                                  <Trash2 aria-hidden="true" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <span className="text-[11px] font-mono text-fg3">
-                                {log.time}
-                              </span>
-                              <button
-                                onClick={() => handleDeleteActivity(log.id.toString())}
-                                className="p-1 text-fg3 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                title="Hapus Log"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="py-10 text-center text-fg3 text-sm">
-                        Belum ada aktivitas terbaru.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                          );
+                        })
+                      ) : (
+                        <div className="py-10 text-center text-fg3 text-sm">
+                          Belum ada aktivitas terbaru.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </StaggerItem>
           )}
 
           {/* Opsi Manajerial (Settings etc) */}
           <StaggerItem className="lg:col-span-1">
             <div className="mb-4">
-              <h3 className="text-sm font-bold text-fg tracking-tight">Opsi Manajerial</h3>
+              <h3 className="text-sm font-bold text-fg tracking-tight">
+                Opsi Manajerial
+              </h3>
             </div>
             <div className="flex flex-col gap-3">
               {managementActions.map((action) => (
                 <Link
                   key={action.href}
                   to={action.href}
-                  className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-3.5 transition-all hover:border-fg/30 hover:bg-surface"
+                  className="group flex items-center gap-3 rounded-lg border border-border bg-card p-3.5 transition-colors hover:border-foreground/30 hover:bg-muted/40"
                 >
                   <action.icon className="h-4.5 w-4.5 text-fg2" />
-                  <span className="text-sm font-medium text-fg">{action.title}</span>
+                  <span className="text-sm font-medium text-fg">
+                    {action.title}
+                  </span>
                   <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1 ml-auto" />
                 </Link>
               ))}
               <Link
                 to="/account"
-                className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-3.5 transition-all hover:border-fg/30 hover:bg-surface mt-2"
+                className="group mt-2 flex items-center gap-3 rounded-lg border border-border bg-card p-3.5 transition-colors hover:border-foreground/30 hover:bg-muted/40"
               >
                 <UserCog className="h-4.5 w-4.5 text-fg2" />
-                <span className="text-sm font-medium text-fg">Pengaturan Profil</span>
+                <span className="text-sm font-medium text-fg">
+                  Pengaturan Profil
+                </span>
                 <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1 ml-auto" />
               </Link>
             </div>
           </StaggerItem>
         </div>
-
       </StaggerList>
-    </div>
+    </main>
   );
 }

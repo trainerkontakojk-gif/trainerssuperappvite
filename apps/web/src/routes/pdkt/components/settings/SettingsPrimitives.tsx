@@ -1,4 +1,10 @@
 import React from "react";
+import { Check, ChevronDown } from "lucide-react";
+import { cn } from "cn";
+import { Button } from "../../../../components/ui/button";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import { Textarea } from "../../../../components/ui/textarea";
 
 interface SettingsFieldProps {
   label: string;
@@ -22,20 +28,15 @@ export function SettingsField({
   children,
 }: SettingsFieldProps) {
   return (
-    <div className={`space-y-1.5 ${className}`}>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5"
-      >
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
         {label}{" "}
         {required ? (
-          <span className="ml-1 text-xs font-semibold text-foreground">
-            Wajib
-          </span>
+          <span className="font-normal text-foreground/70">Wajib</span>
         ) : (
-          <span className="ml-1 text-xs text-muted-foreground">Opsional</span>
+          <span className="font-normal text-muted-foreground/70">Opsional</span>
         )}
-      </label>
+      </Label>
       {children}
       {error && (
         <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
@@ -43,7 +44,7 @@ export function SettingsField({
         </p>
       )}
       {helperText && (
-        <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           {helperText}
         </p>
       )}
@@ -60,8 +61,11 @@ export function SettingsInput({
   ...props
 }: SettingsInputProps) {
   return (
-    <input
-      className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30 ${className}`}
+    <Input
+      className={cn(
+        "min-h-11 w-full rounded-lg bg-background text-sm",
+        className,
+      )}
       {...props}
     />
   );
@@ -71,36 +75,45 @@ interface SettingsSelectProps extends React.SelectHTMLAttributes<HTMLSelectEleme
   className?: string;
 }
 
+interface SettingsTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  className?: string;
+}
+
+export function SettingsTextarea({
+  className = "",
+  ...props
+}: SettingsTextareaProps) {
+  return (
+    <Textarea
+      className={cn(
+        "min-h-24 resize-y rounded-lg bg-background text-sm",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export function SettingsSelect({
   className = "",
   children,
   ...props
 }: SettingsSelectProps) {
   return (
-    <div className="relative group">
+    <div className="relative">
       <select
-        className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors appearance-none cursor-pointer ${className}`}
+        className={cn(
+          "min-h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
         {...props}
       >
         {children}
       </select>
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-        <svg
-          width="10"
-          height="6"
-          viewBox="0 0 10 6"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M1 1L5 5L9 1"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
+      />
     </div>
   );
 }
@@ -126,58 +139,42 @@ export function SettingsCardOption({
 }: SettingsCardOptionProps) {
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={title}
-      aria-pressed={isSelected}
-      onClick={(event) => {
-        if (
-          (event.target as HTMLElement).closest(
-            "button, a, input, select, textarea",
-          )
-        ) {
-          return;
-        }
-        onClick();
-      }}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
-      className={`group cursor-pointer rounded-xl border p-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground flex flex-col justify-between ${
+      className={cn(
+        "flex flex-col gap-3 rounded-xl border p-4 transition-colors",
         isSelected
-          ? "border-primary bg-primary/5"
-          : "border-border bg-card/45 hover:bg-foreground/[0.02]"
-      } ${className}`}
+          ? "border-primary/50 bg-primary/5"
+          : "border-border bg-card hover:border-foreground/20",
+        className,
+      )}
     >
-      <div className="flex justify-between items-start mb-2 gap-2">
-        <div className="flex flex-col gap-1 min-w-0">
-          <h4 className="font-semibold text-foreground tracking-tight text-sm truncate">
-            {title}
-          </h4>
-          {badge && <div className="flex gap-2 flex-wrap mt-0.5">{badge}</div>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="truncate text-sm font-semibold tracking-tight text-foreground">
+              {title}
+            </h4>
+            {badge}
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {children}
+          </p>
         </div>
-        <div className="flex items-center shrink-0 gap-2">
-          {isSelected ? (
-            <div
-              aria-hidden="true"
-              className="w-4 h-4 rounded-full border border-primary flex items-center justify-center shrink-0"
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-            </div>
-          ) : (
-            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              {actions}
-            </div>
-          )}
+        <Button
+          type="button"
+          variant={isSelected ? "secondary" : "outline"}
+          aria-pressed={isSelected}
+          onClick={onClick}
+          className="shrink-0"
+        >
+          {isSelected && <Check data-icon="inline-start" />}
+          {isSelected ? "Dipakai" : "Pilih"}
+        </Button>
+      </div>
+      {actions && (
+        <div className="flex items-center justify-end gap-1.5 border-t border-border pt-3">
+          {actions}
         </div>
-      </div>
-      <div className="text-sm text-muted-foreground leading-relaxed mt-1.5">
-        {children}
-      </div>
+      )}
     </div>
   );
 }

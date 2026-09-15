@@ -6,6 +6,7 @@ import {
   type PdktScenario,
 } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { Button } from "../../../../components/ui/button";
 import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
@@ -19,6 +20,7 @@ import {
   SettingsField,
   SettingsInput,
   SettingsSelect,
+  SettingsTextarea,
 } from "./SettingsPrimitives";
 import { ScenarioList } from "./scenarios/ScenarioList";
 import { ScenarioForm } from "./scenarios/ScenarioForm";
@@ -540,17 +542,18 @@ export function PdktScenariosTab(props: Props) {
                       scenarioForm.setDraft({ category: event.target.value });
                     }}
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => {
                       setNewCategoryMode(false);
                       setNewCategory("");
                       scenarioForm.setDraft({ category: "" });
                     }}
-                    className="rounded-md border border-border px-3 text-xs"
+                    className="min-h-11 px-3 text-xs"
                   >
                     Batal
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <SettingsSelect
@@ -613,7 +616,7 @@ export function PdktScenariosTab(props: Props) {
                   : undefined
               }
             >
-              <textarea
+              <SettingsTextarea
                 id="scenario-description"
                 required
                 aria-required="true"
@@ -633,7 +636,6 @@ export function PdktScenariosTab(props: Props) {
                 onChange={(event) =>
                   scenarioForm.setDraft({ description: event.target.value })
                 }
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground focus:outline-none"
               />
               <p
                 id="scenario-description-counter"
@@ -646,15 +648,17 @@ export function PdktScenariosTab(props: Props) {
           </div>
         }
         profileContent={
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <div className="space-y-4 rounded-xl border border-border p-4">
-              <h4 className="text-base font-semibold text-foreground">
-                Identitas Pengirim
-              </h4>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Berlaku khusus untuk skenario ini. Field kosong akan memakai
-                nilai skenario terkait, lalu identitas default.
-              </p>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="flex flex-col gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-foreground">
+                  Identitas Pengirim
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Berlaku khusus untuk skenario ini. Field kosong akan memakai
+                  nilai skenario terkait, lalu identitas default.
+                </p>
+              </div>
               <SettingsField
                 label="Nama pengirim"
                 id="custom-sender-name"
@@ -733,11 +737,17 @@ export function PdktScenariosTab(props: Props) {
                   <option value="none">Tidak disebut</option>
                 </SettingsSelect>
               </SettingsField>
-            </div>
-            <div className="space-y-4 rounded-xl border border-border p-4">
-              <h4 className="text-base font-semibold text-foreground">
-                Karakter dan Gaya Komunikasi
-              </h4>
+            </section>
+            <section className="flex flex-col gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-foreground">
+                  Karakter dan Gaya Komunikasi
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Karakter aktif dan detailnya dipakai khusus untuk skenario
+                  ini.
+                </p>
+              </div>
               <SettingsField
                 label="Karakter aktif"
                 id="global-consumer-type"
@@ -811,23 +821,22 @@ export function PdktScenariosTab(props: Props) {
                     id="consumer-description"
                     optional
                   >
-                    <textarea
+                    <SettingsTextarea
                       id="consumer-description"
                       rows={4}
                       value={selectedConsumer.description}
                       onChange={(event) =>
                         updateConsumer({ description: event.target.value })
                       }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground focus:outline-none"
                     />
                   </SettingsField>
                 </>
               )}
-            </div>
+            </section>
           </div>
         }
         emailContent={
-          <div className="space-y-5 pt-4">
+          <div className="flex flex-col gap-4">
             <ScenarioRecipientsField
               draft={draft}
               onDraftChange={(updates) => scenarioForm.setDraft(updates)}
@@ -884,7 +893,7 @@ export function PdktScenariosTab(props: Props) {
                 onChange={(event) =>
                   setEnableImageGeneration(event.target.checked)
                 }
-                className="h-4 w-4 rounded border-border text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                className="size-4 rounded border-input accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               />
             </SettingsField>
             <SettingsField label="Model AI" id="selected-model" optional>

@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Skeleton } from "../../components/ui/skeleton";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../../components/ui/tabs";
 import { useAuthStore } from "../../store/authStore";
 import { aiClient, unwrapResponse } from "../../lib/api";
 import { mapError, type UnifiedHistoryEntry } from "./utils/formatting";
@@ -91,7 +100,7 @@ export default function MonitoringPage() {
   };
 
   return (
-    <main className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none">
+    <main className="mx-auto w-full max-w-[var(--content-max-width)] space-y-8 p-4 lg:p-8">
       {/* Test & Accessibility Compatibility Elements */}
       <div className="sr-only">
         <span>SIMULATION MONITORING</span>
@@ -117,96 +126,73 @@ export default function MonitoringPage() {
         </p>
       </div>
 
-      {/* Modern Underline Tab switcher */}
-      <div
-        role="tablist"
-        aria-label="Bagian monitoring"
-        className="flex w-full gap-2 overflow-x-auto border-b border-border/60 mt-2"
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          setTab(value as "history" | "usage" | "pricing")
+        }
+        className="mt-2"
       >
-        <button
-          type="button"
-          id="monitoring-tab-history"
-          role="tab"
-          aria-selected={tab === "history"}
-          aria-controls="monitoring-panel-history"
-          onClick={() => setTab("history")}
-          className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-            tab === "history"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
+        <TabsList
+          variant="line"
+          aria-label="Bagian monitoring"
+          className="w-full justify-start overflow-x-auto rounded-none border-b border-border"
         >
-          Riwayat Simulasi
-        </button>
-        <button
-          type="button"
-          id="monitoring-tab-usage"
-          role="tab"
-          aria-selected={tab === "usage"}
-          aria-controls="monitoring-panel-usage"
-          onClick={() => setTab("usage")}
-          className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-            tab === "usage"
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Penggunaan Token
-        </button>
-        {canEditPricing && (
-          <button
-            type="button"
-            id="monitoring-tab-pricing"
-            role="tab"
-            aria-selected={tab === "pricing"}
-            aria-controls="monitoring-panel-pricing"
-            onClick={() => setTab("pricing")}
-            className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-              tab === "pricing"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+          <TabsTrigger
+            value="history"
+            id="monitoring-tab-history"
+            className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
           >
-            Harga & Kurs
-          </button>
+            Riwayat Simulasi
+          </TabsTrigger>
+          <TabsTrigger
+            value="usage"
+            id="monitoring-tab-usage"
+            className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
+          >
+            Penggunaan Token
+          </TabsTrigger>
+          {canEditPricing && (
+            <TabsTrigger
+              value="pricing"
+              id="monitoring-tab-pricing"
+              className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
+            >
+              Harga &amp; Kurs
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {error && (
+          <Alert variant="destructive" className="mt-6 items-center">
+            <AlertCircle aria-hidden="true" />
+            <AlertDescription>{error}</AlertDescription>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setError(null)}
+              className="ml-auto min-h-11"
+            >
+              Tutup
+            </Button>
+          </Alert>
         )}
-      </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div
-          className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20"
-          role="alert"
-        >
-          <AlertCircle size={14} aria-hidden="true" />
-          <span>{error}</span>
-          <button
-            type="button"
-            className="ml-auto min-h-11 px-2 text-xs underline hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive"
-            onClick={() => setError(null)}
+        {loading && (
+          <div
+            className="flex items-center gap-2 py-4 text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite"
           >
-            Tutup
-          </button>
-        </div>
-      )}
+            <Skeleton className="size-4 rounded-full" />
+            Memuat data...
+          </div>
+        )}
 
-      {/* Loading Indicator */}
-      {loading && (
-        <div
-          className="flex items-center gap-2 text-sm text-muted-foreground py-4"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin motion-reduce:animate-none" />
-          Memuat data...
-        </div>
-      )}
-
-      {/* Tab Content */}
-      {tab === "history" && (
-        <div
+        <TabsContent
+          value="history"
           id="monitoring-panel-history"
-          role="tabpanel"
           aria-labelledby="monitoring-tab-history"
           tabIndex={0}
         >
@@ -216,12 +202,10 @@ export default function MonitoringPage() {
             onViewDetail={handleViewDetail}
             onRefresh={fetchHistory}
           />
-        </div>
-      )}
-      {tab === "usage" && (
-        <div
+        </TabsContent>
+        <TabsContent
+          value="usage"
           id="monitoring-panel-usage"
-          role="tabpanel"
           aria-labelledby="monitoring-tab-usage"
           tabIndex={0}
         >
@@ -235,23 +219,23 @@ export default function MonitoringPage() {
             module={usageModule}
             onModuleChange={setUsageModule}
           />
-        </div>
-      )}
-      {tab === "pricing" && canEditPricing && (
-        <div
-          id="monitoring-panel-pricing"
-          role="tabpanel"
-          aria-labelledby="monitoring-tab-pricing"
-          tabIndex={0}
-        >
-          <PricingTab
-            pricing={pricing}
-            billingRate={billingRate}
-            onBillingRateChange={setBillingRate}
-            onRefresh={fetchPricing}
-          />
-        </div>
-      )}
+        </TabsContent>
+        {canEditPricing && (
+          <TabsContent
+            value="pricing"
+            id="monitoring-panel-pricing"
+            aria-labelledby="monitoring-tab-pricing"
+            tabIndex={0}
+          >
+            <PricingTab
+              pricing={pricing}
+              billingRate={billingRate}
+              onBillingRateChange={setBillingRate}
+              onRefresh={fetchPricing}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Detail Modal */}
       {showDetail && detailEntry && (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Lightbulb, Copy, Check, BookOpen } from "lucide-react";
 import type { KetikEducation } from "@trainers/types";
+import { Button } from "./ui/button";
 
 /**
  * Evaluasi Edukatif KETIK — lapisan edukasi di atas skor deterministik.
@@ -24,11 +25,12 @@ function CopyButton({ text }: { text: string }) {
   };
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={handleCopy}
       aria-label={copied ? "Tersalin" : "Salin contoh"}
-      className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border/60 bg-card text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors"
+      className="min-h-11 gap-1.5 rounded-lg px-2.5 text-[10px] font-bold uppercase tracking-wider"
     >
       {copied ? (
         <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -36,7 +38,7 @@ function CopyButton({ text }: { text: string }) {
         <Copy className="w-3.5 h-3.5" />
       )}
       {copied ? "Tersalin" : "Salin"}
-    </button>
+    </Button>
   );
 }
 
@@ -109,7 +111,7 @@ function GuidanceCard({
             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
               Contoh Perbaikan
             </div>
-            <blockquote className="text-sm text-foreground/80 italic leading-relaxed bg-emerald-500/5 border-l-2 border-emerald-500/50 pl-3 pr-3 py-2 rounded-r-xl">
+            <blockquote className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm italic leading-relaxed text-foreground/80">
               {exampleRewrite}
             </blockquote>
             <div className="mt-2">

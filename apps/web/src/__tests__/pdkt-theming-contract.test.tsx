@@ -19,7 +19,7 @@ describe("PDKT theme contract", () => {
     }
   });
 
-  it("keeps the black scrim as the semantic modal backdrop", () => {
+  it("uses the shared Dialog primitive for modal backdrops", () => {
     const createModal = readFileSync(
       resolve(process.cwd(), targets[0]),
       "utf8",
@@ -29,8 +29,8 @@ describe("PDKT theme contract", () => {
       "utf8",
     );
 
-    expect(createModal).toContain("bg-black/40");
-    expect(historyModal).toContain("bg-black/40");
+    expect(createModal).toContain("<DialogContent");
+    expect(historyModal).toContain("<DialogContent");
   });
 
   it("uses readable light and dark text variants for semantic statuses", () => {
@@ -43,29 +43,14 @@ describe("PDKT theme contract", () => {
     }
   });
 
-  it("keeps the canonical surface, border, and text tokens in every target", () => {
-    const requiredTokens = ["var(--surface)", "var(--border)"];
+  it("uses semantic surface and border tokens in every target", () => {
+    const requiredTokens = ["bg-card", "border-border"];
 
     for (const relativePath of targets) {
       const source = readFileSync(resolve(process.cwd(), relativePath), "utf8");
       for (const token of requiredTokens) {
         expect(source, `${relativePath}: ${token}`).toContain(token);
       }
-    }
-
-    const createModal = readFileSync(
-      resolve(process.cwd(), targets[0]),
-      "utf8",
-    );
-    const historyModal = readFileSync(
-      resolve(process.cwd(), targets[2]),
-      "utf8",
-    );
-    for (const source of [createModal, historyModal]) {
-      expect(source).toContain("var(--bg)");
-      expect(source).toContain("var(--fg)");
-      expect(source).toContain("var(--fg2)");
-      expect(source).toContain("var(--fg3)");
     }
   });
 });

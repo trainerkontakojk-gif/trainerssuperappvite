@@ -7,6 +7,11 @@ import {
 } from "@trainers/types";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import { formatSimulationSubjectLabel } from "../../lib/simulation-subject-display";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 
 function statusLabel(status: PdktSessionHistory["evaluationStatus"]): string {
   switch (status) {
@@ -195,47 +200,52 @@ export default function PdktHistory() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => exportHistory(history)}
             disabled={history.length === 0}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border)] px-3.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            className="min-h-11 gap-2 text-sm font-medium"
           >
-            <Download className="h-4 w-4" />
+            <Download aria-hidden="true" />
             Export CSV
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => void loadHistory()}
             disabled={loading}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--inv-bg)] px-3.5 text-sm font-medium text-[var(--inv-fg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            className="min-h-11 gap-2 text-sm font-medium"
           >
             <RefreshCw
-              className={`h-4 w-4 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`}
+              aria-hidden="true"
+              className={
+                loading ? "animate-spin motion-reduce:animate-none" : ""
+              }
             />
             Muat ulang
-          </button>
+          </Button>
         </div>
       </header>
 
       {error && (
-        <section
-          className="flex flex-col gap-3 rounded-xl border border-[var(--destructive)]/40 bg-[var(--surface)] p-5 sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
+        <Alert
+          variant="destructive"
+          className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between"
         >
-          <p className="text-sm text-[var(--fg)]">{error}</p>
-          <button
+          <AlertDescription>{error}</AlertDescription>
+          <Button
             type="button"
+            variant="outline"
             onClick={() => void loadHistory()}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border)] px-3 text-sm font-medium text-[var(--fg)] hover:bg-[var(--bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            className="min-h-11 text-sm font-medium"
           >
             Coba lagi
-          </button>
-        </section>
+          </Button>
+        </Alert>
       )}
 
-      <section
-        className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
+      <Card
+        className="overflow-hidden rounded-xl border-border bg-card p-0"
         aria-label="Daftar riwayat PDKT"
         aria-busy={loading}
       >
@@ -246,15 +256,15 @@ export default function PdktHistory() {
             aria-label="Memuat riwayat"
           >
             {[1, 2, 3].map((row) => (
-              <div
-                key={row}
-                className="h-14 animate-pulse rounded-lg bg-[var(--bg)] motion-reduce:animate-none"
-              />
+              <Skeleton key={row} className="h-14 rounded-lg" />
             ))}
           </div>
         ) : history.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
-            <History className="h-8 w-8 text-[var(--fg3)]" />
+            <History
+              aria-hidden="true"
+              className="size-8 text-muted-foreground"
+            />
             <h2 className="text-base font-semibold text-[var(--fg)]">
               Belum ada sesi PDKT
             </h2>
@@ -263,7 +273,7 @@ export default function PdktHistory() {
             </p>
             <Link
               to="/pdkt"
-              className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-[var(--inv-bg)] px-4 text-sm font-medium text-[var(--inv-fg)] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+              className="mt-2 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               Mulai simulasi
             </Link>
@@ -334,11 +344,12 @@ export default function PdktHistory() {
                         </div>
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <span
-                          className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${statusClass(session.evaluationStatus)}`}
+                        <Badge
+                          variant="outline"
+                          className={`h-7 rounded-md px-2.5 text-xs font-medium ${statusClass(session.evaluationStatus)}`}
                         >
                           {statusLabel(session.evaluationStatus)}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-5 py-4 text-right align-top font-semibold tabular-nums text-[var(--fg)]">
                         {session.evaluation?.score ?? "—"}
@@ -350,7 +361,7 @@ export default function PdktHistory() {
             </table>
           </div>
         )}
-      </section>
+      </Card>
     </main>
   );
 }

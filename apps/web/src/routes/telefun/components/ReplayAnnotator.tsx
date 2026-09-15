@@ -213,7 +213,7 @@ function AnnotationCard({
         <button
           type="button"
           onClick={() => onDelete(annotation.id)}
-          className="absolute right-2 top-2 rounded-lg p-1 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-500/10"
+          className="absolute right-2 top-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Hapus anotasi"
         >
           <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -435,10 +435,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               className="w-full rounded-xl border border-slate-950/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
             >
               {(
-                Object.entries(MOMENT_LABELS) as [
-                  AnnotationMoment,
-                  string,
-                ][]
+                Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
               ).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}

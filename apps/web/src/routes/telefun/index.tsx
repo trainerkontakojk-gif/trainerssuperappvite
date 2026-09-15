@@ -829,7 +829,7 @@ export default function TelefunLanding() {
                 <div className="flex flex-1 flex-col">
                   <TelefunMotionFrame />
                 </div>
-                <p className="mt-4 text-center text-sm leading-6 text-fg2">
+                <p className="mt-4 text-center text-sm leading-6 text-muted-foreground">
                   Lihat alur panggilan sebelum memilih skenario latihan.
                 </p>
               </div>
@@ -839,7 +839,7 @@ export default function TelefunLanding() {
                   <CardTitle className="max-w-xl text-3xl font-semibold tracking-tight text-balance">
                     Latih percakapan telepon. Tanggapi lebih tenang dan terarah.
                   </CardTitle>
-                  <CardDescription className="max-w-xl text-base leading-7 text-fg2">
+                  <CardDescription className="max-w-xl text-base leading-7">
                     Pilih skenario, lakukan panggilan dengan konsumen virtual,
                     lalu tinjau hasilnya.
                   </CardDescription>
@@ -852,7 +852,7 @@ export default function TelefunLanding() {
                       <h2 className="text-sm font-semibold text-foreground">
                         Mulai latihan
                       </h2>
-                      <span className="text-sm text-fg2">
+                      <span className="text-sm text-muted-foreground">
                         {
                           settings.scenarios.filter(
                             (scenario) => scenario.isActive,

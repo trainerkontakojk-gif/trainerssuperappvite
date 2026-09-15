@@ -25,6 +25,17 @@ import {
   YAxis,
   ReferenceLine,
 } from "recharts";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { MonthRangePicker } from "../../components/ui/MonthRangePicker";
 import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
 import { ForecastActionButton } from "../../components/sidak/ForecastActionButton";
@@ -321,7 +332,7 @@ export default function DashboardTrendPanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
       {/* Chart Panel */}
-      <div className="lg:col-span-2 rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-sm p-8 shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="lg:col-span-2 overflow-visible rounded-xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/5 text-primary rounded-lg border border-primary/10">
@@ -334,68 +345,66 @@ export default function DashboardTrendPanel({
 
           {/* Filtering Controls */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center bg-background/50 border border-border/40 rounded-xl p-1 gap-1">
-              <button
-                onClick={() => setSelectedService("all")}
-                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                  selectedService === "all"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "hover:bg-foreground/5 text-foreground/50"
-                }`}
+            <Tabs
+              value={selectedService}
+              onValueChange={(value) => setSelectedService(value || "all")}
+            >
+              <TabsList
+                variant="line"
+                className="max-w-full overflow-x-auto rounded-lg border border-border bg-muted p-1"
               >
-                Semua
-              </button>
-              {activeTrend.activeServices.map((svc) => (
-                <button
-                  key={svc}
-                  onClick={() =>
-                    setSelectedService(selectedService === svc ? "all" : svc)
-                  }
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                    selectedService === svc
-                      ? "bg-foreground/10 text-foreground shadow-sm"
-                      : "hover:bg-foreground/5 text-foreground/50"
-                  }`}
+                <TabsTrigger
+                  value="all"
+                  className="min-h-11 text-[9px] uppercase"
                 >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{
-                      backgroundColor: SERVICE_COLORS[svc] || "#ccc",
-                    }}
-                  />
-                  {SERVICE_LABELS[svc] || svc}
-                </button>
-              ))}
-            </div>
+                  Semua
+                </TabsTrigger>
+                {activeTrend.activeServices.map((svc) => (
+                  <TabsTrigger
+                    key={svc}
+                    value={svc}
+                    className="min-h-11 gap-1.5 text-[9px] uppercase"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full"
+                      style={{
+                        backgroundColor: SERVICE_COLORS[svc] || "#ccc",
+                      }}
+                    />
+                    {SERVICE_LABELS[svc] || svc}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
-            <div className="flex items-center bg-background/50 border border-border/40 rounded-xl px-3 py-1.5 gap-2">
-              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Tahun:
               </span>
-              <select
-                value={selectedYear}
-                onChange={(event) => onYearChange(Number(event.target.value))}
-                className="bg-transparent text-[9px] font-black uppercase tracking-widest focus:outline-none cursor-pointer"
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(value) => {
+                  if (value) onYearChange(Number(value));
+                }}
               >
-                {availableYears.length > 0 ? (
-                  availableYears.map((year) => (
-                    <option
-                      key={year}
-                      value={year}
-                      className="bg-card text-foreground"
-                    >
+                <SelectTrigger
+                  aria-label="Tahun tren"
+                  className="min-h-11 w-[7rem] rounded-lg border-border bg-background text-xs font-semibold uppercase"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(availableYears.length > 0
+                    ? availableYears
+                    : [currentYear]
+                  ).map((year) => (
+                    <SelectItem key={year} value={String(year)}>
                       {year}
-                    </option>
-                  ))
-                ) : (
-                  <option
-                    value={currentYear}
-                    className="bg-card text-foreground"
-                  >
-                    {currentYear}
-                  </option>
-                )}
-              </select>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="h-4 w-px bg-border/40 hidden sm:block" />
@@ -409,8 +418,10 @@ export default function DashboardTrendPanel({
             />
 
             {forecastResult && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 aria-pressed={showForecastPrediction}
                 aria-label={
                   showForecastPrediction
@@ -418,7 +429,7 @@ export default function DashboardTrendPanel({
                     : "Tampilkan Prediksi"
                 }
                 onClick={() => setShowForecastPrediction((prev) => !prev)}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-transparent px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-11 gap-2 px-3 text-xs"
               >
                 {showForecastPrediction ? (
                   <EyeOff className="h-4 w-4" />
@@ -428,7 +439,7 @@ export default function DashboardTrendPanel({
                 {showForecastPrediction
                   ? "Sembunyikan Prediksi"
                   : "Tampilkan Prediksi"}
-              </button>
+              </Button>
             )}
 
             <ForecastActionButton
@@ -443,7 +454,7 @@ export default function DashboardTrendPanel({
 
         <div className="h-[300px] w-full relative">
           {(trendLoading || forecastLoading) && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/50 backdrop-blur-[1px] rounded-2xl">
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-card/80">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           )}
@@ -662,13 +673,11 @@ export default function DashboardTrendPanel({
       </div>
 
       {/* Performance Summary Panel */}
-      <div className="rounded-[2rem] border border-border bg-surface-sunken text-fg p-6 flex flex-col shadow-xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-
-        <h2 className="font-display text-lg font-bold tracking-tight mb-4 relative z-10 text-fg">
+      <Card className="flex flex-col overflow-hidden border-border bg-surface-sunken p-6 text-fg animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <h2 className="mb-4 font-display text-lg font-bold tracking-tight text-fg">
           Ringkasan Performa
         </h2>
-        <div className="flex-1 flex flex-col justify-center gap-4 relative z-10">
+        <div className="flex flex-1 flex-col justify-center gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
               <Activity className="w-6 h-6 text-primary" />
@@ -679,16 +688,17 @@ export default function DashboardTrendPanel({
                   Total Temuan
                 </div>
                 {trendDelta !== null && (
-                  <div
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${trendDelta <= 0 ? "bg-emerald-400/20 text-emerald-400" : "bg-rose-400/20 text-rose-400"}`}
+                  <Badge
+                    variant="outline"
+                    className={`h-7 gap-0.5 px-1.5 text-[10px] font-bold ${trendDelta <= 0 ? "border-chart-green/30 bg-chart-green/10 text-chart-green" : "border-destructive/30 bg-destructive/10 text-destructive"}`}
                   >
                     {trendDelta <= 0 ? (
-                      <TrendingDown className="w-2.5 h-2.5" />
+                      <TrendingDown aria-hidden="true" />
                     ) : (
-                      <TrendingUp className="w-2.5 h-2.5" />
+                      <TrendingUp aria-hidden="true" />
                     )}
                     {Math.abs(Math.round(trendDelta))}%
-                  </div>
+                  </Badge>
                 )}
               </div>
               <div className="text-4xl font-bold tracking-tight">
@@ -703,7 +713,7 @@ export default function DashboardTrendPanel({
                 ([svc, stats]) => (
                   <div
                     key={svc}
-                    className="px-3 py-1.5 rounded-xl bg-surface/50 border border-border flex flex-col items-start gap-0.5 min-w-[70px]"
+                    className="flex min-w-[70px] flex-col items-start gap-0.5 rounded-xl border border-border bg-surface/50 px-3 py-1.5"
                   >
                     <span className="text-[8px] uppercase tracking-tighter opacity-60 font-bold">
                       {SERVICE_LABELS[svc] || svc}
@@ -761,8 +771,8 @@ export default function DashboardTrendPanel({
           </div>
 
           {topParameter && (
-            <div className="mt-2 pt-4 border-t border-border relative overflow-hidden">
-              <div className="flex items-start gap-3 relative z-10">
+            <div className="relative mt-2 overflow-hidden border-t border-border pt-4">
+              <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-xl bg-amber-400/20 flex items-center justify-center border border-amber-400/20 shrink-0">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
                 </div>
@@ -781,7 +791,7 @@ export default function DashboardTrendPanel({
             </div>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

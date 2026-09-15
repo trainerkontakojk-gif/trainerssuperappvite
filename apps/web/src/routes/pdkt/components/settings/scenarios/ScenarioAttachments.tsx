@@ -1,5 +1,6 @@
 import React from "react";
-import { FileUp, X } from "lucide-react";
+import { FileUp, Trash2 } from "lucide-react";
+import { Button } from "../../../../../components/ui/button";
 import ScenarioImage from "../../ScenarioImage";
 
 interface ScenarioAttachmentsProps {
@@ -16,21 +17,26 @@ export function ScenarioAttachments({
   fileInputRef,
 }: ScenarioAttachmentsProps) {
   return (
-    <div className="col-span-2 border-t border-border pt-5">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Lampiran Bukti / Media
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="flex flex-col gap-4 border-t border-border pt-4">
+      <div>
+        <h4 className="text-sm font-medium text-foreground">
+          Lampiran Bukti / Media
+        </h4>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Gambar maksimal 500KB atau PDF maksimal 2MB, maksimal 5 lampiran per
+          skenario.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <label
           htmlFor="scenario-attachment-upload"
-          className="group flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-foreground"
+          className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/40 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring sm:max-w-64"
         >
-          <div className="flex flex-col items-center justify-center py-4">
-            <FileUp className="mb-1.5 h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
-            <p className="text-xs font-medium text-foreground">
-              Pilih Gambar / PDF
-            </p>
-          </div>
+          <FileUp aria-hidden="true" className="size-5 text-muted-foreground" />
+          <span className="text-xs font-medium text-foreground">
+            Pilih Gambar / PDF
+          </span>
           <input
             id="scenario-attachment-upload"
             type="file"
@@ -42,25 +48,28 @@ export function ScenarioAttachments({
         </label>
 
         {attachmentImages.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto border-l-2 border-border px-3 py-2 scrollbar-hide">
+          <ul className="flex flex-wrap gap-3">
             {attachmentImages.map((img, index) => (
-              <div key={index} className="relative shrink-0 group">
+              <li key={index} className="flex w-24 flex-col gap-1.5">
                 <ScenarioImage
                   base64={img}
                   variant="thumbnail"
-                  className="w-14 h-14 rounded-md object-cover border border-border"
+                  className="size-24 w-full rounded-lg border border-border object-cover"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onRemove(index)}
+                  className="justify-start text-muted-foreground hover:text-destructive"
                   aria-label={`Hapus lampiran ${index + 1}`}
-                  className="absolute -right-2 -top-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                 >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </div>
+                  <Trash2 data-icon="inline-start" />
+                  Hapus
+                </Button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
     </div>

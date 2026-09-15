@@ -5,17 +5,24 @@ import {
   Search,
   ArrowDownToLine,
   RefreshCw,
-  Filter,
-  Calendar,
-  Shield,
-  Activity,
-  HelpCircle,
   Trash2,
 } from "lucide-react";
 import { useApi } from "../../hooks/useApi";
 import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Skeleton } from "../../components/ui/skeleton";
 import type { ActivityLog } from "@trainers/types";
 
 export default function ActivitiesPage() {
@@ -43,7 +50,8 @@ export default function ActivitiesPage() {
       (log.module || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesAction =
-      selectedActionType === "ALL" || (log.type || log.action) === selectedActionType;
+      selectedActionType === "ALL" ||
+      (log.type || log.action) === selectedActionType;
 
     return matchesSearch && matchesAction;
   });
@@ -53,25 +61,11 @@ export default function ActivitiesPage() {
     page * pageSize,
   );
 
-  const getActionColor = (action: string) => {
-    const act = action.toUpperCase();
-    if (act.includes("APPROVE") || act.includes("CREATE"))
-      return "bg-muted text-foreground border-border"; // semantic neutral for success-ish
-    if (
-      act.includes("REJECT") ||
-      act.includes("REVOKE") ||
-      act.includes("DELETE")
-    )
-      return "bg-muted text-foreground border-border"; // semantic neutral
-    if (act.includes("UPDATE") || act.includes("REASSIGN"))
-      return "bg-muted text-foreground border-border"; // semantic neutral
-    return "bg-muted text-muted-foreground border-border";
-  };
-
   const renderActionBadge = (action: string) => {
     const act = action.toUpperCase();
     let color = "var(--muted-foreground)";
-    if (act.includes("APPROVE") || act.includes("CREATE")) color = "var(--chart-green)";
+    if (act.includes("APPROVE") || act.includes("CREATE"))
+      color = "var(--chart-green)";
     if (
       act.includes("REJECT") ||
       act.includes("REVOKE") ||
@@ -82,12 +76,13 @@ export default function ActivitiesPage() {
       color = "var(--chart-blue)";
 
     return (
-      <span
-        className="inline-flex rounded-full border border-border bg-muted px-2.5 py-0.5 font-bold uppercase tracking-widest text-[9px]"
+      <Badge
+        variant="outline"
+        className="h-7 border-border bg-muted px-2.5 text-[9px] font-bold uppercase tracking-widest"
         style={{ color }}
       >
         {action}
-      </span>
+      </Badge>
     );
   };
 
@@ -141,7 +136,7 @@ export default function ActivitiesPage() {
   // Distinct action types for filter
   const actionTypes = Array.from(
     new Set((logs || []).map((l) => l.type || l.action)),
-  );
+  ).filter((type): type is string => Boolean(type));
 
   return (
     <motion.div
@@ -153,10 +148,13 @@ export default function ActivitiesPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-muted border border-border px-3 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            <History className="h-3 w-3" />
+          <Badge
+            variant="outline"
+            className="h-7 w-fit gap-2 border-border bg-muted px-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground"
+          >
+            <History aria-hidden="true" className="size-3" />
             Audit Trail
-          </div>
+          </Badge>
           <h2 className="text-4xl font-bold tracking-tight text-foreground font-outfit">
             Log Aktivitas
           </h2>
@@ -167,25 +165,31 @@ export default function ActivitiesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => refetch()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted/50 transition-all shadow-sm cursor-pointer active:scale-95"
+            className="min-h-11 gap-1.5 text-xs font-bold"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 text-muted-foreground ${loading ? "animate-spin" : ""}`}
+              aria-hidden="true"
+              className={
+                loading ? "animate-spin motion-reduce:animate-none" : ""
+              }
             />
             Refresh
-          </button>
+          </Button>
 
-          <button
+          <Button
+            type="button"
             onClick={exportLogsToCsv}
             disabled={filteredLogs.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/10 hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+            className="min-h-11 gap-1.5 text-xs font-bold"
           >
-            <ArrowDownToLine className="h-4 w-4" />
+            <ArrowDownToLine aria-hidden="true" />
             Ekspor CSV
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -193,45 +197,60 @@ export default function ActivitiesPage() {
       <div className="grid gap-4 md:grid-cols-[1fr_240px]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Input
             type="text"
+            aria-label="Cari aktor, tipe aksi, atau modul"
             placeholder="Cari aktor, tipe aksi, atau modul..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-border bg-card pl-12 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+            className="min-h-11 w-full rounded-xl border-input bg-card pl-12 pr-4 py-3 text-sm"
           />
         </div>
 
-        <div>
-          <select
-            value={selectedActionType}
-            onChange={(e) => setSelectedActionType(e.target.value)}
-            className="w-full h-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground font-semibold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+        <Select
+          value={selectedActionType}
+          onValueChange={(value) => {
+            if (value) setSelectedActionType(value);
+          }}
+        >
+          <SelectTrigger
+            aria-label="Jenis aksi"
+            className="min-h-11 w-full rounded-xl border-border bg-card px-4 py-3 text-sm font-semibold lg:w-60"
           >
-            <option value="ALL">Semua Jenis Aksi</option>
-            {actionTypes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+            <SelectValue placeholder="Semua Jenis Aksi" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Semua Jenis Aksi</SelectItem>
+            {actionTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
             ))}
-          </select>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Logs Table Card */}
-      <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      <Card className="overflow-hidden border-border bg-card p-0">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div
+            className="flex flex-col items-center justify-center py-24 text-muted-foreground"
+            role="status"
+            aria-live="polite"
+          >
+            <Skeleton className="size-10 rounded-full" />
             <span className="mt-4 text-xs font-bold uppercase tracking-widest">
               Memuat audit logs...
             </span>
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="py-24 text-center text-muted-foreground">
-            <History className="mx-auto h-12 w-12 text-muted-foreground/20 mb-4" />
+            <History
+              aria-hidden="true"
+              className="mx-auto mb-4 size-12 text-muted-foreground/20"
+            />
             <h3 className="font-bold text-foreground">Belum ada aktivitas</h3>
-            <p className="text-xs mt-1 font-medium">
+            <p className="mt-1 text-xs font-medium">
               Belum ada rekaman mutasi yang terekam.
             </p>
           </div>
@@ -280,21 +299,25 @@ export default function ActivitiesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-5 text-right">
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDelete(log.id)}
                           disabled={deleting === log.id}
-                          className="text-muted-foreground hover:text-chart-red p-2 rounded-xl hover:bg-chart-red/10 transition-all disabled:opacity-50 cursor-pointer active:scale-90"
+                          className="min-h-11 min-w-11 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           title="Hapus log"
+                          aria-label={`Hapus log ${log.action}`}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          <Trash2 aria-hidden="true" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="px-6 py-4 border-t border-border bg-muted/10">
+            <div className="border-t border-border bg-muted/10 px-6 py-4">
               <Pagination
                 page={page}
                 pageSize={pageSize}
@@ -309,7 +332,7 @@ export default function ActivitiesPage() {
             </div>
           </>
         )}
-      </div>
+      </Card>
     </motion.div>
   );
 }
