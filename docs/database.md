@@ -132,7 +132,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`ketik_history`**: Riwayat sesi KETIK per user, termasuk skenario, identitas konsumen, messages, dan `simulation_duration` (durasi simulasi dalam menit, nullable untuk backward compatibility).
 - **`ketik_session_reviews`**: Hasil review AI per sesi KETIK. Berisi skor, rubrik, dan feedback dalam format JSONB.
 - **`pdkt_history`**: Riwayat sesi PDKT per user, email thread, config, dan hasil evaluasi async.
-- **`pdkt_mailbox_items`**: Kotak masuk simulasi PDKT yang persisten. Menyimpan inbound email, status (`open`, `replied`, `deleted`).
+- **`pdkt_mailbox_items`**: Kotak masuk simulasi PDKT yang persisten. Menyimpan inbound email, status (`open`, `replied`, `deleted`), thread, serta snapshot scenario/config. Beberapa snapshot dapat memuat attachment inline yang sama; kontrak list API karena itu hanya memproyeksikan kolom scalar, sedangkan empat kolom JSON lengkap dibaca secara lazy melalui detail per-id. Optimasi ini tidak mengubah schema, RLS, atau data tersimpan.
 - **`telefun_history`**: Riwayat sesi TELEFUN per user, termasuk skenario, durasi, URL/path rekaman, skor, feedback, dan Phase 4 recording/scoring readiness state.
 - **`telefun_replay_annotations`**: Anotasi AI dan manual untuk fitur Replay Telefun.
 - **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN. Untuk KETIK, `quickTemplates` pada namespace tersimpan menjadi daftar template pribadi pemilik; API menggabungkannya dengan template standar global saat membaca settings.

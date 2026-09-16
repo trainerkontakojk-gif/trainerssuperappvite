@@ -3,6 +3,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import {
   mapSimulationSubjectRowToSnapshot,
   PdktMailboxItem,
+  type PdktMailboxListItem,
   PdktMailboxBatch,
   PdktMailboxReply,
   type SimulationSubjectSnapshot,
@@ -32,11 +33,18 @@ function throwMappedMailboxRpcError(
   const message = error?.message || fallbackMessage;
   const normalized = message.toLowerCase();
   const code = error?.code?.toUpperCase();
-  if (code === "PGRST301" || code === "401" || normalized.includes("jwt expired")) {
+  if (
+    code === "PGRST301" ||
+    code === "401" ||
+    normalized.includes("jwt expired")
+  ) {
     throw statusError(401, "Sesi Anda telah berakhir. Silakan login kembali.");
   }
   if (code === "42501") {
-    throw statusError(403, "Anda tidak memiliki izin untuk melakukan tindakan ini.");
+    throw statusError(
+      403,
+      "Anda tidak memiliki izin untuk melakukan tindakan ini.",
+    );
   }
   if (code === "PGRST116") {
     throw statusError(404, "Email mailbox tidak ditemukan.");
@@ -109,40 +117,66 @@ export function canDeletePdktMailboxItem(
 }
 
 /**
- * Fetch all active shared canonical mailbox items.
- * Aligned with shared mailbox policy: returns canonical rows (is_shared_copy=false/null),
- * status !== 'deleted', and appends creator profile metadata and delete permission.
+ * The mailbox list is rendered as a text-only inbox. Inline base64 attachments
+ * are stored duplicated across `inbound_email`, `emails_thread`,
+ * `scenario_snapshot`, and `config_snapshot`; sending all copies slows (and can
+ * break) opening the session. The detail endpoint returns them on demand.
  */
-export async function fetchMailboxItems(
-  supabaseClient: SupabaseClient,
-  actorOrId: string | { id: string; role: string },
-): Promise<PdktMailboxItem[]> {
-  const actor =
-    typeof actorOrId === "string"
-      ? { id: actorOrId, role: "agent" }
-      : actorOrId;
+export function toMailboxListRow(
+  row: Record<string, any>,
+): PdktMailboxListItem {
+  const listRow = { ...row };
+  delete listRow.inbound_email;
+  delete listRow.emails_thread;
+  delete listRow.scenario_snapshot;
+  delete listRow.config_snapshot;
+  return listRow as PdktMailboxListItem;
+}
 
-  const { data, error } = await supabaseClient
-    .from("pdkt_mailbox_items")
-    .select("*")
-    .neq("status", "deleted")
-    .or("is_shared_copy.eq.false,is_shared_copy.is.null")
-    .order("last_activity_at", { ascending: false })
-    .limit(100);
+type MailboxActor = { id: string; role: string };
 
-  if (error) {
-    console.error("[PDKT] Mailbox fetch failed:", error);
-    throw new Error("Gagal mengambil data mailbox.");
-  }
+// Keep the list query scalar-only. The four JSON snapshots contain duplicated
+// inline base64 and are fetched exclusively through the detail endpoint.
+const MAILBOX_LIST_COLUMNS = [
+  "id",
+  "user_id",
+  "status",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+  "replied_at",
+  "sender_name",
+  "sender_email",
+  "subject",
+  "snippet",
+  "history_id",
+  "last_activity_at",
+  "created_by_user_id",
+  "client_request_id",
+  "share_batch_id",
+  "is_shared_copy",
+  "shared_at",
+  "source_mailbox_item_id",
+  "simulation_subject_type",
+  "simulation_subject_peserta_id",
+  "simulation_subject_name",
+  "simulation_subject_batch_name",
+  "simulation_subject_team",
+].join(",");
 
-  if (!data || data.length === 0) {
-    return [];
-  }
+/**
+ * Resolve creator profiles in one batch and attach creator metadata plus
+ * delete permission to every canonical mailbox row.
+ */
+async function decorateMailboxRows(
+  rows: Array<Record<string, any>>,
+  actor: MailboxActor,
+): Promise<Array<Record<string, any>>> {
+  if (rows.length === 0) return [];
 
-  // Batch query to resolve creator profile details (name and role)
   const creatorIds = Array.from(
     new Set(
-      data
+      rows
         .map((item: any) => item.created_by_user_id || item.user_id)
         .filter(Boolean),
     ),
@@ -166,8 +200,7 @@ export async function fetchMailboxItems(
     }
   }
 
-  // Map canonical items with creator summary and permissions
-  return data.map((item: any) => {
+  return rows.map((item: any) => {
     const creatorId = item.created_by_user_id || item.user_id;
     const profile = profilesMap.get(creatorId);
 
@@ -187,8 +220,77 @@ export async function fetchMailboxItems(
       created_by_user,
       permissions,
       simulationSubject: mapSimulationSubjectRowToSnapshot(item),
-    } as PdktMailboxItem;
+    };
   });
+}
+
+/**
+ * Fetch all active shared canonical mailbox items.
+ * Aligned with shared mailbox policy: returns canonical rows (is_shared_copy=false/null),
+ * status !== 'deleted', and appends creator profile metadata and delete permission.
+ * Heavy JSON snapshots are omitted; use `fetchMailboxItemById` for the full row.
+ */
+export async function fetchMailboxItems(
+  supabaseClient: SupabaseClient,
+  actorOrId: string | { id: string; role: string },
+): Promise<PdktMailboxListItem[]> {
+  const actor =
+    typeof actorOrId === "string"
+      ? { id: actorOrId, role: "agent" }
+      : actorOrId;
+
+  const { data, error } = await supabaseClient
+    .from("pdkt_mailbox_items")
+    .select(MAILBOX_LIST_COLUMNS)
+    .neq("status", "deleted")
+    .or("is_shared_copy.eq.false,is_shared_copy.is.null")
+    .order("last_activity_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("[PDKT] Mailbox fetch failed:", error);
+    throw new Error("Gagal mengambil data mailbox.");
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  const decorated = await decorateMailboxRows(data, actor);
+  return decorated.map((item) => toMailboxListRow(item));
+}
+
+/**
+ * Fetch a single active mailbox item with its inline attachments and thread.
+ * Used to keep the list payload small while the detail pane stays complete.
+ */
+export async function fetchMailboxItemById(
+  supabaseClient: SupabaseClient,
+  actorOrId: string | { id: string; role: string },
+  id: string,
+): Promise<PdktMailboxItem | null> {
+  const actor =
+    typeof actorOrId === "string"
+      ? { id: actorOrId, role: "agent" }
+      : actorOrId;
+
+  const { data, error } = await supabaseClient
+    .from("pdkt_mailbox_items")
+    .select("*")
+    .eq("id", id)
+    .neq("status", "deleted")
+    .or("is_shared_copy.eq.false,is_shared_copy.is.null")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[PDKT] Mailbox item fetch failed:", error);
+    throw new Error("Gagal mengambil data email.");
+  }
+
+  if (!data) return null;
+
+  const [item] = await decorateMailboxRows([data], actor);
+  return (item as PdktMailboxItem | undefined) ?? null;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -105,6 +105,10 @@ export default function PdktLanding() {
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
+  // Landing data is handed to the session view so it does not refetch it.
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsVersion, setSettingsVersion] = useState<string | undefined>();
+  const [historyReady, setHistoryReady] = useState(false);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const usageSnapshotRef = useRef<UsageSnapshot | null>(null);
@@ -128,6 +132,8 @@ export default function PdktLanding() {
       } else {
         setSettings(null);
       }
+      setSettingsReady(true);
+      setSettingsVersion(settingsVersionRef.current.current());
     } catch (err) {
       console.error("[PDKT] Failed to load settings:", err);
     } finally {
@@ -158,6 +164,7 @@ export default function PdktLanding() {
           simulationSubject: item.simulationSubject ?? null,
         }));
         setHistory(mapped);
+        setHistoryReady(true);
       }
     } catch (err) {
       console.error("[PDKT] Failed to load history:", err);
@@ -179,6 +186,7 @@ export default function PdktLanding() {
     await unwrapResponse(response);
     settingsVersionRef.current.capture(response);
     setSettings(newSettings);
+    setSettingsVersion(settingsVersionRef.current.current());
     await fetchHistory();
   };
 
@@ -275,12 +283,31 @@ export default function PdktLanding() {
   const handleConfirmSubject = async (sel: SimulationSubjectSelection) => {
     setSimulationSubject(sel);
     setShowSubjectPicker(false);
-    await captureUsageBaseline();
+    // Baseline usage is only needed for the delta notification; never block
+    // opening the mailbox on it.
+    void captureUsageBaseline();
     setSessionDelta(null);
     setSessionDeltaPending(true);
     setReplaySession(null);
     setView("mailbox");
   };
+
+  const handleSessionSettingsChange = useCallback(
+    (nextSettings: PdktAppSettings, nextVersion: string | undefined) => {
+      setSettings(nextSettings);
+      setSettingsVersion(nextVersion);
+      setSettingsReady(true);
+    },
+    [],
+  );
+
+  const handleSessionHistoryChange = useCallback(
+    (nextHistory: SessionHistory[]) => {
+      setHistory(nextHistory);
+      setHistoryReady(true);
+    },
+    [],
+  );
 
   const handleOpenSettings = () => {
     setIsSettingsOpen(true);
@@ -430,6 +457,15 @@ export default function PdktLanding() {
                 onAfterActivity={computeUsageDeltaNow}
                 initialReplaySession={replaySession}
                 onConsumeReplaySession={() => setReplaySession(null)}
+                initialSettings={settingsReady ? settings : undefined}
+                initialSettingsVersion={
+                  settingsReady ? settingsVersion : undefined
+                }
+                initialHistory={historyReady ? history : undefined}
+                onSettingsChange={handleSessionSettingsChange}
+                onHistoryChange={handleSessionHistoryChange}
+                initialScenarios={defaultScenarios ?? undefined}
+                initialConsumerTypes={defaultConsumerTypesFromApi ?? undefined}
               />
             </div>
           </motion.div>

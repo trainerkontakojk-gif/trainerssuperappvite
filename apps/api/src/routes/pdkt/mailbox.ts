@@ -20,6 +20,7 @@ import {
   Variables,
   getUserClient,
   jsonAiError,
+  jsonNotFound,
   jsonServerError,
   resolveRequestSimulationSubject,
 } from "./route-utils";
@@ -49,6 +50,35 @@ mailbox.get(
         id: user.id,
         role: profile.role,
       });
+      return c.json({ success: true, data });
+    } catch (error: unknown) {
+      return jsonServerError(c, error);
+    }
+  },
+);
+
+mailbox.get(
+  "/:id",
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const userClient = getUserClient(c);
+
+    try {
+      // Detail rows keep inline attachments; the list stays text-only so
+      // opening the session does not download every attachment up front.
+      const data = await pdktService.fetchMailboxItemById(
+        userClient,
+        { id: user.id, role: profile.role },
+        id,
+      );
+
+      if (!data) {
+        return jsonNotFound(c, "Email mailbox tidak ditemukan.");
+      }
+
       return c.json({ success: true, data });
     } catch (error: unknown) {
       return jsonServerError(c, error);

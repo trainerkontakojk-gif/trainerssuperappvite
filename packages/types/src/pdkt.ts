@@ -406,6 +406,11 @@ export interface PdktMailboxItem {
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
+export type PdktMailboxListItem = Omit<
+  PdktMailboxItem,
+  "scenario_snapshot" | "config_snapshot" | "inbound_email" | "emails_thread"
+>;
+
 export interface PdktMailboxCreator {
   id: string | null;
   full_name: string;

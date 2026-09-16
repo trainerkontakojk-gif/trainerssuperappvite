@@ -14,6 +14,7 @@ const historyGetMock = vi.hoisted(() => vi.fn());
 const evalGetMock = vi.hoisted(() => vi.fn());
 const refetchMock = vi.hoisted(() => vi.fn());
 const retryEvalPostMock = vi.hoisted(() => vi.fn());
+const mailboxDetailGetMock = vi.hoisted(() => vi.fn());
 let mailboxItems: PdktMailboxItem[];
 
 vi.mock("../hooks/useApi", () => ({
@@ -22,7 +23,12 @@ vi.mock("../hooks/useApi", () => ({
 
 vi.mock("../lib/api", () => ({
   pdktClient: {
-    settings: { $get: vi.fn().mockResolvedValue(null) },
+    settings: {
+      $get: vi.fn().mockResolvedValue({
+        headers: new Headers({ "x-settings-version": "absent" }),
+      }),
+    },
+    mailbox: { ":id": { $get: mailboxDetailGetMock } },
     history: {
       $get: historyGetMock,
       eval: { ":id": { $get: evalGetMock } },
@@ -88,6 +94,10 @@ describe("PDKT evaluation polling", () => {
       mailboxItem("m1", "history-1"),
       mailboxItem("m2", "history-2"),
     ];
+    mailboxDetailGetMock.mockImplementation(
+      ({ param }: { param: { id: string } }) =>
+        mailboxItems.find((item) => item.id === param.id) ?? null,
+    );
     useApiMock.mockImplementation((path: string) => ({
       data: path === "/pdkt/mailbox" ? mailboxItems : [],
       loading: false,

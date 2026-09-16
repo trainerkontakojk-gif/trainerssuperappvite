@@ -77,7 +77,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Durable Mailbox**: Inbound email tersimpan secara persisten di database.
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
-  - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru.
+  - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru. Daftar mailbox tidak mengunduh attachment inline; attachment email terpilih dimuat melalui endpoint detail.
   - **Multi-Recipient Email Targets**: Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`. Field Penerima Utama mengatur arah narasi email awal.
   - **Scenario Editor Wizard**: Wizard terstruktur untuk membuat dan mengedit skenario PDKT dengan langkah-langkah terpandu.
   - **Attachment & Submit Safety**: Lampiran skenario diakumulasi secara functional; FileReader yang terlambat atau errored tidak bisa menimpa draft baru, submit/reset native dikunci sampai pembacaan selesai, dan save/reset menunggu request sukses sebelum menutup form.
@@ -89,8 +89,10 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Monitoring detail**: `/monitoring` menampilkan `identity`, `consumer_type`, `recipient/contact`, snapshot config yang allow-list normalized, email thread penuh, evaluasi lengkap, error, dan timing; tidak ada kontrol delete/reply di permukaan monitoring.
 - **Catatan Teknis**:
   - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
+  - **Mailbox list/detail contract**: `GET /api/v1/pdkt/mailbox` hanya memilih kolom scalar untuk `PdktMailboxListItem`; empat snapshot JSON berat (`inbound_email`, `emails_thread`, `scenario_snapshot`, dan `config_snapshot`) tidak dibaca dari Supabase pada list path. Setelah item dipilih, `GET /api/v1/pdkt/mailbox/:id` memuat `PdktMailboxItem` lengkap berikut thread dan attachment. Kedua route memakai user JWT/RLS dan role guard yang sama; detail yang tidak terlihat atau sudah dihapus menghasilkan `404`.
+  - **Session-open reuse**: landing meneruskan settings beserta `x-settings-version`, history, scenarios, dan consumer types yang sudah siap ke workspace. Workspace hanya melakukan fallback fetch untuk data yang belum tersedia. Perubahan settings/version dan history di dalam workspace disinkronkan kembali ke landing agar pembukaan ulang tidak memakai snapshot stale; request usage baseline tidak menahan perpindahan ke mailbox.
   - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
-  - **Settings versioning**: GET/POST settings membaca dan mengirim `x-settings-version`. Save wajib membawa header itu; backend memakai optimistic compare-and-swap pada `user_settings.updated_at`. Jika versi stale, respons `409 SETTINGS_CONFLICT` minta user memuat ulang/sinkronisasi lalu retry.
+  - **Settings versioning**: GET/POST settings membaca dan mengirim `x-settings-version`. Save wajib membawa header itu; backend memakai optimistic compare-and-swap pada `user_settings.updated_at`. Jika versi stale, respons `409 SETTINGS_CONFLICT` minta user memuat ulang/sinkronisasi lalu retry. Setiap save sukses memperbarui revision landing dan workspace agar save berikutnya memakai versi terbaru.
   - **CORS exposure**: CORS API mengekspos `x-settings-version` agar browser dapat membaca versi terbaru.
   - **No migration/storage redesign**: Perubahan ini tidak menambah migrasi atau merombak storage; namespace `pdkt` tetap disimpan pada row `user_settings` yang sama.
   - **Awaited save/reset**: `usePdktSettingsDraft()` dan wizard menunggu `onSave` selesai sebelum menutup modal; error atau konflik menjaga draf tetap terbuka untuk retry.

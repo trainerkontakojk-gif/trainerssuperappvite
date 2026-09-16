@@ -10,11 +10,11 @@ import {
   BarChart3,
   CheckSquare,
 } from "lucide-react";
-import type { PdktMailboxItem } from "@trainers/types";
+import type { PdktMailboxListItem } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 
-function formatCreatorLabel(item: PdktMailboxItem) {
+function formatCreatorLabel(item: PdktMailboxListItem) {
   const creator = item.created_by_user;
   if (!creator) return "Dibuat oleh user lama";
   if (creator.is_current_user) return "Dibuat oleh Anda";
@@ -23,7 +23,7 @@ function formatCreatorLabel(item: PdktMailboxItem) {
 }
 
 interface MailboxSidebarProps {
-  items: PdktMailboxItem[];
+  items: PdktMailboxListItem[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -93,7 +93,7 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   return (
     <aside
       aria-label="Mailbox"
-      className="w-full shrink-0 border-r border-border bg-card md:w-80"
+      className="flex h-full w-full shrink-0 flex-col border-r border-border bg-card md:w-80"
     >
       {/* Sidebar Header */}
       <div className="space-y-4 border-b border-border p-4">

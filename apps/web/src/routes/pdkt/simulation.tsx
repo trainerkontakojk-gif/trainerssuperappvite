@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { ApiError, pdktClient, unwrapResponse } from "../../lib/api";
 import type {
   PdktMailboxItem,
+  PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
   PdktIdentity,
@@ -83,6 +84,21 @@ interface PdktSimulationProps {
   onAfterActivity?: () => void;
   initialReplaySession?: SessionHistory | null;
   onConsumeReplaySession?: () => void;
+  /**
+   * Data already loaded by the landing page. `undefined` means "not provided"
+   * and keeps the session fetching it itself; `null` (settings only) means the
+   * server confirmed there is nothing stored.
+   */
+  initialSettings?: PdktAppSettings | null;
+  initialSettingsVersion?: string;
+  initialHistory?: SessionHistory[];
+  initialScenarios?: PdktScenario[];
+  initialConsumerTypes?: PdktConsumerType[];
+  onSettingsChange?: (
+    settings: PdktAppSettings,
+    version: string | undefined,
+  ) => void;
+  onHistoryChange?: (history: SessionHistory[]) => void;
 }
 
 export default function PdktSimulation({
@@ -92,7 +108,18 @@ export default function PdktSimulation({
   onAfterActivity,
   initialReplaySession = null,
   onConsumeReplaySession,
+  initialSettings,
+  initialSettingsVersion,
+  initialHistory,
+  initialScenarios,
+  initialConsumerTypes,
+  onSettingsChange,
+  onHistoryChange,
 }: PdktSimulationProps = {}) {
+  const hasInitialSettings = initialSettings !== undefined;
+  const hasInitialHistory = initialHistory !== undefined;
+  const hasInitialScenarios = initialScenarios !== undefined;
+  const hasInitialConsumerTypes = initialConsumerTypes !== undefined;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -116,12 +143,16 @@ export default function PdktSimulation({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Settings state
-  const [settings, setSettings] = useState<PdktAppSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settings, setSettings] = useState<PdktAppSettings | null>(
+    initialSettings ?? null,
+  );
+  const [settingsLoading, setSettingsLoading] = useState(!hasInitialSettings);
 
   // History state
-  const [history, setHistory] = useState<SessionHistory[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const [history, setHistory] = useState<SessionHistory[]>(
+    initialHistory ?? [],
+  );
+  const [historyLoading, setHistoryLoading] = useState(!hasInitialHistory);
 
   // Tab filter state
   const [filter, setFilter] = useState<"all" | "open" | "replied">("open");
@@ -130,6 +161,11 @@ export default function PdktSimulation({
   // Timer for time_taken (per mailbox)
   const sessionStartTimeRef = useRef<Record<string, number>>({});
   const settingsVersionRef = useRef(createSettingsVersionStore());
+  const onHistoryChangeRef = useRef(onHistoryChange);
+
+  useEffect(() => {
+    onHistoryChangeRef.current = onHistoryChange;
+  }, [onHistoryChange]);
 
   // Evaluation tracking by mailbox id
   const [evaluations, setEvaluations] = useState<
@@ -162,11 +198,19 @@ export default function PdktSimulation({
     loading,
     error,
     refetch,
-  } = useApi<PdktMailboxItem[]>("/pdkt/mailbox");
-  const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
-  const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
-    "/pdkt/consumer-types",
+  } = useApi<PdktMailboxListItem[]>("/pdkt/mailbox");
+  const { data: fetchedScenarios } = useApi<PdktScenario[]>(
+    hasInitialScenarios ? null : "/pdkt/scenarios",
   );
+  const { data: fetchedConsumerTypes } = useApi<PdktConsumerType[]>(
+    hasInitialConsumerTypes ? null : "/pdkt/consumer-types",
+  );
+  const defaultScenarios = hasInitialScenarios
+    ? initialScenarios
+    : fetchedScenarios;
+  const defaultConsumerTypesFromApi = hasInitialConsumerTypes
+    ? initialConsumerTypes
+    : fetchedConsumerTypes;
 
   const visibleMailboxItems = useMemo(() => {
     const serverItems = mailboxItems ?? [];
@@ -198,9 +242,51 @@ export default function PdktSimulation({
     return visibleMailboxItems.filter((item) => item.status === filter);
   }, [visibleMailboxItems, filter]);
 
-  const selectedItem = visibleMailboxItems.find(
-    (item) => item.id === selectedId,
-  );
+  // Detail rows (attachments + full thread) are fetched on demand so opening
+  // the session never downloads every inline attachment of the inbox.
+  const [mailboxDetails, setMailboxDetails] = useState<
+    Record<string, PdktMailboxItem>
+  >({});
+
+  useEffect(() => {
+    if (!selectedId || mailboxDetails[selectedId]) return;
+    // Replay rows are synthesized from history and already hold full payloads.
+    if (!mailboxItems?.some((item) => item.id === selectedId)) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const detail = (await unwrapResponse(
+          await pdktClient.mailbox[":id"].$get({ param: { id: selectedId } }),
+        )) as PdktMailboxItem | null;
+        if (!cancelled && detail) {
+          setMailboxDetails((prev) => ({ ...prev, [detail.id]: detail }));
+        }
+      } catch (err) {
+        console.error("[PDKT] Failed to load mailbox detail:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, mailboxDetails, mailboxItems]);
+
+  const invalidateMailboxDetail = (id: string | null) => {
+    if (!id) return;
+    setMailboxDetails((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const selectedItem = selectedId
+    ? mailboxDetails[selectedId] ??
+      (replayItem?.id === selectedId ? replayItem : undefined)
+    : undefined;
 
   const handleSelectMailboxItem = (id: string) => {
     setSelectedId(id);
@@ -253,6 +339,7 @@ export default function PdktSimulation({
           simulationSubject: item.simulationSubject ?? null,
         }));
         setHistory(mapped);
+        onHistoryChangeRef.current?.(mapped);
       }
     } catch (err) {
       console.error("[PDKT] Failed to load history:", err);
@@ -262,9 +349,17 @@ export default function PdktSimulation({
   }, []);
 
   useEffect(() => {
-    fetchSettings();
-    fetchHistory();
-  }, [fetchHistory]);
+    if (!hasInitialSettings) fetchSettings();
+    if (!hasInitialHistory) fetchHistory();
+  }, [fetchHistory, hasInitialSettings, hasInitialHistory]);
+
+  // Settings saved from inside the session must keep the optimistic-concurrency
+  // version that the landing page already captured.
+  useEffect(() => {
+    if (initialSettingsVersion) {
+      settingsVersionRef.current.restore(initialSettingsVersion);
+    }
+  }, [initialSettingsVersion]);
 
   // Auto-sync selection when filter tab changes or items change
   useEffect(() => {
@@ -497,6 +592,7 @@ export default function PdktSimulation({
     await unwrapResponse(response);
     settingsVersionRef.current.capture(response);
     setSettings(newSettings);
+    onSettingsChange?.(newSettings, settingsVersionRef.current.current());
     // Refetch history as scenarios configuration might affect display
     await fetchHistory();
   };
@@ -507,7 +603,11 @@ export default function PdktSimulation({
       await unwrapResponse(
         await pdktClient.history[":id"].$delete({ param: { id: historyId } }),
       );
-      setHistory((prev) => prev.filter((h) => h.id !== historyId));
+      setHistory((prev) => {
+        const next = prev.filter((h) => h.id !== historyId);
+        onHistoryChangeRef.current?.(next);
+        return next;
+      });
     } catch (err) {
       console.error("[PDKT] Failed to delete session:", err);
       notify.error("Gagal menghapus riwayat sesi.");
@@ -519,6 +619,7 @@ export default function PdktSimulation({
     try {
       await unwrapResponse(await pdktClient.history.$delete());
       setHistory([]);
+      onHistoryChangeRef.current?.([]);
     } catch (err) {
       notify.error("Gagal membersihkan riwayat.");
     }
@@ -775,6 +876,7 @@ export default function PdktSimulation({
 
       await refetch();
       await fetchHistory();
+      invalidateMailboxDetail(selectedId);
       setIsReplyOpen(false);
       setFilter("replied");
       notifyAfter();
@@ -1133,7 +1235,7 @@ export default function PdktSimulation({
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden gap-4 p-4">
-        <Card className="flex min-h-0 flex-1 overflow-hidden rounded-xl border-border bg-card p-0">
+        <Card className="flex min-h-0 flex-1 flex-row overflow-hidden rounded-xl border-border bg-card p-0">
           <div
             className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-80 md:shrink-0`}
           >
@@ -1191,6 +1293,15 @@ export default function PdktSimulation({
                     />
                   </div>
                 )}
+              </div>
+            ) : selectedId ? (
+              <div
+                aria-label="Memuat detail email"
+                className="flex flex-1 flex-col gap-4 p-6"
+              >
+                <Skeleton className="h-7 w-2/3" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-32 w-full" />
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-[var(--fg2)]">

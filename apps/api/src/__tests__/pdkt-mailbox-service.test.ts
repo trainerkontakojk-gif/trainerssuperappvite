@@ -20,6 +20,7 @@ import {
   createMailboxItem,
   softDeleteMailboxItem,
   fetchMailboxItems,
+  fetchMailboxItemById,
   canDeletePdktMailboxItem,
   bulkSoftDeleteMailboxItems,
 } from "../services/pdkt/mailbox-service";
@@ -429,6 +430,47 @@ describe("canDeletePdktMailboxItem", () => {
   });
 });
 
+const INLINE_ATTACHMENT = "data:image/png;base64," + "A".repeat(2048);
+
+function makeStoredMailboxRow(overrides: Record<string, any> = {}) {
+  const inboundEmail = {
+    id: "msg-1",
+    from: "konsumen@test.com",
+    to: "ojk@kontak157.go.id",
+    subject: "Keluhan transaksi",
+    body: "Mohon tindak lanjut.",
+    timestamp: new Date().toISOString(),
+    isAgent: false,
+    attachments: [INLINE_ATTACHMENT],
+  };
+  const scenario = {
+    id: "pinjol",
+    category: "Pinjol",
+    title: "Pinjol Ilegal",
+    description: "Test",
+    isActive: true,
+    attachmentImages: [INLINE_ATTACHMENT],
+  };
+
+  return {
+    id: "m-1",
+    user_id: "user-1",
+    created_by_user_id: "user-1",
+    status: "open",
+    created_at: new Date().toISOString(),
+    last_activity_at: new Date().toISOString(),
+    sender_name: "Konsumen",
+    sender_email: "konsumen@test.com",
+    subject: "Keluhan transaksi",
+    snippet: "Mohon tindak lanjut.",
+    scenario_snapshot: scenario,
+    config_snapshot: { scenarios: [scenario] },
+    inbound_email: inboundEmail,
+    emails_thread: [inboundEmail],
+    ...overrides,
+  };
+}
+
 describe("fetchMailboxItems", () => {
   it("returns empty array when no data", async () => {
     const client = buildMockClient({
@@ -447,6 +489,91 @@ describe("fetchMailboxItems", () => {
     await expect(fetchMailboxItems(client, agentActor)).rejects.toThrow(
       "Gagal mengambil data mailbox.",
     );
+  });
+
+  it("keeps the list payload free of inline attachment base64", async () => {
+    const client = buildMockClient({
+      limit: vi.fn().mockResolvedValue({
+        data: [makeStoredMailboxRow()],
+        error: null,
+      }),
+    });
+
+    const result = await fetchMailboxItems(client, agentActor);
+    const item = result[0] as any;
+
+    expect(JSON.stringify(result)).not.toContain(INLINE_ATTACHMENT);
+    expect(item).not.toHaveProperty("inbound_email");
+    expect(item).not.toHaveProperty("emails_thread");
+    expect(item).not.toHaveProperty("scenario_snapshot");
+    expect(item).not.toHaveProperty("config_snapshot");
+  });
+
+  it("shrinks the stored row by every duplicated inline attachment copy", async () => {
+    const storedRow = makeStoredMailboxRow();
+    const client = buildMockClient({
+      limit: vi.fn().mockResolvedValue({ data: [storedRow], error: null }),
+    });
+
+    const [listRow] = await fetchMailboxItems(client, agentActor);
+    const storedSize = JSON.stringify(storedRow).length;
+    const listSize = JSON.stringify(listRow).length;
+
+    // inbound_email + emails_thread + scenario_snapshot + config_snapshot all
+    // carry the same base64 payload; the list keeps none of them (the list row
+    // only gains a small creator/permission decoration).
+    expect(storedSize - listSize).toBeGreaterThanOrEqual(
+      3 * INLINE_ATTACHMENT.length,
+    );
+    expect(listSize).toBeLessThan(storedSize / 2);
+  });
+
+  it("keeps lightweight mailbox fields and permissions intact", async () => {
+    const client = buildMockClient({
+      limit: vi.fn().mockResolvedValue({
+        data: [makeStoredMailboxRow()],
+        error: null,
+      }),
+    });
+
+    const [item] = await fetchMailboxItems(client, agentActor);
+    expect(item.subject).toBe("Keluhan transaksi");
+    expect(item.status).toBe("open");
+    expect(item.permissions).toEqual({ can_delete: true });
+
+    const projection = client.select.mock.calls[0]?.[0];
+    expect(projection).not.toBe("*");
+    expect(projection).not.toContain("scenario_snapshot");
+    expect(projection).not.toContain("config_snapshot");
+    expect(projection).not.toContain("emails_thread");
+    expect(projection).not.toContain("inbound_email");
+  });
+});
+
+describe("fetchMailboxItemById", () => {
+  it("returns the full row including inline attachments", async () => {
+    const client = buildMockClient({
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: makeStoredMailboxRow(),
+        error: null,
+      }),
+    });
+
+    const item = (await fetchMailboxItemById(client, agentActor, "m-1")) as any;
+
+    expect(item.id).toBe("m-1");
+    expect(item.inbound_email.attachments).toEqual([INLINE_ATTACHMENT]);
+    expect(item.permissions).toEqual({ can_delete: true });
+  });
+
+  it("returns null when the item is missing", async () => {
+    const client = buildMockClient({
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    });
+
+    await expect(
+      fetchMailboxItemById(client, agentActor, "missing"),
+    ).resolves.toBeNull();
   });
 });
 
