@@ -74,7 +74,7 @@ function MonthSelect({
         aria-label={label}
         aria-invalid={invalid || undefined}
         className={cn(
-          "min-h-10 w-full min-w-0 rounded-lg border-border bg-background text-sm font-medium text-foreground",
+          "h-8 w-full min-w-0 rounded-lg border-border bg-background px-2.5 text-xs font-semibold text-foreground",
           "hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
           invalid && "border-destructive/60",
           className,
@@ -100,16 +100,18 @@ function MonthSelect({
 function ResetRangeButton({
   onClick,
   showLabel = false,
+  className,
 }: {
   onClick: () => void;
   showLabel?: boolean;
+  className?: string;
 }) {
   return (
     <Button
       type="button"
       variant="outline"
-      size={showLabel ? "lg" : "icon-lg"}
-      className={cn("min-h-11 shrink-0", !showLabel && "min-w-11")}
+      size={showLabel ? "sm" : "icon-sm"}
+      className={cn("h-8 shrink-0", !showLabel && "w-8", className)}
       onClick={onClick}
       aria-label="Reset rentang bulan"
       title="Reset rentang bulan"
@@ -134,6 +136,14 @@ export function MonthRangePicker({
 
   const handleReset = () => onRangeChange(null, null);
 
+  // Toolbar variant sits alongside tall (min-h-11) filter selects in
+  // DashboardFilters, so it keeps the tall touch height. Compact is the
+  // button-height toolbar used in tight filter bars like /dashboard trend.
+  const toolbarTriggerClassName =
+    variant === "toolbar" ? "min-h-11 text-sm font-medium" : undefined;
+  const toolbarResetClassName =
+    variant === "toolbar" ? "min-h-11 min-w-11" : undefined;
+
   const startSelect = (
     <MonthSelect
       id="month-range-start"
@@ -142,6 +152,7 @@ export function MonthRangePicker({
       placeholder={variant === "toolbar" ? "Awal" : "Bulan awal"}
       invalid={isInvalidRange}
       onChange={(value) => onRangeChange(value, endMonth)}
+      className={toolbarTriggerClassName}
     />
   );
   const endSelect = (
@@ -152,6 +163,7 @@ export function MonthRangePicker({
       placeholder={variant === "toolbar" ? "Akhir" : "Bulan akhir"}
       invalid={isInvalidRange}
       onChange={(value) => onRangeChange(startMonth, value)}
+      className={toolbarTriggerClassName}
     />
   );
 
@@ -164,7 +176,12 @@ export function MonthRangePicker({
             sampai
           </span>
           <div className="min-w-[8rem] flex-1">{endSelect}</div>
-          {hasRange ? <ResetRangeButton onClick={handleReset} /> : null}
+          {hasRange ? (
+            <ResetRangeButton
+              onClick={handleReset}
+              className={toolbarResetClassName}
+            />
+          ) : null}
         </div>
         {isInvalidRange ? (
           <p className="flex items-center gap-1.5 px-1 text-xs font-medium text-destructive">

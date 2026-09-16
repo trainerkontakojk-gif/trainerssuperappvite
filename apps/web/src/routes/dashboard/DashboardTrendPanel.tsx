@@ -344,18 +344,15 @@ export default function DashboardTrendPanel({
           </div>
 
           {/* Filtering Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Tabs
               value={selectedService}
               onValueChange={(value) => setSelectedService(value || "all")}
             >
-              <TabsList
-                variant="line"
-                className="max-w-full overflow-x-auto rounded-lg border border-border bg-muted p-1"
-              >
+              <TabsList className="h-8 max-w-full overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <TabsTrigger
                   value="all"
-                  className="min-h-11 text-[9px] uppercase"
+                  className="h-6 px-3 text-xs font-semibold normal-case whitespace-nowrap"
                 >
                   Semua
                 </TabsTrigger>
@@ -363,7 +360,7 @@ export default function DashboardTrendPanel({
                   <TabsTrigger
                     key={svc}
                     value={svc}
-                    className="min-h-11 gap-1.5 text-[9px] uppercase"
+                    className="h-6 gap-1.5 px-3 text-xs font-semibold normal-case whitespace-nowrap"
                   >
                     <span
                       aria-hidden="true"
@@ -379,7 +376,7 @@ export default function DashboardTrendPanel({
             </Tabs>
 
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Tahun:
               </span>
               <Select
@@ -390,7 +387,7 @@ export default function DashboardTrendPanel({
               >
                 <SelectTrigger
                   aria-label="Tahun tren"
-                  className="min-h-11 w-[7rem] rounded-lg border-border bg-background text-xs font-semibold uppercase"
+                  className="h-8 w-[7rem] rounded-lg border-border bg-background text-xs font-semibold"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -414,7 +411,7 @@ export default function DashboardTrendPanel({
               startMonth={trendStartMonth}
               endMonth={trendEndMonth}
               onRangeChange={onRangeChange}
-              className="mb-0 !gap-0"
+              variant="compact"
             />
 
             {forecastResult && (
@@ -429,7 +426,7 @@ export default function DashboardTrendPanel({
                     : "Tampilkan Prediksi"
                 }
                 onClick={() => setShowForecastPrediction((prev) => !prev)}
-                className="min-h-11 gap-2 px-3 text-xs"
+                className="h-8 gap-2 px-3 text-xs"
               >
                 {showForecastPrediction ? (
                   <EyeOff className="h-4 w-4" />
