@@ -34,10 +34,8 @@ import SidakSelectionCard from "../../components/sidak/SidakSelectionCard";
 import SidakSelectionGrid from "../../components/sidak/SidakSelectionGrid";
 import SidakInputManualForm from "../../components/sidak/SidakInputManualForm";
 import SidakInputImportPanel from "../../components/sidak/SidakInputImportPanel";
-import {
-  resolveServiceTypeFromTeam,
-  calculateQAScoreFromTemuan,
-} from "../../lib/scoring";
+import { calculateQAScoreFromTemuan } from "../../lib/scoring";
+import { resolveInitialInputService } from "../../lib/sidak-input-service";
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
@@ -100,8 +98,9 @@ export default function SidakInputPage() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
-  const [selectedService, setSelectedService] =
-    useState<QAIndicator["service_type"]>("call");
+  const [selectedService, setSelectedService] = useState<
+    QAIndicator["service_type"] | ""
+  >("call");
   const [activeWeight, setActiveWeight] = useState<ServiceWeight | null>(null);
 
   const profile = useAuthStore((s) => s.profile);
@@ -225,11 +224,16 @@ export default function SidakInputPage() {
     setErrorMsg(null);
 
     try {
-      const agentService = resolveServiceTypeFromTeam(
-        agent.tim,
-      ) as QAIndicator["service_type"];
+      const agentService = resolveInitialInputService(agent.tim);
       setSelectedService(agentService);
-      await loadResolvedConfig(agentService);
+      if (agentService) {
+        await loadResolvedConfig(agentService);
+      } else {
+        setResolvedIndicators([]);
+        setActiveWeight(null);
+        setRuleVersionId(null);
+        setHasDraftVersion(false);
+      }
       setStep("period");
     } catch {
       setErrorMsg("Gagal memuat data");
@@ -240,6 +244,10 @@ export default function SidakInputPage() {
 
   const handlePeriodClick = async (period: QAPeriod) => {
     if (!selectedAgent) return;
+    if (!selectedService) {
+      setErrorMsg("Pilih layanan audit terlebih dahulu.");
+      return;
+    }
     setSelectedPeriod(period);
     setLoading(true);
     setErrorMsg(null);
@@ -349,11 +357,16 @@ export default function SidakInputPage() {
         setAgents(folderAgents);
         setSelectedFolder(folder);
         setSelectedAgent(found);
-        const agentService = resolveServiceTypeFromTeam(
-          found.tim,
-        ) as QAIndicator["service_type"];
+        const agentService = resolveInitialInputService(found.tim);
         setSelectedService(agentService);
-        await loadResolvedConfig(agentService);
+        if (agentService) {
+          await loadResolvedConfig(agentService);
+        } else {
+          setResolvedIndicators([]);
+          setActiveWeight(null);
+          setRuleVersionId(null);
+          setHasDraftVersion(false);
+        }
         setStep("period");
         window.history.replaceState({}, "", window.location.pathname);
       } catch {
@@ -643,6 +656,42 @@ export default function SidakInputPage() {
                 </div>
               </div>
 
+              {resolveInitialInputService(selectedAgent?.tim) === "" && (
+                <div
+                  data-testid="explicit-service-selection"
+                  className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4"
+                >
+                  <label
+                    htmlFor="sidak-mix-service"
+                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                  >
+                    Layanan Audit
+                  </label>
+                  <select
+                    id="sidak-mix-service"
+                    aria-label="Layanan audit"
+                    value={selectedService}
+                    onChange={(event) => {
+                      const service = event.target.value as QAIndicator["service_type"];
+                      if (service) void handleServiceChange(service);
+                    }}
+                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-foreground sm:max-w-sm"
+                  >
+                    <option value="">Pilih layanan audit</option>
+                    {SERVICE_TYPES.map((service) => (
+                      <option key={service} value={service}>
+                        {SERVICE_LABELS[service]}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    Tim Mix menangani lebih dari satu layanan. Pilih layanan
+                    audit sebelum memilih periode agar sesi tersimpan pada
+                    service yang benar.
+                  </p>
+                </div>
+              )}
+
               {loading ? (
                 <SidakSelectionGrid testId="period-selection-skeleton">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -676,6 +725,7 @@ export default function SidakInputPage() {
                       title={MONTHS[p.month - 1]}
                       subtitle={String(p.year)}
                       onClick={() => handlePeriodClick(p)}
+                      disabled={!selectedService}
                       testId="period-selection-card"
                     />
                   ))}
@@ -880,7 +930,9 @@ export default function SidakInputPage() {
                       onCancel={formHook.resetForm}
                       activeIndicators={activeIndicators}
                       scoringMode={scoringMode}
-                      serviceType={selectedService}
+                      serviceType={
+                        selectedService as QAIndicator["service_type"]
+                      }
                       saving={formHook.saving}
                       previewing={formHook.previewing}
                     />
@@ -911,7 +963,9 @@ export default function SidakInputPage() {
                       onFileUpload={importHook.handleFileUpload}
                       onImportSave={importHook.handleImportSave}
                       disabled={activeIndicators.length === 0}
-                      serviceType={selectedService}
+                      serviceType={
+                        selectedService as QAIndicator["service_type"]
+                      }
                     />
                   </motion.div>
                 )}

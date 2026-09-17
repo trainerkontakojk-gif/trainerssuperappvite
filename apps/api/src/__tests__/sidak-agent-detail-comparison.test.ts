@@ -202,6 +202,48 @@ describe("getAgentDetail — comparison benchmark table", () => {
     expect(total!.agentCount).toBe(4);
   });
 
+  it("returns phantom sessions separately while keeping them out of temuan", async () => {
+    const phantom = {
+      ...temuanRow(
+        "phantom-a",
+        AGENT_A,
+        "p-feb",
+        "call-greeting",
+        3,
+        "B1",
+      ),
+      no_tiket: "__PHANTOM__batch-1",
+      is_phantom_padding: true,
+      ketidaksesuaian: null,
+      sebaiknya: null,
+    };
+    pendingResolve = (table) => {
+      if (table === "profiler_peserta") {
+        return {
+          data: { id: AGENT_A, nama: "Agent A", tim: "B1", batch_name: "B1" },
+          error: null,
+        };
+      }
+      if (table === "qa_indicators") return { data: callIndicators, error: null };
+      if (table === "qa_periods") return { data: periods, error: null };
+      if (table === "qa_service_weights") return { data: [], error: null };
+      if (table === "qa_temuan") {
+        return { data: [...allTemuan, phantom], error: null };
+      }
+      if (table === "qa_service_rule_versions")
+        return { data: [], error: null };
+      if (table === "qa_service_rule_indicators")
+        return { data: [], error: null };
+      return { data: [], error: null };
+    };
+
+    const result = await getAgentDetail(AGENT_A, 2026, "call", 1, 2);
+
+    expect(result.temuan.some((row) => row.id === "phantom-a")).toBe(false);
+    expect(result.phantomSessions).toHaveLength(1);
+    expect(result.phantomSessions[0].no_tiket).toBe("__PHANTOM__batch-1");
+  });
+
   it("restricts service cohort to accessible agents for leaders", async () => {
     // Leader scope only includes A and B (not C)
     const result = await getAgentDetail(AGENT_A, 2026, "call", 1, 2, undefined, [

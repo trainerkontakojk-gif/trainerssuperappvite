@@ -530,6 +530,7 @@ export interface AgentDetailData {
   periodSummaries: AgentPeriodSummary[];
   selectedPeriod?: AgentPeriodSummary | null;
   temuan: QATemuan[];
+  phantomSessions: QATemuan[];
   weights: Record<ServiceType, ServiceWeight>;
   comparisonTable?: AgentComparisonTable;
   personalTrend: {

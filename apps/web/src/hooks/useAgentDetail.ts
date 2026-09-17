@@ -38,6 +38,15 @@ export interface TemuanDisplayItem {
   no_tiket: string | null;
 }
 
+export interface PhantomSessionDisplayItem {
+  id: string;
+  month: number;
+  year: number;
+  no_tiket: string | null;
+  parameterCount: number;
+  score: number;
+}
+
 export interface EditFormState {
   nilai: number;
   ketidaksesuaian: string;
@@ -137,6 +146,10 @@ export function useAgentDetail(agentId: string) {
   );
   const periodSummaries = data?.periodSummaries;
   const temuan = data?.temuan;
+  const phantomSessions = useMemo(
+    () => data?.phantomSessions ?? [],
+    [data?.phantomSessions],
+  );
   const indicators = data?.indicators;
 
   // Init selectedService to first available service once data loads
@@ -254,6 +267,53 @@ export function useAgentDetail(agentId: string) {
       })
       .filter((t) => t.month > 0);
   }, [temuan, periodSummaries, indicators, selectedService]);
+
+  const phantomSessionDisplayItems = useMemo(
+    (): PhantomSessionDisplayItem[] => {
+      const periodMap = new Map(
+        (periodSummaries ?? []).map((summary) => [
+          summary.id,
+          { month: summary.month, year: summary.year },
+        ]),
+      );
+      const sessions = new Map<string, PhantomSessionDisplayItem>();
+
+      for (const phantom of phantomSessions) {
+        if (
+          selectedService !== "all" &&
+          phantom.service_type !== selectedService
+        ) {
+          continue;
+        }
+        const period = periodMap.get(phantom.period_id);
+        if (!period) continue;
+
+        const sessionKey = `${phantom.period_id}:${phantom.no_tiket ?? phantom.phantom_batch_id ?? phantom.id}`;
+        const current = sessions.get(sessionKey);
+        if (current) {
+          current.parameterCount += 1;
+          continue;
+        }
+
+        sessions.set(sessionKey, {
+          id: sessionKey,
+          month: period.month,
+          year: period.year,
+          no_tiket: phantom.no_tiket ?? null,
+          parameterCount: 1,
+          score: 100,
+        });
+      }
+
+      return [...sessions.values()].sort(
+        (left, right) =>
+          right.year - left.year ||
+          right.month - left.month ||
+          left.id.localeCompare(right.id),
+      );
+    },
+    [phantomSessions, periodSummaries, selectedService],
+  );
 
   const topTickets = useMemo((): TicketScore[] => {
     if (!data || !temuan || !indicators || !data.periodSummaries) return [];
@@ -434,11 +494,13 @@ export function useAgentDetail(agentId: string) {
   }, [data?.peserta?.bergabung_date]);
 
   const availableServiceTypes = useMemo(() => {
-    if (!temuan) return [];
-    return VALID_SERVICE_TYPES.filter((svc) =>
-      temuan.some((t) => t.service_type === svc),
+    if (!temuan && phantomSessions.length === 0) return [];
+    return VALID_SERVICE_TYPES.filter(
+      (svc) =>
+        (temuan ?? []).some((t) => t.service_type === svc) ||
+        phantomSessions.some((session) => session.service_type === svc),
     );
-  }, [temuan]);
+  }, [temuan, phantomSessions]);
 
   const handleExport = useCallback(
     async (format: AgentReportFormat, exportContext: AgentHtmlExportContext = {}) => {
@@ -617,6 +679,7 @@ export function useAgentDetail(agentId: string) {
     latestPeriod,
     previousPeriod,
     temuanDisplayItems,
+    phantomSessionDisplayItems,
     topTickets,
     activeRootCauses,
     masaKerja,

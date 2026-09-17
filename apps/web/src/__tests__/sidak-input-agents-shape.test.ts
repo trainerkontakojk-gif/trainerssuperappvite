@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { normalizeAgentsResponse } from "../routes/sidak/input";
+import { resolveInitialInputService } from "../lib/sidak-input-service";
 
 describe("normalizeAgentsResponse", () => {
   it("returns empty array for null", () => {
@@ -43,5 +44,11 @@ describe("normalizeAgentsResponse", () => {
       { id: "a2", nama: "Bob" },
     ];
     expect(normalizeAgentsResponse(payload)).toEqual(payload);
+  });
+
+  it("requires an explicit service for Mix agents instead of defaulting to CSO", () => {
+    expect(resolveInitialInputService("Mix")).toBe("");
+    expect(resolveInitialInputService("Telepon")).toBe("call");
+    expect(resolveInitialInputService("Email")).toBe("email");
   });
 });

@@ -39,8 +39,18 @@ interface TemuanItem {
   no_tiket: string | null;
 }
 
+export interface PhantomSessionItem {
+  id: string;
+  month: number;
+  year: number;
+  no_tiket: string | null;
+  parameterCount: number;
+  score: number;
+}
+
 interface Props {
   items: TemuanItem[];
+  phantomSessions?: PhantomSessionItem[];
   loading?: boolean;
   deletingId?: string | null;
   canEdit?: boolean;
@@ -65,6 +75,7 @@ const MONTHS_FULL = [
 
 export default function AgentTemuanTab({
   items,
+  phantomSessions = [],
   loading = false,
   deletingId,
   canEdit = false,
@@ -73,7 +84,7 @@ export default function AgentTemuanTab({
 }: Props) {
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
 
-  if (items.length === 0) {
+  if (items.length === 0 && phantomSessions.length === 0) {
     if (loading) {
       return (
         <Card className="border-border bg-surface ring-0">
@@ -112,8 +123,18 @@ export default function AgentTemuanTab({
     acc[key].push(item);
     return acc;
   }, {});
+  const groupedPhantoms = phantomSessions.reduce<
+    Record<string, PhantomSessionItem[]>
+  >((acc, session) => {
+    const key = session.month + "-" + session.year;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(session);
+    return acc;
+  }, {});
 
-  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+  const sortedKeys = Array.from(
+    new Set([...Object.keys(grouped), ...Object.keys(groupedPhantoms)]),
+  ).sort((a, b) => {
     const [monthA, yearA] = a.split("-").map(Number);
     const [monthB, yearB] = b.split("-").map(Number);
     return yearB - yearA || monthB - monthA;
@@ -139,7 +160,8 @@ export default function AgentTemuanTab({
         ) : null}
         {sortedKeys.map((key) => {
           const [month, year] = key.split("-").map(Number);
-          const monthItems = grouped[key];
+          const monthItems = grouped[key] ?? [];
+          const monthPhantoms = groupedPhantoms[key] ?? [];
           const isOpen = openMonths.has(key);
           const panelId = "temuan-month-panel-" + key;
           const headingId = "temuan-month-heading-" + key;
@@ -187,7 +209,14 @@ export default function AgentTemuanTab({
                         {monthLabel}
                       </span>
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        {monthItems.length} temuan · {Object.keys(tickets).length} tiket
+                        {monthItems.length} temuan · {Object.keys(tickets).length}{" "}
+                        tiket
+                        {monthPhantoms.length > 0 ? (
+                          <>
+                            {" · "}
+                            {monthPhantoms.length} sesi tanpa temuan
+                          </>
+                        ) : null}
                       </span>
                     </span>
                   </span>
@@ -316,6 +345,39 @@ export default function AgentTemuanTab({
                           );
                         })}
                       </div>
+                    </section>
+                  ))}
+                  {monthPhantoms.map((session, sessionIndex) => (
+                    <section
+                      key={session.id}
+                      aria-label="Sesi tanpa temuan"
+                      className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                            <ShieldCheck className="size-4" aria-hidden="true" />
+                          </span>
+                          <div>
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                            >
+                              Sesi tanpa temuan
+                            </Badge>
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                              Audit #{sessionIndex + 1}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                          Skor audit {session.score}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        Tidak ada ketidaksesuaian pada {session.parameterCount}{" "}
+                        parameter yang dinilai.
+                      </p>
                     </section>
                   ))}
                 </CollapsibleContent>

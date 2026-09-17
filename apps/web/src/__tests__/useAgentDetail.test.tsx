@@ -403,6 +403,81 @@ describe("useAgentDetail", () => {
     expect(result.current.availableServiceTypes).toHaveLength(2);
   });
 
+  it("keeps phantom-only services available and aggregates their parameters into one session", async () => {
+    const data = {
+      ...buildAgentDetailData(null),
+      periodSummaries: [
+        ...buildAgentDetailData(null).periodSummaries,
+        {
+          id: "period-pencatatan-aug",
+          month: 8,
+          year: 2026,
+          label: "08/2026",
+          serviceType: "pencatatan",
+          finalScore: 100,
+          nonCriticalScore: 100,
+          criticalScore: 100,
+          sessionCount: 1,
+          findingsCount: 0,
+        },
+      ],
+      phantomSessions: [
+        {
+          id: "phantom-1",
+          peserta_id: "agent-1",
+          period_id: "period-pencatatan-aug",
+          indicator_id: "indicator-pencatatan-1",
+          service_type: "pencatatan",
+          no_tiket: "__PHANTOM__batch-1",
+          phantom_batch_id: "batch-1",
+          is_phantom_padding: true,
+          nilai: 3,
+          tahun: 2026,
+        },
+        {
+          id: "phantom-2",
+          peserta_id: "agent-1",
+          period_id: "period-pencatatan-aug",
+          indicator_id: "indicator-pencatatan-2",
+          service_type: "pencatatan",
+          no_tiket: "__PHANTOM__batch-1",
+          phantom_batch_id: "batch-1",
+          is_phantom_padding: true,
+          nilai: 3,
+          tahun: 2026,
+        },
+      ],
+    };
+    useApiMock.mockReturnValue({
+      data,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+    expect(result.current.availableServiceTypes).toContain("pencatatan");
+
+    act(() => {
+      result.current.handleServiceChange("pencatatan");
+    });
+
+    await waitFor(() =>
+      expect(result.current.phantomSessionDisplayItems).toEqual([
+        {
+          id: "period-pencatatan-aug:__PHANTOM__batch-1",
+          month: 8,
+          year: 2026,
+          no_tiket: "__PHANTOM__batch-1",
+          parameterCount: 2,
+          score: 100,
+        },
+      ]),
+    );
+  });
+
   it("handleInputAudit navigates with folder param encoded", async () => {
     const assignMock = vi.fn();
     const originalLocation = window.location;

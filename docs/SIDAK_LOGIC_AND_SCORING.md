@@ -110,6 +110,19 @@ Konsekuensinya:
 - clean session bisa membuat `findingsCount = 0`
 - clean session tidak boleh menambah total defect, pareto, donut, atau ranking defect
 
+### Presentasi Sesi Phantom pada Agent Detail
+
+Endpoint `GET /sidak/agents/:id` mengembalikan dua koleksi yang berbeda:
+
+- `temuan` hanya berisi row audit riil dan menjadi sumber aksi edit/hapus.
+- `phantomSessions` berisi row `is_phantom_padding = true` agar histori clean
+  session tetap dapat ditampilkan tanpa menjadikannya temuan biasa.
+
+Frontend mengelompokkan `phantomSessions` berdasarkan `period_id` dan
+`no_tiket`, lalu menampilkannya sebagai **Sesi tanpa temuan** dengan skor `100`
+dan jumlah parameter. Phantom tidak memiliki tombol edit/hapus dan tidak
+menambah jumlah temuan.
+
 ## Logika Workspace Data (Data Report)
 
 Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk clean session), Workspace Data (`/sidak/reports-data`) dirancang sebagai alat kerja perbaikan kualitas.
@@ -331,12 +344,13 @@ Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama unt
 - Jika data temuan real dan phantom bercampur dalam sesi yang sama, hitungan skor dan defect harus mengikuti row real saja.
 - Gunakan `docs/SIDAK_SCORING_GUARDRAILS.md` untuk perubahan yang menyentuh scoring atau agregasi SIDAK.
 - **Tampilan UI**: Halaman input (`/sidak/input`) memakai grid responsif untuk pilihan folder, agen, periode, dan daftar temuan. Di mobile grid kembali menjadi satu kolom agar tetap mudah dibaca; di layar lebih lebar trainer bisa melihat lebih banyak pilihan atau sesi dalam satu viewport.
+- **Tim Mix**: Karena satu tim Mix dapat menangani beberapa layanan, layanan audit wajib dipilih eksplisit setelah agent dipilih. Sistem tidak lagi otomatis menyimpan sesi Mix sebagai CSO.
 
 ## Agent Detail Ranking and Forecast Quickview
 
 Halaman `/sidak/agents/:id` menampilkan quickview pada panel **Ringkasan**, di bawah header profil ringkas. Quickview memakai konteks **tahun terpilih + layanan terpilih** dengan mode periode YTD; pilihan bulan aktif dan rentang grafik tren tidak mengubah quickview.
 
-Presentation halaman memakai tab `summary`, `trend`, `temuan`, dan `simulations`. Ringkasan menjadi tab awal; hanya panel aktif yang terlihat, sementara panel yang sudah dibuka tetap mounted untuk mempertahankan state lokal. Tahun dan layanan audit berlaku untuk tiga tab audit, rentang bulan hanya tersedia pada Tren, dan filter history Simulasi tetap independen.
+Presentation halaman memakai tab `summary`, `trend`, `temuan`, dan `simulations`. Ringkasan menjadi tab awal; hanya panel aktif yang terlihat, sementara panel yang sudah dibuka tetap mounted untuk mempertahankan state lokal. Tahun dan layanan audit berlaku untuk tiga tab audit, rentang bulan hanya tersedia pada Tren, dan filter history Simulasi tetap independen. Response detail memisahkan `temuan` riil dari `phantomSessions` agar clean session tetap muncul sebagai histori tanpa menjadi temuan yang bisa diedit atau dihapus.
 
 Header profil memakai avatar shadcn/ui berukuran 96px pada mobile dan 112px mulai breakpoint `sm`. Kontrol dan surface pada detail agen menggunakan primitive shadcn/ui dengan token tema aplikasi, target sentuh minimum 44px, label aksesibel, serta nama panjang yang dapat membungkus.
 

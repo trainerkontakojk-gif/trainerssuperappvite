@@ -50,6 +50,7 @@ export default function SidakAgentDetailPage() {
     latestPeriod,
     previousPeriod,
     temuanDisplayItems,
+    phantomSessionDisplayItems,
     topTickets,
     activeRootCauses,
     availableServiceTypes,
@@ -309,12 +310,14 @@ export default function SidakAgentDetailPage() {
                       Temuan audit
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Temuan dikelompokkan berdasarkan bulan dan tiket.
+                      Temuan dan sesi tanpa temuan dikelompokkan berdasarkan
+                      bulan dan tiket.
                     </p>
                   </div>
                 </div>
                 <AgentTemuanTab
                   items={temuanDisplayItems}
+                  phantomSessions={phantomSessionDisplayItems}
                   loading={loading}
                   deletingId={deletingId}
                   canEdit={role === "trainer" || role === "admin"}

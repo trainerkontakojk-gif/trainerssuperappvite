@@ -174,6 +174,7 @@ const sampleData = (overrides?: Partial<AgentDetailData>): AgentDetailData => ({
   peserta: samplePeserta,
   periodSummaries: sampleSummaries,
   temuan: [],
+  phantomSessions: [],
   indicators: [],
   weights: {
     call: {

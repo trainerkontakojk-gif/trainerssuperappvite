@@ -9,6 +9,7 @@ interface SidakSelectionCardProps {
   delay?: number;
   onClick: () => void;
   testId?: string;
+  disabled?: boolean;
 }
 
 export default function SidakSelectionCard({
@@ -18,6 +19,7 @@ export default function SidakSelectionCard({
   delay = 0,
   onClick,
   testId,
+  disabled = false,
 }: SidakSelectionCardProps) {
   return (
     <motion.button
@@ -27,7 +29,9 @@ export default function SidakSelectionCard({
       transition={{ delay }}
       type="button"
       onClick={onClick}
-      className="group flex min-h-32 cursor-pointer flex-col items-start justify-between rounded-2xl border border-border bg-surface p-5 text-left transition-all hover:border-foreground/20 focus:outline-none focus:border-foreground"
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      className="group flex min-h-32 cursor-pointer flex-col items-start justify-between rounded-2xl border border-border bg-surface p-5 text-left transition-all hover:border-foreground/20 focus:outline-none focus:border-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border"
       title={title}
     >
       <div className="flex w-full items-start justify-between gap-3">

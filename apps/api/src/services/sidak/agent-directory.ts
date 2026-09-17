@@ -531,6 +531,7 @@ export async function getAgentDetail(
     indicators,
     periodSummaries: sortedSummaries,
     temuan: rows.filter((r) => !r.is_phantom_padding),
+    phantomSessions: rows.filter((r) => r.is_phantom_padding),
     weights: resolvedWeights as Record<ServiceType, ServiceWeight>,
     comparisonTable,
     rootCauses,
