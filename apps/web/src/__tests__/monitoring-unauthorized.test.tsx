@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { tabsListVariants } from "../components/ui/tabs";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 
@@ -291,7 +292,44 @@ describe(
           await import("../routes/monitoring");
         render(React.createElement(MonitoringPage));
         const tab = await screen.findByText("Riwayat Simulasi");
-        expect(tab.className).toContain("border-primary");
+        const tabList = screen.getByRole("tablist", {
+          name: "Bagian monitoring",
+        });
+        expect(tab.className).toContain("data-active:after:bg-primary");
+        expect(tab.className).not.toContain("data-active:border-primary");
+        expect(tab.className).toContain("min-h-12");
+        expect(tab.className).toContain("text-sm");
+        expect(tab.className).toContain("font-semibold");
+        expect(tabList.className).toContain("min-h-12");
+        expect(tabList.className).toContain("gap-6");
+        const lineTabListClasses = tabsListVariants({ variant: "line" });
+        expect(lineTabListClasses).toContain(
+          "group-data-[orientation=horizontal]/tabs:h-auto",
+        );
+        expect(lineTabListClasses).not.toContain(
+          "group-data-[orientation=horizontal]/tabs:h-8",
+        );
+      });
+
+      it("keeps history table header and actions reachable on wide tables", async () => {
+        const { default: MonitoringPage } =
+          await import("../routes/monitoring");
+        render(React.createElement(MonitoringPage));
+        await screen.findByText("Skenario A");
+
+        const actionHeader = screen.getByRole("columnheader", {
+          name: "Aksi",
+        });
+        const actionCell = screen.getAllByRole("cell").find((cell) =>
+          cell.textContent?.includes("Lihat Detail"),
+        );
+
+        expect(actionHeader.className).toContain("sticky");
+        expect(actionHeader.className).toContain("right-0");
+        expect(actionHeader.className).toContain("min-w-[176px]");
+        expect(actionCell).toBeTruthy();
+        expect(actionCell?.className).toContain("sticky");
+        expect(actionCell?.className).toContain("right-0");
       });
     });
 

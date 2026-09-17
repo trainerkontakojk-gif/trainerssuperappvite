@@ -6,7 +6,7 @@ Dokumen ini menjelaskan kontrak fitur monitoring token bulanan, billing Rupiah, 
 
 Fitur ini menambahkan observabilitas usage AI lintas modul dengan dua permukaan utama:
 
-- `/dashboard` (tab monitoring) untuk rekap lintas akun
+- `/monitoring` untuk rekap lintas akun dan review sesi
 - quick-view usage bulanan di modul `KETIK`, `PDKT`, dan `TELEFUN` untuk user login
 
 Tujuan utamanya:
@@ -39,6 +39,27 @@ Tab `Harga & Kurs`:
 - hanya tersedia untuk `trainer` dan `admin`
 - menampilkan editor harga input/output per model
 - menampilkan editor kurs USD/IDR
+
+#### Kontrak UI Monitoring
+
+Permukaan `/monitoring` memakai primitive UI lokal bergaya shadcn/Base UI:
+`Button`, `Card`, `Input`, `Select`, `Tabs`, dan `Badge` dari
+`apps/web/src/components/ui/`. Styling tetap memakai token CSS aplikasi,
+Tailwind, CVA, dan Lucide; jangan mencampur library UI kedua untuk pola yang
+sama.
+
+Aturan visual dan responsif yang perlu dipertahankan:
+
+- Tab utama menggunakan line-style dengan label minimal `text-sm`, target
+  interaksi yang nyaman, jarak antartab yang jelas, dan foreground plus
+  underline `primary` untuk state aktif.
+- Variant `line` pada `TabsList` memakai tinggi otomatis; tinggi fixed hanya
+  berlaku untuk variant default agar label tab tidak terpotong.
+- Tabel riwayat mempertahankan horizontal-scroll region yang dapat difokuskan
+  keyboard, header sticky, kolom `Aksi` sticky di kanan, dan kolom waktu
+  `nowrap` agar action utama tetap dapat dijangkau pada tabel lebar.
+- Breadcrumb route dimiliki oleh app header; halaman monitoring tidak
+  menambahkan breadcrumb kedua.
 
 Riwayat Simulasi menampilkan histori penuh per modul dengan detail served-consumer yang relevan:
 
@@ -305,8 +326,11 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 - `apps/api/src/lib/ai-models.ts` — Model registry
 - `apps/api/src/lib/ai-usage.ts` — Usage logging
 - `apps/web/src/lib/api/rpc-client.ts` — Authenticated Hono RPC client (`aiClient` + `unwrapResponse`, inject bearer token)
-- `apps/web/src/routes/monitoring.tsx` — Monitoring page (3 tab, legacy visual parity)
-- `apps/web/src/__tests__/monitoring-unauthorized-parity.test.tsx` — Regression tests
+- `apps/web/src/routes/monitoring/MonitoringPage.tsx` — Monitoring page dan tiga tab
+- `apps/web/src/routes/monitoring/components/HistoryTab.tsx` — Filter dan tabel riwayat
+- `apps/web/src/components/ui/tabs.tsx` — Primitive tabs dan variant line
+- `apps/web/src/__tests__/monitoring-unauthorized.test.tsx` — Route/RBAC/UI regression tests
+- `apps/web/src/__tests__/monitoring-redesign.test.tsx` — History UI regression tests
 - `docs/modules.md`
 - `docs/database.md`
 - `docs/auth-rbac.md`

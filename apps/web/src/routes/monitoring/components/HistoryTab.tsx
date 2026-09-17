@@ -804,30 +804,56 @@ export function HistoryTab({
 
       {/* Spacious Telemetry Table */}
       <Card className="overflow-hidden border-border bg-card p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div
+          className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+          role="region"
+          aria-label="Tabel riwayat simulasi"
+          tabIndex={0}
+        >
+          <table className="min-w-[1180px] w-full text-left border-collapse">
             <caption className="sr-only">Riwayat sesi simulasi</caption>
             <thead>
               <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground/80 text-[11px] font-bold uppercase tracking-wider">
-                <th scope="col" className="py-3.5 px-6 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 bg-muted/20 py-3.5 px-6 font-bold"
+                >
                   Modul
                 </th>
-                <th scope="col" className="py-3.5 px-4 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 bg-muted/20 py-3.5 px-4 font-bold"
+                >
                   Status
                 </th>
-                <th scope="col" className="py-3.5 px-4 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 bg-muted/20 py-3.5 px-4 font-bold"
+                >
                   Skenario
                 </th>
-                <th scope="col" className="py-3.5 px-4 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 bg-muted/20 py-3.5 px-4 font-bold"
+                >
                   Pengguna & Target
                 </th>
-                <th scope="col" className="py-3.5 px-4 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 min-w-[136px] whitespace-nowrap bg-muted/20 py-3.5 px-4 font-bold"
+                >
                   Waktu
                 </th>
-                <th scope="col" className="py-3.5 px-4 font-bold">
+                <th
+                  scope="col"
+                  className="sticky top-0 z-20 bg-muted/20 py-3.5 px-4 font-bold"
+                >
                   Skor & Ringkasan
                 </th>
-                <th scope="col" className="py-3.5 px-6 font-bold text-right">
+                <th
+                  scope="col"
+                  className="sticky right-0 top-0 z-30 min-w-[176px] border-l border-border bg-muted/20 py-3.5 px-6 font-bold text-right"
+                >
                   Aksi
                 </th>
               </tr>
@@ -879,7 +905,7 @@ export function HistoryTab({
                   </td>
 
                   {/* Waktu & Durasi */}
-                  <td className="py-4 px-4 align-middle">
+                  <td className="min-w-[136px] whitespace-nowrap py-4 px-4 align-middle">
                     <div className="font-medium text-foreground">
                       {formatDate(entry.created_at)}
                     </div>
@@ -894,7 +920,7 @@ export function HistoryTab({
                   </td>
 
                   {/* Aksi buttons */}
-                  <td className="py-4 px-6 align-middle text-right">
+                  <td className="sticky right-0 z-20 min-w-[176px] border-l border-border bg-card py-4 px-6 align-middle text-right group-hover:bg-muted/10">
                     <div
                       className="inline-flex items-center gap-2 justify-end w-full relative"
                       onClick={(e) => e.stopPropagation()}

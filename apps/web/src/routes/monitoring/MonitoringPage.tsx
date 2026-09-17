@@ -111,14 +111,9 @@ export default function MonitoringPage() {
         </span>
       </div>
 
-      {/* Breadcrumbs & Header */}
+      {/* Page Header — breadcrumb is provided by the app header */}
       <div className="flex flex-col gap-1">
-        <div className="text-xs text-muted-foreground/80 flex items-center gap-1 font-medium">
-          <span>Dashboard</span>
-          <span className="text-muted-foreground/45 font-normal">/</span>
-          <span className="text-muted-foreground">Monitoring</span>
-        </div>
-        <h1 className="text-page-title font-display text-foreground mt-2">
+        <h1 className="text-page-title font-display text-foreground">
           Monitoring AI Usage
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -136,19 +131,19 @@ export default function MonitoringPage() {
         <TabsList
           variant="line"
           aria-label="Bagian monitoring"
-          className="w-full justify-start overflow-x-auto rounded-none border-b border-border"
+          className="min-h-12 h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border"
         >
           <TabsTrigger
             value="history"
             id="monitoring-tab-history"
-            className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
+            className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
           >
             Riwayat Simulasi
           </TabsTrigger>
           <TabsTrigger
             value="usage"
             id="monitoring-tab-usage"
-            className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
+            className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
           >
             Penggunaan Token
           </TabsTrigger>
@@ -156,7 +151,7 @@ export default function MonitoringPage() {
             <TabsTrigger
               value="pricing"
               id="monitoring-tab-pricing"
-              className="min-h-11 flex-none px-4 text-xs data-active:border-primary"
+              className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
             >
               Harga &amp; Kurs
             </TabsTrigger>

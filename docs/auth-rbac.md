@@ -154,7 +154,7 @@ Untuk mencegah masalah auto-login otomatis (di mana user yang baru saja logout k
 
 ## Monitoring Usage & Billing Access
 
-Route `/dashboard` (tab monitoring) memakai guard untuk `trainer`, `leader`, `admin`.
+Route `/monitoring` memakai guard untuk `trainer`, `leader`, `admin`.
 
 Kontrak akses untuk fitur monitoring usage billing:
 
