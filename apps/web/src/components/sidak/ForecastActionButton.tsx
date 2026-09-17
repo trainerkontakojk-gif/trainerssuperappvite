@@ -1,4 +1,4 @@
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import type { SidakForecastLookupStatus } from "@trainers/types";
 import { Button } from "@/components/ui/button";
 
@@ -33,8 +33,8 @@ export function ForecastActionButton({
       size={compact ? "sm" : "lg"}
       className={
         isStale
-          ? "min-h-11 animate-pulse ring-2 ring-primary/30 motion-reduce:animate-none hover:bg-primary/90"
-          : "min-h-11 border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
+          ? "min-h-[44px] animate-pulse ring-2 ring-primary/30 motion-reduce:animate-none hover:bg-primary/90"
+          : "min-h-[44px] border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
       }
       disabled={disabled || loading}
       onClick={onClick}
@@ -47,7 +47,7 @@ export function ForecastActionButton({
           aria-hidden="true"
         />
       ) : (
-        <Sparkles data-icon="inline-start" aria-hidden="true" />
+        <RefreshCw data-icon="inline-start" aria-hidden="true" />
       )}
       {loading ? "Sedang memproses..." : label}
     </Button>

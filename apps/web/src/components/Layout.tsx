@@ -144,7 +144,7 @@ function DashboardLayoutContent() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden pb-[calc(3rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+      <main className="flex-1 flex flex-col overflow-hidden pb-[calc(44px+env(safe-area-inset-bottom,0px))] lg:pb-0">
         {/* Sticky Glass Header */}
         {!pathname.startsWith("/profiler") && (
           <AppHeader onOpenMobileMenu={() => setMobileDrawerOpen(true)} />

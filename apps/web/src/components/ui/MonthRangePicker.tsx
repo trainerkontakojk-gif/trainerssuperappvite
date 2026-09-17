@@ -136,13 +136,13 @@ export function MonthRangePicker({
 
   const handleReset = () => onRangeChange(null, null);
 
-  // Toolbar variant sits alongside tall (min-h-11) filter selects in
-  // DashboardFilters, so it keeps the tall touch height. Compact is the
+  // Toolbar variant sits alongside 44px filter selects in
+  // DashboardFilters, so it keeps the 44px touch height. Compact is the
   // button-height toolbar used in tight filter bars like /dashboard trend.
   const toolbarTriggerClassName =
-    variant === "toolbar" ? "min-h-11 text-sm font-medium" : undefined;
+    variant === "toolbar" ? "min-h-[44px] text-sm font-medium" : undefined;
   const toolbarResetClassName =
-    variant === "toolbar" ? "min-h-11 min-w-11" : undefined;
+    variant === "toolbar" ? "min-h-[44px] min-w-[44px]" : undefined;
 
   const startSelect = (
     <MonthSelect
@@ -170,12 +170,22 @@ export function MonthRangePicker({
   if (variant === "toolbar") {
     return (
       <div className={cn("flex flex-col gap-2", className)}>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[8rem] flex-1">{startSelect}</div>
-          <span className="shrink-0 px-1 text-xs font-medium text-muted-foreground">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
+            <span className="mb-1 block text-[11px] font-semibold text-muted-foreground sm:hidden">
+              Dari
+            </span>
+            {startSelect}
+          </div>
+          <span className="hidden shrink-0 px-1 text-xs font-medium text-muted-foreground sm:block">
             sampai
           </span>
-          <div className="min-w-[8rem] flex-1">{endSelect}</div>
+          <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
+            <span className="mb-1 block text-[11px] font-semibold text-muted-foreground sm:hidden">
+              Sampai
+            </span>
+            {endSelect}
+          </div>
           {hasRange ? (
             <ResetRangeButton
               onClick={handleReset}

@@ -115,7 +115,7 @@ describe("ForecastActionButton", () => {
     );
 
     const button = screen.getByRole("button");
-    expect(button).toHaveClass("min-h-11");
+    expect(button).toHaveClass("min-h-[44px]");
     expect(button).not.toHaveClass("h-9");
   });
 });

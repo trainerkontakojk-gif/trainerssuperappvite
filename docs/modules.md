@@ -184,7 +184,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - **Routes**:
   - **Landing** (`/sidak`): 5 card links ke sub-modul (termasuk Forecast).
   - **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, top agents, Pareto chart, dan forecast visibility toggle.
-  - **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent (improving/declining/stable/insufficient_data). Service chart dengan filter parameter, agent-level projection dengan regresi linear.
+  - **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent (`improving`/`declining`/`stable`/`insufficient_data`) dengan service chart, filter parameter, dan proyeksi agent berbasis regresi linear. Filter membedakan `Periode data` dari `Periode proyeksi` 1–6 bulan. UI memakai section flat `Proyeksi temuan`, `Kecukupan data`, `Tren layanan`, dan `Prioritas agent`; row agent memprioritaskan skor/tren, metadata wrap-safe, serta lane desktop memakai max-height dan scroll internal saat daftar panjang.
   - **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload. Live score card dengan radial progress ring, konfigurasi audit card, dan show all data toggle.
   - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect, dengan rank change indicator (▲/▼) dan dynamic context subtitle.
   - **Settings** (`/sidak/settings`): Service weights configuration dengan versioned rules per service+periode.

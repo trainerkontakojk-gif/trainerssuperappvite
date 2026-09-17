@@ -157,7 +157,7 @@ describe("ForecastInsightPanel", () => {
     );
 
     expect(screen.getByTestId("forecast-insight-panel")).toBeInTheDocument();
-    expect(screen.getByText(/Insight Forecast/i)).toBeInTheDocument();
+    expect(screen.getByText(/Penjelasan proyeksi/i)).toBeInTheDocument();
     expect(screen.getByText(/Ringkasan Eksekutif/i)).toBeInTheDocument();
     expect(screen.getByText(/Coaching Etika/i)).toBeInTheDocument();
     expect(screen.getByText(/^Menurun$/i)).toBeInTheDocument();

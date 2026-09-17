@@ -21,6 +21,9 @@ This file contains concise project guardrails for every harness. The detailed wo
 
 - Behavior, bug, regression, security, permission, auth/RLS, schema/migration, and API-contract changes require regression evidence and strict TDD. Use the repository-specific `trainers-superapp-tdd` workflow as the primary TDD workflow. Load it at task start before lane classification — never edit before the skill is loaded.
 - Keep tests consolidated by module, share differing harness helpers, and remove or rename transitional `parity`/`legacy` tests when their migration contract is complete.
+- **Test curation:** before adding a test, search the owning suite. Update an existing test when the contract changes; merge overlapping cases; remove obsolete, duplicate, transitional, or implementation-detail tests. Prefer table-driven cases for the same behavior. Keep one focused regression test per distinct observable contract—not one test per branch, variant, CSS class, or fallback.
+- **Test budget:** add coverage only for a distinct bug, contract, boundary, failure mode, or security risk. Do not add snapshots, oversized fixtures, or parallel suites merely to increase counts; keep `scripts/test-core.json` curated and remove stale entries when ownership or contract moves.
+- **Fallback discipline:** keep one primary path and at most one bounded fallback per failure boundary. Add a fallback only for an explicit user-recoverable/error contract; never chain fallbacks or silently turn failure into plausible success. Any exception needs an explicit contract/plan and tests for its distinct outcome.
 - Files listed in `scripts/test-core.json`, including `.tsx` entries, must execute under the intended test configuration.
 
 ## Skills and quality gates

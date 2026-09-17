@@ -62,6 +62,7 @@ interface Props {
   availableYears: number[];
   leaderLockedService?: string | null;
   availableServices?: string[];
+  showHeader?: boolean;
 }
 
 interface FilterSelectProps {
@@ -129,7 +130,7 @@ function FilterSelect({
           id={id}
           aria-label={label}
           className={cn(
-            "min-h-11 w-full min-w-0 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground",
+            "min-h-[44px] w-full min-w-0 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground",
             "hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
           )}
         >
@@ -189,7 +190,7 @@ function TeamCombobox({
             <Button
               variant="outline"
               size="lg"
-              className="min-h-11 w-full min-w-0 justify-between rounded-lg border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+              className="min-h-[44px] w-full min-w-0 justify-between rounded-lg border-border px-3 text-sm font-medium text-foreground hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30"
             />
           }
         >
@@ -257,6 +258,7 @@ export default function DashboardFilters({
   availableYears,
   leaderLockedService,
   availableServices,
+  showHeader = true,
 }: Props) {
   const serviceOptions = leaderLockedService
     ? [leaderLockedService]
@@ -300,17 +302,21 @@ export default function DashboardFilters({
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/20 p-3 lg:flex-row lg:items-end lg:gap-4">
-      <div className="flex shrink-0 items-center gap-3 px-1 py-1 lg:pb-2">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-border">
-          <Filter aria-hidden="true" />
+      {showHeader ? (
+        <div className="flex shrink-0 items-center gap-3 px-1 py-1 lg:pb-2">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-border">
+            <Filter aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">
+              Konteks
+            </p>
+            <p className="font-heading text-sm font-semibold tracking-tight text-foreground">
+              Filter data
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground">Konteks</p>
-          <p className="font-heading text-sm font-semibold tracking-tight text-foreground">
-            Filter data
-          </p>
-        </div>
-      </div>
+      ) : null}
 
       <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-3">
         <FilterSelect
@@ -365,7 +371,7 @@ export default function DashboardFilters({
 
       <fieldset className="min-w-0 flex-[1.4]">
         <legend className="mb-1.5 text-xs font-semibold text-muted-foreground">
-          Rentang bulan
+          Periode data
         </legend>
         <MonthRangePicker
           selectedYear={selectedYear}

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import SidakForecastPage from "../routes/sidak/forecast";
 import { sidakClient, unwrapResponse } from "../lib/api";
 import { useApi } from "../hooks/useApi";
@@ -396,10 +402,10 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
       screen.getByRole("heading", { name: "Forecast" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Horizon", { selector: "label" }),
+      screen.getByText("Periode proyeksi", { selector: "label" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Keputusan Cepat")).toBeInTheDocument();
-    expect(screen.getByText("Confidence & Coverage")).toBeInTheDocument();
+    expect(screen.getByText("Proyeksi temuan")).toBeInTheDocument();
+    expect(screen.getByText("Kecukupan data")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByTestId("service-forecast-chart")).toBeInTheDocument();
@@ -724,5 +730,86 @@ describe("SidakForecastPage", { timeout: 15_000 }, () => {
 
     expect(serviceForecastCall?.json?.filters?.serviceType).toBe("chat");
     expect(agentForecastCall?.json?.serviceType).toBe("chat");
+  });
+
+  it("keeps forecast controls at a 44px touch target and labels month range", () => {
+    render(<SidakForecastPage />);
+
+    expect(screen.getByRole("button", { name: "Perbarui" })).toHaveClass(
+      "min-h-[44px]",
+    );
+    expect(
+      screen.getByRole("combobox", { name: "Periode proyeksi" }),
+    ).toHaveClass("min-h-[44px]");
+    expect(screen.getByRole("combobox", { name: "Bulan awal" })).toHaveClass(
+      "min-h-[44px]",
+    );
+    expect(screen.getByRole("combobox", { name: "Bulan akhir" })).toHaveClass(
+      "min-h-[44px]",
+    );
+    expect(
+      screen.getByRole("button", { name: "Reset rentang bulan" }),
+    ).toHaveClass("min-w-[44px]");
+    expect(screen.getByText("Dari")).toBeInTheDocument();
+    expect(screen.getByText("Sampai")).toBeInTheDocument();
+  });
+
+  it("uses desktop-only lane scrolling and avoids misleading local rank badges", async () => {
+    const { container } = render(<SidakForecastPage />);
+    await screen.findByText("Agent A");
+
+    const laneScrollAreas = container.querySelectorAll(
+      '[data-slot="scroll-area"]',
+    );
+    expect(laneScrollAreas).toHaveLength(4);
+    for (const area of laneScrollAreas) {
+      expect(area).toHaveClass("h-auto", "lg:max-h-[23rem]");
+      expect(area).toHaveAttribute("role", "region");
+      expect(area).toHaveAttribute("aria-label");
+    }
+
+    const agentName = await screen.findByText("Agent A");
+    const agentRow = agentName.closest("article");
+    expect(agentRow).not.toBeNull();
+    expect(
+      within(agentRow as HTMLElement).getByText("Membaik"),
+    ).not.toHaveClass("sr-only");
+    expect(
+      within(agentRow as HTMLElement).queryByText("#1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses human-readable forecast metric labels and method names", async () => {
+    render(<SidakForecastPage />);
+    await screen.findByText("Agent A");
+
+    const decisionCard = screen
+      .getByRole("heading", { name: "Proyeksi temuan" })
+      .closest('section[aria-labelledby="forecast-projection-title"]');
+    expect(decisionCard).not.toBeNull();
+    expect(
+      within(decisionCard as HTMLElement).getByText("Titik data"),
+    ).toBeInTheDocument();
+    expect(
+      within(decisionCard as HTMLElement).getByText("Regresi Linear"),
+    ).toBeInTheDocument();
+    expect(
+      within(decisionCard as HTMLElement).queryByText("linear-regression"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the loaded forecast surface flat and operational", async () => {
+    const { container } = render(<SidakForecastPage />);
+    await screen.findByText("Agent A");
+
+    expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(0);
+    expect(container.querySelector(".lucide-sparkles")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Tren layanan" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Prioritas agent" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Penjelasan proyeksi")).toBeInTheDocument();
   });
 });

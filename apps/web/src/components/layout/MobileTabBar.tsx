@@ -40,7 +40,7 @@ export function MobileTabBar({
       className="fixed inset-x-0 bottom-0 z-50 border-t bg-bg pb-[env(safe-area-inset-bottom,0px)] lg:hidden shadow-lg"
       style={{ borderColor: "var(--border)" }}
     >
-      <div className="flex h-12 items-center justify-around">
+      <div className="flex h-[44px] items-center justify-around">
         {tabs.map((tab) => {
           const active =
             tab.id === "dashboard"
@@ -57,11 +57,11 @@ export function MobileTabBar({
                   openMaintenance();
                 }
               }}
-              className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 transition-colors"
+              className="flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-1 transition-colors"
               style={{ color: active ? "var(--fg)" : "var(--fg3)" }}
             >
               <tab.icon className="h-[18px] w-[18px]" />
-              <span className="text-[9px] font-semibold tracking-wider">
+              <span className="text-[10px] font-semibold tracking-wider">
                 {tab.label}
               </span>
             </Link>
@@ -71,11 +71,11 @@ export function MobileTabBar({
         {/* "More" tab — opens fullscreen drawer */}
         <button
           onClick={onOpenDrawer}
-          className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 px-2 py-1 text-muted-foreground transition-colors hover:text-foreground"
           style={{ color: "var(--fg3)" }}
         >
           <Menu className="h-[18px] w-[18px]" />
-          <span className="text-[9px] font-semibold tracking-wider">Lainnya</span>
+          <span className="text-[10px] font-semibold tracking-wider">Lainnya</span>
         </button>
       </div>
     </nav>
