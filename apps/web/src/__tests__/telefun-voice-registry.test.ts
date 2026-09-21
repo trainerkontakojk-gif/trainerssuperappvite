@@ -34,6 +34,47 @@ describe("Telefun provider-aware voice registry", () => {
     );
   });
 
+  it("exposes the approved 30-voice Gemini catalog with gender mapping", () => {
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).toEqual([
+      "Zephyr",
+      "Kore",
+      "Leda",
+      "Aoede",
+      "Callirrhoe",
+      "Autonoe",
+      "Despina",
+      "Erinome",
+      "Laomedeia",
+      "Achernar",
+      "Gacrux",
+      "Pulcherrima",
+      "Vindemiatrix",
+      "Sulafat",
+    ]);
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toEqual([
+      "Puck",
+      "Charon",
+      "Fenrir",
+      "Orus",
+      "Enceladus",
+      "Iapetus",
+      "Umbriel",
+      "Algieba",
+      "Algenib",
+      "Rasalgethi",
+      "Schedar",
+      "Alnilam",
+      "Achird",
+      "Zubenelgenubi",
+      "Sadachbia",
+      "Sadaltager",
+    ]);
+
+    const allVoices = Object.values(GEMINI_LIVE_VOICES_BY_GENDER).flat();
+    expect(allVoices).toHaveLength(30);
+    expect(new Set(allVoices).size).toBe(30);
+  });
+
   it("keeps Gemini voices gender-aware and normalizes an incompatible voice", () => {
     expect(getVoicesForModel(DEFAULT_TELEFUN_LIVE_MODEL_ID, "male")).toEqual(
       GEMINI_LIVE_VOICES_BY_GENDER.male,

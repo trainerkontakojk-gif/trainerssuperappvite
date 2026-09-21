@@ -7,6 +7,7 @@ import {
 } from "@trainers/types";
 import {
   GEMINI_LIVE_VOICES_BY_GENDER,
+  GEMINI_LIVE_VOICES,
   getVoicesForModel,
   resolveGeminiLiveVoice,
   resolveVoiceForModel,
@@ -486,15 +487,10 @@ export function parseTelefunSettings(
   return normalized;
 }
 
-export const VOICE_OPTIONS = [
-  { id: "Puck", name: "Puck" },
-  { id: "Charon", name: "Charon" },
-  { id: "Fenrir", name: "Fenrir" },
-  { id: "Orus", name: "Orus" },
-  { id: "Kore", name: "Kore" },
-  { id: "Leda", name: "Leda" },
-  { id: "Aoede", name: "Aoede" },
-];
+export const VOICE_OPTIONS = GEMINI_LIVE_VOICES.map((voice) => ({
+  id: voice,
+  name: voice,
+}));
 
 export const CONSUMER_GENDERS = [
   { id: "male", name: "Laki-laki" },

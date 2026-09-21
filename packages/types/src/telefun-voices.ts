@@ -1,8 +1,40 @@
 export type TelefunGender = "male" | "female";
 
 export const GEMINI_LIVE_VOICES_BY_GENDER = {
-  male: ["Puck", "Charon", "Fenrir", "Orus"],
-  female: ["Kore", "Leda", "Aoede"],
+  male: [
+    "Puck",
+    "Charon",
+    "Fenrir",
+    "Orus",
+    "Enceladus",
+    "Iapetus",
+    "Umbriel",
+    "Algieba",
+    "Algenib",
+    "Rasalgethi",
+    "Schedar",
+    "Alnilam",
+    "Achird",
+    "Zubenelgenubi",
+    "Sadachbia",
+    "Sadaltager",
+  ],
+  female: [
+    "Zephyr",
+    "Kore",
+    "Leda",
+    "Aoede",
+    "Callirrhoe",
+    "Autonoe",
+    "Despina",
+    "Erinome",
+    "Laomedeia",
+    "Achernar",
+    "Gacrux",
+    "Pulcherrima",
+    "Vindemiatrix",
+    "Sulafat",
+  ],
 } as const satisfies Record<TelefunGender, readonly string[]>;
 
 export type GeminiLiveVoiceName =

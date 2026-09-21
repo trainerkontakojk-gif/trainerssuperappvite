@@ -42,6 +42,22 @@ Browser settings/history/recordings
   `400 TELEFUN_OPENAI_DISABLED`. Reads normalize a persisted retired selection
   to Gemini without writing the row back.
 
+## Voice catalog
+
+Telefun exposes the 30 official Gemini Live/TTS voice names through the shared
+voice registry. The approved gender mapping used by the identity picker is:
+
+- **Female:** `Zephyr`, `Kore`, `Leda`, `Aoede`, `Callirrhoe`, `Autonoe`,
+  `Despina`, `Erinome`, `Laomedeia`, `Achernar`, `Gacrux`, `Pulcherrima`,
+  `Vindemiatrix`, `Sulafat`
+- **Male:** `Puck`, `Charon`, `Fenrir`, `Orus`, `Enceladus`, `Iapetus`,
+  `Umbriel`, `Algieba`, `Algenib`, `Rasalgethi`, `Schedar`, `Alnilam`,
+  `Achird`, `Zubenelgenubi`, `Sadachbia`, `Sadaltager`
+
+`Kore` remains the default voice. The gender labels are the approved
+application mapping; Google documents the voice names and characteristics but
+does not publish a first-party gender field for the full catalog.
+
 ## Session flow
 
 1. The browser creates or resumes an owned Telefun session through the API.
