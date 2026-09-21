@@ -19,7 +19,8 @@ export function AppHeader({ onOpenMobileMenu }: AppHeaderProps) {
         {/* Mobile hamburger */}
         <button
           onClick={onOpenMobileMenu}
-          className="lg:hidden p-1.5 rounded-md -ml-1 mr-2 transition-colors cursor-pointer hover:bg-foreground/5"
+          aria-label="Buka menu navigasi"
+          className="-ml-2 mr-1 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-foreground/5 lg:hidden"
           style={{ color: "var(--fg3)" }}
         >
           <PanelLeftOpen className="h-4 w-4" />

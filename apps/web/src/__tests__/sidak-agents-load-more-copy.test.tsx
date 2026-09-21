@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useApiMock = vi.hoisted(() => vi.fn());
@@ -61,6 +61,15 @@ describe("Sidak agents load-more copy", () => {
     expect(
       screen.getByRole("button", { name: "Muat 6 agen lagi" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Daftar agen" })).toHaveClass(
+      "grid",
+      "grid-cols-1",
+      "md:grid-cols-2",
+      "xl:grid-cols-3",
+    );
+    expect(screen.getByRole("region", { name: "Daftar agen" })).not.toHaveClass(
+      "auto-rows-fr",
+    );
   });
 
   it("hides the load-more button when all agents are already visible", () => {
@@ -79,6 +88,27 @@ describe("Sidak agents load-more copy", () => {
     expect(
       screen.queryByRole("button", { name: /Muat \d+ agen lagi/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the batch filter behind an explicit mobile disclosure", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        agents: makeAgents(1),
+        batches: ["Batch A"],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<SidakAgentsPage />);
+
+    const filterButton = screen.getByRole("button", { name: /Filter batch/ });
+    expect(filterButton).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(filterButton);
+
+    expect(filterButton).toHaveAttribute("aria-expanded", "true");
   });
 
   it("shows an actionable error state when the directory request fails", () => {

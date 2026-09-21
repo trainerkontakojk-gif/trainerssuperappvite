@@ -144,7 +144,7 @@ function DashboardLayoutContent() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden pb-[calc(44px+env(safe-area-inset-bottom,0px))] lg:pb-0">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(44px+env(safe-area-inset-bottom,0px))] lg:pb-0">
         {/* Sticky Glass Header */}
         {!pathname.startsWith("/profiler") && (
           <AppHeader onOpenMobileMenu={() => setMobileDrawerOpen(true)} />
@@ -152,7 +152,10 @@ function DashboardLayoutContent() {
 
         {/* Scrollable Workspace Content */}
         <section
-          className={`flex-1 min-w-0 ${pathname === "/profiler" || pathname === "/profiler/" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}
+          role="region"
+          aria-label="Konten halaman"
+          tabIndex={0}
+          className={`min-h-0 min-w-0 flex-1 overscroll-contain ${pathname === "/profiler" || pathname === "/profiler/" ? "flex flex-col overflow-hidden" : "overflow-y-auto"}`}
         >
           {pathname.startsWith("/telefun") && !hasTelefunAccess ? (
             <div className="flex items-center justify-center h-full text-gray-400">

@@ -1,10 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { useApi } from "../../hooks/useApi";
-import { Eye, EyeOff, RotateCcw, Search } from "lucide-react";
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Filter,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 import type { AgentDirectoryResponse } from "@trainers/types";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import AgentCard from "../../components/sidak/AgentCard";
@@ -13,29 +19,37 @@ import { titleize } from "../../lib/humanize";
 
 const INITIAL_VISIBLE = 24;
 const AGENT_GRID_CLASS =
-  "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5 xl:grid-cols-4 2xl:grid-cols-5";
+  "grid grid-cols-1 items-stretch gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3";
 
 function AgentCardSkeleton() {
   return (
-    <Card className="gap-0 border-border bg-surface py-0 ring-0">
-      <CardContent className="flex h-full flex-col gap-5 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <Skeleton className="size-16 rounded-xl motion-reduce:animate-none" />
-          <div className="flex flex-col items-end gap-2">
-            <Skeleton className="h-5 w-28 rounded-full motion-reduce:animate-none" />
-            <Skeleton className="h-6 w-20 rounded-md motion-reduce:animate-none" />
+    <div className="flex flex-col rounded-xl border border-border bg-surface p-4">
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-10 shrink-0 rounded-lg motion-reduce:animate-none" />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <Skeleton className="h-4 w-3/5 rounded-md motion-reduce:animate-none" />
+          <Skeleton className="h-3 w-4/5 rounded-md motion-reduce:animate-none" />
+        </div>
+        <Skeleton className="size-5 shrink-0 rounded-md motion-reduce:animate-none" />
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-3">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-16 rounded-md motion-reduce:animate-none" />
+          <Skeleton className="h-7 w-24 rounded-md motion-reduce:animate-none" />
+          <Skeleton className="h-3 w-20 rounded-md motion-reduce:animate-none" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3 w-20 rounded-md motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-24 rounded-md motion-reduce:animate-none" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3 w-20 rounded-md motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-20 rounded-md motion-reduce:animate-none" />
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-5 w-4/5 rounded-md motion-reduce:animate-none" />
-          <Skeleton className="h-4 w-3/5 rounded-md motion-reduce:animate-none" />
-        </div>
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <Skeleton className="h-4 w-24 rounded-md motion-reduce:animate-none" />
-          <Skeleton className="size-9 rounded-lg motion-reduce:animate-none" />
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -44,6 +58,7 @@ export default function SidakAgentsPage() {
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [showAll, setShowAll] = useState(false);
+  const [batchFilterOpen, setBatchFilterOpen] = useState(false);
   const year = new Date().getFullYear();
 
   const { data, loading, error, refetch } = useApi<AgentDirectoryResponse>(
@@ -98,12 +113,9 @@ export default function SidakAgentsPage() {
   return (
     <div className="min-w-0 overflow-x-hidden pb-16">
       <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-muted-foreground">
-              SIDAK · Analisis Individu
-            </p>
-            <h1 className="mt-1 font-outfit text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               Daftar agen
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -113,21 +125,35 @@ export default function SidakAgentsPage() {
 
           <Button
             type="button"
-            variant="outline"
+            variant={showAll ? "default" : "outline"}
             size="lg"
             aria-pressed={showAll}
+            aria-label={
+              showAll
+                ? "Sembunyikan agen tambahan"
+                : "Tampilkan agen tambahan dari daftar utama"
+            }
+            title={
+              showAll
+                ? "Sembunyikan agen tambahan"
+                : "Sertakan agen di luar daftar utama"
+            }
             onClick={() => {
               setShowAll((s) => !s);
               setVisibleCount(INITIAL_VISIBLE);
             }}
-            className="min-h-11 w-full sm:w-auto"
+            className="min-h-[44px] w-full sm:w-auto"
           >
             {showAll ? (
               <EyeOff data-icon="inline-start" aria-hidden="true" />
             ) : (
               <Eye data-icon="inline-start" aria-hidden="true" />
             )}
-            <span>{showAll ? "Data terfilter" : "Tampilkan semua data"}</span>
+            <span>
+              {showAll
+                ? "Sembunyikan agen tambahan"
+                : "Tampilkan agen tambahan"}
+            </span>
           </Button>
         </div>
 
@@ -142,7 +168,7 @@ export default function SidakAgentsPage() {
                 variant="outline"
                 size="lg"
                 onClick={() => void refetch()}
-                className="min-h-11"
+                className="min-h-[44px]"
               >
                 <RotateCcw data-icon="inline-start" aria-hidden="true" />
                 <span>Coba lagi</span>
@@ -151,107 +177,142 @@ export default function SidakAgentsPage() {
           />
         ) : (
           <>
-            <Card className="gap-0 border-border bg-surface py-0 ring-0">
-              <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <label htmlFor="sidak-agent-search" className="sr-only">
-                      Cari agen berdasarkan nama, tim, atau batch
-                    </label>
-                    <div className="relative">
-                      <Search
-                        aria-hidden="true"
-                        className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                      />
-                      <Input
-                        id="sidak-agent-search"
-                        type="search"
-                        placeholder="Cari nama, tim, atau batch..."
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        className="h-11 pl-10 pr-4"
-                      />
-                    </div>
+            <section
+              aria-label="Filter daftar agen"
+              className="flex flex-col gap-4 border-y border-border bg-surface/30 py-4 sm:py-5"
+            >
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <label htmlFor="sidak-agent-search" className="sr-only">
+                    Cari agen berdasarkan nama, tim, atau batch
+                  </label>
+                  <div className="relative">
+                    <Search
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      id="sidak-agent-search"
+                      type="search"
+                      placeholder="Cari nama, tim, atau batch..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      className="h-[44px] pl-10 pr-4"
+                    />
                   </div>
-
-                  {data ? (
-                    <div className="flex items-center justify-between gap-3 lg:justify-end">
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-semibold tabular-nums text-foreground">
-                          {filtered.length}
-                        </span>{" "}
-                        dari {data.agents.length} agen
-                      </p>
-                      {hasActiveFilters ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={resetFilters}
-                          className="min-h-10"
-                        >
-                          <RotateCcw
-                            data-icon="inline-start"
-                            aria-hidden="true"
-                          />
-                          <span>Reset filter</span>
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
 
-                {batches.length > 0 ? (
-                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-                    <span className="shrink-0 text-sm font-semibold text-foreground">
-                      Batch
-                    </span>
-                    <div
-                      className="flex min-w-0 gap-2 overflow-x-auto pb-1 no-scrollbar"
-                      role="group"
-                      aria-label="Filter batch"
+                {data ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+                    <p
+                      className="text-sm text-muted-foreground"
+                      aria-live="polite"
                     >
+                      Menampilkan{" "}
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {filtered.length}
+                      </span>{" "}
+                      dari {data.agents.length} agen
+                    </p>
+                    {hasActiveFilters ? (
                       <Button
                         type="button"
-                        variant={selectedBatch === null ? "default" : "outline"}
-                        size="sm"
-                        aria-pressed={selectedBatch === null}
-                        onClick={() => {
-                          setSelectedBatch(null);
-                          setVisibleCount(INITIAL_VISIBLE);
-                        }}
-                        className="min-h-10 shrink-0 rounded-full px-4"
+                        variant="ghost"
+                        size="default"
+                        onClick={resetFilters}
+                        className="min-h-[44px] self-start px-2 sm:self-auto"
                       >
-                        Semua batch
+                        <RotateCcw
+                          data-icon="inline-start"
+                          aria-hidden="true"
+                        />
+                        <span>Reset filter</span>
                       </Button>
-                      {batches.map((batch) => (
-                        <Button
-                          key={batch}
-                          type="button"
-                          variant={
-                            selectedBatch === batch ? "default" : "outline"
-                          }
-                          size="sm"
-                          aria-pressed={selectedBatch === batch}
-                          onClick={() => {
-                            setSelectedBatch(
-                              batch === selectedBatch ? null : batch,
-                            );
-                            setVisibleCount(INITIAL_VISIBLE);
-                          }}
-                          className={cn(
-                            "min-h-10 shrink-0 rounded-full px-4",
-                            selectedBatch !== batch && "text-muted-foreground",
-                          )}
-                        >
-                          {titleize(batch)}
-                        </Button>
-                      ))}
-                    </div>
+                    ) : null}
                   </div>
                 ) : null}
-              </CardContent>
-            </Card>
+              </div>
+
+              {batches.length > 0 ? (
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="shrink-0 text-sm font-semibold text-foreground">
+                    Batch
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-expanded={batchFilterOpen}
+                    aria-controls="sidak-batch-filter"
+                    onClick={() => setBatchFilterOpen((open) => !open)}
+                    className="min-h-[44px] w-full justify-between sm:hidden"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Filter aria-hidden="true" className="size-4" />
+                      <span>Filter batch</span>
+                      <span className="min-w-0 truncate text-muted-foreground">
+                        {selectedBatch
+                          ? titleize(selectedBatch)
+                          : "Semua batch"}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={cn(
+                        "size-4 transition-transform",
+                        batchFilterOpen && "rotate-180",
+                      )}
+                    />
+                  </Button>
+                  <div
+                    id="sidak-batch-filter"
+                    className={cn(
+                      "min-w-0 flex-wrap gap-2 pb-1",
+                      batchFilterOpen ? "flex" : "hidden",
+                      "sm:flex",
+                    )}
+                    role="group"
+                    aria-label="Filter batch"
+                  >
+                    <Button
+                      type="button"
+                      variant={selectedBatch === null ? "default" : "outline"}
+                      size="sm"
+                      aria-pressed={selectedBatch === null}
+                      onClick={() => {
+                        setSelectedBatch(null);
+                        setVisibleCount(INITIAL_VISIBLE);
+                      }}
+                      className="min-h-[44px] shrink-0 rounded-full px-4"
+                    >
+                      Semua batch
+                    </Button>
+                    {batches.map((batch) => (
+                      <Button
+                        key={batch}
+                        type="button"
+                        variant={
+                          selectedBatch === batch ? "default" : "outline"
+                        }
+                        size="sm"
+                        aria-pressed={selectedBatch === batch}
+                        onClick={() => {
+                          setSelectedBatch(
+                            batch === selectedBatch ? null : batch,
+                          );
+                          setVisibleCount(INITIAL_VISIBLE);
+                        }}
+                        className={cn(
+                          "min-h-[44px] shrink-0 rounded-full px-4",
+                          selectedBatch !== batch && "text-muted-foreground",
+                        )}
+                      >
+                        {titleize(batch)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </section>
 
             {loading ? (
               <div
@@ -284,7 +345,7 @@ export default function SidakAgentsPage() {
                         variant="outline"
                         size="lg"
                         onClick={resetView}
-                        className="min-h-11"
+                        className="min-h-[44px]"
                       >
                         <RotateCcw
                           data-icon="inline-start"
@@ -299,8 +360,8 @@ export default function SidakAgentsPage() {
             ) : (
               <>
                 <section className={AGENT_GRID_CLASS} aria-label="Daftar agen">
-                  {visible.map((agent, index) => (
-                    <AgentCard key={agent.id} agent={agent} index={index} />
+                  {visible.map((agent) => (
+                    <AgentCard key={agent.id} agent={agent} />
                   ))}
                 </section>
                 {hasMore ? (
@@ -312,7 +373,7 @@ export default function SidakAgentsPage() {
                       onClick={() =>
                         setVisibleCount((count) => count + INITIAL_VISIBLE)
                       }
-                      className="min-h-11"
+                      className="min-h-[44px]"
                     >
                       Muat {nextLoadCount} agen lagi
                     </Button>

@@ -142,6 +142,17 @@ Pakai Tailwind spacing scale konsisten: `4` (16px), `6` (24px), `8` (32px) sebag
 - **Shadow:** Hindari *box-shadow*. Andalkan *border* untuk memisahkan *card* dengan *background*.
 - **Modal:** title + close button di header, backdrop click & Escape nutup modal, focus trap, konten panjang pakai `overflow-y-auto`.
 
+### Entity Directory Cards (SIDAK)
+
+Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang utuh dan perbandingan antar-entitas memang menjadi pekerjaan utama user. Implementasinya wajib tetap operasional, bukan template statistik dekoratif:
+
+- Satu kartu = satu entitas yang dapat dibuka; seluruh surface menjadi target klik dan memiliki focus state yang terlihat.
+- Gunakan label domain yang eksplisit pada metrik (`Skor audit`, `Status audit`, `Periode`, `Perubahan`), bukan angka besar tanpa konteks.
+- Jangan membuat nested mini-card, badge status berulang, gradient, atau shadow dekoratif di dalam kartu.
+- Grid responsif harus menjaga keterbacaan: 1 kolom mobile, 2 kolom tablet, 3 kolom desktop; jangan memakai `auto-rows-fr` untuk memaksa ruang kosong.
+- State tanpa data harus menyatakan kondisi sebenarnya (`Belum diaudit`), bukan angka, tren, atau placeholder yang mengarang data.
+- Konten terakhir harus tetap dapat discroll melewati fixed bottom navigation dengan ruang aman yang memadai.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`

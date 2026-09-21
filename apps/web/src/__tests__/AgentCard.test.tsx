@@ -37,14 +37,22 @@ describe("AgentCard Component", () => {
     renderWithRouter(<AgentCard agent={mockAgent} index={0} />);
 
     expect(await screen.findByText("Adhitya Wisnuwadhana")).toBeInTheDocument();
-    expect(screen.getByText("Telepon · Tim Call")).toBeInTheDocument();
+    expect(screen.getByText("Tim: Telepon")).toBeInTheDocument();
+    expect(screen.getByText("Batch: Tim Call")).toBeInTheDocument();
+    expect(screen.getByText("Skor audit")).toBeInTheDocument();
+    expect(screen.getByText("Status audit")).toBeInTheDocument();
     expect(screen.getByText("97.8%")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "Lihat detail audit Adhitya Wisnuwadhana",
+      }),
+    ).toHaveClass("rounded-xl", "border");
   });
 
   it("displays the audited month name next to the percentage", async () => {
     renderWithRouter(<AgentCard agent={mockAgent} index={0} />);
 
-    expect(await screen.findByText("(Mei)")).toBeInTheDocument();
+    expect(await screen.findByText("Periode: Mei")).toBeInTheDocument();
   });
 
   it("does not display the month name when periodMonth is null or missing", async () => {
@@ -52,14 +60,27 @@ describe("AgentCard Component", () => {
     renderWithRouter(<AgentCard agent={noMonthAgent} index={0} />);
 
     expect(await screen.findByText("Adhitya Wisnuwadhana")).toBeInTheDocument();
-    expect(screen.queryByText("(Mei)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Periode: Mei")).not.toBeInTheDocument();
   });
 
-  it("renders '--' score when avgScore is null and does not render month name", async () => {
+  it("renders an explicit unavailable score when avgScore is null", async () => {
     const noScoreAgent = { ...mockAgent, avgScore: null, periodMonth: 5 };
     renderWithRouter(<AgentCard agent={noScoreAgent} index={0} />);
 
-    expect(await screen.findByText("--")).toBeInTheDocument();
-    expect(screen.queryByText("(Mei)")).not.toBeInTheDocument();
+    expect(await screen.findByText("Belum diaudit")).toBeInTheDocument();
+    expect(screen.queryByText("Periode: Mei")).not.toBeInTheDocument();
+  });
+
+  it("does not show a stable trend when the agent has no audit score", async () => {
+    const noScoreAgent = {
+      ...mockAgent,
+      avgScore: null,
+      trend: "same" as const,
+      trendValue: null,
+    };
+    renderWithRouter(<AgentCard agent={noScoreAgent} index={0} />);
+
+    expect(await screen.findByText("Belum Ada Tren")).toBeInTheDocument();
+    expect(screen.queryByText("Stabil")).not.toBeInTheDocument();
   });
 });
