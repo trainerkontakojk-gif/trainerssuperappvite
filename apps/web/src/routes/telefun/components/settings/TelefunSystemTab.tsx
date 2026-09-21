@@ -113,10 +113,10 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {localSettings.telefunModelWarningReason === "unknown-model"
-                ? "Model tersimpan tidak dikenali. Pilihan dikembalikan ke Gemini 3.1."
+                ? "Model tersimpan tidak dikenali. Pilihan dikembalikan ke Gemini 3.8."
                 : localSettings.telefunModelWarningReason ===
                     "provider-unavailable"
-                  ? "Pilihan model lama telah dikembalikan ke Gemini 3.1."
+                  ? "Pilihan model lama telah dikembalikan ke Gemini 3.8."
                   : "Pilihan model lama telah dikembalikan ke Gemini."}
             </span>
           </p>

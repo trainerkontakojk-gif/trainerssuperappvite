@@ -16,9 +16,9 @@ import {
 } from "@trainers/types";
 
 describe("Telefun live model registry", () => {
-  it("exposes exactly the two active Gemini Live models", () => {
+  it("exposes Gemini 3.8 Live as default while keeping both previous models", () => {
     expect(DEFAULT_TELEFUN_LIVE_MODEL_ID).toBe(
-      "gemini-3.1-flash-live-preview",
+      "gemini-3.8-live",
     );
     expect(
       TELEFUN_LIVE_MODELS.map((model) => ({
@@ -28,6 +28,12 @@ describe("Telefun live model registry", () => {
         voiceProvider: model.realtime?.voiceProvider,
       })),
     ).toEqual([
+      {
+        id: "gemini-3.8-live",
+        provider: "gemini",
+        transport: "gemini-live",
+        voiceProvider: "gemini",
+      },
       {
         id: "gemini-3.1-flash-live-preview",
         provider: "gemini",
@@ -41,6 +47,20 @@ describe("Telefun live model registry", () => {
         voiceProvider: "gemini",
       },
     ]);
+  });
+
+  it("keeps the previous Gemini Live models selectable", () => {
+    expect(getTelefunLiveModel("gemini-3.1-flash-live-preview")).toBeDefined();
+    expect(getTelefunLiveModel("gemini-3.0-flash-live-preview")).toBeDefined();
+    expect(getTelefunLiveModel("gemini-3.8-live")).toMatchObject({
+      id: "gemini-3.8-live",
+      provider: "gemini",
+      realtime: {
+        transport: "gemini-live",
+        inputSampleRateHz: 16_000,
+        outputSampleRateHz: 24_000,
+      },
+    });
   });
 
   it("keeps the two GPT Realtime records in a historical-only registry", () => {

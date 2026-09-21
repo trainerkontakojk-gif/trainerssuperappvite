@@ -1,7 +1,8 @@
 # Telefun
 
-> **Runtime status:** Telefun is Gemini Live only. The selectable models are
-> `gemini-3.1-flash-live-preview` and `gemini-3.0-flash-live-preview`.
+> **Runtime status:** Telefun is Gemini Live only. The default selectable model
+> is `gemini-3.8-live`; `gemini-3.1-flash-live-preview` and
+> `gemini-3.0-flash-live-preview` remain available as explicit choices.
 > GPT/OpenAI Realtime is permanently retired for Telefun and no configuration,
 > cohort, cached browser bundle, or request can start it.
 
@@ -28,9 +29,11 @@ Browser settings/history/recordings
 - The active protocol barrel exports only Gemini/common protocol helpers. The
   retired WebRTC capability compatibility value is static and unavailable; the
   browser does not fetch it during startup.
-- `GET /api/v1/ai/models?module=telefun` returns the two active Gemini Live
-  models only. Historical GPT realtime IDs are not selectable or valid for a
-  new configure frame.
+- `GET /api/v1/ai/models?module=telefun` returns the three active Gemini Live
+  models, with `gemini-3.8-live` first as the default. Historical GPT realtime
+  IDs are not selectable or valid for a new configure frame.
+- Empty/new settings and unknown persisted selections fall back to
+  `gemini-3.8-live`; an explicitly persisted 3.1 or 3.0 selection is retained.
 - `telefun_session_configure` accepts only a Gemini Live model, Gemini voice,
   and its canonical sample rate. Historical GPT input is rejected before an
   adapter is constructed.

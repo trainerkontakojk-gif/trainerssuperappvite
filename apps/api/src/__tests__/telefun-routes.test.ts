@@ -103,6 +103,7 @@ describe("Gemini-only Telefun public model and capability reads", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).data.map((model: { id: string }) => model.id)).toEqual([
+      "gemini-3.8-live",
       "gemini-3.1-flash-live-preview",
       "gemini-3.0-flash-live-preview",
     ]);

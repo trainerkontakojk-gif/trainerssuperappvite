@@ -50,6 +50,7 @@ describe("ai model registry", () => {
     const models = getModelsForModule("telefun");
 
     expect(models.map((model) => model.id)).toEqual([
+      "gemini-3.8-live",
       "gemini-3.1-flash-live-preview",
       "gemini-3.0-flash-live-preview",
     ]);

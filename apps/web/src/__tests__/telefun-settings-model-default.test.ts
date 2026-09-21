@@ -210,7 +210,7 @@ describe("resolveFinalIdentity fallback", () => {
 describe("parseTelefunSettings", () => {
   it("returns defaults for empty input", () => {
     const result = parseTelefunSettings({});
-    expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
+    expect(result.selectedModel).toBe("gemini-3.8-live");
     expect(result.voiceName).toBe("Kore");
     expect(result.maxCallDuration).toBe(5);
     expect(result.responsePacingMode).toBe("realistic");
@@ -304,25 +304,36 @@ describe("parseTelefunSettings", () => {
     expect(result.selectedModel).toBe("gemini-3.0-flash-live-preview");
   });
 
-  it("derives the canonical transport when a known persisted model has no transport", () => {
+  it("preserves Gemini 3.1 when Gemini 3.8 becomes the default", () => {
     const result = parseTelefunSettings({
-      telefunModelId: "gpt-realtime-2.1-mini",
+      telefunModelId: "gemini-3.1-flash-live-preview",
+      telefunTransport: "gemini-live",
     });
 
     expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunTransport).toBe("gemini-live");
+  });
+
+  it("derives the canonical transport when a known persisted model has no transport", () => {
+    const result = parseTelefunSettings({
+      telefunModelId: "gpt-realtime-2.1-mini",
+    });
+
+    expect(result.selectedModel).toBe("gemini-3.8-live");
+    expect(result.telefunModelId).toBe("gemini-3.8-live");
+    expect(result.telefunTransport).toBe("gemini-live");
     expect(result.identitySettings.voiceName).toBe("");
     expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });
 
-  it("falls back unknown persisted models to Gemini 3.1 with a stable warning", () => {
+  it("falls back unknown persisted models to Gemini 3.8 with a stable warning", () => {
     const result = parseTelefunSettings({
       telefunModelId: "legacy-unknown-live-model",
       telefunTransport: "openai-audio",
     });
 
-    expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
+    expect(result.telefunModelId).toBe("gemini-3.8-live");
     expect(result.telefunTransport).toBe("gemini-live");
     expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });
@@ -333,8 +344,8 @@ describe("parseTelefunSettings", () => {
       telefunTransport: "openai-audio",
     });
 
-    expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
-    expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
+    expect(result.telefunModelId).toBe("gemini-3.8-live");
+    expect(result.selectedModel).toBe("gemini-3.8-live");
     expect(result.telefunTransport).toBe("gemini-live");
     expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });

@@ -41,10 +41,31 @@ export type AiModelModule =
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.8-flash";
 export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
-export const DEFAULT_TELEFUN_LIVE_MODEL_ID = "gemini-3.1-flash-live-preview";
+export const DEFAULT_TELEFUN_LIVE_MODEL_ID = "gemini-3.8-live";
+
+const GEMINI_38_LIVE_MODEL = {
+  id: DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  name: "Gemini 3.8 Live",
+  description:
+    "Default voice agent berlatensi rendah untuk dialog real-time yang natural.",
+  provider: "gemini",
+  timeoutMs: 300_000,
+  capabilities: {
+    supportsText: true,
+    supportsImage: false,
+  },
+  availableModules: ["default", "telefun"],
+  realtime: {
+    transport: "gemini-live",
+    inputSampleRateHz: 16_000,
+    outputSampleRateHz: 24_000,
+    voiceProvider: "gemini",
+    supportsAudio: true,
+  },
+} as const satisfies AiModelInfo;
 
 const GEMINI_31_FLASH_LIVE_MODEL = {
-  id: DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  id: "gemini-3.1-flash-live-preview",
   name: "Gemini 3.1 Flash Live",
   description:
     "Generasi terbaru dengan pemahaman konteks terbaik untuk simulasi Telefun.",
@@ -65,6 +86,7 @@ const GEMINI_31_FLASH_LIVE_MODEL = {
 } as const satisfies AiModelInfo;
 
 export const TELEFUN_LIVE_MODELS = [
+  GEMINI_38_LIVE_MODEL,
   GEMINI_31_FLASH_LIVE_MODEL,
   {
     id: "gemini-3.0-flash-live-preview",

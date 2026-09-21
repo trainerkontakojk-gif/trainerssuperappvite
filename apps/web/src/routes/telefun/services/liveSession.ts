@@ -3,6 +3,7 @@ import {
   type TelefunAppSettings,
 } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
+import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
 import {
   createHoldTrackerState,
@@ -627,8 +628,7 @@ export class LiveSession {
       signatureName: this.config.identitySettings?.signatureName || "",
     };
 
-    const modelId =
-      this.config.telefunModelId || "gemini-3.1-flash-live-preview";
+    const modelId = this.config.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID;
     const setupVoiceName = resolveVoiceForModel({
       modelId,
       requestedVoice: resolvedIdentity.voiceName,

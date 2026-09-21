@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
+import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import { env } from "./env.js";
 import { verifyToken } from "./auth.js";
 import {
@@ -239,7 +240,7 @@ wss.on("connection", async (ws, req) => {
   const usageAccumulator = createLiveUsageAccumulator();
   let usageFlushed = false;
   let usageFlushPromise: Promise<void> | null = null;
-  let activeModelId = "gemini-3.1-flash-live-preview";
+  let activeModelId = DEFAULT_TELEFUN_LIVE_MODEL_ID;
   let finalized = false;
   let drainCoordinator: DrainCoordinator | null = null;
   let drainTimers: ReturnType<typeof setTimeout>[] = [];

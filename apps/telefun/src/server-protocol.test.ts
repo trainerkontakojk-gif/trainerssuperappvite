@@ -50,6 +50,32 @@ describe("telefun proxy protocol", () => {
       expect(TELEFUN_CONFIGURATION_CLOSE_CODE).toBe(4002);
     });
 
+    it("accepts Gemini 3.8 Live as the canonical default model", () => {
+      const result = parseTelefunSessionConfigure({
+        ...validGeminiConfigure,
+        modelId: "gemini-3.8-live",
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          configure: {
+            ...validGeminiConfigure,
+            modelId: "gemini-3.8-live",
+          },
+          model: {
+            id: "gemini-3.8-live",
+            provider: "gemini",
+            realtime: {
+              transport: "gemini-live",
+              inputSampleRateHz: 16_000,
+              outputSampleRateHz: 24_000,
+            },
+          },
+        },
+      });
+    });
+
     it.each([
       [
         "unknown model",
