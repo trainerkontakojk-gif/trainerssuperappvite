@@ -1,15 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useApi } from "../../hooks/useApi";
-import {
-  ChevronDown,
-  Eye,
-  EyeOff,
-  Filter,
-  RotateCcw,
-  Search,
-} from "lucide-react";
+import { ChevronDown, Eye, EyeOff, RotateCcw, Search } from "lucide-react";
 import type { AgentDirectoryResponse } from "@trainers/types";
-import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,7 +50,6 @@ export default function SidakAgentsPage() {
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [showAll, setShowAll] = useState(false);
-  const [batchFilterOpen, setBatchFilterOpen] = useState(false);
   const year = new Date().getFullYear();
 
   const { data, loading, error, refetch } = useApi<AgentDirectoryResponse>(
@@ -115,7 +106,7 @@ export default function SidakAgentsPage() {
       <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0">
-            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="font-outfit text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               Daftar agen
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -235,80 +226,34 @@ export default function SidakAgentsPage() {
 
               {batches.length > 0 ? (
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-                  <span className="shrink-0 text-sm font-semibold text-foreground">
+                  <label
+                    htmlFor="sidak-batch-filter"
+                    className="shrink-0 text-xs font-semibold text-foreground"
+                  >
                     Batch
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-expanded={batchFilterOpen}
-                    aria-controls="sidak-batch-filter"
-                    onClick={() => setBatchFilterOpen((open) => !open)}
-                    className="min-h-[44px] w-full justify-between sm:hidden"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Filter aria-hidden="true" className="size-4" />
-                      <span>Filter batch</span>
-                      <span className="min-w-0 truncate text-muted-foreground">
-                        {selectedBatch
-                          ? titleize(selectedBatch)
-                          : "Semua batch"}
-                      </span>
-                    </span>
-                    <ChevronDown
-                      aria-hidden="true"
-                      className={cn(
-                        "size-4 transition-transform",
-                        batchFilterOpen && "rotate-180",
-                      )}
-                    />
-                  </Button>
-                  <div
-                    id="sidak-batch-filter"
-                    className={cn(
-                      "min-w-0 flex-wrap gap-2 pb-1",
-                      batchFilterOpen ? "flex" : "hidden",
-                      "sm:flex",
-                    )}
-                    role="group"
-                    aria-label="Filter batch"
-                  >
-                    <Button
-                      type="button"
-                      variant={selectedBatch === null ? "default" : "outline"}
-                      size="sm"
-                      aria-pressed={selectedBatch === null}
-                      onClick={() => {
-                        setSelectedBatch(null);
+                  </label>
+                  <div className="relative w-full min-w-0 sm:max-w-[320px]">
+                    <select
+                      id="sidak-batch-filter"
+                      aria-label="Filter batch"
+                      value={selectedBatch ?? ""}
+                      onChange={(event) => {
+                        setSelectedBatch(event.target.value || null);
                         setVisibleCount(INITIAL_VISIBLE);
                       }}
-                      className="min-h-[44px] shrink-0 rounded-full px-4"
+                      className="h-11 w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-9"
                     >
-                      Semua batch
-                    </Button>
-                    {batches.map((batch) => (
-                      <Button
-                        key={batch}
-                        type="button"
-                        variant={
-                          selectedBatch === batch ? "default" : "outline"
-                        }
-                        size="sm"
-                        aria-pressed={selectedBatch === batch}
-                        onClick={() => {
-                          setSelectedBatch(
-                            batch === selectedBatch ? null : batch,
-                          );
-                          setVisibleCount(INITIAL_VISIBLE);
-                        }}
-                        className={cn(
-                          "min-h-[44px] shrink-0 rounded-full px-4",
-                          selectedBatch !== batch && "text-muted-foreground",
-                        )}
-                      >
-                        {titleize(batch)}
-                      </Button>
-                    ))}
+                      <option value="">Semua batch</option>
+                      {batches.map((batch) => (
+                        <option key={batch} value={batch}>
+                          {titleize(batch)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    />
                   </div>
                 </div>
               ) : null}

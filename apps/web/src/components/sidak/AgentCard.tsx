@@ -106,6 +106,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
       : "compliant"
     : "none";
   const StatusIcon = RISK_STATUS_ICONS[riskKey];
+  const scoreValueClass = hasAuditScore
+    ? "text-xl font-bold leading-6 tabular-nums"
+    : "text-base font-semibold leading-5";
+  const agentName = titleize(agent.nama);
 
   return (
     <Link
@@ -129,12 +133,17 @@ export default function AgentCard({ agent }: AgentCardProps) {
           </Avatar>
 
           <div className="min-w-0">
-            <p className="break-words text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base">
-              {titleize(agent.nama)}
+            <p
+              title={agentName}
+              className="truncate text-[13px] font-semibold leading-[18px] text-foreground transition-colors group-hover:text-primary"
+            >
+              {agentName}
             </p>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-muted-foreground">
-              <span>Tim: {titleize(agent.tim)}</span>
-              {agent.batch ? <span>Batch: {titleize(agent.batch)}</span> : null}
+            <div className="mt-1 flex min-w-0 flex-col gap-0.5 text-xs font-medium text-muted-foreground">
+              <span className="truncate">Tim: {titleize(agent.tim)}</span>
+              {agent.batch ? (
+                <span className="truncate">Batch: {titleize(agent.batch)}</span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -151,10 +160,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
             Skor audit
           </p>
           <p
-            className={cn(
-              "mt-1 text-2xl font-black leading-none tabular-nums",
-              scoreColor(agent.avgScore),
-            )}
+            className={cn("mt-1", scoreValueClass, scoreColor(agent.avgScore))}
           >
             {agent.avgScore !== null
               ? `${agent.avgScore.toFixed(1)}%`

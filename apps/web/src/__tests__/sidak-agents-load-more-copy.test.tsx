@@ -70,6 +70,11 @@ describe("Sidak agents load-more copy", () => {
     expect(screen.getByRole("region", { name: "Daftar agen" })).not.toHaveClass(
       "auto-rows-fr",
     );
+    const batchSelect = screen.getByRole("combobox", {
+      name: "Filter batch",
+    });
+    expect(batchSelect).toHaveValue("");
+    expect(batchSelect).not.toHaveClass("rounded-full");
   });
 
   it("hides the load-more button when all agents are already visible", () => {
@@ -90,7 +95,7 @@ describe("Sidak agents load-more copy", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the batch filter behind an explicit mobile disclosure", () => {
+  it("keeps the batch filter compact with one accessible selector", () => {
     useApiMock.mockReturnValue({
       data: {
         agents: makeAgents(1),
@@ -103,12 +108,14 @@ describe("Sidak agents load-more copy", () => {
 
     render(<SidakAgentsPage />);
 
-    const filterButton = screen.getByRole("button", { name: /Filter batch/ });
-    expect(filterButton).toHaveAttribute("aria-expanded", "false");
+    const batchSelect = screen.getByRole("combobox", {
+      name: "Filter batch",
+    });
+    expect(batchSelect).toHaveValue("");
 
-    fireEvent.click(filterButton);
+    fireEvent.change(batchSelect, { target: { value: "Batch A" } });
 
-    expect(filterButton).toHaveAttribute("aria-expanded", "true");
+    expect(batchSelect).toHaveValue("Batch A");
   });
 
   it("shows an actionable error state when the directory request fails", () => {
