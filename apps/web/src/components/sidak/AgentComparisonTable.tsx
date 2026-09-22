@@ -42,7 +42,10 @@ function formatNumber(value: number): string {
   }).format(value);
 }
 
-function calculateDeltaPercent(agentCount: number, average: number): number | null {
+function calculateDeltaPercent(
+  agentCount: number,
+  average: number,
+): number | null {
   if (average === 0) {
     if (agentCount === 0) return 0;
     return null;
@@ -69,7 +72,10 @@ function deltaTone(value: number | null): string {
   return "text-muted-foreground";
 }
 
-export default function AgentComparisonTable({ comparisonTable, embedded = false }: Props) {
+export default function AgentComparisonTable({
+  comparisonTable,
+  embedded = false,
+}: Props) {
   if (!comparisonTable) return null;
 
   const hasComparison = comparisonTable.rows.some((r) => r.key !== "total");
@@ -85,7 +91,7 @@ export default function AgentComparisonTable({ comparisonTable, embedded = false
       >
         <CardContent className="px-5 py-6">
           <p className="text-sm text-muted-foreground">
-          Belum ada data pembanding untuk periode ini
+            Belum ada data pembanding untuk periode ini
           </p>
         </CardContent>
       </Card>
@@ -111,33 +117,63 @@ export default function AgentComparisonTable({ comparisonTable, embedded = false
           : "gap-0 border-border bg-surface py-0"
       }
     >
-      <CardHeader className="border-b border-border px-5 py-4">
+      <CardHeader className="min-w-0 border-b border-border px-5 py-4">
         <CardTitle className="font-outfit text-lg font-bold tracking-tight text-foreground">
           Perbandingan Temuan
         </CardTitle>
-        <CardDescription className="mt-1 text-sm text-muted-foreground">
+        <CardDescription className="mt-1 break-words text-sm text-muted-foreground">
           {scopeLine}
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-0">
-        <Table className="min-w-[720px] text-sm">
-          <TableCaption className="sr-only">Perbandingan temuan agen dengan rata-rata tim dan layanan yang sama</TableCaption>
+      <CardContent className="min-w-0 px-0">
+        <Table className="w-full min-w-0 table-fixed text-xs sm:text-sm">
+          <TableCaption className="sr-only">
+            Perbandingan temuan agen dengan rata-rata tim dan layanan yang sama
+          </TableCaption>
+          <colgroup>
+            <col className="w-1/4" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+          </colgroup>
           <TableHeader>
             <TableRow className="border-b border-border text-left text-xs font-semibold text-muted-foreground hover:bg-transparent">
-              <TableHead className="px-5 py-3 font-bold">Parameter</TableHead>
-              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-3 py-3 font-bold leading-tight sm:px-5"
+              >
+                Parameter
+              </TableHead>
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-1.5 py-3 text-right font-bold leading-tight tabular-nums sm:px-5"
+              >
                 Agen ini
               </TableHead>
-              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-1.5 py-3 text-right font-bold leading-tight tabular-nums sm:px-5"
+              >
                 Rata-rata tim
               </TableHead>
-              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-1.5 py-3 text-right font-bold leading-tight tabular-nums sm:px-5"
+              >
                 Rata-rata layanan sama
               </TableHead>
-              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-1.5 py-3 text-right font-bold leading-tight tabular-nums sm:px-5"
+              >
                 % vs tim
               </TableHead>
-              <TableHead className="px-5 py-3 text-right font-bold tabular-nums">
+              <TableHead
+                scope="col"
+                className="!whitespace-normal break-words px-1.5 py-3 text-right font-bold leading-tight tabular-nums sm:px-5"
+              >
                 % vs layanan sama
               </TableHead>
             </TableRow>
@@ -158,25 +194,27 @@ export default function AgentComparisonTable({ comparisonTable, embedded = false
                   key={row.key}
                   className={isTotal ? "bg-muted/30 font-semibold" : ""}
                 >
-                  <TableCell className="px-5 py-3 text-foreground">{row.label}</TableCell>
-                  <TableCell className="px-5 py-3 text-right text-foreground tabular-nums">
+                  <TableCell className="!whitespace-normal break-words px-3 py-3 align-top leading-snug text-foreground sm:px-5">
+                    {row.label}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-1.5 py-3 text-right align-top text-foreground tabular-nums sm:px-5">
                     {row.agentCount}
                   </TableCell>
-                  <TableCell className="px-5 py-3 text-right text-muted-foreground tabular-nums">
+                  <TableCell className="whitespace-nowrap px-1.5 py-3 text-right align-top text-muted-foreground tabular-nums sm:px-5">
                     {formatNumber(row.teamAverage)}
                   </TableCell>
-                  <TableCell className="px-5 py-3 text-right text-muted-foreground tabular-nums">
+                  <TableCell className="whitespace-nowrap px-1.5 py-3 text-right align-top text-muted-foreground tabular-nums sm:px-5">
                     {formatNumber(row.serviceAverage)}
                   </TableCell>
                   <TableCell
-                    className={`px-5 py-3 text-right tabular-nums ${deltaTone(
+                    className={`whitespace-nowrap px-1.5 py-3 text-right align-top tabular-nums sm:px-5 ${deltaTone(
                       deltaTeam,
                     )}`}
                   >
                     {formatDeltaPercent(deltaTeam)}
                   </TableCell>
                   <TableCell
-                    className={`px-5 py-3 text-right tabular-nums ${deltaTone(
+                    className={`whitespace-nowrap px-1.5 py-3 text-right align-top tabular-nums sm:px-5 ${deltaTone(
                       deltaService,
                     )}`}
                   >

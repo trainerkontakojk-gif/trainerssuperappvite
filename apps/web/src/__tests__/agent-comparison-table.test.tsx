@@ -49,7 +49,9 @@ describe("AgentComparisonTable", () => {
 
     // Scope line
     expect(
-      screen.getByText(/Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agen tim \/ 20 agen layanan sama/),
+      screen.getByText(
+        /Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agen tim \/ 20 agen layanan sama/,
+      ),
     ).toBeInTheDocument();
 
     // Column headers
@@ -72,6 +74,22 @@ describe("AgentComparisonTable", () => {
     // Deltas: total agent(10) vs teamAvg(7) = +42.9%; vs layananAvg(8) = +25%
     expect(screen.getByText("+42,9%")).toBeInTheDocument();
     expect(screen.getByText("+25%")).toBeInTheDocument();
+  });
+
+  it("keeps all columns within the card width while wrapping text", () => {
+    render(<AgentComparisonTable comparisonTable={baseTable} />);
+
+    const table = screen.getByRole("table");
+
+    expect(table).toHaveClass("w-full", "min-w-0", "table-fixed");
+    expect(table).not.toHaveClass("min-w-[720px]");
+    expect(
+      screen.getByRole("columnheader", { name: "Rata-rata layanan sama" }),
+    ).toHaveClass("!whitespace-normal", "break-words");
+    expect(screen.getByRole("cell", { name: "Salam Pembuka" })).toHaveClass(
+      "!whitespace-normal",
+      "break-words",
+    );
   });
 
   it("shows the empty state when there are no comparison rows beyond totals", () => {
