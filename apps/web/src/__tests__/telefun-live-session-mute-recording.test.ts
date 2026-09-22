@@ -121,7 +121,108 @@ describe("LiveSession mute recording capture regression", () => {
     expect((session as unknown as { isMuted: boolean }).isMuted).toBe(false);
   });
 
-  it("applies pre-stream mute to newly acquired track before recorder graph attaches (race regression)", async () => {
+  it("disables every microphone audio track while held", () => {
+    const session = new LiveSession(createMockConfig());
+    const trackA = createFakeTrack(true);
+    const trackB = createFakeTrack(true);
+    const stream = createFakeStream([trackA, trackB]);
+    (session as unknown as { stream: MediaStream }).stream = stream;
+
+    session.setHold(true);
+
+    expect(trackA.enabled).toBe(false);
+    expect(trackB.enabled).toBe(false);
+  });
+
+  it.each([
+    {
+      name: "unheld and unmuted",
+      beforeUnhold: () => undefined,
+      expectedEnabled: true,
+    },
+    {
+      name: "unheld but muted",
+      beforeUnhold: (session: LiveSession) => session.setMute(true),
+      expectedEnabled: false,
+    },
+  ])(
+    "unhold applies the composed microphone state ($name)",
+    ({ beforeUnhold, expectedEnabled }) => {
+      const session = new LiveSession(createMockConfig());
+      const track = createFakeTrack(false);
+      (session as unknown as { stream: MediaStream }).stream =
+        createFakeStream([track]);
+      session.setHold(true);
+      beforeUnhold(session);
+
+      session.setHold(false);
+
+      expect(track.enabled).toBe(expectedEnabled);
+    },
+  );
+
+  it.each([
+    {
+      name: "mute then hold then unhold",
+      run: (session: LiveSession) => {
+        session.setMute(true);
+        session.setHold(true);
+        session.setHold(false);
+      },
+    },
+    {
+      name: "hold then mute then unhold",
+      run: (session: LiveSession) => {
+        session.setHold(true);
+        session.setMute(true);
+        session.setHold(false);
+      },
+    },
+  ])("keeps the microphone disabled across overlapping state orderings ($name)", ({ run }) => {
+    const session = new LiveSession(createMockConfig());
+    const track = createFakeTrack(true);
+    (session as unknown as { stream: MediaStream }).stream =
+      createFakeStream([track]);
+
+    run(session);
+
+    expect(track.enabled).toBe(false);
+
+    session.setMute(false);
+
+    expect(track.enabled).toBe(true);
+  });
+
+  it("keeps repeated mute and hold calls idempotent", () => {
+    const session = new LiveSession(createMockConfig());
+    const track = createFakeTrack(true);
+    (session as unknown as { stream: MediaStream }).stream =
+      createFakeStream([track]);
+
+    session.setMute(true);
+    session.setMute(true);
+    session.setHold(true);
+    session.setHold(true);
+    expect(track.enabled).toBe(false);
+
+    session.setHold(false);
+    expect(track.enabled).toBe(false);
+
+    session.setMute(false);
+    session.setMute(false);
+    expect(track.enabled).toBe(true);
+  });
+
+  it.each([
+    {
+      name: "mute",
+      selectState: (session: LiveSession) => session.setMute(true),
+    },
+    {
+      name: "hold",
+      selectState: (session: LiveSession) => session.setHold(true),
+    },
+  ])("applies pre-stream $name to newly acquired track before recorder graph attaches (race regression)", async ({ selectState }) => {
     // Minimal fakes following telefun-live-session-auth.test.ts patterns — no real browser/provider calls
     vi.stubGlobal(
       "WebSocket",
@@ -168,9 +269,8 @@ describe("LiveSession mute recording capture regression", () => {
       });
 
     const session = new LiveSession(createMockConfig());
-    // Mute before stream exists — reachable race while getUserMedia is pending
-    session.setMute(true);
-    expect((session as unknown as { isMuted: boolean }).isMuted).toBe(true);
+    // State selected before stream exists — reachable race while getUserMedia is pending
+    selectState(session);
 
     const connectPromise = session.connect("test-access-token");
 

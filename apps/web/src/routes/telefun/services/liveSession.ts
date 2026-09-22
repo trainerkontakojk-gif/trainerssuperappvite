@@ -170,7 +170,7 @@ export class LiveSession {
           sampleRate: this.audioConfiguration.inputSampleRateHz,
         },
       });
-      this.applyMuteToTracks();
+      this.applyMicrophoneCaptureStateToTracks();
       this.onLocalStream(this.stream);
 
       // 2. Setup Audio Context
@@ -746,17 +746,17 @@ export class LiveSession {
     }
   }
 
-  private applyMuteToTracks(): void {
+  private applyMicrophoneCaptureStateToTracks(): void {
     if (!this.stream) return;
     this.stream.getAudioTracks().forEach((track) => {
-      track.enabled = !this.isMuted;
+      track.enabled = !this.isMuted && !this.isHeld;
     });
   }
 
   public setMute(muted: boolean) {
     this.isMuted = muted;
     this.emitTimelineEvent("mute_changed", { muted });
-    this.applyMuteToTracks();
+    this.applyMicrophoneCaptureStateToTracks();
   }
 
   public setHold(held: boolean) {
@@ -765,6 +765,7 @@ export class LiveSession {
       ? startHold(this.holdTracker, relativeNow)
       : endHold(this.holdTracker, relativeNow);
     this.isHeld = this.holdTracker.active !== null;
+    this.applyMicrophoneCaptureStateToTracks();
     if (held) {
       this.clearAiPlayback("hold_activated");
     }

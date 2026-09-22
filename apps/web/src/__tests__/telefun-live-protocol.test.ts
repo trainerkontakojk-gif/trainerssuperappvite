@@ -339,24 +339,65 @@ describe("telefun live protocol", () => {
     );
   });
 
-  it("does not send realtime audio before setupComplete", () => {
+  it.each([
+    {
+      name: "connected and setup with an unmuted, unheld microphone",
+      wsReady: true,
+      setupComplete: true,
+      muted: false,
+      held: false,
+      expected: true,
+    },
+    {
+      name: "a muted microphone",
+      wsReady: true,
+      setupComplete: true,
+      muted: true,
+      held: false,
+      expected: false,
+    },
+    {
+      name: "a held microphone",
+      wsReady: true,
+      setupComplete: true,
+      muted: false,
+      held: true,
+      expected: false,
+    },
+    {
+      name: "a microphone that is both muted and held",
+      wsReady: true,
+      setupComplete: true,
+      muted: true,
+      held: true,
+      expected: false,
+    },
+    {
+      name: "a websocket that is not connected",
+      wsReady: false,
+      setupComplete: true,
+      muted: false,
+      held: false,
+      expected: false,
+    },
+    {
+      name: "a session before setup completes",
+      wsReady: true,
+      setupComplete: false,
+      muted: false,
+      held: false,
+      expected: false,
+    },
+  ])("sends realtime audio only for $name", ({
+    wsReady,
+    setupComplete,
+    muted,
+    held,
+    expected,
+  }) => {
     expect(
-      shouldSendRealtimeAudio({
-        wsReady: true,
-        setupComplete: false,
-        muted: false,
-        held: false,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldSendRealtimeAudio({
-        wsReady: true,
-        setupComplete: true,
-        muted: false,
-        held: false,
-      }),
-    ).toBe(true);
+      shouldSendRealtimeAudio({ wsReady, setupComplete, muted, held }),
+    ).toBe(expected);
   });
 
   it("processes audio input frames into volume and pcm16 data", () => {
