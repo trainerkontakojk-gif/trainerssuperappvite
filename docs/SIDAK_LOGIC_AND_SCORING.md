@@ -153,7 +153,20 @@ Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua 
 2. **Metrik Persen** (`avg-score` dan `compliance`): Delta ditampilkan sebagai perubahan poin persentase (poin) absolut agar operator tidak bingung. Rumusnya: `current - previous` (dengan nilai mutlak untuk magnitudo).
 3. **Kepatuhan (Compliance)**: Delta kepatuhan dihitung menggunakan `complianceRate` (persentase) alih-alih `complianceCount` (jumlah agen) agar konsisten dengan nilai utama KPI.
 
-Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break.
+Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break tampilan. **Rank bisnis tetap memakai competition ranking**: jumlah defect yang sama berbagi peringkat yang sama, sedangkan tie-break nama hanya menentukan urutan baris. Sorting kolom nama atau skor mengubah urutan tampilan, bukan rank bisnis.
+
+Halaman ranking utama adalah ranking **prioritas temuan**: rank `1` berarti defect terbanyak dan rank yang lebih besar berarti prioritas lebih rendah. Untuk periode yang memiliki pembanding, `rankChange = previousRank - currentRank` sehingga:
+
+- nilai positif (`+N`) berarti **prioritas naik** menuju rank yang lebih kecil;
+- nilai negatif berarti **prioritas turun** menuju rank yang lebih besar;
+- `0` berarti **Tetap**;
+- `null` berarti **Baru** dan `alltime` tidak menampilkan perbandingan periode.
+
+Status perubahan posisi ditampilkan satu kali pada setiap breakpoint: di kolom **Perubahan posisi** pada desktop, dan di bawah nama agent pada mobile ketika kolom desktop disembunyikan. Catatan **Berbagi peringkat dengan ...** tetap terpisah dari status perubahan. Label `Fatal` bukan bagian dari status ranking karena tidak diperlukan untuk keputusan prioritas.
+
+Quickview performa agent dapat memakai konteks performa tersendiri dan wajib memberi label semantic-nya secara eksplisit.
+
+Agent non-service (QA, trainer, WFM, team leader, supervisor/SPV, operational manager, serta folder tim non-service) tidak masuk populasi ranking. Leader tanpa agent scope yang disetujui ditolak dengan `403`, bukan diperlakukan sebagai scope tanpa filter.
 
 Pareto dan donut memakai `findingRows` saja. Phantom tidak dihitung sebagai defect.
 

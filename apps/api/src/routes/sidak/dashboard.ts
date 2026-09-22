@@ -476,6 +476,19 @@ sidakDashboard.get(
       user.id,
       profile?.role ?? "",
     );
+    if (accessibleIds && accessibleIds.length === 0) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Anda belum memiliki scope agent SIDAK yang disetujui.",
+          },
+        },
+        403,
+      );
+    }
+
     const filterScope = await resolveSidakFilterScope(c);
 
     try {

@@ -13,6 +13,7 @@ const mockFolders = [
 ];
 
 let mockTemuanRows: any[] = [];
+let mockProfilerRows: any[] = [];
 
 function parseNotInValues(raw: string): string[] {
   return raw
@@ -89,6 +90,10 @@ function buildQueryResult(
   }
   if (tableName === "mv_qa_period_summary") {
     return { data: null, error: null };
+  }
+  if (tableName === "profiler_peserta") {
+    const rows = applyQueryFilters(mockProfilerRows, state);
+    return { data: rows, error: null };
   }
   if (tableName === "qa_temuan") {
     const rows = applyQueryFilters(mockTemuanRows, state);
@@ -180,6 +185,7 @@ function generateTemuanRows(count: number) {
 describe("SIDAK Dashboard pagination (>1000 rows)", () => {
   beforeEach(() => {
     mockTemuanRows = [];
+    mockProfilerRows = [];
   });
 
   it("processes 100 rows correctly (baseline sanity)", async () => {
@@ -305,5 +311,70 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
     expect(result.summary!.totalAgents).toBe(0);
     expect(result.summary!.totalDefects).toBe(0);
     expect(result.topAgents).toEqual([]);
+  });
+
+  it("excludes non-service agents from the ranking population", async () => {
+    mockProfilerRows = [
+      {
+        id: "agent-qa",
+        nama: "QA Internal",
+        tim: "Tim QA",
+        batch_name: "",
+        jabatan: "Agent",
+      },
+      {
+        id: "agent-valid",
+        nama: "Agen Valid",
+        tim: "Tim Call",
+        batch_name: "Folder A",
+        jabatan: "Agent",
+      },
+    ];
+    mockTemuanRows = [
+      {
+        id: "temuan-qa",
+        period_id: "period-1",
+        peserta_id: "agent-qa",
+        service_type: "call",
+        indicator_id: "ind-1",
+        nilai: 0,
+        is_phantom_padding: false,
+        tahun: 2026,
+        profiler_peserta: {
+          id: "agent-qa",
+          nama: "QA Internal",
+          batch_name: "",
+          tim: "Tim QA",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "temuan-valid",
+        period_id: "period-1",
+        peserta_id: "agent-valid",
+        service_type: "call",
+        indicator_id: "ind-1",
+        nilai: 0,
+        is_phantom_padding: false,
+        tahun: 2026,
+        profiler_peserta: {
+          id: "agent-valid",
+          nama: "Agen Valid",
+          batch_name: "Folder A",
+          tim: "Tim Call",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      year: 2026,
+      period_ids: ["period-1"],
+      limit: 0,
+    });
+
+    expect(result.summary!.totalAgents).toBe(1);
+    expect(result.summary!.totalDefects).toBe(1);
+    expect(result.topAgents.map((agent) => agent.agentId)).toEqual(["agent-valid"]);
   });
 });

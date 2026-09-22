@@ -33,7 +33,7 @@ export default function TopAgentsTable({ agents, serviceType, selectedYear }: Pr
   }
 
   const rankingParams = new URLSearchParams();
-  if (serviceType) rankingParams.set("service", serviceType);
+  if (serviceType) rankingParams.set("service_type", serviceType);
   if (selectedYear) rankingParams.set("year", String(selectedYear));
   const rankingQuery = rankingParams.toString();
   const rankingUrl = rankingQuery

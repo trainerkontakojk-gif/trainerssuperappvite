@@ -21,6 +21,29 @@ export type RankingData = {
   availableServices: string[];
 };
 
+function buildBusinessRankMap(agents: TopAgentData[]): Map<string, number> {
+  const ordered = [...agents].sort(
+    (left, right) =>
+      right.defects - left.defects ||
+      left.nama.localeCompare(right.nama, "id", { sensitivity: "base", numeric: true }),
+  );
+  const ranks = new Map<string, number>();
+  let previousDefects: number | undefined;
+  let previousRank = 0;
+
+  ordered.forEach((agent, index) => {
+    const rank =
+      index > 0 && agent.defects === previousDefects
+        ? previousRank
+        : index + 1;
+    ranks.set(agent.agentId, rank);
+    previousDefects = agent.defects;
+    previousRank = rank;
+  });
+
+  return ranks;
+}
+
 export async function getRankingData(params: GetRankingDataParams): Promise<RankingData> {
   const { period, service_type, year, folder, accessibleIds, filterScope } = params;
   const effectiveServiceType = sidakService.resolveScopedServiceType(
@@ -134,13 +157,11 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
         limit: 0,
       });
 
-      const prevRankMap = new Map<string, number>();
-      (prevDashboardData.topAgents ?? []).forEach((agent: any, index: number) => {
-        prevRankMap.set(agent.agentId, index + 1);
-      });
+      const prevRankMap = buildBusinessRankMap(prevDashboardData.topAgents ?? []);
+      const currentRankMap = buildBusinessRankMap(dashboardData.topAgents ?? []);
 
-      finalRankings = (dashboardData.topAgents ?? []).map((agent: any, index: number) => {
-        const currentRank = index + 1;
+      finalRankings = (dashboardData.topAgents ?? []).map((agent: any) => {
+        const currentRank = currentRankMap.get(agent.agentId) ?? 0;
         const previousRank = prevRankMap.get(agent.agentId);
         const rankChange = previousRank !== undefined ? (previousRank - currentRank) : null;
         return {

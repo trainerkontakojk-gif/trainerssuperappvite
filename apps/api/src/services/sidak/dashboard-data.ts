@@ -30,7 +30,7 @@ import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
-import { getSoftDeletedPesertaIds } from "./agent-directory";
+import { getSidakExcludedPesertaIds, getSoftDeletedPesertaIds } from "./agent-directory";
 import {
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
@@ -124,9 +124,11 @@ export async function getDashboardData(params: {
     supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
-  const excludedIds = params.showArchived
-    ? []
-    : await getSoftDeletedPesertaIds();
+  const [excludedIds, sidakExcludedIds] = await Promise.all([
+    params.showArchived ? Promise.resolve([]) : getSoftDeletedPesertaIds(),
+    getSidakExcludedPesertaIds(),
+  ]);
+  const allExcludedIds = [...new Set([...excludedIds, ...sidakExcludedIds])];
 
   const allowedSvcs =
     params.allowedServiceTypes && params.allowedServiceTypes.length > 0
@@ -158,7 +160,7 @@ export async function getDashboardData(params: {
     peserta_id: params.peserta_id,
     agent_ids: params.agent_ids,
     folderNames,
-    excludedIds,
+    excludedIds: allExcludedIds,
     allowedSvcs,
   });
   const rows = toDashboardTemuanRows(allTemuan);

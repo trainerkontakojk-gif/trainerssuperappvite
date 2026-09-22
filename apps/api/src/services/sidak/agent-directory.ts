@@ -59,6 +59,33 @@ export function isAgentExcluded(
   );
 }
 
+export async function getSidakExcludedPesertaIds(): Promise<string[]> {
+  const agents = await fetchAllPages<{
+    id: string;
+    tim?: string | null;
+    batch_name?: string | null;
+    jabatan?: string | null;
+  }>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("id, tim, batch_name, jabatan")
+        .order("id", { ascending: true })
+        .range(from, to),
+  });
+
+  return [
+    ...new Set(
+      agents
+        .filter((agent) =>
+          isAgentExcluded(agent.tim, agent.batch_name, agent.jabatan),
+        )
+        .map((agent) => agent.id)
+        .filter(Boolean),
+    ),
+  ];
+}
+
 export async function getSoftDeletedPesertaIds(): Promise<string[]> {
   // profiler_peserta has no user_id column (only trainer_id).
   // The original query was always broken and returned [].

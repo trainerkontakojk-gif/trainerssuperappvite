@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { Link } from "@tanstack/react-router";
 import { useApi } from "../../hooks/useApi";
 import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import type { TopAgentData, QAPeriod } from "@trainers/types";
@@ -10,10 +11,6 @@ import {
 } from "../../lib/sidak-folder-options";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Trophy,
-  Calendar,
-  LayoutGrid,
-  Users,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -127,6 +124,70 @@ export default function SidakRankingPage() {
   }, [allFolders, selectedFolder, loading, effectiveService]);
 
   const rankings = data?.rankings;
+  const businessRanks = useMemo(() => {
+    if (!rankings) return new Map<string, number>();
+
+    const collator = new Intl.Collator("id", {
+      sensitivity: "base",
+      numeric: true,
+    });
+    const businessOrder = [...rankings].sort(
+      (a, b) => b.defects - a.defects || collator.compare(a.nama, b.nama),
+    );
+    const ranks = new Map<string, number>();
+    let previousDefects: number | undefined;
+    let previousRank = 0;
+
+    businessOrder.forEach((agent, index) => {
+      const rank =
+        index > 0 && agent.defects === previousDefects
+          ? previousRank
+          : index + 1;
+      ranks.set(agent.agentId, rank);
+      previousDefects = agent.defects;
+      previousRank = rank;
+    });
+
+    return ranks;
+  }, [rankings]);
+
+  const tiedNamesByAgent = useMemo(() => {
+    const result = new Map<string, string[]>();
+    if (!rankings) return result;
+
+    const groups = new Map<number, string[]>();
+    rankings.forEach((agent) => {
+      const names = groups.get(agent.defects) ?? [];
+      names.push(agent.nama);
+      groups.set(agent.defects, names);
+    });
+
+    rankings.forEach((agent) => {
+      const names = (groups.get(agent.defects) ?? [])
+        .filter((name) => name !== agent.nama)
+        .sort((a, b) => a.localeCompare(b, "id", { sensitivity: "base" }));
+      if (names.length > 0) result.set(agent.agentId, names);
+    });
+
+    return result;
+  }, [rankings]);
+
+  const formatTieLabel = (rank: number, names: string[]) => {
+    if (names.length === 0) return null;
+    const peerLabel =
+      names.length <= 2
+        ? names.join(" dan ")
+        : `${names[0]} dan ${names.length - 1} agen lain`;
+    return `Berbagi peringkat ${rank} dengan ${peerLabel}`;
+  };
+
+  const showBatchColumn = useMemo(() => {
+    const batches = new Set(
+      (rankings ?? []).map((agent) => agent.batch?.trim()).filter(Boolean),
+    );
+    return batches.size > 1;
+  }, [rankings]);
+
   const sortedRankings = useMemo(() => {
     if (!rankings) return [];
     const collator = new Intl.Collator("id", {
@@ -184,43 +245,25 @@ export default function SidakRankingPage() {
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
-          {/* HEADER */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-1"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-2xl">
-                  <Trophy className="w-6 h-6 text-primary" />
-                </div>
-                <h1 className="font-outfit text-3xl font-black tracking-tight text-foreground">
-                  Ranking Agen
-                </h1>
-              </div>
-              <p className="text-muted-foreground pl-12 text-sm md:text-base font-medium">
-                Peringkat agen berdasarkan jumlah temuan QA. Klik nama atau skor
-                QA untuk mengubah urutan.
-              </p>
-            </motion.div>
-          </div>
+      <div className="flex-1 overflow-y-auto p-4 pb-14 md:p-8 md:pb-10 lg:pb-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <header className="flex flex-col gap-1">
+            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
+              Ranking prioritas temuan
+            </h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Temuan terbanyak berada di peringkat teratas. Jumlah temuan yang sama berbagi peringkat.
+            </p>
+          </header>
 
           {/* FILTER BAR */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-border bg-surface overflow-hidden"
-          >
-            <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <section aria-label="Filter ranking" className="border-y border-border py-4 md:py-5">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               {/* Layanan */}
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
-                  <LayoutGrid className="w-3.5 h-3.5" /> Layanan
-                </label>
+                <label htmlFor="sidak-ranking-service" className="text-xs font-semibold text-foreground">Layanan</label>
                 <select
+                  id="sidak-ranking-service"
                   value={leaderLockedService ?? selectedService}
                   onChange={(e) => {
                     if (leaderLockedService) return;
@@ -242,7 +285,7 @@ export default function SidakRankingPage() {
                     }
                   }}
                   disabled={!!leaderLockedService}
-                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
+                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
                 >
                   {(leaderLockedService
                     ? [leaderLockedService]
@@ -259,13 +302,12 @@ export default function SidakRankingPage() {
 
               {/* Periode */}
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
-                  <Calendar className="w-3.5 h-3.5" /> Periode
-                </label>
+                <label htmlFor="sidak-ranking-period" className="text-xs font-semibold text-foreground">Periode</label>
                 <select
+                  id="sidak-ranking-period"
                   value={selectedPeriod}
                   onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
+                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
                 >
                   <option value="ytd">Year to Date (YTD)</option>
                   <option value="alltime">All Time</option>
@@ -281,13 +323,12 @@ export default function SidakRankingPage() {
 
               {/* Tahun */}
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
-                  <Calendar className="w-3.5 h-3.5" /> Tahun
-                </label>
+                <label htmlFor="sidak-ranking-year" className="text-xs font-semibold text-foreground">Tahun</label>
                 <select
+                  id="sidak-ranking-year"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
+                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
                 >
                   {(data?.availableYears ?? []).map((y) => (
                     <option key={y} value={y}>
@@ -299,13 +340,12 @@ export default function SidakRankingPage() {
 
               {/* Folder/Tim */}
               <div className="space-y-2">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
-                  <Users className="w-3.5 h-3.5" /> Folder/Tim
-                </label>
+                <label htmlFor="sidak-ranking-folder" className="text-xs font-semibold text-foreground">Folder/tim</label>
                 <select
+                  id="sidak-ranking-folder"
                   value={selectedFolder}
                   onChange={(e) => setSelectedFolder(e.target.value)}
-                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
+                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
                 >
                   <option value="ALL">Semua Tim</option>
                   {standaloneFolders.map((f) => (
@@ -331,22 +371,18 @@ export default function SidakRankingPage() {
                 </select>
               </div>
             </div>
-          </motion.div>
+          </section>
 
           {/* RANKING TABLE */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-border bg-surface overflow-hidden"
-          >
-            <div className="overflow-x-auto">
+          <section aria-label="Daftar ranking agen" className="border-y border-border">
+            <div className="overflow-x-hidden md:overflow-x-auto">
               <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-16">
+                <thead className="hidden md:table-header-group">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground w-16">
                       Rank
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">
                       <button
                         type="button"
                         onClick={() => toggleSort("nama", "asc")}
@@ -356,10 +392,10 @@ export default function SidakRankingPage() {
                         {renderSortIcon("nama")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <th className={showBatchColumn ? "px-4 py-3 text-xs font-semibold text-muted-foreground" : "hidden"}>
                       Tim/Batch
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
                       <button
                         type="button"
                         onClick={() => toggleSort("defects", "desc")}
@@ -369,7 +405,7 @@ export default function SidakRankingPage() {
                         {renderSortIcon("defects")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">
+                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
                       <button
                         type="button"
                         onClick={() => toggleSort("score", "desc")}
@@ -379,13 +415,13 @@ export default function SidakRankingPage() {
                         {renderSortIcon("score")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-center">
-                      Status
+                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">
+                      Perubahan posisi
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  <AnimatePresence mode="wait">
+                <tbody className="block md:table-row-group">
+                  <AnimatePresence mode="sync">
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <motion.tr
@@ -401,115 +437,96 @@ export default function SidakRankingPage() {
                       ))
                     ) : sortedRankings.length > 0 ? (
                       sortedRankings.map((agent, i) => {
-                        const rank = i + 1;
-                        const isTop3 = rank <= 3;
+                        const rank = businessRanks.get(agent.agentId) ?? i + 1;
+                        const tiedNames = tiedNamesByAgent.get(agent.agentId) ?? [];
+                        const tieLabel = formatTieLabel(rank, tiedNames);
+                        const rankChange = agent.rankChange;
+                        const rankChangeLabel =
+                          selectedPeriod === "alltime" || rankChange === undefined
+                            ? null
+                            : rankChange === null
+                              ? "Baru"
+                              : rankChange > 0
+                                ? `Prioritas naik +${rankChange}`
+                                : rankChange < 0
+                                  ? `Prioritas turun ${Math.abs(rankChange)}`
+                                  : "Tetap";
+                        const rankChangeClass =
+                          rankChange === undefined
+                            ? "text-muted-foreground"
+                            : rankChange === null
+                              ? "text-blue-600 dark:text-blue-400"
+                              : rankChange > 0
+                                ? "text-red-600 dark:text-red-400"
+                                : rankChange < 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-muted-foreground";
                         return (
-                          <motion.tr
+                          <tr
                             key={agent.agentId}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                            onClick={() => {
-                              window.location.href = `/sidak/agents/${agent.agentId}`;
-                            }}
-                            className={`group cursor-pointer hover:bg-primary/5 transition-all duration-200 ${isTop3 ? "bg-primary/5" : ""}`}
+                            className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 border-b border-border px-4 py-4 last:border-0 hover:bg-muted/20 md:table-row md:px-0 md:py-0"
                           >
-                            <td className="px-6 py-5">
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                  rank === 1
-                                    ? "bg-amber-400/20 text-amber-600 dark:text-amber-400"
-                                    : rank === 2
-                                      ? "bg-slate-400/20 text-slate-600 dark:text-slate-400"
-                                      : rank === 3
-                                        ? "bg-orange-400/20 text-orange-600 dark:text-orange-400"
-                                        : "bg-muted text-muted-foreground"
+                            <td className="row-span-2 px-0 py-0 align-middle md:table-cell md:px-4 md:py-4">
+                              <span
+                                className={`font-mono text-sm font-semibold ${
+                                  rank === 1 ? "text-primary" : "text-muted-foreground"
                                 }`}
                               >
                                 {rank}
-                              </div>
+                              </span>
                             </td>
-                            <td className="px-6 py-5">
-                              <div className="font-bold text-foreground/80 group-hover:text-primary transition-colors">
+                            <td className="min-w-0 px-0 py-0 align-middle md:table-cell md:px-4 md:py-4">
+                              <Link
+                                to="/sidak/agents/$id"
+                                params={{ id: agent.agentId }}
+                                className="block break-words font-semibold text-foreground hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                              >
                                 {agent.nama}
+                              </Link>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:hidden">
+                                {agent.batch && <span>{agent.batch}</span>}
+                                <span>{agent.defects} temuan</span>
+                                <span>Skor QA {agent.score.toFixed(1)}%</span>
                               </div>
+                              {rankChangeLabel && (
+                                <span className={`mt-2 block text-xs font-semibold md:hidden ${rankChangeClass}`}>
+                                  {rankChangeLabel}
+                                </span>
+                              )}
+                              {tieLabel && (
+                                <span className="mt-1 block text-[11px] text-muted-foreground">
+                                  {tieLabel}
+                                </span>
+                              )}
                             </td>
-                            <td className="px-6 py-5">
-                              <div className="text-xs font-semibold px-2 py-1 bg-foreground/5 rounded-md inline-block">
+                            <td className={showBatchColumn ? "hidden px-4 py-4 align-middle md:table-cell" : "hidden"}>
+                              <div className="text-xs font-semibold text-muted-foreground">
                                 {agent.batch}
                               </div>
                             </td>
-                            <td className="px-6 py-5 text-right font-mono font-bold text-foreground/80">
+                            <td className="hidden px-4 py-4 text-right align-middle font-mono font-semibold text-foreground md:table-cell">
                               {agent.defects}
                             </td>
                             <td
-                              className={`px-6 py-5 text-right font-bold ${scoreColor(agent.score)}`}
+                              className={`hidden px-4 py-4 text-right align-middle font-semibold md:table-cell ${scoreColor(agent.score)}`}
                             >
                               {agent.score.toFixed(1)}%
                             </td>
-                            <td className="px-6 py-5 text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                {selectedPeriod !== "alltime" && agent.rankChange !== undefined && (
-                                  <>
-                                    {typeof agent.rankChange === 'number' && agent.rankChange > 0 && (
-                                      <div className="flex flex-col items-center gap-0.5">
-                                        <motion.span
-                                          initial={{ opacity: 0, scale: 0.8 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black border border-red-500/20"
-                                          title="Posisi defects naik (kinerja memburuk)"
-                                        >
-                                          ▲ +{agent.rankChange}
-                                        </motion.span>
-                                        <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
-                                          Sebelumnya Posisi {rank + agent.rankChange}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {typeof agent.rankChange === 'number' && agent.rankChange < 0 && (
-                                      <div className="flex flex-col items-center gap-0.5">
-                                        <motion.span
-                                          initial={{ opacity: 0, scale: 0.8 }}
-                                          animate={{ opacity: 1, scale: 1 }}
-                                          className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20"
-                                          title="Posisi defects turun (kinerja membaik)"
-                                        >
-                                          ▼ {agent.rankChange}
-                                        </motion.span>
-                                        <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
-                                          Sebelumnya Posisi {rank + agent.rankChange}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {agent.rankChange === 0 && (
-                                      <span className="text-muted-foreground text-xs font-bold" title="Posisi tetap">
-                                        -
+                            <td className="hidden px-4 py-4 text-left align-middle md:table-cell">
+                              <div className="space-y-1 text-xs">
+                                {rankChangeLabel && (
+                                  <span className={`block font-semibold ${rankChangeClass}`}>
+                                    {rankChangeLabel}
+                                    {typeof rankChange === "number" && rankChange !== 0 && (
+                                      <span className="ml-1 font-normal text-muted-foreground">
+                                        (sebelumnya posisi {rank + rankChange})
                                       </span>
                                     )}
-                                    {agent.rankChange === null && (
-                                      <motion.span
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-500/20"
-                                        title="Agen baru dinilai pada periode ini"
-                                      >
-                                        Baru
-                                      </motion.span>
-                                    )}
-                                  </>
-                                )}
-                                {agent.hasCritical && (
-                                  <motion.span
-                                    initial={{ scale: 0.8 }}
-                                    animate={{ scale: 1 }}
-                                    className="px-2 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-full shadow-lg shadow-red-500/20"
-                                  >
-                                    Fatal
-                                  </motion.span>
+                                  </span>
                                 )}
                               </div>
                             </td>
-                          </motion.tr>
+                          </tr>
                         );
                       })
                     ) : (
@@ -531,7 +548,7 @@ export default function SidakRankingPage() {
                 </tbody>
               </table>
             </div>
-          </motion.div>
+          </section>
         </div>
       </div>
     </main>

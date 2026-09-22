@@ -125,6 +125,16 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
     );
   });
 
+  it("fails closed when a leader has no accessible agents", async () => {
+    vi.mocked(sidakService.getAccessibleAgentIds).mockResolvedValueOnce([]);
+
+    const res = await app.request("/ranking?period=ytd&year=2026&service_type=call");
+
+    expect(res.status).toBe(403);
+    expect(sidakService.getDashboardData).not.toHaveBeenCalled();
+    expect(sidakService.getAccessibleSidakFilters).not.toHaveBeenCalled();
+  });
+
   it("calculates rankChange comparing current YTD and previous YTD", async () => {
     // Mock getPeriods to return multiple periods
     vi.spyOn(sidakService, "getPeriods").mockResolvedValue([
@@ -157,8 +167,8 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           summary: {} as any,
           serviceData: [],
           topAgents: [
-            { agentId: "agent-a", nama: "Agent A", defects: 5, score: 90, hasCritical: false, batch: "Batch 1" },
-            { agentId: "agent-b", nama: "Agent B", defects: 10, score: 80, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-a", nama: "Agent A", defects: 10, score: 90, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-b", nama: "Agent B", defects: 5, score: 80, hasCritical: false, batch: "Batch 1" },
           ],
           paretoData: [],
           donutData: { critical: 0, nonCritical: 0, total: 0 },
@@ -222,8 +232,8 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           summary: {} as any,
           serviceData: [],
           topAgents: [
-            { agentId: "agent-a", nama: "Agent A", defects: 2, score: 95, hasCritical: false, batch: "Batch 1" },
-            { agentId: "agent-b", nama: "Agent B", defects: 4, score: 85, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-a", nama: "Agent A", defects: 4, score: 95, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-b", nama: "Agent B", defects: 2, score: 85, hasCritical: false, batch: "Batch 1" },
           ],
           paretoData: [],
           donutData: { critical: 0, nonCritical: 0, total: 0 },
