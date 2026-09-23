@@ -1,22 +1,29 @@
-# Product
-
-## Register
-
-product
+# Trainers SuperApp — Product Definition
 
 ## Users
 
-Trainers SuperApp is used by trainers, leaders, admins, and agents who need one internal workspace for communication training, quality analysis, participant/profile management, access control, and AI usage monitoring.
+Trainers SuperApp is an internal operational workspace for trainers, QA, leaders, admins, and agents. It combines communication training, quality analysis, participant/profile management, access control, monitoring, and AI-assisted feedback.
 
-Trainers and admins configure scenarios, review outcomes, manage users, and keep operational standards consistent across modules. Leaders inspect scoped team data and follow up on quality or coaching needs. Agents use permitted simulation surfaces to practice communication and review feedback.
+- **Trainer, QA, and Admin** configure scenarios, review outcomes, manage users and standards, and operate quality workflows.
+- **Leader** inspects only approved team or participant scope and follows up on quality or coaching needs.
+- **Agent** uses permitted simulation surfaces to practice communication and review feedback.
 
-Users are usually in a focused work context: reading operational data, running training simulations, checking scores, approving access, or responding to simulated customer interactions. The interface should help them move quickly without hiding critical context.
+Users work in focused contexts: reading operational data, running simulations, checking scores or feedback, approving access, or responding to simulated customer interactions. The interface must surface status, scope, and next action without hiding critical context.
 
 ## Product Purpose
 
-Trainers SuperApp consolidates training and quality workflows into a single product for KETIK chat simulation, PDKT email simulation, Telefun voice simulation, KTP/Profiler participant data, SIDAK quality analytics, monitoring, and admin operations.
+Trainers SuperApp consolidates the following operational surfaces:
+
+- **KETIK** — chat communication simulation with review and educational feedback.
+- **PDKT** — email communication simulation with a durable mailbox, scenario management, and evaluation.
+- **Telefun** — voice communication simulation using Gemini Live. OpenAI Realtime Telefun is retired; historical records remain readable and limited cleanup remains available for old sessions.
+- **KTP / Profiler** — participant, team, import, export, and profile management.
+- **SIDAK** — quality audit input, scoring, ranking, forecast, agent analysis, and reports.
+- **Dashboard, Monitoring, and Admin** — operational summaries, simulation history, AI usage/pricing visibility, user management, access approval, groups, and activity logs.
 
 Success means users can understand module state, complete the next task, and trust the displayed score, access scope, or AI feedback without needing technical help. The product should feel like a precise working tool rather than a showcase.
+
+The runtime and module contracts are maintained in [`docs/architecture.md`](docs/architecture.md) and [`docs/modules.md`](docs/modules.md). Visual rules are maintained in [`docs/design.md`](docs/design.md).
 
 ## Brand Personality
 
