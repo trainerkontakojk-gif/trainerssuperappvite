@@ -1,20 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import {
-  X,
-  Trash2,
-  Phone,
-  Clock,
-  Download,
-  History as HistoryIcon,
-  Eye,
-  FileDown,
-} from "lucide-react";
+import { X, Clock, History as HistoryIcon, FileDown } from "lucide-react";
 import type { CallRecord } from "../types";
 import { getTelefunScoringStatusLabel } from "../types";
 import { notify } from "../../../lib/toast";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { Button } from "../../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../../components/ui/dropdown-menu";
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -37,6 +35,26 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatHistoryTarget(record: CallRecord): string {
+  return formatSimulationSubjectLabel(record.simulationSubject, {
+    includeParticipantDetails: false,
+  });
+}
+
+function shouldShowHistoryTarget(record: CallRecord, targetLabel: string) {
+  if (!record.simulationSubject) return true;
+  if (targetLabel === "Target tidak tercatat — sesi lama") return true;
+  if (targetLabel.includes("record peserta tidak lagi tersedia")) return true;
+  return targetLabel !== record.consumerName;
+}
+
+function formatHistoryDuration(record: CallRecord): string {
+  const actualDuration = formatDuration(record.duration);
+  return record.configuredDuration
+    ? `${actualDuration} · batas ${record.configuredDuration} menit`
+    : actualDuration;
 }
 
 function exportToCSV(history: CallRecord[]) {
@@ -85,20 +103,15 @@ function exportToCSV(history: CallRecord[]) {
   URL.revokeObjectURL(url);
 }
 
-const SCORING_STATUS_ICONS: Record<
+const SCORING_STATUS_TEXT_CLASSES: Record<
   NonNullable<ReturnType<typeof getTelefunScoringStatusLabel>>["tone"],
-  React.ReactNode
+  string
 > = {
-  waiting: <Clock className="h-3 w-3 text-amber-500" aria-hidden />,
-  processing: (
-    <HistoryIcon
-      className="h-3 w-3 text-sky-500 animate-pulse motion-reduce:animate-none"
-      aria-hidden
-    />
-  ),
-  retryable: <Clock className="h-3 w-3 text-amber-500" aria-hidden />,
-  failed: <Trash2 className="h-3 w-3 text-red-500" aria-hidden />,
-  ready: <Eye className="h-3 w-3 text-emerald-500" aria-hidden />,
+  waiting: "text-muted-foreground",
+  processing: "text-muted-foreground",
+  retryable: "text-muted-foreground",
+  failed: "text-destructive",
+  ready: "text-module-telefun",
 };
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
@@ -244,7 +257,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
           <motion.div
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -254,7 +267,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               e.stopPropagation();
               onCloseRef.current();
             }}
-            className="absolute inset-0 bg-background/80 backdrop-blur-md"
+            className="absolute inset-0 bg-background/80"
           />
 
           <motion.div
@@ -278,45 +291,50 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 : { opacity: 0, scale: 0.95, y: 20 }
             }
             transition={shouldReduceMotion ? { duration: 0 } : undefined}
-            className="relative w-full max-w-2xl bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] max-h-dvh"
+            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card sm:max-h-[calc(100dvh-3rem)]"
           >
             {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b border-border shrink-0 bg-foreground/[0.02]">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
-                  <HistoryIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
+            <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6 sm:py-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <HistoryIcon
+                  className="mt-1 h-5 w-5 shrink-0 text-module-telefun"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
                   <h2
                     id="telefun-history-title"
-                    className="text-2xl font-bold tracking-tight text-foreground"
+                    className="font-heading text-xl font-bold leading-tight text-foreground sm:text-2xl"
                   >
                     Riwayat Panggilan
                   </h2>
-                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">
-                    {history.length} Rekaman Tersimpan
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {history.length} rekaman tersimpan
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 {history.length > 0 && (
                   <>
                     <button
                       type="button"
                       onClick={() => exportToCSV(history)}
-                      className="min-h-11 min-w-11 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all border border-emerald-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       title="Ekspor ke CSV"
                       aria-label="Ekspor riwayat panggilan ke CSV"
                     >
-                      <FileDown className="w-4 h-4" />
+                      <FileDown
+                        className="h-4 w-4 text-module-telefun"
+                        aria-hidden="true"
+                      />
+                      <span>Ekspor CSV</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleClear}
                       disabled={isClearing}
-                      className="min-h-11 px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      className="inline-flex min-h-[44px] items-center rounded-lg border border-destructive/30 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive"
                     >
-                      {isClearing ? "Menghapus..." : "Hapus Semua"}
+                      {isClearing ? "Menghapus..." : "Hapus semua"}
                     </button>
                   </>
                 )}
@@ -324,7 +342,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   ref={closeButtonRef}
                   type="button"
                   onClick={() => onCloseRef.current()}
-                  className="min-h-11 min-w-11 p-2 hover:bg-foreground/5 rounded-full transition-colors border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   aria-label="Tutup riwayat panggilan"
                 >
                   <X
@@ -336,116 +354,132 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 scrollbar-hide sm:px-6">
               {history.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="w-20 h-20 bg-foreground/5 rounded-full flex items-center justify-center mb-6 border border-border">
-                    <Clock className="w-10 h-10 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2 text-foreground">
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Clock
+                    className="mb-4 h-8 w-8 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <h3 className="text-lg font-semibold text-foreground">
                     Belum Ada Rekaman
                   </h3>
-                  <p className="text-muted-foreground text-sm max-w-xs mx-auto font-light">
+                  <p className="mt-2 max-w-sm text-sm text-muted-foreground">
                     Selesaikan simulasi panggilan pertama Anda untuk melihat
                     rekaman di sini.
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-4">
+                <ul
+                  aria-label="Daftar riwayat panggilan"
+                  className="divide-y divide-border"
+                >
                   {sortedHistory.map((rec) => {
                     const scoringLabel = getTelefunScoringStatusLabel(rec);
+                    const targetLabel = formatHistoryTarget(rec);
+                    const isDownloading = downloadingId === rec.id;
+                    const isProcessing = processingId === rec.id;
                     return (
-                      <motion.div
+                      <li
                         key={rec.id}
-                        whileHover={
-                          shouldReduceMotion
-                            ? undefined
-                            : {
-                                scale: 1.01,
-                                backgroundColor: "rgba(var(--foreground),0.03)",
-                              }
-                        }
-                        className="group relative bg-foreground/[0.02] border border-border rounded-3xl p-5 transition-all"
+                        className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
                       >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 bg-emerald-500/5 rounded-2xl flex items-center justify-center border border-emerald-500/10">
-                              <Phone className="w-6 h-6 text-emerald-600/60 dark:text-emerald-400/60" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold text-foreground leading-tight">
-                                {rec.scenarioTitle}
-                              </h4>
-                              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">
-                                {rec.consumerName} · {formatDate(rec.date)}
-                                {rec.configuredDuration
-                                  ? ` · Limit: ${rec.configuredDuration}m`
-                                  : ""}
-                              </p>
-                              <p className="mt-1 text-[10px] text-muted-foreground">
-                                Target: {formatSimulationSubjectLabel(rec.simulationSubject, { includeParticipantDetails: true })}
-                              </p>
-                              {scoringLabel && (
-                                <p className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                  {SCORING_STATUS_ICONS[scoringLabel.tone]}
-                                  <span>{scoringLabel.text}</span>
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {onReviewSession && (
-                              <button
-                                type="button"
-                                onClick={() => onReviewSession(rec)}
-                                className="min-h-11 min-w-11 p-3 bg-foreground/5 hover:bg-foreground/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-border transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                title="Lihat Detail"
-                                aria-label={`Lihat detail ${rec.scenarioTitle}`}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <h4 className="font-heading text-base font-semibold leading-tight text-foreground">
+                              {rec.scenarioTitle}
+                            </h4>
+                            {scoringLabel && (
+                              <span
+                                className={`text-sm font-medium ${SCORING_STATUS_TEXT_CLASSES[scoringLabel.tone]}`}
                               >
-                                <Eye className="w-4 h-4" aria-hidden="true" />
-                              </button>
+                                {scoringLabel.text}
+                              </span>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleDownload(rec)}
-                              disabled={downloadingId === rec.id}
-                              className="min-h-11 min-w-11 p-3 bg-foreground/5 hover:bg-foreground/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-border transition-all disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              title="Unduh Rekaman"
-                              aria-label={`Unduh rekaman ${rec.scenarioTitle}`}
-                            >
-                              {downloadingId === rec.id ? (
-                                <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin motion-reduce:animate-none" />
-                              ) : (
-                                <Download
-                                  className="w-4 h-4"
-                                  aria-hidden="true"
-                                />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(rec.id)}
-                              disabled={processingId === rec.id}
-                              className="min-h-11 min-w-11 p-3 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl border border-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              title="Hapus"
-                              aria-label={`Hapus ${rec.scenarioTitle}`}
-                            >
-                              {processingId === rec.id ? (
-                                <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin motion-reduce:animate-none" />
-                              ) : (
-                                <Trash2
-                                  className="w-4 h-4"
-                                  aria-hidden="true"
-                                />
-                              )}
-                            </button>
                           </div>
+                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                            <span>{rec.consumerName}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatDate(rec.date)}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatHistoryDuration(rec)}</span>
+                          </p>
+                          {shouldShowHistoryTarget(rec, targetLabel) && (
+                            <p className="mt-2 break-words text-sm text-muted-foreground">
+                              Target: {targetLabel}
+                            </p>
+                          )}
                         </div>
-                      </motion.div>
+
+                        <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                          {onReviewSession && (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="lg"
+                              onClick={() => onReviewSession(rec)}
+                              className="min-h-[44px] px-2 font-semibold text-module-telefun"
+                              aria-label={`Lihat detail ${rec.scenarioTitle}`}
+                            >
+                              Lihat detail
+                            </Button>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="lg"
+                                  className="min-h-[44px] px-2 text-muted-foreground hover:text-foreground"
+                                  aria-label={
+                                    isDownloading
+                                      ? `Mengunduh rekaman ${rec.scenarioTitle}`
+                                      : isProcessing
+                                        ? `Menghapus ${rec.scenarioTitle}`
+                                        : `Aksi lainnya untuk ${rec.scenarioTitle}`
+                                  }
+                                  disabled={isDownloading || isProcessing}
+                                />
+                              }
+                            >
+                              {isDownloading
+                                ? "Mengunduh..."
+                                : isProcessing
+                                  ? "Menghapus..."
+                                  : "Lainnya"}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              positionerClassName="z-[210]"
+                              className="w-44"
+                            >
+                              <DropdownMenuItem
+                                disabled={isDownloading}
+                                onClick={() => void handleDownload(rec)}
+                                className="min-h-[44px]"
+                              >
+                                {isDownloading
+                                  ? "Mengunduh..."
+                                  : "Unduh rekaman"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={isProcessing}
+                                onClick={() => void handleDelete(rec.id)}
+                                variant="destructive"
+                                className="min-h-[44px]"
+                              >
+                                {isProcessing
+                                  ? "Menghapus..."
+                                  : "Hapus riwayat"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               )}
             </div>
           </motion.div>

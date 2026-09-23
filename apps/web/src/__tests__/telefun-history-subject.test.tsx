@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/api", () => ({
@@ -37,7 +37,7 @@ describe("Telefun history subject projection", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the unavailable participant marker in the history card and CSV", async () => {
+  it("shows the unavailable participant marker in the history list and CSV", async () => {
     let capturedBlob: Blob | undefined;
     vi.stubGlobal("URL", {
       createObjectURL: vi.fn((blob: Blob) => {
@@ -71,5 +71,90 @@ describe("Telefun history subject projection", () => {
     expect(await capturedBlob!.text()).toContain(
       "Andi — Batch 12 — Tim Alpha (record peserta tidak lagi tersedia)",
     );
+  });
+
+  it("keeps review primary and secondary actions out of the row surface", () => {
+    render(
+      <HistoryModal
+        isOpen
+        onClose={vi.fn()}
+        history={[unavailableRecord]}
+        onDeleteSession={vi.fn()}
+        onClearHistory={vi.fn()}
+        onReviewSession={vi.fn()}
+      />,
+    );
+
+    const reviewButton = screen.getByRole("button", {
+      name: "Lihat detail Skenario Telefun",
+    });
+    expect(reviewButton).toBeDefined();
+    expect(reviewButton).toHaveClass("min-h-[44px]");
+    const moreButton = screen.getByRole("button", {
+      name: "Aksi lainnya untuk Skenario Telefun",
+    });
+    expect(moreButton).toBeDefined();
+    expect(moreButton).toHaveClass("min-h-[44px]");
+    expect(screen.queryByRole("button", { name: /Unduh rekaman/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Hapus Skenario Telefun/ }),
+    ).toBeNull();
+    expect(
+      screen.getByText("Target: Andi (record peserta tidak lagi tersedia)"),
+    ).toBeDefined();
+  });
+
+  it("keeps secondary menu actions at the minimum touch target", () => {
+    render(
+      <HistoryModal
+        isOpen
+        onClose={vi.fn()}
+        history={[unavailableRecord]}
+        onDeleteSession={vi.fn()}
+        onClearHistory={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Aksi lainnya untuk Skenario Telefun",
+      }),
+    );
+
+    expect(screen.getByRole("menu").parentElement).toHaveClass("z-[210]");
+    expect(screen.getByRole("menuitem", { name: "Unduh rekaman" })).toHaveClass(
+      "min-h-[44px]",
+    );
+    expect(screen.getByRole("menuitem", { name: "Hapus riwayat" })).toHaveClass(
+      "min-h-[44px]",
+    );
+  });
+
+  it("keeps download and delete available from the secondary menu", async () => {
+    const onDeleteSession = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <HistoryModal
+        isOpen
+        onClose={vi.fn()}
+        history={[unavailableRecord]}
+        onDeleteSession={onDeleteSession}
+        onClearHistory={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Aksi lainnya untuk Skenario Telefun",
+      }),
+    );
+    expect(
+      screen.getByRole("menuitem", { name: "Unduh rekaman" }),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Hapus riwayat" }));
+
+    await waitFor(() => {
+      expect(onDeleteSession).toHaveBeenCalledWith("telefun-history-1");
+    });
   });
 });
