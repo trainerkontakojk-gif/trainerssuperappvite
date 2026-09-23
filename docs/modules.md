@@ -79,7 +79,9 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
   - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru. Daftar mailbox tidak mengunduh attachment inline; attachment email terpilih dimuat melalui endpoint detail.
   - **Multi-Recipient Email Targets**: Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`. Field Penerima Utama mengatur arah narasi email awal.
-  - **Scenario Editor Wizard**: Wizard terstruktur untuk membuat dan mengedit skenario PDKT dengan langkah-langkah terpandu.
+  - **Scenario Editor Wizard**: Wizard tiga tahap untuk membuat dan mengedit skenario PDKT. User memilih mode **Skenario AI** (AI membuat contoh email dari deskripsi situasi) atau **Email buatan sendiri** (subject/body ditulis user) sebelum masuk wizard. Label tahap mengikuti mode: `Skenario AI`/`Email Anda`, `Profil Pengirim`, dan `Review Email AI`/`Review Email Anda`.
+  - **Mode-specific Email Review**: Tahap review AI hanya menampilkan generator/preview email AI; tahap review manual menyediakan editor subject/body yang tetap terhubung ke draft dan bisa disimpan langsung dari tahap review. Kontrol generator AI tidak ditampilkan pada mode manual.
+  - **Progressive Simulation Settings**: Penerima dan lampiran tetap terlihat pada tahap review; pengaturan perilaku simulasi dibuka melalui disclosure `Pengaturan tambahan` agar hierarchy tetap ringkas. Area wizard dapat di-scroll tanpa menutup sticky footer.
   - **Attachment & Submit Safety**: Lampiran skenario diakumulasi secara functional; FileReader yang terlambat atau errored tidak bisa menimpa draft baru, submit/reset native dikunci sampai pembacaan selesai, dan save/reset menunggu request sukses sebelum menutup form.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).

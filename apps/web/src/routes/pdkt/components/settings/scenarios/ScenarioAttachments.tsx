@@ -19,9 +19,7 @@ export function ScenarioAttachments({
   return (
     <div className="flex flex-col gap-4 border-t border-border pt-4">
       <div>
-        <h4 className="text-sm font-medium text-foreground">
-          Lampiran Bukti / Media
-        </h4>
+        <h4 className="text-sm font-medium text-foreground">Lampiran</h4>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           Gambar maksimal 500KB atau PDF maksimal 2MB, maksimal 5 lampiran per
           skenario.

@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  PDKT_PROMPT_INPUT_LIMITS,
   type PdktConsumerType,
   type PdktIdentity,
   type PdktScenario,
 } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
-import { Button } from "../../../../components/ui/button";
 import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
@@ -14,7 +12,6 @@ import { resolvePdktScenarioIdentity, TEXT_MODELS } from "../../pdktSettings";
 import {
   findInvalidPdktRecipientEmails,
   normalizePdktScenarioDraft,
-  isValidPdktRecipientEmail,
 } from "./pdktDraftNormalizers";
 import {
   SettingsField,
@@ -25,9 +22,15 @@ import {
 import { ScenarioList } from "./scenarios/ScenarioList";
 import { ScenarioForm } from "./scenarios/ScenarioForm";
 import { ScenarioRecipientsField } from "./scenarios/ScenarioRecipientsField";
-import { ScenarioTemplateField } from "./scenarios/ScenarioTemplateField";
 import { ScenarioAttachments } from "./scenarios/ScenarioAttachments";
-import { ScenarioAIGenerator } from "./scenarios/ScenarioAIGenerator";
+import { ScenarioTemplateField } from "./scenarios/ScenarioTemplateField";
+import { ScenarioBasicsFields } from "./scenarios/ScenarioBasicsFields";
+import type { ScenarioCreationMode } from "./scenarios/ScenarioCreationModePicker";
+import { ScenarioAIEmailSection } from "./scenarios/ScenarioAIEmailSection";
+import {
+  getScenarioCreationValidation,
+  type ScenarioValidationErrorKey,
+} from "./scenarios/ScenarioCreationValidation";
 import type {
   ScenarioStepStatus,
   ScenarioWizardStep,
@@ -58,7 +61,7 @@ interface Props {
   setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
-type ErrorKey = "category" | "title" | "description" | "email";
+type ErrorKey = ScenarioValidationErrorKey;
 const CONFIRM_MESSAGE = "Perubahan belum disimpan. Yakin ingin keluar?";
 const EMPTY_SCENARIO_DRAFT: Omit<PdktScenario, "id"> = {
   category: "",
@@ -80,6 +83,12 @@ function focusField(id: string) {
   }, 0);
 }
 
+function inferScenarioCreationMode(
+  scenario: PdktScenario,
+): ScenarioCreationMode {
+  return scenario.alwaysUseSampleEmail ? "manual" : "ai";
+}
+
 export function PdktScenariosTab(props: Props) {
   const {
     scenarios,
@@ -98,6 +107,9 @@ export function PdktScenariosTab(props: Props) {
     setWritingStyleMode,
     setLocalSettings,
   } = props;
+  const [creationMode, setCreationMode] = useState<ScenarioCreationMode | null>(
+    null,
+  );
   const [step, setStep] = useState<ScenarioWizardStep>("scenario");
   const [newCategory, setNewCategory] = useState("");
   const [newCategoryMode, setNewCategoryMode] = useState(false);
@@ -146,31 +158,24 @@ export function PdktScenariosTab(props: Props) {
   const category = (
     newCategoryMode ? newCategory : draft.category || ""
   ).trim();
-  const scenarioErrors: Record<ErrorKey, string> = {
-    category: category ? "" : "Kategori wajib diisi.",
-    title: draft.title?.trim() ? "" : "Judul skenario wajib diisi.",
-    description: draft.description?.trim()
-      ? ""
-      : "Deskripsi masalah wajib diisi.",
-    email:
-      draft.identity?.email?.trim() &&
-      !isValidPdktRecipientEmail(draft.identity.email.trim())
-        ? "Format email tidak valid."
-        : "",
-  };
+  const {
+    errors: scenarioErrors,
+    validationKeys: scenarioValidationKeys,
+    validationIds: scenarioValidationIds,
+    scenarioValid,
+    profileValid,
+    emailValid,
+    manualEmailBody,
+  } = getScenarioCreationValidation({
+    draft,
+    category,
+    creationMode,
+    newCategoryMode,
+  });
   const descriptionErrorId =
     attempted.has("description") && scenarioErrors.description
       ? "scenario-description-error"
       : undefined;
-  const scenarioValid =
-    !scenarioErrors.category &&
-    !scenarioErrors.title &&
-    !scenarioErrors.description;
-  const profileValid = !scenarioErrors.email;
-  const emailValid =
-    findInvalidPdktRecipientEmails(draft.recipientEmails).length === 0 &&
-    (!draft.alwaysUseSampleEmail ||
-      Boolean(draft.sampleEmailTemplate?.body?.trim()));
   const selectedConsumer = consumerTypes.find(
     (consumer) => consumer.id === globalConsumerTypeId,
   );
@@ -211,14 +216,7 @@ export function PdktScenariosTab(props: Props) {
     }
     if (!scenarioValid) {
       setStep("scenario");
-      markAndFocus(
-        ["category", "title", "description"],
-        [
-          newCategoryMode ? "scenario-category-new" : "scenario-category",
-          "scenario-title",
-          "scenario-description",
-        ],
-      );
+      markAndFocus(scenarioValidationKeys, scenarioValidationIds);
       return;
     }
     if (!profileValid) {
@@ -246,6 +244,7 @@ export function PdktScenariosTab(props: Props) {
       writingStyleMode,
       consumerTypes: structuredClone(consumerTypes),
     };
+    setCreationMode(editing ? inferScenarioCreationMode(editing) : null);
     if (editing) scenarioForm.openEdit(editing);
     else scenarioForm.openAdd();
   };
@@ -292,6 +291,7 @@ export function PdktScenariosTab(props: Props) {
       }));
     } else scenarioForm.close();
     wizardSnapshot.current = null;
+    setCreationMode(null);
     setStep("scenario");
     setEmailVisited(false);
     setAttempted(new Set());
@@ -301,14 +301,7 @@ export function PdktScenariosTab(props: Props) {
     if (pendingAttachmentReads > 0) return;
     if (!scenarioValid) {
       setStep("scenario");
-      markAndFocus(
-        ["category", "title", "description"],
-        [
-          newCategoryMode ? "scenario-category-new" : "scenario-category",
-          "scenario-title",
-          "scenario-description",
-        ],
-      );
+      markAndFocus(scenarioValidationKeys, scenarioValidationIds);
       return;
     }
     if (!profileValid) {
@@ -320,7 +313,7 @@ export function PdktScenariosTab(props: Props) {
       draft.recipientEmails,
     );
     const invalidTemplate = Boolean(
-      draft.alwaysUseSampleEmail && !draft.sampleEmailTemplate?.body?.trim(),
+      creationMode === "manual" && !draft.sampleEmailTemplate?.body?.trim(),
     );
     if (invalidRecipients.length || invalidTemplate) {
       setStep("email");
@@ -340,12 +333,23 @@ export function PdktScenariosTab(props: Props) {
       }
       return;
     }
-    const normalized = normalizePdktScenarioDraft({ ...draft, category });
+    const normalized = normalizePdktScenarioDraft({
+      ...draft,
+      category,
+      description:
+        draft.description?.trim() ||
+        (creationMode === "manual" ? manualEmailBody : ""),
+      alwaysUseSampleEmail:
+        creationMode === "manual"
+          ? true
+          : (draft.alwaysUseSampleEmail ?? false),
+    });
     setLocalSettings((previous) => ({
       ...previous,
       scenarios: scenarioForm.save(previous.scenarios, normalized),
     }));
     closeEditor();
+    setCreationMode(null);
     setStep("scenario");
     setAttempted(new Set());
   };
@@ -500,13 +504,22 @@ export function PdktScenariosTab(props: Props) {
     }));
   };
 
+  const selectCreationMode = (mode: ScenarioCreationMode) => {
+    setCreationMode(mode);
+    setStep("scenario");
+    setAttempted(new Set());
+    setEmailVisited(false);
+  };
+
   if (scenarioForm.isOpen) {
     return (
       <ScenarioForm
         scenarioForm={scenarioForm}
+        creationMode={creationMode}
         activeStep={step}
         statuses={statuses}
         onStepChange={goToStep}
+        onModeSelect={selectCreationMode}
         onNext={next}
         onBack={() => setStep(step === "email" ? "profile" : "scenario")}
         onCancel={cancel}
@@ -514,138 +527,23 @@ export function PdktScenariosTab(props: Props) {
         pendingAttachmentReads={pendingAttachmentReads}
         canNext={step === "scenario" ? scenarioValid : profileValid}
         scenarioContent={
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <SettingsField
-              label="Kategori"
-              id={
-                newCategoryMode ? "scenario-category-new" : "scenario-category"
-              }
-              required
-              error={
-                attempted.has("category") ? scenarioErrors.category : undefined
-              }
-            >
-              {newCategoryMode ? (
-                <div className="flex gap-2">
-                  <SettingsInput
-                    id="scenario-category-new"
-                    required
-                    aria-required="true"
-                    value={newCategory}
-                    placeholder="Nama kategori baru"
-                    aria-invalid={Boolean(
-                      attempted.has("category") && scenarioErrors.category,
-                    )}
-                    aria-describedby="scenario-category-error"
-                    onChange={(event) => {
-                      setNewCategory(event.target.value);
-                      scenarioForm.setDraft({ category: event.target.value });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setNewCategoryMode(false);
-                      setNewCategory("");
-                      scenarioForm.setDraft({ category: "" });
-                    }}
-                    className="min-h-11 px-3 text-xs"
-                  >
-                    Batal
-                  </Button>
-                </div>
-              ) : (
-                <SettingsSelect
-                  id="scenario-category"
-                  required
-                  aria-required="true"
-                  value={draft.category || ""}
-                  aria-invalid={Boolean(
-                    attempted.has("category") && scenarioErrors.category,
-                  )}
-                  aria-describedby="scenario-category-error"
-                  onChange={(event) => {
-                    if (event.target.value === "NEW") {
-                      setNewCategoryMode(true);
-                      setNewCategory("");
-                      scenarioForm.setDraft({ category: "" });
-                    } else
-                      scenarioForm.setDraft({ category: event.target.value });
-                  }}
-                >
-                  <option value="">Pilih kategori</option>
-                  {categories.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                  <option value="NEW">+ Tambah kategori</option>
-                </SettingsSelect>
-              )}
-            </SettingsField>
-            <SettingsField
-              label="Judul"
-              id="scenario-title"
-              required
-              error={attempted.has("title") ? scenarioErrors.title : undefined}
-            >
-              <SettingsInput
-                id="scenario-title"
-                required
-                aria-required="true"
-                value={draft.title || ""}
-                placeholder="Contoh: Kesalahan Transaksi Real-time"
-                aria-invalid={Boolean(
-                  attempted.has("title") && scenarioErrors.title,
-                )}
-                aria-describedby="scenario-title-error"
-                onChange={(event) =>
-                  scenarioForm.setDraft({ title: event.target.value })
-                }
-              />
-            </SettingsField>
-            <SettingsField
-              label="Deskripsi"
-              id="scenario-description"
-              required
-              className="md:col-span-2"
-              error={
-                attempted.has("description")
-                  ? scenarioErrors.description
-                  : undefined
-              }
-            >
-              <SettingsTextarea
-                id="scenario-description"
-                required
-                aria-required="true"
-                rows={4}
-                value={draft.description || ""}
-                placeholder="Jelaskan konteks masalah yang harus diselesaikan oleh agen..."
-                aria-invalid={Boolean(
-                  attempted.has("description") && scenarioErrors.description,
-                )}
-                aria-describedby={[
-                  "scenario-description-counter",
-                  descriptionErrorId,
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                maxLength={PDKT_PROMPT_INPUT_LIMITS.longText}
-                onChange={(event) =>
-                  scenarioForm.setDraft({ description: event.target.value })
-                }
-              />
-              <p
-                id="scenario-description-counter"
-                className="text-xs text-muted-foreground"
-              >
-                {descriptionLength.toLocaleString("id-ID")} /{" "}
-                {PDKT_PROMPT_INPUT_LIMITS.longText.toLocaleString("id-ID")}
-              </p>
-            </SettingsField>
-          </div>
+          <ScenarioBasicsFields
+            creationMode={creationMode ?? "ai"}
+            categories={categories}
+            newCategory={newCategory}
+            newCategoryMode={newCategoryMode}
+            draft={draft}
+            attempted={attempted}
+            categoryError={scenarioErrors.category}
+            titleError={scenarioErrors.title}
+            descriptionError={scenarioErrors.description}
+            manualEmailError={scenarioErrors.manualEmail}
+            descriptionLength={descriptionLength}
+            descriptionErrorId={descriptionErrorId}
+            onNewCategoryChange={setNewCategory}
+            onNewCategoryModeChange={setNewCategoryMode}
+            onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+          />
         }
         profileContent={
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -836,35 +734,60 @@ export function PdktScenariosTab(props: Props) {
           </div>
         }
         emailContent={
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-8">
+            <section
+              className="flex flex-col gap-4"
+              aria-labelledby="scenario-email-content-title"
+            >
+              <div>
+                <h4
+                  id="scenario-email-content-title"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Isi email
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {creationMode === "ai"
+                    ? "AI menggunakan deskripsi skenario untuk membuat contoh email yang dapat Anda tinjau."
+                    : "Email yang Anda tulis menjadi sumber utama isi simulasi."}
+                </p>
+              </div>
+              {creationMode === "ai" ? (
+                <ScenarioAIEmailSection
+                  draft={draft}
+                  onGenerate={generateTemplate}
+                  isGenerating={generating}
+                  canGenerate={Boolean(
+                    draft.title?.trim() && draft.description?.trim(),
+                  )}
+                />
+              ) : (
+                <ScenarioTemplateField
+                  draft={draft}
+                  mode="manual"
+                  idPrefix="scenario-review-template"
+                  onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+                  error={
+                    attempted.has("email") &&
+                    !draft.sampleEmailTemplate?.body?.trim()
+                      ? "Isi email wajib diisi."
+                      : undefined
+                  }
+                />
+              )}
+            </section>
+
             <ScenarioRecipientsField
               draft={draft}
               onDraftChange={(updates) => scenarioForm.setDraft(updates)}
             />
-            <ScenarioTemplateField
-              draft={draft}
-              onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-              error={
-                attempted.has("email") &&
-                draft.alwaysUseSampleEmail &&
-                !draft.sampleEmailTemplate?.body?.trim()
-                  ? "Isi body template email jika opsi ini aktif."
-                  : undefined
-              }
-            >
-              <ScenarioAIGenerator
-                onGenerate={generateTemplate}
-                isGenerating={generating}
-                canGenerate={Boolean(
-                  draft.title?.trim() && draft.description?.trim(),
-                )}
-              />
-            </ScenarioTemplateField>
+
             {pendingAttachmentReads > 0 && (
               <p role="status" className="text-xs text-muted-foreground">
                 Membaca lampiran...
               </p>
             )}
+
             <ScenarioAttachments
               attachmentImages={draft.attachmentImages || []}
               onUpload={uploadAttachment}

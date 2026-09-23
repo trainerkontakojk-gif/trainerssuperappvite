@@ -10,9 +10,10 @@ interface Props {
   activeStep: ScenarioWizardStep;
   statuses: Record<ScenarioWizardStep, ScenarioStepStatus>;
   onStepChange: (step: ScenarioWizardStep) => void;
+  labels?: Partial<Record<ScenarioWizardStep, string>>;
 }
 
-const steps: { id: ScenarioWizardStep; label: string }[] = [
+const defaultSteps: { id: ScenarioWizardStep; label: string }[] = [
   { id: "scenario", label: "1. Skenario" },
   { id: "profile", label: "2. Profil Pengirim" },
   { id: "email", label: "3. Email & Pengaturan" },
@@ -22,7 +23,12 @@ export function ScenarioWizardStepHeader({
   activeStep,
   statuses,
   onStepChange,
+  labels,
 }: Props) {
+  const steps = defaultSteps.map((step) => ({
+    ...step,
+    label: labels?.[step.id] ?? step.label,
+  }));
   return (
     <nav
       aria-label="Tahapan pengaturan skenario"

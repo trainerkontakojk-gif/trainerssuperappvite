@@ -1,17 +1,19 @@
 import React from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "../../../../../components/ui/button";
 
 interface ScenarioAIGeneratorProps {
   onGenerate: () => void;
   isGenerating: boolean;
   canGenerate: boolean;
+  hasGenerated: boolean;
 }
 
 export function ScenarioAIGenerator({
   onGenerate,
   isGenerating,
   canGenerate,
+  hasGenerated,
 }: ScenarioAIGeneratorProps) {
   return (
     <Button
@@ -21,16 +23,18 @@ export function ScenarioAIGenerator({
       disabled={isGenerating || !canGenerate}
       className="shrink-0"
     >
-      {isGenerating ? (
+      {isGenerating && (
         <Loader2
           aria-hidden="true"
           data-icon="inline-start"
           className="animate-spin motion-reduce:animate-none"
         />
-      ) : (
-        <Sparkles aria-hidden="true" data-icon="inline-start" />
       )}
-      {isGenerating ? "Membuat..." : "Generate"}
+      {isGenerating
+        ? "Membuat..."
+        : hasGenerated
+          ? "Buat ulang contoh email"
+          : "Buat contoh email"}
     </Button>
   );
 }

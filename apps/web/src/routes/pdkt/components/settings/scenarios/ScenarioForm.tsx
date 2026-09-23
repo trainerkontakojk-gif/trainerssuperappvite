@@ -3,8 +3,11 @@ import { X } from "lucide-react";
 import type { PdktScenario } from "@trainers/types";
 import { useCrudForm } from "../../../../../hooks/useCrudForm";
 import { ScenarioStickyFooter } from "./ScenarioStickyFooter";
+import {
+  ScenarioCreationModePicker,
+  type ScenarioCreationMode,
+} from "./ScenarioCreationModePicker";
 import { Button } from "../../../../../components/ui/button";
-import { Separator } from "../../../../../components/ui/separator";
 import {
   ScenarioWizardStepHeader,
   type ScenarioStepStatus,
@@ -13,9 +16,11 @@ import {
 
 interface Props {
   scenarioForm: ReturnType<typeof useCrudForm<PdktScenario>>;
+  creationMode: ScenarioCreationMode | null;
   activeStep: ScenarioWizardStep;
   statuses: Record<ScenarioWizardStep, ScenarioStepStatus>;
   onStepChange: (step: ScenarioWizardStep) => void;
+  onModeSelect: (mode: ScenarioCreationMode) => void;
   onNext: () => void;
   onBack: () => void;
   onCancel: () => void;
@@ -30,9 +35,11 @@ interface Props {
 
 export function ScenarioForm({
   scenarioForm,
+  creationMode,
   activeStep,
   statuses,
   onStepChange,
+  onModeSelect,
   onNext,
   onBack,
   onCancel,
@@ -50,6 +57,11 @@ export function ScenarioForm({
   useEffect(() => {
     if (scenarioForm.isOpen) closeButtonRef.current?.focus();
   }, [scenarioForm.isOpen]);
+
+  const stepLabels = {
+    scenario: creationMode === "ai" ? "1. Skenario AI" : "1. Email Anda",
+    email: "3. Review & Pengaturan",
+  };
 
   if (!scenarioForm.isOpen) return null;
 
@@ -74,7 +86,11 @@ export function ScenarioForm({
             {editing ? "Edit Skenario PDKT" : "Tambah Skenario PDKT"}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Lengkapi informasi secara bertahap untuk membuat simulasi email.
+            {creationMode === null
+              ? "Pilih cara menyiapkan skenario sebelum mengisi form."
+              : creationMode === "ai"
+                ? "Skenario AI · email akan dibuat oleh AI dari deskripsi situasi."
+                : "Email buatan sendiri · gunakan email yang Anda tulis."}
           </p>
         </div>
         <Button
@@ -90,126 +106,137 @@ export function ScenarioForm({
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[env(safe-area-inset-bottom)] sm:px-6">
-        <ScenarioWizardStepHeader
-          activeStep={activeStep}
-          statuses={statuses}
-          onStepChange={onStepChange}
-        />
+        {creationMode === null ? (
+          <ScenarioCreationModePicker
+            onSelect={onModeSelect}
+            onCancel={onCancel}
+          />
+        ) : (
+          <>
+            <ScenarioWizardStepHeader
+              activeStep={activeStep}
+              statuses={statuses}
+              onStepChange={onStepChange}
+              labels={stepLabels}
+            />
 
-        <section
-          id="scenario-step-scenario"
-          hidden={activeStep !== "scenario"}
-          className="flex flex-col gap-5 pt-5"
-          aria-labelledby="scenario-step-scenario-title"
-        >
-          <div>
-            <h3
-              id="scenario-step-scenario-title"
-              className="text-sm font-semibold tracking-tight text-foreground"
+            <section
+              id="scenario-step-scenario"
+              hidden={activeStep !== "scenario"}
+              className="flex flex-col gap-5 pt-5"
+              aria-labelledby="scenario-step-scenario-title"
             >
-              Skenario Permasalahan
-            </h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Jelaskan situasi yang akan dihadapi agent dalam simulasi email.
-            </p>
-          </div>
-          {scenarioContent}
-        </section>
+              <div>
+                <h3
+                  id="scenario-step-scenario-title"
+                  className="text-sm font-semibold tracking-tight text-foreground"
+                >
+                  {creationMode === "ai"
+                    ? "Skenario Permasalahan"
+                    : "Email Buatan Sendiri"}
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {creationMode === "ai"
+                    ? "Jelaskan situasi yang akan dihadapi agent dalam simulasi email."
+                    : "Tulis email yang akan dipakai sebagai isi awal simulasi."}
+                </p>
+              </div>
+              {scenarioContent}
+            </section>
 
-        <section
-          id="scenario-step-profile"
-          hidden={activeStep !== "profile"}
-          className="flex flex-col gap-5 pt-5"
-          aria-labelledby="scenario-step-profile-title"
-        >
-          <div>
-            <h3
-              id="scenario-step-profile-title"
-              className="text-sm font-semibold tracking-tight text-foreground"
+            <section
+              id="scenario-step-profile"
+              hidden={activeStep !== "profile"}
+              className="flex flex-col gap-5 pt-5"
+              aria-labelledby="scenario-step-profile-title"
             >
-              Profil Pengirim
-            </h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Atur siapa pengirim email dan bagaimana cara pengirim
-              berkomunikasi.
-            </p>
-          </div>
-          {profileContent}
-        </section>
+              <div>
+                <h3
+                  id="scenario-step-profile-title"
+                  className="text-sm font-semibold tracking-tight text-foreground"
+                >
+                  Profil Pengirim
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Atur siapa pengirim email dan bagaimana cara pengirim
+                  berkomunikasi.
+                </p>
+              </div>
+              {profileContent}
+            </section>
 
-        <section
-          id="scenario-step-email"
-          hidden={activeStep !== "email"}
-          className="flex flex-col gap-6 pt-5"
-          aria-labelledby="scenario-step-email-title"
-        >
-          <div>
-            <h3
-              id="scenario-step-email-title"
-              className="text-sm font-semibold tracking-tight text-foreground"
+            <section
+              id="scenario-step-email"
+              hidden={activeStep !== "email"}
+              className="flex flex-col gap-6 pt-5"
+              aria-labelledby="scenario-step-email-title"
             >
-              Email &amp; Pengaturan
-            </h3>
-          </div>
+              <div>
+                <h3
+                  id="scenario-step-email-title"
+                  className="text-sm font-semibold tracking-tight text-foreground"
+                >
+                  {creationMode === "ai"
+                    ? "Review Email AI"
+                    : "Review Email Anda"}
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  {creationMode === "ai"
+                    ? "Pastikan contoh email AI, tujuan, dan pengaturan simulasi sudah sesuai."
+                    : "Pastikan email Anda, tujuan, dan pengaturan simulasi sudah sesuai."}
+                </p>
+              </div>
 
-          <div className="flex flex-col gap-4">
-            <div>
-              <h4
-                id="email-config-title"
-                className="text-sm font-medium text-foreground"
-              >
-                Konfigurasi Email
-              </h4>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Atur penerima, template, dan lampiran untuk skenario ini.
-              </p>
-            </div>
-            {emailContent}
-          </div>
+              {emailContent}
 
-          <Separator />
-
-          <div className="flex flex-col gap-4">
-            <div>
-              <h4
-                id="simulation-settings-title"
-                className="text-sm font-medium text-foreground"
-              >
-                Pengaturan Simulasi
-              </h4>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Sesuaikan perilaku AI yang digunakan dalam simulasi.
-              </p>
-            </div>
-            {simulationContent}
-          </div>
-        </section>
+              <details className="border-t border-border pt-5">
+                <summary className="cursor-pointer text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                  Pengaturan tambahan
+                </summary>
+                <div className="pt-4">
+                  <h4
+                    id="simulation-settings-title"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Pengaturan Simulasi
+                  </h4>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Sesuaikan perilaku AI yang digunakan dalam simulasi.
+                  </p>
+                </div>
+                <div className="pt-4">{simulationContent}</div>
+              </details>
+            </section>
+          </>
+        )}
       </main>
 
-      <ScenarioStickyFooter>
-        {activeStep === "scenario" ? (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Batal
-          </Button>
-        ) : (
-          <Button type="button" variant="outline" onClick={onBack}>
-            Kembali
-          </Button>
-        )}
-        {activeStep === "email" ? (
-          <Button
-            type="button"
-            onClick={onSubmit}
-            disabled={pendingAttachmentReads > 0}
-          >
-            {editing ? "Simpan Perubahan" : "Buat Skenario"}
-          </Button>
-        ) : (
-          <Button type="button" onClick={onNext} disabled={!canNext}>
-            Lanjut
-          </Button>
-        )}
-      </ScenarioStickyFooter>
+      {creationMode !== null && (
+        <ScenarioStickyFooter>
+          {activeStep === "scenario" ? (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Batal
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" onClick={onBack}>
+              Kembali
+            </Button>
+          )}
+          {activeStep === "email" ? (
+            <Button
+              type="button"
+              onClick={onSubmit}
+              disabled={pendingAttachmentReads > 0}
+            >
+              {editing ? "Simpan Perubahan" : "Buat Skenario"}
+            </Button>
+          ) : (
+            <Button type="button" onClick={onNext} disabled={!canNext}>
+              Lanjut
+            </Button>
+          )}
+        </ScenarioStickyFooter>
+      )}
     </div>
   );
 }

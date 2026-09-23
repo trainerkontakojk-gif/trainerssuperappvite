@@ -11,6 +11,8 @@ interface ScenarioTemplateFieldProps {
   onDraftChange: (updates: Partial<PdktScenario>) => void;
   error?: string;
   children?: React.ReactNode; // For AIGenerator
+  mode?: "ai" | "manual";
+  idPrefix?: string;
 }
 
 export function ScenarioTemplateField({
@@ -18,50 +20,62 @@ export function ScenarioTemplateField({
   onDraftChange,
   error,
   children,
+  mode = "ai",
+  idPrefix = "scenario-template",
 }: ScenarioTemplateFieldProps) {
   const alwaysUseTemplate = draft.alwaysUseSampleEmail || false;
+  const manual = mode === "manual";
+  const toggleId = `${idPrefix}-toggle`;
+  const subjectId = `${idPrefix}-subject`;
+  const bodyId = `${idPrefix}-body`;
+  const bodyErrorId = `${bodyId}-error`;
 
   return (
-    <div className="flex flex-col gap-4 border-t border-border pt-4">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-md">
           <h4 className="text-sm font-medium text-foreground">
-            Template Email
+            {manual ? "Ditulis oleh Anda" : "Template Email"}
           </h4>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Template hanya dipakai bila opsi di bawah aktif; jika tidak, email
-            konsumen dibuat ulang oleh AI.
+            {manual
+              ? "Email ini menjadi sumber utama isi simulasi dan dapat Anda ubah langsung."
+              : "Template hanya dipakai bila opsi di bawah aktif; jika tidak, email konsumen dibuat ulang oleh AI."}
           </p>
         </div>
         {children}
       </div>
 
-      <label
-        htmlFor="scenario-template-toggle"
-        className="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-foreground"
-      >
-        <input
-          id="scenario-template-toggle"
-          type="checkbox"
-          checked={alwaysUseTemplate}
-          onChange={(e) =>
-            onDraftChange({ alwaysUseSampleEmail: e.target.checked })
-          }
-          className="size-4 shrink-0 rounded border-input accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        />
-        Selalu pakai template ini
-      </label>
+      {!manual && (
+        <label
+          htmlFor={toggleId}
+          className="flex cursor-pointer items-center gap-2.5 text-xs font-medium text-foreground"
+        >
+          <input
+            id={toggleId}
+            type="checkbox"
+            checked={alwaysUseTemplate}
+            onChange={(e) =>
+              onDraftChange({ alwaysUseSampleEmail: e.target.checked })
+            }
+            className="size-4 shrink-0 rounded border-input accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          />
+          Selalu pakai template ini
+        </label>
+      )}
 
       <div className="flex flex-col gap-3">
         <SettingsField
-          label="Subjek Template Email"
-          id="scenario-template-subject"
+          label={
+            manual ? "Subjek email buatan sendiri" : "Subjek Template Email"
+          }
+          id={subjectId}
           optional
         >
           <SettingsInput
-            id="scenario-template-subject"
+            id={subjectId}
             type="text"
-            placeholder="Subjek email template"
+            placeholder={manual ? "Subjek email" : "Subjek email template"}
             value={draft.sampleEmailTemplate?.subject || ""}
             onChange={(e) =>
               onDraftChange({
@@ -75,21 +89,28 @@ export function ScenarioTemplateField({
         </SettingsField>
 
         <SettingsField
-          label="Isi Template Email"
-          id="scenario-template-body"
-          optional
+          label={manual ? "Isi email buatan sendiri" : "Isi Template Email"}
+          id={bodyId}
+          required={manual}
+          optional={!manual}
           error={error}
-          helperText="Gunakan wording netral; nama konsumen disisipkan otomatis sesuai pengaturan sistem."
+          helperText={
+            manual
+              ? "Tulis email lengkap yang ingin dipakai dalam simulasi."
+              : "Gunakan wording netral; nama konsumen disisipkan otomatis sesuai pengaturan sistem."
+          }
         >
           <SettingsTextarea
-            id="scenario-template-body"
+            id={bodyId}
             rows={6}
-            placeholder="Tulis isi email template di sini."
+            placeholder={
+              manual
+                ? "Tulis email buatan sendiri di sini."
+                : "Tulis isi email template di sini."
+            }
             value={draft.sampleEmailTemplate?.body || ""}
             aria-invalid={Boolean(error)}
-            aria-describedby={
-              error ? "scenario-template-body-error" : undefined
-            }
+            aria-describedby={error ? bodyErrorId : undefined}
             onChange={(e) =>
               onDraftChange({
                 sampleEmailTemplate: {

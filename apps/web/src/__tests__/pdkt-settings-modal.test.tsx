@@ -88,10 +88,16 @@ function renderModal(
   return { onSave, onClose };
 }
 
+async function selectAiModeIfNeeded(user: ReturnType<typeof userEvent.setup>) {
+  const modeButton = screen.queryByRole("button", { name: /^Skenario AI/ });
+  if (modeButton) await user.click(modeButton);
+}
+
 async function completeScenarioStage(
   user: ReturnType<typeof userEvent.setup>,
   title = " Wizard",
 ) {
+  await selectAiModeIfNeeded(user);
   await user.selectOptions(screen.getByLabelText(/Kategori/), "Kepatuhan");
   fireEvent.change(
     screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
@@ -179,13 +185,112 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     apiMocks.unwrapResponse.mockImplementation(async (value: unknown) => value);
   });
 
+  it("asks for a creation mode before opening the scenario wizard", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+
+    expect(screen.getByText("Pilih cara menyiapkan skenario")).toBeDefined();
+    expect(screen.getByRole("button", { name: /skenario ai/i })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: /email buatan sendiri/i }),
+    ).toBeDefined();
+    expect(screen.queryByText("1. Skenario")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /skenario ai/i }));
+    expect(screen.getByText("1. Skenario AI")).toBeDefined();
+    expect(screen.getByText(/email akan dibuat oleh ai/i)).toBeDefined();
+    expect(
+      screen.queryByRole("textbox", { name: "Isi email buatan sendiri" }),
+    ).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Batal" }));
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /email buatan sendiri/i }),
+    );
+    expect(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Generate" })).toBeNull();
+  });
+
+  it("reopens manual scenarios directly in the manual flow", async () => {
+    const user = userEvent.setup();
+    renderModal({
+      settings: {
+        ...initialSettings,
+        scenarios: [
+          {
+            ...initialSettings.scenarios[0],
+            alwaysUseSampleEmail: true,
+            sampleEmailTemplate: {
+              subject: "Kendala transaksi",
+              body: "Saya ingin menyampaikan kendala transaksi ini.",
+            },
+          },
+        ],
+      },
+    });
+
+    await user.click(screen.getByTitle("Edit"));
+
+    expect(screen.queryByText("Pilih cara menyiapkan skenario")).toBeNull();
+    expect(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    ).toHaveValue("Saya ingin menyampaikan kendala transaksi ini.");
+    expect(screen.queryByRole("button", { name: "Generate" })).toBeNull();
+  });
+
+  it("saves a manually authored email without invoking the AI generator", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderModal();
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /email buatan sendiri/i }),
+    );
+    await user.selectOptions(screen.getByLabelText(/Kategori/), "Kepatuhan");
+    await user.type(
+      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
+      "Email Manual",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+      "Saya ingin menyampaikan kendala transaksi ini.",
+    );
+    expect(screen.queryByRole("button", { name: "Generate" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+
+    const savedScenario = onSave.mock.calls[0][0].scenarios.at(-1);
+    expect(savedScenario).toMatchObject({
+      title: "Email Manual",
+      description: "Saya ingin menyampaikan kendala transaksi ini.",
+      alwaysUseSampleEmail: true,
+      sampleEmailTemplate: {
+        body: "Saya ingin menyampaikan kendala transaksi ini.",
+      },
+    });
+  });
+
   it("renders the exact three-stage contract and disables invalid progress", async () => {
     const user = userEvent.setup();
     renderModal();
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
-    expect(screen.getByText("1. Skenario")).toBeDefined();
+    await selectAiModeIfNeeded(user);
+    expect(screen.getByText("1. Skenario AI")).toBeDefined();
     expect(
       screen.getByText(
         "Jelaskan situasi yang akan dihadapi agent dalam simulasi email.",
@@ -193,11 +298,59 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
       ),
     ).toBeDefined();
     expect(screen.getByText("2. Profil Pengirim")).toBeDefined();
-    expect(screen.getByText("3. Email & Pengaturan")).toBeDefined();
+    expect(screen.getByText("3. Review & Pengaturan")).toBeDefined();
     expect(screen.getByRole("button", { name: "Lanjut" })).toBeDisabled();
     expect(screen.getAllByText("Wajib").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Opsional").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Batal" })).toBeDefined();
+  });
+
+  it("keeps the active wizard panel scrollable on long profile steps", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await completeScenarioStage(user);
+
+    const scenarioPanel = document.querySelector(
+      '[data-slot="tabs-content"]',
+    );
+    expect(scenarioPanel).toHaveClass(
+      "min-h-0",
+      "flex",
+      "flex-1",
+      "flex-col",
+      "overflow-hidden",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    expect(scenarioPanel).toHaveClass(
+      "min-h-0",
+      "flex",
+      "flex-1",
+      "flex-col",
+      "overflow-hidden",
+    );
+
+    const wizardMain = document.querySelector("#scenario-form main");
+    const wizardFooter = document.querySelector("#scenario-form footer");
+    expect(wizardMain).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(wizardFooter).toHaveClass("shrink-0");
+
+    expect(screen.getByText("Email Tujuan")).toBeDefined();
+    const additionalSettings = screen
+      .getByText("Pengaturan tambahan")
+      .closest("details");
+    expect(additionalSettings).not.toBeNull();
+    expect(additionalSettings).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Pengaturan tambahan"));
+    expect(
+      screen.getByRole("heading", { name: "Pengaturan Simulasi" }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(/Model AI/)).toBeDefined();
+    expect(wizardMain).toHaveClass("overflow-y-auto");
+    expect(wizardFooter).toHaveClass("shrink-0");
   });
 
   it("shows and updates the scenario description character counter", async () => {
@@ -206,6 +359,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
+    await selectAiModeIfNeeded(user);
 
     const description = screen.getByPlaceholderText(
       "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
@@ -276,13 +430,13 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
       expect(screen.getByRole("button", { name: "Lanjut" })).not.toBeDisabled();
       await user.type(screen.getByLabelText(/Nama pengirim/), "Profil Baru");
       await user.click(screen.getByRole("button", { name: "Lanjut" }));
-      expect(screen.getByText("Konfigurasi Email")).toBeDefined();
+      expect(screen.getByRole("heading", { name: "Email Tujuan" })).toBeDefined();
       expect(
         document.getElementById("simulation-settings-title"),
       ).toBeDefined();
       await user.click(screen.getByRole("button", { name: "Kembali" }));
       expect(
-        screen.getByRole("button", { name: /3\. Email & Pengaturan, Selesai/ }),
+        screen.getByRole("button", { name: /3\. Review & Pengaturan, Selesai/ }),
       ).toBeDefined();
       expect(screen.getByDisplayValue("Profil Baru")).toBeDefined();
     },
@@ -319,15 +473,21 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await reachEmailStage(user);
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Generate" }),
+        screen.getByRole("button", { name: "Buat contoh email" }),
       ).not.toBeDisabled(),
     );
-    await user.click(screen.getByRole("button", { name: "Generate" }));
+    await user.click(
+      screen.getByRole("button", { name: "Buat contoh email" }),
+    );
 
     await waitFor(() =>
       expect(apiMocks.generateIdentity).toHaveBeenCalledTimes(1),
     );
     expect(apiMocks.generateTemplate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Template Body")).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Buat ulang contoh email" }),
+    ).toBeDefined();
     expect(apiMocks.generateTemplate).toHaveBeenCalledWith(
       expect.objectContaining({
         json: expect.objectContaining({
@@ -463,31 +623,98 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     );
   });
 
-  it("shows two profile cards and all stage 3 settings immediately", async () => {
+  it("shows the AI email surface before shared stage 3 settings", async () => {
     const user = userEvent.setup();
     renderModal();
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
     await reachEmailStage(user);
-    expect(screen.getByText("Identitas Pengirim")).toBeDefined();
-    expect(screen.getByText("Karakter dan Gaya Komunikasi")).toBeDefined();
-    expect(screen.getByText("Konfigurasi Email")).toBeDefined();
-    expect(document.getElementById("simulation-settings-title")).toBeDefined();
+
+    expect(screen.getByRole("heading", { name: "Isi email" })).toBeDefined();
+    expect(screen.getByText("Dibuat oleh AI")).toBeDefined();
+    expect(screen.getByText("Belum ada contoh email")).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Buat contoh email" }),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    ).toBeNull();
+    expect(screen.getByText("Email Tujuan")).toBeDefined();
+    expect(screen.getByText("Lampiran")).toBeDefined();
+    const additionalSettings = screen
+      .getByText("Pengaturan tambahan")
+      .closest("details");
+    expect(additionalSettings).not.toBeNull();
+    expect(additionalSettings).not.toHaveAttribute("open");
+    await user.click(screen.getByText("Pengaturan tambahan"));
+    expect(screen.getByRole("heading", { name: "Pengaturan Simulasi" })).toBeDefined();
     expect(screen.getByLabelText(/Penerima Utama/)).toBeDefined();
     expect(screen.getByLabelText(/Mode Penerima/)).toBeDefined();
     expect(screen.getByLabelText(/Buat gambar/)).toBeDefined();
     expect(screen.getByLabelText(/Model AI/)).toBeDefined();
     expect(screen.getByLabelText(/Gaya penulisan/)).toBeDefined();
-    expect(
-      screen.getByRole("textbox", { name: "Subjek Template Email Opsional" }),
-    ).toBeDefined();
-    expect(
-      screen.getByRole("textbox", { name: "Isi Template Email Opsional" }),
-    ).toBeDefined();
     expect(screen.getByText("Pilih Gambar / PDF")).toBeDefined();
+    expect(screen.queryByText("Konfigurasi Email")).toBeNull();
     expect(screen.queryByText("Pengaturan Lanjutan")).toBeNull();
     expect(screen.queryByTestId("advanced-summary")).toBeNull();
+  });
+
+  it("shows the manual email editor and no AI email controls in stage 3", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /email buatan sendiri/i }),
+    );
+    await user.selectOptions(screen.getByLabelText(/Kategori/), "Kepatuhan");
+    await user.type(
+      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
+      "Email Manual",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+      "Isi email yang ditulis trainer.",
+    );
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+
+    expect(screen.getByRole("heading", { name: "Isi email" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "Ditulis oleh Anda" }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    ).toHaveValue("Isi email yang ditulis trainer.");
+    await user.clear(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+      "Isi email yang diedit di tahap review.",
+    );
+    expect(
+      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
+    ).toHaveValue("Isi email yang diedit di tahap review.");
+    expect(screen.queryByText("Dibuat oleh AI")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Buat (ulang )?contoh email/ }),
+    ).toBeNull();
+    expect(screen.getByRole("heading", { name: "Email Tujuan" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Lampiran" })).toBeDefined();
+    expect(document.getElementById("simulation-settings-title")).toBeDefined();
+    expect(screen.getByLabelText(/Penerima Utama/)).toBeDefined();
+    expect(screen.getByLabelText(/Mode Penerima/)).toBeDefined();
+    expect(screen.getByText("Pilih Gambar / PDF")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+    await user.click(screen.getByRole("button", { name: /Simpan Perubahan/ }));
+    expect(onSave.mock.calls[0][0].scenarios.at(-1)).toMatchObject({
+      sampleEmailTemplate: {
+        body: "Isi email yang diedit di tahap review.",
+      },
+    });
   });
 
   it("preserves normalized OJK recipients through the three-stage wizard and outer save", async () => {
@@ -988,6 +1215,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
+    await selectAiModeIfNeeded(user);
     await user.type(
       screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
       "Wizard change",
@@ -1024,6 +1252,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
+    await selectAiModeIfNeeded(user);
     await user.type(
       screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
       "Dirty",

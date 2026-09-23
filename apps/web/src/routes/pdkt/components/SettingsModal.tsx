@@ -198,7 +198,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   : "overflow-y-auto px-5 py-6 sm:px-6",
               )}
             >
-              <TabsContent value="scenarios">
+              <TabsContent
+                value="scenarios"
+                className={cn(
+                  "min-h-0",
+                  wizardOpen && "flex flex-1 flex-col overflow-hidden",
+                )}
+              >
                 <PdktScenariosTab
                   scenarios={localSettings.scenarios}
                   consumerTypes={localSettings.consumerTypes}
