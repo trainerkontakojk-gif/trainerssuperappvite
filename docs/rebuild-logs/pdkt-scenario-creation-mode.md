@@ -9,13 +9,14 @@ Alur `Tambah Skenario Baru` kini menampilkan pilihan mode sebelum membuka wizard
 
 Wizard tiga tahap, profil pengirim, penerima, lampiran, pengaturan simulasi, validasi, dan konfirmasi perubahan tetap dipakai sesuai kebutuhan tiap mode. Edit skenario lama langsung membuka wizard; mode lama diinferensikan dari `alwaysUseSampleEmail`.
 
-## UX Follow-up: Email & Pengaturan
+## UX Follow-up: Tujuan & Pratinjau
 
-- Header dan label tahap mengikuti mode aktif: `1. Skenario AI` atau `1. Email Anda`, lalu `2. Profil Pengirim`, kemudian `3. Review Email AI` atau `3. Review Email Anda`.
-- Mode AI menampilkan konteks bahwa AI membuat email, generator/regenerate yang relevan, dan preview hasil.
-- Mode manual menampilkan editor subject/body yang terhubung ke draft yang sama. User dapat mengubah email langsung pada tahap review dan menyimpannya tanpa kontrol generator AI.
-- Penerima dan lampiran tetap terlihat pada tahap review. Pengaturan perilaku simulasi dipindahkan ke disclosure tertutup `Pengaturan tambahan` agar hierarchy tidak penuh sejak awal.
-- Area konten wizard tetap scrollable dan sticky footer tetap terpisah dari field paling bawah.
+- Step ketiga kini bernama `Tujuan & Pratinjau` untuk mode AI maupun manual. Urutan mental model dibuat eksplisit: `Penerima Email → Email Tambahan/Lampiran → Pratinjau Email → Simpan`.
+- Surface step 3 memakai dua kolom pada desktop: kolom kiri berisi lawan bicara utama, email tambahan, dan lampiran; kolom kanan berisi pratinjau email. Pada layar kecil kolom ditumpuk dalam urutan yang sama.
+- Copy penerima disederhanakan menjadi `Penerima Email`, `Lawan Bicara Utama`, `Email Tambahan`, dan `Tambah Email`. `Mode Penerima` dihapus dari UI, tetapi `recipientMode` tetap dipertahankan untuk kompatibilitas state/storage/API.
+- `konsumen@ojk.go.id` ditampilkan sebagai baris tersendiri dengan keterangan `Disertakan otomatis.`. Preview email menampilkan tujuan utama yang dipilih, subjek, dan body dalam bentuk email, bukan form konfigurasi.
+- Mode AI menempatkan `Buat Pratinjau`/`Buat Ulang` di area preview setelah penerima dan lampiran. Mode manual menampilkan preview dengan `Edit Email` untuk membuka editor subject/body terkontrol; generator AI tidak ditampilkan.
+- Pengaturan perilaku simulasi tetap paling bawah dalam disclosure tertutup `Pengaturan tambahan`. Konten wizard tetap scrollable dan sticky footer edit menggunakan `Simpan Skenario`.
 
 ## Kompatibilitas
 
@@ -23,8 +24,9 @@ Tidak ada perubahan pada tipe `PdktScenario`, API, normalizer, storage, atau mig
 
 ## Verifikasi
 
-- Web Vitest terarah untuk `pdkt-settings-modal.test.tsx` dan `pdkt-scenario-recipients.test.tsx`: **32 test passed**.
+- Web Vitest terarah untuk `pdkt-settings-modal.test.tsx` dan `pdkt-scenario-recipients.test.tsx`: **33 test passed**.
 - Typecheck Web: **pass**.
-- Web production build: **pass**.
+- ESLint file terkait: **pass**.
+- Web production build: **pass**; terdapat warning non-blocking dari builtin Tailwind/Vite yang di-skip.
 - `git diff --check`: **pass**.
 - Recheck browser terbaru tidak diklaim sebagai bukti visual karena session dogfood mendapat `403` dari Supabase; tidak ada credential yang disimpan.

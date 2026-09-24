@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import {
   generateEmailPromptSchema,
+  pdktSessionGenerationSchema,
   simulationSubjectSelectionSchema,
   type PdktMailboxBatch,
   type SimulationSubjectSnapshot,
@@ -24,6 +25,10 @@ import {
   resolveRequestSimulationSubject,
 } from "./route-utils";
 import { createPdktMailboxRetryDraft } from "../../services/pdkt/mailbox-retry";
+import {
+  toPdktSimulationConfig,
+  toPdktSimulationScenario,
+} from "../../services/pdkt/scenario-projections";
 
 const simulation = new Hono<{ Variables: Variables }>();
 
@@ -31,7 +36,8 @@ simulation.get(
   "/scenarios",
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   (c) => {
-    return c.json({ success: true, data: pdktService.getScenarios() });
+    const scenarios = pdktService.getScenarios().map(toPdktSimulationScenario);
+    return c.json({ success: true, data: scenarios });
   },
 );
 
@@ -103,7 +109,7 @@ simulation.post(
   aiRateLimitMiddleware,
   zValidator(
     "json",
-    generateEmailPromptSchema.extend({
+    pdktSessionGenerationSchema.extend({
       client_request_id: z.string().max(200).optional(),
       simulationSubject: simulationSubjectSelectionSchema.optional(),
     }),
@@ -199,7 +205,7 @@ simulation.post(
   aiRateLimitMiddleware,
   zValidator(
     "json",
-    generateEmailPromptSchema.extend({
+    pdktSessionGenerationSchema.extend({
       client_request_id: z.string().max(200).optional(),
       simulationSubject: simulationSubjectSelectionSchema.optional(),
     }),
@@ -242,13 +248,22 @@ simulation.post(
         return jsonAiError(c, result.error || "Gagal membuat sesi mailbox.");
       }
       const status = pdktErrorStatus(result, 503);
-      const details = result.retryDraft
+      const retryBatch = result.retryDraft?.batch;
+      const details = result.retryDraft && retryBatch
         ? {
             retryable: true,
             retryDraft: {
               token: result.retryDraft.token,
-              batch: result.retryDraft.batch,
-              inbound_email: result.retryDraft.batch.inbound_email,
+              batch: {
+                ...retryBatch,
+                scenario_snapshot: toPdktSimulationScenario(
+                  retryBatch.scenario_snapshot,
+                ),
+                config_snapshot: toPdktSimulationConfig(
+                  retryBatch.config_snapshot,
+                ),
+              },
+              inbound_email: retryBatch.inbound_email,
               simulationSubject: result.retryDraft.simulationSubjectSnapshot,
             },
           }

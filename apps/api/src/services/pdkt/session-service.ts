@@ -482,15 +482,20 @@ export function resolvePdktGenerationConfig(body: {
 } {
   const scenarios = getScenarios();
   const consumerTypes = getConsumerTypes();
-  const scenario =
+  const selectedScenario =
     body.scenarioDraft ?? scenarios.find((s) => s.id === body.scenarioId);
   const consumerType = body.consumerTypeDraft
     ? body.consumerTypeDraft
     : consumerTypes.find((ct) => ct.id === body.consumerTypeId);
 
-  if (!scenario || !consumerType) {
+  if (!selectedScenario || !consumerType) {
     throw new Error("Scenario atau consumer type tidak ditemukan.");
   }
+
+  const scenario: PdktScenario = { ...selectedScenario };
+  const expectedAnswer = scenario.expectedAnswer?.trim();
+  if (expectedAnswer) scenario.expectedAnswer = expectedAnswer;
+  else delete scenario.expectedAnswer;
 
   const config: PdktSessionConfig = {
     scenarios: [scenario],

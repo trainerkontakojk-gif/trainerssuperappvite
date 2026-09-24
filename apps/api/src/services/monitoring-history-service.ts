@@ -17,6 +17,7 @@ import type {
   VoiceQualityAssessment,
 } from "@trainers/types";
 import { createAdminClient } from "../lib/supabase";
+import { toPdktSimulationConfig } from "./pdkt/scenario-projections";
 import {
   evaluateTelefunHoldAssessment,
   normalizeTelefunHoldMetrics,
@@ -110,7 +111,7 @@ export function normalizeTelefunCoachingRecommendations(
 
 export function normalizePdktConfig(value: unknown): PdktSessionConfig | null {
   const parsed = pdktSessionConfigSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  return parsed.success ? toPdktSimulationConfig(parsed.data) : null;
 }
 
 export function normalizeKetikMessages(value: unknown): ChatMessage[] {
@@ -145,6 +146,9 @@ export function normalizePdktEvaluation(
     clarityIssues: parsed.clarityIssues,
     contentGaps: parsed.contentGaps,
     scoreBreakdown: full.success ? full.data.scoreBreakdown : undefined,
+    ...(parsed.expectedAnswerAlignment
+      ? { expectedAnswerAlignment: parsed.expectedAnswerAlignment }
+      : {}),
     ...(parsed.edu
       ? {
           // Persisted edu was ranked by the backend builder before storage;

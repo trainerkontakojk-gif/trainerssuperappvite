@@ -450,6 +450,42 @@ describe("EmailDetailPane Component", () => {
     expect(screen.getByText('"Good reply but watch grammar."')).toBeDefined();
   });
 
+  it("shows expected-answer alignment to trainees without revealing the reference text", () => {
+    const reference = "INTERNAL expected-answer reference";
+    render(
+      <EmailDetailPane
+        item={{
+          ...mockItem,
+          scenario_snapshot: { expectedAnswer: reference } as any,
+        }}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={{
+          score: 86,
+          feedback: "Perlu melengkapi satu detail.",
+          typos: [],
+          clarityIssues: [],
+          contentGaps: [],
+          expectedAnswerAlignment: {
+            category: "Hampir sesuai",
+            reason: "Nomor laporan ada, tetapi estimasi tindak lanjut belum disebutkan.",
+          },
+        }}
+        evaluationStatus="completed"
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Hampir sesuai")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Nomor laporan ada, tetapi estimasi tindak lanjut belum disebutkan.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText(reference)).toBeNull();
+  });
+
   it("renders creator info in EmailDetailPane", () => {
     const itemWithCreator = {
       ...mockItem,

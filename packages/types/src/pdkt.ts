@@ -40,6 +40,16 @@ export interface PdktEvaluationScoreBreakdown {
   templateComplianceScore: number;
 }
 
+export const pdktExpectedAnswerAlignmentSchema = z
+  .object({
+    category: z.enum(["Sesuai", "Hampir sesuai", "Berbeda sama sekali"]),
+    reason: z.string().trim().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+  })
+  .strict();
+export type PdktExpectedAnswerAlignment = z.infer<
+  typeof pdktExpectedAnswerAlignmentSchema
+>;
+
 // ── Evaluasi Edukatif (edu layer) ────────────────────────
 export type PdktDimensionKey =
   | "recipientDirection"
@@ -109,6 +119,10 @@ export const pdktScenarioSchema = z.object({
   title: z.string(),
   description: z.string(),
   isActive: z.boolean(),
+  expectedAnswer: z
+    .string()
+    .max(PDKT_PROMPT_INPUT_LIMITS.longText)
+    .optional(),
   primaryRecipientType: z.enum(["ojk", "reported_company"]).optional(),
   recipientMode: z.enum(["single", "multiple"]).optional(),
   recipientEmails: z.array(z.string()).optional(),
@@ -154,7 +168,7 @@ export const pdktPromptConsumerTypeSchema = pdktConsumerTypeSchema.extend({
 });
 
 export const pdktPromptScenarioSchema = pdktScenarioSchema
-  .omit({ identity: true })
+  .omit({ identity: true, expectedAnswer: true })
   .extend({
     id: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.id),
     category: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
@@ -174,6 +188,11 @@ export const pdktPromptScenarioSchema = pdktScenarioSchema
       })
       .optional(),
   });
+
+/** Session creation may carry an evaluation-only reference; generation prompt schemas do not. */
+export const pdktSessionScenarioSchema = pdktPromptScenarioSchema.extend({
+  expectedAnswer: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
+});
 
 export const pdktPromptIdentitySchema = pdktIdentitySchema.extend({
   name: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
@@ -221,6 +240,16 @@ export const pdktMailboxPromptSessionConfigSchema =
   pdktSessionConfigSchema.extend({
     ...pdktPromptSessionConfigFields,
     scenarios: z.array(pdktPromptScenarioSchema).max(1),
+  });
+
+export const pdktEvaluationSessionConfigSchema =
+  pdktPromptSessionConfigSchema.extend({
+    scenarios: z.array(pdktSessionScenarioSchema).length(1),
+  });
+
+export const pdktMailboxSessionConfigSchema =
+  pdktMailboxPromptSessionConfigSchema.extend({
+    scenarios: z.array(pdktSessionScenarioSchema).max(1),
   });
 
 const pdktAiScoreSchema = z.number().finite().min(0).max(100);
@@ -307,6 +336,7 @@ export const pdktEvaluationAiOutputSchema = z
       .max(PDKT_PROMPT_INPUT_LIMITS.issueCount),
     feedback: z.string().max(PDKT_PROMPT_INPUT_LIMITS.feedback),
     edu: pdktEducationAiOutputSchema,
+    expectedAnswerAlignment: pdktExpectedAnswerAlignmentSchema.optional(),
   })
   .strict();
 
@@ -318,6 +348,7 @@ export interface PdktEvaluationResult {
   contentGaps: string[];
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
+  expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";
@@ -478,8 +509,12 @@ export const generateEmailPromptSchema = generateEmailSchema.extend({
   ),
 });
 
+export const pdktSessionGenerationSchema = generateEmailPromptSchema.extend({
+  scenarioDraft: pdktSessionScenarioSchema.optional(),
+});
+
 export const evaluatePromptSchema = evaluateSchema.extend({
-  config: pdktPromptSessionConfigSchema,
+  config: pdktEvaluationSessionConfigSchema,
   emails: z.array(pdktPromptEmailMessageSchema).length(2),
 });
 
@@ -497,8 +532,8 @@ export const pdktMailboxBatchSchema = z.object({
 export type PdktMailboxBatch = z.infer<typeof pdktMailboxBatchSchema>;
 
 export const pdktMailboxBatchPromptSchema = pdktMailboxBatchSchema.extend({
-  scenario_snapshot: pdktPromptScenarioSchema,
-  config_snapshot: pdktMailboxPromptSessionConfigSchema,
+  scenario_snapshot: pdktSessionScenarioSchema,
+  config_snapshot: pdktMailboxSessionConfigSchema,
   inbound_email: pdktPromptEmailMessageSchema,
 });
 

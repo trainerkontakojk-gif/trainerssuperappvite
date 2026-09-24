@@ -26,12 +26,14 @@ Editing an existing scenario must continue to open the wizard directly. Existing
 - [x] Make wizard fields and validation mode-aware without changing shared types/API/storage contracts.
 - [x] Update existing characterization tests only where the intentional mode gate changes the add flow; keep edit and other PDKT flows covered.
 - [x] Run focused Vitest, web typecheck, touched-file lint, and `git diff --check`.
-- [x] Add the follow-up UX refinement: mode-specific step labels, editable manual review, collapsed simulation settings, and scroll-safe wizard layout.
+- [x] Add the follow-up UX refinement: mode-specific first-stage labels, `Tujuan & Pratinjau` hierarchy, two-column recipient/attachment/preview layout, simplified recipient copy, manual preview with controlled editing, collapsed simulation settings, and scroll-safe sticky footer.
 
 ## Result
 
 - New scenarios start with a mode picker: **Skenario AI** or **Email buatan sendiri**.
-- AI and manual modes have distinct first/review surfaces and no cross-mode generator controls.
-- Existing persistence, normalization, API routes, storage shape, and unrelated PDKT settings remain unchanged.
-- Verification: 32 focused PDKT tests passed, web typecheck passed, production build passed, and docs formatting passed.
+- AI and manual modes have distinct first-stage surfaces and share a third stage named **Tujuan & Pratinjau**.
+- Step 3 follows `Penerima Email → Email Tambahan/Lampiran → Pratinjau Email → Simpan`; desktop uses two columns and small screens stack the same order.
+- Existing persistence, normalization, API routes, storage shape, and unrelated PDKT settings remain unchanged. The persisted `recipientMode` remains available even though `Mode Penerima` is no longer user-facing.
+- Verification: 33 focused PDKT tests passed, web typecheck passed, touched-file lint passed, production build passed, and docs formatting passed.
 - Latest browser recheck was blocked by an expired Supabase dogfood session (`403`); no credentials were stored.
+- Follow-up regression fix: aligned the pristine `useCrudForm` draft with the wizard snapshot by defaulting `primaryRecipientType` to OJK. Both add-mode/cancel regressions now pass, and the full modal suite passes (34/34).

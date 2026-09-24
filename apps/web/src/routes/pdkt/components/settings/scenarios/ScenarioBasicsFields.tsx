@@ -170,7 +170,6 @@ export function ScenarioBasicsFields({
         <div className="md:col-span-2">
           <ScenarioTemplateField
             draft={draft}
-            mode="manual"
             onDraftChange={onDraftChange}
             error={attempted.has("manualEmail") ? manualEmailError : undefined}
           />

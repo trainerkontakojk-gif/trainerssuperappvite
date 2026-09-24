@@ -12,19 +12,18 @@ import {
   SettingsSelect,
 } from "../SettingsPrimitives";
 
+const SCENARIO_FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
+
 interface ScenarioRecipientsFieldProps {
   draft: Partial<PdktScenario>;
   onDraftChange: (updates: Partial<PdktScenario>) => void;
 }
 
-const FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
-
 export function ScenarioRecipientsField({
   draft,
   onDraftChange,
 }: ScenarioRecipientsFieldProps) {
-  const recipientMode = draft.recipientMode ?? "single";
-  const primaryRecipientType = draft.primaryRecipientType ?? "reported_company";
+  const primaryRecipientType = draft.primaryRecipientType ?? "ojk";
   const recipientEmails = draft.recipientEmails ?? [];
   const invalidEmails = new Set(
     findInvalidPdktRecipientEmails(recipientEmails),
@@ -35,7 +34,10 @@ export function ScenarioRecipientsField({
   };
 
   const handleAddEmail = () => {
-    updateRecipientEmails([...recipientEmails, ""]);
+    onDraftChange({
+      recipientEmails: [...recipientEmails, ""],
+      recipientMode: "multiple",
+    });
   };
 
   const handleRemoveEmail = (index: number) => {
@@ -55,67 +57,40 @@ export function ScenarioRecipientsField({
   return (
     <div id="scenario-recipient-targets" className="flex flex-col gap-4">
       <div>
-        <h4 className="text-sm font-medium text-foreground">Email Tujuan</h4>
+        <h4 className="text-sm font-medium text-foreground">Penerima Email</h4>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Arahkan email simulasi ke lawan bicara utama. Alamat fallback sistem{" "}
-          <span className="font-medium text-foreground">
-            {FALLBACK_RECIPIENT}
-          </span>{" "}
-          selalu ikut terkirim.
+          Tentukan lawan bicara dalam simulasi.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <SettingsField
-          label="Penerima Utama"
+      <SettingsField
+        label="Lawan Bicara Utama"
+        id="pdkt-primary-recipient-type"
+        helperText="Pilih tujuan utama email simulasi."
+      >
+        <SettingsSelect
           id="pdkt-primary-recipient-type"
-          helperText="Menentukan lawan bicara utama dan arah narasi sesi."
+          value={primaryRecipientType}
+          onChange={(e) =>
+            onDraftChange({
+              primaryRecipientType:
+                e.target.value === "ojk" ? "ojk" : "reported_company",
+            })
+          }
         >
-          <SettingsSelect
-            id="pdkt-primary-recipient-type"
-            value={primaryRecipientType}
-            onChange={(e) =>
-              onDraftChange({
-                primaryRecipientType:
-                  e.target.value === "ojk" ? "ojk" : "reported_company",
-              })
-            }
-          >
-            <option value="reported_company">Perusahaan terlapor</option>
-            <option value="ojk">OJK 157</option>
-          </SettingsSelect>
-        </SettingsField>
-
-        <SettingsField
-          label="Mode Penerima"
-          id="pdkt-recipient-mode"
-          helperText="Hanya mengatur alamat tambahan; fallback OJK tetap dipakai."
-        >
-          <SettingsSelect
-            id="pdkt-recipient-mode"
-            value={recipientMode}
-            onChange={(e) =>
-              onDraftChange({
-                recipientMode:
-                  e.target.value === "multiple" ? "multiple" : "single",
-              })
-            }
-          >
-            <option value="single">Pilih satu alamat</option>
-            <option value="multiple">Kirim ke beberapa alamat</option>
-          </SettingsSelect>
-        </SettingsField>
-      </div>
+          <option value="reported_company">Perusahaan terlapor</option>
+          <option value="ojk">OJK 157</option>
+        </SettingsSelect>
+      </SettingsField>
 
       <div className="flex flex-col gap-3 border-t border-border pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs font-medium text-foreground">
-              Alamat Tambahan
+              Email Tambahan
             </div>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Alamat custom untuk skenario ini. Alamat yang tidak lolos validasi
-              akan ditolak saat menyimpan.
+              Tambahkan alamat lain untuk simulasi ini.
             </p>
           </div>
           <Button
@@ -125,13 +100,13 @@ export function ScenarioRecipientsField({
             className="shrink-0"
           >
             <Plus data-icon="inline-start" />
-            Tambah alamat
+            Tambah Email
           </Button>
         </div>
 
         {recipientEmails.length === 0 ? (
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Belum ada alamat tambahan. Fallback sistem dipakai otomatis.
+            Belum ada email tambahan.
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -145,8 +120,8 @@ export function ScenarioRecipientsField({
                     <SettingsInput
                       id={`scenario-recipient-email-${index}`}
                       type="email"
-                      placeholder="alamat.tujuan@domain.com"
-                      aria-label={`Alamat email tambahan ${index + 1}`}
+                      placeholder="email.tambahan@domain.com"
+                      aria-label={`Email tambahan ${index + 1}`}
                       value={email}
                       onChange={(e) => handleChangeEmail(index, e.target.value)}
                       aria-invalid={isInvalid}
@@ -172,7 +147,7 @@ export function ScenarioRecipientsField({
                     size="icon-lg"
                     onClick={() => handleRemoveEmail(index)}
                     className="text-muted-foreground hover:text-destructive"
-                    aria-label={`Hapus alamat ${index + 1}`}
+                    aria-label={`Hapus email ${index + 1}`}
                   >
                     <Trash2 data-icon="inline" />
                   </Button>
@@ -181,6 +156,15 @@ export function ScenarioRecipientsField({
             })}
           </ul>
         )}
+      </div>
+
+      <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+        <span className="break-words text-sm font-medium text-foreground">
+          {SCENARIO_FALLBACK_RECIPIENT}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          Disertakan otomatis.
+        </span>
       </div>
     </div>
   );

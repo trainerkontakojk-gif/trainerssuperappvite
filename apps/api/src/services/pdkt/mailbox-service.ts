@@ -9,6 +9,10 @@ import {
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
+import {
+  toPdktSimulationConfig,
+  toPdktSimulationScenario,
+} from "./scenario-projections";
 
 const MAILBOX_MANAGER_ROLES = new Set(["admin", "trainer"]);
 
@@ -290,7 +294,13 @@ export async function fetchMailboxItemById(
   if (!data) return null;
 
   const [item] = await decorateMailboxRows([data], actor);
-  return (item as PdktMailboxItem | undefined) ?? null;
+  if (!item) return null;
+
+  return {
+    ...item,
+    scenario_snapshot: toPdktSimulationScenario(item.scenario_snapshot),
+    config_snapshot: toPdktSimulationConfig(item.config_snapshot),
+  } as PdktMailboxItem;
 }
 
 /**

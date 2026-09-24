@@ -150,6 +150,7 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
             category: "cat",
             title: "Skenario",
             description: "Desc",
+            expectedAnswer: "Berikan nomor laporan.",
             isActive: true,
           },
         ],
@@ -162,7 +163,17 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
         },
       },
       emails: [],
-      evaluation: null,
+      evaluation: {
+        score: 80,
+        feedback: "Cukup baik.",
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        expectedAnswerAlignment: {
+          category: "Hampir sesuai",
+          reason: "Nomor laporan belum diberikan.",
+        },
+      },
       evaluation_status: "processing",
       evaluation_error: null,
       time_taken: 30,
@@ -188,6 +199,12 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
           team: "Tim Alpha",
         },
       });
+      expect((pdkt as any)?.pdkt_session.config.scenarios[0]).not.toHaveProperty(
+        "expectedAnswer",
+      );
+      expect((pdkt as any)?.pdkt_session.evaluation.expectedAnswerAlignment).toEqual(
+        row.evaluation.expectedAnswerAlignment,
+      );
     } finally {
       mockPdktData.pop();
     }

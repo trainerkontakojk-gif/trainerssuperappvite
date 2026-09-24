@@ -448,6 +448,7 @@ function makeStoredMailboxRow(overrides: Record<string, any> = {}) {
     category: "Pinjol",
     title: "Pinjol Ilegal",
     description: "Test",
+    expectedAnswer: "Berikan nomor laporan kepada konsumen.",
     isActive: true,
     attachmentImages: [INLINE_ATTACHMENT],
   };
@@ -564,6 +565,10 @@ describe("fetchMailboxItemById", () => {
     expect(item.id).toBe("m-1");
     expect(item.inbound_email.attachments).toEqual([INLINE_ATTACHMENT]);
     expect(item.permissions).toEqual({ can_delete: true });
+    expect(item.scenario_snapshot).not.toHaveProperty("expectedAnswer");
+    expect(item.config_snapshot.scenarios[0]).not.toHaveProperty(
+      "expectedAnswer",
+    );
   });
 
   it("returns null when the item is missing", async () => {

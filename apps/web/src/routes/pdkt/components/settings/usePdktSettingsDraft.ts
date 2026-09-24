@@ -112,6 +112,7 @@ export function usePdktSettingsDraft({
       category: "",
       title: "",
       description: "",
+      primaryRecipientType: "ojk" as const,
       recipientMode: "single" as const,
       recipientEmails: [] as string[],
       sampleEmailTemplate: {

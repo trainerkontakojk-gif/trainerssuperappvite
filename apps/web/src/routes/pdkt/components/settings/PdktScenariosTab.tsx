@@ -1,14 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  PDKT_PROMPT_INPUT_LIMITS,
   type PdktConsumerType,
-  type PdktIdentity,
   type PdktScenario,
 } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
-import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
-import { resolvePdktScenarioIdentity, TEXT_MODELS } from "../../pdktSettings";
+import { TEXT_MODELS } from "../../pdktSettings";
 import {
   findInvalidPdktRecipientEmails,
   normalizePdktScenarioDraft,
@@ -23,10 +22,8 @@ import { ScenarioList } from "./scenarios/ScenarioList";
 import { ScenarioForm } from "./scenarios/ScenarioForm";
 import { ScenarioRecipientsField } from "./scenarios/ScenarioRecipientsField";
 import { ScenarioAttachments } from "./scenarios/ScenarioAttachments";
-import { ScenarioTemplateField } from "./scenarios/ScenarioTemplateField";
 import { ScenarioBasicsFields } from "./scenarios/ScenarioBasicsFields";
 import type { ScenarioCreationMode } from "./scenarios/ScenarioCreationModePicker";
-import { ScenarioAIEmailSection } from "./scenarios/ScenarioAIEmailSection";
 import {
   getScenarioCreationValidation,
   type ScenarioValidationErrorKey,
@@ -67,6 +64,7 @@ const EMPTY_SCENARIO_DRAFT: Omit<PdktScenario, "id"> = {
   category: "",
   title: "",
   description: "",
+  primaryRecipientType: "ojk",
   recipientMode: "single",
   recipientEmails: [],
   sampleEmailTemplate: { subject: "", body: "" },
@@ -96,7 +94,6 @@ export function PdktScenariosTab(props: Props) {
     scenarioForm,
     enableImageGeneration,
     setEnableImageGeneration,
-    customIdentity,
     globalConsumerTypeId,
     setGlobalConsumerTypeId,
     consumerNameMentionPattern,
@@ -113,7 +110,6 @@ export function PdktScenariosTab(props: Props) {
   const [step, setStep] = useState<ScenarioWizardStep>("scenario");
   const [newCategory, setNewCategory] = useState("");
   const [newCategoryMode, setNewCategoryMode] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [attempted, setAttempted] = useState<Set<ErrorKey>>(new Set());
   const [emailVisited, setEmailVisited] = useState(false);
   const [pendingAttachmentReads, setPendingAttachmentReads] = useState(0);
@@ -445,52 +441,6 @@ export function PdktScenariosTab(props: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const generateTemplate = async () => {
-    if (!draft.title?.trim() || !draft.description?.trim()) {
-      notify.warning(
-        "Isi judul dan deskripsi masalah terlebih dahulu untuk generate template.",
-      );
-      return;
-    }
-    setGenerating(true);
-    try {
-      const fallbackIdentity = (await unwrapResponse(
-        await pdktClient["generate-identity"].$post({ json: {} }),
-      )) as PdktIdentity;
-      const result = (await unwrapResponse(
-        await pdktClient["generate-template"].$post({
-          json: {
-            scenarioDraft: {
-              id: scenarioForm.editingId || "draft",
-              ...normalizePdktScenarioDraft({ ...draft, category }),
-              attachmentImages: (draft.attachmentImages || []).map(() => ""),
-            },
-            consumerTypeId:
-              globalConsumerTypeId === "random"
-                ? "ramah"
-                : globalConsumerTypeId,
-            consumerTypeDraft: selectedConsumer,
-            identity: resolvePdktScenarioIdentity({
-              scenario: {
-                id: scenarioForm.editingId || "draft",
-                ...normalizePdktScenarioDraft({ ...draft, category }),
-              },
-              customIdentity,
-              fallbackIdentity,
-            }),
-          },
-        }),
-      )) as { subject: string; body: string };
-      scenarioForm.setDraft({ sampleEmailTemplate: result });
-    } catch (error) {
-      notify.error(
-        error instanceof Error ? error.message : "Gagal generate template.",
-      );
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   const activeCount = scenarios.filter((scenario) => scenario.isActive).length;
   const updateConsumer = (updates: Partial<PdktConsumerType>) => {
     if (!selectedConsumer) return;
@@ -734,72 +684,63 @@ export function PdktScenariosTab(props: Props) {
           </div>
         }
         emailContent={
-          <div className="flex flex-col gap-8">
-            <section
-              className="flex flex-col gap-4"
-              aria-labelledby="scenario-email-content-title"
-            >
-              <div>
-                <h4
-                  id="scenario-email-content-title"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Isi email
-                </h4>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {creationMode === "ai"
-                    ? "AI menggunakan deskripsi skenario untuk membuat contoh email yang dapat Anda tinjau."
-                    : "Email yang Anda tulis menjadi sumber utama isi simulasi."}
+          <div
+            id="scenario-email-content"
+            className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8"
+          >
+            <div className="flex min-w-0 flex-col gap-6">
+              <ScenarioRecipientsField
+                draft={draft}
+                onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+              />
+
+              {pendingAttachmentReads > 0 && (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Membaca lampiran...
                 </p>
-              </div>
-              {creationMode === "ai" ? (
-                <ScenarioAIEmailSection
-                  draft={draft}
-                  onGenerate={generateTemplate}
-                  isGenerating={generating}
-                  canGenerate={Boolean(
-                    draft.title?.trim() && draft.description?.trim(),
-                  )}
-                />
-              ) : (
-                <ScenarioTemplateField
-                  draft={draft}
-                  mode="manual"
-                  idPrefix="scenario-review-template"
-                  onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-                  error={
-                    attempted.has("email") &&
-                    !draft.sampleEmailTemplate?.body?.trim()
-                      ? "Isi email wajib diisi."
-                      : undefined
+              )}
+
+              <ScenarioAttachments
+                attachmentImages={draft.attachmentImages || []}
+                onUpload={uploadAttachment}
+                onRemove={(index) =>
+                  scenarioForm.setDraft({
+                    attachmentImages: (draft.attachmentImages || []).filter(
+                      (_, current) => current !== index,
+                    ),
+                  })
+                }
+                fileInputRef={fileInputRef}
+              />
+            </div>
+
+            <div className="min-w-0">
+              <SettingsField
+                label="Jawaban yang Diharapkan"
+                id="scenario-expected-answer"
+              >
+                <SettingsTextarea
+                  id="scenario-expected-answer"
+                  rows={4}
+                  aria-describedby="scenario-expected-answer-help"
+                  maxLength={PDKT_PROMPT_INPUT_LIMITS.longText}
+                  value={draft.expectedAnswer || ""}
+                  placeholder="Tuliskan inti tindakan atau informasi yang diharapkan dalam balasan agent..."
+                  onChange={(event) =>
+                    scenarioForm.setDraft({
+                      expectedAnswer: event.target.value,
+                    })
                   }
                 />
-              )}
-            </section>
-
-            <ScenarioRecipientsField
-              draft={draft}
-              onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-            />
-
-            {pendingAttachmentReads > 0 && (
-              <p role="status" className="text-xs text-muted-foreground">
-                Membaca lampiran...
-              </p>
-            )}
-
-            <ScenarioAttachments
-              attachmentImages={draft.attachmentImages || []}
-              onUpload={uploadAttachment}
-              onRemove={(index) =>
-                scenarioForm.setDraft({
-                  attachmentImages: (draft.attachmentImages || []).filter(
-                    (_, current) => current !== index,
-                  ),
-                })
-              }
-              fileInputRef={fileInputRef}
-            />
+                <p
+                  id="scenario-expected-answer-help"
+                  className="text-xs leading-relaxed text-muted-foreground"
+                >
+                  Hanya digunakan sebagai referensi evaluasi setelah balasan
+                  dikirim, bukan untuk membuat email simulasi.
+                </p>
+              </SettingsField>
+            </div>
           </div>
         }
         simulationContent={

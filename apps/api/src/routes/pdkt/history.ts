@@ -7,6 +7,7 @@ import * as pdktService from "../../services/pdkt-service";
 import { requireRole } from "../../middleware/role";
 import { createAdminClient } from "../../lib/supabase";
 import { Variables, getUserClient, jsonServerError } from "./route-utils";
+import { toPdktSimulationConfig } from "../../services/pdkt/scenario-projections";
 
 const history = new Hono<{ Variables: Variables }>();
 
@@ -31,6 +32,7 @@ history.get(
         success: true,
         data: (data || []).map((row: any) => ({
           ...row,
+          config: toPdktSimulationConfig(row.config),
           user_id: row.user_id ?? user.id,
           user_email: user.email ?? null,
           user_role: profile?.role ?? null,

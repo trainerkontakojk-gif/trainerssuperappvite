@@ -13,6 +13,7 @@ import {
   normalizeTelefunScenarioDraft,
 } from "../routes/telefun/components/settings/telefunDraftNormalizers";
 import { ConsumerDifficulty } from "../routes/telefun/telefunSettings";
+import { pdktScenarioSchema } from "@trainers/types";
 
 describe("settings draft normalizers", () => {
   it("normalizes KETIK scenario defaults without changing explicit inactive state", () => {
@@ -61,6 +62,32 @@ describe("settings draft normalizers", () => {
       keyword: "follow-up",
       content: "Terima kasih",
     });
+  });
+
+  it("defaults a legacy PDKT recipient to OJK and preserves only a nonblank evaluation reference", () => {
+    const legacyScenario = {
+      id: "legacy",
+      category: "Umum",
+      title: "Skenario lama",
+      description: "Deskripsi",
+      isActive: true,
+    };
+    const normalized = normalizePdktScenarioDraft({
+      ...legacyScenario,
+      expectedAnswer: "  Sampaikan nomor laporan dan estimasi tindak lanjut.  ",
+    });
+
+    expect(normalized.primaryRecipientType).toBe("ojk");
+    expect(normalized.expectedAnswer).toBe(
+      "Sampaikan nomor laporan dan estimasi tindak lanjut.",
+    );
+    expect(
+      pdktScenarioSchema.parse({ ...legacyScenario, expectedAnswer: "Jawaban" })
+        .expectedAnswer,
+    ).toBe("Jawaban");
+    expect(
+      normalizePdktScenarioDraft({ ...legacyScenario, expectedAnswer: "  " }),
+    ).not.toHaveProperty("expectedAnswer");
   });
 
   it("normalizes PDKT scenario and consumer defaults", () => {

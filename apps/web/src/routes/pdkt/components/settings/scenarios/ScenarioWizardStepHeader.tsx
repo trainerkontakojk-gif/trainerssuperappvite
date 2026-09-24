@@ -16,7 +16,7 @@ interface Props {
 const defaultSteps: { id: ScenarioWizardStep; label: string }[] = [
   { id: "scenario", label: "1. Skenario" },
   { id: "profile", label: "2. Profil Pengirim" },
-  { id: "email", label: "3. Email & Pengaturan" },
+  { id: "email", label: "3. Penerima & Evaluasi" },
 ];
 
 export function ScenarioWizardStepHeader({

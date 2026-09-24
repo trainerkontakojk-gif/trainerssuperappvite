@@ -117,8 +117,8 @@ export async function createMailboxSession(
       message: inboundMessage,
     };
   } catch (error: unknown) {
-    // The generated message is intentionally returned with a signed, actor-bound
-    // draft. A transient mailbox failure must never force a second AI generation.
+    // The generated message is intentionally returned with an encrypted,
+    // actor-bound retry draft. A transient save failure must not rerun AI.
     let retryDraft: ReturnType<typeof createPdktMailboxRetryDraft> | undefined;
     if (payload.simulationSubjectSnapshot) {
       retryDraft = createPdktMailboxRetryDraft({

@@ -3,6 +3,7 @@ import type { PdktIdentity, PdktScenario } from "@trainers/types";
 import {
   buildPdktEmailGenerationPolicy,
   buildPdktSystemInstruction,
+  buildPdktGenerationMessages,
   getPdktContentLengthPolicy,
   renderPdktIdentityByMentionPattern,
   validatePdktEmailPolicyCompliance,
@@ -25,6 +26,31 @@ const scenario: PdktScenario = {
 };
 
 describe("pdkt-email-policy", () => {
+  it("does not include evaluation-only expected answers in generation prompts", () => {
+    const reference = "Evaluation-only answer that must not reach generation.";
+    const scenarioWithReference: PdktScenario = {
+      ...scenario,
+      expectedAnswer: reference,
+    };
+    const policy = buildPdktEmailGenerationPolicy(
+      {
+        identity,
+        consumerType: {
+          id: "ramah",
+          name: "Ramah",
+          description: "Konsumen yang tenang.",
+        },
+      },
+      scenarioWithReference,
+      "initial_email",
+    );
+    const generated = buildPdktGenerationMessages(policy);
+
+    expect(`${generated.systemInstruction}\n${generated.prompt}`).not.toContain(
+      reference,
+    );
+  });
+
   describe("cleanNameOccurrences", () => {
     it("removes introductory name mentions and replaces with saya", () => {
       expect(cleanNameOccurrences("Perkenalkan nama saya Budi Santoso.", "Budi Santoso", "Budi"))

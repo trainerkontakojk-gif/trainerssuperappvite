@@ -63,11 +63,14 @@ function normalizePdktScenarioIdentity(
 export function normalizePdktScenarioDraft(
   draft: Partial<Omit<PdktScenario, "id">>,
 ): Omit<PdktScenario, "id"> {
+  const expectedAnswer = draft.expectedAnswer?.trim();
+
   return {
     category: draft.category || "Umum",
     title: draft.title || "",
     description: draft.description || "",
-    primaryRecipientType: draft.primaryRecipientType,
+    ...(expectedAnswer ? { expectedAnswer } : {}),
+    primaryRecipientType: draft.primaryRecipientType ?? "ojk",
     recipientMode: draft.recipientMode ?? "single",
     recipientEmails: normalizePdktRecipientEmails(draft.recipientEmails),
     sampleEmailTemplate: draft.sampleEmailTemplate ?? { subject: "", body: "" },

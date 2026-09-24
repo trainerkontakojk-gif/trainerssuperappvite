@@ -298,6 +298,7 @@ mailbox.post(
         clarityIssues: result.clarityIssues,
         contentGaps: result.contentGaps,
         scoreBreakdown: result.scoreBreakdown,
+        expectedAnswerAlignment: result.expectedAnswerAlignment,
       },
     });
   },

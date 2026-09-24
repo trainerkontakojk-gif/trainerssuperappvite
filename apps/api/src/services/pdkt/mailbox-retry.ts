@@ -1,4 +1,12 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import {
   simulationSubjectSnapshotSchema,
   type PdktMailboxBatch,
@@ -6,11 +14,13 @@ import {
 } from "@trainers/types";
 import { env } from "../../lib/env";
 
-const RETRY_TOKEN_VERSION = 1 as const;
+const LEGACY_RETRY_TOKEN_VERSION = 1 as const;
+const RETRY_TOKEN_VERSION = 2 as const;
+const RETRY_TOKEN_PREFIX = "v2";
+const RETRY_TOKEN_AAD = Buffer.from("trainerssuperapp:pdkt-mailbox-retry:v2");
 const RETRY_TOKEN_TTL_MS = 30 * 60 * 1000;
 
-type RetryEnvelope = {
-  version: typeof RETRY_TOKEN_VERSION;
+type RetryEnvelopeFields = {
   actorId: string;
   issuedAt: number;
   expiresAt: number;
@@ -18,6 +28,16 @@ type RetryEnvelope = {
   batch: PdktMailboxBatch;
   simulationSubjectSnapshot: SimulationSubjectSnapshot;
 };
+
+type RetryEnvelope = RetryEnvelopeFields & {
+  version: typeof RETRY_TOKEN_VERSION;
+};
+
+type LegacyRetryEnvelope = RetryEnvelopeFields & {
+  version: typeof LEGACY_RETRY_TOKEN_VERSION;
+};
+
+type AnyRetryEnvelope = RetryEnvelope | LegacyRetryEnvelope;
 
 export type PdktMailboxRetryDraft = {
   token: string;
@@ -36,8 +56,70 @@ export class PdktMailboxRetryError extends Error {
   }
 }
 
-function encode(value: string): string {
-  return Buffer.from(value, "utf8").toString("base64url");
+function deriveEncryptionKey(): Buffer {
+  return createHash("sha256")
+    .update("trainerssuperapp:pdkt-mailbox-retry-encryption:v2\0")
+    .update(env.SUPABASE_SERVICE_ROLE_KEY)
+    .digest();
+}
+
+function decodeBase64Url(value: string): Buffer {
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.toString("base64url") !== value) {
+    throw new Error("Invalid base64url value.");
+  }
+  return decoded;
+}
+
+function encrypt(payload: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", deriveEncryptionKey(), iv);
+  cipher.setAAD(RETRY_TOKEN_AAD);
+  const ciphertext = Buffer.concat([
+    cipher.update(payload, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    RETRY_TOKEN_PREFIX,
+    iv.toString("base64url"),
+    ciphertext.toString("base64url"),
+    tag.toString("base64url"),
+  ].join(".");
+}
+
+function decrypt(token: string): string {
+  const [prefix, encodedIv, encodedCiphertext, encodedTag, extra] =
+    token.split(".");
+  if (
+    prefix !== RETRY_TOKEN_PREFIX ||
+    !encodedIv ||
+    !encodedCiphertext ||
+    !encodedTag ||
+    extra !== undefined
+  ) {
+    throw new Error("Invalid encrypted retry token.");
+  }
+
+  const iv = decodeBase64Url(encodedIv);
+  const ciphertext = decodeBase64Url(encodedCiphertext);
+  const tag = decodeBase64Url(encodedTag);
+  if (iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) {
+    throw new Error("Invalid encrypted retry token.");
+  }
+
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    deriveEncryptionKey(),
+    iv,
+  );
+  decipher.setAAD(RETRY_TOKEN_AAD);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 function decode(value: string): string {
@@ -100,8 +182,11 @@ function parseDraft(envelope: unknown, actorId: string): PdktMailboxRetryDraft {
     );
   }
 
-  const value = envelope as Partial<RetryEnvelope>;
-  if (value.version !== RETRY_TOKEN_VERSION) {
+  const value = envelope as Partial<AnyRetryEnvelope>;
+  if (
+    value.version !== RETRY_TOKEN_VERSION &&
+    value.version !== LEGACY_RETRY_TOKEN_VERSION
+  ) {
     throw new PdktMailboxRetryError(
       400,
       "VALIDATION_ERROR",
@@ -144,9 +229,9 @@ function parseDraft(envelope: unknown, actorId: string): PdktMailboxRetryDraft {
     );
   }
 
-  // The envelope is signed by this backend. Keep the generated payload intact
-  // (including optional fields/defaults) instead of normalizing it a second
-  // time during retry verification.
+  // The envelope is authenticated by this backend. Keep the generated payload
+  // intact (including optional fields/defaults) instead of normalizing it a
+  // second time during retry verification.
   assertSubjectMatchesBatch(batch as PdktMailboxBatch, parsedSnapshot.data);
   return {
     token: "",
@@ -191,8 +276,7 @@ export function createPdktMailboxRetryDraft(params: {
     batch: params.batch,
     simulationSubjectSnapshot: parsedSnapshot.data,
   };
-  const encodedPayload = encode(JSON.stringify(envelope));
-  const token = `${encodedPayload}.${sign(encodedPayload)}`;
+  const token = encrypt(JSON.stringify(envelope));
 
   return {
     token,
@@ -213,27 +297,22 @@ export function verifyPdktMailboxRetryToken(
     );
   }
 
-  const separator = token.lastIndexOf(".");
-  if (separator <= 0 || separator === token.length - 1) {
-    throw new PdktMailboxRetryError(
-      400,
-      "VALIDATION_ERROR",
-      "Draft retry tidak valid atau sudah kedaluwarsa.",
-    );
-  }
-  const encodedPayload = token.slice(0, separator);
-  const signature = token.slice(separator + 1);
-  if (!hasValidSignature(encodedPayload, signature)) {
-    throw new PdktMailboxRetryError(
-      400,
-      "VALIDATION_ERROR",
-      "Draft retry tidak valid atau sudah kedaluwarsa.",
-    );
-  }
-
   let envelope: unknown;
   try {
-    envelope = JSON.parse(decode(encodedPayload));
+    if (token.startsWith(`${RETRY_TOKEN_PREFIX}.`)) {
+      envelope = JSON.parse(decrypt(token));
+    } else {
+      const separator = token.lastIndexOf(".");
+      if (separator <= 0 || separator === token.length - 1) {
+        throw new Error("Invalid legacy retry token.");
+      }
+      const encodedPayload = token.slice(0, separator);
+      const signature = token.slice(separator + 1);
+      if (!hasValidSignature(encodedPayload, signature)) {
+        throw new Error("Invalid legacy retry token.");
+      }
+      envelope = JSON.parse(decode(encodedPayload));
+    }
   } catch {
     throw new PdktMailboxRetryError(
       400,

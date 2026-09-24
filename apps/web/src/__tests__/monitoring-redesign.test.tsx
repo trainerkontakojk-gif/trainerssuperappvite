@@ -270,6 +270,34 @@ describe("PdktEvaluationPanel — score breakdown", () => {
     mockPdktReviewResponse.mockReset();
   });
 
+  it("renders optional expected-answer alignment to reviewers", async () => {
+    mockPdktReviewResponse.mockResolvedValueOnce({
+      module: "pdkt",
+      review_status: "completed",
+      evaluation_error: null,
+      time_taken: 90,
+      emails: [],
+      evaluation: {
+        score: 88,
+        feedback: "Arah penerima sudah tepat.",
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        expectedAnswerAlignment: {
+          category: "Sesuai",
+          reason: "Inti tindakan dan informasi yang diminta sudah disampaikan.",
+        },
+      },
+    });
+
+    render(<PdktEvaluationPanel entryId="pdkt-1" />);
+
+    expect(await screen.findByText("Sesuai")).toBeTruthy();
+    expect(
+      screen.getByText("Inti tindakan dan informasi yang diminta sudah disampaikan."),
+    ).toBeTruthy();
+  });
+
   it("renders PDKT score breakdown when available", async () => {
     mockPdktReviewResponse.mockResolvedValueOnce({
       module: "pdkt",

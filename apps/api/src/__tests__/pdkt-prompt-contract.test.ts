@@ -4,9 +4,12 @@ import {
   DEFAULT_AI_MODEL_ID as SHARED_DEFAULT_AI_MODEL_ID,
   PDKT_PROMPT_INPUT_LIMITS,
   emailMessageSchema,
+  evaluatePromptSchema,
   pdktEvaluationAiOutputSchema,
   pdktGeneratedEmailAiOutputSchema,
   pdktInitialEmailAiOutputSchema,
+  generateEmailPromptSchema,
+  pdktSessionGenerationSchema,
   pdktPromptEmailMessageSchema,
   pdktPromptScenarioSchema,
   pdktPromptSessionConfigSchema,
@@ -45,10 +48,17 @@ describe("PDKT prompt-specific shared contracts", () => {
       category: "Pengaduan",
       title: "Rekening bermasalah",
       description: "x".repeat(PDKT_PROMPT_INPUT_LIMITS.longText),
+      expectedAnswer: "Evaluation-only reference",
       isActive: true,
       attachmentImages: ["data:application/pdf;base64," + "A".repeat(200_000)],
     };
 
+    expect(pdktScenarioSchema.parse(baseScenario).expectedAnswer).toBe(
+      "Evaluation-only reference",
+    );
+    expect(pdktPromptScenarioSchema.parse(baseScenario)).not.toHaveProperty(
+      "expectedAnswer",
+    );
     expect(pdktPromptScenarioSchema.safeParse(baseScenario).success).toBe(true);
     expect(
       pdktPromptScenarioSchema.safeParse({
@@ -57,6 +67,77 @@ describe("PDKT prompt-specific shared contracts", () => {
       }).success,
     ).toBe(false);
     expect(pdktScenarioSchema.safeParse(baseScenario).success).toBe(true);
+  });
+
+  it("keeps the reference in stored/evaluation context but strips it from generation input", () => {
+    const scenarioDraft = {
+      id: "scenario-1",
+      category: "Pengaduan",
+      title: "Tagihan bermasalah",
+      description: "Deskripsi",
+      expectedAnswer: "Berikan nomor laporan.",
+      isActive: true,
+    };
+    const request = {
+      scenarioDraft,
+      consumerTypeId: "ramah",
+      identity: {
+        name: "Budi",
+        email: "budi@example.com",
+        city: "Jakarta",
+        bodyName: "Budi",
+      },
+    };
+    const sessionInput = pdktSessionGenerationSchema.parse(request);
+    const generationInput = generateEmailPromptSchema.parse(request);
+    const evaluationInput = evaluatePromptSchema.parse({
+      config: {
+        scenarios: [scenarioDraft],
+        consumerType: {
+          id: "ramah",
+          name: "Ramah",
+          description: "Konsumen yang tenang.",
+        },
+        identity: request.identity,
+      },
+      emails: [
+        {
+          id: "consumer",
+          from: "budi@example.com",
+          to: "konsumen@ojk.go.id",
+          subject: "Pengaduan",
+          body: "Mohon bantu cek status laporan.",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          isAgent: false,
+        },
+        {
+          id: "agent",
+          from: "agent@ojk.go.id",
+          to: "budi@example.com",
+          subject: "Re: Pengaduan",
+          body: "Kami tindak lanjuti.",
+          timestamp: "2026-01-01T00:01:00.000Z",
+          isAgent: true,
+        },
+      ],
+    });
+
+    expect(sessionInput.scenarioDraft?.expectedAnswer).toBe(
+      "Berikan nomor laporan.",
+    );
+    expect(evaluationInput.config.scenarios[0].expectedAnswer).toBe(
+      "Berikan nomor laporan.",
+    );
+    expect(generationInput.scenarioDraft).not.toHaveProperty("expectedAnswer");
+    expect(
+      pdktSessionGenerationSchema.safeParse({
+        ...request,
+        scenarioDraft: {
+          ...scenarioDraft,
+          expectedAnswer: "x".repeat(PDKT_PROMPT_INPUT_LIMITS.longText + 1),
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("strictly rejects wrong-shape generation output", () => {

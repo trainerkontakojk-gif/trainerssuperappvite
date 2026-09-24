@@ -8,6 +8,7 @@ import {
   PdktDimensionKey,
   PdktActionItemAI,
   PdktEvaluationEdu,
+  PdktExpectedAnswerAlignment,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
@@ -38,6 +39,7 @@ export function buildPdktEvaluationPrompt(input: {
   agentReplyBody: string;
   scenarioTitle?: string;
   scenarioCategory?: string;
+  expectedAnswer?: string;
   recipientContext?: PdktRecipientContext;
   conflictHints?: string[];
 }): { systemInstruction: string; prompt: string } {
@@ -49,6 +51,7 @@ export function buildPdktEvaluationPrompt(input: {
     "Berikan evaluasi objektif dalam JSON berbahasa Indonesia.",
   ].join(" ");
 
+  const expectedAnswer = input.expectedAnswer?.trim() || "";
   const evaluationData = {
     inboundEmailBody: input.inboundEmailBody,
     agentReplyBody: input.agentReplyBody,
@@ -56,6 +59,7 @@ export function buildPdktEvaluationPrompt(input: {
       title: input.scenarioTitle ?? null,
       category: input.scenarioCategory ?? null,
     },
+    ...(expectedAnswer ? { expectedAnswer } : {}),
     recipientContext: input.recipientContext ?? null,
     recipientContextFallback: input.recipientContext
       ? null
@@ -91,6 +95,20 @@ export function buildPdktEvaluationPrompt(input: {
     "- Jika pembuka atau penutup membuat email tampak kembali dialamatkan ke OJK sebagai pihak utama, beri penalti besar pada recipient framing.",
     "- Jika recipientContext tidak tersedia, gunakan legacy fallback reply_to_ojk dan jangan menebak intent dari body terakhir.",
     "- Abaikan field score sebagai sumber skor final; isi tetap dengan estimasi agregat. Sistem menghitung ulang skor final dari lima breakdown.",
+    ...(expectedAnswer
+      ? [
+          "",
+          "PERBANDINGAN JAWABAN YANG DIHARAPKAN (referensi evaluasi saja):",
+          "- Bandingkan inti tindakan/informasi secara semantik, bukan kesamaan kata. Redaksi berbeda tetap sesuai bila inti yang diminta hadir.",
+          "- Sesuai: tindakan atau informasi inti hadir meski kata-katanya berbeda.",
+          "- Hampir sesuai: maksud utama hadir, tetapi detail penting/tindakan hilang atau tidak presisi.",
+          "- Berbeda sama sekali: balasan melewatkan atau bertentangan dengan inti jawaban yang diharapkan.",
+          "- Gunakan perbandingan sebagai bukti untuk normativeResponseScore dan contentGaps; jangan menambah dimensi, skala, atau bobot skor baru.",
+          "- Isi reason secara ringkas dan spesifik terhadap bagian jawaban yang ada atau belum ada.",
+          "- Jangan mengutip atau menyalin teks referensi ke field output mana pun; sebutkan hanya tindakan/detail inti yang sudah hadir atau masih hilang.",
+          "- Teks expectedAnswer adalah data evaluasi privat. Jangan tampilkan atau bocorkan teksnya di feedback, contentGaps, edu, rewrite, atau alignment.reason.",
+        ]
+      : []),
     "",
     "OUTPUT JSON:",
     "{",
@@ -111,14 +129,22 @@ export function buildPdktEvaluationPrompt(input: {
     '    "improvementTips": string[],',
     '    "actionItems": [{ "dimension": string, "text": string, "example": string }],',
     '    "suggestedRewrite": { "subject": string, "body": string, "highlights": string[] }',
-    "  }",
+    expectedAnswer ? "  }," : "  }",
+    ...(expectedAnswer
+      ? [
+          '  "expectedAnswerAlignment": {',
+          '    "category": "Sesuai" | "Hampir sesuai" | "Berbeda sama sekali",',
+          '    "reason": "alasan ringkas"',
+          "  }",
+        ]
+      : []),
     "}",
     "",
     "ATURAN EDUKASI:",
-    "- Untuk tiap dimensi scoreBreakdown < 75 wajib ada tip pada \"edu\": \"dimensionTips\" (1 kalimat cara memperbaiki).",
-    "- \"improvementTips\" berisi 3-5 langkah prioritas.",
-    "- \"actionItems\" array {dimension,text,example} — JANGAN isi field prioritas; backend yang menentukan urutan.",
-    "- \"suggestedRewrite\": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga primaryRecipientType dari recipientContext.",
+    '- Untuk tiap dimensi scoreBreakdown < 75 wajib ada tip pada "edu": "dimensionTips" (1 kalimat cara memperbaiki).',
+    '- "improvementTips" berisi 3-5 langkah prioritas.',
+    '- "actionItems" array {dimension,text,example} — JANGAN isi field prioritas; backend yang menentukan urutan.',
+    '- "suggestedRewrite": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga primaryRecipientType dari recipientContext.',
     "- Semua teks edukasi dalam Bahasa Indonesia.",
   ].join("\n");
 
@@ -223,16 +249,100 @@ function readFeedback(value: unknown): string | null {
   return value;
 }
 
-function normalizePdktEvaluationResponse(raw: unknown):
-  | {
-      score: number;
-      scoreBreakdown?: PdktEvaluationScoreBreakdown;
-      typos: string[];
-      clarityIssues: string[];
-      contentGaps: string[];
-      feedback: string;
-    }
-  | null {
+function redactExpectedAnswerText(
+  value: string,
+  expectedAnswer: string,
+): string {
+  const reference = expectedAnswer.trim();
+  if (!reference) return value;
+
+  const escapedReference = reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const wordCharacter = "\\p{L}\\p{N}_";
+  const startsWithWordCharacter = new RegExp(`^[${wordCharacter}]`, "u").test(
+    reference,
+  );
+  const endsWithWordCharacter = new RegExp(`[${wordCharacter}]$`, "u").test(
+    reference,
+  );
+  const precedingBoundary = startsWithWordCharacter
+    ? `(^|[^${wordCharacter}])`
+    : "";
+  const followingBoundary = endsWithWordCharacter
+    ? `(?=$|[^${wordCharacter}])`
+    : "";
+  const referencePattern = new RegExp(
+    `${precedingBoundary}${escapedReference}${followingBoundary}`,
+    "giu",
+  );
+  const replacement = startsWithWordCharacter
+    ? "$1inti jawaban yang diharapkan"
+    : "inti jawaban yang diharapkan";
+
+  return value.replace(referencePattern, replacement);
+}
+
+function redactExpectedAnswerFromValue<T>(value: T, expectedAnswer: string): T {
+  if (typeof value === "string") {
+    return redactExpectedAnswerText(value, expectedAnswer) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) =>
+      redactExpectedAnswerFromValue(item, expectedAnswer),
+    ) as T;
+  }
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        key === "category" || key === "dimension"
+          ? item
+          : redactExpectedAnswerFromValue(item, expectedAnswer),
+      ]),
+    ) as T;
+  }
+  return value;
+}
+
+function readExpectedAnswerAlignment(
+  value: unknown,
+  expectedAnswer: string,
+): PdktExpectedAnswerAlignment | null {
+  if (!isPlainObject(value)) return null;
+
+  const category = value.category;
+  if (
+    category !== "Sesuai" &&
+    category !== "Hampir sesuai" &&
+    category !== "Berbeda sama sekali"
+  ) {
+    return null;
+  }
+  const reason = readBounded(value.reason, PDKT_PROMPT_INPUT_LIMITS.issueText);
+  if (!reason) return null;
+  const reasonWithoutReference = redactExpectedAnswerText(
+    reason,
+    expectedAnswer,
+  );
+  const sanitizedReason = sanitizeAiResponse(reasonWithoutReference)
+    .slice(0, PDKT_PROMPT_INPUT_LIMITS.issueText)
+    .trim();
+  if (!sanitizedReason) return null;
+
+  return { category, reason: sanitizedReason };
+}
+
+function normalizePdktEvaluationResponse(
+  raw: unknown,
+  expectedAnswer = "",
+): {
+  score: number;
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
+  typos: string[];
+  clarityIssues: string[];
+  contentGaps: string[];
+  feedback: string;
+  expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+} | null {
   if (!isPlainObject(raw)) return null;
 
   const feedback = readFeedback(raw.feedback);
@@ -245,6 +355,12 @@ function normalizePdktEvaluationResponse(raw: unknown):
     return null;
   }
 
+  const hasExpectedAnswer = Boolean(expectedAnswer.trim());
+  const expectedAnswerAlignment = hasExpectedAnswer
+    ? readExpectedAnswerAlignment(raw.expectedAnswerAlignment, expectedAnswer)
+    : undefined;
+  if (hasExpectedAnswer && !expectedAnswerAlignment) return null;
+
   const scoreBreakdown = readScoreBreakdown(raw.scoreBreakdown);
   if (scoreBreakdown) {
     return {
@@ -254,6 +370,7 @@ function normalizePdktEvaluationResponse(raw: unknown):
       clarityIssues,
       contentGaps,
       feedback,
+      ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
     };
   }
 
@@ -266,6 +383,7 @@ function normalizePdktEvaluationResponse(raw: unknown):
     clarityIssues,
     contentGaps,
     feedback,
+    ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
   };
 }
 
@@ -521,6 +639,7 @@ export async function evaluateAgentResponse(
   contentGaps?: string[];
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
+  expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
   error?: string;
 }> {
   const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
@@ -548,16 +667,24 @@ export async function evaluateAgentResponse(
     recipientContext,
   });
   const conflictHints = Array.from(
-    new Set([...(conflictAnalysis.conflictHints || []), ...(recipientContext ? [] : ["legacy fallback: mode reply_to_ojk"]) ]),
+    new Set([
+      ...(conflictAnalysis.conflictHints || []),
+      ...(recipientContext ? [] : ["legacy fallback: mode reply_to_ojk"]),
+    ]),
   );
 
   const scenario = config.scenarios?.[0];
+  const expectedAnswer =
+    typeof scenario?.expectedAnswer === "string"
+      ? scenario.expectedAnswer.trim()
+      : "";
   const { systemInstruction, prompt: evaluationPrompt } =
     buildPdktEvaluationPrompt({
       inboundEmailBody,
       agentReplyBody,
       scenarioTitle: scenario?.title,
       scenarioCategory: scenario?.category,
+      ...(expectedAnswer ? { expectedAnswer } : {}),
       recipientContext,
       conflictHints,
     });
@@ -596,7 +723,10 @@ export async function evaluateAgentResponse(
         throw new InvalidPdktEvaluationResponseError();
       }
 
-      const normalizedResult = normalizePdktEvaluationResponse(rawResult);
+      const normalizedResult = normalizePdktEvaluationResponse(
+        rawResult,
+        expectedAnswer,
+      );
       if (!normalizedResult) {
         throw new InvalidPdktEvaluationResponseError();
       }
@@ -622,22 +752,36 @@ export async function evaluateAgentResponse(
           )
         : undefined;
 
+      const userFacingAssessment = redactExpectedAnswerFromValue(
+        {
+          typos: normalizedResult.typos,
+          clarityIssues: normalizedResult.clarityIssues,
+          contentGaps: normalizedResult.contentGaps,
+          feedback,
+          ...(edu ? { edu } : {}),
+          ...(normalizedResult.expectedAnswerAlignment
+            ? {
+                expectedAnswerAlignment:
+                  normalizedResult.expectedAnswerAlignment,
+              }
+            : {}),
+        },
+        expectedAnswer,
+      );
+
       return {
         success: true,
         score: scored.score,
         scoreBreakdown: scored.scoreBreakdown,
-        typos: normalizedResult.typos,
-        clarityIssues: normalizedResult.clarityIssues,
-        contentGaps: normalizedResult.contentGaps,
-        feedback,
-        ...(edu ? { edu } : {}),
+        ...userFacingAssessment,
       };
     } catch (error: unknown) {
       lastError = error;
       const isRetryableEvaluationError =
         error instanceof InvalidPdktEvaluationResponseError ||
         isTransientAiError(error);
-      if (!isRetryableEvaluationError || attempt === retryDelaysMs.length) break;
+      if (!isRetryableEvaluationError || attempt === retryDelaysMs.length)
+        break;
 
       await new Promise((resolve) =>
         setTimeout(resolve, retryDelaysMs[attempt]),
@@ -739,6 +883,9 @@ export async function processPdktEvaluation(
       contentGaps: result.contentGaps || [],
       scoreBreakdown: result.scoreBreakdown,
       ...(result.edu ? { edu: result.edu } : {}),
+      ...(result.expectedAnswerAlignment
+        ? { expectedAnswerAlignment: result.expectedAnswerAlignment }
+        : {}),
     };
 
     const { data: saved, error: updateEndError } = await adminClient
@@ -771,7 +918,11 @@ export async function processPdktEvaluation(
       .update({
         evaluation_status: "failed",
         evaluation_error:
-          err instanceof Error ? err.message : typeof err === "string" ? err : String(err),
+          err instanceof Error
+            ? err.message
+            : typeof err === "string"
+              ? err
+              : String(err),
         evaluation_completed_at: new Date().toISOString(),
       })
       .eq("id", historyId)

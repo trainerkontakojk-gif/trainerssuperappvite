@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ScenarioRecipientsField } from "../routes/pdkt/components/settings/scenarios/ScenarioRecipientsField";
 import type { PdktScenario } from "@trainers/types";
 
-describe("PDKT scenario recipient editor", { timeout: 15_000 }, () => {
+describe("PDKT scenario recipient editor", () => {
   it("adds, removes, and saves per-scenario recipient targets", async () => {
     const user = userEvent.setup();
     const onSaveMock = vi.fn();
@@ -33,21 +33,24 @@ describe("PDKT scenario recipient editor", { timeout: 15_000 }, () => {
 
     render(<TestHarness />);
 
-    await user.selectOptions(screen.getByLabelText(/Penerima Utama/), "ojk");
-    await user.selectOptions(
-      screen.getByLabelText(/Mode Penerima/),
-      "multiple",
-    );
-    await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
-    await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
+    const primaryRecipient = screen.getByLabelText(/Lawan Bicara Utama/);
+    expect(primaryRecipient).toHaveValue("ojk");
+    await user.selectOptions(primaryRecipient, "reported_company");
+    expect(primaryRecipient).toHaveValue("reported_company");
+    await user.selectOptions(primaryRecipient, "ojk");
+    expect(screen.queryByLabelText(/Mode Penerima/)).toBeNull();
+    expect(screen.getByText("konsumen@ojk.go.id")).toBeDefined();
+    expect(screen.getByText("Disertakan otomatis.")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: /tambah email/i }));
+    await user.click(screen.getByRole("button", { name: /tambah email/i }));
 
     const recipientInputs = screen.getAllByPlaceholderText(
-      "alamat.tujuan@domain.com",
+      "email.tambahan@domain.com",
     );
     await user.type(recipientInputs[0], "alpha@test.com");
     await user.type(recipientInputs[1], "beta@test.com");
 
-    await user.click(screen.getByRole("button", { name: /hapus alamat 2/i }));
+    await user.click(screen.getByRole("button", { name: /hapus email 2/i }));
     expect(screen.queryByDisplayValue("beta@test.com")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: /commit/i }));

@@ -22,6 +22,7 @@ import {
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
 import ScenarioImage from "./ScenarioImage";
+import { ExpectedAnswerAlignmentCard } from "./ExpectedAnswerAlignmentCard";
 import {
   getAttachmentDataUri,
   getPdfBlob,
@@ -472,6 +473,11 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
               </Alert>
             ) : evalData ? (
               <div className="space-y-6">
+                {evalData.expectedAnswerAlignment && (
+                  <ExpectedAnswerAlignmentCard
+                    alignment={evalData.expectedAnswerAlignment}
+                  />
+                )}
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <h3 className="text-sm font-bold text-[var(--fg)]">

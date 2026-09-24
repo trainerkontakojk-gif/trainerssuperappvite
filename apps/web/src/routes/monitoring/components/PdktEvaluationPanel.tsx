@@ -24,6 +24,7 @@ import {
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
 import { getSimulationSubjectMeta } from "../utils/formatting";
+import { ExpectedAnswerAlignmentCard } from "../../pdkt/components/ExpectedAnswerAlignmentCard";
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -328,6 +329,12 @@ export function PdktEvaluationPanel({
               </span>
             </div>
           </div>
+
+          {evaluation.expectedAnswerAlignment && (
+            <ExpectedAnswerAlignmentCard
+              alignment={evaluation.expectedAnswerAlignment}
+            />
+          )}
 
           {scoreBreakdown && (
             <div className="grid gap-2 sm:grid-cols-5">

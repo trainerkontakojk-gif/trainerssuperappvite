@@ -60,7 +60,7 @@ export function ScenarioForm({
 
   const stepLabels = {
     scenario: creationMode === "ai" ? "1. Skenario AI" : "1. Email Anda",
-    email: "3. Review & Pengaturan",
+    email: "3. Penerima & Evaluasi",
   };
 
   if (!scenarioForm.isOpen) return null;
@@ -176,14 +176,11 @@ export function ScenarioForm({
                   id="scenario-step-email-title"
                   className="text-sm font-semibold tracking-tight text-foreground"
                 >
-                  {creationMode === "ai"
-                    ? "Review Email AI"
-                    : "Review Email Anda"}
+                  Penerima & Evaluasi
                 </h3>
                 <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  {creationMode === "ai"
-                    ? "Pastikan contoh email AI, tujuan, dan pengaturan simulasi sudah sesuai."
-                    : "Pastikan email Anda, tujuan, dan pengaturan simulasi sudah sesuai."}
+                  Atur penerima dan lampiran; jawaban acuan opsional membantu
+                  evaluasi balasan.
                 </p>
               </div>
 
@@ -228,7 +225,7 @@ export function ScenarioForm({
               onClick={onSubmit}
               disabled={pendingAttachmentReads > 0}
             >
-              {editing ? "Simpan Perubahan" : "Buat Skenario"}
+              {editing ? "Simpan Skenario" : "Buat Skenario"}
             </Button>
           ) : (
             <Button type="button" onClick={onNext} disabled={!canNext}>

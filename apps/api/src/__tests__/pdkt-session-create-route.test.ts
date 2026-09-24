@@ -103,6 +103,39 @@ afterEach(() => {
 });
 
 describe("PDKT Unified Session Create Route", () => {
+  it(
+    "omits the evaluation-only reference from simulation scenario catalogs",
+    { timeout: 15_000 },
+    async () => {
+      const pdktService = await import("../services/pdkt-service");
+      const expectedAnswer = "Berikan nomor laporan kepada konsumen.";
+      const getScenarios = vi
+        .spyOn(pdktService, "getScenarios")
+        .mockReturnValue([
+          {
+            id: "evaluation-reference",
+            category: "Umum",
+            title: "Kendala pengaduan",
+            description: "Konsumen menanyakan status laporannya.",
+            expectedAnswer,
+            isActive: true,
+          },
+        ]);
+
+      try {
+        await createAuthenticatedApp("trainer");
+        const response = await app.request("/api/v1/pdkt/scenarios");
+        const result = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(result.data[0]).not.toHaveProperty("expectedAnswer");
+        expect(JSON.stringify(result)).not.toContain(expectedAnswer);
+      } finally {
+        getScenarios.mockRestore();
+      }
+    },
+  );
+
   it.each([
     "/api/v1/pdkt/generate-template",
     "/api/v1/pdkt/session/init",
@@ -208,6 +241,48 @@ describe("PDKT Unified Session Create Route", () => {
     });
   });
 
+  it("persists an evaluation reference without returning it in the simulation response", async () => {
+    const app = await createAuthenticatedApp("trainer");
+    const expectedAnswer = "Berikan nomor laporan kepada konsumen.";
+    const response = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioDraft: {
+          id: "evaluation-reference",
+          category: "Umum",
+          title: "Kendala pengaduan",
+          description: "Konsumen menanyakan status laporannya.",
+          expectedAnswer,
+          isActive: true,
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Status laporan",
+            body: "Mohon bantu cek status laporan saya.",
+          },
+        },
+        consumerTypeId: "ramah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+      }),
+    });
+    const result = await response.json();
+    const batch = mockRpc.mock.calls.find(
+      ([, args]) =>
+        args.p_config_snapshot?.scenarios?.[0]?.id === "evaluation-reference",
+    )?.[1];
+
+    expect(response.status).toBe(200);
+    expect(batch?.p_config_snapshot.scenarios[0].expectedAnswer).toBe(
+      expectedAnswer,
+    );
+    expect(JSON.stringify(result)).not.toContain(expectedAnswer);
+  });
+
   it("returns the resolved subject with init output so the following mailbox save can retain the same selection", async () => {
     await createAuthenticatedApp("trainer");
     mockMaybeSingle.mockResolvedValueOnce({
@@ -255,7 +330,8 @@ describe("PDKT Unified Session Create Route", () => {
     expect(json.data.mailboxDraftToken).toEqual(expect.any(String));
   });
 
-  it("uses the exact signed init token for the following mailbox batch", async () => {
+  it("uses an encrypted init token for the following mailbox batch without losing evaluation data", async () => {
+    const expectedAnswer = "Sampaikan nomor laporan kepada konsumen.";
     await createAuthenticatedApp("trainer");
     mockMaybeSingle.mockResolvedValueOnce({
       data: {
@@ -271,7 +347,14 @@ describe("PDKT Unified Session Create Route", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        scenarioId: "pinjol",
+        scenarioDraft: {
+          id: "retry-evaluation-reference",
+          category: "Umum",
+          title: "Status laporan",
+          description: "Konsumen menanyakan status laporannya.",
+          expectedAnswer,
+          isActive: true,
+        },
         consumerTypeId: "marah",
         identity: {
           name: "Budi",
@@ -288,6 +371,10 @@ describe("PDKT Unified Session Create Route", () => {
     const initJson = await initResponse.json();
     const token = initJson.data.mailboxDraftToken;
 
+    expect(initResponse.status).toBe(200);
+    expect(token).toMatch(/^v2\./);
+    expect(JSON.stringify(initJson)).not.toContain(expectedAnswer);
+
     const batchResponse = await app.request("/api/v1/pdkt/mailbox/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -299,15 +386,19 @@ describe("PDKT Unified Session Create Route", () => {
       "submit_pdkt_mailbox_batch_with_subject",
       expect.objectContaining({
         p_subject_type: "participant",
-        p_subject_peserta_id:
-          "123e4567-e89b-12d3-a456-426614174000",
+        p_subject_peserta_id: "123e4567-e89b-12d3-a456-426614174000",
         p_subject_name: "Andi",
+        p_scenario_snapshot: expect.objectContaining({ expectedAnswer }),
+        p_config_snapshot: expect.objectContaining({
+          scenarios: [expect.objectContaining({ expectedAnswer })],
+        }),
         p_inbound_email: expect.objectContaining({ subject: "Test Subject" }),
       }),
     );
   });
 
-  it("maps mailbox save conflicts to 409 without discarding the generated email", async () => {
+  it("maps mailbox save conflicts without exposing evaluation references", async () => {
+    const expectedAnswer = "Sampaikan nomor laporan kepada konsumen.";
     await createAuthenticatedApp("trainer");
     mockRpc.mockResolvedValueOnce({
       data: null,
@@ -320,7 +411,14 @@ describe("PDKT Unified Session Create Route", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        scenarioId: "pinjol",
+        scenarioDraft: {
+          id: "conflict-evaluation-reference",
+          category: "Umum",
+          title: "Status laporan",
+          description: "Konsumen menanyakan status laporannya.",
+          expectedAnswer,
+          isActive: true,
+        },
         consumerTypeId: "marah",
         identity: {
           name: "Budi",
@@ -341,6 +439,14 @@ describe("PDKT Unified Session Create Route", () => {
     expect(json.error.details.retryDraft.inbound_email).toEqual(
       expect.objectContaining({ subject: "Test Subject" }),
     );
+    expect(json.error.details.retryDraft.token).toMatch(/^v2\./);
+    expect(
+      json.error.details.retryDraft.batch.scenario_snapshot,
+    ).not.toHaveProperty("expectedAnswer");
+    expect(
+      json.error.details.retryDraft.batch.config_snapshot.scenarios[0],
+    ).not.toHaveProperty("expectedAnswer");
+    expect(JSON.stringify(json)).not.toContain(expectedAnswer);
   });
 
   it("drops raw scenarioDraft.identity before session creation and keeps the top-level identity as the runtime source", async () => {
@@ -481,6 +587,7 @@ describe("PDKT Unified Session Create Route", () => {
           title: "Pinjol Ilegal",
           description: "Konsumen diteror pinjol ilegal.",
           isActive: true,
+          primaryRecipientType: "reported_company",
           recipientMode: "multiple",
           recipientEmails: ["alpha@test.com", "beta@test.com"],
           alwaysUseSampleEmail: true,

@@ -82,11 +82,10 @@ export function resolvePdktRecipientContext(input: {
 
   const requestedPrimaryType = input.primaryRecipientType;
   const primaryRecipientType =
-    requestedPrimaryType === "ojk"
-      ? "ojk"
-      : nonFallbackRecipients.length > 0
-        ? "reported_company"
-        : "ojk";
+    requestedPrimaryType === "reported_company" &&
+    nonFallbackRecipients.length > 0
+      ? "reported_company"
+      : "ojk";
   const primaryRecipientAddress =
     primaryRecipientType === "ojk"
       ? PDKT_FALLBACK_RECIPIENT
