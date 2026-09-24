@@ -496,9 +496,9 @@ export function PdktScenariosTab(props: Props) {
           />
         }
         profileContent={
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <section className="flex flex-col gap-4">
-              <div>
+          <div className="flex min-w-0 flex-col gap-6">
+            <section className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="min-w-0 md:col-span-2">
                 <h4 className="text-sm font-medium text-foreground">
                   Identitas Pengirim
                 </h4>
@@ -563,31 +563,9 @@ export function PdktScenariosTab(props: Props) {
                   }
                 />
               </SettingsField>
-              <SettingsField
-                label="Penyebutan nama konsumen"
-                id="consumer-mention-pattern"
-                optional
-              >
-                <SettingsSelect
-                  id="consumer-mention-pattern"
-                  value={consumerNameMentionPattern}
-                  onChange={(event) =>
-                    setConsumerNameMentionPattern(
-                      event.target
-                        .value as AppSettings["consumerNameMentionPattern"],
-                    )
-                  }
-                >
-                  <option value="random">Acak</option>
-                  <option value="upfront">Di awal</option>
-                  <option value="middle">Di tengah</option>
-                  <option value="late">Di akhir</option>
-                  <option value="none">Tidak disebut</option>
-                </SettingsSelect>
-              </SettingsField>
             </section>
-            <section className="flex flex-col gap-4">
-              <div>
+            <section className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="min-w-0 md:col-span-2">
                 <h4 className="text-sm font-medium text-foreground">
                   Karakter dan Gaya Komunikasi
                 </h4>
@@ -614,6 +592,28 @@ export function PdktScenariosTab(props: Props) {
                       {consumer.name}
                     </option>
                   ))}
+                </SettingsSelect>
+              </SettingsField>
+              <SettingsField
+                label="Penyebutan nama konsumen"
+                id="consumer-mention-pattern"
+                optional
+              >
+                <SettingsSelect
+                  id="consumer-mention-pattern"
+                  value={consumerNameMentionPattern}
+                  onChange={(event) =>
+                    setConsumerNameMentionPattern(
+                      event.target
+                        .value as AppSettings["consumerNameMentionPattern"],
+                    )
+                  }
+                >
+                  <option value="random">Acak</option>
+                  <option value="upfront">Di awal</option>
+                  <option value="middle">Di tengah</option>
+                  <option value="late">Di akhir</option>
+                  <option value="none">Tidak disebut</option>
                 </SettingsSelect>
               </SettingsField>
               {selectedConsumer && (
@@ -686,14 +686,16 @@ export function PdktScenariosTab(props: Props) {
         emailContent={
           <div
             id="scenario-email-content"
-            className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8"
+            className="grid min-w-0 grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8"
           >
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="min-w-0">
               <ScenarioRecipientsField
                 draft={draft}
                 onDraftChange={(updates) => scenarioForm.setDraft(updates)}
               />
+            </div>
 
+            <div className="flex min-w-0 flex-col gap-6">
               {pendingAttachmentReads > 0 && (
                 <p role="status" className="text-xs text-muted-foreground">
                   Membaca lampiran...
@@ -712,9 +714,7 @@ export function PdktScenariosTab(props: Props) {
                 }
                 fileInputRef={fileInputRef}
               />
-            </div>
 
-            <div className="min-w-0">
               <SettingsField
                 label="Jawaban yang Diharapkan"
                 id="scenario-expected-answer"

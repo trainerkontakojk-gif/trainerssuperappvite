@@ -19,7 +19,7 @@ export function ScenarioAttachments({
   return (
     <div
       id="scenario-attachments"
-      className="flex min-w-0 flex-col gap-4 border-t border-border pt-4"
+      className="flex min-w-0 flex-col gap-4 border-t border-border pt-4 lg:border-t-0 lg:pt-0"
     >
       <div>
         <h4 className="text-sm font-medium text-foreground">

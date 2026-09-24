@@ -504,6 +504,32 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
         screen.getByRole("button", { name: /tambah skenario baru/i }),
       );
       await completeScenarioStage(user);
+      const identitySection = screen
+        .getByRole("heading", { name: "Identitas Pengirim" })
+        .closest("section");
+      const communicationSection = screen
+        .getByRole("heading", { name: "Karakter dan Gaya Komunikasi" })
+        .closest("section");
+      expect(identitySection).toHaveClass(
+        "grid",
+        "grid-cols-1",
+        "md:grid-cols-2",
+      );
+      expect(communicationSection).toHaveClass(
+        "grid",
+        "grid-cols-1",
+        "md:grid-cols-2",
+      );
+      expect(
+        identitySection?.querySelectorAll("input, select, textarea"),
+      ).toHaveLength(4);
+      expect(
+        communicationSection?.querySelectorAll("input, select, textarea"),
+      ).toHaveLength(2);
+      await user.selectOptions(screen.getByLabelText(/Karakter aktif/), "c-1");
+      expect(
+        communicationSection?.querySelectorAll("input, select, textarea"),
+      ).toHaveLength(6);
       expect(screen.getByText("Profil Pengirim")).toBeDefined();
       expect(screen.getByRole("button", { name: "Lanjut" })).not.toBeDisabled();
       await user.type(screen.getByLabelText(/Nama pengirim/), "Profil Baru");
@@ -650,7 +676,7 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     );
   });
 
-  it("shows a compact recipient and evaluation form without an email preview", async () => {
+  it("balances recipients against attachments and evaluation without an email preview", async () => {
     const user = userEvent.setup();
     renderModal();
     await user.click(
@@ -681,10 +707,15 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     const expectedAnswer = screen.getByLabelText(/Jawaban yang Diharapkan/);
     const emailLayout = document.getElementById("scenario-email-content");
     expect(emailLayout).toHaveClass("min-w-0", "grid-cols-1", "lg:grid-cols-2");
-    expect(emailLayout).toContainElement(expectedAnswer);
     expect(document.getElementById("scenario-email-preview")).toBeNull();
     expect(recipientSection).not.toBeNull();
     expect(attachmentSection).not.toBeNull();
+    const columns = Array.from(emailLayout!.children);
+    expect(columns).toHaveLength(2);
+    expect(columns[0]).toContainElement(recipientSection!);
+    expect(columns[0]).not.toContainElement(attachmentSection!);
+    expect(columns[1]).toContainElement(attachmentSection!);
+    expect(columns[1]).toContainElement(expectedAnswer);
     expect(
       recipientSection!.compareDocumentPosition(attachmentSection!) &
         Node.DOCUMENT_POSITION_FOLLOWING,

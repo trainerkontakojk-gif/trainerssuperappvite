@@ -2,14 +2,15 @@
 
 ## Requirement
 
-Remove email previews from the PDKT scenario wizard and tidy the third step. Keep manual email authoring in the first step, and use the last step for recipient, attachment, and optional expected-answer settings. Preserve AI/manual behavior, validation, persistence, attachment handling, and API semantics except for removing the preview-only template-generation UI.
+Remove email previews from the PDKT scenario wizard and balance the sender-profile and evaluation layouts. Keep manual email authoring in the first step. Balance fields across two desktop columns: pair sender-profile fields within each section, and place recipients on the left with attachments and optional expected-answer settings on the right in the final step. Stack naturally on narrow screens. Preserve AI/manual behavior, validation, persistence, attachment handling, and API semantics except for removing the preview-only template-generation UI.
 
 ## Design
 
 - Keep `creationMode` in `PdktScenariosTab` as the only mode source of truth.
 - Keep `creationMode` as the single source of truth and label step 3 `Penerima & Evaluasi` in both modes.
 - Remove the preview panel, preview-specific AI generation action, and manual `Edit Email` review state. The manual email remains editable in step 1.
-- Reflow step 3 into a responsive two-column form: recipients and attachments together on the left; the optional expected-answer field on the right. Stack naturally on small screens.
+- Balance sender-profile fields in two-column grids within each semantic section: identity fields form two pairs; character/style controls split evenly, including when per-character fields are visible.
+- Reflow step 3 into a responsive two-column form: recipient controls on the left; attachments and optional expected-answer settings on the right. Stack naturally on small screens.
 - Keep recipient labels (`Penerima Email`, `Lawan Bicara Utama`, `Email Tambahan`, `Tambah Email`) and the automatically included `konsumen@ojk.go.id` notice; preserve recipient defaults and storage semantics.
 - Keep `Pengaturan tambahan` collapsed below the main form. Preserve the wizard's scrollable content, sticky footer, validation, focus handling, attachment state, and save behavior.
 - Update the existing settings tests to assert that neither creation mode renders an email preview or preview-only action, and cover the revised hierarchy, responsive layout, and retained manual editing. Do not add a duplicate suite.
@@ -24,9 +25,15 @@ Remove email previews from the PDKT scenario wizard and tidy the third step. Kee
 ## Current Result
 
 - Removed the AI preview/generation panel and manual preview/review state. Manual email subject/body remain editable in step 1, and the test verifies edited content is saved.
-- Step 3 is labeled `Penerima & Evaluasi`; recipients and attachments share the left column, the optional expected-answer field sits on the right, and advanced settings remain collapsed below.
-- Focused PDKT settings/recipient tests: 34/34 passed. Web typecheck, touched-file ESLint, Prettier, `git diff --check`, and web build passed. The build emitted Node/Tailwind toolchain warnings.
-- Source review confirmed the responsive one/two-column layout and retained field labels/help. Browser visual verification was not run because no local app listener was found on the usual Vite/preview ports; no server was started.
+- Sender identity and character/style controls use paired responsive grids; the mention-placement control is grouped with communication style. Step 3 balances recipient controls on the left against attachments and expected answers on the right; the columns align at the top and stack on narrow screens.
+- Focused PDKT settings/recipient tests: 34/34 passed. `pnpm test:core` passed (API 284, Telefun 158, Web 213); web typecheck and build passed. `pnpm lint` passed with existing warnings elsewhere. Touched-file ESLint, Prettier, and `git diff --check` passed. Build emitted Node/Tailwind toolchain warnings.
+- Source review confirmed labels, error/persistence handlers, and responsive structure are unchanged beyond reflow. Browser visual verification was not run because no local app listener was found on the usual Vite/preview ports; no server was started.
+
+## Balance Follow-up (completed)
+
+- [x] Add RED assertions to the existing settings-modal cases for balanced profile fields and the recipient/evaluation column split.
+- [x] Reflow profile fields into paired responsive grids and move attachments beside the expected-answer field without changing validation or persistence.
+- [x] Run focused tests, web typecheck/lint, formatting, build, and diff check; complete source/UI audit and record browser availability.
 
 ## Previous Result (superseded by the no-preview request)
 
