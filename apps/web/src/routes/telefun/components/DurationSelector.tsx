@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
 import {
   classifyDurationMode,
   filterDurationInput,
   normalizeDurationDisplay,
   validateDuration,
   PRESET_DURATIONS,
-} from './duration-validation';
+} from "./duration-validation";
 
 export interface DurationSelectorProps {
   value: number;
@@ -20,9 +22,9 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
   presets = PRESET_DURATIONS,
 }) => {
   const initialClass = classifyDurationMode(value);
-  const [mode, setMode] = useState<'preset' | 'custom'>(initialClass.mode);
+  const [mode, setMode] = useState<"preset" | "custom">(initialClass.mode);
   const [customInputValue, setCustomInputValue] = useState<string>(
-    initialClass.mode === 'custom' ? initialClass.value.toString() : ''
+    initialClass.mode === "custom" ? initialClass.value.toString() : "",
   );
   const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,24 +32,24 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
   useEffect(() => {
     const cls = classifyDurationMode(value);
     setMode(cls.mode);
-    if (cls.mode === 'custom') {
+    if (cls.mode === "custom") {
       setCustomInputValue(cls.value.toString());
       setValidationError(null);
     } else {
-      setCustomInputValue('');
+      setCustomInputValue("");
       setValidationError(null);
     }
   }, [value]);
 
   const handlePresetClick = (presetValue: number) => {
-    setMode('preset');
-    setCustomInputValue('');
+    setMode("preset");
+    setCustomInputValue("");
     setValidationError(null);
     onChange(presetValue);
   };
 
   const handleCustomClick = () => {
-    setMode('custom');
+    setMode("custom");
     setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
@@ -83,99 +85,85 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
   };
 
   return (
-    <div className="space-y-4 w-full">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="w-full space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {presets.map((duration) => {
-          const isSelected = mode === 'preset' && value === duration;
+          const isSelected = mode === "preset" && value === duration;
           return (
-            <div
+            <Button
               key={duration}
+              type="button"
+              variant="outline"
+              aria-pressed={isSelected}
               onClick={() => handlePresetClick(duration)}
-              className={`cursor-pointer p-5 rounded-xl border transition-colors flex flex-col justify-between h-28 relative group ${
+              className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal ${
                 isSelected
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card/45 hover:bg-foreground/[0.02]'
+                  ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                  : "border-border bg-card hover:bg-muted/40"
               }`}
             >
-              <div className="flex justify-between items-start w-full">
-                <span
-                  className={`text-3xl font-bold tracking-tight ${
-                    isSelected ? 'text-primary' : 'text-foreground/30'
-                  }`}
-                >
-                  {duration}
-                </span>
-                <div className="flex items-center shrink-0">
-                  {isSelected ? (
-                    <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                    </div>
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
-                  )}
-                </div>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Menit
+              <span className="text-sm font-medium text-foreground">
+                {duration} Menit
               </span>
-            </div>
+              <span
+                aria-hidden="true"
+                className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                  isSelected ? "border-primary" : "border-border"
+                }`}
+              >
+                {isSelected && (
+                  <span className="size-2.5 rounded-full bg-primary" />
+                )}
+              </span>
+            </Button>
           );
         })}
 
-        {/* Custom Card */}
-        <div
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={mode === "custom"}
           onClick={handleCustomClick}
-          className={`cursor-pointer p-5 rounded-xl border transition-colors flex flex-col justify-between h-28 relative group ${
-            mode === 'custom'
-              ? 'border-primary bg-primary/5'
-              : 'border-border bg-card/45 hover:bg-foreground/[0.02]'
+          className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal ${
+            mode === "custom"
+              ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+              : "border-border bg-card hover:bg-muted/40"
           }`}
         >
-          <div className="flex justify-between items-start w-full">
-            <span
-              className={`text-3xl font-bold ${
-                mode === 'custom' ? 'text-primary' : 'text-foreground/30'
-              }`}
-            >
-              ⚙️
-            </span>
-            <div className="flex items-center shrink-0">
-              {mode === 'custom' ? (
-                <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
-                  <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                </div>
-              ) : (
-                <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
-              )}
-            </div>
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Kustom
+          <span className="text-sm font-medium text-foreground">Kustom</span>
+          <span
+            aria-hidden="true"
+            className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+              mode === "custom" ? "border-primary" : "border-border"
+            }`}
+          >
+            {mode === "custom" && (
+              <span className="size-2.5 rounded-full bg-primary" />
+            )}
           </span>
-        </div>
+        </Button>
       </div>
 
-      {/* Revealed Custom Input Area */}
       <AnimatePresence>
-        {mode === 'custom' && (
+        {mode === "custom" && (
           <motion.div
             initial={{ opacity: 0, height: 0, y: -10 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -10 }}
-            className="overflow-hidden pt-2"
+            className="overflow-hidden"
           >
-            <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+            <div className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center">
               <div>
-                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1">
+                <label className="mb-1 block text-xs font-semibold text-foreground">
                   Masukkan Durasi Kustom
                 </label>
-                <p className="text-[11px] text-muted-foreground font-medium">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   Tentukan durasi simulasi antara 1 hingga 60 menit.
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
+              <div className="flex shrink-0 flex-col items-end gap-1">
                 <div className="relative w-36">
-                  <input
+                  <Input
                     ref={inputRef}
                     type="text"
                     inputMode="numeric"
@@ -183,9 +171,9 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
                     value={customInputValue}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors text-right font-medium pr-10"
+                    className="bg-background pr-12 text-right font-medium"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wider text-muted-foreground pointer-events-none">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                     Min
                   </span>
                 </div>
@@ -193,7 +181,7 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-[10px] font-semibold text-red-500 uppercase tracking-wide mt-1"
+                    className="text-xs font-medium text-destructive"
                   >
                     {validationError}
                   </motion.span>

@@ -45,25 +45,24 @@ export function KetikSystemTab({
   }, [durationMode, inputRef]);
 
   return (
-    <div className="mt-2 flex flex-col gap-8 pb-10">
-      {/* Model Selection */}
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1 border-b border-border pb-3">
-          <h3 className="font-heading text-base font-semibold tracking-tight text-foreground">
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Pilih Model AI
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Pilih model AI yang akan menggerakkan karakter pelanggan.
           </p>
         </div>
-        <div className="grid gap-3" role="group" aria-label="Model AI">
+        <div className="grid gap-2.5" role="group" aria-label="Model AI">
           {TEXT_MODELS.map((model) => {
             const isSelected = localSettings.selectedModel === model.id;
             return (
               <Button
                 key={model.id}
                 type="button"
-                variant={isSelected ? "secondary" : "outline"}
+                variant="outline"
                 aria-pressed={isSelected}
                 onClick={() =>
                   setLocalSettings((prev) => ({
@@ -71,46 +70,47 @@ export function KetikSystemTab({
                     selectedModel: model.id,
                   }))
                 }
-                className={`h-auto min-h-20 w-full justify-between gap-4 whitespace-normal rounded-xl p-4 text-left ${
+                className={`h-auto min-h-16 w-full justify-between gap-3 whitespace-normal rounded-xl p-4 text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
-                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
+                    ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                    : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <h4 className="truncate text-sm font-semibold text-foreground">
+                <span className="min-w-0 flex-1">
+                  <span className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                       {model.name}
-                    </h4>
-                    <Badge variant="outline" className="text-[11px]">
+                    </span>
+                    <Badge variant="outline" className="shrink-0 text-xs">
                       {model.provider === "gemini" ? "Gemini" : "OpenAI"}
                     </Badge>
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  </span>
+                  <span className="block text-xs leading-relaxed text-muted-foreground">
                     {model.description}
-                  </p>
-                </div>
-                <div
-                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${isSelected ? "border-primary" : "border-border"}`}
+                  </span>
+                </span>
+                <span
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    isSelected ? "border-primary" : "border-border"
+                  }`}
                   aria-hidden="true"
                 >
                   {isSelected && (
-                    <div className="size-2.5 rounded-full bg-primary" />
+                    <span className="size-2.5 rounded-full bg-primary" />
                   )}
-                </div>
+                </span>
               </Button>
             );
           })}
         </div>
       </section>
 
-      {/* Duration Configuration */}
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1 border-b border-border pb-3">
-          <h3 className="font-heading text-base font-semibold tracking-tight">
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Durasi Simulasi
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Tentukan batas waktu maksimal untuk setiap sesi simulasi.
           </p>
         </div>
@@ -123,41 +123,63 @@ export function KetikSystemTab({
               <Button
                 key={d}
                 type="button"
-                size="lg"
-                variant={isSelected ? "secondary" : "outline"}
+                variant="outline"
+                aria-pressed={isSelected}
                 onClick={() => handlePresetClick(d)}
-                className={`min-h-11 ${
+                className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
-                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
+                    ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                    : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                {d} Menit
+                <span className="text-sm font-medium text-foreground">
+                  {d} Menit
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    isSelected ? "border-primary" : "border-border"
+                  }`}
+                >
+                  {isSelected && (
+                    <span className="size-2.5 rounded-full bg-primary" />
+                  )}
+                </span>
               </Button>
             );
           })}
           <Button
             type="button"
-            size="lg"
-            variant={durationMode === "custom" ? "secondary" : "outline"}
+            variant="outline"
+            aria-pressed={durationMode === "custom"}
             onClick={handleCustomClick}
-            className={`min-h-11 ${
+            className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left ${
               durationMode === "custom"
-                ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
-                : "border-border bg-card/45 text-foreground hover:bg-muted/40"
+                ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                : "border-border bg-card hover:bg-muted/40"
             }`}
           >
-            Kustom
+            <span className="text-sm font-medium text-foreground">Kustom</span>
+            <span
+              aria-hidden="true"
+              className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                durationMode === "custom" ? "border-primary" : "border-border"
+              }`}
+            >
+              {durationMode === "custom" && (
+                <span className="size-2.5 rounded-full bg-primary" />
+              )}
+            </span>
           </Button>
         </div>
         {durationMode === "custom" && (
-          <Card>
-            <CardContent className="flex flex-col justify-between gap-4 bg-card/20 p-4 sm:flex-row sm:items-center">
+          <Card className="border border-border bg-card py-0 ring-0">
+            <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs font-semibold text-foreground">
                   Masukkan Durasi Kustom
                 </Label>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs leading-relaxed text-muted-foreground">
                   Tentukan durasi simulasi antara {MIN_DURATION} hingga{" "}
                   {MAX_DURATION} menit.
                 </p>
@@ -174,12 +196,12 @@ export function KetikSystemTab({
                     onBlur={handleDurationBlur}
                     className="bg-background pr-12 text-right"
                   />
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11px] font-medium text-muted-foreground">
+                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                     Menit
                   </span>
                 </div>
                 {durationValidationError && (
-                  <span className="mt-0.5 text-[11px] font-medium text-destructive">
+                  <span className="mt-0.5 text-xs font-medium text-destructive">
                     {durationValidationError}
                   </span>
                 )}
@@ -189,13 +211,12 @@ export function KetikSystemTab({
         )}
       </section>
 
-      {/* Response Pacing Mode */}
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1 border-b border-border pb-3">
-          <h3 className="font-heading text-base font-semibold tracking-tight">
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Tempo Balasan Konsumen
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Pengaturan ini memengaruhi kecepatan balasan konsumen ditampilkan.
           </p>
         </div>
@@ -206,7 +227,7 @@ export function KetikSystemTab({
               <Button
                 key={mode}
                 type="button"
-                variant={isSelected ? "secondary" : "outline"}
+                variant="outline"
                 aria-pressed={isSelected}
                 onClick={() =>
                   setLocalSettings((prev) => ({
@@ -214,16 +235,14 @@ export function KetikSystemTab({
                     responsePacingMode: mode,
                   }))
                 }
-                className={`h-auto min-h-24 w-full items-start justify-between gap-4 whitespace-normal rounded-xl p-4 text-left ${
+                className={`h-auto min-h-24 w-full items-center justify-between gap-3 whitespace-normal rounded-xl p-4 text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5 text-primary hover:bg-primary/10"
-                    : "border-border bg-card/45 text-foreground hover:bg-muted/40"
+                    ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                    : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                <div className="min-w-0 flex-1">
-                  <span
-                    className={`block text-sm font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}
-                  >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold tracking-tight text-foreground">
                     {mode === "realistic" ? "Realistis" : "Cepat Latihan"}
                   </span>
                   <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
@@ -231,15 +250,17 @@ export function KetikSystemTab({
                       ? "Variasi tempo seperti manusia asli."
                       : "Balasan lebih cepat, cocok untuk latihan."}
                   </span>
-                </div>
-                <div
-                  className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border ${isSelected ? "border-primary" : "border-border"}`}
+                </span>
+                <span
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    isSelected ? "border-primary" : "border-border"
+                  }`}
                   aria-hidden="true"
                 >
                   {isSelected && (
-                    <div className="size-2.5 rounded-full bg-primary" />
+                    <span className="size-2.5 rounded-full bg-primary" />
                   )}
-                </div>
+                </span>
               </Button>
             );
           })}

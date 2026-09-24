@@ -1,5 +1,5 @@
 import React from "react";
-import { Zap, AlertCircle, Clock, Check } from "lucide-react";
+import { AlertCircle, Check } from "lucide-react";
 import { TELEFUN_LIVE_MODELS } from "@trainers/types";
 import { DurationSelector } from "../DurationSelector";
 import { TelefunAppSettings as AppSettings } from "../../telefunSettings";
@@ -31,31 +31,21 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
   webRtcCapability: _webRtcCapability,
 }) => {
   return (
-    <div className="space-y-8 mt-4">
-      {/* AI Model Selection for Telefun */}
-      <section className="space-y-3">
-        <div className="relative group overflow-hidden rounded-xl border border-border bg-primary/5 p-4">
-          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary/5 transition-transform group-hover:scale-110">
-            <Zap className="w-24 h-24" />
-          </div>
-          <div className="relative z-10 max-w-2xl flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
-                Model AI untuk Telefun
-              </h3>
-              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                Pilih model AI yang akan digunakan untuk simulasi voice call.
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Model AI untuk Telefun
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Pilih model AI yang akan digunakan untuk simulasi voice call.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-2.5">
-          {TELEFUN_LIVE_MODELS.filter((model) => model.provider === "gemini").map(
-            (model) => {
+          {TELEFUN_LIVE_MODELS.filter(
+            (model) => model.provider === "gemini",
+          ).map((model) => {
             const isSelected = selectedTelefunModel === model.id;
             const isDisabled = false;
             return (
@@ -65,41 +55,37 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                 onClick={() => setSelectedTelefunModel(model.id)}
                 disabled={isDisabled}
                 aria-pressed={isSelected}
-                className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between gap-4 group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`flex h-auto min-h-16 w-full items-center justify-between gap-3 rounded-xl border p-4 text-left whitespace-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   isSelected
-                    ? "bg-card border-primary opacity-100"
+                    ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
                     : isDisabled
-                      ? "border-border/30 bg-card/20 opacity-50 cursor-not-allowed"
-                      : "bg-card/30 border-border/40 opacity-85 hover:opacity-100 hover:bg-card/50"
+                      ? "cursor-not-allowed border-border bg-muted/40 opacity-60"
+                      : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h4 className="text-sm font-bold text-foreground tracking-tight truncate">
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-semibold tracking-tight text-foreground">
                       {model.name}
-                    </h4>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-sm font-bold uppercase tracking-wider border ${
-                        "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                      }`}
-                    >
+                    </span>
+                    <span className="shrink-0 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                       Gemini Live
                     </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground font-medium">
+                  </span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">
                     {model.description}
-                  </p>
-
-                </div>
-                <div className="flex items-center shrink-0">
-                  {isSelected && !isDisabled ? (
-                    <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                    </div>
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    isSelected ? "border-primary" : "border-border"
+                  }`}
+                >
+                  {isSelected && (
+                    <span className="size-2.5 rounded-full bg-primary" />
                   )}
-                </div>
+                </span>
               </button>
             );
           })}
@@ -110,7 +96,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             role="status"
             className="flex items-start gap-2 text-sm font-medium text-amber-600 dark:text-amber-400"
           >
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
             <span>
               {localSettings.telefunModelWarningReason === "unknown-model"
                 ? "Model tersimpan tidak dikenali. Pilihan dikembalikan ke Gemini 3.8."
@@ -123,25 +109,14 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         ) : null}
       </section>
 
-      {/* Simulation Duration Selection */}
-      <section className="space-y-3">
-        <div className="relative group overflow-hidden rounded-xl border border-border bg-primary/5 p-4">
-          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary/5 transition-transform group-hover:scale-110">
-            <Clock className="w-24 h-24" />
-          </div>
-          <div className="relative z-10 max-w-2xl flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
-                Durasi Simulasi
-              </h3>
-              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                Tentukan batas waktu maksimal untuk setiap sesi simulasi.
-              </p>
-            </div>
-          </div>
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Durasi Simulasi
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Tentukan batas waktu maksimal untuk setiap sesi simulasi.
+          </p>
         </div>
 
         <DurationSelector
@@ -155,23 +130,15 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         />
       </section>
 
-      {/* Tempo Respons Konsumen */}
-      <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl">
-          <div className="relative z-10 max-w-2xl flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
-                Tempo Respons Konsumen
-              </h3>
-              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                Atur kecepatan bicara konsumen: Natural (tempo normal) atau
-                Cepat (respons lebih cepat).
-              </p>
-            </div>
-          </div>
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Tempo Respons Konsumen
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Atur kecepatan bicara konsumen: Natural (tempo normal) atau Cepat
+            (respons lebih cepat).
+          </p>
         </div>
 
         <div
@@ -207,26 +174,28 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                     responsePacingMode: option.value,
                   }))
                 }
-                className={`relative flex h-36 flex-col justify-between rounded-xl border p-5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`flex h-auto min-h-24 w-full items-center justify-between gap-3 rounded-xl border p-4 text-left whitespace-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   selected
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+                    ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+                    : "border-border bg-card hover:bg-muted/40"
                 }`}
               >
-                <span
-                  className={`text-sm font-bold tracking-tight ${selected ? "text-primary" : "text-foreground"}`}
-                >
-                  {option.label}
-                </span>
-                <span className="text-sm font-medium leading-relaxed text-muted-foreground">
-                  {option.description}
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="text-sm font-semibold tracking-tight text-foreground">
+                    {option.label}
+                  </span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">
+                    {option.description}
+                  </span>
                 </span>
                 <span
                   aria-hidden="true"
-                  className={`absolute right-5 top-5 flex h-4 w-4 items-center justify-center rounded-full border ${selected ? "border-primary" : "border-border"}`}
+                  className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
+                    selected ? "border-primary" : "border-border"
+                  }`}
                 >
                   {selected && (
-                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                    <span className="size-2.5 rounded-full bg-primary" />
                   )}
                 </span>
               </button>
@@ -235,26 +204,18 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         </div>
       </section>
 
-      {/* Conversation Challenges */}
-      <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl">
-          <div className="relative z-10 max-w-2xl flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Zap className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">
-                Tantangan Percakapan (Opsional)
-              </h3>
-              <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                Pilih maksimal 3 tantangan. AI akan menggunakannya hanya saat
-                sesuai konteks, sehingga kemunculannya tidak selalu dijamin.
-              </p>
-            </div>
-          </div>
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Tantangan Percakapan (Opsional)
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Pilih maksimal 3 tantangan. AI akan menggunakannya hanya saat sesuai
+            konteks, sehingga kemunculannya tidak selalu dijamin.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {SIMULATION_CHALLENGES.map((challenge) => {
             const currentTypes = localSettings.simulationChallengeTypes || [];
             const isSelected = currentTypes.includes(challenge.id);
@@ -277,29 +238,30 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                     };
                   });
                 }}
-                className={`flex items-center gap-2 px-3 py-2.5 min-h-11 rounded-lg border text-sm font-semibold transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   isSelected
-                    ? "border-primary bg-primary/5 text-primary"
+                    ? "border-primary/50 bg-primary/5 text-foreground"
                     : isDisabled
-                      ? "border-border/30 bg-card/25 text-muted-foreground/30 cursor-not-allowed opacity-50"
-                      : "border-border bg-card/40 text-muted-foreground hover:border-primary/30"
+                      ? "cursor-not-allowed border-border bg-muted/30 text-muted-foreground opacity-60"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted/40"
                 }`}
               >
                 <span
-                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                  aria-hidden="true"
+                  className={`flex size-4 shrink-0 items-center justify-center rounded border ${
                     isSelected
-                      ? "bg-primary border-primary text-primary-foreground"
+                      ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-transparent"
                   }`}
                 >
-                  {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  {isSelected && <Check className="size-3.5 stroke-[3]" />}
                 </span>
-                {challenge.label}
+                <span className="min-w-0">{challenge.label}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-2.5 text-sm text-muted-foreground font-medium">
+        <p className="text-sm text-muted-foreground">
           {(localSettings.simulationChallengeTypes || []).length}/3 tantangan
           dipilih
         </p>
