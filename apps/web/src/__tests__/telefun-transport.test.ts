@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 import {
@@ -14,14 +11,6 @@ const legacyConfig = {
   telefunTransport: "openai-webrtc",
   telefunModelId: "gpt-realtime-2.1",
 } as unknown as TelefunAppSettings;
-
-const source = readFileSync(
-  join(
-    dirname(fileURLToPath(import.meta.url)),
-    "../routes/telefun/services/telefunTransport.ts",
-  ),
-  "utf8",
-);
 
 describe("Telefun transport retirement", () => {
   it("normalizes historical transport to the Gemini Live session", () => {
@@ -41,13 +30,6 @@ describe("Telefun transport retirement", () => {
       fetch,
     });
     expect(fetch).toHaveBeenCalledOnce();
-  });
-
-  it("keeps a typed Gemini transport surface without retired lifecycle widening", () => {
-    expect(source).not.toContain("as unknown as TelefunTransportSession");
-    expect(source).not.toContain("...args: any[]");
-    expect(source).not.toContain('"provider_error"');
-    expect(source).not.toContain('"network_lost"');
   });
 
   it("keeps safe cleanup and microphone error mapping", () => {

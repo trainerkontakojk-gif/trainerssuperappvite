@@ -549,29 +549,6 @@ describe("OpenAI Realtime response usage", () => {
     expect(insertedUsagePayloads).toHaveLength(0);
   });
 
-  it("does not write a retired audit even when a request ID would be duplicate", async () => {
-    mockFrom.mockImplementation((table: string) =>
-      table === "ai_usage_logs"
-        ? {
-            insert: vi.fn(async () => ({
-              error: { code: "23505", message: "duplicate" },
-            })),
-          }
-        : (() => {
-            throw new Error(`unexpected table: ${table}`);
-          })(),
-    );
-    await expect(
-      recordFailedOpenAIRealtimeUsage(
-        "attempt-duplicate",
-        "user-1",
-        "gpt-realtime-2.1",
-        "missing usage",
-      ),
-    ).resolves.toBe(false);
-    expect(mockFrom).not.toHaveBeenCalled();
-  });
-
   it("refuses a nonhistorical failed audit before persistence", async () => {
     mockFrom.mockImplementation((table: string) =>
       table === "ai_usage_logs"

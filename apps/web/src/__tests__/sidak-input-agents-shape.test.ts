@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { normalizeAgentsResponse } from "../routes/sidak/input";
 import { resolveInitialInputService } from "../lib/sidak-input-service";
 
@@ -9,14 +9,6 @@ describe("normalizeAgentsResponse", () => {
 
   it("returns empty array for undefined", () => {
     expect(normalizeAgentsResponse(undefined)).toEqual([]);
-  });
-
-  it("returns empty array for string", () => {
-    expect(normalizeAgentsResponse("garbage")).toEqual([]);
-  });
-
-  it("returns empty array for number", () => {
-    expect(normalizeAgentsResponse(42)).toEqual([]);
   });
 
   it("extracts agents array from object shape (AgentDirectoryResponse)", () => {

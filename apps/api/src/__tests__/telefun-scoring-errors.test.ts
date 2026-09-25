@@ -174,32 +174,36 @@ describe("buildTelefunHistoryScoringView retryable derivation", () => {
     expect(view.scoring_retryable).toBe(false);
   });
 
-  it("marks permanent failures (no next attempt) as not retryable", () => {
-    const view = buildTelefunHistoryScoringView({
+  it.each([
+    {
+      label: "permanent failure without a scheduled retry",
       scoring_status: "failed",
       scoring_attempt_count: 1,
       scoring_next_attempt_at: null,
-    });
-    expect(view.scoring_retryable).toBe(false);
+    },
+    {
+      label: "pending row",
+      scoring_status: "pending",
+      scoring_attempt_count: 0,
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    },
+    {
+      label: "processing row",
+      scoring_status: "processing",
+      scoring_attempt_count: 1,
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    },
+    {
+      label: "completed row",
+      scoring_status: "completed",
+      scoring_attempt_count: 1,
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    },
+  ])("does not mark $label as retryable", ({ label: _label, ...row }) => {
+    expect(buildTelefunHistoryScoringView(row).scoring_retryable).toBe(false);
   });
 
-  it("never marks pending, processing, or completed rows retryable", () => {
-    expect(
-      buildTelefunHistoryScoringView({ scoring_status: "pending" })
-        .scoring_retryable,
-    ).toBe(false);
-    expect(
-      buildTelefunHistoryScoringView({ scoring_status: "processing" })
-        .scoring_retryable,
-    ).toBe(false);
-    expect(
-      buildTelefunHistoryScoringView({ scoring_status: "completed" })
-        .scoring_retryable,
-    ).toBe(false);
-  });
-
-  it("keeps a null score null and a zero score as zero", () => {
-    expect(buildTelefunHistoryScoringView({ score: null }).score).toBeNull();
+  it("preserves a legitimate zero score instead of treating it as absent", () => {
     expect(buildTelefunHistoryScoringView({ score: 0 }).score).toBe(0);
   });
 

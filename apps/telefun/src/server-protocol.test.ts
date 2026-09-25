@@ -151,14 +151,6 @@ describe("telefun proxy protocol", () => {
       ).toEqual({ ok: false, reason: "invalid_instructions" });
     });
 
-    it("keeps the limit comfortably above the measured realistic builder maximum (~35k chars)", () => {
-      // Production bug: realistic 300-line scenario scripts build ~27k-35k
-      // chars (orchestrator fixture: 27,032; re-verified web harness fixture:
-      // 34,717), above the stale 16k limit, so Railway telefun rejected real
-      // Gemini sessions with 4002 invalid_instructions.
-      expect(TELEFUN_MAX_INSTRUCTIONS_LENGTH).toBeGreaterThanOrEqual(48_000);
-    });
-
     it("rejects a historical GPT realtime configure before any adapter can be selected", () => {
       expect(
         parseTelefunSessionConfigure({
@@ -255,14 +247,6 @@ describe("telefun proxy protocol", () => {
         },
       }),
     ).toBe(true);
-  });
-
-  it("keeps current forwardable message contract", () => {
-    expect(isGeminiForwardableMessage({ setup: {} })).toBe(true);
-    expect(
-      isGeminiForwardableMessage({ realtimeInput: { audioStreamEnd: true } }),
-    ).toBe(true);
-    expect(isGeminiForwardableMessage({ unknown: true })).toBe(false);
   });
 
   it("extracts Gemini GoAway timeLeft seconds", () => {

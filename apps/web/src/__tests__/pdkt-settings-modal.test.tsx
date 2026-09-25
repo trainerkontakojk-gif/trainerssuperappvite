@@ -325,43 +325,6 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     );
   });
 
-  it("saves a manually authored email without invoking the AI generator", async () => {
-    const user = userEvent.setup();
-    const { onSave } = renderModal();
-
-    await user.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: /email buatan sendiri/i }),
-    );
-    await user.selectOptions(screen.getByLabelText(/Kategori/), "Kepatuhan");
-    await user.type(
-      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
-      "Email Manual",
-    );
-    await user.type(
-      screen.getByRole("textbox", { name: /Isi email buatan sendiri/ }),
-      "Saya ingin menyampaikan kendala transaksi ini.",
-    );
-    expect(screen.queryByRole("button", { name: "Generate" })).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
-    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
-
-    const savedScenario = onSave.mock.calls[0][0].scenarios.at(-1);
-    expect(savedScenario).toMatchObject({
-      title: "Email Manual",
-      description: "Saya ingin menyampaikan kendala transaksi ini.",
-      alwaysUseSampleEmail: true,
-      sampleEmailTemplate: {
-        body: "Saya ingin menyampaikan kendala transaksi ini.",
-      },
-    });
-  });
-
   it("renders the exact three-stage contract and disables invalid progress", async () => {
     const user = userEvent.setup();
     renderModal();
@@ -805,6 +768,8 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
     await user.click(screen.getByRole("button", { name: /Simpan Perubahan/ }));
     expect(onSave.mock.calls[0][0].scenarios.at(-1)).toMatchObject({
+      description: "Email manual yang diperbarui.",
+      alwaysUseSampleEmail: true,
       sampleEmailTemplate: {
         body: "Email manual yang diperbarui.",
       },
@@ -905,24 +870,6 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     expect(onSave.mock.calls.at(-1)![0].writingStyleMode).toBe("realistic");
   });
 
-  it("keeps invalid recipient validation visible and focused on final save", async () => {
-    const user = userEvent.setup();
-    renderModal();
-    fireEvent.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
-    );
-    await reachEmailStage(user);
-    fireEvent.click(screen.getByRole("button", { name: /tambah email/i }));
-    fireEvent.change(screen.getByPlaceholderText("email.tambahan@domain.com"), {
-      target: { value: "bad" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Buat Skenario" }));
-    expect(screen.getByText(/format email tidak valid/i)).toBeDefined();
-    expect(
-      screen.getByPlaceholderText("email.tambahan@domain.com"),
-    ).toHaveAttribute("aria-invalid", "true");
-  });
-
   it("focuses the first invalid recipient row on final save", async () => {
     const user = userEvent.setup();
     renderModal();
@@ -944,11 +891,11 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
 
     expect(screen.getByText(/format email tidak valid/i)).toBeDefined();
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByRole("textbox", { name: "Email tambahan 2" }),
-      ),
-    );
+    const invalidRecipient = screen.getByRole("textbox", {
+      name: "Email tambahan 2",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(invalidRecipient));
+    expect(invalidRecipient).toHaveAttribute("aria-invalid", "true");
     expect(
       screen.getByRole("textbox", { name: "Email tambahan 1" }),
     ).not.toHaveAttribute("aria-invalid", "true");

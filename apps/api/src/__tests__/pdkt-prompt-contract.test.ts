@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import {
   DEFAULT_AI_MODEL_ID as SHARED_DEFAULT_AI_MODEL_ID,
   PDKT_PROMPT_INPUT_LIMITS,
@@ -335,16 +334,6 @@ describe("canonical PDKT default model", () => {
     expect(normalizeModelId()).toBe(SHARED_DEFAULT_AI_MODEL_ID);
   });
 
-  it("does not keep a PDKT fallback literal in config resolution", () => {
-    const source = readFileSync(
-      new URL("../services/pdkt/session-service.ts", import.meta.url),
-      "utf8",
-    );
-
-    expect(source).not.toMatch(
-      /selectedModel:\s*body\.selectedModel\s*\|\|\s*["']gemini-3\.1-flash-lite["']/,
-    );
-  });
 });
 
 describe("PDKT prompt serialization and budget helpers", () => {

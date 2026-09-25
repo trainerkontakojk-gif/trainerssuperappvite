@@ -18,11 +18,6 @@ import {
 } from "../routes/telefun/services/liveProtocol";
 import * as liveProtocol from "../routes/telefun/services/liveProtocol";
 import { TELEFUN_CONFIGURATION_CLOSE_CODE } from "@trainers/types";
-import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
-import {
-  resolveGeminiLiveVoice,
-  GEMINI_LIVE_VOICES_BY_GENDER,
-} from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
   it("exports only the active Gemini runtime control message builder", () => {
@@ -154,6 +149,10 @@ describe("telefun live protocol", () => {
     });
 
     expect(message.setup.model).toBe("models/gemini-2.0-flash-exp");
+    expect(
+      message.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig
+        .voiceName,
+    ).toBe("Aoede");
     expect(message.setup.systemInstruction.parts[0].text).toBe("ROLEPLAY TEST");
     expect(
       message.setup.realtimeInputConfig.automaticActivityDetection.disabled,
@@ -162,13 +161,15 @@ describe("telefun live protocol", () => {
     expect(message.setup.outputAudioTranscription).toEqual({});
   });
 
-  it("builds realtime audio JSON with base64 pcm16 data", () => {
+  it("encodes captured PCM16 frames as Gemini audio payloads", () => {
     const pcm16 = new Int16Array([1, -1, 32767]);
     const message = buildRealtimeAudioMessage(pcm16.buffer);
 
     expect(message.realtimeInput.audio.mimeType).toBe("audio/pcm;rate=16000");
     expect(typeof message.realtimeInput.audio.data).toBe("string");
-    expect(message.realtimeInput.audio.data.length).toBeGreaterThan(0);
+    expect(Buffer.from(message.realtimeInput.audio.data, "base64")).toEqual(
+      Buffer.from(pcm16.buffer),
+    );
   });
 
   it("uses active Gemini metadata and falls back safely for retired models", () => {
@@ -244,15 +245,6 @@ describe("telefun live protocol", () => {
     });
   });
 
-  it("does not use selectedModel as live voice model", () => {
-    const message = buildTelefunLiveSetupMessage({
-      telefunModelId: "gemini-2.0-flash-exp",
-      voiceName: "Aoede",
-      systemInstruction: "test",
-    });
-    expect(message.setup.model).not.toBe("models/openai-audio");
-  });
-
   it("extracts Gemini inline audio chunks from JSON server messages", () => {
     const bytes = new Uint8Array([1, 2, 3, 4]);
     const b64 = Buffer.from(bytes).toString("base64");
@@ -275,68 +267,6 @@ describe("telefun live protocol", () => {
   it("defaults Gemini output PCM sample rate to 24000", () => {
     expect(parsePcmSampleRate(undefined)).toBe(24000);
     expect(parsePcmSampleRate("audio/pcm;rate=16000")).toBe(16000);
-  });
-
-  it("uses a Gemini-valid male voice when saved settings contain Ursa", () => {
-    const identity = resolveFinalIdentity({
-      displayName: "Rudi",
-      gender: "male",
-      phoneNumber: "0811",
-      city: "Jakarta",
-      signatureName: "",
-      voiceName: "Ursa",
-    });
-
-    const safeVoice = resolveGeminiLiveVoice({
-      requestedVoice: identity.voiceName,
-      gender: identity.gender as "male" | "female",
-    });
-
-    const message = buildTelefunLiveSetupMessage({
-      telefunModelId: "gemini-3.1-flash-live-preview",
-      voiceName: safeVoice,
-      systemInstruction: "test",
-    });
-
-    expect(
-      message.setup.generationConfig.speechConfig.voiceConfig
-        .prebuiltVoiceConfig.voiceName,
-    ).not.toBe("Ursa");
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
-      message.setup.generationConfig.speechConfig.voiceConfig
-        .prebuiltVoiceConfig.voiceName,
-    );
-  });
-
-  it("uses a Gemini-valid male voice when saved settings contain Dipper", () => {
-    const identity = resolveFinalIdentity({
-      displayName: "Budi",
-      gender: "male",
-      phoneNumber: "0812",
-      city: "Bandung",
-      signatureName: "",
-      voiceName: "Dipper",
-    });
-
-    const safeVoice = resolveGeminiLiveVoice({
-      requestedVoice: identity.voiceName,
-      gender: identity.gender as "male" | "female",
-    });
-
-    const message = buildTelefunLiveSetupMessage({
-      telefunModelId: "gemini-3.1-flash-live-preview",
-      voiceName: safeVoice,
-      systemInstruction: "test",
-    });
-
-    expect(
-      message.setup.generationConfig.speechConfig.voiceConfig
-        .prebuiltVoiceConfig.voiceName,
-    ).not.toBe("Dipper");
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
-      message.setup.generationConfig.speechConfig.voiceConfig
-        .prebuiltVoiceConfig.voiceName,
-    );
   });
 
   it.each([

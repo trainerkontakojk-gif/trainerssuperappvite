@@ -683,6 +683,17 @@ describe("generateHTML", () => {
         ?.getAttribute("aria-pressed"),
     ).toBe("true");
     expect(otherNodes.every((node) => !node.hasAttribute("hidden"))).toBe(true);
+
+    const totalButton = document.querySelector<HTMLButtonElement>(
+      '[data-trend-filter="total"]',
+    );
+    expect(totalButton).not.toBeNull();
+    totalButton?.click();
+
+    expect(totalButton?.getAttribute("aria-pressed")).toBe("true");
+    expect(totalNodes.every((node) => !node.hasAttribute("hidden"))).toBe(true);
+    expect(selectedNodes.every((node) => node.hasAttribute("hidden"))).toBe(true);
+    expect(otherNodes.every((node) => node.hasAttribute("hidden"))).toBe(true);
   });
 
   it("uses the live agent-detail hierarchy for trend and grouped findings", () => {
@@ -1336,23 +1347,6 @@ describe("generateHTML", () => {
     expect(html).toContain("% vs layanan sama");
     expect(html).not.toContain("agent service sama");
     expect(html).not.toContain("% vs service sama");
-  });
-
-  it("keeps interactive trend filters aligned with live series semantics", () => {
-    const html = generateHTML(
-      sampleData(),
-      sampleSummaries,
-      sampleTemuan,
-      sampleTickets,
-      sampleRootCauses,
-      2026,
-      "call",
-      "interactive",
-    );
-    expect(html).toMatch(/filter === 'total'\s*\?\s*isTotal\s*:/);
-    expect(html).not.toContain(
-      ": isTotal || node.getAttribute('data-series-key') === filter",
-    );
   });
 
   it("renders the selected dossier as a non-interactive snapshot", () => {

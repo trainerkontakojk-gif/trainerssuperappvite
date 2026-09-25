@@ -412,38 +412,30 @@ describe("buildCommunicationProfileFromAssessment", () => {
     expect(m.status).toBe("good");
   });
 
-  it("fillers 0 count produces radar value 0 and status good", () => {
-    const assessment = makeLegacyAssessment({
-      fillerWords: { score: 10, count: 0, examples: [], verdict: "Sempurna", feedback: "" },
-    });
-    const profile = buildCommunicationProfileFromAssessment(assessment);
-    const fl = profile!.metrics.find((x) => x.key === "fillers")!;
-    expect(fl.rawValue).toBe(0);
-    expect(fl.displayScore).toBe(0);
-    expect(fl.status).toBe("good");
-  });
+  it.each([
+    { count: 0, displayScore: 0, status: "good" },
+    { count: 3, displayScore: 20, status: "good" },
+    { count: 20, displayScore: 100, status: "poor" },
+  ] as const)(
+    "maps $count fillers to radar burden $displayScore and status $status",
+    ({ count, displayScore, status }) => {
+      const assessment = makeLegacyAssessment({
+        fillerWords: {
+          score: 2,
+          count,
+          examples: count ? ["eh", "um", "anu"] : [],
+          verdict: "Baik",
+          feedback: "",
+        },
+      });
+      const profile = buildCommunicationProfileFromAssessment(assessment);
+      const fillers = profile!.metrics.find((metric) => metric.key === "fillers")!;
 
-  it("fillers exactly at target (3) aligns radar with green guide 20", () => {
-    const assessment = makeLegacyAssessment({
-      fillerWords: { score: 8, count: 3, examples: ["eh"], verdict: "Baik", feedback: "" },
-    });
-    const profile = buildCommunicationProfileFromAssessment(assessment);
-    const fl = profile!.metrics.find((x) => x.key === "fillers")!;
-    expect(fl.rawValue).toBe(3);
-    expect(fl.displayScore).toBe(20);
-    expect(fl.status).toBe("good");
-  });
-
-  it("fillers 15+ caps displayScore at 100 and status poor", () => {
-    const assessment = makeLegacyAssessment({
-      fillerWords: { score: 2, count: 20, examples: ["eh", "um", "anu"], verdict: "Buruk", feedback: "" },
-    });
-    const profile = buildCommunicationProfileFromAssessment(assessment);
-    const fl = profile!.metrics.find((x) => x.key === "fillers")!;
-    expect(fl.rawValue).toBe(20);
-    expect(fl.displayScore).toBe(100);
-    expect(fl.status).toBe("poor");
-  });
+      expect(fillers.rawValue).toBe(count);
+      expect(fillers.displayScore).toBe(displayScore);
+      expect(fillers.status).toBe(status);
+    },
+  );
 });
 
 describe("enrichAssessmentWithCommunicationProfile", () => {

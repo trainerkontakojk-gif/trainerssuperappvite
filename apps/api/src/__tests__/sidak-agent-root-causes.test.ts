@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it } from "vitest";
 import { deriveAgentRootCauses } from "../services/sidak/agent-root-causes";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
 
@@ -545,8 +545,7 @@ describe("deriveAgentRootCauses", () => {
     });
   });
 
-  it("preserves existing cluster matching for non-APPK rows", () => {
-    // Row without APPK should still match existing cluster
+  it("maps wrong product selection without an APPK mention to salah_jawaban", () => {
     const result = deriveAgentRootCauses({
       indicators,
       periodById,

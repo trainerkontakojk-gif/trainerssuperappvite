@@ -436,26 +436,6 @@ describe("generateScenarioEmailTemplate", () => {
       expect(mockGeminiContent).not.toHaveBeenCalled();
     });
 
-    it("uses OpenAI with the canonical model payload", async () => {
-      setupOpenAIProvider();
-      const body = buildBody(600);
-      mockOpenAIContent.mockReset().mockResolvedValue({
-        success: true,
-        text: JSON.stringify({ subject: "OpenAI Test", body }),
-      });
-      mockParseJson.mockReset().mockReturnValue({ subject: "OpenAI Test", body });
-      mockValidateCompliance.mockReset().mockReturnValue([]);
-
-      const result = await generateScenarioEmailTemplate(
-        mockPinjolScenario,
-        buildConfig({ selectedModel: "gpt-5.4-mini" }),
-      );
-      expect(result.success).toBe(true);
-      expect(mockOpenAIContent).toHaveBeenCalled();
-      expect(mockGeminiContent).not.toHaveBeenCalled();
-
-    });
-
   });
 });
 

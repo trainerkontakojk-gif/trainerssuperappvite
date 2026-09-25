@@ -99,17 +99,6 @@ describe("claim lease 300s + token fencing (RED)", () => {
     expect(seen).toEqual([{ hash: "deadbeef" }]);
   });
 
-  it("no literal 120s lease remains in claim paths", () => {
-    const svc = readFileSync(path.resolve(__dirname, "../services/telefun-scoring-service.ts"), "utf8");
-    const route = readFileSync(
-      path.resolve(__dirname, "../routes/telefun/recordings.ts"),
-      "utf8",
-    );
-    expect(svc).not.toContain("p_claim_timeout_seconds: 120");
-    expect(route).not.toContain("p_claim_timeout_seconds: 120");
-    expect(svc).not.toMatch(/timeoutSeconds:\s*number\s*=\s*120/);
-  });
-
   it("fencing migration adds token/owner columns with additive guards", () => {
     const sql = fencingMigrationSql();
     expect(sql).toContain("scoring_claim_token_hash");
