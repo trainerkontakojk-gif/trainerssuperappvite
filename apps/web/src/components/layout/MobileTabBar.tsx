@@ -1,5 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, MessageSquare, Phone, BarChart3, Menu } from "lucide-react";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Phone,
+  BarChart3,
+  Menu,
+} from "lucide-react";
 import { isRoleAllowed } from "../../lib/app-config";
 
 const PRIMARY_TABS = [
@@ -37,7 +43,7 @@ export function MobileTabBar({
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-50 border-t bg-bg pb-[env(safe-area-inset-bottom,0px)] lg:hidden shadow-lg"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-bg pb-[env(safe-area-inset-bottom,0px)] lg:hidden shadow-lg"
       style={{ borderColor: "var(--border)" }}
     >
       <div className="flex h-[44px] items-center justify-around">
@@ -75,7 +81,9 @@ export function MobileTabBar({
           style={{ color: "var(--fg3)" }}
         >
           <Menu className="h-[18px] w-[18px]" />
-          <span className="text-[10px] font-semibold tracking-wider">Lainnya</span>
+          <span className="text-[10px] font-semibold tracking-wider">
+            Lainnya
+          </span>
         </button>
       </div>
     </nav>

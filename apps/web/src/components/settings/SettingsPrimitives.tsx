@@ -1,10 +1,10 @@
 import React from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "cn";
-import { Button } from "../../../../components/ui/button";
-import { Input } from "../../../../components/ui/input";
-import { Label } from "../../../../components/ui/label";
-import { Textarea } from "../../../../components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface SettingsFieldProps {
   label: string;
@@ -32,9 +32,16 @@ export function SettingsField({
       <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
         {label}{" "}
         {required ? (
-          <span className="font-normal text-foreground/70">Wajib</span>
+          <span aria-hidden="true" className="font-normal text-foreground/70">
+            Wajib
+          </span>
         ) : (
-          <span className="font-normal text-muted-foreground/70">Opsional</span>
+          <span
+            aria-hidden="true"
+            className="font-normal text-muted-foreground/70"
+          >
+            Opsional
+          </span>
         )}
       </Label>
       {children}
@@ -171,7 +178,7 @@ export function SettingsCardOption({
         </Button>
       </div>
       {actions && (
-        <div className="flex items-center justify-end gap-1.5 border-t border-border pt-3">
+        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border pt-3">
           {actions}
         </div>
       )}

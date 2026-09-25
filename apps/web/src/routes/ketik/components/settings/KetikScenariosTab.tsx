@@ -17,9 +17,13 @@ import {
   CardHeader,
   CardTitle,
 } from "../../../../components/ui/card";
-import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
-import { Textarea } from "../../../../components/ui/textarea";
+import {
+  SettingsField,
+  SettingsInput,
+  SettingsSelect,
+  SettingsTextarea,
+} from "../../../../components/settings/SettingsPrimitives";
 import {
   KetikAppSettings,
   KetikScenario,
@@ -231,7 +235,7 @@ export function KetikScenariosTab({
 
   if (scenarioForm.isOpen) {
     return (
-      <div className="flex flex-col gap-6 pb-10">
+      <div className="flex flex-col gap-6">
         <div className="border-b border-border pb-4">
           <Button
             type="button"
@@ -253,13 +257,14 @@ export function KetikScenariosTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-6 p-6">
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Kategori
-              </Label>
+            <SettingsField
+              label="Kategori"
+              id="ketik-scenario-category"
+              required
+            >
               {!isNewCategoryInput ? (
-                <select
-                  className="h-10 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                <SettingsSelect
+                  id="ketik-scenario-category"
                   value={scenarioForm.draft.category || ""}
                   onChange={(event) => {
                     if (event.target.value === "NEW") {
@@ -279,12 +284,13 @@ export function KetikScenariosTab({
                     </option>
                   ))}
                   <option value="NEW">+ Tambah Kategori Lainnya</option>
-                </select>
+                </SettingsSelect>
               ) : (
-                <div className="flex gap-2">
-                  <Input
+                <div className="flex flex-wrap gap-2">
+                  <SettingsInput
+                    id="ketik-scenario-category"
                     type="text"
-                    className="flex-1 bg-background"
+                    className="min-w-48 flex-1"
                     placeholder="Kategori Baru"
                     value={newScenarioCategory}
                     onChange={(e) => {
@@ -302,31 +308,30 @@ export function KetikScenariosTab({
                   </Button>
                 </div>
               )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Judul Masalah
-              </Label>
-              <Input
+            </SettingsField>
+            <SettingsField
+              label="Judul Masalah"
+              id="ketik-scenario-title"
+              required
+            >
+              <SettingsInput
+                id="ketik-scenario-title"
                 type="text"
-                className="bg-background"
                 placeholder="Contoh: Gagal Transfer"
                 value={scenarioForm.draft.title || ""}
                 onChange={(e) =>
                   scenarioForm.setDraft({ title: e.target.value })
                 }
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="ketik-scenario-description"
-                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              >
-                Deskripsi Masalah
-              </Label>
-              <Textarea
+            </SettingsField>
+            <SettingsField
+              label="Deskripsi Masalah"
+              id="ketik-scenario-description"
+              required
+            >
+              <SettingsTextarea
                 id="ketik-scenario-description"
-                className="min-h-20 resize-none bg-background"
+                className="min-h-20 resize-none"
                 rows={3}
                 value={scenarioDescription}
                 maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
@@ -342,12 +347,9 @@ export function KetikScenariosTab({
                 {scenarioDescription.length.toLocaleString("id-ID")} /{" "}
                 {formattedScenarioDescriptionLimit}
               </p>
-            </div>
-            <div className="flex flex-col gap-2">
+            </SettingsField>
+            <SettingsField label="Skrip Percakapan" id="ketik-scenario-script">
               <div className="flex items-center justify-between gap-4">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Skrip Percakapan
-                </Label>
                 <Button
                   type="button"
                   variant={isScenarioScriptEnabled ? "secondary" : "outline"}
@@ -367,12 +369,9 @@ export function KetikScenariosTab({
                   {isScenarioScriptEnabled ? "Ikuti Skrip" : "Sangat Kreatif"}
                 </Button>
               </div>
-              <Textarea
-                className={`w-full rounded-md border p-3 text-sm outline-none resize-none transition-colors ${
-                  isScenarioScriptEnabled
-                    ? "border-border bg-background text-foreground focus:border-foreground"
-                    : "border-border/40 bg-muted/30 text-muted-foreground cursor-not-allowed"
-                }`}
+              <SettingsTextarea
+                id="ketik-scenario-script"
+                className="min-h-40 resize-y disabled:cursor-not-allowed"
                 rows={8}
                 value={scenarioForm.draft.script || ""}
                 onChange={(e) =>
@@ -390,9 +389,9 @@ export function KetikScenariosTab({
                 akan dibiarkan lebih bebas dan kreatif mengikuti konteks
                 skenario.
               </p>
-            </div>
+            </SettingsField>
             <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <Label className="text-xs font-medium text-muted-foreground">
                 Lampiran Gambar
               </Label>
               <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-muted/30">
@@ -449,14 +448,14 @@ export function KetikScenariosTab({
                             #{idx}
                           </Badge>
                         </div>
-                        <Input
+                        <SettingsInput
                           type="text"
                           value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
                           onChange={(e) => handleAltChange(idx, e.target.value)}
                           placeholder="Keterangan gambar..."
                           maxLength={KETIK_PROMPT_LIMITS.imageAlt}
                           aria-label={`Keterangan gambar ${idx + 1}`}
-                          className="h-8 bg-background px-2 text-xs"
+                          className="h-8 min-h-8 bg-background px-2 text-xs"
                         />
                       </div>
                     ))}
@@ -486,13 +485,13 @@ export function KetikScenariosTab({
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-6 pb-10">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-1">
-          <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Daftar Skenario
           </h3>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
+          <p className="text-xs text-muted-foreground">
             {activeCount} / {totalScenarios} AKTIF
           </p>
         </div>
@@ -540,7 +539,11 @@ export function KetikScenariosTab({
                   onClick={() => handleToggleScenario(scenario.id)}
                   className="size-11 shrink-0 rounded-md"
                 >
-                  <Check data-icon="inline" />
+                  {scenario.isActive ? (
+                    <Check data-icon="inline" />
+                  ) : (
+                    <span aria-hidden="true" className="size-4" />
+                  )}
                 </Button>
               </div>
               <div className="min-w-0 flex-1">

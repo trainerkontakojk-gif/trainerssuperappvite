@@ -66,6 +66,29 @@ describe("Telefun SettingsModal accessibility", () => {
     draftState.isSaving = false;
   });
 
+  it("exposes settings categories through the shared tab navigation", () => {
+    render(
+      <SettingsModal
+        isOpen
+        onClose={draftState.handleClose}
+        settings={DEFAULT_TELEFUN_SETTINGS}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const tabList = screen.getByRole("tablist");
+    expect(tabList.parentElement).toHaveAttribute("data-slot", "tabs");
+    expect(tabList.nextElementSibling).toHaveClass("min-h-0", "min-w-0");
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      "Masalah",
+      "Karakter",
+      "Identitas",
+      "Sistem",
+    ]);
+    expect(tabs[0]).toHaveClass("flex-none", "shrink-0");
+  });
+
   it("provides dialog semantics, Escape close, and focus restoration", async () => {
     const trigger = document.createElement("button");
     document.body.append(trigger);

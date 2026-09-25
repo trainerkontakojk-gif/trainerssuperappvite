@@ -6,7 +6,7 @@ import {
   SettingsInput,
   SettingsSelect,
   SettingsTextarea,
-} from "../SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 import { ScenarioTemplateField } from "./ScenarioTemplateField";
 import type { ScenarioCreationMode } from "./ScenarioCreationModePicker";
 

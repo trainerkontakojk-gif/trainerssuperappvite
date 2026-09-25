@@ -17,7 +17,7 @@ import {
   SettingsInput,
   SettingsSelect,
   SettingsTextarea,
-} from "./SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 import { ScenarioList } from "./scenarios/ScenarioList";
 import { ScenarioForm } from "./scenarios/ScenarioForm";
 import { ScenarioRecipientsField } from "./scenarios/ScenarioRecipientsField";
@@ -565,7 +565,7 @@ export function PdktScenariosTab(props: Props) {
               </SettingsField>
             </section>
             <section className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="min-w-0 md:col-span-2">
+              <div className="min-w-0 pb-2 md:col-span-2">
                 <h4 className="text-sm font-medium text-foreground">
                   Karakter dan Gaya Komunikasi
                 </h4>

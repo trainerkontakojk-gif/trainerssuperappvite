@@ -11,7 +11,7 @@ import {
   SettingsSelect,
   SettingsTextarea,
   SettingsCardOption,
-} from "./SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 
 interface PdktConsumersTabProps {
   consumerTypes: PdktConsumerType[];

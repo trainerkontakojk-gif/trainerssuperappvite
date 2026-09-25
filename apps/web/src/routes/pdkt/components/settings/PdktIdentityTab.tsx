@@ -2,7 +2,7 @@ import {
   SettingsField,
   SettingsInput,
   SettingsSelect,
-} from "./SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 
 type ConsumerNameMentionPattern =
   | "random"

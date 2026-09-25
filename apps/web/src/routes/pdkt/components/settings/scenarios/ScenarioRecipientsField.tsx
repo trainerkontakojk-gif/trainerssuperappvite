@@ -10,7 +10,7 @@ import {
   SettingsField,
   SettingsInput,
   SettingsSelect,
-} from "../SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 
 const SCENARIO_FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
 

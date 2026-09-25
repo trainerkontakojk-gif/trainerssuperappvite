@@ -14,9 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "../../../../components/ui/card";
-import { Input } from "../../../../components/ui/input";
-import { Label } from "../../../../components/ui/label";
-import { Textarea } from "../../../../components/ui/textarea";
+import {
+  SettingsField,
+  SettingsInput,
+  SettingsTextarea,
+} from "../../../../components/settings/SettingsPrimitives";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { normalizeKetikQuickTemplateDraft } from "./ketikDraftNormalizers";
@@ -147,7 +149,7 @@ export function KetikTemplateTab({
 
   if (templateForm.isOpen) {
     return (
-      <div className="flex flex-col gap-6 pb-10">
+      <div className="flex flex-col gap-6">
         <div className="border-b border-border pb-4">
           <Button
             type="button"
@@ -173,15 +175,16 @@ export function KetikTemplateTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Shortcut Keyword (Tanpa Spasi)
-              </Label>
+            <SettingsField
+              label="Shortcut Keyword (Tanpa Spasi)"
+              id="ketik-template-keyword"
+            >
               <div className="relative">
                 <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
                   /
                 </span>
-                <Input
+                <SettingsInput
+                  id="ketik-template-keyword"
                   className="bg-background pl-7"
                   value={templateForm.draft.keyword || ""}
                   onChange={(e) =>
@@ -194,13 +197,11 @@ export function KetikTemplateTab({
                   placeholder="contoh: salam"
                 />
               </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Isi Template
-              </Label>
-              <Textarea
-                className="min-h-32 resize-none bg-background leading-relaxed"
+            </SettingsField>
+            <SettingsField label="Isi Template" id="ketik-template-content">
+              <SettingsTextarea
+                id="ketik-template-content"
+                className="min-h-32 bg-background leading-relaxed"
                 rows={5}
                 value={templateForm.draft.content || ""}
                 onChange={(e) =>
@@ -208,7 +209,7 @@ export function KetikTemplateTab({
                 }
                 placeholder="Masukkan isi pesan yang akan muncul saat shortcut dipanggil..."
               />
-            </div>
+            </SettingsField>
           </CardContent>
           <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-6 py-4">
             <Button
@@ -286,9 +287,9 @@ export function KetikTemplateTab({
   };
 
   return (
-    <div className="mt-2 flex flex-col gap-6 pb-10">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2 border-b border-border pb-4">
-        <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground">
+        <h3 className="text-sm font-semibold tracking-tight text-foreground">
           Template Cepat
         </h3>
         <p className="text-sm leading-relaxed text-muted-foreground">

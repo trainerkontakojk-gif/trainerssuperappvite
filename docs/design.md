@@ -110,7 +110,9 @@ Kami menggunakan dua font keluarga dari Google Fonts: **Outfit** dan **Inter**.
 - **Cards** jangan jadi default — pakai hanya kalau memang affordance terbaik. **Nested cards always wrong.**
 - **Vary spacing untuk rhythm** — jangan semua seragam.
 - **Z-index scale** semantic: dropdown → sticky → modal-backdrop → modal → toast → tooltip. Jangan `999`/`9999`.
-- **Tab container:** `flex gap-6 shrink-0` — jangan `gap-4` (bikin text overlap pas tab panjang).
+- **Tab list:** Jaga trigger tetap selebar labelnya (`shrink-0`). Pada layar sempit, izinkan
+  strip horizontal untuk di-scroll; pada layout lebar, tab boleh menjadi navigasi vertikal.
+  Jangan mengecilkan label sampai bertumpuk atau terpotong.
 
 ### Spacing Scale
 
@@ -141,6 +143,24 @@ Pakai Tailwind spacing scale konsisten: `4` (16px), `6` (24px), `8` (32px) sebag
 - **Border Radius:** `12px` hingga `24px` (untuk *container* besar). **Jangan** `32px+` pada cards/sections/inputs.
 - **Shadow:** Hindari *box-shadow*. Andalkan *border* untuk memisahkan *card* dengan *background*.
 - **Modal:** title + close button di header, backdrop click & Escape nutup modal, focus trap, konten panjang pakai `overflow-y-auto`.
+
+### Dialog Pengaturan Simulasi
+
+Dialog pengaturan KETIK, PDKT, dan Telefun mengikuti satu pola visual dan responsif:
+
+- Gunakan hierarki header, navigasi kategori, area konten, dan footer aksi yang konsisten.
+  Field dan label bersama memakai primitive dari
+  `apps/web/src/components/settings/SettingsPrimitives.tsx`; panel tiap modul tetap menangani
+  data dan kontrol khususnya.
+- Header dan footer tetap terlihat saat konten panjang di-scroll. Batasi tinggi dialog ke
+  viewport, beri area konten `min-h-0 min-w-0`, lalu scroll konten di area itu agar tombol
+  Simpan tidak terdorong keluar layar.
+- Di mobile, daftar kategori boleh scroll horizontal dan setiap trigger mempertahankan lebar
+  labelnya. Di layar lebar, daftar kategori dapat disusun vertikal.
+- Pertahankan jarak `gap-4` (16px) antar-field. Pada bagian yang memiliki pengantar, beri jarak
+  total sekitar 24px sebelum field pertama agar heading dan deskripsi tidak menempel pada form.
+- Pastikan backdrop dan dialog berada di atas navigasi bawah yang fixed; navigasi bawah tidak
+  boleh menutupi isi dialog atau footer.
 
 ### Entity Directory Cards (SIDAK)
 

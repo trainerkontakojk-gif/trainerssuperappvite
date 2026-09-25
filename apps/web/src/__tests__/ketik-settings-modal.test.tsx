@@ -126,6 +126,19 @@ describe(
     );
   });
 
+  it("exposes each settings category through the shared tab navigation", () => {
+    render(<SettingsModal {...defaultProps} />);
+
+    expect(screen.getByRole("tablist")).toBeDefined();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Masalah",
+      "Karakter",
+      "Identitas",
+      "Template",
+      "Sistem",
+    ]);
+  });
+
   it("edits simulation duration and calls onSave with updated value", async () => {
     const user = userEvent.setup();
     const onSaveMock = vi.fn().mockResolvedValue(undefined);
@@ -204,14 +217,13 @@ describe(
     expect(screen.getByDisplayValue("20")).toBeDefined();
   });
 
-  it("keeps the random character choice arranged as a vertical card", async () => {
+  it("marks the selected random character accessibly", async () => {
     const user = userEvent.setup();
     render(<SettingsModal {...defaultProps} />);
 
     await user.click(screen.getByRole("tab", { name: "Karakter" }));
 
-    const randomChoice = screen.getByRole("button", { name: /Acak/ });
-    expect(randomChoice.className).toContain("flex-col");
+    const randomChoice = screen.getByRole("button", { name: "Dipakai" });
     expect(randomChoice).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -234,7 +246,7 @@ describe(
       "ketik-scenario-description-counter",
     );
     expect(description).toHaveAttribute("id", "ketik-scenario-description");
-    expect(screen.getByLabelText("Deskripsi Masalah")).toBe(description);
+    expect(screen.getByLabelText(/Deskripsi Masalah/)).toBe(description);
 
     fireEvent.change(description, { target: { value: "Deskripsi baru" } });
     expect(screen.getByText("14 / 12.000")).toBeDefined();
@@ -312,7 +324,10 @@ describe(
         screen.getByPlaceholderText("Contoh: Gagal Transfer"),
         "Lampiran",
       );
-      await user.type(screen.getByLabelText("Deskripsi Masalah"), "Deskripsi");
+      await user.type(
+        screen.getByLabelText(/Deskripsi Masalah/),
+        "Deskripsi",
+      );
 
       const input = document.querySelector(
         'input[type="file"]',
@@ -388,7 +403,10 @@ describe(
         screen.getByPlaceholderText("Contoh: Gagal Transfer"),
         "Lampiran",
       );
-      await user.type(screen.getByLabelText("Deskripsi Masalah"), "Deskripsi");
+      await user.type(
+        screen.getByLabelText(/Deskripsi Masalah/),
+        "Deskripsi",
+      );
 
       const input = document.querySelector(
         'input[type="file"]',

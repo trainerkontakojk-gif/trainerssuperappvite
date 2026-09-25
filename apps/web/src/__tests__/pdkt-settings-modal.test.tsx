@@ -519,7 +519,12 @@ describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
         "grid",
         "grid-cols-1",
         "md:grid-cols-2",
+        "gap-4",
       );
+      expect(
+        screen.getByRole("heading", { name: "Karakter dan Gaya Komunikasi" })
+          .parentElement,
+      ).toHaveClass("pb-2");
       expect(
         identitySection?.querySelectorAll("input, select, textarea"),
       ).toHaveLength(4);

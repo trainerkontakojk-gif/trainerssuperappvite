@@ -4,7 +4,7 @@ import {
   SettingsField,
   SettingsInput,
   SettingsTextarea,
-} from "../SettingsPrimitives";
+} from "@/components/settings/SettingsPrimitives";
 
 interface ScenarioTemplateFieldProps {
   draft: Partial<PdktScenario>;

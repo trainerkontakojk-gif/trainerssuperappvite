@@ -114,15 +114,19 @@ export function SettingsModal({
           container={dialogContainer}
           showCloseButton={false}
           data-module="ketik"
-          className="!w-[calc(100vw-2rem)] !max-w-5xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
+          aria-labelledby="ketik-settings-modal-title"
+          className="w-[calc(100vw-2rem)] max-w-5xl sm:max-w-5xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
         >
           <DialogHeader className="shrink-0 border-b px-5 py-4 sm:px-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <DialogTitle className="text-lg tracking-tight sm:text-xl">
+                <DialogTitle
+                  id="ketik-settings-modal-title"
+                  className="text-lg tracking-tight sm:text-xl"
+                >
                   Pengaturan Simulasi
                 </DialogTitle>
-                <DialogDescription className="mt-1 text-xs uppercase tracking-wide">
+                <DialogDescription className="mt-1 text-sm">
                   Module KETIK
                 </DialogDescription>
               </div>
@@ -159,7 +163,7 @@ export function SettingsModal({
                   value={tab.id}
                   className="min-h-11 justify-start px-3 py-2.5 text-left"
                 >
-                  <tab.icon data-icon="inline-start" />
+                  <tab.icon aria-hidden="true" className="size-4 shrink-0" />
                   <span>{tab.label}</span>
                 </TabsTrigger>
               ))}
