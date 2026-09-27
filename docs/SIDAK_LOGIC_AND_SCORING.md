@@ -130,6 +130,9 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 - **Eksklusi Phantom**: Row `is_phantom_padding = true` tidak pernah ditampilkan di tabel maupun ekspor Excel.
 - **Findings-Only**: Hanya row yang memiliki data temuan riil DAN saran perbaikan yang ditampilkan.
 - **Tujuan**: Memungkinkan trainer/leader untuk melakukan audit detail dan coaching fokus pada area yang bermasalah saja.
+- **Filter dan tampilan**: Per Layanan dan Per Individu menyediakan filter Parameter berdasarkan indikator aktif; Per Individu mewajibkan pemilihan agen. Bulan ditampilkan sebagai nama Januari–Desember dengan default rentang setahun penuh (`startMonth=1`, `endMonth=12`); rentang terbalik ditolak. Hasil yang tidak lagi cocok setelah filter berubah tidak ditampilkan. Tabel desktop dan daftar mobile menampilkan Temuan serta Rekomendasi lengkap dari input QA.
+- **Dataset hasil dan ekspor**: Hitungan, pagination, tampilan, dan Excel memakai baris actionable yang sama; kolom Rekomendasi di layar diekspor dengan header `Seharusnya` demi kompatibilitas. **Perbedaan format yang masih ada**: nomor tiket di layar dipangkas spasi tepinya (atau `-` bila kosong), sedangkan Excel saat ini memakai `no_tiket` mentah (atau sel kosong). Teks Temuan/Rekomendasi di layar dipangkas spasi tepinya, sedangkan Excel memakai teks mentah. Jangan mengartikan kesamaan baris hasil sebagai kesamaan format sel.
+- **Bukti regresi**: `apps/web/e2e/sidak-reports-data.spec.ts` menguji alur halaman dan unduhan Excel dengan API/auth mock serta guard jaringan fail-closed di dev-server lokal. Delapan kontrak unit yang dapat diamati pada halaman telah dipindahkan ke E2E; satu unit untuk fallback helper `getReportFindingText` pada teks hanya-spasi tetap dipertahankan karena baris tersebut dikeluarkan sebelum render halaman. E2E tidak membuktikan backend atau database produksi.
 
 ## Metrik Dashboard Dan Ranking
 

@@ -30,6 +30,34 @@ export function getReportFindingText(row: {
     : "-";
 }
 
+export function getReportRecommendationText(row: {
+  sebaiknya?: unknown;
+}): string {
+  return typeof row.sebaiknya === "string" && row.sebaiknya.trim()
+    ? row.sebaiknya.trim()
+    : "-";
+}
+
+/**
+ * Kontrak Workspace Data (`docs/SIDAK_LOGIC_AND_SCORING.md`): hanya temuan
+ * riil dengan Temuan DAN Rekomendasi yang boleh ditampilkan maupun diekspor.
+ * Seleksi ini dipakai sekali pada respons halaman agar count, tabel,
+ * pagination, dan Excel memakai satu sumber hasil yang sama.
+ */
+export function isActionableReportRow(row: {
+  is_phantom_padding?: unknown;
+  ketidaksesuaian?: unknown;
+  sebaiknya?: unknown;
+}): boolean {
+  return (
+    row.is_phantom_padding !== true &&
+    typeof row.ketidaksesuaian === "string" &&
+    row.ketidaksesuaian.trim().length > 0 &&
+    typeof row.sebaiknya === "string" &&
+    row.sebaiknya.trim().length > 0
+  );
+}
+
 export function getReportTicketText(row: { no_tiket?: unknown }): string {
   return typeof row.no_tiket === "string" && row.no_tiket.trim()
     ? row.no_tiket.trim()
