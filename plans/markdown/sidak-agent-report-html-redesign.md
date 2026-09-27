@@ -169,11 +169,12 @@ visible }` in `@media print`, and the regression is now tested from the default
   `exportAgentReport.ts` and the feature doc still fail prettier; both already failed
   at baseline `8866306` (verified via `git show 8866306:<path> | prettier --check`),
   so this task did not introduce that debt and did not reformat them (that would
-  bury the behavioural diff). The E2E spec is **new** — it did not exist at
-  `8866306` and is still dirty in the working tree — so no baseline claim is made
-  for it; it is excluded from this task's formatting scope.
-- `git diff --check` → exit 0. Tree contains only the owned paths plus the five
-  pre-existing dirty files, which were left untouched.
+  bury the behavioural diff). *(Historical state at Phase 3: the E2E spec was
+  **new** — it did not exist at `8866306` and was uncommitted in the working tree
+  at the time of this verification — so no baseline claim was made for it; it was
+  excluded from this task's formatting scope.)*
+- `git diff --check` → exit 0. Tree contains only the owned paths plus
+  pre-existing dirty paths outside task scope, which were left untouched.
 
 ### Gate-repair verification
 
