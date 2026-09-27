@@ -1599,6 +1599,10 @@ function startAudit(): NetworkAudit {
 
 /** Indeks sel "No. Tiket" pada `<tr>` tabel desktop (Layanan, Periode, Agen, Tiket, ...). */
 const TICKET_CELL_INDEX = 3;
+/** Indeks sel "Temuan" pada `<tr>` yang sama (Parameter ada di indeks 4). */
+const FINDING_CELL_INDEX = 5;
+/** Indeks sel "Rekomendasi" pada `<tr>` yang sama. */
+const RECOMMENDATION_CELL_INDEX = 6;
 
 /** Nomor tiket ber-spasi yang harus tampil tanpa spasi tepi. */
 const PADDED_TICKET_VALUE = "TKT-2026-0777";
@@ -1642,6 +1646,89 @@ const ROW_ACTIONABLE_TICKET_ABSENT: ReportRow = {
  * diharapkan, test tidak membuktikan apa pun.
  */
 const RAW_TICKET_PAD = PADDED_TICKET_RAW;
+
+// ── Paritas format sel: Excel vs UI ─────────────────────────────────────────
+// `exportExcel` harus menulis SEL yang sama persis dengan yang dirender UI:
+//   - `No. Tiket`: dipangkas spasi tepinya, dan `null`/kosong menjadi `-`
+//     (bukan sel kosong, supaya "tiket tidak ada" tidak tertukar dengan
+//     "sel tidak terisi").
+//   - `Temuan` dan `Seharusnya`: dipangkas spasi tepinya.
+// Ketiga aturan itu sudah hidup di `getReportTicketText`,
+// `getReportFindingText`, dan `getReportRecommendationText`; bukti di bawah
+// membandingkan file Excel hasil unduhan sungguhan dengan teks yang benar-benar
+// terlihat di layar, bukan dengan nilai mentah dari respons mock.
+//
+// Nama agen dipakai sebagai kunci penyambung baris UI ↔ baris file karena
+// `Agen` BUKAN salah satu dari tiga sel yang diuji — jadi kolom itu tidak bisa
+// ikut "selalu cocok" hanya karena kedua sisi membaca sumber yang sama.
+
+/**
+ * (1) actionable: nomor tiket, Temuan, dan Rekomendasi dikelilingi spasi tepi.
+ * Nilai yang sudah ada di atas dipakai apa adanya supaya nilai yang diharapkan
+ * di file sama persis dengan konstanta yang dipakai UI.
+ */
+const ROW_EXPORT_PADDED_TICKET: ReportRow = {
+  ...ROW_ACTIONABLE_CALL,
+  id: "row-export-padded-ticket",
+  profiler_peserta: { nama: "Sari Prasetya", batch_name: "Batch 7" },
+  no_tiket: PADDED_TICKET_RAW,
+  ketidaksesuaian: `  ${FINDING_ACTIONABLE_CALL}  `,
+  sebaiknya: `  ${RECOMMENDATION_ACTIONABLE_CALL}  `,
+};
+
+/** (2) actionable, `no_tiket: null` → UI menulis `-`, bukan sel kosong. */
+const ROW_EXPORT_NULL_TICKET: ReportRow = {
+  ...ROW_ACTIONABLE_CALL,
+  id: "row-export-null-ticket",
+  profiler_peserta: { nama: "Bima Saputra", batch_name: "Batch 7" },
+  no_tiket: null,
+  ketidaksesuaian: `  ${FINDING_ACTIONABLE_CALL}  `,
+  sebaiknya: `  ${RECOMMENDATION_ACTIONABLE_CALL}  `,
+};
+
+/** (3) actionable, `no_tiket` hanya berisi spasi → juga `-` di UI. */
+const ROW_EXPORT_BLANK_TICKET: ReportRow = {
+  ...ROW_ACTIONABLE_EMAIL,
+  id: "row-export-blank-ticket",
+  profiler_peserta: { nama: "Citra Lestari", batch_name: "Batch 7" },
+  no_tiket: "   ",
+  ketidaksesuaian: `  ${FINDING_ACTIONABLE_EMAIL}  `,
+  sebaiknya: `  ${RECOMMENDATION_ACTIONABLE_EMAIL}  `,
+};
+
+/** Tiga baris paritas; semua tetap actionable, jadi hitungan UI = 3. */
+const EXPORT_PARITY_ROWS = [
+  ROW_EXPORT_PADDED_TICKET,
+  ROW_EXPORT_NULL_TICKET,
+  ROW_EXPORT_BLANK_TICKET,
+];
+
+/**
+ * Baris yang HARUS dibuang, ikut dilayani supaya "tidak ikut di file" ikut
+ * terbukti, bukan hanya diasumsikan. Urutannya sengaja tidak sama dengan
+ * `EXPORT_PARITY_ROWS` supaya tidak ada asumsi posisi.
+ */
+const EXPORT_PARITY_NON_ACTIONABLE = [
+  ROW_WITHOUT_RECOMMENDATION,
+  ROW_PHANTOM,
+  ROW_WITHOUT_FINDING,
+];
+
+/** Kunci baris (nama agen) untuk penyambung UI ↔ file Excel. */
+const EXPORT_PARITY_AGENTS = [
+  "Sari Prasetya",
+  "Bima Saputra",
+  "Citra Lestari",
+] as const;
+
+/** Nilai mentah ber-spasi yang tidak boleh ikut ke file Excel. */
+const EXPORT_PARITY_RAW_TEXTS = [
+  PADDED_TICKET_RAW,
+  `  ${FINDING_ACTIONABLE_CALL}  `,
+  `  ${RECOMMENDATION_ACTIONABLE_CALL}  `,
+  `  ${FINDING_ACTIONABLE_EMAIL}  `,
+  `  ${RECOMMENDATION_ACTIONABLE_EMAIL}  `,
+];
 
 /**
  * `textContent` mentah satu elemen — TANPA normalisasi whitespace.
@@ -2161,6 +2248,110 @@ test.describe("SIDAK reports data workspace", () => {
       ).toBe("Tiket -");
     }
 
+    expectNoApplicationTraffic(audit);
+  });
+
+  test("Excel memakai sel No. Tiket, Temuan, dan Seharusnya yang sama persis dengan UI", async ({
+    page,
+  }) => {
+    const audit = startAudit();
+    const dataRequests: DataRequest[] = [];
+
+    await openReportsData(page, audit, dataRequests, [
+      ...EXPORT_PARITY_ROWS,
+      ...EXPORT_PARITY_NON_ACTIONABLE,
+    ]);
+
+    await page.getByRole("button", { name: "Cari Data" }).click();
+    // Ketiga baris paritas tetap ACTIONABLE — yang diuji adalah format sel, bukan
+    // kelayakan baris, jadi hitungan tidak boleh turun jadi 0.
+    await expect(page.getByTestId(RESULTS_COUNT)).toHaveText(`${EXPORT_PARITY_ROWS.length} temuan`);
+
+    // (1) Acuan pembanding: teks yang benar-benar TERLIHAT di layar, dibaca lewat
+    // `textContent` mentah supaya normalisasi whitespace locator tidak menutupi
+    // padding. Tiga sel ini tidak boleh dibuktikan "cocok" hanya karena kedua sisi
+    // membaca sumber yang sama.
+    await expectActiveRepresentation(page, TICKET_DESKTOP_VIEWPORT);
+    const uiByAgent = new Map<string, { ticket: string; finding: string; recommendation: string }>();
+    for (const agent of EXPORT_PARITY_AGENTS) {
+      const row = desktopResults(page).getByRole("row").filter({ hasText: agent });
+      await expect(row, `baris agen "${agent}" tidak ada tepat satu kali di UI`).toHaveCount(1);
+      uiByAgent.set(agent, {
+        ticket: await rawText(row.getByRole("cell").nth(TICKET_CELL_INDEX)),
+        finding: await rawText(row.getByRole("cell").nth(FINDING_CELL_INDEX)),
+        recommendation: await rawText(row.getByRole("cell").nth(RECOMMENDATION_CELL_INDEX)),
+      });
+    }
+    // UI sendiri yang jadi kontrak: tiket ber-spasi terpangkas, tiket null dan
+    // tiket kosong jadi "-".
+    expect(RAW_TICKET_PAD, "fixture tiket harus benar-benar punya spasi tepi").not.toBe(
+      PADDED_TICKET_VALUE,
+    );
+    expect(uiByAgent.get("Sari Prasetya")?.ticket, "UI belum menormalisasi tiket ber-spasi").toBe(
+      PADDED_TICKET_VALUE,
+    );
+    expect(uiByAgent.get("Bima Saputra")?.ticket, "UI harus menulis - untuk tiket null").toBe("-");
+    expect(uiByAgent.get("Citra Lestari")?.ticket, "UI harus menulis - untuk tiket kosong").toBe("-");
+
+    // (2) File Excel sungguhan dari button Export Excel, dibaca dengan exceljs.
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export Excel" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^laporan-data-\d{4}\.xlsx$/);
+    // Artefak di luar repo yang bisa diperiksa ulang: .xlsx asli dari app.
+    const artifact = path.join(resolveArtifactDir(), "export-cell-parity.xlsx");
+    await download.saveAs(artifact);
+    console.log(`[artifact] xlsx paritas sel: ${artifact}`);
+
+    const workbook = await readDownloadedWorkbook(download);
+    expect(Object.keys(workbook)).toContain("Data Laporan");
+    const grid = workbook["Data Laporan"];
+    const header = grid[0];
+    // Header Rekomendasi tetap `Seharusnya` demi kompatibilitas file.
+    expect(header).toContain("Seharusnya");
+    const columnFor = (label: string): number => {
+      const index = header.indexOf(label);
+      expect(index, `kolom export "${label}" hilang`).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const agentColumn = columnFor("Agen");
+    const ticketColumn = columnFor("No. Tiket");
+    const findingColumn = columnFor("Temuan");
+    const recommendationColumn = columnFor("Seharusnya");
+
+    // (3) Isi sel Excel = isi sel UI, baris per baris.
+    const exportedRows = grid.slice(1).filter((cells) => cells.some((cell) => cell.trim() !== ""));
+    expect(exportedRows, "baris non-actionable ikut masuk file Excel").toHaveLength(
+      EXPORT_PARITY_ROWS.length,
+    );
+    for (const agent of EXPORT_PARITY_AGENTS) {
+      const exported = exportedRows.filter((cells) => cells[agentColumn] === agent);
+      expect(
+        exported,
+        `baris agen "${agent}" tidak ada tepat satu kali di file Excel`,
+      ).toHaveLength(1);
+      expect(
+        {
+          ticket: exported[0][ticketColumn],
+          finding: exported[0][findingColumn],
+          recommendation: exported[0][recommendationColumn],
+        },
+        `sel Excel untuk "${agent}" berbeda dari yang tampil di UI`,
+      ).toEqual(uiByAgent.get(agent));
+    }
+
+    // (4) Nilai mentah ber-spasi tidak boleh masuk file sama sekali.
+    const allCells = Object.values(workbook).flat(2).join("\n");
+    for (const raw of EXPORT_PARITY_RAW_TEXTS) {
+      expect(allCells, `nilai mentah ber-spasi bocor ke Excel: ${JSON.stringify(raw)}`).not.toContain(
+        raw,
+      );
+    }
+    for (const text of NON_ACTIONABLE_TEXTS) {
+      expect(allCells, `ekspor membocorkan baris non-actionable: ${text}`).not.toContain(text);
+    }
+
+    expect(dataRequests).toHaveLength(1);
     expectNoApplicationTraffic(audit);
   });
 

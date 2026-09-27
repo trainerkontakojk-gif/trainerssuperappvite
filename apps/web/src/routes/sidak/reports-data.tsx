@@ -312,17 +312,27 @@ export default function SidakReportsData() {
     // `results` sudah terseleksi (tanpa phantom, Temuan + Rekomendasi terisi),
     // jadi export memakai dataset yang sama dengan layar. Header `Seharusnya`
     // dipertahankan untuk kompatibilitas file.
-    const rows = results.map((r: any) => ({
-      Layanan: SERVICE_LABELS[r.service_type] || r.service_type,
-      Periode: `${String(r.qa_periods?.month || "").padStart(2, "0")}/${r.qa_periods?.year || ""}`,
-      Agen: r.profiler_peserta?.nama || "",
-      Batch: r.profiler_peserta?.batch_name || "",
-      "No. Tiket": r.no_tiket || "",
-      Parameter: r.qa_indicators?.name || "",
-      Temuan: r.ketidaksesuaian || "",
-      Seharusnya: r.sebaiknya || "",
-      Skor: r.nilai,
-    }));
+    //
+    // `No. Tiket`, `Temuan`, dan `Seharusnya` diambil dari `toRowFacts` — bentuk
+    // fakta yang sama dengan tabel desktop dan daftar mobile. Tiga sel itu
+    // dinormalisasi di sana (nomor tiket dipangkas, atau `-` bila kosong/
+    // tidak ada; Temuan dan Rekomendasi dipangkas), jadi file tidak boleh menulis
+    // field mentah: dari situ spasi tepi ikut masuk dan tiket kosong menjadi sel
+    // kosong. Kolom lain apa adanya di bawah ini.
+    const rows = results.map((r: any) => {
+      const facts = toRowFacts(r);
+      return {
+        Layanan: SERVICE_LABELS[r.service_type] || r.service_type,
+        Periode: `${String(r.qa_periods?.month || "").padStart(2, "0")}/${r.qa_periods?.year || ""}`,
+        Agen: r.profiler_peserta?.nama || "",
+        Batch: r.profiler_peserta?.batch_name || "",
+        "No. Tiket": facts.ticket,
+        Parameter: r.qa_indicators?.name || "",
+        Temuan: facts.finding,
+        Seharusnya: facts.recommendation,
+        Skor: r.nilai,
+      };
+    });
     await writeFlatExcel("Data Laporan", rows, `laporan-data-${year}.xlsx`);
   };
 
