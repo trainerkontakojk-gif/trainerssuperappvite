@@ -10,124 +10,307 @@ import type {
   AgentDetailData,
   AgentPeriodSummary,
   RootCauseResult,
-  SidakAgentQuickviewResponse,
 } from "@trainers/types";
 import {
-  buildInteractiveReportScript,
-  buildTrendReportHtml,
-  type AgentHtmlVariant,
+  MONTHS_FULL,
+  MONTHS_SHORT,
+  buildAgentReportHtml,
+  computeTenure,
+  monthScopeLabel,
+  nilaiLabel,
+  trendScopeLabel,
+  yearServiceScopeLabel,
+  yearToDateScopeLabel,
+} from "./agentReportHtml";
+import type {
+  AgentHtmlExportContext,
+  AgentHtmlVariant,
+  TicketScoreExport,
+  TemuanDisplayItemExport,
+} from "./agentReportHtml";
+
+// Kontrak ini berasal dari `agentReportHtml.ts` (satu sumber untuk satu laporan),
+// tapi tetap di-re-export di sini supaya pemanggil yang sudah mengimpor dari
+// modul ini tidak perlu tahu file mana yang memiliki definisinya.
+export type {
+  AgentHtmlExportContext,
+  TicketScoreExport,
+  TemuanDisplayItemExport,
 } from "./agentReportHtml";
 
 // ---------------------------------------------------------------------------
-// Re-exported types used by the generators
+// Format laporan
 // ---------------------------------------------------------------------------
-
-export interface TicketScoreExport {
-  no_tiket: string;
-  scoreDeduction: number;
-  findingCount: number;
-  heaviestParam: string;
-  isSamplingQa: boolean;
-}
-
-export interface TemuanDisplayItemExport {
-  id: string;
-  month: number;
-  year: number;
-  indicatorName: string;
-  category: string;
-  nilai: number;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
-  no_tiket: string | null;
-}
 
 export type AgentReportFormat =
   | "csv"
   | "md"
   | "html-interactive"
-  | "html-static";
+  | "html-static"
+  | "pdf";
 
-export interface AgentHtmlExportContext {
-  selectedMonth?: number | null;
-  trendStartMonth?: number;
-  trendEndMonth?: number;
-  quickview?: SidakAgentQuickviewResponse | null;
-  isStaff?: boolean;
+/**
+ * Konteks audit aktif saat unduhan ditekan.
+ *
+ * CSV/MD tidak memakai satu periode untuk seluruh dokumen: ringkasan bulanan dan
+ * detail temuan mengikuti tahun + layanan, tiket dan akar masalah mengikuti bulan
+ * terpilih, tren mengikuti periode yang benar-benar ada pada datanya, dan
+ * benchmark memakai cakupan yang dideklarasikan `comparisonTable.scope`. Agar
+ * laporan tidak menyiratkan satu bulan untuk semua seksi, tiap seksi menyatakan
+ * cakupannya sendiri di batas non-tabel (baris komentar CSV / baris `_..._` MD).
+ *
+ * `service` dan `month` TIDAK pernah memengaruhi isi baris data — hanya label
+ * cakupan. Tanpa objek ini, generator tetap menghasilkan keluaran yang sama
+ * seperti sebelumnya (dipakai pemanggil lama yang tidak punya konteks).
+ */
+export interface AgentReportScope {
+  /** Layanan audit terpilih di UI; `""`/tak dikenal berarti belum terkonteks. */
+  service: string;
+  /** Bulan audit terpilih di UI; `null` berarti belum ada bulan aktif. */
+  month: number | null;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
+//
+// Bulan, masa kerja, dan label cakupan seksi TIDAK didefinisikan ulang di sini:
+// semuanya datang dari `agentReportHtml.ts` supaya "cakupan seksi" punya satu
+// definisi yang dipakai HTML, CSV, dan MD sekaligus.
 // ---------------------------------------------------------------------------
-
-const MONTHS_FULL = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
-const MONTHS_SHORT = [
-  "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
-  "Jul", "Agt", "Sep", "Okt", "Nov", "Des",
-];
-
-function computeTenure(bergabungDate: string | null): string {
-  if (!bergabungDate) return "-";
-  const start = new Date(bergabungDate);
-  const now = new Date();
-  const months =
-    (now.getFullYear() - start.getFullYear()) * 12 +
-    (now.getMonth() - start.getMonth());
-  if (months < 12) return months + " bulan";
-  const years = Math.floor(months / 12);
-  const rem = months % 12;
-  return rem > 0 ? years + " tahun " + rem + " bulan" : years + " tahun";
-}
-
-function nilaiLabel(nilai: number): string {
-  const labels: Record<number, string> = {
-    3: "SESUAI",
-    2: "PERBAIKAN",
-    1: "TIDAK SESUAI",
-    0: "KRITIS",
-  };
-  return labels[nilai] ?? "?";
-}
 
 function formatNilai(nilai: number): string {
   return nilai + " (" + nilaiLabel(nilai) + ")";
+}
+
+/**
+ * Cakupan benchmark memakai `comparisonTable.scope` apa adanya — nilai yang
+ * dideklarasikan backend tidak ditimpa nilai UI, jadi label ini selalu jujur
+ * tentang periode yang benar-benar dihitung server. Bentuk kalimatnya dikunci
+ * di docs dan diuji E2E, jadi ia tetap hidup di modul ini.
+ *
+ * Diekspor supaya PDF memakai kalimat yang sama persis, bukan definisi kedua:
+ * "cakupan benchmark" harus punya satu kalimat di semua format.
+ */
+export function comparisonScopeLabel(data: AgentDetailData): string {
+  const scope = data.comparisonTable?.scope;
+  if (!scope) return "";
+  const startLabel = MONTHS_SHORT[(scope.startMonth ?? 1) - 1] ?? "";
+  const endLabel = MONTHS_SHORT[(scope.endMonth ?? 12) - 1] ?? "";
+  const period =
+    startLabel && endLabel ? ` • Periode ${startLabel}-${endLabel}` : "";
+  return (
+    `Tahun ${scope.year} • Layanan ${scope.serviceLabel || scope.serviceType}` +
+    ` • ${scope.teamLabel}${period}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Nama file
+// ---------------------------------------------------------------------------
+
+/**
+ * Karakter yang merusak nama file lintas OS/path: separator direktori, wildcard,
+ * dan reserved Windows. Karakter kontrol ditangani terpisah lewat
+ * `isControlCode` supaya tidak butuh regex control-character.
+ */
+const UNSAFE_FILENAME_CHARS = new Set([
+  "/",
+  "\\",
+  ":",
+  "*",
+  "?",
+  '"',
+  "<",
+  ">",
+  "|",
+]);
+
+function isControlCode(code: number): boolean {
+  return code < 0x20 || code === 0x7f;
+}
+
+export function sanitizeReportFilePart(
+  value: string | null | undefined,
+  fallback: string,
+): string {
+  // Satu garis bawah per RENTETAN karakter berbahaya, jadi
+  // `Rina/Adi:*?"<>|Bunga` menjadi `Rina_Adi_Bunga`, bukan `Rina_Adi______Bunga`.
+  let out = "";
+  let pendingSeparator = false;
+  for (const char of String(value ?? "")) {
+    const code = char.codePointAt(0) ?? 0;
+    if (UNSAFE_FILENAME_CHARS.has(char) || isControlCode(code)) {
+      if (out.length > 0) pendingSeparator = true;
+      continue;
+    }
+    if (pendingSeparator) {
+      out += "_";
+      pendingSeparator = false;
+    }
+    out += char;
+  }
+
+  const cleaned = out
+    .slice(0, 120)
+    .replace(/\s+/g, " ")
+    .trim()
+    // Nama file/folder tidak boleh diawali atau diakhiri titik, spasi, garis,
+    // atau underscore (`.hidden`, `CON`, `trailing .`).
+    .replace(/^[.\-_\s]+|[.\-_\s]+$/g, "");
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+
+export function buildAgentReportFileName(options: {
+  agentName: string | null | undefined;
+  agentId: string;
+  year: number;
+  extension: string;
+}): string {
+  const { agentName, agentId, year, extension } = options;
+  const safeAgentId = sanitizeReportFilePart(agentId, "agent");
+  const safeAgentName = sanitizeReportFilePart(agentName, safeAgentId);
+  return `Laporan_Audit_${safeAgentName}_${year}.${extension}`;
 }
 
 // ---------------------------------------------------------------------------
 // CSV Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Pemicu formula spreadsheet. Kalau karakter pertama sebuah sel adalah salah
+ * satunya, spreadsheet dapat memperlakukan sel itu sebagai formula, bukan
+ * sebagai teks.
+ *
+ * Bukti empiris yang tersedia di lingkungan ini: pada LibreOffice headless
+ * hanya `=` yang benar-benar menjadi formula (`'=1+1` tetap sel formula pada
+ * baca-balik `openpyxl`), sementara `@SUM(1,1)`, `+1+1`, dan `-1-1` tetap
+ * teks. `+`, `-`, dan `@` tetap dimasukkan karena aturan konsumen
+ * berbeda-beda dan hanya satu konsumen yang bisa diuji di sini — jadi bagian
+ * ini bersifat **defensif, bukan terverifikasi**. `\t` dan `\r` dipertahankan
+ * dari perilaku lama; keduanya tidak terbukti memicu formula di LibreOffice,
+ * tapi tidak ada biaya menanganinya dan keduanya merusak pembacaan kalau tidak
+ * di-escape.
+ */
+const CSV_FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+/**
+ * Angka biasa, tanda opsional. Sel seperti `-1.5` atau `+3` BUKAN formula:
+ * menganotasinya akan mengubah kolom numerik menjadi teks dan merusak
+ * perhitungan pembaca, jadi sel seperti itu dikecualikan.
+ */
+const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
+/**
+ * Placeholder internal laporan untuk nilai yang tidak ada — `computeTenure()`
+ * memakai `-` untuk agen tanpa `bergabung_date`. Ini bukan pemicu formula,
+ * jadi penanda `[teks] ` di depannya hanya mengaburkan nilai yang sebenarnya
+ * (`Masa Kerja,[teks] -`), dan reviewer laporan mengira ada data yang perlu
+ * dinetralisasi padahal tidak ada.
+ *
+ * Pengecualian ini sengaja **sangat sempit**: hanya string yang persis satu
+ * tanda hubung. Semua tetangganya tetap seperti sebelumnya —
+ *   - `-1-1` masih pemicu formula, jadi tetap dilindungi penanda;
+ *   - `-1.5` sudah dikecualikan `CSV_PLAIN_NUMBER` sebagai angka biasa;
+ *   - `- 1`, `--`, dan ` - ` bukan placeholder, jadi masuk aturan biasa.
+ *
+ * Empat karakter, `=`, `+`, `-`, dan `@`, tidak mungkin membentuk ekspresi
+ * lengkap tanpa operand: satu tanda hubung tunggal bukan formula yang bisa
+ * dievaluasi spreadsheet, dan itulah yang dibuktikan lewat konsumen spreadsheet
+ * nyata pada file yang diunduh.
+ */
+const CSV_INTERNAL_PLACEHOLDER = "-";
+
+/**
+ * Penanda netralisasi, disisipkan di depan nilai yang akan dibaca spreadsheet
+ * sebagai formula.
+ *
+ * Kenapa penanda, bukan sekadar diapit tanda kutip: pengapitan tanda kutip
+ * sudah terbukti BUKAN netralisasi. Diuji pada file CSV yang benar-benar
+ * diunduh, dibuka di LibreOffice headless, sel `"=1+1"` tetap terbaca sebagai
+ * sel formula (`data_type` formula pada baca-balik `openpyxl`) — cukup untuk
+ * membuktikan bahwa diapit tanda kutip tidak neutralize apa pun. Penanda
+ * membuat karakter pertama sel berhenti jadi pemicu formula, jadi tidak ada
+ * konsumen yang bisa menilainya sebagai formula hanya karena mem-parse CSV.
+ *
+ * Penanda `[teks] ` dipilih (bukan hanya tanda kutip tunggal) karena tidak ada
+ * alat mana pun yang mengupasnya: kalau suatu saat pipeline hilir menghapus
+ * tanda kutip paksa, nilai yang tersisa kembali berawalan `=` dan bisa dievaluasi
+ * lagi. Penanda ini juga terbaca apa adanya oleh auditor yang membuka
+ * laporan, dan persis satu prefiks per sel yang perlu netralisasi — bukan
+ * pengubah isi atau skema dokumen.
+ *
+ * Batasan yang jujur: nilai yang diawali spasi lalu pemicu (` =1+1`) tidak
+ * diubah — di LibreOffice sel seperti itu tetap teks, dan tidak ada konsumen
+ * lain yang bisa diuji di sini. Penganotasan prosa biasa yang kebetulan
+ * diawali spasi hanya menambah kebisingan, jadi aturan ini sengaja berhenti di
+ * karakter pertama. Lihat `docs/feature-agent-detail-export-csv-md-html.md`.
+ */
+const CSV_FORMULA_PREFIX = "[teks] ";
+
+/**
+ * Escape satu nilai sel CSV.
+ *
+ * Empat lapis, berurutan:
+ *   1. **Pengecualian placeholder internal.** String yang persis `-` (lihat
+ *      `CSV_INTERNAL_PLACEHOLDER`) ditulis apa adanya — tanpa penanda dan
+ *      tanpa tanda kutip, jadi nilainya tetap terbaca persis seperti yang
+ *      ditulis exporter.
+ *   2. **Netralisasi formula.** Nilai yang diawali pemicu formula dan bukan
+ *      angka biasa diberi penanda di depannya. Nilai aslinya tidak pernah
+ *      diubah atau dipotong — penanda bisa dihapus sepenuhnya untuk
+ *      memulihkan teks apa adanya.
+ *   3. **Pengapitan.** Sel yang berisi koma, tanda kutip, atau baris baru
+ *      diapit tanda kutip; tanda kutip di dalamnya digandakan (RFC 4180).
+ *   4. **Konsistensi angka bertanda.** Nilai yang sudah berupa angka bertanda
+ *      (`-1.5`) tetap diapit tanda kutip seperti sebelumnya, jadi sel angka
+ *      tidak pernah berubah bentuk byte hanya karena ada mitigasi baru.
+ */
 function csvEscape(value: unknown): string {
   const str = value == null ? "" : String(value);
+  const isPlaceholder = str === CSV_INTERNAL_PLACEHOLDER;
+  const isFormula =
+    !isPlaceholder &&
+    CSV_FORMULA_TRIGGER.test(str) &&
+    !CSV_PLAIN_NUMBER.test(str);
+  const safe = isFormula ? CSV_FORMULA_PREFIX + str : str;
   if (
-    str.includes(",") ||
-    str.includes('"') ||
-    str.includes("\n") ||
-    str.includes("\r")
+    safe.includes(",") ||
+    safe.includes('"') ||
+    safe.includes("\n") ||
+    safe.includes("\r") ||
+    // Angka bertanda: pertahankan pengapitan yang sudah ada sebelumnya.
+    // Placeholder dikecualikan supaya `-` tetap polos, bukan `"-"`.
+    (!isPlaceholder && CSV_FORMULA_TRIGGER.test(safe))
   ) {
-    return '"' + str.replace(/"/g, '""') + '"';
+    return '"' + safe.replace(/"/g, '""') + '"';
   }
-  // Also protect against formula injection
-  if (/^[=+\-@\t]/.test(str)) {
-    return '"' + str + '"';
-  }
-  return str;
+  return safe;
 }
 
 function csvRow(values: unknown[]): string {
   return values.map(csvEscape).join(",") + "\n";
 }
 
+/**
+ * Baris komentar cakupan. Diletakkan DI ANTARA baris kosong pemisah dan baris
+ * heading seksi, jadi tidak pernah ikut terhitung sebagai baris tabel oleh
+ * pembaca seksi (`csvSectionRows` berhenti di baris kosong maupun di `# `).
+ */
+function csvScopeComment(label: string): string {
+  return "// Cakupan: " + label + "\n";
+}
+
 function csvSection(
   rows: string[],
   sectionName: string,
   headerRow?: unknown[],
+  scopeLabel?: string,
 ): void {
   rows.push("\n");
+  if (scopeLabel) {
+    rows.push(csvScopeComment(scopeLabel));
+  }
   rows.push("# " + sectionName + "\n");
   if (headerRow) {
     rows.push(csvRow(headerRow));
@@ -145,23 +328,35 @@ export function generateCSV(
   topTickets: TicketScoreExport[],
   activeRootCauses: RootCauseResult[],
   selectedYear: number,
+  scope?: AgentReportScope,
 ): string {
   const rows: string[] = [];
 
   const peserta = data.peserta;
   const masaKerja = computeTenure(peserta.bergabung_date);
-  rows.push("# Laporan Audit Agent - " + peserta.nama + "\n");
+  // Nama agen ikut di-escape: tanpa itu, satu tanda kutip di nama agen membuat
+  // seluruh file CSV tidak bisa di-parse (saya buka kuotanya sampai baris
+  // berikutnya). Untuk nama tanpa karakter khusus, byte keluaran tidak berubah.
+  rows.push("# Laporan Audit Agent - " + csvEscape(peserta.nama) + "\n");
   rows.push(csvRow(["Nama", peserta.nama]));
   rows.push(csvRow(["Tim", peserta.tim]));
   rows.push(csvRow(["Batch", peserta.batch_name]));
   rows.push(csvRow(["Jabatan", peserta.jabatan ?? "Agent"]));
   rows.push(csvRow(["Masa Kerja", masaKerja]));
   rows.push(csvRow(["Tahun Laporan", String(selectedYear)]));
+  // Baris key/value tambahan, bukan kolom tabel baru: menyatakan layanan audit
+  // yang aktif sehingga angka seksi lain tidak dibaca sebagai satu periode.
+  if (scope) {
+    rows.push(csvRow(["Layanan Audit", scope.service.toUpperCase()]));
+  }
 
   // Monthly Summaries
-  csvSection(rows, "Ringkasan Skor Bulanan", [
-    "Bulan", "Skor Final", "NC Score", "CR Score", "Sesi", "Temuan",
-  ]);
+  csvSection(
+    rows,
+    "Ringkasan Skor Bulanan",
+    ["Bulan", "Skor Final", "NC Score", "CR Score", "Sesi", "Temuan"],
+    scope ? yearServiceScopeLabel(scope.service, selectedYear) : undefined,
+  );
   for (const s of monthlySummaries) {
     rows.push(
       csvRow([s.label, s.finalScore, s.nonCriticalScore, s.criticalScore, s.sessionCount, s.findingsCount]),
@@ -169,9 +364,14 @@ export function generateCSV(
   }
 
   // Detail Temuan
-  csvSection(rows, "Detail Temuan", [
-    "Bulan", "Tahun", "Indikator", "Kategori", "Nilai", "Ketidaksesuaian", "Sebaiknya", "No Tiket",
-  ]);
+  csvSection(
+    rows,
+    "Detail Temuan",
+    [
+      "Bulan", "Tahun", "Indikator", "Kategori", "Nilai", "Ketidaksesuaian", "Sebaiknya", "No Tiket",
+    ],
+    scope ? yearServiceScopeLabel(scope.service, selectedYear) : undefined,
+  );
   for (const t of temuanDisplayItems) {
     rows.push(
       csvRow([
@@ -188,9 +388,14 @@ export function generateCSV(
   }
 
   // Top Tickets
-  csvSection(rows, "Tiket Pengurang Skor Terbesar", [
-    "No Tiket", "Score Deduction", "Jumlah Temuan", "Parameter Terberat",
-  ]);
+  csvSection(
+    rows,
+    "Tiket Pengurang Skor Terbesar",
+    [
+      "No Tiket", "Score Deduction", "Jumlah Temuan", "Parameter Terberat",
+    ],
+    scope ? monthScopeLabel(scope.service, selectedYear, scope.month) : undefined,
+  );
   for (const ticket of topTickets) {
     rows.push(
       csvRow([
@@ -203,10 +408,15 @@ export function generateCSV(
   }
 
   // Root Causes
-  csvSection(rows, "Akar Masalah", [
-    "Label", "Prioritas", "Jumlah Temuan", "Tiket Terdampak",
-    "Temuan Critical", "Rata-rata Nilai", "Rekomendasi",
-  ]);
+  csvSection(
+    rows,
+    "Akar Masalah",
+    [
+      "Label", "Prioritas", "Jumlah Temuan", "Tiket Terdampak",
+      "Temuan Critical", "Rata-rata Nilai", "Rekomendasi",
+    ],
+    scope ? yearToDateScopeLabel(scope.service, selectedYear, scope.month) : undefined,
+  );
   for (const cause of activeRootCauses) {
     rows.push(
       csvRow([
@@ -223,10 +433,21 @@ export function generateCSV(
 
   // Trend Data
   if (data.personalTrend && data.personalTrend.labels.length > 0) {
-    csvSection(rows, "Perkembangan Skor", [
-      "Periode",
-      ...data.personalTrend.datasets.map((ds) => ds.label),
-    ]);
+    csvSection(
+      rows,
+      "Perkembangan Skor",
+      [
+        "Periode",
+        ...data.personalTrend.datasets.map((ds) => ds.label),
+      ],
+      scope
+        ? trendScopeLabel(
+            scope.service,
+            selectedYear,
+            data.personalTrend.labels,
+          )
+        : undefined,
+    );
     for (let i = 0; i < data.personalTrend.labels.length; i++) {
       rows.push(
         csvRow([
@@ -239,9 +460,14 @@ export function generateCSV(
 
   // Comparison Table
   if (data.comparisonTable && data.comparisonTable.rows.length > 0) {
-    csvSection(rows, "Perbandingan Temuan", [
-      "Parameter", "Agent Ini", "Rata-rata Tim", "Rata-rata Service",
-    ]);
+    csvSection(
+      rows,
+      "Perbandingan Temuan",
+      [
+        "Parameter", "Agent Ini", "Rata-rata Tim", "Rata-rata Service",
+      ],
+      comparisonScopeLabel(data),
+    );
     for (const row of data.comparisonTable.rows) {
       rows.push(
         csvRow([row.label, row.agentCount, row.teamAverage, row.serviceAverage]),
@@ -273,6 +499,11 @@ function mdTable(
   return "\n" + h + sep + body + "\n";
 }
 
+/** Baris cakupan MD, setara baris komentar CSV di batas non-tabel yang sama. */
+function mdScopeLine(label: string): string {
+  return "_Cakupan: " + label + "_\n";
+}
+
 // ---------------------------------------------------------------------------
 // generateMD
 // ---------------------------------------------------------------------------
@@ -284,6 +515,7 @@ export function generateMD(
   topTickets: TicketScoreExport[],
   activeRootCauses: RootCauseResult[],
   selectedYear: number,
+  scope?: AgentReportScope,
 ): string {
   const peserta = data.peserta;
   const masaKerja = computeTenure(peserta.bergabung_date);
@@ -304,12 +536,17 @@ export function generateMD(
         ["Jabatan", peserta.jabatan ?? "Agent"],
         ["Masa Kerja", masaKerja],
         ["Tahun Laporan", String(selectedYear)],
+        ...(scope
+          ? [["Layanan Audit", scope.service.toUpperCase()]]
+          : []),
       ],
     ),
   );
 
   // Monthly Summaries
   lines.push("\n## Ringkasan Skor Bulanan\n");
+  if (scope)
+    lines.push(mdScopeLine(yearServiceScopeLabel(scope.service, selectedYear)));
   if (monthlySummaries.length === 0) {
     lines.push("_Tidak ada data ringkasan untuk periode ini._\n");
   } else {
@@ -330,6 +567,8 @@ export function generateMD(
 
   // Detail Temuan
   lines.push("\n## Detail Temuan\n");
+  if (scope)
+    lines.push(mdScopeLine(yearServiceScopeLabel(scope.service, selectedYear)));
   if (temuanDisplayItems.length === 0) {
     lines.push("_Tidak ada temuan untuk periode ini._\n");
   } else {
@@ -352,6 +591,10 @@ export function generateMD(
 
   // Top Tickets
   lines.push("\n## Tiket Pengurang Skor Terbesar\n");
+  if (scope)
+    lines.push(
+      mdScopeLine(monthScopeLabel(scope.service, selectedYear, scope.month)),
+    );
   if (topTickets.length === 0) {
     lines.push("_Tidak ada tiket yang menurunkan skor._\n");
   } else {
@@ -371,6 +614,12 @@ export function generateMD(
 
   // Root Causes
   lines.push("\n## Akar Masalah\n");
+  if (scope)
+    lines.push(
+      mdScopeLine(
+        yearToDateScopeLabel(scope.service, selectedYear, scope.month),
+      ),
+    );
   if (activeRootCauses.length === 0) {
     lines.push("_Belum ditemukan pola akar masalah yang dominan._\n");
   } else {
@@ -389,6 +638,17 @@ export function generateMD(
   // Trend Data
   if (data.personalTrend && data.personalTrend.labels.length > 0) {
     lines.push("\n## Perkembangan Skor\n");
+    if (scope) {
+      lines.push(
+        mdScopeLine(
+          trendScopeLabel(
+            scope.service,
+            selectedYear,
+            data.personalTrend.labels,
+          ),
+        ),
+      );
+    }
     lines.push(
       mdTable(
         ["Periode", ...data.personalTrend.datasets.map((ds) => ds.label)],
@@ -431,501 +691,16 @@ export function generateMD(
 }
 
 // ---------------------------------------------------------------------------
-// HTML generation helpers
-// ---------------------------------------------------------------------------
-
-function escHtml(s: unknown): string {
-  const str = s == null ? "" : String(s);
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function finiteNumber(value: unknown, fallback = 0, min = -Infinity, max = Infinity): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, value));
-}
-
-function numberText(value: unknown, fallback = 0): string {
-  return String(finiteNumber(value, fallback));
-}
-
-function yearText(value: unknown, fallback = 0): string {
-  return String(Math.trunc(finiteNumber(value, fallback)));
-}
-
-function scoreColor(score: number): string {
-  if (finiteNumber(score) >= 85) return "#047857";
-  if (finiteNumber(score) >= 70) return "#b45309";
-  return "#be123c";
-}
-
-function scoreLabel(score: number): string {
-  if (score >= 85) return "Baik";
-  if (score >= 70) return "Cukup";
-  return "Perlu Perhatian";
-}
-
-function deltaStyle(delta: number | null): string {
-  if (delta === null) return "color: #6b7280;";
-  return delta >= 0 ? "color: #047857;" : "color: #be123c;";
-}
-
-// ---------------------------------------------------------------------------
-// HTML section builders
-// ---------------------------------------------------------------------------
-
-function buildProfileHtml(
-  peserta: AgentDetailData["peserta"],
-  masaKerja: string,
-  isStaff = true,
-): string {
-  const avatarContent = peserta.foto_url
-    ? '<img src="' + escHtml(peserta.foto_url) + '" alt="' + escHtml(peserta.nama) + '" />'
-    : escHtml(peserta.nama.charAt(0).toUpperCase());
-  const downloadIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10m0 0 4-4m-4 4-4-4M5 17.5V19h14v-1.5"/></svg>';
-  const chevronIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
-  const plusIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-
-  return [
-    '<div class="profile-bar">',
-    '  <div class="profile-inner">',
-    '    <div class="profile-main">',
-    '      <div class="profile-avatar">',
-    '        <div class="profile-avatar-inner">' + avatarContent + '</div>',
-    '      </div>',
-    '      <div class="profile-info">',
-    '        <h1 class="profile-name">' + escHtml(peserta.nama) + '</h1>',
-    '        <div class="profile-meta">',
-    '          <span>&#128101; ' + escHtml(peserta.tim) + '</span>',
-    '          <span>&bull;</span>',
-    '          <span>&#128197; ' + escHtml(peserta.batch_name) + '</span>',
-    '          <span>&bull;</span>',
-    '          <span>&#128188; ' + escHtml(peserta.jabatan || "Agent") + '</span>',
-    '          <span>&bull;</span>',
-    '          <span>&#9201; ' + escHtml(masaKerja) + '</span>',
-    '        </div>',
-    '      </div>',
-    '    </div>',
-    '    <div class="profile-actions" aria-label="Aksi laporan">',
-    '      <span class="profile-action profile-action-secondary" aria-hidden="true">',
-    '        <span class="profile-action-icon">' + downloadIcon + '</span>',
-    '        <span>Unduh Laporan</span>',
-    '        <span class="profile-action-icon">' + chevronIcon + '</span>',
-    '      </span>',
-    isStaff
-      ? '      <span class="profile-action profile-action-primary" aria-hidden="true"><span class="profile-action-icon">' + plusIcon + '</span><span>Input Audit</span></span>'
-      : '',
-    '    </div>',
-    '  </div>',
-    '</div>',
-  ].join("\n");
-}
-
-function buildQuickviewHtml(
-  quickview: SidakAgentQuickviewResponse | null | undefined,
-  selectedYear: number,
-  selectedService: string,
-): string {
-  if (!quickview) return "";
-  const sameScope = quickview.combinedTeam?.scopeId != null && quickview.combinedTeam.scopeId === quickview.leaderTeam?.scopeId;
-  const rankMetric = (label: string, metric: SidakAgentQuickviewResponse["combinedTeam"], sameAsCombined = false): string => {
-    const hasRank = metric?.rank != null;
-    const supportingText = !metric ? "Peringkat belum tersedia" : sameAsCombined ? "Cakupan sama dengan Tim Gabungan" : hasRank ? metric.scopeLabel : finiteNumber(metric.total) > 0 ? "Belum masuk peringkat pada cakupan ini" : "Belum ada agen pembanding";
-    const peers = metric?.tiedAgents ?? null;
-    const tie = peers?.length && metric?.rank != null
-      ? peers.length <= 2
-        ? `<p class="quickview-tie">Berbagi peringkat ${numberText(metric.rank)} dengan ${peers.map((peer) => escHtml(peer.nama)).join(peers.length === 2 ? " dan " : "")}</p>`
-        : `<details class="quickview-ties"><summary>Berbagi peringkat ${numberText(metric.rank)} dengan ${escHtml(peers[0].nama)} dan ${peers.length - 1} agen lain</summary><ul>${peers.map((peer) => `<li>${escHtml(peer.nama)}</li>`).join("")}</ul></details>`
-      : "";
-    return `<div role="group" aria-label="${escHtml(label)}: ${hasRank ? `peringkat ${numberText(metric?.rank)}` : "belum tersedia"}"><strong>${escHtml(label)}</strong><b>${hasRank ? `#${numberText(metric?.rank)} dari ${numberText(metric?.total)}` : "—"}</b><small>${escHtml(supportingText)}</small>${tie}</div>`;
-  };
-  const forecast = quickview.forecast;
-  const completeRanking = quickview.combinedTeam?.rank != null && quickview.leaderTeam?.rank != null;
-  const quickviewRail = '<div class="quickview-rail" role="region" aria-label="Quickview performa agent">' +
-    rankMetric("Tim Gabungan", quickview.combinedTeam) +
-    rankMetric("Tim Leader", quickview.leaderTeam, sameScope) +
-    '<div role="group" aria-label="Forecast: ' + escHtml(forecast?.label ?? "belum tersedia") + '"><strong>Forecast 3 bulan</strong><b>' + escHtml(forecast?.label ?? "—") + '</b><small>' + escHtml(forecast?.supportingText ?? "Forecast belum tersedia") + '</small></div>' +
-    (completeRanking ? '<p>Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.</p>' : "") +
-    '</div>';
-  return '<div class="quickview-surface"><div class="quickview-heading"><h3>Quickview performa</h3><p>Tahun ' + yearText(selectedYear) + ' &#8226; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>' + quickviewRail + '</div>';
-}
-
-function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
-  topTickets: TicketScoreExport[],
-  activeRootCauses: RootCauseResult[],
-  variant: AgentHtmlVariant,
-  selectedMonth: number | null): string {
-  if (monthlySummaries.length === 0) return "";
-  const latest = (selectedMonth
-    ? monthlySummaries.find((summary) => summary.month === selectedMonth)
-    : null) ?? monthlySummaries[monthlySummaries.length - 1];
-  const sColor = scoreColor(latest.finalScore);
-  const sLabel = scoreLabel(latest.finalScore);
-  const safeMonth = Math.trunc(finiteNumber(latest.month, 1, 1, 12));
-  const monthLabel = (MONTHS_FULL[safeMonth - 1]?.slice(0, 3) ?? "") + " " + numberText(latest.year);
-  const latestIndex = monthlySummaries.findIndex((summary) => summary.id === latest.id);
-  const prev = latestIndex > 0 ? monthlySummaries[latestIndex - 1] : null;
-  const delta = prev ? latest.finalScore - prev.finalScore : null;
-  const safeFinalScore = finiteNumber(latest.finalScore, 0, 0, 100);
-  const pct = safeFinalScore;
-
-  const deltaText = delta !== null
-    ? (delta > 0 ? "+" : "") + finiteNumber(delta).toFixed(1) + "%"
-    : "-";
-
-  // Build tickets HTML
-  let ticketsHtml: string;
-  if (topTickets.length === 0) {
-    ticketsHtml = '<p style="text-align:center;padding:1.5rem 0;color:#6b7280;font-size:0.75rem;font-weight:700;text-transform:uppercase;">Tidak ada tiket yang menurunkan skor</p>';
-  } else {
-    ticketsHtml = topTickets
-      .map(function (t, i) {
-        return [
-          '<div class="ticket-item">',
-          '  <span class="ticket-rank">#' + (i + 1) + "</span>",
-          "  <div>",
-          '    <div style="display:flex;align-items:center;gap:0.375rem;">',
-          '      <span class="ticket-id-label">ID</span>',
-          '      <span class="ticket-id">' + escHtml(t.no_tiket) + "</span>",
-          "    </div>",
-          '    <p class="ticket-param">"' + escHtml(t.heaviestParam) + '"</p>',
-          "  </div>",
-          '  <div style="text-align:right;">',
-          '    <div class="ticket-deduction">',
-          '      <span class="ticket-deduction-value">' +
-            finiteNumber(t.scoreDeduction).toFixed(1) +
-            "</span>",
-          '      <span class="ticket-deduction-label">Poin</span>',
-          "    </div>",
-          '    <div class="ticket-count">' + numberText(t.findingCount) + " Temuan</div>",
-          "  </div>",
-          "</div>",
-        ].join("\n");
-      })
-      .join("\n");
-  }
-
-  // Build root causes HTML
-  let causesHtml: string;
-  if (activeRootCauses.length === 0) {
-    causesHtml = '<p style="text-align:center;padding:1.5rem 0;color:#6b7280;font-size:0.75rem;font-weight:700;text-transform:uppercase;">Belum ditemukan pola akar masalah yang dominan</p>';
-  } else {
-    causesHtml = activeRootCauses
-      .map(function (cause) {
-        const keywordTag = cause.matchedKeywords[0]
-          ? "<span>Keyword: " + escHtml(cause.matchedKeywords[0]) + "</span>"
-          : "";
-        const ticketDisclosure = cause.ticketReferences?.length
-          ? '<details class="root-cause-tickets"' + (variant === "static" ? " open" : "") + '><summary>' + (variant === "static" ? "Tiket terkait" : "Tampilkan tiket") + '</summary><ul>' + cause.ticketReferences.map((ticket) => '<li><strong>' + escHtml(ticket.no_tiket) + '</strong> · ' + escHtml(ticket.periodLabel) + ' · ' + numberText(ticket.findingsCount) + ' temuan</li>').join("") + '</ul></details>'
-          : "";
-        return [
-          '<div class="cause-box">',
-          '  <div class="cause-primary-badges"><span>Utama</span>' + (finiteNumber(cause.criticalFindingsCount) > 0 ? '<span class="critical">◉ ' + numberText(cause.criticalFindingsCount) + ' critical</span>' : '') + '</div>',
-          '  <div class="cause-label">' + escHtml(cause.label) + "</div>",
-          '  <div class="cause-stats">',
-          "    <span>" + numberText(cause.findingsCount) + " temuan</span>",
-          "    <span>" + numberText(cause.affectedTickets) + " tiket</span>",
-          "    " + keywordTag,
-          "  </div>",
-          '  <div class="cause-recommendation">' +
-            escHtml(cause.recommendation) +
-            "</div>",
-          "  " + ticketDisclosure,
-          "</div>",
-        ].join("\n");
-      })
-      .join("\n");
-  }
-
-  return [
-    '<div class="audit-dossier">',
-    '  <div class="dossier-score-strip">',
-    '    <div class="score-section dossier-score-panel">',
-    '  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.25rem 0.75rem;margin-bottom:0.25rem;">',
-    '    <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#475569;">' + escHtml(monthLabel) + '</span>',
-    '    <span style="font-size:0.75rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:' + sColor + ';">' + sLabel + '</span>',
-    '  </div>',
-    '  <div style="display:flex;align-items:baseline;gap:0.375rem;">',
-    '    <span style="font-size:2.25rem;font-weight:900;letter-spacing:-0.03em;line-height:1;color:' + sColor + ';">' + safeFinalScore.toFixed(1) + '</span>',
-    '    <span style="font-size:0.875rem;font-weight:800;color:#475569;">%</span>',
-    '  </div>',
-    '  <div class="score-bar" style="margin-top:0.5rem;">',
-    '    <div class="score-bar-fill" style="width:' + pct + '%;background:' + sColor + ';"></div>',
-    '  </div>',
-    '  <div style="display:flex;gap:2rem;padding-top:0.75rem;border-top:1px solid #e5e7eb;margin-top:0.75rem;">',
-    '    <div class="stat-cell">',
-    '      <span class="stat-label">Sesi</span>',
-    '      <span class="stat-value">' + numberText(latest.sessionCount) + '</span>',
-    '    </div>',
-    '    <div class="stat-cell">',
-    '      <span class="stat-label">Temuan</span>',
-    '      <span class="stat-value">' + numberText(latest.findingsCount) + '</span>',
-    '    </div>',
-    '    <div class="stat-cell">',
-    '      <span class="stat-label">Selisih</span>',
-    '      <span class="stat-value" style="' + deltaStyle(delta) + '">' + deltaText + '</span>',
-    '    </div>',
-    '  </div>',
-    '    </div>',
-    '  </div>',
-    '',
-    '  <div class="dossier-lower-row">',
-    '<div class="score-section dossier-ticket-column">',
-    '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:0.5rem;">',
-    '    <h4 style="font-family:Outfit, Inter, sans-serif;font-size:1.125rem;font-weight:700;letter-spacing:-0.02em;color:#111827;">Tiket Pengurang Skor Terbesar</h4>',
-    '    <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#475569;">' + topTickets.length + ' Tiket</span>',
-    '  </div>',
-    '  ' + ticketsHtml,
-    '</div>',
-    '',
-    '<div class="score-section dossier-root-cause-column">',
-    '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:1rem;">',
-    '    <div>',
-    '      <h4 style="font-family:Outfit, Inter, sans-serif;font-size:1.125rem;font-weight:700;letter-spacing:-0.02em;color:#111827;">Akar Masalah</h4>',
-    '      <p style="font-size:0.75rem;font-weight:500;color:#6b7280;margin-top:0.125rem;">Berdasarkan temuan periode aktif</p>',
-    '    </div>',
-    '    <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#475569;">' + activeRootCauses.length + ' Pola</span>',
-    '  </div>',
-    '  ' + causesHtml,
-    '</div>',
-    '  </div>',
-    '</div>',
-  ].join("\n");
-}
-
-function buildComparisonHtml(data: AgentDetailData): string {
-  if (!data.comparisonTable || data.comparisonTable.rows.length === 0) {
-    return "";
-  }
-  const scope = data.comparisonTable.scope;
-  const rows = data.comparisonTable.rows;
-  const startLabel = MONTHS_SHORT[(scope.startMonth ?? 1) - 1];
-  const endLabel = MONTHS_SHORT[(scope.endMonth ?? 12) - 1];
-  const totalRow = rows.find(function (r) { return r.key === "total"; });
-  const scopeLine = startLabel + "-" + endLabel + " " + yearText(scope.year) +
-    " &#8226; Layanan " + escHtml(scope.serviceLabel || scope.serviceType) +
-    " &#8226; " + escHtml(scope.teamLabel) +
-    " &#8226; " + numberText(totalRow?.teamAgentCount) + " agen tim / " +
-    numberText(totalRow?.serviceAgentCount) + " agen layanan sama";
-
-  const tableRows = rows.map(function (row) {
-    const cls = row.key === "total" ? ' class="total-row"' : "";
-    const teamDelta = calculateComparisonDelta(row.agentCount, row.teamAverage);
-    const serviceDelta = calculateComparisonDelta(
-      row.agentCount,
-      row.serviceAverage,
-    );
-    return [
-      '<tr' + cls + '>',
-      '  <td>' + escHtml(row.label) + '</td>',
-      '  <td class="num">' + numberText(row.agentCount) + '</td>',
-      '  <td class="num muted">' + finiteNumber(row.teamAverage).toFixed(1) + '</td>',
-      '  <td class="num muted">' + finiteNumber(row.serviceAverage).toFixed(1) + '</td>',
-      '  <td class="num ' + comparisonDeltaClass(teamDelta) + '">' +
-        formatComparisonDelta(teamDelta) + '</td>',
-      '  <td class="num ' + comparisonDeltaClass(serviceDelta) + '">' +
-        formatComparisonDelta(serviceDelta) + '</td>',
-      '</tr>',
-    ].join("\n");
-  }).join("\n");
-
-  return [
-    '<div class="trend-comparison">',
-    '  <div class="section-header">',
-    '    <h4>Perbandingan Temuan</h4>',
-    '    <p class="section-subtitle">' + scopeLine + '</p>',
-    '  </div>',
-    '  <div class="table-scroll">',
-    '  <table class="comparison-table">',
-    '    <thead>',
-    '      <tr>',
-    '        <th>Parameter</th>',
-    '        <th class="num">Agen ini</th>',
-    '        <th class="num">Rata-rata tim</th>',
-    '        <th class="num">Rata-rata layanan sama</th>',
-    '        <th class="num">% vs tim</th>',
-    '        <th class="num">% vs layanan sama</th>',
-    '      </tr>',
-    '    </thead>',
-    '    <tbody>',
-    '      ' + tableRows,
-    '    </tbody>',
-    '  </table>',
-    '  </div>',
-    '</div>',
-  ].join("\n");
-}
-
-function calculateComparisonDelta(
-  agentCount: number,
-  average: number,
-): number | null {
-  const safeAgentCount = finiteNumber(agentCount);
-  const safeAverage = finiteNumber(average);
-  if (safeAverage === 0) return safeAgentCount === 0 ? 0 : null;
-  return finiteNumber(((safeAgentCount - safeAverage) / safeAverage) * 100);
-}
-
-function formatComparisonDelta(value: number | null): string {
-  if (value === null) return "n/a";
-  const rounded = Math.round(finiteNumber(value) * 10) / 10;
-  if (Object.is(rounded, -0) || rounded === 0) return "0%";
-  const sign = rounded > 0 ? "+" : "-";
-  const formatted = new Intl.NumberFormat("id-ID", {
-    maximumFractionDigits: 1,
-  }).format(Math.abs(rounded));
-  return sign + formatted + "%";
-}
-
-function comparisonDeltaClass(value: number | null): string {
-  if (value === null || value === 0) return "muted";
-  return value > 0 ? "delta-adverse" : "delta-favorable";
-}
-
-function buildFindingsHtml(
-  temuanDisplayItems: TemuanDisplayItemExport[],
-  variant: AgentHtmlVariant,
-): string {
-  if (temuanDisplayItems.length === 0) {
-    return '<p style="text-align:center;padding:2rem 0;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;font-size:0.75rem;">Tidak ada data temuan untuk konteks ini</p>';
-  }
-
-  const grouped = new Map<string, TemuanDisplayItemExport[]>();
-  temuanDisplayItems.forEach(function (item) {
-    const key = item.year + "-" + String(item.month).padStart(2, "0");
-    const items = grouped.get(key) ?? [];
-    items.push(item);
-    grouped.set(key, items);
-  });
-
-  return Array.from(grouped.entries())
-    .sort(function ([a], [b]) { return b.localeCompare(a); })
-    .map(function ([, monthItems]) {
-      const first = monthItems[0];
-      const tickets = new Map<string, { label: string; items: TemuanDisplayItemExport[] }>();
-      monthItems.forEach(function (item) {
-        const rawTicket = (item.no_tiket ?? "").trim();
-        const key = rawTicket ? rawTicket.toUpperCase() : "audit-" + item.id;
-        const ticket = tickets.get(key) ?? {
-          label: rawTicket ? rawTicket.toUpperCase() : "AUDIT INTERNAL",
-          items: [],
-        };
-        ticket.items.push(item);
-        tickets.set(key, ticket);
-      });
-
-      const ticketHtml = Array.from(tickets.values())
-        .map(function (ticket, ticketIndex) {
-          const itemsHtml = ticket.items.map(function (item) {
-            const badgeClass = item.category === "critical"
-              ? "badge-critical"
-              : "badge-non-critical";
-            return [
-              '<article class="finding-item">',
-              '<div class="finding-score"><strong>' + numberText(item.nilai) + '</strong><span>' +
-                escHtml(nilaiLabel(item.nilai)) + '</span></div>',
-              '<div class="finding-body">',
-              '<span class="badge ' + badgeClass + '">' + escHtml(item.category) + '</span>',
-              '<h5>' + escHtml(item.indicatorName) + '</h5>',
-              '<div class="finding-copy-grid">',
-              '<div><span>Ketidaksesuaian</span><p>' + escHtml(item.ketidaksesuaian ?? "—") + '</p></div>',
-              '<div><span class="recommendation-label">Rekomendasi</span><p class="recommendation-copy">' +
-                escHtml(item.sebaiknya ?? "—") + '</p></div>',
-              '</div>',
-              '</div>',
-              '</article>',
-            ].join("");
-          }).join("");
-
-          return [
-            '<div class="findings-ticket">',
-            '<div class="findings-ticket-head">',
-            '<span class="ticket-index">#' + (ticketIndex + 1) + '</span>',
-            '<div><span>No Tiket</span><strong>' + escHtml(ticket.label) + '</strong></div>',
-            '<small>' + numberText(ticket.items.length) + ' Parameter</small>',
-            '</div>',
-            itemsHtml,
-            '</div>',
-          ].join("");
-        }).join("");
-
-      const monthLabel = (MONTHS_FULL[first.month - 1] ?? String(first.month)) +
-        " " + first.year;
-      const open = variant === "static" ? " open" : "";
-      return [
-        '<details class="findings-period"' + open + '>',
-        '<summary>',
-        '<span class="findings-month-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>',
-        '<span class="findings-period-copy"><strong>' + escHtml(monthLabel) + '</strong><small>' +
-          numberText(monthItems.length) + ' Temuan &bull; ' + numberText(tickets.size) + ' Tiket</small></span>',
-        '<span class="disclosure-icon" aria-hidden="true"></span>',
-        '</summary>',
-        '<div class="findings-period-content">' + ticketHtml + '</div>',
-        '</details>',
-      ].join("");
-    }).join("");
-}
-
-// ---------------------------------------------------------------------------
-// Live page shell
-// ---------------------------------------------------------------------------
-
-function buildLiveShellHtml(): string {
-  return '<header class="page-header">' +
-    '<div class="back-heading"><span class="back-button" aria-hidden="true">←</span><p>SIDAK · Profil Agen</p></div>' +
-    '<span class="shell-refresh" aria-hidden="true">↻ Muat ulang</span>' +
-    '</header>';
-}
-
-function buildLiveContextHtml(
-  data: AgentDetailData,
-  selectedYear: number,
-  selectedService: string,
-  variant: AgentHtmlVariant,
-): string {
-  const tabItems = [
-    ["summary", "Ringkasan", "section-summary"],
-    ["trend", "Tren", "section-trend"],
-    ["temuan", "Temuan", "section-temuan"],
-  ];
-  const tabs = tabItems.map(([id, label, target]) =>
-    variant === "interactive"
-      ? '<button type="button" id="report-tab-' + id + '" role="tab" tabindex="' + (id === "summary" ? "0" : "-1") + '" data-report-tab="' + id + '" aria-selected="' + (id === "summary" ? "true" : "false") + '" aria-controls="' + target + '">' + label + '</button>'
-      : '<span id="report-tab-' + id + '" role="tab" data-report-tab="' + id + '" aria-selected="true" aria-controls="' + target + '">' + label + '</span>',
-  ).join("");
-  return '<div class="context-control-bar" aria-label="Kontrol konteks audit">' +
-    '<div class="context-primary">' +
-      '<label for="report-year"><span>Tahun audit</span><select id="report-year" disabled aria-label="Tahun audit"><option>' + yearText(selectedYear) + '</option></select></label>' +
-      '<div class="service-pills"><span class="context-label">Layanan audit</span><span class="service-pill">' + escHtml(selectedService.toUpperCase()) + '</span></div>' +
-    '</div>' +
-    '<div class="agent-switchers"><label for="report-folder">Folder</label><select id="report-folder" disabled><option>Folder...</option></select><label for="report-agent">Agen</label><select id="report-agent" disabled><option>' + escHtml(data.peserta.nama) + '</option></select></div>' +
-    '</div><nav class="section-tabs" role="tablist" aria-label="Navigasi bagian laporan">' + tabs + '</nav>';
-}
-
-function buildMonthRailHtml(summaries: AgentPeriodSummary[], selectedMonth: number | null): string {
-  if (!summaries.length) return "";
-  const activeMonth = selectedMonth ?? summaries[summaries.length - 1].month;
-  return `<div class="month-rail-block"><div class="month-rail-legend"><span class="month-score-indicator" aria-hidden="true">⚠</span><span>QA di bawah target 95%</span></div><div class="month-rail" aria-label="Bulan audit terpilih">${summaries.map((summary) => {
-    const active = activeMonth === summary.month;
-    const safeScore = finiteNumber(summary.finalScore, 0, 0, 100);
-    const width = Math.max(20, Math.min(100, safeScore));
-    const scoreStatus = safeScore < 95 ? ", QA di bawah target 95 persen" : "";
-    const scoreMark = safeScore < 95
-      ? '<span class="month-score-indicator" role="img" aria-label="Skor QA di bawah target 95 persen" title="Skor QA di bawah target 95 persen">⚠</span>'
-      : '';
-    const monthLabel = (MONTHS_FULL[summary.month - 1] ?? String(summary.month)) + " " + yearText(summary.year);
-    return `<span class="month-chip${active ? " active" : ""}" aria-current="${active ? "true" : "false"}" aria-label="${escHtml(monthLabel + ", skor " + safeScore.toFixed(1) + " persen" + scoreStatus)}"><span class="month-label">${escHtml(monthLabel)}</span><strong>${safeScore.toFixed(1)}</strong><em>%</em>${scoreMark}<i style="width:${width}%"></i></span>`;
-  }).join("")}</div></div>`;
-}
-
-// ---------------------------------------------------------------------------
 // generateHTML
 // ---------------------------------------------------------------------------
 
+/**
+ * Pintu masuk HTML untuk kedua varian.
+ *
+ * Seluruh desain laporan (stylesheet, kerangka markup, dan script interaktif)
+ * hidup di `agentReportHtml.ts` supaya hanya ada SATU sumber desain. Fungsi ini
+ * tidak merakit apa pun: ia hanya meneruskan snapshot yang sama ke builder itu.
+ */
 export function generateHTML(
   data: AgentDetailData,
   monthlySummaries: AgentPeriodSummary[],
@@ -937,322 +712,15 @@ export function generateHTML(
   variant: AgentHtmlVariant = "static",
   context: AgentHtmlExportContext = {},
 ): string {
-  const peserta = data.peserta;
-  const masaKerja = computeTenure(peserta.bergabung_date);
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("id-ID", {
-    year: "numeric", month: "long", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-
-  const quickviewHtml = buildQuickviewHtml(
-    context.quickview,
+  return buildAgentReportHtml({
+    data,
+    monthlySummaries,
+    temuanDisplayItems,
+    topTickets,
+    activeRootCauses,
     selectedYear,
     selectedService,
-  );
-  const profileHtml = buildProfileHtml(peserta, masaKerja, context.isStaff ?? true);
-  const activeMonth = context.selectedMonth ?? monthlySummaries[monthlySummaries.length - 1]?.month ?? null;
-  const dossierHtml = buildDossierHtml(monthlySummaries, topTickets, activeRootCauses, variant, activeMonth);
-  const comparisonHtml = buildComparisonHtml(data);
-  const trendHtml = buildTrendReportHtml(data, variant, selectedYear, comparisonHtml);
-  const findingsHtml = buildFindingsHtml(temuanDisplayItems, variant);
-  const interactiveScript = buildInteractiveReportScript(variant);
-  const liveShellHtml = buildLiveShellHtml();
-  const liveContextHtml = buildLiveContextHtml(data, selectedYear, selectedService, variant);
-  const monthRailHtml = buildMonthRailHtml(monthlySummaries, context.selectedMonth ?? null);
-  const summaryEmptyHtml = monthlySummaries.length === 0
-    ? '<div class="summary-empty"><strong>Data belum tersedia</strong><p>Belum ada ringkasan skor untuk layanan ' + escHtml(selectedService.toUpperCase()) + ' pada tahun ' + yearText(selectedYear) + '.</p></div>'
-    : '';
-
-  return [
-    '<!DOCTYPE html>',
-    '<html lang="id">',
-    '<head>',
-    '<meta charset="UTF-8">',
-    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-    '<title>Laporan Audit - ' + escHtml(peserta.nama) + '</title>',
-    '<style>',
-    '  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }',
-    '  html { font-size: 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
-    '  body {',
-    '    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;',
-    '    background: #f8fafc;',
-    '    color: #111827;',
-    '    line-height: 1.5;',
-    '    overflow-x: hidden;',
-    '    padding: clamp(1rem, 3vw, 2.5rem);',
-    '  }',
-    '  .container { width: 100%; max-width: 1280px; margin: 0 auto; min-width: 0; }',
-    '  .card {',
-    '    background: #ffffff;',
-    '    border: 1px solid #e2e8f0;',
-    '    border-radius: 1rem;',
-    '    padding: 1.5rem;',
-    '    margin-bottom: 1.25rem;',
-    '  }',
-    '  .card-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }',
-    '  .card-header h3 {',
-    '    font-family: Outfit, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
-    '    font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; color: #111827;',
-    '  }',
-    '  .card-header p {',
-    '    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em;',
-    '    text-transform: uppercase; color: #6b7280;',
-    '  }',
-    '  .report-section { margin: 0 0 2rem; min-width: 0; }',
-    '  .report-section-heading { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }',
-    '  .report-section-heading h2 { font-size: 1.125rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: #0f172a; }',
-    '  .report-section-heading p { margin-top: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #475569; }',
-    '  .section-icon { display: inline-flex; width: 2.5rem; height: 2.5rem; flex: none; align-items: center; justify-content: center; border-radius: 0.5rem; background: #f1f5f9; color: #64748b; }',
-    '  .section-icon svg, .findings-month-icon svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }',
-    '  .section-header { margin-bottom: 1rem; }',
-    '  .section-header h4 {',
-    '    font-family: Outfit, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
-    '    font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; color: #111827;',
-    '  }',
-    '  .section-subtitle { font-size: 0.875rem; font-weight: 500; color: #475569; margin-top: 0.25rem; }',
-    '  .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }',
-    '  .trend-card { padding: clamp(1.25rem, 3vw, 2rem); }',
-    '  .trend-intro { max-width: 48rem; }',
-    '  .trend-kicker { color: #475569; font-size: 0.75rem; font-weight: 700; }',
-    '  .trend-intro h3 { margin-top: 0.45rem; color: #0f172a; font-size: clamp(1.35rem, 3vw, 1.875rem); font-weight: 900; line-height: 1.15; letter-spacing: -0.035em; text-wrap: balance; }',
-    '  .trend-intro > p:last-child { margin-top: 0.5rem; max-width: 68ch; color: #475569; font-size: 0.875rem; font-weight: 500; }',
-    '  .trend-chart-shell { margin-top: 1.5rem; padding: clamp(0.5rem, 2vw, 1rem); border: 1px solid #e2e8f0; border-radius: 1rem; background: #fbfdff; }',
-    '  .trend-chart { display: block; width: 100%; height: auto; min-width: 0; }',
-    '  .trend-figure { width: 100%; min-width: 0; }',
-    '  .chart-grid { stroke: #e5e7eb; stroke-width: 1; }',
-    '  .chart-axis-label { fill: #475569; font-size: 12px; font-weight: 600; }',
-    '  .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.875rem; color: #475569; font-size: 0.75rem; }',
-    '  .chart-legend-item { display: inline-flex; align-items: center; gap: 0.375rem; }',
-    '  .legend-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex: none; }',
-    '  .trend-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.5rem; }',
-    '  .trend-filter { display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.45rem; border: 1px solid #cbd5e1; border-radius: 0.75rem; background: #fff; color: #334155; padding: 0.5rem 0.8rem; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: border-color 160ms ease-out, background 160ms ease-out, color 160ms ease-out; }',
-    '  .trend-filter:hover { border-color: #94a3b8; color: #0f172a; }',
-    '  .trend-filter[aria-pressed="true"] { border-color: #111827; background: #111827; color: #ffffff; }',
-    '  .trend-filter[aria-pressed="true"] .legend-dot { background: #ffffff !important; }',
-    '  .trend-filter:focus-visible { outline: 3px solid rgba(37,99,235,0.3); outline-offset: 2px; }',
-
-    '  .trend-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid #e2e8f0; } .trend-stat, .trend-insight { min-width:0; } .trend-insight { grid-column:span 2; display:flex; align-items:flex-start; gap:1rem; }',
-    '  .trend-stat span, .trend-insight span { display: block; color: #475569; font-size: 0.75rem; font-weight: 700; }',
-    '  .trend-stat strong { display: inline-block; margin-top: 0.35rem; color: #0f172a; font-size: 1.75rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }',
-    '  .trend-stat small { margin-left: 0.5rem; color: #475569; font-size: 0.875rem; }',
-    '  .trend-insight p { margin-top: 0.5rem; max-width: 68ch; color: #334155; font-size: 0.875rem; line-height: 1.6; }',
-    '  @media (max-width: 640px) { .trend-stats { grid-template-columns:1fr; gap:1rem; } .trend-insight { grid-column:auto; } .trend-filter { width:100%; justify-content:flex-start; } }',
-    '  @media (prefers-reduced-motion: reduce) { .trend-filter { transition: none; } }',
-    '  .empty-state { padding: 2rem 0; text-align: center; color: #475569; font-size: 0.875rem; } .summary-empty { padding:3rem 1rem; text-align:center; } .summary-empty strong { color:#475569; font-size:1.125rem; } .summary-empty p { margin-top:0.5rem; color:#475569; font-size:0.875rem; }',
-    '  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }',
-    '  [hidden] { display: none !important; }',
-    '  @media print {',
-    '    @page { size: A4 landscape; margin: 10mm; }',
-    '    body { background: white; padding: 0.5in; }',
-    '    .card { break-inside: auto; border: 1px solid #ddd; }',
-    '    .profile-bar, .score-section, .trend-figure { break-inside: avoid; }',
-    '    .table-scroll { overflow: visible; }',
-    '    .findings-table { table-layout: fixed; }',
-    '    thead { display: table-header-group; }',
-    '    tr { break-inside: avoid; }',
-    '  }',
-    '',
-    '  /* Profile Bar */',
-    '  .profile-bar {',
-    '    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem;',
-    '    padding: 1rem 1.25rem; margin-bottom: 1.5rem; overflow: visible; position: relative;',
-    '  }',
-    '  .profile-inner {',
-    '    display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 1rem;',
-    '  }',
-    '  .profile-main {',
-    '    display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1rem; min-width: 0;',
-    '  }',
-    '  .profile-actions {',
-    '    display: flex; flex-direction: column; gap: 0.75rem; width: 100%; align-items: stretch;',
-    '  }',
-    '  .profile-action {',
-    '    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0 1rem; color: #111827; font-size: 0.875rem; font-weight: 700; white-space: nowrap; user-select: none;',
-    '  }',
-    '  .profile-action svg { width: 0.875rem; height: 0.875rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }',
-    '  .profile-action-icon { display: inline-flex; align-items: center; justify-content: center; }',
-    '  .profile-action-secondary { background: transparent; }',
-    '  .profile-action-primary { background: #111827; color: #ffffff; }',
-    '  @media (min-width: 768px) {',
-    '    .profile-inner { flex-direction: row; align-items: flex-end; }',
-    '    .profile-main { flex-direction: row; text-align: left; align-items: center; }',
-    '    .profile-actions { width: auto; flex-direction: row; align-items: center; justify-content: flex-end; }',
-    '  }',
-    '  .profile-avatar {',
-    '    width: 3rem; height: 3rem; border-radius: 0.75rem;',
-    '    border: 1px solid #e5e7eb; padding: 0.25rem; background: #ffffff; flex-shrink: 0;',
-    '  }',
-    '  .profile-avatar-inner {',
-    '    width: 100%; height: 100%; border-radius: calc(0.75rem - 4px);',
-    '    background: #f8f9fb; display: flex; align-items: center; justify-content: center;',
-    '    font-size: 1.25rem; font-weight: 700; text-transform: uppercase;',
-    '    color: #334155; overflow: hidden;',
-    '  }',
-    '  .profile-avatar-inner img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(0.75rem - 4px); }',
-    '  .profile-name {',
-    '    font-family: Outfit, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;',
-    '    font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;',
-    '    line-height: 1.2; color: #111827; margin-bottom: 0.75rem;',
-    '  }',
-    '  .profile-meta {',
-    '    display: flex; flex-wrap: wrap; justify-content: center;',
-    '    gap: 0.25rem 1rem; font-size: 0.875rem; font-weight: 600; color: #475569;',
-    '  }',
-    '  @media (min-width: 768px) { .profile-meta { justify-content: flex-start; } }',
-    '',
-    '  /* Score Section */',
-    '  .score-section { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1.25rem; }',
-    '  .audit-dossier { overflow:hidden; background:#fff; border:1px solid #e5e7eb; border-radius:1rem; } .dossier-score-strip { padding:1.25rem; } .dossier-score-panel { border:0; padding:0; } .dossier-lower-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); border-top:1px solid #e5e7eb; } .dossier-lower-row > .score-section { border:0; border-radius:0; margin:0 !important; } .dossier-ticket-column { border-right:1px solid #e5e7eb !important; } .dossier-root-cause-column { min-width:0; }',
-    '  .cause-primary-badges { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; } .cause-primary-badges span { display:inline-flex; align-items:center; border:1px solid #e5e7eb; border-radius:999px; padding:.3rem .6rem; font-size:.75rem; font-weight:700; } .cause-primary-badges .critical { border-color:#fda4af; background:#fff1f2; color:#be123c; }',
-    '  .score-bar {',
-    '    height: 0.5rem; border-radius: 9999px; background: #f3f4f6; overflow: hidden;',
-    '  }',
-    '  .score-bar-fill { height: 100%; border-radius: 9999px; }',
-    '  .stat-cell { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }',
-    '  .stat-label {',
-    '    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;',
-    '    color: #475569;',
-    '  }',
-    '  .stat-value { font-size: 1rem; font-weight: 900; line-height: 1; color: #111827; }',
-    '',
-    '  /* Tables */',
-    '  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }',
-    '  th {',
-    '    text-align: left; font-size: 0.75rem; font-weight: 700;',
-    '    letter-spacing: 0.02em; color: #475569;',
-    '    padding: 0.75rem 1rem; border-bottom: 1px solid #e5e7eb;',
-    '  }',
-    '  td {',
-    '    padding: 0.625rem 1rem; border-bottom: 1px solid rgba(229,231,235,0.6); color: #111827;',
-    '  }',
-    '  .num { text-align: right; font-variant-numeric: tabular-nums; }',
-    '  .muted { color: #6b7280; }',
-    '  .delta-adverse { color: #be123c; font-weight: 700; }',
-    '  .delta-favorable { color: #047857; font-weight: 700; }',
-    '  .total-row td { font-weight: 600; }',
-    '  .badge {',
-    '    display: inline-block; padding: 0.25rem 0.5rem; border-radius: 0.5rem;',
-    '    font-size: 0.75rem; font-weight: 700;',
-    '    border: 1px solid;',
-    '  }',
-    '  .badge-critical { background: #fff1f2; color: #be123c; border-color: #fda4af; }',
-    '  .badge-non-critical { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }',
-    '',
-    '  /* Grouped Findings */',
-    '  .findings-period { border-bottom: 1px solid #e2e8f0; }',
-    '  .findings-period:last-child { border-bottom: 0; }',
-    '  .findings-period > summary { display: flex; min-height: 2.75rem; align-items: center; gap: 1rem; border-radius: 0.75rem; padding: 0.75rem 1rem; cursor: pointer; list-style: none; transition: background 160ms ease-out; }',
-    '  .findings-period > summary::-webkit-details-marker { display: none; }',
-    '  .findings-period > summary:hover { background: #f8fafc; }',
-    '  .findings-month-icon { display: inline-flex; width: 2.5rem; height: 2.5rem; flex: none; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 0.75rem; color: #64748b; }',
-    '  .findings-period-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; }',
-    '  .findings-period-copy strong { color: #0f172a; font-size: 1rem; font-weight: 800; }',
-    '  .findings-period-copy small { margin-top: 0.2rem; color: #475569; font-size: 0.75rem; font-weight: 600; }',
-    '  .disclosure-icon { width: 0.55rem; height: 0.55rem; flex: none; border-right: 2px solid #64748b; border-bottom: 2px solid #64748b; transform: rotate(45deg); transition: transform 160ms ease-out; }',
-    '  .findings-period[open] .disclosure-icon { transform: rotate(225deg); }',
-    '  .findings-period-content { padding: 0.5rem 1rem 1.75rem 1rem; }',
-    '  .findings-ticket + .findings-ticket { margin-top: 2rem; }',
-    '  .findings-ticket-head { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; }',
-    '  .ticket-index { color: #94a3b8; font-size: 0.75rem; font-style: italic; font-weight: 900; }',
-    '  .findings-ticket-head div { display: flex; flex-direction: column; }',
-    '  .findings-ticket-head div span { color: #475569; font-size: 0.75rem; font-weight: 600; }',
-    '  .findings-ticket-head div strong { margin-top: 0.15rem; color: #0f172a; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.875rem; font-weight: 800; letter-spacing: 0.04em; overflow-wrap:anywhere; }',
-    '  .findings-ticket-head small { color: #475569; font-size: 0.75rem; font-weight: 600; }',
-    '  .finding-item { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 1rem; padding: 1rem 0 0; }',
-    '  .finding-score { display: flex; flex-direction: column; align-items: center; padding-top: 0.15rem; }',
-    '  .finding-score strong { color: #0f172a; font-size: 1.25rem; font-weight: 900; line-height: 1; }',
-    '  .finding-score span { margin-top: 0.25rem; color: #475569; font-size: 0.75rem; font-weight: 700; }',
-    '  .finding-body h5 { margin-top: 0.45rem; color: #0f172a; font-size: 0.9375rem; font-weight: 900; line-height: 1.35; overflow-wrap: anywhere; }',
-    '  .finding-copy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin-top: 1rem; }',
-    '  .finding-copy-grid span { color: #475569; font-size: 0.75rem; font-weight: 700; }',
-    '  .finding-copy-grid p { margin-top: 0.35rem; color: #475569; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }',
-    '  .finding-copy-grid .recommendation-label { color: #2563eb; }',
-    '  .finding-copy-grid .recommendation-copy { color: #1e293b; font-weight: 700; }',
-    '  @media (max-width: 640px) { .findings-period-content { padding-left: 0.75rem; padding-right: 0.75rem; } .finding-item { grid-template-columns: 2.5rem minmax(0, 1fr); gap: 0.75rem; padding-left: 0; } .finding-copy-grid { grid-template-columns: 1fr; gap: 1rem; } .findings-ticket-head { grid-template-columns: 1.5rem minmax(0, 1fr); } .findings-ticket-head small { grid-column: 2; } }',
-    '',
-    '  /* Ticket Items */',
-    '  .ticket-item {',
-    '    display: grid; grid-template-columns: auto 1fr auto; align-items: start;',
-    '    gap: 0.625rem; padding: 0.75rem 0; border-bottom: 1px solid #f3f4f6;',
-    '  }',
-    '  .ticket-item:last-child { border-bottom: none; }',
-    '  .ticket-rank { font-size: 0.75rem; font-weight: 700; font-style: italic; color: #64748b; width: 1.25rem; }',
-    '  .ticket-id-label { font-size: 0.75rem; font-weight: 700; color: #475569; }',
-    '  .ticket-id {',
-    '    font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 0.875rem;',
-    '    font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; color: #111827;',
-    '  }',
-    '  .ticket-param { font-size: 0.875rem; font-weight: 500; color: #475569; overflow-wrap:anywhere; }',
-    '  .ticket-deduction { color: #be123c; }',
-    '  .ticket-deduction-value { font-size: 0.75rem; font-weight: 900; }',
-    '  .ticket-deduction-label { font-size: 0.75rem; font-weight: 700; }',
-    '  .ticket-count { font-size: 0.75rem; font-weight: 600; color: #475569; }',
-    '',
-    '  /* Cause Boxes */',
-    '  .cause-box {',
-    '    border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1rem;',
-    '    background: rgba(248,249,251,0.7); margin-bottom: 0.75rem;',
-    '  }',
-    '  .cause-box:last-child { margin-bottom: 0; }',
-    '  .cause-label { font-size: 0.875rem; font-weight: 900; letter-spacing: -0.01em; color: #111827; margin-bottom: 0.25rem; }',
-    '  .cause-stats {',
-    '    display: flex; flex-wrap: wrap; gap: 0.5rem;',
-    '    font-size: 0.75rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;',
-    '  }',
-    '  .cause-recommendation { font-size: 0.8125rem; line-height: 1.5; color: #374151; }',
-    '  .root-cause-tickets { margin-top:0.75rem; color:#334155; font-size:0.75rem; } .root-cause-tickets summary { cursor:pointer; font-weight:800; } .root-cause-tickets ul { margin-top:0.5rem; padding-left:1rem; }',
-    '  .page-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0 0 1.25rem; }',
-    '  .back-heading { display:flex; align-items:center; gap:0.75rem; } .back-button { display:inline-flex; width:2.25rem; height:2.25rem; align-items:center; justify-content:center; border:1px solid #e5e7eb; border-radius:0.75rem; color:#64748b; font-size:1.25rem; }',
-    '  .page-header p { color:#475569; font-size:0.875rem; font-weight:700; } .quickview-rail b { color:#111827; font-size:1.125rem; }',
-    '  .context-control-bar { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1rem; padding:.75rem 0; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; } .context-primary, .service-pills, .trend-control, .agent-switchers { display:flex; align-items:center; gap:.5rem; } .context-control-bar label, .context-label, .trend-control > span, .agent-switchers label { color:#475569; font-size:.75rem; font-weight:700; } .context-control-bar select, .service-pills .service-pill, .agent-switchers select { min-height:2.75rem; border:1px solid #cbd5e1; border-radius:.75rem; background:#f8fafc; color:#111827; padding:0 .75rem; font:inherit; font-size:.875rem; font-weight:700; } .service-pills { padding:.25rem; border:1px solid #cbd5e1; border-radius:.75rem; } .service-pills .service-pill { display:inline-flex; align-items:center; justify-content:center; min-height:2.25rem; background:#fff; color:#111827; } .trend-control { flex-wrap:wrap; padding:.25rem 0; } .trend-control select { min-height:2.75rem; } .agent-switchers select { min-width:0; }',
-    '  .quickview-surface { margin-top:1rem; border-top:1px solid #e5e7eb; } .quickview-heading { padding-top:1rem; } .quickview-heading h3 { color:#111827; font-family:Outfit, Inter, sans-serif; font-size:1rem; font-weight:800; } .quickview-heading p { margin-top:.25rem; color:#475569; font-size:.875rem; } .quickview-rail { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1rem; border-top:1px solid #e5e7eb; } .quickview-rail > div { min-width:0; padding:1rem 1.25rem; border-right:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-right:0; } .quickview-rail strong, .quickview-rail small { display:block; color:#475569; font-size:0.875rem; } .quickview-rail b { display:block; margin-top:0.35rem; } .quickview-rail p { grid-column:1/-1; padding:0.75rem 1.25rem; border-top:1px solid #e5e7eb; color:#475569; font-size:0.75rem; }',
-    '  .section-tabs { position:sticky; top:0; z-index:2; display:flex; gap:1.5rem; margin:0 0 2rem; border-bottom:1px solid #e5e7eb; background:#f8fafc; } .section-tabs [data-report-tab] { min-height:2.75rem; border:0; border-bottom:2px solid transparent; background:transparent; color:#475569; padding:0.75rem 0; font:inherit; font-size:0.875rem; font-weight:700; cursor:pointer; } .section-tabs [data-report-tab]:hover, .section-tabs [data-report-tab]:focus-visible, .section-tabs [data-report-tab][aria-selected="true"] { border-bottom-color:#111827; color:#111827; outline:none; }',
-    '  .month-rail-block { min-width:0; } .month-rail-legend { display:flex; align-items:center; gap:.375rem; margin-bottom:.5rem; color:#475569; font-size:.75rem; font-weight:700; } .month-rail-legend .month-score-indicator { position:static; display:inline-flex; width:1rem; height:1rem; align-items:center; justify-content:center; color:#b45309; font-size:.9rem; line-height:1; } .month-rail { display:flex; gap:0.375rem; overflow-x:auto; margin-bottom:1.5rem; padding-bottom:0.25rem; } .month-chip { position:relative; min-width:5.5rem; padding:.6rem .7rem .8rem; border:1px solid transparent; border-radius:.75rem; background:transparent; color:#475569; text-align:left; } .month-chip.active { border-color:#cbd5e1; background:#f1f5f9; color:#111827; } .month-chip .month-label, .month-chip strong, .month-chip em { display:block; } .month-chip .month-label { margin-bottom:.35rem; font-size:.75rem; font-weight:700; line-height:1.2; } .month-chip strong { font-size:1rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; } .month-chip em { position:absolute; left:3rem; bottom:.82rem; color:#475569; font-size:.75rem; font-style:normal; font-weight:700; } .month-chip .month-score-indicator { position:absolute; top:.55rem; right:.55rem; display:inline-flex; width:1.25rem; height:1.25rem; align-items:center; justify-content:center; color:#b45309; font-size:.95rem; line-height:1; } .month-chip i { position:absolute; bottom:0; left:.7rem; right:.7rem; height:.25rem; border-radius:9999px; background:#e2e8f0; overflow:hidden; } .month-chip i::before { content:""; display:block; width:100%; height:100%; border-radius:9999px; background:#059669; }',
-    '  .shell-refresh { display:inline-flex; min-height:2.75rem; align-items:center; justify-content:center; border:1px solid #e5e7eb; border-radius:0.75rem; background:transparent; color:#111827; padding:0.55rem 0.75rem; font:inherit; font-size:0.875rem; font-weight:700; } .shell-refresh[aria-hidden="true"] { pointer-events:none; }',
-    '  @media (max-width:640px) { .page-header { align-items:flex-start; flex-direction:column; } .profile-bar { padding:1rem; } .profile-main { width:100%; } .profile-actions { width:100%; } .quickview-rail { grid-template-columns:1fr; } .quickview-rail > div { border-right:0; border-bottom:1px solid #e5e7eb; } .quickview-rail > div:last-of-type { border-bottom:0; } .dossier-lower-row { grid-template-columns:1fr; } .dossier-ticket-column { border-right:0 !important; border-bottom:1px solid #e5e7eb !important; } .context-control-bar, .context-primary, .trend-control, .agent-switchers { align-items:stretch; flex-direction:column; width:100%; } .context-primary > *, .trend-control > *, .agent-switchers > * { width:100%; } .agent-switchers select { min-width:0 !important; } .section-tabs { gap:1rem; overflow-x:auto; } .section-tabs [data-report-tab] { white-space:nowrap; } }',
-    '  @media print { .section-tabs { display:none; } .page-header { padding-bottom:0.5rem; } .quickview-rail { break-inside:avoid; } .month-chip { border-color:#e5e7eb; } [data-report-panel][hidden] { display:block !important; } }',
-    '</style>',
-    '</head>',
-    '<body>',
-    '<div class="container" data-report-variant="' + variant + '">',
-    liveShellHtml,
-    profileHtml,
-    liveContextHtml,
-    '',
-    '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-summary" data-report-section="performance" data-report-panel="summary" id="section-summary">',
-    '<div class="report-section-heading">',
-    '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>',
-    '<div><h2>Ringkasan Skor Bulanan</h2><p>Tahun ' + yearText(selectedYear) + ' &bull; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>',
-    '</div>',
-    '<div class="card summary-card">',
-    '  ' + quickviewHtml,
-    '  ' + monthRailHtml,
-    '  ' + summaryEmptyHtml,
-    '  ' + dossierHtml,
-    '</div>',
-    '</section>',
-    '',
-    trendHtml,
-    '',
-    '',
-    '<section class="report-section" role="tabpanel" aria-labelledby="report-tab-temuan" data-report-section="findings" data-report-panel="temuan" id="section-temuan"' + (variant === "interactive" ? " hidden" : "") + '>',
-    '<div class="report-section-heading">',
-    '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>',
-    '<div><h2>Riwayat Temuan</h2><p>Temuan dikelompokkan per bulan penilaian</p></div>',
-    '</div>',
-    '<div class="card">',
-    '  ' + findingsHtml,
-    '</div>',
-    '</section>',
-    '',
-    '<div style="text-align:center;padding-top:1rem;font-size:0.75rem;color:#64748b;">',
-    '  <p>Laporan Audit SIDAK &mdash; Dihasilkan pada ' + escHtml(dateStr) + '</p>',
-    '</div>',
-    '',
-    '</div>',
-    interactiveScript,
-    '</body>',
-    '</html>',
-  ].join("\n");
+    variant,
+    context,
+  });
 }

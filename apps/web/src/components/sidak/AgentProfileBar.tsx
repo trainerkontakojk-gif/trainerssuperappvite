@@ -5,6 +5,7 @@ import {
   Clock,
   Code,
   Download,
+  FileDown,
   FileText,
   Plus,
   RefreshCw,
@@ -64,7 +65,8 @@ const exportOptions: Array<{
     format: "csv",
     label: "CSV",
     icon: <Table aria-hidden="true" />,
-    description: "Format tabel sederhana",
+    // Jujur soal bentuk filenya: CSV ini multi-seksi, bukan satu tabel datar.
+    description: "Multi-seksi: profil, bulanan, temuan, tiket, akar masalah",
   },
   {
     format: "md",
@@ -83,6 +85,14 @@ const exportOptions: Array<{
     label: "HTML Statis",
     icon: <Code aria-hidden="true" />,
     description: "Siap cetak tanpa JavaScript",
+  },
+  {
+    format: "pdf",
+    label: "PDF",
+    icon: <FileDown aria-hidden="true" />,
+    // Jujur soal isinya: dokumen A4 ber-paginasi dengan teks yang bisa dicari,
+    // bukan hasil tangkapan layar.
+    description: "Dokumen A4, teks bisa dicari dan disalin",
   },
 ];
 

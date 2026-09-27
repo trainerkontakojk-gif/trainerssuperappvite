@@ -8,6 +8,7 @@ import type {
   RootCauseResult,
 } from "@trainers/types";
 import { useAuthStore } from "../store/authStore";
+import { notify } from "../lib/toast";
 import {
   calculateSessionScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
@@ -16,6 +17,13 @@ import type {
   AgentHtmlExportContext,
   AgentReportFormat,
 } from "../utils/exportAgentReport";
+
+/**
+ * Judul umpan balik ekspor gagal. Sengaja satu konstanta supaya copy yang
+ * dilihat pengguna tidak berbeda antara "data belum ada" dan "generator
+ * melempar error".
+ */
+const EXPORT_ERROR_TITLE = "Gagal membuat laporan";
 
 interface TicketScore {
   no_tiket: string;
@@ -504,77 +512,167 @@ export function useAgentDetail(agentId: string) {
 
   const handleExport = useCallback(
     async (format: AgentReportFormat, exportContext: AgentHtmlExportContext = {}) => {
+      // Data profil adalah sumber semua angka laporan. Tanpa data, yang bisa
+      // terjadi hanya unduhan berisi tebakan — jadi gagal terukur, bukan diam.
+      if (!data) {
+        notify.error(
+          EXPORT_ERROR_TITLE,
+          "Data profil agen belum tersedia. Muat ulang halaman lalu coba lagi.",
+        );
+        return;
+      }
+
+      let objectUrl: string | null = null;
       try {
         const {
           generateCSV,
           generateMD,
           generateHTML,
+          buildAgentReportFileName,
         } = await import("../utils/exportAgentReport");
 
-        const fileName = `Laporan_Audit_${
-          data?.peserta.nama ?? agentId
-        }_${selectedYear}`;
-        let content: string;
+        /**
+         * Cakupan dibaca dari state yang sama dengan yang tampil di layar, bukan
+         * dari argumen terpisah, sehingga label cakupan tidak pernah berbeda dari
+         * angka yang sedang dilihat pengguna. Nilai ini hanya menambah label —
+         * isi baris data tetap berasal dari perhitungan yang sudah ada.
+         */
+        const scope = { service: selectedService, month: selectedMonth };
+        let content: string | null = null;
         let mimeType: string;
         let extension: string;
+        /**
+         * Blob biner (PDF) memakai jalur sendiri: tidak ada prefix BOM, dan
+         * MIME-nya `application/pdf` tanpa `charset`. Empat format teks
+         * sebelumnya tetap memakai BOM UTF-8 seperti sebelumnya.
+         */
+        let binaryContent: ArrayBuffer | null = null;
 
-        if (format === "csv") {
-          content = generateCSV(
-            data!,
-            monthlySummaries,
-            temuanDisplayItems,
-            topTickets,
-            activeRootCauses,
-            selectedYear,
-          );
-          mimeType = "text/csv;charset=utf-8;";
-          extension = "csv";
-        } else if (format === "md") {
-          content = generateMD(
-            data!,
-            monthlySummaries,
-            temuanDisplayItems,
-            topTickets,
-            activeRootCauses,
-            selectedYear,
-          );
-          mimeType = "text/markdown;charset=utf-8;";
-          extension = "md";
-        } else {
-          const variant =
-            format === "html-interactive" ? "interactive" : "static";
-          content = generateHTML(
-            data!,
-            monthlySummaries,
-            temuanDisplayItems,
-            topTickets,
-            activeRootCauses,
-            selectedYear,
-            selectedService,
-            variant,
-            exportContext,
-          );
-          mimeType = "text/html;charset=utf-8;";
-          extension = `${variant === "interactive" ? "interaktif" : "statis"}.html`;
+        // Dispatch eksplisit: format yang tidak dikenal gagal keras, bukan
+        // diam-diam jatuh ke cabang HTML.
+        switch (format) {
+          case "csv":
+            content = generateCSV(
+              data,
+              monthlySummaries,
+              temuanDisplayItems,
+              topTickets,
+              activeRootCauses,
+              selectedYear,
+              scope,
+            );
+            mimeType = "text/csv;charset=utf-8;";
+            extension = "csv";
+            break;
+          case "md":
+            content = generateMD(
+              data,
+              monthlySummaries,
+              temuanDisplayItems,
+              topTickets,
+              activeRootCauses,
+              selectedYear,
+              scope,
+            );
+            mimeType = "text/markdown;charset=utf-8;";
+            extension = "md";
+            break;
+          case "html-interactive":
+          case "html-static": {
+            const variant =
+              format === "html-interactive" ? "interactive" : "static";
+            content = generateHTML(
+              data,
+              monthlySummaries,
+              temuanDisplayItems,
+              topTickets,
+              activeRootCauses,
+              selectedYear,
+              selectedService,
+              variant,
+              exportContext,
+            );
+            mimeType = "text/html;charset=utf-8;";
+            extension = `${variant === "interactive" ? "interaktif" : "statis"}.html`;
+            break;
+          }
+          case "pdf": {
+            /**
+             * Generator PDF diimpor terpisah dari `exportAgentReport` supaya
+             * `jspdf` hanya dimuat ketika pengguna benar-benar memilih PDF,
+             * dan supaya kegagalan async-nya punya sumber kegagalan sendiri
+             * (bukan tercampur dengan generator teks).
+             */
+            const { generateAgentReportPdf } = await import(
+              "../utils/agentReportPdf"
+            );
+            binaryContent = await generateAgentReportPdf({
+              data,
+              monthlySummaries,
+              temuanDisplayItems,
+              topTickets,
+              activeRootCauses,
+              selectedYear,
+              selectedService,
+              context: exportContext,
+            });
+            mimeType = "application/pdf";
+            extension = "pdf";
+            break;
+          }
+          default:
+            throw new Error(
+              `format laporan tidak didukung: ${String(format)}`,
+            );
+        }
+
+        // Fail-closed: kalau tidak ada isi teks maupun biner, jangan pernah
+        // membuat file kosong yang unduhannya sukses padahal isinya tidak ada.
+        if (binaryContent === null && content === null) {
+          throw new Error(`format laporan tidak menghasilkan isi: ${format}`);
         }
 
         const bom = "\uFEFF";
-        const blob = new Blob([bom + content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
+        const blob =
+          binaryContent !== null
+            ? new Blob([binaryContent], { type: mimeType })
+            : new Blob([bom + (content as string)], { type: mimeType });
+        objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `${fileName}.${extension}`;
+        a.href = objectUrl;
+        a.download = buildAgentReportFileName({
+          agentName: data.peserta.nama,
+          agentId,
+          year: selectedYear,
+          extension,
+        });
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch {
-        // silent
+      } catch (error) {
+        // Kegagalan tidak boleh senyap: tanpa umpan balik ini pengguna hanya
+        // melihat tombol yang "tidak terjadi apa-apa". Detail teknis tetap di
+        // console supaya tidak membocorkan pesan mentah ke UI.
+        console.error("[sidak] gagal membuat laporan audit", error);
+        notify.error(
+          EXPORT_ERROR_TITLE,
+          "Laporan tidak dapat dibuat. Muat ulang halaman lalu coba unduh ulang.",
+        );
+      } finally {
+        // Jangan revoke pada task yang sama dengan `click()`: unduhan blob
+        // dimulai asynchronous, jadi revoke langsung bisa membatalkan file
+        // sebelum browser menulisnya. Blob URL juga dibersihkan otomatis saat
+        // dokumen dibuang.
+        if (objectUrl) {
+          const url = objectUrl;
+          window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
       }
     },
     [
       data,
       selectedYear,
+      selectedMonth,
       monthlySummaries,
       temuanDisplayItems,
       topTickets,
