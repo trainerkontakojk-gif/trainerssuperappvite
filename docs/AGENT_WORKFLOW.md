@@ -63,7 +63,7 @@ Documentation, comments, or a simple ignored-file/config correction with **no ru
 
 One module, an established local pattern, and no public contract, security, schema, migration, authentication/RLS, or access-control change. Use an inline mini-spec with the goal, acceptance criteria, exact files, and focused verification. A persisted plan is optional unless requested.
 
-- Run an explicit focused test when behavior is touched, the affected workspace lint and typecheck, and self-review.
+- Run focused Playwright E2E for runtime behavior when touched, plus affected-workspace lint/typecheck and self-review. If E2E is not feasible, stop and ask Fajar before any non-E2E test.
 - TDD remains mandatory for behavior or regression changes even when the edit is local. A bug fix or material runtime blast radius is at least Lane C; high-risk categories are Lane D.
 - A root build is not inherited automatically; run it only when an affected or release gate requires it.
 
@@ -72,7 +72,7 @@ One module, an established local pattern, and no public contract, security, sche
 A behavior change, bug fix, or multi-file implementation with moderate blast radius that does not meet Lane D. Persist `plans/markdown/<feature>.md` with **Requirement**, **Design**, and **Tasklist** sections, and drift-check any approved plan before editing.
 
 - Use `trainers-superapp-tdd` as the primary repository TDD workflow: RED, confirm the expected failure, smallest GREEN implementation, then REFACTOR while green.
-- Run focused regression tests, affected-workspace checks, and `thermo-nuclear` after implementation and before final verification. Repair material findings and repeat the relevant gate.
+- Run focused Playwright E2E regression, affected-workspace checks, `thermo-nuclear`, then the applicable final checks. Ask Fajar before any non-E2E test exception.
 - A behavior change never bypasses its regression test because it is small.
 
 ### Lane D — high-risk/release
@@ -81,7 +81,7 @@ Security, permissions, authentication/RLS, secret handling, schema or migration,
 
 - Use a full persisted plan with Requirement/Design/Tasklist, strict TDD, and the relevant specialist review.
 - Preserve security/auth/RLS/schema/API and AI-usage evidence; do not trade it for a shorter loop.
-- Run root `typecheck`, lint, applicable core tests, and the production build, plus full-suite/CI verification for pre-merge or release.
+- For pre-merge/release, run root `typecheck`, lint, production build, and the applicable safe E2E gate; do not run legacy unit/full suites without Fajar's explicit approval.
 - For a new interface or significant redesign, use `ui-ux-pro-max` before implementation and run `impeccable` audit/polish before the final gate. Copy-only, invisible, and docs work do not require UI skills.
 
 ### Read-only analysis (outside the change lanes)
@@ -151,7 +151,7 @@ Existing code and tests are sufficient for an internal refactor that does not ch
 ## 6. Execution and evidence
 
 - Start by loading `trainers-superapp-tdd` for any Lane B/C/D behavior work and classifying the lane, then writing the required mini-spec or persisted plan. If scope expands across a trust boundary, reclassify upward before continuing. Editing before lane classification is a violation — stop and load the skill.
-- For behavior work, follow RED → confirm failure → smallest GREEN change → REFACTOR while green. Keep the regression test with the owning module.
+- For behavior work, follow RED → confirm failure → smallest GREEN change → REFACTOR while green, using Playwright E2E as the default regression test under Fajar's E2E-first rule. Keep the E2E with the owning module/spec. If E2E cannot prove a distinct contract, stop and ask Fajar before using a non-E2E test.
 - Preserve intentional dirty work. Do not reset, clean, stash, overwrite, or attribute unrelated changes to the current task. Workers edit only assigned paths.
 - Record exact commands and exit codes. A report must never claim a command ran unless it actually ran.
 
@@ -159,51 +159,35 @@ Existing code and tests are sufficient for an internal refactor that does not ch
 
 Run only the gates applicable to the selected lane. Stop at the first new or unexplained failure, preserve the exact output, and do not repair unrelated product code. Docs/config-only work does not inherit product tests, root lint, or root build.
 
-### Focused and Git-affected checks
+### Focused E2E and Git-affected checks
 
-An explicit Vitest path is the focused loop and runs the named file only:
-
-```bash
-pnpm --filter @trainers/api exec vitest run src/__tests__/<file>.test.ts
-pnpm --filter @trainers/web exec vitest run src/__tests__/<file>.test.tsx
-pnpm --filter @trainers/telefun exec vitest run src/<file>.test.ts
-```
-
-Use the default Web config for a `.tsx` focused test. The `--changed` task is Git-affected selection, not one-file focus; its scope and duration depend on the dirty tree and Turbo graph.
-
-After implementation, run applicable checks in this order:
-
-```bash
-pnpm --filter @trainers/api exec vitest run src/__tests__/auth-middleware.test.ts
-pnpm --filter @trainers/web exec vitest run src/__tests__/sidak-scoring-core.test.tsx
-pnpm --filter @trainers/telefun exec vitest run src/providers/OpenAIRealtimeAdapter.test.ts
-pnpm typecheck
-pnpm test:affected
-```
-
-The tooling contract defines root `typecheck` as Turbo typechecking. Use `test:affected` for the Git-affected loop; `test:targeted` remains a compatibility name for that same Turbo task and must not be run again as separate evidence. Neither name is evidence that only the named regression ran. `pnpm typecheck` must finish with no emitted files and exit 0.
+- For changed runtime behavior, add/run a focused Playwright E2E through the relevant user-facing flow. An existing Vitest/unit test is not a substitute for that E2E evidence.
+- Run the E2E RED-first when applicable. Before running it, verify the Playwright web server and every backend/database/provider target are local or explicitly test-only and disposable; `apps/web/playwright.config.ts` currently starts root `pnpm dev`, so inspect inherited environment and target URLs rather than assuming it is safe. Never use production credentials/data. If a safe E2E path cannot be established, stop and ask Fajar; do not fall back to a unit test.
+- When the E2E proves the same contract as an existing unit test, remove that superseded unit test and its entries from suite manifests in the same scoped change. Do not bulk-delete unrelated legacy tests.
+- Do not add or routinely run Vitest/unit suites (`test:affected`, `test:targeted`, `test:core`, `test:fast`, or `test:full`) as the default regression check. If a distinct invariant cannot be meaningfully, safely, and reliably proved end-to-end, ask Fajar before adding/running any non-E2E test; include the exact invariant, limitation, and smallest proposed alternative.
+- Typecheck, lint, and build remain compile/quality checks, not substitutes for E2E behavior evidence. Root `pnpm typecheck` is Turbo typechecking and must finish without emitted files and exit 0.
 
 ### Final integration checks
 
-For applicable Lane C/D or release gates, run once in this fail-fast order:
+For applicable Lane C/D or release gates, after confirming the E2E target is safe, run:
 
 ```bash
+pnpm --filter @trainers/web test:e2e -- <focused-spec>
 pnpm lint
-pnpm test:core
 pnpm build
 git diff --check
 ```
 
-Expected evidence is lint success, curated core tests (including Web `.tsx` entries under the default config and the Telefun curated core list), production build success, and a clean final diff check. Full `pnpm test`/`pnpm test:full` is a pre-merge/release product gate, not required solely for docs/config-only work. The fast tier is curated per app: API files are listed in `scripts/test-fast.json` (append new light unit tests there), Web runs every `.test.ts` under `vitest.config.fast.ts` (`.tsx` excluded), and Telefun runs its full unit suite. Heavy integration-style files run only in the full suite.
+Expected evidence is the focused E2E result, applicable lint/build success, and a clean final diff check. Existing Vitest suite commands/manifests are legacy inventory, not default regression gates; do not expand them or run them for new work without Fajar's explicit approval. Docs/config-only work does not inherit product tests, root lint, or root build.
 
 Any verification failure is unresolved until independently explained; do not weaken a gate or change unrelated product code to make it pass.
 
 ### Lane-specific stop points
 
 - Lane A: relevant syntax/format/structural checks, stale-rule checks where applicable, and `git diff --check`.
-- Lane B: focused behavior tests if touched, affected workspace lint/typecheck, then self-review.
-- Lane C: focused regression tests, affected workspace checks, `thermo-nuclear`, then the applicable final checks.
-- Lane D: strict TDD evidence, specialist review, root typecheck/lint/core/build, and full-suite/CI verification when pre-merge or release applies.
+- Lane B: focused E2E for runtime behavior if touched, affected workspace lint/typecheck, then self-review.
+- Lane C: focused E2E regression, affected workspace checks, `thermo-nuclear`, then the applicable final checks.
+- Lane D: strict E2E-first TDD evidence, specialist review, root typecheck/lint/build, and applicable safe E2E/CI verification when pre-merge or release applies. Ask Fajar before any non-E2E test exception.
 
 ## 8. Checklists
 

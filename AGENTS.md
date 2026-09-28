@@ -1,4 +1,4 @@
-- NEVER write unit tests after you write code.
+- Default to no unit tests: verify runtime behavior with E2E. If a contract cannot be proven through E2E, ask Fajar before adding or running any non-E2E test.
 - Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work. At the end of E2E tests, produce a verifiable and repeatable artifact.
 - If you must test a system in isolation, FIRST write all the ways it could fail, THEN write the code.
 
@@ -23,12 +23,14 @@ This file contains concise project guardrails for every harness. The detailed wo
 
 ## Test Hygiene
 
-- Behavior, bug, regression, security, permission, auth/RLS, schema/migration, and API-contract changes require regression evidence and strict TDD. Use the repository-specific `trainers-superapp-tdd` workflow as the primary TDD workflow. Load it at task start before lane classification — never edit before the skill is loaded.
-- Keep tests consolidated by module, share differing harness helpers, and remove or rename transitional `parity`/`legacy` tests when their migration contract is complete.
-- **Test curation:** before adding a test, search the owning suite. Update an existing test when the contract changes; merge overlapping cases; remove obsolete, duplicate, transitional, or implementation-detail tests. Prefer table-driven cases for the same behavior. Keep one focused regression test per distinct observable contract—not one test per branch, variant, CSS class, or fallback.
-- **Test budget:** add coverage only for a distinct bug, contract, boundary, failure mode, or security risk. Do not add snapshots, oversized fixtures, or parallel suites merely to increase counts; keep `scripts/test-core.json` curated and remove stale entries when ownership or contract moves.
-- **Fallback discipline:** keep one primary path and at most one bounded fallback per failure boundary. Add a fallback only for an explicit user-recoverable/error contract; never chain fallbacks or silently turn failure into plausible success. Any exception needs an explicit contract/plan and tests for its distinct outcome.
-- Files listed in `scripts/test-core.json`, including `.tsx` entries, must execute under the intended test configuration.
+- Behavior, bug, regression, security, permission, auth/RLS, schema/migration, and API-contract changes require regression evidence and strict TDD. Use the repository-specific `trainers-superapp-tdd` workflow as the primary workflow. Load it at task start before lane classification — never edit before the skill is loaded.
+- **E2E-first (standing Fajar rule):** for changed runtime behavior, use Playwright E2E through the relevant user-facing flow as the default regression proof; do not add unit tests or use them as a substitute. Write/run the failing E2E before implementation when applicable. Keep E2E setup isolated to local/test-only services and data; never point it at production.
+- **Replace, then remove:** when an existing unit test covers the same contract, add and verify equivalent E2E coverage, then remove that superseded unit test and its stale suite-list entry in the same scoped change. Do not mass-delete unrelated existing tests under this rule.
+- **Ask before a non-E2E exception:** if a distinct contract cannot be tested meaningfully, safely, and reliably through E2E, stop and ask Fajar before adding or running a unit/isolated test. State the exact contract, why E2E cannot prove it, and the smallest proposed alternative; do not silently choose a fallback.
+- **Test curation:** before changing coverage, search the owning suite. Merge overlapping coverage and remove obsolete/duplicate tests only when replacement coverage is verified. Prefer one E2E per distinct observable contract—not one test per branch, CSS class, or fallback.
+- **Test budget:** add coverage only for a distinct bug, contract, boundary, failure mode, or security risk. Do not add snapshots, oversized fixtures, or parallel suites merely to increase counts. Do not add new unit tests to `scripts/test-core.json` or `scripts/test-fast.json`; keep legacy entries only until the corresponding contracts are migrated or separately approved for removal.
+- **Fallback discipline:** keep one primary path and at most one bounded fallback per failure boundary. Add a fallback only for an explicit user-recoverable/error contract; never chain fallbacks or silently turn failure into plausible success. Any exception needs Fajar's approval before adding/running non-E2E coverage.
+- Existing unit-test suite lists are legacy inventory, not authorization to add or run unit tests for new work. Remove an entry when its contract has been replaced by verified E2E coverage; leave unrelated entries untouched unless separately scoped.
 
 ## Skills and quality gates
 

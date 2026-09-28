@@ -105,6 +105,14 @@ const MOCKED_API: ReadonlyArray<MockedEndpoint> = [
     path: "/api/v1/sidak/agents/agent-tren-jarak-null",
   },
   {
+    // Agen dengan tabel benchmark panjang: memaksa tabel PDF benar-benar
+    // terbelah antar halaman, jadi paginasi tabel + header berulang bisa
+    // dibuktikan dari file yang diunduh.
+    id: "agentDetailLongTable",
+    method: "GET",
+    path: "/api/v1/sidak/agents/agent-tabel-panjang",
+  },
+  {
     id: "agentDetailEmpty",
     method: "GET",
     path: "/api/v1/sidak/agents/agent-kosong",
@@ -845,6 +853,48 @@ const longTextAgentFixture: AgentDetailData = {
 };
 
 /**
+ * Angka yang HARUS muncul di seksi "Perkembangan Skor" untuk dua agen di atas,
+ * ditulis literal dan TIDAK diturunkan dari `periodSummaries`.
+ *
+ * Kalau test ikut menghitung ulang dari fixture, ia hanya mengukur bahwa
+ * laporan konsisten dengan dirinya sendiri. Yang dibuktikan di sini adalah
+ * kontrak yang dilihat pembaca: grafik/tabel skor berisi skor asli yang
+ * dihitung backend, dan bukan jumlah temuan. Kalau skor fixture diubah tanpa
+ * konstanta ini ikut diubah, test gagal pada nilai yang paling konkret.
+ */
+type ScoreExpectation = {
+  /** Label periode seperti yang digambar di sumbu X. */
+  period: string;
+  finalScore: number;
+  nonCriticalScore: number;
+  criticalScore: number;
+};
+
+/** Skor agen utama (layanan CALL): `period-01` + `period-02`. */
+const AGENT_SCORE_HISTORY: readonly ScoreExpectation[] = [
+  { period: "Jan 26", finalScore: 82, nonCriticalScore: 84, criticalScore: 80 },
+  { period: "Feb 26", finalScore: 91, nonCriticalScore: 92, criticalScore: 90 },
+];
+
+/** Skor agen teks panjang (layanan CALL): + `period-04` dengan nilai desimal. */
+const LONG_TEXT_SCORE_HISTORY: readonly ScoreExpectation[] = [
+  ...AGENT_SCORE_HISTORY,
+  {
+    period: "Mar 26",
+    finalScore: 74.5,
+    nonCriticalScore: 79,
+    criticalScore: 70,
+  },
+];
+
+/**
+ * Jumlah temuan per periode untuk agen utama (`personalTrend`). Angka-angka ini
+ * punya satuan dan makna yang berbeda dari skor, dan itulah yang diuji: tabel
+ * tren temuan harus berisi angka-angka ini, tabel skor tidak boleh memuatnya.
+ */
+const AGENT_FINDING_COUNTS: readonly number[] = [0, 1];
+
+/**
  * Label seri tren yang MEMUTUS \`<script>\` dari dalam data. Vektor ini
  * berbeda dari teks temuan: label ikut masuk ke legenda, sumbu, dan\`
  * `data-series*\`, jadi kalau escaping-nya hanya di jalur temuan,vektor ini
@@ -1007,6 +1057,65 @@ const gapTrendAgentFixture: AgentDetailData = {
       teamLabel: HOSTILE_TEAM_LABEL,
       serviceLabel: HOSTILE_SERVICE_LABEL,
     },
+  },
+};
+
+/**
+ * Agen kedelapan — tabel benchmark yang MELAMPAUI satu halaman.
+ *
+ * Tabel perbandingan temuan yang pendek selalu muat di satu halaman, jadi
+ * paginasi tabel (baris berpindah halaman, header berulang, tidak ada baris
+ * yang terpotong) tidak pernah bisa dibuktikan dari fixture lain. Fixture ini
+ * sengaja punya banyak baris perbandingan: cukup untuk membuat tabel PDF
+ * melewati batas halaman, dan setiap label baris unik sehingga test bisa
+ * menghitung bahwa setiap baris muncul utuh PADA SATU halaman.
+ */
+const LONG_TABLE_AGENT_ID = "agent-tabel-panjang";
+const LONG_TABLE_AGENT_NAME = "Nadia Puspita";
+/** Jumlah baris perbandingan di luar baris total. */
+const LONG_TABLE_ROWS = 24;
+
+/** Label baris benchmark ke-`index` (1-based), unik dan bisa dipin test. */
+function longTableRowLabel(index: number): string {
+  return `Indikator QA ${String(index).padStart(2, "0")}`;
+}
+
+const longTableAgentFixture: AgentDetailData = {
+  ...agentFixture,
+  peserta: {
+    ...agentFixture.peserta,
+    id: LONG_TABLE_AGENT_ID,
+    nama: LONG_TABLE_AGENT_NAME,
+  },
+  comparisonTable: {
+    scope: {
+      year: YEAR,
+      serviceType: SERVICE,
+      startMonth: 1,
+      endMonth: 12,
+      teamLabel: "Tim Call",
+      serviceLabel: "Call",
+    },
+    rows: [
+      {
+        key: "total",
+        label: "Total Temuan",
+        agentCount: 12,
+        teamAverage: 20,
+        serviceAverage: 25,
+        teamAgentCount: 4,
+        serviceAgentCount: 8,
+      },
+      ...Array.from({ length: LONG_TABLE_ROWS }, (_, offset) => ({
+        key: `long-row-${offset + 1}`,
+        label: longTableRowLabel(offset + 1),
+        agentCount: offset + 1,
+        teamAverage: 2 + offset,
+        serviceAverage: 3 + offset,
+        teamAgentCount: 4,
+        serviceAgentCount: 8,
+      })),
+    ],
   },
 };
 
@@ -1434,6 +1543,12 @@ async function mockAgentApi(page: Page, audit: NetworkAudit) {
       );
       return;
     }
+    if (endpoint.id === "agentDetailLongTable") {
+      await route.fulfill(
+        toJson({ success: true, data: longTableAgentFixture }),
+      );
+      return;
+    }
     if (endpoint.id === "agentDetailEmpty") {
       await route.fulfill(toJson({ success: true, data: emptyAgentFixture }));
       return;
@@ -1855,6 +1970,13 @@ export {
   SINGLE_POINT_TREND_AGENT_NAME,
   GAP_TREND_AGENT_ID,
   GAP_TREND_AGENT_NAME,
+  LONG_TABLE_AGENT_ID,
+  LONG_TABLE_AGENT_NAME,
+  LONG_TABLE_ROWS,
+  longTableRowLabel,
+  AGENT_SCORE_HISTORY,
+  LONG_TEXT_SCORE_HISTORY,
+  AGENT_FINDING_COUNTS,
   DEGENERATE_SERIES_LABEL,
   HOSTILE_SERIES_LABEL,
   HOSTILE_TEAM_LABEL,

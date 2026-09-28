@@ -23,6 +23,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 
 - [`MONITORING_TOKEN_USAGE_BILLING.md`](MONITORING_TOKEN_USAGE_BILLING.md) — AI usage and billing contract.
 - [`SIDAK_LOGIC_AND_SCORING.md`](SIDAK_LOGIC_AND_SCORING.md) — SIDAK scoring and aggregation rules.
+- [`feature-agent-detail-export-csv-md-html.md`](feature-agent-detail-export-csv-md-html.md) — agent-detail report export contract and regression coverage.
 - [`SIDAK_SCORING_GUARDRAILS.md`](SIDAK_SCORING_GUARDRAILS.md) — safeguards for scoring changes.
 - [`LEADER_APPROVAL_ACCESS.md`](LEADER_APPROVAL_ACCESS.md) — leader approval-based KTP/SIDAK access.
 - [`SIDAK_SIMULATION_HISTORY.md`](SIDAK_SIMULATION_HISTORY.md) — SIDAK agent simulation history API, attribution, and leader recording scope.
@@ -33,10 +34,8 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 
 ## Verification navigation
 
-Command meanings only; tier definitions, the fail-fast ladder, and lane exceptions live in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) §7.
+Command meanings only; E2E policy, target-safety checks, tier exceptions, and verification gates live in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) §7.
 
-- **Focused** — an explicit Vitest file path runs that file only; use the default Web config for `.tsx`.
-- **`pnpm test:affected`** (`turbo test:targeted`) — Git-affected loop; `test:targeted` is a compatibility name for the same task, so do not run both as separate evidence.
-- **`pnpm test:core`** — curated cross-module contract gate; Web `.tsx` entries execute under the default configuration.
-- **`pnpm test:fast`** — API curated list in `scripts/test-fast.json`, Web fast config, Telefun full unit suite.
-- **`pnpm lint` / `pnpm typecheck` / `pnpm build` / `git diff --check`** — root gates when the selected lane requires them.
+- **Runtime behavior** — focused Playwright E2E: `pnpm --filter @trainers/web test:e2e -- <focused-spec>`. Run only after verifying all targets are local/test-only and disposable.
+- **Legacy unit-suite commands** — `pnpm test:affected`, `pnpm test:targeted`, `pnpm test:core`, `pnpm test:fast`, and `pnpm test:full` remain in the repository but are not default verification for new work. Do not add unit tests or run these suites without Fajar's explicit approval.
+- **`pnpm lint` / `pnpm typecheck` / `pnpm build` / `git diff --check`** — compile/quality gates when the selected lane requires them; they do not replace E2E behavior evidence.

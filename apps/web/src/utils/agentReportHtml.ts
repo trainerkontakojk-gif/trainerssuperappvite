@@ -16,12 +16,29 @@
  *    seri grafik, dan SEMUA disclosure yang tadinya tertutup — termasuk isi
  *    `<details>` yang disembunyikan mesin lewat `::details-content`, yang
  *    hilang dari cetak kalau hanya `display` yang dipaksa.
- *  - Cetak A4: laporan ini muat dalam tiga halaman untuk fixture standar dan
+ *  - Cetak A4: laporan ini muat dalam lima halaman untuk fixture standar dan
  *    tidak pernah menyisakan halaman terakhir yang isinya hanya colophon. Jarak
  *    panel/seksi dikecilkan HANYA untuk `@media print` supaya seluruh isi
  *    ikut tercetak; tampilan layar tidak berubah.
  *  - Setiap seksi menyatakan cakupannya sendiri. Helper `*ScopeLabel` di file ini
  *    dipakai bersama oleh CSV/MD, jadi "cakupan seksi" hanya punya satu definisi.
+ *  - **Dua keluarga tren, dua seksi.** `personalTrend` berisi **jumlah temuan**
+ *    per periode — itu hitungan temuan, BUKAN skor — jadi grafiknya hidup di
+ *    seksi "Tren Temuan". Seksi "Perkembangan Skor" memakai skor yang benar-benar
+ *    dihitung backend (`periodSummaries`: `finalScore`, `nonCriticalScore`,
+ *    `criticalScore`) untuk tahun + layanan yang sama, jadi tidak ada skor yang
+ *    pernah diturunkan dari jumlah temuan dan tidak ada perhitungan ulang.
+ *  - **Satu metrik satu grafik.** Di seksi skor, `Skor Final`, `Skor
+ *    Non-Critical`, dan `Skor Critical` masing-masing punya grafik sendiri; di
+ *    seksi temuan, `Total Temuan` (agregat) dan rincian per parameter
+ *    (komponen) tidak pernah digabung dalam satu trendline karena keduanya
+ *    memiliki satuan yang sama tetapi semantik yang berbeda. Tiap grafik punya
+ *    judul, satuan, legenda, dan tabel data lengkapnya sendiri; angka yang
+ *    digambar tidak pernah dikarang atau dibulatkan ulang.
+ *  - **Nomor tiket adalah identifier utama.** Ia tampil lebih besar, lebih
+ *    tebal, dan lebih berkontras daripada nama parameter maupun nilai, supaya
+ *    pembaca bisa memindai tiket yang diaudit tanpa kehilangan posisinya di
+ *    antara angka.
  *  - Dokumen offline: CSS inline, tanpa font/link/script/gambar remote. Avatar
  *    memakai inisial, bukan `<img>`.
  *  - Semua teks dari data pengguna di-escape; tidak ada nilai yang bisa
@@ -462,13 +479,23 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
 .trend-filter[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .trend-filter:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .legend-swatch { display: inline-block; width: 1.25rem; height: 0.4rem; flex: none; border-radius: 2px; }
-.trend-figure { margin-top: 1.25rem; padding: 1rem 1rem 0.5rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
-.trend-chart { display: block; width: 100%; height: auto; }
+.trend-figure { margin-top: 1.25rem; padding: 0.9rem 1rem 0.75rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+/* Tiap grafik punya judul, catatan satuan, dan legenda sendiri: dua metrik
+   yang tidak sebanding (agregat vs rincian) tidak pernah digabung dalam satu
+   sumbu, jadi grafik kedua selalu punya judulnya sendiri. */
+.chart-title { margin-top: 0; color: var(--ink); font-family: var(--display); font-size: 0.9375rem; font-weight: 700; letter-spacing: -0.01em; }
+.chart-note { margin-top: 0.2rem; max-width: 72ch; color: var(--ink-mute); font-size: 0.8125rem; }
+.chart-unit { fill: var(--ink-mute); font-size: 13px; font-weight: 700; }
+.chart-value { fill: var(--ink); font-size: 13px; font-weight: 700; }
+.trend-chart { display: block; margin-top: 0.35rem; width: 100%; height: auto; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }
 .chart-axis-label { fill: var(--ink-faint); font-size: 12px; font-weight: 600; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; margin-top: 0.9rem; color: var(--ink-mute); font-size: 0.8125rem; }
+/* Legenda duduk DI DALAM figure, tepat di bawah grafik — jauh lebih dekat
+   dengan garisnya daripada blok terpisah di bawah tabel. */
+.chart-legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; margin-top: 0.6rem; color: var(--ink-body); font-size: 0.8125rem; font-weight: 600; }
 .chart-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; }
 .trend-caption { margin-top: 0.6rem; color: var(--ink-faint); font-size: 0.75rem; }
+.trend-table { font-size: 0.8125rem; }
 .trend-foot { display: grid; gap: 1.5rem; margin-top: 1.5rem; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 .trend-foot dt { color: var(--ink-faint); font-size: 0.75rem; font-weight: 600; }
 .trend-foot dd { margin-top: 0.25rem; color: var(--ink-mute); font-size: 0.875rem; }
@@ -491,16 +518,29 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
 .disclosure-caret { width: 0.5rem; height: 0.5rem; flex: none; border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint); transform: rotate(45deg); transition: transform 160ms ease-out; }
 .findings-period[open] > summary .disclosure-caret { transform: rotate(225deg); }
 .findings-body { padding-bottom: 1.5rem; }
-.finding-ticket { margin-top: 1.25rem; }
-.finding-ticket-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
-.finding-ticket-head span { color: var(--ink-faint); font-size: 0.75rem; font-weight: 600; }
-.ticket-code { color: var(--ink); font-family: var(--sans); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.02em; overflow-wrap: anywhere; }
-.finding { display: grid; gap: 0.35rem 1.25rem; padding: 1rem 0; border-bottom: 1px solid var(--line); grid-template-columns: 6rem minmax(0, 1fr); }
+/* Nomor tiket adalah IDENTIFIER laporan, jadi elemen terkuat di dalam blok
+   temuan: pita berlabel dengan latar penuh, kontras penuh (--ink), dan ukuran
+   lebih besar dari nama parameter maupun nilai. Sebelumnya ia hanya span kecil bernada pucat
+   dengan    nama parameter yang lebih besar, sehingga pembaca laporan mudah kehilangan
+   tiket yang sebenarnya diaudit. */
+.finding-ticket { margin-top: 1.5rem; }
+.finding-ticket-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem;
+  padding: 0.5rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--wash);
+}
+.ticket-label { color: var(--ink-mute); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.ticket-code { color: var(--ink); font-family: var(--display); font-size: 1.125rem; font-weight: 800; line-height: 1.2; letter-spacing: 0.01em; overflow-wrap: anywhere; }
+.ticket-meta { margin-left: auto; color: var(--ink-mute); font-size: 0.75rem; font-weight: 600; }
+/* Bentuk tabel: identifier tetap bold kontras penuh, tapi tidak memperbesar
+   baris tabel yang padat. */
+.ticket-code-cell { font-family: var(--sans); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.02em; }
+.finding { display: grid; gap: 0.35rem 1.25rem; padding: 0.9rem 0 1rem 0.75rem; border-bottom: 1px solid var(--line); grid-template-columns: 5.5rem minmax(0, 1fr); }
 .finding:last-child { border-bottom: 0; }
 .finding-value { font-variant-numeric: tabular-nums; }
-.finding-value strong { display: block; color: var(--ink); font-size: 1.25rem; font-weight: 800; line-height: 1; }
+.finding-value strong { display: block; color: var(--ink); font-size: 1rem; font-weight: 700; line-height: 1.1; }
 .finding-value span { display: block; margin-top: 0.25rem; color: var(--ink-mute); font-size: 0.75rem; font-weight: 600; }
-.finding-name { color: var(--ink); font-family: var(--display); font-size: 1rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.finding-name { color: var(--ink); font-family: var(--display); font-size: 0.9375rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .finding-copy { display: grid; gap: 0.85rem; margin-top: 0.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .finding-copy dt { color: var(--ink-faint); font-size: 0.75rem; font-weight: 700; }
 .finding-copy dd { margin-top: 0.25rem; color: var(--ink-body); font-size: 0.875rem; overflow-wrap: anywhere; }
@@ -534,6 +574,7 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
   /* Sumbu SVG diskalakan bersama viewBox, jadi labelnya harus ikut membesar
      agar tetap terbaca pada layar 390px. */
   .chart-axis-label { font-size: 26px; }
+  .chart-unit, .chart-value { font-size: 28px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .report-tab, .trend-filter, .findings-period > summary, .disclosure-caret { transition: none; }
@@ -550,6 +591,9 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
   .table-hint { display: none !important; }
   [data-report-panel][hidden] { display: block !important; }
   [data-chart-series][hidden] { display: inline !important; }
+  /* Grafik yang disembunyikan filter seri di layar ikut dibuka lagi saat
+     cetak: kalau tidak, cetakan bisa kehilangan salah satu grafik tren. */
+  [data-chart-figure][hidden] { display: block !important; }
   /* Isi <details> yang tertutup disembunyikan mesin lewat
      ::details-content { content-visibility: hidden }, BUKAN lewat display,
      jadi display: block pada anaknya saja tidak cukup — tanpa dua aturan ini
@@ -559,16 +603,30 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
   .findings-period > summary, .disclosure > summary { cursor: default; }
   .findings-period > summary:hover, .disclosure > summary:hover { background: transparent; }
   .table-scroll { overflow: visible; }
+  /* Header tabel boleh membungkus di atas kertas. Tanpa aturan ini, label
+     seri/parameter yang panjang (nowrap di layar) membuat tabel lebih lebar
+     dari halaman dan kolom terakhir terpotong di tepi kanan. */
+  thead th { white-space: normal; }
+  tbody td, tbody th, thead th { overflow-wrap: anywhere; }
+  .trend-table { font-size: 0.75rem; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
   tr, .score-block, .score-figure, .cause, .finding, .masthead, .standing-item, .trend-foot, .colophon { break-inside: avoid; }
-  h1, h2, h3, caption, .section-title, .section-scope { break-after: avoid; }
+  /* Grafik, legenda, dan kepala blok temuan adalah unit yang harus utuh di
+     atas kertas: judul grafik tidak boleh terpisah dari plot-nya, dan pita
+     nomor tiket tidak boleh tertinggal di halaman sebelumnya. */
+  .trend-figure, .chart-legend, .finding-ticket-head, figcaption { break-inside: avoid; }
+  .finding-ticket-head { break-after: avoid; }
+  h1, h2, h3, h4, caption, .section-title, .section-scope, .chart-title { break-after: avoid; }
   .panel { break-before: auto; }
   .section { break-inside: auto; }
-  /* Ritme vertikal khusus cetak. Tanpa pemadatan ini, halaman A4 ke-4 hanya
-     berisi colophon dan tabel benchmark terpotong di awal halaman; dengan ini
-     seluruh laporan + footer muat dalam tiga halaman. Nilai layar (desktop dan
-     mobile) tidak tersentuh — semua aturan di dalam blok cetak ini. */
+  /* Kalimat penjelasan per grafik dan keterangan grafik tidak ikut dicetak: di
+     kertas, judul grafik dan satuan sumbu sudah menyebut apa yang diukur, dan
+     tiap kalimat tambahan hanya mendorong isi ke halaman tambahan. */
+  /* Ritme vertikal khusus cetak. Tanpa pemadatan ini, halaman A4 terakhir
+     hanya berisi colophon dan tabel benchmark terpotong di awal halaman.
+     Nilai layar (desktop dan mobile) tidak tersentuh — semua aturan di dalam
+     blok cetak ini. */
   .masthead { padding-bottom: 1.25rem; }
   .masthead-meta { margin-top: 1rem; }
   .panel { margin-top: 1.5rem; }
@@ -580,7 +638,10 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
   .score-block { margin-top: 0.75rem; }
   .table-scroll { margin-top: 0.75rem; }
   .cause { padding: 0.75rem 0; }
-  .trend-figure { margin-top: 0.9rem; }
+  .trend-figure { margin-top: 0.75rem; padding: 0.6rem 0.75rem 0.5rem; }
+  .chart-note { display: none; }
+  .trend-caption { display: none; }
+  .chart-legend { margin-top: 0.35rem; }
   .trend-foot { margin-top: 1rem; }
   .finding-ticket { margin-top: 0.9rem; }
   .finding { padding: 0.75rem 0; }
@@ -593,17 +654,26 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
 // Grafik tren
 // ---------------------------------------------------------------------------
 
-interface TrendSeries {
+export interface TrendSeries {
   key: string;
   label: string;
   data: Array<number | null>;
   isTotal: boolean;
   isSummary: boolean;
+  /**
+   * Seri utama grafik: garis solid tebal tanpa arsir. Milik keluarga jumlah
+   * temuan hanya `Total Temuan`; tiap metrik skor punya satu seri, jadi
+   * serinya adalah serinya yang utama. Dipisah dari `isTotal` karena
+   * `isTotal` hanya makna untuk filter seri keluarga temuan — memakai ulang
+   * atribut itu untuk skor akan membuat filter "Total Temuan" ikut
+   * menyorot/menyembunyikan garis skor.
+   */
+  emphasis: boolean;
   color: string;
   dash: string;
 }
 
-function normalizeTrend(data: AgentDetailData): {
+export function normalizeTrend(data: AgentDetailData): {
   labels: string[];
   series: TrendSeries[];
 } {
@@ -634,6 +704,7 @@ function normalizeTrend(data: AgentDetailData): {
       }),
       isTotal: dataset.isTotal,
       isSummary: dataset.isTotal || summaryIndexes.has(index),
+      emphasis: dataset.isTotal,
       color: dataset.isTotal
         ? TREND_COLORS[0]
         : TREND_COLORS[(index % (TREND_COLORS.length - 1)) + 1],
@@ -642,6 +713,181 @@ function normalizeTrend(data: AgentDetailData): {
         : TREND_DASHES[1 + ((index - 1) % (TREND_DASHES.length - 1))],
     })),
   };
+}
+
+/**
+ * Dua kelompok seri yang TIDAK boleh digabung dalam satu trendline.
+ *
+ * `Total Temuan` adalah agregat: nilainya selalu >= setiap parameternya, jadi
+ * meletakkannya di garis yang sama dengan rincian membuat pembaca salah
+ * membaca kurva parameter sebagai "turun whilst total naik" dan sebaliknya.
+ * Satu-satunya cara grafik ini jujur adalah dua grafik dengan satuan yang
+ * dinyatakan, masing-masing dengan tabel datanya sendiri. Keduanya membaca
+ * `personalTrend` yang sama, jadi tidak ada angka baru dan cakupan tidak berubah.
+ */
+export interface TrendGroups {
+  labels: string[];
+  total: TrendSeries | null;
+  parameters: TrendSeries[];
+}
+
+export function groupTrendSeries(data: AgentDetailData): TrendGroups {
+  const { labels, series } = normalizeTrend(data);
+  const total = series.find((item) => item.isTotal) ?? null;
+  return {
+    labels,
+    total,
+    parameters: series.filter((item) => !item.isTotal),
+  };
+}
+
+/** Satuan yang dinyatakan di judul grafik dan sumbu Y. */
+export const TREND_UNIT_LABEL = "Jumlah temuan";
+/** Caption tabel data yang menyertai tiap grafik tren temuan. */
+export const TREND_TOTAL_TABLE_CAPTION = "Data tren — Total Temuan per Periode";
+export const TREND_PARAMETER_TABLE_CAPTION = "Data tren — Temuan per Parameter";
+
+// ---------------------------------------------------------------------------
+// Tren skor — sumbernya `periodSummaries`, bukan `personalTrend`
+// ---------------------------------------------------------------------------
+
+/** Metrik skor yang digambar; masing-masing jadi satu grafik + satu tabel. */
+export type ScoreMetric = "final" | "nonCritical" | "critical";
+
+/**
+ * Satuan sumbu Y untuk semua grafik skor.
+ *
+ * Skor QA dihitung pada skala 0–100 (ambang `QA_TARGET` 95), jadi satuan
+ * ditulis eksplisit: pembaca tidak boleh salah membaca angka skor sebagai
+ * jumlah temuan, yang satuan dan rentangnya sama sekali berbeda.
+ */
+export const SCORE_UNIT_LABEL = "Skor (0-100)";
+
+export const SCORE_FINAL_TABLE_CAPTION = "Data skor — Skor Final per Periode";
+export const SCORE_NON_CRITICAL_TABLE_CAPTION =
+  "Data skor — Skor Non-Critical (NC) per Periode";
+export const SCORE_CRITICAL_TABLE_CAPTION =
+  "Data skor — Skor Critical (CR) per Periode";
+/** Kalimat untuk seksi skor yang tidak punya satu pun periode terskor. */
+export const SCORE_EMPTY_NOTE =
+  "Riwayat skor belum tersedia untuk konteks ini.";
+
+/** Kontrak tiap metrik skor: judul, catatan, nama aksesibel, sumber angka. */
+const SCORE_METRICS: ReadonlyArray<{
+  metric: ScoreMetric;
+  label: string;
+  title: string;
+  note: string;
+  accessibleName: string;
+  tableCaption: string;
+}> = [
+  {
+    metric: "final",
+    label: "Skor Final",
+    title: "Skor Final per Periode",
+    note: "Skor akhir tiap periode penilaian — angka yang sama dengan tabel Ringkasan Skor Bulanan, bukan jumlah temuan.",
+    accessibleName: "Grafik tren skor final: skor akhir per periode",
+    tableCaption: SCORE_FINAL_TABLE_CAPTION,
+  },
+  {
+    metric: "nonCritical",
+    label: "Skor Non-Critical (NC)",
+    title: "Skor Non-Critical (NC) per Periode",
+    note: "Skor kategori non-critical tiap periode. Digeser sebagai satu grafik supaya tidak pernah tercampur dengan skor critical pada satu trendline.",
+    accessibleName:
+      "Grafik tren skor non-critical: skor kategori non-critical per periode",
+    tableCaption: SCORE_NON_CRITICAL_TABLE_CAPTION,
+  },
+  {
+    metric: "critical",
+    label: "Skor Critical (CR)",
+    title: "Skor Critical (CR) per Periode",
+    note: "Skor kategori critical tiap periode. Skor terendah biasanya yang paling menentukan skor akhir.",
+    accessibleName:
+      "Grafik tren skor critical: skor kategori critical per periode",
+    tableCaption: SCORE_CRITICAL_TABLE_CAPTION,
+  },
+];
+
+/** Satu grafik skor mandiri: satu metrik, satu sumbu, satu tabel. */
+export interface ScoreTrendChart {
+  metric: ScoreMetric;
+  title: string;
+  note: string;
+  accessibleName: string;
+  /** Caption tabel data milik grafik ini (bukan milik metrik lain). */
+  tableCaption: string;
+  series: TrendSeries;
+}
+
+export interface ScoreTrend {
+  labels: string[];
+  charts: ScoreTrendChart[];
+}
+
+function scoreValue(summary: AgentPeriodSummary, metric: ScoreMetric) {
+  const value =
+    metric === "final"
+      ? summary.finalScore
+      : metric === "nonCritical"
+        ? summary.nonCriticalScore
+        : summary.criticalScore;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** `Jan 26` — bentuk label yang sama dengan label sumbu tren temuan. */
+function scorePeriodLabel(month: number, year: number): string {
+  const name = MONTHS_SHORT[Math.trunc(month) - 1] ?? String(month);
+  return `${name} ${String(Math.trunc(year)).slice(-2)}`;
+}
+
+/**
+ * Riwayat skor untuk seksi "Perkembangan Skor".
+ *
+ * Sumbernya `monthlySummaries` — ringkasan periode yang dihitung backend dan
+ * sudah dipakai tabel "Ringkasan Skor Bulanan" — jadi angka grafik ini persis
+ * angka tabel itu, untuk tahun dan layanan yang sama. `personalTrend` TIDAK
+ * dipakai di sini: isinya jumlah temuan per periode, dan mengubahnya menjadi
+ * "skor" akan mengarang metrik yang tidak pernah dihitung.
+ *
+ * Ringkasan di luar tahun laporan dibuang supaya sumbu X tidak pernah
+ * mencampur dua tahun. Satu ringkasan per bulan untuk satu layanan: pilihan
+ * layanan di UI selalu layanan nyata (`VALID_SERVICE_TYPES`), bukan "semua",
+ * jadi tidak ada dua titik untuk bulan yang sama.
+ */
+export function buildScoreTrend(input: {
+  monthlySummaries: AgentPeriodSummary[];
+  selectedYear: number;
+}): ScoreTrend {
+  const periods = input.monthlySummaries
+    .filter((summary) => summary.year === input.selectedYear)
+    .slice()
+    .sort((a, b) => a.year - b.year || a.month - b.month);
+  if (periods.length === 0) return { labels: [], charts: [] };
+
+  const labels = periods.map((period) =>
+    scorePeriodLabel(period.month, period.year),
+  );
+  const charts = SCORE_METRICS.map((definition) => ({
+    metric: definition.metric,
+    title: definition.title,
+    note: definition.note,
+    accessibleName: definition.accessibleName,
+    tableCaption: definition.tableCaption,
+    series: {
+      key: "score-" + definition.metric,
+      label: definition.label,
+      data: periods.map((period) => scoreValue(period, definition.metric)),
+      // Skor tidak pernah jadi filter "Total Temuan": ia bukan jumlah temuan.
+      isTotal: false,
+      isSummary: true,
+      emphasis: true,
+      color: TREND_COLORS[0],
+      dash: "",
+    },
+  }));
+
+  return { labels, charts };
 }
 
 function buildLinePath(
@@ -725,9 +971,19 @@ function buildAreaPath(
 // Potongan dokumen
 // ---------------------------------------------------------------------------
 
+/**
+ * Panel laporan, berurutan seperti dokumen yang dibaca.
+ *
+ * `trend` dan `temuanTren` sengaja dua panel, bukan satu: yang pertama
+ * mengukur skor (`periodSummaries`), yang kedua mengukur jumlah temuan
+ * (`personalTrend`). Menggabungkannya membuat judul "Perkembangan Skor"
+ * memuat grafik yang bukan skor.
+ */
+type ReportPanel = "summary" | "trend" | "temuanTren" | "temuan";
+
 function panelAttributes(
   variant: AgentHtmlVariant,
-  panel: "summary" | "trend" | "temuan",
+  panel: ReportPanel,
   section: string,
   hidden: boolean,
 ): string {
@@ -754,7 +1010,7 @@ function panelAttributes(
  */
 function panelHeading(
   variant: AgentHtmlVariant,
-  panel: "summary" | "trend" | "temuan",
+  panel: ReportPanel,
   title: string,
 ): string {
   void variant;
@@ -1014,7 +1270,7 @@ function buildTicketsTableHtml(
       [
         "<tr>",
         '<td class="num">' + (position + 1) + "</td>",
-        '<th scope="row" class="ticket-code">' +
+        '<th scope="row" class="ticket-code ticket-code-cell">' +
           escHtml(ticket.no_tiket) +
           "</th>",
         "<td>" + escHtml(ticket.heaviestParam) + "</td>",
@@ -1215,36 +1471,43 @@ function formatDelta(value: number | null): string {
   );
 }
 
-function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
-  const variant = input.variant;
-  const { labels, series } = normalizeTrend(input.data);
-  const comparisonHtml = buildComparisonTableHtml(input);
-  const scope = trendScopeLabel(
-    input.selectedService,
-    input.selectedYear,
-    labels,
-  );
+/**
+ * Satu grafik tren mandiri untuk PDF maupun HTML statis.
+ *
+ * Setiap grafik punya judul, satuan sumbu Y, label periode pada sumbu X, nilai
+ * di atas tiap titik, dan legenda yang menempel di bawah plot. Nilai di atas
+ * titik membuat grafik terbaca tanpa harus mengukur garis dengan mata, dan
+ * karena masih berupa `<text>`, nilainya tetap bisa dicari di dokumen.
+ */
+interface TrendChartSpec {
+  /** Judul yang dilihat pembaca: metrik + satuan, bukan "Grafik". */
+  title: string;
+  /** Satu kalimat yang menjelaskan apa yang diukur grafik ini. */
+  note: string;
+  /** Nama yang bisa dianounce pembaca layar. */
+  accessibleName: string;
+  /** Satuan sumbu Y, ditulis di atas plot ("Jumlah temuan" / "Skor (0-100)"). */
+  unit: string;
+  /** Kunci figure untuk filter seri varian interaktif. */
+  figure: string;
+  series: TrendSeries[];
+  labels: string[];
+}
 
-  if (labels.length === 0 || series.length === 0) {
-    return [
-      '<div class="section">',
-      scopeLine(
-        yearServiceScopeLabel(input.selectedService, input.selectedYear),
-      ),
-      '<p class="empty-state">Data tren belum tersedia untuk konteks ini.</p>',
-      comparisonHtml,
-      "</div>",
-    ].join("");
-  }
+const CHART_WIDTH = 960;
+const CHART_HEIGHT = 320;
+/** Ruang kiri untuk angka sumbu Y + label satuan. */
+const CHART_PLOT_LEFT = 64;
+/** Ruang kanan supaya label periode terakhir tidak menyentuh tepi. */
+const CHART_PLOT_RIGHT = 28;
+/** Ruang atas untuk label satuan. */
+const CHART_PLOT_TOP = 34;
+/** Ruang bawah untuk label periode. */
+const CHART_PLOT_BOTTOM = 44;
 
-  const width = 960;
-  const height = 380;
-  const plotLeft = 56;
-  const plotRight = 24;
-  const plotTop = 20;
-  const plotBottom = 48;
-  const plotWidth = width - plotLeft - plotRight;
-  const plotHeight = height - plotTop - plotBottom;
+function trendChartGeometry(labels: readonly string[], series: TrendSeries[]) {
+  const plotWidth = CHART_WIDTH - CHART_PLOT_LEFT - CHART_PLOT_RIGHT;
+  const plotHeight = CHART_HEIGHT - CHART_PLOT_TOP - CHART_PLOT_BOTTOM;
   const values = series.flatMap((item) =>
     item.data.filter((value): value is number => value !== null),
   );
@@ -1253,12 +1516,30 @@ function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
   const { step: tickStep } = niceScale(Math.max(1, ...values));
   const tickMax =
     tickStep * Math.max(1, Math.ceil(Math.max(1, ...values) / tickStep));
-  const xFor = (index: number) =>
-    labels.length === 1
-      ? plotLeft + plotWidth / 2
-      : plotLeft + (index / (labels.length - 1)) * plotWidth;
-  const yFor = (value: number) =>
-    plotTop + plotHeight - (value / tickMax) * plotHeight;
+  return {
+    plotWidth,
+    plotHeight,
+    tickStep,
+    tickMax,
+    xFor: (index: number) =>
+      labels.length === 1
+        ? CHART_PLOT_LEFT + plotWidth / 2
+        : CHART_PLOT_LEFT + (index / (labels.length - 1)) * plotWidth,
+    yFor: (value: number) =>
+      CHART_PLOT_TOP + plotHeight - (value / tickMax) * plotHeight,
+  };
+}
+
+function trendAxisText(value: number): string {
+  return new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(
+    value,
+  );
+}
+
+function buildTrendChartSvg(spec: TrendChartSpec): string {
+  const { labels, series } = spec;
+  const { plotWidth, plotHeight, tickStep, tickMax, xFor, yFor } =
+    trendChartGeometry(labels, series);
 
   // Garis kisi hanya digambar sampai nilai tertinggi sumbu. Tanpa ini, langkah
   // sumbu yang kecil membuat garis ke-3 dan seterusnya digambar di luar area
@@ -1268,41 +1549,78 @@ function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
     const value = tickStep * index;
     const y = yFor(value);
     return (
-      `<line x1="${plotLeft}" y1="${y.toFixed(2)}" x2="${width - plotRight}" y2="${y.toFixed(2)}" class="chart-grid" />` +
-      `<text x="${plotLeft - 10}" y="${(y + 4).toFixed(2)}" class="chart-axis-label" text-anchor="end">${escHtml(
-        new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(
-          value,
-        ),
+      `<line x1="${CHART_PLOT_LEFT}" y1="${y.toFixed(2)}" x2="${
+        CHART_WIDTH - CHART_PLOT_RIGHT
+      }" y2="${y.toFixed(2)}" class="chart-grid" />` +
+      `<text x="${CHART_PLOT_LEFT - 10}" y="${(y + 4).toFixed(
+        2,
+      )}" class="chart-axis-label" text-anchor="end">${escHtml(
+        trendAxisText(value),
       )}</text>`
     );
   }).join("");
 
+  // Label periode: tepi kiri/dengan rata kiri dan tepi kanan rata kanan supaya
+  // tidak pernah melewati batas viewBox.
   const xLabels = labels
-    .map(
-      (label, index) =>
-        `<text x="${xFor(index).toFixed(2)}" y="${height - 18}" class="chart-axis-label" text-anchor="middle">${escHtml(label)}</text>`,
-    )
+    .map((label, index) => {
+      const anchor =
+        index === 0 ? "start" : index === labels.length - 1 ? "end" : "middle";
+      return `<text x="${xFor(index).toFixed(2)}" y="${
+        CHART_HEIGHT - 16
+      }" class="chart-axis-label" text-anchor="${anchor}">${escHtml(
+        label,
+      )}</text>`;
+    })
     .join("");
 
+  const spacing =
+    labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
+  // Label nilai hanya digambar kalau jaraknya cukup lega; kalau tidak, angka-
+  // angka itu saling tumpang tindih dan membuat grafik makin sulit dibaca.
+  const showValues = spacing >= 26;
   const chartSeries = series
     .map((item) => {
       const line = buildLinePath(item.data, xFor, yFor);
-      const area = buildAreaPath(item.data, xFor, yFor, height - plotBottom);
+      const area = buildAreaPath(
+        item.data,
+        xFor,
+        yFor,
+        CHART_PLOT_TOP + plotHeight,
+      );
       const points = item.data
         .map((value, index) => {
           if (value === null) return "";
-          return `<circle cx="${xFor(index).toFixed(2)}" cy="${yFor(value).toFixed(2)}" r="4" fill="#ffffff" stroke="${item.color}" stroke-width="2"><title>${escHtml(
-            item.label,
-          )} · ${escHtml(labels[index])}: ${escHtml(String(value))}</title></circle>`;
+          const x = xFor(index);
+          const y = yFor(value);
+          // Nilai di puncak plot digambar di BAWAH titik supaya tidak menabrak
+          // label satuan di atas area plot.
+          const valueY = showValues
+            ? y <= CHART_PLOT_TOP + 4
+              ? y + 16
+              : y - 9
+            : null;
+          return (
+            `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4" fill="#ffffff" stroke="${item.color}" stroke-width="2"><title>${escHtml(
+              item.label,
+            )} · ${escHtml(labels[index])}: ${escHtml(String(value))}</title></circle>` +
+            (valueY === null
+              ? ""
+              : `<text x="${x.toFixed(2)}" y="${valueY.toFixed(
+                  2,
+                )}" class="chart-value" text-anchor="middle">${escHtml(
+                  trendAxisText(value),
+                )}</text>`)
+          );
         })
         .join("");
       return [
         `<g data-chart-series data-series="${escHtml(item.label)}" data-series-key="${escHtml(item.key)}" data-series-total="${item.isTotal}" data-series-summary="${item.isSummary}">`,
-        area && !item.isTotal
+        area && !item.emphasis
           ? `<path d="${area}" fill="${item.color}" fill-opacity="0.06" stroke="none" />`
           : "",
         line
-          ? `<path d="${line}" fill="none" stroke="${item.color}" stroke-width="${item.isTotal ? 3 : 2}"${item.dash ? ` stroke-dasharray="${item.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round" />`
+          ? `<path d="${line}" fill="none" stroke="${item.color}" stroke-width="${item.emphasis ? 3 : 2}"${item.dash ? ` stroke-dasharray="${item.dash}"` : ""} stroke-linecap="round" stroke-linejoin="round" />`
           : "",
         points,
         "</g>",
@@ -1310,11 +1628,62 @@ function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
     })
     .join("");
 
-  const dataTable = [
-    scopeLine(scope),
-    '<div class="table-scroll">',
+  return [
+    `<svg class="trend-chart" viewBox="0 0 ${CHART_WIDTH} ${CHART_HEIGHT}" role="img" aria-label="${escHtml(
+      spec.accessibleName,
+    )}">`,
+    `<title>${escHtml(spec.title)}</title>`,
+    // Satuan yang dinyatakan di atas sumbu Y: tanpa ini pembaca hanya tahu
+    // "angka", bukan apa yang diukur. Rata-kiri di x=0, bukan rata-kanan di
+    // gutter sumbu: label satuan lebih lebar dari gutter itu, jadi rata-kanan
+    // akan mendorongnya keluar dari viewBox dan memotong sebagian teksnya.
+    `<text x="0" y="16" class="chart-unit">${escHtml(spec.unit)}</text>`,
+    grid,
+    xLabels,
+    chartSeries,
+    "</svg>",
+  ].join("");
+}
+
+/** Legenda melekat di bawah plot; seri total dan rincian tidak pernah dicampur. */
+function buildChartLegend(series: TrendSeries[]): string {
+  return series
+    .map(
+      (item) =>
+        '<span class="chart-legend-item" data-chart-series data-series="' +
+        escHtml(item.label) +
+        '" data-series-key="' +
+        escHtml(item.key) +
+        '" data-series-total="' +
+        item.isTotal +
+        '" data-series-summary="' +
+        item.isSummary +
+        '"><span class="legend-swatch" style="background:' +
+        escHtml(item.color) +
+        (item.dash
+          ? `;background-image:repeating-linear-gradient(90deg,${escHtml(item.color)} 0 4px,transparent 4px 7px)`
+          : "") +
+        '"></span>' +
+        escHtml(item.label) +
+        "</span>",
+    )
+    .join("");
+}
+
+/**
+ * Tabel data lengkap milik satu grafik: satu baris per periode, satu kolom per
+ * seri, dan nilai `null` ditulis sebagai "—" supaya pembaca bisa membedakan
+ * "tidak ada data" dari "nol".
+ */
+function buildTrendDataTableHtml(
+  labels: readonly string[],
+  series: TrendSeries[],
+  caption: string,
+): string {
+  return [
+    '<div class="table-scroll trend-table">',
     "<table>",
-    "<caption>Data tren</caption>",
+    `<caption>${escHtml(caption)}</caption>`,
     '<thead><tr><th scope="col">Periode</th>' +
       series
         .map(
@@ -1347,55 +1716,183 @@ function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
     "</table>",
     "</div>",
   ].join("");
+}
+
+function buildTrendGroupHtml(
+  spec: TrendChartSpec & { caption: string; tableCaption: string },
+): string {
+  const { labels, series } = spec;
+  return [
+    // `data-chart-figure` dipakai filter seri varian interaktif: grafik yang
+    // tidak punya seri terpilih disembunyikan, dan `@media print` membukanya
+    // kembali.
+    `<figure class="trend-figure" data-chart-figure="${escHtml(spec.figure)}">`,
+    `<h4 class="chart-title">${escHtml(spec.title)}</h4>`,
+    '<p class="chart-note">' + escHtml(spec.note) + "</p>",
+    buildTrendChartSvg(spec),
+    '<div class="chart-legend">' + buildChartLegend(series) + "</div>",
+    '<figcaption class="trend-caption">Grafik menampilkan ' +
+      labels.length +
+      " periode dan " +
+      series.length +
+      " seri data. Nilai lengkapnya ada pada tabel " +
+      escHtml(spec.caption) +
+      ".</figcaption>",
+    "</figure>",
+    buildTrendDataTableHtml(labels, series, spec.tableCaption),
+  ].join("");
+}
+
+/**
+ * Seksi "Perkembangan Skor" — skor yang benar-benar dihitung backend.
+ *
+ * Tiga metrik (final, non-critical, critical) masing-masing satu grafik dengan
+ * tabelnya sendiri: menggabungkannya menjadi satu trendline membuat pembaca
+ * salah membandingkan tiga satuan yang memang sama-sama poin, tetapi sumbernya
+ * berbeda. Angka grafik = angka `monthlySummaries` apa adanya.
+ */
+function buildScorePanelHtml(input: AgentReportHtmlInput): string {
+  const { labels, charts } = buildScoreTrend({
+    monthlySummaries: input.monthlySummaries,
+    selectedYear: input.selectedYear,
+  });
+
+  if (labels.length === 0) {
+    return [
+      '<div class="section">',
+      scopeLine(
+        yearServiceScopeLabel(input.selectedService, input.selectedYear),
+      ),
+      `<p class="empty-state">${escHtml(SCORE_EMPTY_NOTE)}</p>`,
+      "</div>",
+    ].join("");
+  }
+
+  return [
+    '<div class="section">',
+    scopeLine(
+      trendScopeLabel(input.selectedService, input.selectedYear, labels),
+    ),
+    '<p class="section-note">Perkembangan Skor &bull; ' +
+      escHtml(labels[0] + " - " + labels[labels.length - 1]) +
+      ". Skor akhir, non-critical, dan critical digambar terpisah karena ketiganya sumber hitungannya berbeda; angkanya sama persis dengan tabel Ringkasan Skor Bulanan di seksi Ringkasan.</p>",
+    ...charts.map((chart) =>
+      buildTrendGroupHtml({
+        title: chart.title,
+        note: chart.note,
+        accessibleName: chart.accessibleName,
+        unit: SCORE_UNIT_LABEL,
+        figure: "score-" + chart.metric,
+        series: [chart.series],
+        labels,
+        caption: chart.tableCaption,
+        tableCaption: chart.tableCaption,
+      }),
+    ),
+    '<dl class="trend-foot">',
+    '<div><dt>Periode Terskor</dt><dd><span class="trend-periods">' +
+      labels.length +
+      "</span> periode penilaian</dd></div>",
+    "<div><dt>Cara Membaca</dt><dd>Skor final dipengaruhi temuan critical dan non-critical sekaligus; dua grafik kategori membuat selisihnya terlihat tanpa menebak.</dd></div>",
+    "</dl>",
+    "</div>",
+  ].join("");
+}
+
+/**
+ * Seksi "Tren Temuan" — jumlah temuan per periode dari `personalTrend`.
+ *
+ * Dipisah dari seksi skor karena satuan dan maknanya berbeda: ini hitungan
+ * temuan, bukan skor. `Total Temuan` (agregat) dan rincian per parameter
+ * (komponen) tetap dua grafik, masing-masing dengan tabelnya sendiri, dan tabel
+ * perbandingan temuan ikut di sini karena isinya juga hitungan temuan.
+ */
+function buildFindingsTrendPanelHtml(input: AgentReportHtmlInput): string {
+  const variant = input.variant;
+  const { labels, total, parameters } = groupTrendSeries(input.data);
+  const comparisonHtml = buildComparisonTableHtml(input);
+  const scope = trendScopeLabel(
+    input.selectedService,
+    input.selectedYear,
+    labels,
+  );
+
+  if (labels.length === 0 || (total === null && parameters.length === 0)) {
+    return [
+      '<div class="section">',
+      scopeLine(
+        yearServiceScopeLabel(input.selectedService, input.selectedYear),
+      ),
+      '<p class="empty-state">Data tren belum tersedia untuk konteks ini.</p>',
+      comparisonHtml,
+      "</div>",
+    ].join("");
+  }
 
   // Filter seri hanya ada di varian interaktif: di statis ia tidak bisa dipakai.
+  // Hanya keluarga jumlah temuan yang punya filter — tiap grafik skor punya
+  // satu seri, jadi tidak ada yang bisa disaring.
   const filters =
     variant === "interactive"
       ? [
           '<div class="trend-filters" role="group" aria-label="Filter seri grafik">',
           '<button type="button" class="trend-filter" data-trend-filter="summary" aria-pressed="true">Ringkasan</button>',
-          '<button type="button" class="trend-filter" data-trend-filter="total" aria-pressed="false"><span class="legend-swatch" style="background:' +
-            escHtml(
-              series.find((item) => item.isTotal)?.color ?? TREND_COLORS[0],
-            ) +
-            '"></span>Total Temuan</button>',
-          ...series
-            .filter((item) => !item.isTotal)
-            .map(
-              (item) =>
-                '<button type="button" class="trend-filter" data-trend-filter="' +
-                escHtml(item.key) +
-                '" aria-pressed="false"><span class="legend-swatch" style="background:' +
-                escHtml(item.color) +
-                '"></span>' +
-                escHtml(item.label) +
-                "</button>",
-            ),
+          ...(total
+            ? [
+                '<button type="button" class="trend-filter" data-trend-filter="total" aria-pressed="false"><span class="legend-swatch" style="background:' +
+                  escHtml(total.color) +
+                  '"></span>' +
+                  escHtml(total.label) +
+                  "</button>",
+              ]
+            : []),
+          ...parameters.map(
+            (item) =>
+              '<button type="button" class="trend-filter" data-trend-filter="' +
+              escHtml(item.key) +
+              '" aria-pressed="false"><span class="legend-swatch" style="background:' +
+              escHtml(item.color) +
+              '"></span>' +
+              escHtml(item.label) +
+              "</button>",
+          ),
           "</div>",
         ].join("")
       : "";
 
-  const legend = series
-    .map(
-      (item) =>
-        '<span class="chart-legend-item" data-chart-series data-series="' +
-        escHtml(item.label) +
-        '" data-series-key="' +
-        escHtml(item.key) +
-        '" data-series-total="' +
-        item.isTotal +
-        '" data-series-summary="' +
-        item.isSummary +
-        '"><span class="legend-swatch" style="background:' +
-        escHtml(item.color) +
-        (item.dash
-          ? `;background-image:repeating-linear-gradient(90deg,${escHtml(item.color)} 0 4px,transparent 4px 7px)`
-          : "") +
-        '"></span>' +
-        escHtml(item.label) +
-        "</span>",
-    )
-    .join("");
+  const groups = [
+    total
+      ? buildTrendGroupHtml({
+          title: "Jumlah Total Temuan per Periode",
+          note: "Agregat seluruh temuan pada cakupan ini, satu titik per periode.",
+          accessibleName:
+            "Grafik tren total temuan: jumlah seluruh temuan per periode",
+          unit: TREND_UNIT_LABEL,
+          figure: "total",
+          series: [total],
+          labels,
+          caption: TREND_TOTAL_TABLE_CAPTION,
+          tableCaption: TREND_TOTAL_TABLE_CAPTION,
+        })
+      : "",
+    parameters.length > 0
+      ? buildTrendGroupHtml({
+          title: "Jumlah Temuan per Parameter",
+          note:
+            "Satu seri per parameter penilaian. Semua seri memakai satuan yang sama (" +
+            TREND_UNIT_LABEL.toLowerCase() +
+            " per periode), jadi boleh dibaca sebagai pembanding langsung.",
+          accessibleName:
+            "Grafik tren temuan per parameter: jumlah temuan tiap parameter per periode",
+          unit: TREND_UNIT_LABEL,
+          figure: "parameter",
+          series: parameters,
+          labels,
+          caption: TREND_PARAMETER_TABLE_CAPTION,
+          tableCaption: TREND_PARAMETER_TABLE_CAPTION,
+        })
+      : "",
+  ].join("");
 
   return [
     '<div class="section">',
@@ -1404,28 +1901,14 @@ function buildTrendPanelHtml(input: AgentReportHtmlInput): string {
       (labels.length > 0
         ? " &bull; " + escHtml(labels[0] + " - " + labels[labels.length - 1])
         : "") +
-      ". Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.</p>",
+      ". Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih. Grafik di bawah menghitung JUMLAH TEMUAN, bukan skor — skor ada di seksi Perkembangan Skor. Total temuan dan rincian per parameter memakai satuan yang sama tetapi berbeda makna, jadi keduanya digambar pada grafik terpisah.</p>",
     filters,
-    '<figure class="trend-figure">',
-    `<svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik tren temuan per periode">`,
-    "<title>Grafik tren performa agent</title>",
-    grid,
-    xLabels,
-    chartSeries,
-    "</svg>",
-    '<figcaption class="trend-caption">Grafik menampilkan ' +
-      labels.length +
-      " periode dan " +
-      series.length +
-      " seri data. Nilai lengkapnya ada pada tabel Data tren.</figcaption>",
-    "</figure>",
-    '<div class="chart-legend">' + legend + "</div>",
-    dataTable,
+    groups,
     '<dl class="trend-foot">',
     '<div><dt>Total Periode</dt><dd><span class="trend-periods">' +
       labels.length +
       "</span> periode aktif</dd></div>",
-    "<div><dt>Ringkasan Tren</dt><dd>Gunakan pola naik-turun setiap parameter untuk menentukan fokus coaching pada periode berikutnya.</dd></div>",
+    "<div><dt>Ringkasan Tren</dt><dd>Gunakan pola naik-turun setiap parameter pada grafik rincian untuk menentukan fokus coaching pada periode berikutnya.</dd></div>",
     "</dl>",
     comparisonHtml,
     "</div>",
@@ -1478,11 +1961,14 @@ function buildFindingsPanelHtml(input: AgentReportHtmlInput): string {
         .map((ticket) =>
           [
             '<div class="finding-ticket">',
-            '<div class="finding-ticket-head"><span>No Tiket</span>',
+            // Label, nomor, lalu jumlah parameter: identifier dibaca lebih dulu
+            // dan tidak pernah tenggelam di antara nama parameter.
+            '<div class="finding-ticket-head">',
+            '<p class="ticket-label">No Tiket</p>',
             '<p class="ticket-code">' + escHtml(ticket.label) + "</p>",
-            "<span>" +
+            '<p class="ticket-meta">' +
               numberText(ticket.items.length) +
-              " parameter</span></div>",
+              " parameter</p></div>",
             ...ticket.items.map((item) =>
               [
                 '<article class="finding">',
@@ -1544,9 +2030,13 @@ function buildFindingsPanelHtml(input: AgentReportHtmlInput): string {
 
 function buildTabs(variant: AgentHtmlVariant): string {
   if (variant !== "interactive") return "";
-  const tabs: Array<[string, string]> = [
+  // Label tab sengaja lebih pendek daripada judul panel, tapi tidak pernah
+  // ambigu: "Skor" (Perkembangan Skor) dan "Tren" (Tren Temuan) mengukur dua
+  // hal yang berbeda, jadi keduanya punya tab sendiri.
+  const tabs: Array<[ReportPanel, string]> = [
     ["summary", "Ringkasan"],
-    ["trend", "Tren"],
+    ["trend", "Skor"],
+    ["temuanTren", "Tren"],
     ["temuan", "Temuan"],
   ];
   return [
@@ -1603,7 +2093,6 @@ function buildInteractiveReportScript(variant: AgentHtmlVariant): string {
   const tabs = Array.from(report.querySelectorAll('[data-report-tab]'));
   const panels = Array.from(report.querySelectorAll('[data-report-panel]'));
   const filters = Array.from(report.querySelectorAll('[data-trend-filter]'));
-  const series = Array.from(report.querySelectorAll('[data-chart-series]'));
 
   const applyTab = (tab) => {
     tabs.forEach((button) => {
@@ -1616,15 +2105,22 @@ function buildInteractiveReportScript(variant: AgentHtmlVariant): string {
     });
   };
 
-  const applyFilter = (filter) => {
-    series.forEach((node) => {
-      const isTotal = node.getAttribute('data-series-total') === 'true';
-      const visible = filter === null
-        ? true
-        : filter === 'total'
-          ? isTotal
-          : node.getAttribute('data-series-key') === filter;
-      node.toggleAttribute('hidden', !visible);
+  const applyFilter = (filter, group) => {
+    // Filter hanya berlaku pada panel yang memuat tombolnya. Tanpa batas ini,
+    // klik "Total Temuan" di seksi Tren Temuan ikut menyaring garis skor di
+    // panel lain — yang bukan jumlah temuan sama sekali.
+    const scope = group ? [group] : report.querySelectorAll('[data-report-panel]');
+    const visible = (node) => {
+      if (filter === null) return true;
+      if (filter === 'total') return node.getAttribute('data-series-total') === 'true';
+      return node.getAttribute('data-series-key') === filter;
+    };
+    const groups = new Set();
+    scope.forEach((panel) => {
+      Array.from(panel.querySelectorAll('[data-chart-series]')).forEach((node) => {
+        node.toggleAttribute('hidden', !visible(node));
+        groups.add(node.closest('[data-chart-figure]') || panel);
+      });
     });
     filters.forEach((button) => {
       const key = button.getAttribute('data-trend-filter');
@@ -1632,6 +2128,13 @@ function buildInteractiveReportScript(variant: AgentHtmlVariant): string {
         'aria-pressed',
         String(filter === null ? key === 'summary' : key === filter),
       );
+    });
+    // Grafik tanpa seri yang tersisa disembunyikan: menyisakan sumbu kosong
+    // lebih buruk daripada tidak menampilkannya. Aturan cetakan membukanya
+    // kembali supaya cetakan tetap memuat setiap grafik.
+    groups.forEach((figure) => {
+      const own = Array.from(figure.querySelectorAll('[data-chart-series]'));
+      figure.toggleAttribute('hidden', !own.some((node) => !node.hasAttribute('hidden')));
     });
   };
 
@@ -1664,7 +2167,10 @@ function buildInteractiveReportScript(variant: AgentHtmlVariant): string {
     button.addEventListener('click', () => {
       const filter = button.getAttribute('data-trend-filter') || 'summary';
       const pressed = button.getAttribute('aria-pressed') === 'true';
-      applyFilter(pressed || filter === 'summary' ? null : filter);
+      applyFilter(
+        pressed || filter === 'summary' ? null : filter,
+        button.closest('[data-report-panel]'),
+      );
     });
   });
 
@@ -1725,10 +2231,27 @@ export function buildAgentReportHtml(input: AgentReportHtmlInput): string {
     "</section>",
     "",
     "<section " +
-      panelAttributes(variant, "trend", "trend", variant === "interactive") +
+      panelAttributes(
+        variant,
+        "trend",
+        "score-trend",
+        variant === "interactive",
+      ) +
       ">",
     panelHeading(variant, "trend", "Perkembangan Skor"),
-    buildTrendPanelHtml(input),
+    buildScorePanelHtml(input),
+    "</section>",
+    "",
+    "<section " +
+      panelAttributes(
+        variant,
+        "temuanTren",
+        "findings-trend",
+        variant === "interactive",
+      ) +
+      ">",
+    panelHeading(variant, "temuanTren", "Tren Temuan"),
+    buildFindingsTrendPanelHtml(input),
     "</section>",
     "",
     "<section " +

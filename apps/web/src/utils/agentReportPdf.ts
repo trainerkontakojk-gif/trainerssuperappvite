@@ -12,9 +12,9 @@
  *    angkanya tetap hadir lengkap di tabel "Data tren".
  *  - **A4 portrait, satu sumber isi.** Hirarki dokumen sama dengan varian HTML
  *    (identitas -> ringkasan eksekutif -> bulanan -> tiket -> akar masalah ->
- *    tren -> benchmark -> seluruh temuan -> colophon), dan tiap seksi memakai
- *    helper `*ScopeLabel` yang sama dengan CSV/MD/HTML sehingga "cakupan seksi"
- *    hanya punya satu definisi.
+ *    skor -> tren temuan + benchmark -> seluruh temuan -> colophon), dan tiap
+ *    seksi memakai helper `*ScopeLabel` yang sama dengan CSV/MD/HTML sehingga
+ *    "cakupan seksi" hanya punya satu definisi.
  *  - **Paginasi jujur.** Judul seksi tidak pernah menggantung di dasar halaman,
  *    header tabel berulang saat tabel terbelah, satu baris tabel tidak pernah
  *    keluar dari area cetak, dan setiap halaman memakai footer
@@ -29,6 +29,22 @@
  *    menulis byte rusak yang membuat glyph tidak bisa dipetakan ke Unicode;
  *    menukar karakter itu dengan spasi lebih buruk lagi, karena bukti pengguna
  *    hilang tanpa jejak.
+ *  - **Hierarki yang bisa dipindai.** Nomor tiket adalah identifier laporan,
+ *    jadi ia dicetak paling besar dan paling tebal di dalam blok temuan
+ *    (pita berlabel "NO TIKET"), sementara nama parameter dan nilai tetap
+ *    lengkap tapi tipografinya proporsional. Skor periode aktif tetap angka
+ *    utama blok ringkasan tanpa mengambil alih halaman.
+ *  - **Dua keluarga tren, dua seksi.** "Perkembangan Skor" memakai skor yang
+ *    dihitung backend (`monthlySummaries`: final, non-critical, critical),
+ *    masing-masing satu grafik + satu tabel. "Tren Temuan" memakai
+ *    `personalTrend`, yang berisi JUMLAH TEMUAN per periode — bukan skor — dan
+ *    hanya memuat grafik temuan, bukan satu pun garis skor.
+ *  - **Satu metrik satu grafik.** Tiga metrik skor tidak pernah digabung dalam
+ *    satu trendline; di seksi temuan, `Total Temuan` (agregat) dan rincian per
+ *    parameter (komponen) juga terpisah: masing-masing punya grafik, judul,
+ *    satuan sumbu, legenda, dan tabel data lengkapnya sendiri. Angka yang
+ *    digambar persis sama dengan sumbernya, jadi tidak ada data turunan yang
+ *    dikarang.
  *  - **Tanpa aset remote.** Tidak ada font eksternal, gambar, atau permintaan
  *    jaringan; avatar berupa inisial seperti di HTML.
  *  - **Tanpa angka karangan.** Bagian yang tidak punya isi dinyatakan eksplisit
@@ -46,7 +62,14 @@ import type {
 } from "@trainers/types";
 import {
   MONTHS_FULL,
+  SCORE_EMPTY_NOTE,
+  SCORE_UNIT_LABEL,
+  TREND_PARAMETER_TABLE_CAPTION,
+  TREND_TOTAL_TABLE_CAPTION,
+  TREND_UNIT_LABEL,
+  buildScoreTrend,
   computeTenure,
+  groupTrendSeries,
   monthScopeLabel,
   nilaiLabel,
   trendScopeLabel,
@@ -57,6 +80,7 @@ import type {
   AgentHtmlExportContext,
   TicketScoreExport,
   TemuanDisplayItemExport,
+  TrendSeries,
 } from "./agentReportHtml";
 import { comparisonScopeLabel } from "./exportAgentReport";
 
@@ -219,7 +243,9 @@ function pdfSafeText(value: unknown): string {
       if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) {
         return unprintableMarker(code);
       }
-      return code <= 0xff || WIN_ANSI_HIGH.has(code) ? char : unprintableMarker(code);
+      return code <= 0xff || WIN_ANSI_HIGH.has(code)
+        ? char
+        : unprintableMarker(code);
     })
     .join("");
   return text.replace(/\s+/g, " ").trim();
@@ -369,6 +395,12 @@ interface PdfColumn {
   weight: number;
   minWidth?: number;
   tone?: (rowIndex: number, value: string) => Tone | null;
+  /**
+   * Kolom identifier (mis. nomor tiket): dicetak bold kontras penuh, bukan
+   * abu-abu seperti sel biasa, supaya nomor tiket mudah dipindai di antara
+   * angka-angka lain.
+   */
+  emphasis?: boolean;
 }
 
 interface PdfTable {
@@ -427,6 +459,13 @@ class PdfDocument {
     // Header digambar pada koordinat tetap, BUKAN pada kursor isi: kalau
     // header memakai kursor, teksnya menimpa baris isi pertama halaman itu.
     this.y = HEADER_TOP;
+    // Font, ukuran, dan warna ditulis eksplisit: `write` hanya memindahkan
+    // glyph, jadi tanpa ini header halaman mewarisi warna sel terakhir yang
+    // digambar — baris tabel dengan delta negatif membuat header identitas
+    // tercetak merah seperti status, bukan seperti header.
+    this.doc.setFont(FONT, "normal");
+    this.doc.setFontSize(8);
+    this.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
     this.write(this.header.left, MARGIN_LEFT, "left");
     this.write(this.header.right, PAGE_WIDTH - MARGIN_RIGHT, "right");
     this.doc.setDrawColor(LINE_STRONG[0], LINE_STRONG[1], LINE_STRONG[2]);
@@ -577,7 +616,7 @@ class PdfDocument {
           row[index] ?? "",
           widths[index] - paddingX * 2,
           this.measure,
-          isTotal ? "bold" : "normal",
+          isTotal || column.emphasis ? "bold" : "normal",
           size,
         ),
       );
@@ -596,8 +635,11 @@ class PdfDocument {
         spec.columns.forEach((column, index) => {
           const align = column.align ?? "left";
           const tone = column.tone?.(rowIndex, row[index] ?? "") ?? null;
-          const color = isTotal ? INK : toneColor(tone);
-          this.doc.setFont(FONT, isTotal ? "bold" : "normal");
+          const bold = isTotal || column.emphasis === true;
+          // Kolom emphasis memakai tinta penuh, bukan warna sel biasa: nomor
+          // tiket tidak boleh ikut memudar bersama baris tabel.
+          const color = bold ? INK : toneColor(tone);
+          this.doc.setFont(FONT, bold ? "bold" : "normal");
           this.doc.setFontSize(size);
           this.doc.setTextColor(color[0], color[1], color[2]);
           const value = cells[index][band];
@@ -859,13 +901,16 @@ function buildActiveScore(
   pdf.doc.setFontSize(7.5);
   pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
   pdf.doc.text(pdfSafeText(periodLabel), MARGIN_LEFT, top, { baseline: "top" });
+  // Skor tetap jadi angka utama blok ini, tapi tidak lagi mendominasi seluruh
+  // dokumen: nama agen (17pt) dan nomor tiket (11.5pt) harus tetap bisa dibaca
+  // tanpa diambil alih oleh angka.
   pdf.doc.setFont(FONT, "bold");
-  pdf.doc.setFontSize(24);
+  pdf.doc.setFontSize(19);
   pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
   pdf.doc.text(`${safeScore.toFixed(1)}%`, MARGIN_LEFT, top + line(8), {
     baseline: "top",
   });
-  const scoreBottom = top + line(8) + mm(24 * 1.05);
+  const scoreBottom = top + line(8) + mm(19 * 1.05);
   pdf.doc.setFontSize(8);
   const statusColor = toneColor(scoreTone(latest.finalScore));
   pdf.doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
@@ -907,11 +952,11 @@ function buildActiveScore(
     pdf.doc.text(pdfSafeText(term), x, statTop, { baseline: "top" });
     const color = tone ? toneColor(tone) : INK;
     pdf.doc.setFont(FONT, "bold");
-    pdf.doc.setFontSize(10);
+    pdf.doc.setFontSize(9.5);
     pdf.doc.setTextColor(color[0], color[1], color[2]);
     pdf.doc.text(pdfSafeText(value), x, statTop + line(7), { baseline: "top" });
   });
-  pdf.moveTo(statTop + line(7) + line(10));
+  pdf.moveTo(statTop + line(7) + line(9.5) + 1);
 }
 
 function buildStanding(pdf: PdfDocument, input: AgentReportPdfInput): void {
@@ -1023,7 +1068,7 @@ function buildTicketsTable(
     caption: "Tiket Pengurang Skor Terbesar",
     columns: [
       { header: "#", weight: 0.25, minWidth: 7, align: "right" },
-      { header: "No Tiket", weight: 1.1, minWidth: 28 },
+      { header: "No Tiket", weight: 1.1, minWidth: 28, emphasis: true },
       { header: "Parameter Terberat", weight: 1.7, minWidth: 42 },
       { header: "Score Deduction", weight: 0.9, minWidth: 24, align: "right" },
       { header: "Jumlah Temuan", weight: 0.8, minWidth: 22, align: "right" },
@@ -1113,42 +1158,163 @@ function buildRootCauses(
   });
 }
 
-function buildTrend(pdf: PdfDocument, input: AgentReportPdfInput): void {
-  const trend = input.data.personalTrend;
-  const labels = trend?.labels ?? [];
-  const datasets = trend?.datasets ?? [];
-  if (labels.length === 0 || datasets.length === 0) {
-    pdf.paragraph("Data tren belum tersedia untuk konteks ini.", {
-      color: INK_MUTE,
-    });
-    return;
-  }
-  pdf.paragraph(
-    trendScopeLabel(input.selectedService, input.selectedYear, labels),
-    {
-      size: 7.5,
-      color: INK_FAINT,
-    },
-  );
+/** [pola garis, lebar garis] per seri; seri total ditebalkan tanpa pola. */
+const DASH_PATTERNS: ReadonlyArray<{ pattern: number[]; width: number }> = [
+  { pattern: [], width: 0.6 },
+  { pattern: [2, 1.5], width: 0.3 },
+  { pattern: [1, 1.2], width: 0.3 },
+  { pattern: [4, 1.5, 1, 1.5], width: 0.3 },
+  { pattern: [3, 1, 1, 1], width: 0.3 },
+  { pattern: [1, 1], width: 0.4 },
+];
 
-  // Grafik vektor sederhana: satu garis per seri, dibedakan oleh pola garis
-  // (bukan hanya warna) supaya tetap terbaca saat dicetak hitam-putih. Angka
-  // lengkapnya ada di tabel "Data tren", jadi grafik tidak pernah jadi satu-
-  // satunya sumber data.
-  const plotHeight = 42;
-  const axisWidth = 8;
-  // Sisakan ruang di kanan supaya label periode terakhir (dipusatkan di titik
-  // terakhir) tidak menyentuh tepi margin.
-  const labelRoom = 4;
-  pdf.ensureSpace(plotHeight + 16);
+/**
+ * Gaya seri pada posisi tertentu. Seri total memakai pola kosong (tebal),
+ * seri rincian SELALU memakai pola garis yang tidak kosong: laporan juga dibaca
+ * saat dicetak hitam-putih, jadi pembeda warna saja tidak boleh jadi satu-
+ *-satunya pembeda dua parameter.
+ */
+function lineDash(index: number, emphasis: boolean) {
+  return emphasis
+    ? DASH_PATTERNS[0]
+    : DASH_PATTERNS[1 + (index % (DASH_PATTERNS.length - 1))];
+}
+
+function seriesPattern(index: number, emphasis: boolean): number[] {
+  return emphasis ? [] : lineDash(index, false).pattern;
+}
+
+/** `#0f766e` → `[15, 118, 110]`, supaya warna seri PDF sama dengan HTML. */
+function hexRgb(hex: string): Rgb {
+  const value = hex.replace("#", "");
+  const full =
+    value.length === 3
+      ? value
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : value;
+  const parsed = Number.parseInt(full, 16);
+  if (!Number.isFinite(parsed)) return INK_MUTE;
+  return [(parsed >> 16) & 0xff, (parsed >> 8) & 0xff, parsed & 0xff];
+}
+
+interface PdfTrendChart {
+  /** Judul yang dilihat pembaca: metrik + satuan, bukan "Grafik". */
+  title: string;
+  /** Satu kalimat yang menjelaskan apa yang diukur grafik ini. */
+  note: string;
+  /** Satuan sumbu Y, ditulis di atas plot ("Jumlah temuan" / "Skor (0-100)"). */
+  unit: string;
+  caption: string;
+  series: TrendSeries[];
+  labels: string[];
+}
+
+/**
+ * Tinggi satu blok grafik tren (mm), dipakai untuk `ensureSpace` supaya plot,
+ * label periode, label nilai, dan legenda tidak pernah terbelah batas halaman.
+ */
+function trendChartHeight(
+  pdf: PdfDocument,
+  chart: PdfTrendChart,
+  legendLines: number,
+): number {
+  const plotHeight = 34;
+  return (
+    line(9.5) +
+    line(7.5) +
+    line(6.5) + // label satuan
+    plotHeight +
+    line(6.5) + // label periode
+    legendLines * line(7.5) +
+    line(7) // keterangan grafik
+  );
+}
+
+/**
+ * Legenda yang menempel di bawah plot: satu baris per seri, memakai potongan
+ * garis dengan pola yang sama dengan garis di grafik, jadi pembaca bisa
+ * mencocokkan garisnya tanpa bergantung pada warna. Label panjang membungkus
+ * dengan indentasi, bukan terpotong.
+ */
+function drawTrendLegend(
+  pdf: PdfDocument,
+  chart: PdfTrendChart,
+  top: number,
+): number {
+  const swatchWidth = 6;
+  const gap = 1.5;
+  const indent = MARGIN_LEFT + swatchWidth + gap;
+  // Kursor dipindah ke atas legenda lebih dulu: `writeLine` menulis pada kursor
+  // dokumen, jadi tanpa ini legenda digambar di dalam area plot.
+  pdf.moveTo(top);
+  chart.series.forEach((series, seriesIndex) => {
+    const y = pdf.cursor;
+    const color = hexRgb(series.color);
+    pdf.doc.setDrawColor(color[0], color[1], color[2]);
+    pdf.doc.setLineWidth(lineDash(seriesIndex, series.emphasis).width);
+    pdf.doc.setLineDashPattern(seriesPattern(seriesIndex, series.emphasis), 0);
+    pdf.doc.line(MARGIN_LEFT, y - 0.6, MARGIN_LEFT + swatchWidth, y - 0.6);
+    pdf.doc.setLineDashPattern([], 0);
+    wrapPdfText(
+      series.label,
+      CONTENT_WIDTH - swatchWidth - gap,
+      pdf.measure,
+      "bold",
+      7.5,
+    ).forEach((item) => {
+      pdf.writeLine(item, indent, { font: "bold", size: 7.5, color: INK });
+    });
+  });
+  return pdf.cursor;
+}
+
+/** Jumlah baris legenda untuk sebuah grafik (dipakai untuk pagination). */
+function trendLegendLineCount(pdf: PdfDocument, chart: PdfTrendChart): number {
+  return chart.series.reduce(
+    (sum, series) =>
+      sum +
+      wrapPdfText(series.label, CONTENT_WIDTH - 7.5, pdf.measure, "bold", 7.5)
+        .length,
+    0,
+  );
+}
+
+/**
+ * Grafik tren vektor: judul, satuan sumbu Y, kisi + angka sumbu, label periode
+ * yang tidak pernah saling tumpang tindih, nilai di atas tiap titik, lalu
+ * legenda. Satu grafik = satu kelompok seri, jadi tiga metrik skor maupun
+ * agregat (Total Temuan) dan rincian (per parameter) tidak pernah digabung
+ * dalam satu trendline.
+ */
+function drawTrendChart(pdf: PdfDocument, chart: PdfTrendChart): void {
+  const { labels, series } = chart;
+  const plotHeight = 34;
+  const axisWidth = 9;
+  // Sisakan ruang di kanan supaya label periode terakhir tidak menyentuh tepi
+  // margin.
+  const labelRoom = 5;
+  const legendLines = trendLegendLineCount(pdf, chart);
+  pdf.ensureSpace(trendChartHeight(pdf, chart, legendLines) + 2);
+
+  pdf.paragraph(chart.title, { font: "bold", size: 9.5, color: INK });
+  pdf.paragraph(chart.note, { size: 7.5, color: INK_MUTE });
+
+  const unitTop = pdf.cursor;
+  pdf.doc.setFont(FONT, "bold");
+  pdf.doc.setFontSize(6.5);
+  pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+  pdf.doc.text(pdfSafeText(chart.unit), MARGIN_LEFT, unitTop, {
+    baseline: "top",
+  });
+  pdf.moveTo(unitTop + line(6.5));
+
   const plotLeft = MARGIN_LEFT + axisWidth;
   const plotTop = pdf.cursor;
   const plotWidth = CONTENT_WIDTH - axisWidth - labelRoom;
-  const values = datasets.flatMap((dataset) =>
-    dataset.data.filter(
-      (value): value is number =>
-        typeof value === "number" && Number.isFinite(value),
-    ),
+  const values = series.flatMap((item) =>
+    item.data.filter((value): value is number => value !== null),
   );
   const maxValue = Math.max(1, ...values);
   const step = niceStep(maxValue);
@@ -1169,39 +1335,59 @@ function buildTrend(pdf: PdfDocument, input: AgentReportPdfInput): void {
     pdf.doc.line(plotLeft, y, plotLeft + plotWidth, y);
     pdf.doc.setFont(FONT, "normal");
     pdf.doc.setFontSize(6.5);
-    pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
+    pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
     pdf.doc.text(String(value), plotLeft - 1.5, y, {
       align: "right",
       baseline: "middle",
     });
   }
+
+  // Label periode: hanya yang tidak akan saling menimpa. Ujung kiri/kanan
+  // selalu dicetak (rata kiri/rata kanan) supaya tidak keluar dari margin.
+  const labelWidths = labels.map((item) =>
+    pdf.measure(pdfSafeText(item), "normal", 6.5),
+  );
+  const spacing =
+    labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
+  const stride = Math.max(
+    1,
+    Math.ceil((Math.max(...labelWidths) + 2) / Math.max(spacing, 0.01)),
+  );
+  const lastIndex = labels.length - 1;
+  let previousDrawn = -1;
   labels.forEach((item, index) => {
+    const isEdge = index === 0 || index === lastIndex;
+    const onStride = index % stride === 0;
+    if (!isEdge && !onStride) return;
+    // Label yang terlalu dekat dengan label terakhir dilewati: dua label
+    // yang tumpang tindih lebih buruk daripada satu label yang dilewati.
+    if (onStride && !isEdge && lastIndex - previousDrawn < stride * 0.7) return;
+    const align =
+      index === 0 ? "left" : index === lastIndex ? "right" : "center";
     pdf.doc.setFont(FONT, "normal");
     pdf.doc.setFontSize(6.5);
-    pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
-    pdf.doc.text(pdfSafeText(item), xFor(index), plotTop + plotHeight + 2.5, {
-      align: "center",
+    pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+    pdf.doc.text(pdfSafeText(item), xFor(index), plotTop + plotHeight + 1.5, {
+      align,
       baseline: "top",
     });
+    previousDrawn = index;
   });
-  // [pola garis, lebar garis] per seri; seri total ditebalkan tanpa pola.
-  const dashPatterns: Array<{ pattern: number[]; width: number }> = [
-    { pattern: [], width: 0.6 },
-    { pattern: [2, 1.5], width: 0.3 },
-    { pattern: [1, 1.2], width: 0.3 },
-    { pattern: [4, 1.5, 1, 1.5], width: 0.3 },
-    { pattern: [3, 1, 1, 1], width: 0.3 },
-    { pattern: [1, 1], width: 0.4 },
-  ];
-  datasets.forEach((dataset, index) => {
-    const style = dashPatterns[index % dashPatterns.length];
-    const color = dataset.isTotal ? INK : INK_MUTE;
+
+  // Label nilai hanya digambar kalau jaraknya cukup lega; kalau tidak, angka
+  // saling tumpang tindih dan grafik justru makin sulit dibaca.
+  const showValues = spacing >= 9;
+  series.forEach((seriesItem, seriesIndex) => {
+    const color = hexRgb(seriesItem.color);
     pdf.doc.setDrawColor(color[0], color[1], color[2]);
-    pdf.doc.setLineWidth(dataset.isTotal ? 0.6 : style.width);
-    pdf.doc.setLineDashPattern(style.pattern, 0);
+    pdf.doc.setLineWidth(lineDash(seriesIndex, seriesItem.emphasis).width);
+    pdf.doc.setLineDashPattern(
+      seriesPattern(seriesIndex, seriesItem.emphasis),
+      0,
+    );
     for (let position = 1; position < labels.length; position += 1) {
-      const previousValue = dataset.data[position - 1];
-      const value = dataset.data[position];
+      const previousValue = seriesItem.data[position - 1];
+      const value = seriesItem.data[position];
       // Periode tanpa data (null) tidak pernah disambung ke periode berikutnya.
       if (previousValue == null || value == null) continue;
       if (!Number.isFinite(previousValue) || !Number.isFinite(value)) continue;
@@ -1214,40 +1400,146 @@ function buildTrend(pdf: PdfDocument, input: AgentReportPdfInput): void {
     }
     pdf.doc.setLineDashPattern([], 0);
     for (let position = 0; position < labels.length; position += 1) {
-      const value = dataset.data[position];
+      const value = seriesItem.data[position];
       if (value == null || !Number.isFinite(value)) continue;
       pdf.doc.setFillColor(255, 255, 255);
       pdf.doc.setDrawColor(color[0], color[1], color[2]);
       pdf.doc.setLineWidth(0.2);
       pdf.doc.circle(xFor(position), yFor(value), 0.9, "FD");
+      if (!showValues) continue;
+      // Hanya nilai yang menyentuh PUNCUK plot yang dicetak di bawah titik.
+      // Nilai di dasar plot (nol) juga dicetak di bawah akan menabrak label
+      // periode yang tepat di bawah sumbu X.
+      const atTop = yFor(value) <= plotTop + 2;
+      pdf.doc.setFont(FONT, "bold");
+      pdf.doc.setFontSize(6.5);
+      pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
+      pdf.doc.text(
+        String(value),
+        xFor(position),
+        yFor(value) + (atTop ? 1.4 : -1.4),
+        {
+          align: "center",
+          baseline: atTop ? "top" : "bottom",
+        },
+      );
     }
   });
-  pdf.moveTo(plotTop + plotHeight + 6);
+
+  const afterPlot = plotTop + plotHeight + line(6.5) + 1;
+  const afterLegend = drawTrendLegend(pdf, chart, afterPlot);
+  pdf.moveTo(afterLegend);
   pdf.paragraph(
-    `Grafik menampilkan ${labels.length} periode dan ${datasets.length} seri data. Nilai lengkapnya ada pada tabel Data tren.`,
+    `Grafik menampilkan ${labels.length} periode dan ${series.length} seri data. Nilai lengkapnya ada pada tabel ${chart.caption}.`,
     { size: 7, color: INK_FAINT, gapAfter: 2 },
   );
 
   pdf.table({
-    caption: "Data tren",
-    columns: ["Periode", ...datasets.map((dataset) => dataset.label)].map(
+    caption: chart.caption,
+    columns: ["Periode", ...series.map((item) => item.label)].map(
       (label, index) => ({
         header: label,
         weight: index === 0 ? 0.8 : 1,
         minWidth: index === 0 ? 16 : 20,
-        align: index === 0 ? "left" : "right",
+        align: index === 0 ? ("left" as const) : ("right" as const),
       }),
     ),
     rows: labels.map((item, index) => [
       item,
-      ...datasets.map((dataset) => {
-        const value = dataset.data[index];
+      ...series.map((seriesItem) => {
+        const value = seriesItem.data[index];
         return typeof value === "number" && Number.isFinite(value)
           ? numberText(value)
           : "\u2014";
       }),
     ]),
   });
+}
+
+/**
+ * Seksi "Perkembangan Skor" — skor dari `monthlySummaries`, bukan dari
+ * `personalTrend`. Tiga metrik (final, non-critical, critical) masing-masing
+ * satu grafik vektor + satu tabel, jadi tidak ada trendline yang mencampur tiga
+ * sumber hitungan berbeda dan tidak ada tabel yang ikut memuat kolom metrik
+ * lain.
+ */
+function buildScoreTrendSection(
+  pdf: PdfDocument,
+  input: AgentReportPdfInput,
+): void {
+  const { labels, charts } = buildScoreTrend({
+    monthlySummaries: input.monthlySummaries,
+    selectedYear: input.selectedYear,
+  });
+  if (labels.length === 0) {
+    pdf.paragraph(SCORE_EMPTY_NOTE, { color: INK_MUTE });
+    return;
+  }
+  pdf.paragraph(
+    trendScopeLabel(input.selectedService, input.selectedYear, labels),
+    { size: 7.5, color: INK_FAINT },
+  );
+  for (const chart of charts) {
+    drawTrendChart(pdf, {
+      title: chart.title,
+      note: chart.note,
+      unit: SCORE_UNIT_LABEL,
+      caption: chart.tableCaption,
+      series: [chart.series],
+      labels,
+    });
+  }
+}
+
+/**
+ * Seksi "Tren Temuan" — `personalTrend`, yaitu JUMLAH TEMUAN per periode.
+ *
+ * Tidak ada satu pun garis skor di sini: seksi skor sudah punya grafik dan
+ * tabelnya sendiri di atas. Tabel perbandingan temuan ikut di sini karena
+ * isinya juga hitungan temuan.
+ */
+function buildFindingsTrendSection(
+  pdf: PdfDocument,
+  input: AgentReportPdfInput,
+): void {
+  const { labels, total, parameters } = groupTrendSeries(input.data);
+  if (labels.length === 0 || (total === null && parameters.length === 0)) {
+    pdf.paragraph("Data tren belum tersedia untuk konteks ini.", {
+      color: INK_MUTE,
+    });
+    return;
+  }
+  pdf.paragraph(
+    trendScopeLabel(input.selectedService, input.selectedYear, labels),
+    {
+      size: 7.5,
+      color: INK_FAINT,
+    },
+  );
+
+  if (total) {
+    drawTrendChart(pdf, {
+      title: "Jumlah Total Temuan per Periode",
+      note: "Agregat seluruh temuan pada cakupan ini, satu titik per periode.",
+      unit: TREND_UNIT_LABEL,
+      caption: TREND_TOTAL_TABLE_CAPTION,
+      series: [total],
+      labels,
+    });
+  }
+  if (parameters.length > 0) {
+    drawTrendChart(pdf, {
+      title: "Jumlah Temuan per Parameter",
+      note:
+        "Satu seri per parameter penilaian. Semua seri memakai satuan yang sama (" +
+        TREND_UNIT_LABEL.toLowerCase() +
+        " per periode), jadi boleh dibaca sebagai pembanding langsung.",
+      unit: TREND_UNIT_LABEL,
+      caption: TREND_PARAMETER_TABLE_CAPTION,
+      series: parameters,
+      labels,
+    });
+  }
 }
 
 function buildComparisonTable(
@@ -1368,30 +1660,103 @@ function buildFindings(pdf: PdfDocument, input: AgentReportPdfInput): void {
       { font: "bold", size: 9.5, color: INK, gapAfter: 1 },
     );
     for (const ticket of tickets.values()) {
-      pdf.paragraph(
-        `No Tiket ${ticket.label} (${numberText(ticket.items.length)} parameter)`,
-        { font: "bold", size: 8.5, color: INK_MUTE },
-      );
+      drawTicketBand(pdf, ticket.label, ticket.items.length);
       for (const item of ticket.items) {
+        // Nama parameter + nilai: lengkap dan proporsional, tapi tidak pernah
+        // lebih besar atau lebih tebal daripada nomor tiket di pitanya.
         pdf.paragraph(
           `${formatNilai(item.nilai)} \u2014 ${item.indicatorName}`,
           {
             font: "bold",
-            size: 8.5,
+            size: 9,
             color: INK,
+            indent: 3,
           },
         );
         pdf.paragraph(`Ketidaksesuaian: ${item.ketidaksesuaian ?? "\u2014"}`, {
-          size: 8.5,
+          size: 9,
+          indent: 3,
           gapAfter: 0.5,
         });
         pdf.paragraph(`Sebaiknya: ${item.sebaiknya ?? "\u2014"}`, {
-          size: 8.5,
+          size: 9,
+          indent: 3,
           gapAfter: 1.5,
         });
       }
     }
   }
+}
+
+/**
+ * Pita identitas per tiket: label "NO TIKET", nomor tiket, dan jumlah parameter
+ * di dalam bidang abu muda. Nomor tiket dicetak paling besar dan paling tebal
+ * di blok temuan — itu identifier yang dicari pembaca saat membaca audit, dan
+ * sebelumnya ia tenggelam di antara nama parameter.
+ *
+ * Pita ini adalah satu blok: pita tidak pernah menggantung sendirian di dasar
+ * halaman, dan pita selalu membawa minimal satu baris temuan bersamanya.
+ */
+function drawTicketBand(
+  pdf: PdfDocument,
+  label: string,
+  itemCount: number,
+): void {
+  const paddingX = 3;
+  const paddingY = 2;
+  const labelSize = 7;
+  const codeSize = 11.5;
+  const labelText = "NO TIKET";
+  const labelWidth = pdf.measure(labelText, "bold", labelSize);
+  const note = `${numberText(itemCount)} parameter`;
+  // Nomor tiket yang panjang membungkus di dalam pita, bukan meluber melewati
+  // margin kanan. Ruang sisanya dipakai untuk jumlah parameter di tepi kanan.
+  const code = wrapPdfText(
+    label,
+    CONTENT_WIDTH - paddingX * 2 - labelWidth - 2 - 30,
+    pdf.measure,
+    "bold",
+    codeSize,
+  );
+  const bandHeight = paddingY * 2 + line(codeSize) * code.length;
+  // Pita + satu baris temuan pertama harus muat bersama; kalau tidak, pindah
+  // halaman sekarang juga.
+  pdf.ensureSpace(bandHeight + line(9) + 2);
+
+  const top = pdf.cursor;
+  pdf.doc.setFillColor(WASH[0], WASH[1], WASH[2]);
+  pdf.doc.setDrawColor(LINE_STRONG[0], LINE_STRONG[1], LINE_STRONG[2]);
+  pdf.doc.setLineWidth(0.2);
+  pdf.doc.rect(MARGIN_LEFT, top, CONTENT_WIDTH, bandHeight, "FD");
+
+  const textTop = top + paddingY;
+  pdf.doc.setFont(FONT, "bold");
+  pdf.doc.setFontSize(labelSize);
+  pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+  pdf.doc.text(labelText, MARGIN_LEFT + paddingX, textTop, { baseline: "top" });
+
+  pdf.doc.setFont(FONT, "bold");
+  pdf.doc.setFontSize(codeSize);
+  pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
+  code.forEach((item, index) => {
+    pdf.doc.text(
+      item,
+      MARGIN_LEFT + paddingX + labelWidth + 2,
+      textTop + index * line(codeSize),
+      {
+        baseline: "top",
+      },
+    );
+  });
+
+  pdf.doc.setFont(FONT, "normal");
+  pdf.doc.setFontSize(7.5);
+  pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+  pdf.doc.text(note, PAGE_WIDTH - MARGIN_RIGHT - paddingX, textTop, {
+    align: "right",
+    baseline: "top",
+  });
+  pdf.moveTo(top + bandHeight + 1);
 }
 
 function buildColophon(
@@ -1500,13 +1865,18 @@ export async function generateAgentReportPdf(
   buildTicketsTable(pdf, input, activeMonth);
   buildRootCauses(pdf, input, activeMonth);
 
-  // Isi pertama seksi ini adalah grafik tren (tinggi plot + label + caption).
+  // Isi pertama seksi ini adalah blok grafik skor pertama: judul, satuan,
+  // plot, label periode, nilai, dan legenda harus utuh di halaman yang sama.
   pdf.heading("Perkembangan Skor", undefined, 62);
-  buildTrend(pdf, input);
+  buildScoreTrendSection(pdf, input);
+
+  // Isi seksi ini adalah grafik JUMLAH TEMUAN (bukan skor) + tabel benchmark.
+  pdf.heading("Tren Temuan", undefined, 62);
+  buildFindingsTrendSection(pdf, input);
   buildComparisonTable(pdf, input);
 
-  // Isi pertama seksi ini adalah satu blok periode + tiket + temuan.
-  pdf.heading("Riwayat Temuan", undefined, 30);
+  // Isi pertama seksi ini adalah satu blok periode + pita tiket + temuan.
+  pdf.heading("Riwayat Temuan", undefined, 34);
   buildFindings(pdf, input);
 
   buildColophon(pdf, input, dateStr, serviceLabel);

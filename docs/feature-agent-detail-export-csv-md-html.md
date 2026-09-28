@@ -86,10 +86,12 @@ Mekanisme export tersedia melalui dropdown **5 format**:
   akar masalah, daftar agen berbagi peringkat); kontrolnya native, terbuka
   secara default, dan aman saat dicetak.
 - **HTML Interaktif** hanya memakai kontrol yang benar-benar bekerja: `tablist`
-  dengan tiga tab (`Ringkasan`, `Tren`, `Temuan`) beserta `aria-selected`,
-  `aria-controls`, roving `tabindex`, dan navigasi Arrow/Home/End; filter seri
-  tren dengan `aria-pressed`; disclosure opsional untuk detail per periode,
-  detail temuan, dan tiket terkait akar masalah.
+  dengan empat tab (`Ringkasan`, `Skor`, `Tren`, `Temuan`) beserta
+  `aria-selected`, `aria-controls`, roving `tabindex`, dan navigasi
+  Arrow/Home/End; filter seri tren temuan dengan `aria-pressed` (hanya pada
+  panelnya sendiri — tiap grafik skor cuma punya satu seri, jadi tidak ada yang
+  bisa disaring); disclosure opsional untuk detail per periode, detail temuan,
+  dan tiket terkait akar masalah.
 - Kedua varian memakai **dataset, markup, dan stylesheet yang sama**; yang
   berbeda hanya perilaku (tab/filter/disclosure `open`). `@media print`
   membuka kembali semua panel, semua seri grafik, dan semua disclosure.
@@ -99,9 +101,34 @@ Mekanisme export tersedia melalui dropdown **5 format**:
 - Rekap bulanan memakai **tabel** dengan kolom `Status QA` terhadap target 95%
   yang sama dengan `MonthRail`/`AgentAuditDossier`, jadi informasi "di bawah
   target" tidak hilang bersamahilangnya rail.
-- Grafik tren memakai satu seri per warna **dan** pola garis berbeda, ditambah
-  tabel `Data tren` yang terlihat di kedua varian, sehingga grafik tidak
-  bergantung pada warna saja dan tetap terbaca saat dicetak hitam-putih.
+- **Dua keluarga tren, dua seksi.** `personalTrend` berisi **jumlah temuan** per
+  periode — itu hitungan temuan, bukan skor. Karena itu grafiknya berada di
+  seksi **Tren Temuan**, sedangkan seksi **Perkembangan Skor** memakai skor yang
+  benar-benar dihitung backend: `periodSummaries` (`finalScore`,
+  `nonCriticalScore`, `criticalScore`) untuk tahun + layanan yang sama, pada
+  periode yang benar-benar ada. Tidak ada skor yang diturunkan dari jumlah
+  temuan, dan tidak ada perhitungan ulang di laporan.
+- **Satu metrik satu grafik.** Di seksi skor, tiga metrik — `Skor Final`,
+  `Skor Non-Critical (NC)`, dan `Skor Critical (CR)` — masing-masing satu grafik
+  dengan satuan sumbu `Skor (0-100)`, judul, nilai di atas tiap titik, legenda
+  yang menempel di bawah plot, dan tabel data lengkapnya sendiri
+  (`Data skor — Skor Final per Periode`, `Data skor — Skor Non-Critical (NC) per
+  Periode`, `Data skor — Skor Critical (CR) per Periode`). Di seksi temuan,
+  `Total Temuan` adalah agregat sedangkan rincian per parameter adalah
+  komponen: satuan sama, makna berbeda, jadi tidak pernah digabung dalam satu
+  trendline. Masing-masing punya judul, satuan sumbu Y, nilai di atas tiap titik,
+  legenda, dan tabelnya sendiri (`Data tren — Total Temuan per Periode` dan
+  `Data tren — Temuan per Parameter`). Di `@media print` kalimat penjelasan per
+  grafik tidak ikut tercetak (judul + satuan sudah cukup), dan grafik, legenda,
+  serta kepala tabel tidak pernah terbelah antar halaman.
+- Grafik tren memakai satu seri per warna **dan** pola garis berbeda, sehingga
+  grafik tidak bergantung pada warna saja dan tetap terbaca saat dicetak
+  hitam-putih.
+- **Nomor tiket adalah identifier utama** di blok temuan: ia tampil pada pita
+  berlabel `NO TIKET` (PDF) atau `No Tiket` (HTML), kontras penuh (`--ink`) dan
+  lebih besar dari nama parameter maupun nilai, sehingga tiket yang diaudit
+  mudah dipindai di antara angka. Nama parameter dan nilai tetap lengkap, dengan
+  tipografi yang proporsional terhadap nomor tiket.
 - Avatar memakai **inisial**, bukan `<img>`, agar dokumen benar-benar offline.
 - Mode: **light mode**, inline CSS lokal, tanpa font/link/script/gambar remote.
 
@@ -114,12 +141,18 @@ Mekanisme export tersedia melalui dropdown **5 format**:
 - **A4 portrait, teks asli.** Seluruh isi ditulis sebagai operator teks, jadi
   bisa diseleksi/dicari/disalin. Tidak ada `html2canvas`, tidak ada raster
   penuh, tidak ada font eksternal. Grafik tren hanya garis vektor (dibedakan
-  pola garis, bukan hanya warna) dan angkanya tetap ada lengkap di tabel
-  **Data tren**.
+  pola garis, bukan hanya warna) dan angkanya tetap ada lengkap di tabel data
+  masing-masing grafik. Pemisahan grafik dan hierarki nomor tiket di PDF
+  mengikuti aturan yang sama dengan HTML statis: satu metrik satu grafik, dan
+  nomor tiket dicetak pada pita berlabel `NO TIKET` dengan ukuran paling besar
+  di blok temuan.
 - **Tidak ada halaman sampul terpisah.** Halaman 1 langsung berisi identitas
   (nama, tahun, layanan, meta) lalu ringkasan eksekutif, rekap bulanan, tiket,
-  dan akar masalah; halaman berikutnya tren, benchmark, seluruh temuan, dan
-  colophon.
+  dan akar masalah; halaman berikutnya skor, tren temuan, benchmark, seluruh
+  temuan, dan colophon. PDF dan HTML Statis adalah **dua implementasi render
+  dan layout yang terpisah** (jsPDF operator teks vs. markup+CSS offline): tidak
+  ada satupun yang memakai tangkapan layar, dan tidak ada satupun yang memakai
+  keluaran format lain sebagai basis.
 - **Paginasi:** judul seksi tidak pernah menggantung di dasar halaman, header
   tabel berulang saat tabel terbelah, satu baris tabel tidak pernah keluar dari
   area cetak, teks panjang mengalir per baris (token tanpa spasi dipecah per
@@ -171,7 +204,7 @@ evidence):
 | `Detail Temuan` | `Bulan,Tahun,Indikator,Kategori,Nilai,Ketidaksesuaian,Sebaiknya,No Tiket` | Semua temuan pada tahun + layanan terpilih, bukan hanya bulan aktif |
 | `Tiket Pengurang Skor Terbesar` | `No Tiket,Score Deduction,Jumlah Temuan,Parameter Terberat` | Bulan terpilih saja |
 | `Akar Masalah` | `Label,Prioritas,Jumlah Temuan,Tiket Terdampak,Temuan Critical,Rata-rata Nilai,Rekomendasi` | Tahun berjalan (YTD) s.d. bulan terpilih |
-| `Perkembangan Skor` | `Periode,<label tiap seri>` | Periode yang benar-benar ada pada data tren; seksi hanya ditulis jika data tren tersedia |
+| `Perkembangan Skor` | `Periode,<label tiap seri>` | Periode yang benar-benar ada pada data tren; seksi hanya ditulis jika data tren tersedia. **Catatan:** di CSV/MD seksi ini masih dibangun dari `personalTrend`, yaitu JUMLAH TEMUAN per periode — nama seksi dan skema Endernya dikunci agar tidak breaking, dan tidak diubah dalam koreksi seksi skor HTML/PDF. Grafik skor yang benar-benar memakai `periodSummaries` hanya ada di HTML (kedua varian) dan PDF |
 | `Perbandingan Temuan` | `Parameter,Agent Ini,Rata-rata Tim,Rata-rata Service` | Cakupan yang dideklarasikan `comparisonTable.scope`; seksi hanya ditulis jika tabel benchmark tersedia |
 
 Menambah atau mengubah baris metadata cakupan **tidak** mengubah nama seksi,
@@ -420,9 +453,12 @@ yang dipecah per karakter.
      jadi memaksa `display: block` saja tidak cukup — seluruh isi temuan dan
      bukti akar masalah akan hilang dari cetak.
   2. Ritme vertikal khusus `@media print` (padding panel/seksi, `line-height`,
-     margin colophon) dikompakan supaya laporan standar muat **tiga** halaman
-     A4 dan halaman terakhir tidak hanya berisi colophon. Aturan ini hanya ada
-     di dalam blok `@media print`; tampilan layar tidak berubah.
+     margin colophon) dikompakan supaya laporan standar muat dalam **lima**
+     halaman A4 dan halaman terakhir tidak hanya berisi colophon. Angka ini
+     terikat isi seksi tren (tiga grafik skor + dua grafik jumlah temuan,
+     masing-masing dengan tabelnya sendiri, tidak pernah terbelah antar
+     halaman). Aturan ini hanya ada di dalam blok `@media print`; tampilan
+     layar tidak berubah.
   3. Bukti paginasi yang sah adalah `page.pdf()` A4 plus baca-balik teks
      per halaman dari PDF itu. Potongan `page.screenshot({ clip })` bukan
      bukti: `clip` memotong aliran dokumen kontinu, bukan hasil paginasi.
@@ -442,7 +478,15 @@ yang dipecah per karakter.
   baris berbasis lebar karakter, `ensureSpace()` sebelum setiap blok, dan
   `table()` yang memecah baris per-baris saat tabel melewati batas halaman.
   `doc.splitTextToSize()` sengaja tidak dipakai: pengukurannya meleset untuk
-  teks tanpa spasi sehingga baris bisa melewati margin kanan.
+  teks tanpa spasi sehingga baris bisa melewati margin kanan. Paginasi tabel
+  dibuktikan dari file yang diunduh dengan fixture tabel panjang (24 baris
+  perbandingan): tabel melewati batas halaman, header kolom diulang di setiap
+  halaman yang memuat baris, dan setiap baris label unik muncul utuh tepat di
+  satu halaman.
+- **Warna glyph ditulis eksplisit sebelum teks.** `startPage()` memasang font,
+  ukuran, dan warna untuk header identitas. Tanpa itu, glyph header mewarisi
+  warna sel terakhir yang digambar, sehingga halaman dengan status negatif bisa
+  tercetak dengan header merah seperti peringatan.
 - **Pengukuran teks.** Lebar string dihitung dari tabel lebar per karakter
   (di-cache), bukan `getTextWidth()` untuk string panjang — yang terbukti
   mengembalikan 0 untuk pengulangan karakter panjang pada jsPDF 4.2.1.
@@ -471,7 +515,7 @@ menu "Unduh Laporan"**, bukan dari panggilan `generateCSV/MD/HTML` dan bukan dar
 
 | Spec | Surface yang diukur | Jumlah test |
 | --- | --- | --- |
-| `apps/web/e2e/sidak-agent-report-download.spec.ts` | Kontrak tiap format: isi file, cakupan, offline-safety, PDF, kegagalan ekspor, guard jaringan, kasus batas, dan diskriminasi placeholder vs pemicu formula | 26 |
+| `apps/web/e2e/sidak-agent-report-download.spec.ts` | Kontrak tiap format: isi file, cakupan, offline-safety, PDF, kegagalan ekspor, guard jaringan, kasus batas, dan diskriminasi placeholder vs pemicu formula | 29 |
 | `apps/web/e2e/sidak-agent-html-export-parity.spec.ts` | Paritas **halaman live vs dokumen unduhan** + review visual live/unduhan | 2 |
 | `apps/web/e2e/helpers/sidakAgentReportFixture.ts` | Harness bersama (fixture, guard fail-closed, preflight, `exportFromMenu`, pembaca offline `file://`) | bukan spec |
 
@@ -492,9 +536,9 @@ Nomor merujuk ke **nomor baris** `it(...)`/`it.each(...)` di
 bukan urutan, supaya setiap baris bisa langsung dibuka dan diperiksa. "Dihapus"
 berarti test lamanya dihapus **setelah** pengganti E2E-nya benar-benar lulus.
 
-Jumlah yang dihapus **bukan** 1:1 dengan E2E yang ditambahkan: **54 case unit
-dihapus, dan 27 test E2E ditambahkan** — dua angka itu tidak berpasangan satu
-per satu. Sebagian baris lama dipecah menjadi beberapa test E2E yang masing-masing
+Jumlah test unit yang dihapus **tidak** berpasangan 1:1 dengan E2E: **54 case unit
+dihapus, sementara E2E laporan bertambah dari 1 menjadi 31 (net +30 dari baseline
+`8866306`)**. Sebagian baris lama dipecah menjadi beberapa test E2E yang masing-masing
 membuktikan satu kontrak berbeda (mis. filter tren menjadi keyboard-tab, filter
 seri, dan cetak), sebagian baris lama lainnya hilang tanpa pengganti 1:1 karena
 isinya kopy shell yang sudah discontinued. Kedua angka harus dibaca sebagai total
@@ -523,7 +567,12 @@ cakupan, bukan sebagai pasangan tukar-tukar.
 | HTML: profil · tabel bulanan · temuan · tiket · akar masalah · tren | L769, L784, L799, L846, L861, L876 | *CSV/MD/HTML asli* + *paritas live vs unduhan* | kopy badge "SESUAI"/"PERBAIKAN" (L799) tidak lagi diassert — kosmetik |
 | HTML: escaping karakter khusus | L816 | *HTML Statis/Interaktif* + *paritas live vs unduhan* | — |
 | HTML: label tren memakai tahun terpilih | L892 | *CSV menyatakan cakupan tiap seksi* + *Tren degeneratif* | kopy `Periode: …` lama tidak lagi jadi kontrak |
-| HTML: tabel data tren terlihat | L906 | *HTML Interaktif: … filter tren* (tabel `Data tren` terlihat + angka per periode) | tabel data tren bukan `sr-only`; aturan CSS `.sr-only` sendiri masih ada di stylesheet generator tetapi tidak dipakai markup laporan mana pun |
+| HTML: tabel data tren terlihat | L906 | *HTML Interaktif: … filter tren* (kedua tabel data tren terlihat + angka per periode) | tabel data tren bukan `sr-only`; aturan CSS `.sr-only` sendiri masih ada di stylesheet generator tetapi tidak dipakai markup laporan mana pun |
+| HTML/PDF: satu metrik satu grafik, tiap grafik punya tabel sendiri | — | *HTML Statis: grafik skor & tren temuan terpisah lengkap* + *PDF: nomor tiket jadi identifier utama* (judul, satuan sumbu, legenda, caption tabel, dan kolom yang tidak saling bocor) | agregat `Total Temuan` dan rincian parameter tidak boleh digabung dalam satu trendline; tiga metrik skor juga tidak boleh digabung satu sama lain |
+| HTML/PDF: nomor tiket lebih besar & lebih kontras dari parameter/nilai | — | *HTML Statis: grafik skor & tren temuan terpisah lengkap* (computed style + rasio kontras) + *PDF: nomor tiket jadi identifier utama* (ukuran font + `/BaseFont` dari run teks) | — |
+| **HTML/PDF: "Perkembangan Skor" berisi skor, bukan jumlah temuan** | — | *HTML Statis: grafik skor & tren temuan terpisah lengkap* (sel tabel skor dibaca satu per satu terhadap `AGENT_SCORE_HISTORY`; tabel tren temuan tidak boleh memuat angka skor) + *PDF: nomor tiket jadi identifier utama* (`LONG_TEXT_SCORE_HISTORY` per seksi, `"74.5"` utuh, nol label/satuan keluarga temuan di seksi skor dan nol label skor di seksi tren) | sumbernya `periodSummaries` (`finalScore`/`nonCriticalScore`/`criticalScore`), bukan `personalTrend`; tidak ada test non-E2E baru — daftar putihanya belum mencakup helper skor ini |
+| HTML: filter seri tidak lintas panel | — | *HTML Interaktif: tab keyboard, filter tren* (filter parameter tidak menyaring grafik skor; panel skor tanpa filter) | tiap grafik skor satu seri, jadi tidak ada yang perlu disaring |
+| PDF: tabel panjang dipaginasi, header berulang, baris utuh | — | *PDF: tabel panjang dipaginasi* (fixture `agent-tabel-panjang`, 24 baris perbandingan) | — |
 | HTML: celah `null` tidak dijembatani | L940 | *Tren degeneratif* (periode tanpa angka tetap terbaca sebagai kosong) | atribut `d` SVG tidak diassert — detail implementasi |
 | HTML statis: tidak ada kontrol palsu | L972 | *HTML Statis adalah dokumen baca* (nol `<button>`, nol `role="tab"`) | — |
 | HTML: quickview "berbagi peringkat" | L993 (`it.each`, 3 case) | *Data BERBAHAYA ... quickview* (dua agen seri) | kopy untuk 1 dan 3+ agen tidak diassert |
@@ -555,19 +604,16 @@ beredar selama fase ini bukan baseline yang sah.
 | `src/__tests__/AgentProfileBar.test.tsx` | 4 `it` | 2 `it` | 2 test kontrak ekspor digantikan E2E |
 | `src/__tests__/useAgentDetail.test.tsx` | 9 `it` | 9 `it` | tidak disentuh |
 | **Total non-E2E** | **62 deklarasi / 66 case** | **12 deklarasi / 12 case** | **50 deklarasi / 54 case dihapus** |
-| `e2e/sidak-agent-report-download.spec.ts` | 0 (tidak ada di baseline `8866306`) | 26 | spec baru, tidak ada di baseline dan ada di perubahan ini |
+| `e2e/sidak-agent-report-download.spec.ts` | 0 (tidak ada di baseline `8866306`) | 29 | spec baru, tidak ada di baseline dan ada di perubahan ini |
 | `e2e/sidak-agent-html-export-parity.spec.ts` | 1 (panggilan generator langsung) | 2 (unduhan nyata) | spec yang sama, dirombak di tempat |
-| **Total E2E laporan** | **1** | **28** | **net +27 dari baseline `8866306`** |
+| **Total E2E laporan** | **1** | **31** | **net +30 dari baseline `8866306`** |
 
-Hitungan yang sering disalahbaca: **54 case unit dihapus, bukan 27**; dan 27
-test E2E itu **bukan** pengganti satu-per-satu dari 54 case tersebut. Keduanya
-hanya boleh dibandingkan sebagai total cakupan (lihat peta kontrak di atas).
+Hitungan yang sering disalahbaca: **54 case unit dihapus**, sedangkan suite E2E
+laporan sekarang berjumlah **31 test** (bertambah 30 dari baseline). Test E2E itu
+**bukan** pengganti satu-per-satu dari 54 case tersebut; keduanya hanya boleh
+dibandingkan sebagai total cakupan (lihat peta kontrak di atas).
 
-Status run terakhir yang tercatat: reporter Playwright melaporkan **28 passed
-(1,9 m)** pada run *focused* terdelegasi terakhir. **Exit code Playwright tidak
-diklaim dari run itu** — worker menangkap status pipeline lewat `tail`, jadi
-tidak ada exit code yang terambil independen. Exit `0` yang tercatat berasal dari
-gate fase sebelumnya, bukan dari run terakhir ini.
+Status run terverifikasi pada **2026-09-28**: `pnpm --filter @trainers/web exec playwright test e2e/sidak-agent-report-download.spec.ts e2e/sidak-agent-html-export-parity.spec.ts --reporter=line` — **31 passed (2.0m)**, exit code `0`. Preflight mengonfirmasi target Vite lokal `http://localhost:3005`; API dan auth dimock, pembacaan HTML dilakukan offline melalui `file://`, dan request font eksternal diblokir.
 
 Catatan gaya: file ini **sudah gagal `prettier --check` di baseline `8866306`**
 (dibuktikan lewat `git show 8866306:<path> | prettier --check`), termasuk pada
@@ -638,6 +684,7 @@ sebagai pengganti E2E", bukan "unit test tidak pernah dipertahankan".
 - `agentReportPdf.ts` — `generateAgentReportPdf()` (A4 ber-paginasi, teks yang bisa dicari)
 - `AgentDetailData` type di `packages/types/src/sidak.ts`
 - `docs/SIDAK_LOGIC_AND_SCORING.md` — kontrak clean session/phantom
+- `docs/rebuild-logs/phase-222-sidak-agent-report-export-readability.md` — ringkasan perubahan keterbacaan PDF/HTML dan verifikasinya
 - `.hermes/plans/2026-09-27_201056-sidak-agent-report-exports.md` — rencana export per fase (Fase 1-4 sudah dieksekusi; Fase 5 migrasi test legacy)
 - `apps/web/e2e/sidak-agent-report-download.spec.ts` — bukti regresi unduhan nyata per format
 - `apps/web/e2e/sidak-agent-html-export-parity.spec.ts` — paritas halaman live vs dokumen unduhan, plus review visual live/unduhan
