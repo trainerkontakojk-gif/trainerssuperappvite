@@ -6,7 +6,6 @@ import {
   Users,
   Shield,
   History,
-  Clock,
   Trash2,
   PlusCircle,
   Trophy,
@@ -26,7 +25,7 @@ import { sidakClient, adminClient, unwrapResponse } from "../lib/api";
 import { StaggerList, StaggerItem } from "../components/motion";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Button } from "../components/ui/button";
-import { Card, CardContent } from "../components/ui/card";
+import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { Skeleton } from "../components/ui/skeleton";
 
 const DashboardTrendPanel = lazy(
@@ -79,6 +78,12 @@ function normalizeActionText(action: string | null | undefined): string {
     .replace(/QA Analyzer/gi, "SIDAK")
     .replace(/Sidak/gi, "SIDAK")
     .replace(/Profiler/gi, "KTP");
+}
+
+function formatSummaryValue(value: number | undefined): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? String(value)
+    : "—";
 }
 
 const getModuleColors = (moduleId: string) => {
@@ -341,9 +346,6 @@ export default function DashboardPage() {
     },
   ];
 
-  const shortcutsToDisplay = isManager
-    ? trainerShortcuts
-    : visibleModules.slice(0, 4);
   const roleLabel = normalizeRoleLabel(userRole);
 
   const formattedLogs = activityLogs.map((act) => ({
@@ -353,6 +355,15 @@ export default function DashboardPage() {
     time: formatTimeAgo(act.created_at),
     type: act.type,
   }));
+
+  // Lintas semua layanan; periode mengikuti filter tanggal pada panel tren.
+  // Tab layanan internal DashboardTrendPanel tidak tersalur ke ringkasan ini.
+  const trendSummary = serviceTrendMap?.all.totalSummary;
+  const summaryAuditedAgents =
+    localTrendData?.totalSummary.auditedAgents ?? trendSummary?.auditedAgents;
+  const summaryActiveServices =
+    localTrendData?.totalSummary.activeServiceCount ??
+    trendSummary?.activeServiceCount;
 
   return (
     <main className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-6 py-8 lg:px-10 lg:py-12">
@@ -373,13 +384,13 @@ export default function DashboardPage() {
       )}
 
       <StaggerList className="flex flex-col gap-10" stagger={0.05}>
-        {/* Section 1: Hero & Quick Stats */}
-        <StaggerItem className="flex flex-col lg:flex-row justify-between items-start gap-8 lg:gap-12">
-          <div className="max-w-2xl flex-1">
-            <h2 className="mb-3 text-4xl font-semibold tracking-tight text-foreground">
+        {/* Section 1: Hero */}
+        <StaggerItem>
+          <div className="max-w-2xl">
+            <h2 className="mb-3 text-4xl font-semibold tracking-tight text-foreground text-balance">
               Halo, {displayName}.
             </h2>
-            <p className="text-base font-normal leading-relaxed text-muted-foreground">
+            <p className="text-base font-normal leading-relaxed text-muted-foreground text-pretty">
               Anda masuk sebagai{" "}
               <span className="font-semibold text-foreground">{roleLabel}</span>
               .{" "}
@@ -388,58 +399,9 @@ export default function DashboardPage() {
                 : "Pantau tren performa layanan utama, mengevaluasi aktivitas harian staf, dan kelola operasional dalam satu platform."}
             </p>
           </div>
-
-          {/* Quick Stats right aligned */}
-          <Card className="shrink-0 border-border bg-card py-0">
-            <CardContent className="flex gap-6 p-5 lg:gap-10 lg:p-6">
-              {showAnalytics && serviceTrendMap ? (
-                <>
-                  <div className="flex flex-col">
-                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                      {localTrendData?.totalSummary.auditedAgents ??
-                        serviceTrendMap.all.totalSummary.auditedAgents ??
-                        0}
-                    </span>
-                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                      Agen Diaudit
-                    </span>
-                  </div>
-                  <div className="w-px bg-border"></div>
-                  <div className="flex flex-col">
-                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                      {localTrendData?.totalSummary.totalDefects ??
-                        serviceTrendMap.all.totalSummary.totalDefects ??
-                        0}
-                    </span>
-                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                      Temuan
-                    </span>
-                  </div>
-                  <div className="w-px bg-border"></div>
-                  <div className="flex flex-col">
-                    <span className="text-3xl font-display font-bold tracking-tight text-fg">
-                      {localTrendData?.totalSummary.activeServiceCount ??
-                        serviceTrendMap.all.totalSummary.activeServiceCount ??
-                        0}
-                    </span>
-                    <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
-                      Layanan
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-3 text-fg2">
-                  <Clock className="w-5 h-5 text-fg3" />
-                  <span className="text-sm font-medium">
-                    Sesi latihan Anda siap dimulai
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </StaggerItem>
 
-        {/* Section 2: Trainer Shortcuts (Prominent Top Placement) */}
+        {/* Section 2: Trainer Shortcuts */}
         {isManager && (
           <StaggerItem>
             <div className="mb-4">
@@ -452,22 +414,25 @@ export default function DashboardPage() {
                 <Link
                   key={shortcut.href}
                   to={shortcut.href}
-                  className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30 hover:bg-muted/40"
+                  className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/30 hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${shortcut.accentSoftClassName} ${shortcut.accentClassName}`}
                   >
-                    <shortcut.icon className="h-5 w-5" />
+                    <shortcut.icon aria-hidden="true" className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-fg">
                       {shortcut.title}
                     </p>
-                    <p className="text-xs text-fg3 truncate mt-0.5">
+                    <p className="text-xs text-fg2 truncate mt-0.5">
                       {shortcut.description}
                     </p>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground" />
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground"
+                  />
                 </Link>
               ))}
             </div>
@@ -491,7 +456,7 @@ export default function DashboardPage() {
                 <Link
                   key={module.id}
                   to={module.href}
-                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/30 hover:bg-muted/40"
+                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/30 hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   onClick={(e) => {
                     if (module.id === "telefun" && !hasTelefunAccess) {
                       e.preventDefault();
@@ -504,14 +469,17 @@ export default function DashboardPage() {
                       <div
                         className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.soft} ${colors.text}`}
                       >
-                        <module.icon className="h-5 w-5" />
+                        <module.icon aria-hidden="true" className="h-5 w-5" />
                       </div>
-                      <ArrowRight className="h-4 w-4 text-fg3 transition-transform group-hover:translate-x-1 group-hover:text-fg" />
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="h-4 w-4 text-fg3 transition-transform group-hover:translate-x-1 group-hover:text-fg"
+                      />
                     </div>
                     <h4 className="text-sm font-semibold text-fg">
                       {module.title}
                     </h4>
-                    <p className="mt-1.5 text-xs text-fg3 leading-relaxed">
+                    <p className="mt-1.5 text-xs text-fg2 leading-relaxed">
                       {module.description}
                     </p>
                   </div>
@@ -524,19 +492,38 @@ export default function DashboardPage() {
         {/* Section 4: Trend Panel */}
         {showAnalytics && serviceTrendMap && (
           <StaggerItem>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-fg tracking-tight">
-                  Tren Performa Kualitas
-                </h3>
-                <p className="text-xs text-fg2 mt-1">
-                  Visualisasi deviasi temuan bulanan
-                </p>
-              </div>
-            </div>
+            <Card className="min-h-[360px] border-border bg-card">
+              <CardHeader>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-fg tracking-tight">
+                      Tren Performa Kualitas
+                    </h3>
+                    <p className="text-xs text-fg2 mt-1">
+                      Visualisasi deviasi temuan bulanan
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 lg:justify-end">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-fg2">Agen diaudit</span>
+                      <span className="text-sm font-semibold tabular-nums text-fg">
+                        {formatSummaryValue(summaryAuditedAgents)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-fg2">Layanan</span>
+                      <span className="text-sm font-semibold tabular-nums text-fg">
+                        {formatSummaryValue(summaryActiveServices)}
+                      </span>
+                    </div>
+                    <p className="w-full text-left text-xs text-fg2 lg:text-right">
+                      Semua layanan · periode mengikuti pilihan.
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
 
-            <Card className="min-h-[360px] border-border bg-card p-1 py-1">
-              <CardContent className="p-0">
+              <CardContent>
                 <Suspense
                   fallback={
                     <div className="flex h-[360px] w-full items-center justify-center">

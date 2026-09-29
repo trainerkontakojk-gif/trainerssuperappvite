@@ -4,17 +4,7 @@ import type {
   SidakForecastLookupStatus,
   SidakForecastLookupResult,
 } from "@trainers/types";
-import {
-  TrendingUp,
-  TrendingDown,
-  Activity,
-  Users,
-  Target,
-  AlertCircle,
-  Loader2,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { TrendingUp, TrendingDown, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -25,9 +15,9 @@ import {
   YAxis,
   ReferenceLine,
 } from "recharts";
+import { cn } from "cn";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card } from "../../components/ui/card";
 import {
   Select,
   SelectContent,
@@ -329,27 +319,104 @@ export default function DashboardTrendPanel({
 
   const currentYear = new Date().getFullYear();
 
+  const legendItems: {
+    key: string;
+    label: string;
+    color: string;
+    dashed?: boolean;
+  }[] = [];
+  if (selectedService === "all") {
+    legendItems.push({
+      key: "total",
+      label: "Total Temuan",
+      color: chartColor,
+    });
+    Object.entries(SERVICE_COLORS).forEach(([svc, color]) => {
+      if (activeTrend.serviceData[svc]) {
+        legendItems.push({ key: svc, label: SERVICE_LABELS[svc] || svc, color });
+      }
+    });
+  } else {
+    legendItems.push({
+      key: selectedService,
+      label: SERVICE_LABELS[selectedService] || selectedService,
+      color: SERVICE_COLORS[selectedService] || chartColor,
+    });
+  }
+  if (visibleTotalForecast) {
+    legendItems.push({
+      key: "forecast",
+      label:
+        selectedService === "all"
+          ? "Prediksi Total"
+          : `Prediksi ${SERVICE_LABELS[selectedService] || selectedService}`,
+      color: chartColor,
+      dashed: true,
+    });
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-      {/* Chart Panel */}
-      <div className="lg:col-span-2 overflow-visible rounded-xl border border-border bg-card p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Chart and controls */}
+      <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/5 text-primary rounded-lg border border-primary/10">
-              <TrendingUp className="w-4 h-4 text-primary" />
+              <TrendingUp aria-hidden="true" className="w-4 h-4 text-primary" />
             </div>
             <h2 className="font-display text-lg font-bold tracking-tight">
               Tren Temuan QA
             </h2>
           </div>
 
-          {/* Filtering Controls */}
+          {/* Forecast controls */}
           <div className="flex flex-wrap items-center gap-2">
+            {forecastResult && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={showForecastPrediction}
+                aria-label={
+                  showForecastPrediction
+                    ? "Sembunyikan Prediksi"
+                    : "Tampilkan Prediksi"
+                }
+                onClick={() => setShowForecastPrediction((prev) => !prev)}
+                className="h-8 gap-2 px-3 text-xs"
+              >
+                {showForecastPrediction ? (
+                  <EyeOff aria-hidden="true" className="h-4 w-4" />
+                ) : (
+                  <Eye aria-hidden="true" className="h-4 w-4" />
+                )}
+                {showForecastPrediction
+                  ? "Sembunyikan Prediksi"
+                  : "Tampilkan Prediksi"}
+              </Button>
+            )}
+
+            <ForecastActionButton
+              status={forecastStatus}
+              loading={forecastLoading}
+              disabled={forecastLoading || activeTrend.labels.length < 2}
+              onClick={handleUpdateForecast}
+              compact
+            />
+          </div>
+        </div>
+
+        {/* Filtering Controls */}
+        <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Layanan
+            </span>
             <Tabs
               value={selectedService}
               onValueChange={(value) => setSelectedService(value || "all")}
             >
-              <TabsList className="h-8 max-w-full overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <TabsList className="h-auto w-full max-w-full flex-wrap overflow-visible p-1">
                 <TabsTrigger
                   value="all"
                   className="h-6 px-3 text-xs font-semibold normal-case whitespace-nowrap"
@@ -374,10 +441,12 @@ export default function DashboardTrendPanel({
                 ))}
               </TabsList>
             </Tabs>
+          </div>
 
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">
-                Tahun:
+                Tahun
               </span>
               <Select
                 value={String(selectedYear)}
@@ -404,52 +473,22 @@ export default function DashboardTrendPanel({
               </Select>
             </div>
 
-            <div className="h-4 w-px bg-border/40 hidden sm:block" />
-
-            <MonthRangePicker
-              selectedYear={selectedYear}
-              startMonth={trendStartMonth}
-              endMonth={trendEndMonth}
-              onRangeChange={onRangeChange}
-              variant="compact"
-            />
-
-            {forecastResult && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-pressed={showForecastPrediction}
-                aria-label={
-                  showForecastPrediction
-                    ? "Sembunyikan Prediksi"
-                    : "Tampilkan Prediksi"
-                }
-                onClick={() => setShowForecastPrediction((prev) => !prev)}
-                className="h-8 gap-2 px-3 text-xs"
-              >
-                {showForecastPrediction ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-                {showForecastPrediction
-                  ? "Sembunyikan Prediksi"
-                  : "Tampilkan Prediksi"}
-              </Button>
-            )}
-
-            <ForecastActionButton
-              status={forecastStatus}
-              loading={forecastLoading}
-              disabled={forecastLoading || activeTrend.labels.length < 2}
-              onClick={handleUpdateForecast}
-              compact
-            />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                Rentang bulan
+              </span>
+              <MonthRangePicker
+                selectedYear={selectedYear}
+                startMonth={trendStartMonth}
+                endMonth={trendEndMonth}
+                onRangeChange={onRangeChange}
+                variant="compact"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="h-[300px] w-full relative">
+        <div className="relative h-[300px] w-full">
           {(trendLoading || forecastLoading) && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-card/80">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -660,6 +699,30 @@ export default function DashboardTrendPanel({
           )}
         </div>
 
+        {legendItems.length > 0 && activeTrend.labels.length > 0 && (
+          <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {legendItems.map((item) => (
+              <li
+                key={item.key}
+                className="flex items-center gap-1.5 text-xs text-fg2"
+              >
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "inline-block w-4 shrink-0 border-t-2",
+                    item.dashed && "border-dashed",
+                  )}
+                  style={{ borderColor: item.color }}
+                />
+                <span>{item.label}</span>
+                {item.dashed && (
+                  <span className="text-muted-foreground">(prediksi)</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
         {showForecastPrediction && forecastResult && totalForecast && (
           <ForecastInsightPanel
             forecastResult={forecastResult}
@@ -670,125 +733,110 @@ export default function DashboardTrendPanel({
       </div>
 
       {/* Performance Summary Panel */}
-      <Card className="flex flex-col overflow-hidden border-border bg-surface-sunken p-6 text-fg animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <h2 className="mb-4 font-display text-lg font-bold tracking-tight text-fg">
+      <section
+        aria-labelledby="trend-summary-title"
+        className="flex min-w-0 flex-col gap-4 lg:col-span-1 lg:border-l lg:border-border lg:pl-6"
+      >
+        <h2
+          id="trend-summary-title"
+          className="font-display text-base font-bold tracking-tight text-fg"
+        >
           Ringkasan Performa
         </h2>
-        <div className="flex flex-1 flex-col justify-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
-              <Activity className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="text-[10px] font-mono uppercase tracking-widest opacity-70">
-                  Total Temuan
-                </div>
-                {trendDelta !== null && (
-                  <Badge
-                    variant="outline"
-                    className={`h-7 gap-0.5 px-1.5 text-[10px] font-bold ${trendDelta <= 0 ? "border-chart-green/30 bg-chart-green/10 text-chart-green" : "border-destructive/30 bg-destructive/10 text-destructive"}`}
-                  >
-                    {trendDelta <= 0 ? (
-                      <TrendingDown aria-hidden="true" />
-                    ) : (
-                      <TrendingUp aria-hidden="true" />
-                    )}
-                    {Math.abs(Math.round(trendDelta))}%
-                  </Badge>
-                )}
-              </div>
-              <div className="text-4xl font-bold tracking-tight">
-                {totalFindings}
-              </div>
-            </div>
-          </div>
 
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground">
+              Total Temuan
+            </p>
+            <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-fg">
+              {totalFindings}
+            </p>
+          </div>
+          {trendDelta !== null && (
+            <Badge
+              variant="outline"
+              className={`h-7 gap-0.5 px-1.5 text-[10px] font-bold ${trendDelta <= 0 ? "border-chart-green/30 bg-chart-green/10 text-chart-green" : "border-destructive/30 bg-destructive/10 text-destructive"}`}
+            >
+              {trendDelta <= 0 ? (
+                <TrendingDown aria-hidden="true" />
+              ) : (
+                <TrendingUp aria-hidden="true" />
+              )}
+              {Math.abs(Math.round(trendDelta))}%
+            </Badge>
+          )}
+        </div>
+
+        <dl className="flex flex-col border-y border-border">
           {selectedService === "all" && (
-            <div className="flex flex-wrap gap-2 pt-2 pb-4">
+            <div className="flex items-baseline justify-between gap-3 border-b border-border py-2.5">
+              <dt className="text-xs text-fg2">Rata-rata / Layanan</dt>
+              <dd className="text-sm font-semibold tabular-nums text-fg">
+                {avgPerService}
+              </dd>
+            </div>
+          )}
+          <div className="flex items-baseline justify-between gap-3 border-b border-border py-2.5">
+            <dt className="text-xs text-fg2">Rata-rata / Agent</dt>
+            <dd className="text-sm font-semibold tabular-nums text-fg">
+              {avgPerAgent}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 py-2.5">
+            <dt className="text-xs text-fg2">Status Saat Ini</dt>
+            <dd className="text-sm font-semibold text-fg">{trendStatus}</dd>
+          </div>
+        </dl>
+        <p className="-mt-1 text-xs text-muted-foreground">
+          Berdasarkan data {timeframeLabel}
+        </p>
+
+        {selectedService === "all" && (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold text-muted-foreground">
+              Temuan per layanan
+            </h3>
+            <dl className="flex flex-col divide-y divide-border/70">
               {Object.entries(activeTrend.serviceSummary).map(
                 ([svc, stats]) => (
                   <div
                     key={svc}
-                    className="flex min-w-[70px] flex-col items-start gap-0.5 rounded-xl border border-border bg-surface/50 px-3 py-1.5"
+                    className="flex items-baseline justify-between gap-3 py-1.5"
                   >
-                    <span className="text-[8px] uppercase tracking-tighter opacity-60 font-bold">
+                    <dt className="min-w-0 truncate text-xs text-fg2">
                       {SERVICE_LABELS[svc] || svc}
-                    </span>
-                    <span className="text-xs font-bold leading-none">
+                    </dt>
+                    <dd className="text-sm font-semibold tabular-nums text-fg">
                       {(stats as { totalDefects: number }).totalDefects}
-                    </span>
+                    </dd>
                   </div>
                 ),
               )}
-            </div>
-          )}
+            </dl>
+          </div>
+        )}
 
-          {selectedService === "all" && (
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
-                <Target className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest opacity-70 mb-1">
-                  Rata-rata / Layanan
-                </div>
-                <div className="text-4xl font-bold tracking-tight">
-                  {avgPerService}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-widest opacity-70 mb-1">
-                Rata-rata / Agent
-              </div>
-              <div className="text-4xl font-bold tracking-tight">
-                {avgPerAgent}
-              </div>
+        {topParameter && (
+          <div className="flex items-start gap-2.5 border-t border-border pt-3">
+            <AlertCircle
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+            />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                Top Finding Issue
+              </p>
+              <p className="mt-0.5 text-sm font-semibold leading-snug text-fg">
+                {topParameter.name}
+              </p>
+              <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                {topParameter.count} temuan terdeteksi
+              </p>
             </div>
           </div>
-
-          <div className="mt-2 p-4 rounded-2xl bg-surface/50 border border-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium opacity-80">
-                Status Saat Ini
-              </span>
-              <TrendingUp className="w-4 h-4 opacity-80" />
-            </div>
-            <div className="text-xl font-bold">{trendStatus}</div>
-            <div className="text-[10px] opacity-60 mt-1">
-              Berdasarkan data {timeframeLabel}
-            </div>
-          </div>
-
-          {topParameter && (
-            <div className="relative mt-2 overflow-hidden border-t border-border pt-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-400/20 flex items-center justify-center border border-amber-400/20 shrink-0">
-                  <AlertCircle className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <div className="text-[9px] font-bold uppercase tracking-widest text-amber-400 mb-0.5">
-                    Top Finding Issue
-                  </div>
-                  <div className="text-sm font-semibold leading-snug line-clamp-2 pr-2">
-                    {topParameter.name}
-                  </div>
-                  <div className="text-[10px] opacity-60 mt-1 font-mono">
-                    {topParameter.count} temuan terdeteksi
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
+        )}
+      </section>
     </div>
   );
 }

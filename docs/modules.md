@@ -17,8 +17,8 @@ Dashboard tunggal yang berfungsi sebagai pusat informasi bagi semua tingkatan us
 - **Fungsi**: Menampilkan KPI ringkasan, grafik tren, dan log aktivitas terbaru.
 - **Route**: `/dashboard`
 - **Fitur Utama**:
-  - **KPI Cards**: Ringkasan Total Temuan, Average Findings, Fatal Error Rate, dsb.
-  - **Quick Shortcuts**: Navigasi cepat ke modul kerja sesuai role.
+  - **Tren Performa Kualitas**: Grafik temuan QA per bulan dengan filter layanan, tahun, dan rentang bulan; legenda teks membedakan total, tiap layanan, dan prediksi. Ringkasan metrik mengikuti cakupan layanan yang dipilih.
+  - **Pintasan Cepat & Workspace Terpadu**: Navigasi role-aware memakai kartu modul dengan ikon, judul, deskripsi singkat, dan panah; seluruh kartu dapat dibuka.
   - **Monitoring**: (Trainer/Leader/Admin) Memantau histori simulasi lintas akun yang dipaginasi penuh dari source canonical KETIK/PDKT/Telefun tanpa cap tersembunyi, agregasi penggunaan token bulanan, dan editor harga/kurs untuk role yang diizinkan; detail menampilkan metadata served-consumer dan assessment native per modul, sedangkan row Telefun legacy hanya kompatibilitas bila tidak ada row canonical.
   - **User Management**: (Hanya Admin) Menyetujui pendaftaran, mengubah role, atau menghapus akun.
 - **Sub-pages**:
