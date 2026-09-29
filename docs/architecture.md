@@ -277,6 +277,30 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY`
 - `OPENAI_API_KEY` (wajib untuk text generation direct via Responses API)
+- `WFM_SCHEDULE_*` (server-only, lihat bagian Jadwal Shifting di bawah; **tidak boleh** ber-prefix `VITE_`)
+
+### SIDAK — Jadwal Shifting (WFM Dash Pro, read-only)
+
+Dua endpoint jadwal WFM, keduanya `admin`/`trainer` dan hanya-baca:
+
+- `GET /api/v1/sidak/jadwal-shifting?date=YYYY-MM-DD` — satu hari, lengkap dengan `activities` dan `shiftPrev`. Dipakai format **Hari ini** (siapa masuk/libur + rincian jam). `activities` berasal dari kolom `wfm_schedules.activities`; nilai interval `LB` berarti Long Break dan slot bersebelahan digabung menjadi rentang 15 menit. Jam mulai/pulang memakai mapping kode shift H (07:45–16:50), S1 (06:00–15:00), S2 (08:00–17:00), S3 (13:00–22:00), atau S4 (22:00–07:00). Jika interval `LB` tidak ada, waktu istirahat ditampilkan sebagai `—`; kode shift yang tak terpetakan tidak diberi jam buatan. Format kalender bulanan tidak berubah.
+- `GET /api/v1/sidak/jadwal-shifting/month?month=YYYY-MM` — satu bulan penuh (maksimal 31 hari per permintaan), proyeksi minimum `nama`, `tl`, `channel`, `shift`, `date` tanpa `activities`/`shiftPrev`. Dipakai format **Kalender**: matriks agen × hari di mana sel berisi kode shift apa adanya dari WFM (`H`, `S1`–`S4`, `TBCCI`, `CUTI`, `OFF`) dan rekap per agen dihitung di klien dari kode tersebut. Kodenya ditampilkan mentah, bukan dipetakan ke enum baru, supaya tidak ada kode yang hilang diam-diam. Tanpa `month`, backend memilih bulan berjalan pada `WFM_SCHEDULE_TIMEZONE`; bulan wajib beririsan dengan jendela `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS`.
+
+**Batas trust adapter (`apps/api/src/services/sidak/wfm-schedule.ts`):**
+
+- **Credential backend-only.** Adapter membaca `WFM_SCHEDULE_SUPABASE_URL`, `WFM_SCHEDULE_SUPABASE_KEY`, dan `WFM_SCHEDULE_API_ALLOWED_ORIGINS` dari `process.env`; ketiganya tidak boleh ber-prefix `VITE_`. URL harus cocok persis dengan exact-origin allowlist sebelum key dikirim lewat header HTTPS. Key tidak pernah masuk URL, query string, log, respons, browser, atau fixture.
+- **Transport langsung dan read-only.** Backend hanya melakukan `GET /rest/v1/wfm_schedules`, membatasi query ke satu tanggal (`date=eq.`) atau satu bulan (`date=gte.` + `date=lte.`), kolom pada proyeksi minimum masing-masing jalur, dan `limit = maxRows + 1`. Redirect ditolak; tidak ada Apps Script `/exec`, `f.req`, login WFM, endpoint lain, pagination ke belakang, atau operasi tulis.
+- **Otorisasi dan response allowlist.** Role `admin`/`trainer` harus lolos sebelum query; role lain ditolak tanpa menyentuh upstream. Browser hanya memanggil API Trainers dan menerima `JadwalShiftingResponse` (harian) atau `JadwalShiftingMonthResponse` (bulanan); NIK, identitas WFM, alasan aktivitas, swap, dan konfigurasi sistem tidak termasuk kontrak.
+- **Kegagalan tidak pernah jadi "kosong".** Env hilang/invalid menghasilkan `WFM_NOT_CONFIGURED` (503); upstream 401/403 menjadi `WFM_UNAUTHORIZED` (502); network/timeout/HTTP upstream menjadi `WFM_UNAVAILABLE` (502); JSON/shape rusak menjadi `WFM_INVALID_RESPONSE` (502). Respons upstream mentah tidak diteruskan.
+- **Log bebas rahasia.** Log kegagalan hanya mencatat kode, penanda konfigurasi, dan host yang direduksi. Tidak ada URL lengkap, query string, key, body upstream, atau baris jadwal.
+- **Hak akses key masih gate produksi.** Gunakan key yang secara eksplisit disetujui pemilik untuk backend ini dengan akses baca minimum dan RLS/pembatasan yang sesuai. Jenis dan izin key yang tersedia belum terverifikasi; jangan memasang service-role key tanpa persetujuan serta review akses. Konfigurasi runtime kosong membuat adapter gagal tertutup.
+- **Tanggal, bulan, dan timezone.** Parameter `date` divalidasi sebagai tanggal kalender asli dan `month` sebagai `YYYY-MM` dengan bulan 01–12; keduanya dibatasi oleh `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS` (bulan diuji terhadap irisan dengan jendela itu). `WFM_SCHEDULE_TIMEZONE` hanya diperlukan untuk nilai default ketika `date`/`month` tidak dikirim; zona yang dikonfirmasi adalah `Asia/Jakarta`. Label slot 15 menit diturunkan dari indeks tanpa konversi zona. `data.date`, `data.month`, `data.from`, dan `data.to` selalu nilai yang benar-benar di-query.
+- **Batas baris.** Harian memakai `WFM_SCHEDULE_MAX_ROWS` (default 500), bulanan memakai `WFM_SCHEDULE_MAX_MONTH_ROWS` (default 3000). Keduanya menandai `truncated: true` saat terlampaui; pemotongan tidak pernah diam-diam.
+- **Tidak ada persistensi.** Jadwal tidak disimpan di database Trainers, tidak di-cache, dan tidak ada operasi tulis atau pemanggilan AI.
+
+**Status verifikasi.** Pada 29 September 2026, request REST langsung read-only dengan key yang tersimpan aman menghasilkan 78 baris untuk satu tanggal. Ini membuktikan endpoint REST dan key tersebut pernah dapat membaca tanggal uji, bukan otorisasi permanen atau izin seluruh histori. Adapter Node kini memakai jalur direct PostgREST, tetapi yang sudah diuji pada kode adalah E2E lokal dengan key sintetis dan stub loopback; belum ada smoke test live dari adapter/service runtime. Alur lama melalui `google.script.run` adalah bukti historis saja dan tidak dipakai adapter. Karena tipe/izin key, RLS, konfigurasi runtime, dan role smoke test belum diverifikasi pada environment target, production tetap **NO-GO**.
+
+Penempatan env dan gate rilis ada di [`.env.example`](../.env.example) serta [`docs/deployment.md`](deployment.md#sidak--jadwal-shifting-wfm-dash-pro).
 
 ### Telefun Server (`apps/telefun`) — variabel langsung:
 

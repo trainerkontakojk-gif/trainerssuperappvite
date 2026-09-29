@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import {
   BarChart3,
+  CalendarClock,
   LayoutDashboard,
   LineChart,
   Users,
@@ -43,6 +44,15 @@ const CARDS = [
     desc: "Ekstraksi data historis dan generasi laporan audit dalam berbagai format standar institusi.",
     icon: FileText,
     href: "/sidak/reports",
+    managerOnly: true,
+  },
+  {
+    // Read-only jadwal WFM. `managerOnly` memakai filter role yang sama dengan
+    // nav dan route guard: admin + trainer saja.
+    title: "Jadwal Shifting",
+    desc: "Jadwal harian agen dari WFM Dash Pro dalam tampilan hanya-baca.",
+    icon: CalendarClock,
+    href: "/sidak/jadwal-shifting",
     managerOnly: true,
   },
 ];

@@ -29,6 +29,14 @@ export const SIDAK_CHILDREN = [
     allowedRoles: ["trainer", "admin"],
   },
   {
+    // Read-only jadwal WFM. Role dibatasi admin+trainer di tiga lapis: nav ini,
+    // route guard, dan `requireRole` di backend. Leader/agent tidak termasuk —
+    // jangan menambah role lain tanpa persetujuan Fajar.
+    to: "/sidak/jadwal-shifting",
+    label: "Jadwal Shifting",
+    allowedRoles: ["trainer", "admin"],
+  },
+  {
     to: "/sidak/settings",
     label: "Parameter QA",
     allowedRoles: ["trainer", "admin"],
@@ -104,6 +112,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     if (pathname === "/sidak/ranking") { crumbs.push({ label: "Ranking" }); return crumbs; }
     if (pathname === "/sidak/settings") { crumbs.push({ label: "Parameter" }); return crumbs; }
     if (pathname === "/sidak/periods") { crumbs.push({ label: "Periode" }); return crumbs; }
+    if (pathname === "/sidak/jadwal-shifting") { crumbs.push({ label: "Jadwal Shifting" }); return crumbs; }
     if (pathname.startsWith("/sidak/agents/")) { crumbs.push({ label: "Agen", href: "/sidak/agents" }); crumbs.push({ label: "Detail" }); return crumbs; }
     if (pathname === "/sidak/agents") { crumbs.push({ label: "Analisis Individu" }); return crumbs; }
     if (pathname.startsWith("/sidak/reports")) { crumbs.push({ label: "Laporan" }); return crumbs; }

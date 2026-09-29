@@ -84,6 +84,36 @@ root sekarang mengunci ke web saja.
 | `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | retired/no-op                      | Model allowlist retired; ignored                                                           |
 | `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | retired/no-op                      | No new WebRTC session/write path                                                           |
 
+#### SIDAK — Jadwal Shifting (WFM Dash Pro)
+
+| Variable                            | Value                                      | Notes                                                                                      |
+| ----------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `WFM_SCHEDULE_SUPABASE_URL`         | `https://dgcsjgskxrjvomruodyb.supabase.co` | URL proyek Supabase WFM; HTTPS wajib di production                                         |
+| `WFM_SCHEDULE_SUPABASE_KEY`         | secret runtime                             | Server API only; never `VITE_`, URL/query, logs, repo, or browser bundle                   |
+| `WFM_SCHEDULE_API_ALLOWED_ORIGINS`  | `https://dgcsjgskxrjvomruodyb.supabase.co` | Exact origin allowlist; must match URL origin; no wildcard/path/query; redirects rejected  |
+| `WFM_SCHEDULE_TIMEOUT_MS`           | `10000`                                    | Optional; bounds upstream request including response body                                  |
+| `WFM_SCHEDULE_MAX_ROWS`             | `500`                                      | Optional; response reports `truncated: true` when exceeded                                 |
+| `WFM_SCHEDULE_MAX_MONTH_ROWS`       | `3000`                                     | Optional; same `truncated` contract for `GET .../jadwal-shifting/month` (max 31-day range) |
+| `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS` | `31`                                       | Optional; allowed date range                                                               |
+| `WFM_SCHEDULE_TIMEZONE`             | `Asia/Jakarta`                             | Only selects default date when `date` is omitted; optional for explicit dates              |
+
+Aturan penempatan:
+
+- **Tiga env wajib** (`WFM_SCHEDULE_SUPABASE_URL`, `WFM_SCHEDULE_SUPABASE_KEY`, dan `WFM_SCHEDULE_API_ALLOWED_ORIGINS`) harus tersedia pada service API. Tanpa salah satu, endpoint menjawab `503 WFM_NOT_CONFIGURED` dan UI menampilkan state gagal—bukan jadwal kosong.
+- **Backend only.** Jangan memakai prefix `VITE_`; key tidak boleh masuk browser, URL/query, log, repo, atau artefak test. E2E hanya menggunakan key palsu dan upstream loopback.
+- Gunakan key yang disetujui pemilik dengan hak baca minimum dan kebijakan RLS yang sesuai. **Jangan pasang service-role key sebelum pemilik menyetujui dan akses tabel/RLS ditinjau.** Key yang tersimpan saat ini belum terverifikasi tipenya/izinnya untuk runtime permanen.
+- `WFM_SCHEDULE_TIMEZONE` hanya diperlukan jika parameter `date` (jalur harian) atau `month` (jalur kalender) tidak dikirim. Zona waktu terkonfirmasi `Asia/Jakarta`.
+- Endpoint kalender `GET .../jadwal-shifting/month` membaca paling banyak satu bulan (≤31 hari) per permintaan dan memakai batas `WFM_SCHEDULE_MAX_MONTH_ROWS` (default 3000). Bulan yang sama sekali di luar jendela `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS` ditolak `400` sebelum query.
+- Web service tidak memerlukan env WFM apa pun.
+
+Gate sebelum rilis, berurutan — production **NO-GO** sampai key dan runtime diverifikasi:
+
+1. Pemilik WFM mengonfirmasi key yang disetujui untuk backend, jenis/izin key, akses baca ke `wfm_schedules`, serta RLS atau pembatasan setara. Jangan meminta key dikirim lewat chat.
+2. Pasang tiga env wajib hanya pada service API, pastikan origin allowlist sama persis dengan URL, dan lakukan smoke test read-only satu tanggal melalui service yang akan dipakai. Jangan menjalankan fungsi Apps Script yang membuat/menghapus jadwal.
+3. Verifikasi role `admin` dan `trainer` berhasil; pastikan `leader`/`agent` ditolak sebelum adapter dipanggil. E2E lokal terhadap stub bukan bukti runtime/izin produksi.
+
+Detail batas integrasi ada di [`docs/architecture.md`](architecture.md#sidak--jadwal-shifting-wfm-dash-pro-read-only).
+
 ### Telefun Service
 
 `OPENAI_API_KEY` di API tetap dipakai untuk direct OpenAI text generation. Telefun aktif hanya Gemini Live; GPT/OpenAI Realtime Telefun sudah permanen dinonaktifkan untuk semua user. Telefun tidak memerlukan key provider untuk start baru. Optional cleanup reference key hanya untuk authenticated owner-bound DELETE historical call.

@@ -74,6 +74,7 @@ Catatan:
 
 - `POST /ketik/generate` dapat dipakai oleh `leader`, sedangkan `POST /ketik/review` tetap dibatasi `admin`, `trainer`, dan `qa`.
 - `GET /ketik/settings` mengembalikan gabungan template cepat standar dari singleton global dan template pribadi akun pemanggil. `PUT /ketik/templates` hanya dapat dipanggil role `admin`; `PUT /ketik/settings` menyimpan namespace settings akun pemanggil, termasuk daftar `personalQuickTemplates`.
+- `GET /sidak/jadwal-shifting` dibatasi `admin` + `trainer` saja, dan **tidak punya** endpoint tulis apa pun. Otorisasi naik di `requireRole("admin", "trainer")`, jadi role di luar itu dijawab `403 FORBIDDEN` **sebelum** adapter WFM dipanggil — penolakan dan "tidak menyentuh WFM" adalah hal yang sama, bukan dua hal yang harus dipercaya. Role `leader` dan `agent` sengaja tidak termasuk; jangan menambah role lain tanpa persetujuan pemilik produk. Kontrak ini dibuktikan di `apps/web/e2e/sidak-jadwal-shifting-api.spec.ts` terhadap router Hono yang sama dengan production.
 
 ### 3. Profile Read Contract & Recovery
 

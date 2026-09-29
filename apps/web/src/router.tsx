@@ -28,6 +28,9 @@ const SidakInput = lazy(() => import("./routes/sidak/input"));
 const SidakRanking = lazy(() => import("./routes/sidak/ranking"));
 const SidakSettings = lazy(() => import("./routes/sidak/settings"));
 const SidakPeriods = lazy(() => import("./routes/sidak/periods"));
+const SidakJadwalShifting = lazy(
+  () => import("./routes/sidak/jadwal-shifting"),
+);
 const SidakAgents = lazy(() => import("./routes/sidak/agents"));
 const SidakAgentDetail = lazy(() => import("./routes/sidak/agents.$id"));
 const SidakReportsLanding = lazy(() => import("./routes/sidak/reports/index"));
@@ -242,6 +245,67 @@ const sidakPeriodsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/periods",
   component: SidakPeriods,
+  beforeLoad: requireRole(["trainer", "admin"]),
+});
+
+const sidakJadwalShiftingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sidak/jadwal-shifting",
+  component: SidakJadwalShifting,
+  // `validateSearch` memindahkan parameter dari URL ke state halaman supaya
+  // deep link bisa dibagikan dan di-back-forward.
+  //
+  // Dua format tampilan disimpan terpisah: `date`+`channel` untuk format
+  // "hari ini", `month`+`section` untuk kalender. Masing-masing divalidasi
+  // bentuknya di sini — nilai yang tidak dikenal DIABAIKAN, bukan diteruskan
+  // apa adanya ke state, supaya URL yang diedit tangan tidak bisa memasukkan
+  // bentuk yang tidak pernah divalidasi lagi di halaman.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    date?: string;
+    view?: "today" | "calendar";
+    channel?: string;
+    month?: string;
+    section?: string;
+  } => {
+    const validated: {
+      date?: string;
+      view?: "today" | "calendar";
+      channel?: string;
+      month?: string;
+      section?: string;
+    } = {};
+
+    if (
+      typeof search.date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(search.date)
+    ) {
+      validated.date = search.date;
+    }
+    if (search.view === "calendar" || search.view === "today") {
+      // `today` tidak ditulis balik ke URL: itu nilai default, jadi URL
+      // tetap pendek tanpa kehilangan apa pun.
+      if (search.view === "calendar") validated.view = "calendar";
+    }
+    const slug = /^[a-z][a-z-]{0,23}$/;
+    if (typeof search.channel === "string" && slug.test(search.channel)) {
+      validated.channel = search.channel;
+    }
+    if (typeof search.section === "string" && slug.test(search.section)) {
+      validated.section = search.section;
+    }
+    if (
+      typeof search.month === "string" &&
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(search.month)
+    ) {
+      validated.month = search.month;
+    }
+
+    return validated;
+  },
+  // Hanya `admin` + `trainer`. Guard ini untuk navigasi/UX; penegakan yang
+  // sebenarnya ada di backend `requireRole("admin", "trainer")`.
   beforeLoad: requireRole(["trainer", "admin"]),
 });
 
@@ -574,6 +638,7 @@ const routeTree = rootRoute.addChildren([
   sidakRankingRoute,
   sidakSettingsRoute,
   sidakPeriodsRoute,
+  sidakJadwalShiftingRoute,
   sidakAgentsRoute,
   sidakAgentDetailRoute,
   sidakReportsRoute,

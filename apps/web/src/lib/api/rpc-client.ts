@@ -5,6 +5,8 @@ import type {
   AccessGroupItemRow,
   AccessGroupRow,
   ApiResponse,
+  JadwalShiftingMonthResponse,
+  JadwalShiftingResponse,
   MonitoringHistoryEntry,
   MonitoringReviewByModule,
   SidakSimulationDetail,
@@ -234,6 +236,30 @@ type AiClient = {
 };
 
 type SidakClient = {
+  /**
+   * Read-only jadwal shifting dari WFM Dash Pro.
+   *
+   * Typed eksplisit (bukan `any`) supaya allowlist field di
+   * `JadwalShiftingResponse` benar-benar ditegakkan di sisi web: field yang
+   * tidak ada di tipe ini tidak bisa dibacanya, bukan sekadar tidak dipakai.
+   */
+  "jadwal-shifting": {
+    $get(args?: {
+      query?: { date?: string };
+      signal?: AbortSignal;
+    }): Promise<RpcResponse<JadwalShiftingResponse>>;
+  };
+  /**
+   * Kalender satu bulan penuh (maksimal 31 hari per permintaan).
+   * Kontraknya terpisah dari jalur harian supaya field bulanan yang lebih
+   * ramping tidak bisa tercampur dengan `JadwalShiftingResponse`.
+   */
+  "jadwal-shifting/month": {
+    $get(args?: {
+      query?: { month?: string };
+      signal?: AbortSignal;
+    }): Promise<RpcResponse<JadwalShiftingMonthResponse>>;
+  };
   "agents/:id/simulations": {
     $get(args: {
       param: { id: string };

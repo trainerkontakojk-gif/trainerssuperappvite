@@ -1,5 +1,6 @@
 export * from "./common";
 export * from "./sidak";
+export * from "./sidak-schedule";
 export * from "./ketik";
 export * from "./pdkt";
 export * from "./telefun";
