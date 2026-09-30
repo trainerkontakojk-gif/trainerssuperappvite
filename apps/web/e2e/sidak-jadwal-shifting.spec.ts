@@ -1584,11 +1584,25 @@ test.describe("Format kalender (matriks agen × hari)", () => {
   });
 
   /**
-   * Ruang di atas matriks berbeda-beda: di ≥1024px kontrol berbaris (300px),
-   * di 768px jadi 368px, dan di ≤480px menumpuk sampai 454px. Batas tinggi
-   * wadah harus tetap membuat scrollbar horizontal berada di dalam layar pada
-   * semua ukuran itu — bukan cuma di 1280×800.
+   * Ruang di atas matriks berbeda-beda menurut lebar (kontrol berbaris di
+   * ≥1024px, menumpuk di ≤480px) dan menurut tinggi jendela. Yang dijamin
+   * kontrak ini:
+   *
+   * 1. Selalu: matriks tidak mengerut jadi nol (`min-h-[5rem]`).
+   * 2. Selama jendela masih memuat kontrol di atas matriks + lantai itu, tepi
+   *    bawah wadah harus berada di dalam layar sehingga scrollbar horizontal
+   *    terjangkau tanpa menggulir halaman.
+   *
+   * Kalau (2) secara fisik tidak mungkin — mis. 390×400, karena kontrol di atas
+   * matriks saja sudah ~454px — maka yang diuji adalah tinggi wadah tepat
+   * setinggi lantai, BUKAN lebih: cadangan ruang tidak boleh berubah jadi
+   * cadangan palsu yang tetap mendorong scrollbar ke bawah layar.
    */
+  // Kontrak lantai ditulis sebagai konstanta, bukan diambil dari pengukuran:
+  // kalau lantai di kode diperbesar (mis. jadi 14rem), test harus GAGAL — bukan
+  // ikut menyesuaikan diri dan meloloskan perilaku yang lebih buruk.
+  const FLOOR_REM = 5;
+
   for (const { width, height } of [
     { width: 1280, height: 800 },
     { width: 1280, height: 720 },
@@ -1596,8 +1610,11 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     { width: 768, height: 1024 },
     { width: 480, height: 800 },
     { width: 390, height: 844 },
+    { width: 1280, height: 400 },
+    { width: 1280, height: 300 },
+    { width: 390, height: 400 },
   ]) {
-    test(`tepi bawah wadah tetap di dalam layar pada ${width}×${height}`, async ({
+    test(`wadah gulir di ${width}×${height}: lantai dihormati dan tepi bawah di dalam layar selama jendela memuatnya`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height });
@@ -1618,88 +1635,38 @@ test.describe("Format kalender (matriks agen × hari)", () => {
           clientHeight: el.clientHeight,
           scrollWidth: el.scrollWidth,
           clientWidth: el.clientWidth,
+          rootFontSize: Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          ),
         };
       });
 
+      // 1rem = 14px di app ini (root font-size bukan 16px).
+      const floor = FLOOR_REM * metrics.rootFontSize;
+      expect(metrics.rootFontSize).toBeGreaterThan(0);
       expect(
-        metrics.bottom,
-        "scrollbar horizontal harus terjangkau tanpa menggulir halaman",
-      ).toBeLessThanOrEqual(height);
+        metrics.clientHeight,
+        `lantai ${FLOOR_REM}rem menjaga matriks tidak mengerut jadi nol`,
+      ).toBeGreaterThanOrEqual(floor - 8);
       expect(
         metrics.scrollWidth,
         "matriks memang meluber horizontal di ukuran ini",
       ).toBeGreaterThan(metrics.clientWidth);
-      expect(
-        metrics.clientHeight,
-        "matriks tidak boleh mengerut jadi nol",
-      ).toBeGreaterThan(0);
-      void metrics.top;
+
+      const muatDiLayar = metrics.top + floor <= height;
+      if (muatDiLayar) {
+        expect(
+          metrics.bottom,
+          "jendela masih memuat kontrol + lantai, jadi scrollbar horizontal harus di dalam layar",
+        ).toBeLessThanOrEqual(height);
+      } else {
+        expect(
+          metrics.clientHeight,
+          "di jendela yang terlalu pendek, wadah harus tetap tepat setinggi lantai — bukan tumbuh menutupi layar",
+        ).toBeLessThanOrEqual(Math.ceil(floor) + 8);
+      }
     });
   }
-
-  /**
-   * Dua sifat yang harus dipegang bersama di jendela pendek: matriks tidak
-   * mengerut jadi nol (lantai `min-h-[5rem]`), dan lantai itu tidak boleh
-   * mendorong tepi bawah wadah keluar layar (yang akan mengembalikan masalah
-   * scrollbar tak terjangkau). Di 1280×400 keduanya bisa dipenuhi sekaligus.
-   */
-  test("di jendela 400px: matriks tidak mengerut jadi nol dan tepi bawah tetap di dalam layar", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 400 });
-    await openJadwalShifting(page, {
-      view: "calendar",
-      month: FIXTURE_MONTH,
-      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
-    });
-
-    const grid = page.getByTestId("jadwal-shifting-calendar");
-    await expect(grid).toBeVisible();
-
-    const measurement = await grid.evaluate((el) => ({
-      clientHeight: el.clientHeight,
-      bottom: Math.round(el.getBoundingClientRect().bottom),
-      rootFontSize: Number.parseFloat(
-        getComputedStyle(document.documentElement).fontSize,
-      ),
-    }));
-    // Aplikasi ini memakai root font-size 14px, jadi 5rem = 70px, bukan 80px.
-    const floor = 5 * measurement.rootFontSize;
-    expect(measurement.rootFontSize).toBeGreaterThan(0);
-    expect(
-      measurement.clientHeight,
-      `lantai 5rem (= ${floor}px di root ${measurement.rootFontSize}px) menjaga matriks tidak mengerut jadi nol`,
-    ).toBeGreaterThanOrEqual(floor - 8);
-    expect(
-      measurement.bottom,
-      "lantai tinggi tidak boleh mendorong tepi bawah wadah keluar layar",
-    ).toBeLessThanOrEqual(400);
-  });
-
-  /**
-   * Batas yang disadari: di jendela setinggi 300px, ruang di atas matriks saja
-   * sudah menghabiskan hampir seluruh layar, jadi `max-h` bisa jatuh ke nol.
-   * Di sini yang dijamin hanya lantai — matriks tidak boleh menghilang.
-   */
-  test("di jendela 300px matriks tidak menghilang walau batas atas jatuh ke nol", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 300 });
-    await openJadwalShifting(page, {
-      view: "calendar",
-      month: FIXTURE_MONTH,
-      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
-    });
-
-    const grid = page.getByTestId("jadwal-shifting-calendar");
-    await expect(grid).toBeVisible();
-
-    const clientHeight = await grid.evaluate((el) => el.clientHeight);
-    expect(
-      clientHeight,
-      "tanpa lantai, tinggi jatuh ke nol dan matriks tidak terlihat sama sekali",
-    ).toBeGreaterThanOrEqual(60);
-  });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({
     page,

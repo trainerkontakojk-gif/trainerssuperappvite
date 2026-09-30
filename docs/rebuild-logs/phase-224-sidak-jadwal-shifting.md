@@ -184,3 +184,33 @@ temuan.
 
 Mutation check: lantai dibalik ke `14rem` → test 400px gagal; lantai dibuang →
 test 300px gagal.
+
+## Update 9 — 2026-09-30 — menutup temuan gate putaran keenam
+
+Gate putaran keenam atas `12f1041` memberi verdict **NEEDS_FIX** dengan tiga
+temuan.
+
+1. **P2 — invariant tepi bawah belum umum.** Perbaikan sebelumnya hanya terbukti
+   di 1280×400; kombinasi lain (1280×300, 390×400) belum diuji, dan di ukuran
+   itu tepi bawah memang bisa keluar layar. Setelah diperiksa, sebagian kasus
+   **mustahil secara fisik**: di 390×400 kontrol di atas matriks saja memakai
+   ~454px, jadi tidak ada nilai CSS yang bisa menaruh tepi bawah di dalam layar.
+   Karena itu kontraknya ditulis eksplisit dan diuji dengan predikat:
+   - selalu: tinggi wadah ≥ lantai 5rem (matriks tidak runtuh);
+   - bila jendela memuat kontrol + lantai: tepi bawah ≤ tinggi layar;
+   - bila tidak: tinggi wadah harus **tepat setinggi lantai**, bukan tumbuh
+     menutupi layar.
+   E2E kini menguji **sembilan** ukuran layar (1280×800, 1280×720, 1024×768,
+   768×1024, 480×800, 390×844, 1280×400, 1280×300, 390×400) dengan konstanta
+   kontrak `FLOOR_REM = 5` (bukan angka hasil pengukuran), supaya memperbesar
+   lantai membuat test GAGAL alih-alih test menyesuaikan diri.
+2. **P3 — `docs/modules.md` terlalu umum.** Klaim "scrollbar terjangkau" kini
+   menyebut pengecualian viewport pendek beserta angka nyatanya.
+3. **P3 — klaim probe manual masih bercokol di bagian historis plan.** Dua
+   tempat ("Gate checkpoint 2026-09-28" dan "Design") sekarang menyatakan
+   eksplisit bahwa 78 row dan 260 slot `LB` berasal dari pengamatan manual di
+   luar repo yang tidak dapat direproduksi dari commit.
+
+Mutation check putaran ini: lantai dibalik ke 14rem → 3 test gagal (termasuk
+1280×400 yang dulu lolos); lantai dibuang → 2 test gagal; cadangan dasar kembali
+24rem → 2 test gagal.

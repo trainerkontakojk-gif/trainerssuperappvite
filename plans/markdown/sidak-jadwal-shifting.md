@@ -66,8 +66,8 @@ Gunakan komponen/token SIDAK yang ada—termasuk pola status `QaStatePanel`—da
 
 - OpenCode sebelumnya hanya menjalankan `plan` read-only dan memberi verdict **NO-GO** sebelum Fajar mengizinkan pembacaan row dan menetapkan role MVP. Discovery read-only kini terotorisasi dan implementasi MVP sudah ada; NO-GO produksi tetap berlaku untuk gate di bawah.
 - Fajar secara eksplisit mengizinkan pembacaan jadwal WFM yang diperlukan dan menetapkan role MVP `admin` + `trainer` saja. Leader/agent dan scope per-agent tidak termasuk; jangan meminta akses console Supabase, endpoint baru, atau credential ulang.
-- Dari browser, login WFM dan `getSystemSettingsServer()` berhasil. Satu GET ber-proyeksi allowlist ke `wfm_schedules` untuk tanggal `2026-09-28` menghasilkan HTTP 200 JSON dan 78 row di empat channel. Schema: `nama`, `tl`, `shift`, `shift_prev`, `activities`, `date`, `channel`; tidak ada row yang kehilangan field minimum. Isi row tidak dicetak atau disimpan. Ini bukan bukti transport server-side Node.
-- `activities` berupa object; agregat tanggal uji menunjukkan 66 object dengan key numerik dan 12 object kosong/array-like, dengan nilai string. Scraper referensi WFM memetakan index ke interval 15 menit, tetapi jangan lakukan konversi timezone tanpa dasar.
+- Dari browser, login WFM dan `getSystemSettingsServer()` berhasil. Satu GET ber-proyeksi allowlist ke `wfm_schedules` untuk tanggal `2026-09-28` sempat menghasilkan HTTP 200 JSON dan 78 row di empat channel — **pengamatan manual di luar repo, tidak dapat direproduksi dari commit** (lihat blok "Pengamatan belum terverifikasi" di atas); angka ini catatan historis, bukan bukti yang bisa diperiksa. Schema: `nama`, `tl`, `shift`, `shift_prev`, `activities`, `date`, `channel`; tidak ada row yang kehilangan field minimum. Isi row tidak dicetak atau disimpan. Ini bukan bukti transport server-side Node.
+- `activities` berupa object; agregat tanggal uji (dari pengamatan manual yang sama, tidak dapat direproduksi dari commit) menunjukkan 66 object dengan key numerik dan 12 object kosong/array-like, dengan nilai string. Scraper referensi WFM memetakan index ke interval 15 menit, tetapi jangan lakukan konversi timezone tanpa dasar.
 - Format key yang tersedia sebelumnya tampak seperti publishable-prefix, tetapi jenis key dan izin efektifnya belum dikonfirmasi oleh pemilik; jangan menganggapnya otomatis disetujui untuk runtime baru. Query satu tanggal hanya membuktikan akses pada tanggal uji, bukan seluruh histori, RLS antar-identitas, atau izin produksi.
 - Probe zero-row sebelumnya dan review OpenCode sebelumnya adalah bukti historis pre-authorization; hasil query row di atas yang menjadi bukti terbaru. Artefak lama dari scraper di scratch tidak dibuka atau digunakan.
 - Hasil live probe yang dipertahankan hanya agregat/schema aman. Tidak ada data row jadwal atau credential yang ditulis ke repo/fixture/log/chat.
@@ -156,7 +156,7 @@ lint, build, Prettier, dan `git diff --check` (file yang dimodifikasi saja).
 
 ### Design
 
-- Probe read-only API live 2026-09-29: 78 row; 260 slot berisi kode `LB`. Penggabungan slot pada data menghasilkan rentang Long Break; dashboard WFM pada gambar referensi menampilkan label `Long Break`.
+- Probe read-only API live 2026-09-29 (pengamatan manual di luar repo, **tidak dapat direproduksi dari commit**; E2E memakai fixture): tercatat 78 row dan 260 slot berisi kode `LB`. Penggabungan slot berurutan menjadi rentang Long Break; dashboard WFM pada gambar referensi menampilkan label `Long Break`.
 - Render ringkas tiga bidang `Mulai`, `Istirahat`, `Pulang`; jangan tampilkan kode mentah `LB` atau buat kartu/badge baru.
 
 ### Tasklist
@@ -300,8 +300,12 @@ tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → 
   lebih besar dari `max-h`, lantai menang dan scrollbar horizontal kembali
   melorot ke bawah layar di jendela pendek. **1rem = 14px di app ini** (root
   font-size bukan 16px) — jangan hitung dengan asumsi 16px.
-- Batas yang disadari: di jendela setinggi ±300px, ruang di atas matriks sudah
-  menghabiskan layar sehingga `max-h` bisa jatuh ke nol; di ukuran itu yang
-  dijamin hanya lantai (matriks tidak menghilang).
+- Batas yang disadari dan diuji: syarat "tepi bawah wadah di dalam layar" hanya
+  bisa dipenuhi kalau jendela memuat kontrol di atas matriks + lantai 5rem.
+  Kalau tidak (mis. 1280×300, 390×400), yang dijamin adalah matriks tidak
+  mengerut jadi nol DAN wadah tetap tepat setinggi lantai. E2E menguji
+  sembilan ukuran layar dengan predikat ini, memakai konstanta `FLOOR_REM = 5`
+  sebagai kontrak — bukan angka hasil pengukuran — supaya memperbesar lantai
+  membuat test gagal, bukan menyesuaikan diri.
 - Uji gulir harus memastikan `overflow` bernilai `auto`/`scroll`, bukan sekadar
   "bukan visible".
