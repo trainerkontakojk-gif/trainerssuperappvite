@@ -105,6 +105,141 @@ export function groupByDuty<T extends { shift: string }>(
   return { masuk, libur };
 }
 
+// ── Pengelompokan per team leader (format harian) ──────────────────────────
+
+/** Judul grup untuk baris yang `tl`-nya kosong di WFM. */
+export const NO_TEAM_LEADER_LABEL = "Tanpa team leader";
+
+export type TeamLeaderGroup<T> = {
+  /** Nama TL apa adanya (sudah di-trim); string kosong = tanpa TL. */
+  tl: string;
+  rows: T[];
+};
+
+/**
+ * Urutan nama Indonesia; dipakai untuk TL maupun nama agen supaya keduanya
+ * diurutkan dengan aturan yang sama.
+ */
+const nameCollator = new Intl.Collator("id");
+
+/**
+ * Kelompokkan baris jadwal per team leader, lalu urutkan nama agen di dalam
+ * tiap kelompok (A–Z).
+ *
+ * Aturan yang dipegang:
+ *   - Grup diurutkan dari nama TL (A–Z) supaya daftar tidak "berganti tempat"
+ *     hanya karena urutan baris dari sumber berubah.
+ *   - Grup tanpa TL selalu PALING AKHIR. Barisnya tetap ditampilkan — nama TL
+ *     yang belum diisi di WFM bukan alasan untuk menyembunyikan orangnya —
+ *     tapi tidak boleh menyelip di antara grup TL yang bernama.
+ *   - Urutan baris di dalam grup tidak mengubah informasi apa pun: `shift`
+ *     tetap ditampilkan apa adanya.
+ */
+export function groupByTeamLeader<T extends { tl: string; nama: string }>(
+  rows: T[],
+): TeamLeaderGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const tl = row.tl.trim();
+    const bucket = groups.get(tl);
+    if (bucket) bucket.push(row);
+    else groups.set(tl, [row]);
+  }
+
+  return [...groups.entries()]
+    .map(([tl, members]) => ({
+      tl,
+      rows: [...members].sort((a, b) => nameCollator.compare(a.nama, b.nama)),
+    }))
+    .sort((a, b) => {
+      if (a.tl === b.tl) return 0;
+      if (a.tl === "") return 1;
+      if (b.tl === "") return -1;
+      return nameCollator.compare(a.tl, b.tl);
+    });
+}
+
+/**
+ * Daftar datar yang sudah berurutan layanan → TL → nama, untuk dipakai bersama
+ * daftar per-layanan dan tabel detail.
+ *
+ * Dipakai supaya daftar dan tabel di halaman yang sama TIDAK punya urutan
+ * masing-masing: orang yang sama harus berada di posisi relatif yang sama di
+ * kedua tempat, kalau tidak mata membaca ulang daftar dari awal.
+ */
+export function orderBySectionThenTeamLeader<
+  T extends { tl: string; nama: string; channel: string },
+>(rows: T[]): T[] {
+  return groupBySectionThenTeamLeader(rows).flatMap((section) =>
+    section.groups.flatMap((group) => group.rows),
+  );
+}
+
+// ── Pengelompokan per layanan (format harian) ──────────────────────────────
+
+/** Judul grup untuk baris yang `channel`-nya kosong di WFM. */
+export const NO_SECTION_LABEL = "Tanpa layanan";
+
+export type ScheduleSectionGroup<T> = {
+  /** Nama bagian apa adanya (sudah di-trim); string kosong = tanpa layanan. */
+  section: string;
+  groups: TeamLeaderGroup<T>[];
+  /** Jumlah baris di bagian ini, dihitung dari baris yang benar-benar lolos filter. */
+  count: number;
+};
+
+/**
+ * Peringkat bagian layanan yang disepakati: Call → Digital Chat → Email →
+ * Leader. Peringkat ini yang menentukan urutan grup, bukan urutan kedatangan
+ * baris — bagian yang sama tidak boleh terpisah-pisah.
+ */
+const sectionRank = new Map<string, number>(
+  SCHEDULE_SECTIONS.map((section, index) => [section.toLowerCase(), index]),
+);
+
+function compareSections(a: string, b: string): number {
+  if (a === b) return 0;
+  const rankA = sectionRank.get(a.toLowerCase());
+  const rankB = sectionRank.get(b.toLowerCase());
+  if (rankA !== undefined && rankB !== undefined) return rankA - rankB;
+  // Bagian di luar daftar yang disepakati tetap tampil — menyembunyikannya
+  // sama saja menghapus orang dari jadwal — tapi diletakkan di belakang.
+  if (rankA !== undefined) return -1;
+  if (rankB !== undefined) return 1;
+  if (a === "") return 1;
+  if (b === "") return -1;
+  return nameCollator.compare(a, b);
+}
+
+/**
+ * Kelompokkan baris jadwal dua tingkat: bagian layanan dulu, lalu team leader
+ * di dalamnya, lalu nama agen A–Z.
+ *
+ * Bagian layanan dipilih sebagai tingkat teratas karena begitulah jadwal dibaca
+ * sehari-hari (Call, Digital Chat, Email, Leader) — dan karena pilihan filter
+ * "Bagian layanan" memakai daftar yang sama, jadi struktur daftarnya tidak
+ * berubah bentuk saat filter diganti.
+ */
+export function groupBySectionThenTeamLeader<
+  T extends { tl: string; nama: string; channel: string },
+>(rows: T[]): ScheduleSectionGroup<T>[] {
+  const bySection = new Map<string, T[]>();
+  for (const row of rows) {
+    const section = row.channel.trim();
+    const bucket = bySection.get(section);
+    if (bucket) bucket.push(row);
+    else bySection.set(section, [row]);
+  }
+
+  return [...bySection.entries()]
+    .map(([section, members]) => ({
+      section,
+      groups: groupByTeamLeader(members),
+      count: members.length,
+    }))
+    .sort((a, b) => compareSections(a.section, b.section));
+}
+
 // ── Kalender matriks (agen × hari) ─────────────────────────────────────────
 
 /** Nama bulan Indonesia; indeks 0 = Januari. */

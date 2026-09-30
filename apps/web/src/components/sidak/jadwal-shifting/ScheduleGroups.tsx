@@ -1,6 +1,12 @@
 import type { JadwalShiftingRow } from "@trainers/types";
 import { cn } from "cn";
-import { dutyOf, groupByDuty } from "./schedule-sections";
+import {
+  dutyOf,
+  groupByDuty,
+  groupBySectionThenTeamLeader,
+  NO_SECTION_LABEL,
+  NO_TEAM_LEADER_LABEL,
+} from "./schedule-sections";
 
 /**
  * Format pertama: jadwal hari ini dipecah menjadi dua kelompok tegas — siapa
@@ -16,6 +22,14 @@ import { dutyOf, groupByDuty } from "./schedule-sections";
  * Baris sudah difilter sesuai pilihan bagian, jadi kelompok yang kosong harus
  * menyatakan dirinya kosong; mengosongkan kelompok tanpa penjelasan akan
  * terbaca sebagai "data hilang".
+ *
+ * Di dalam tiap kelompok, barisnya dipecah dua tingkat: BAGIAN LAYANAN dulu
+ * (Call → Digital Chat → Email → Leader, sesuai urutan yang disepakati), lalu
+ * TEAM LEADER di dalamnya, dengan nama agen urut A–Z. Grup tanpa layanan dan
+ * grup tanpa TL selalu paling akhir. Alasannya operasional: jadwal dibaca per
+ * bagian layanan, dan di dalamnya per tim — urutan baris dari sumber WFM tidak
+ * menjamin keduanya berkumpul. Karena layanan dan TL sudah jadi sub-judul,
+ * keduanya tidak diulang di tiap baris.
  */
 type Props = {
   rows: JadwalShiftingRow[];
@@ -42,9 +56,6 @@ function RowItem({
       <span className="text-xs whitespace-nowrap text-muted-foreground">
         {row.shift || "Tanpa shift"}
       </span>
-      <span className="text-xs whitespace-nowrap text-muted-foreground">
-        {row.tl ? `TL ${row.tl}` : "Tanpa TL"}
-      </span>
       {libur ? null : <span className="sr-only">Masuk pada tanggal ini</span>}
     </li>
   );
@@ -60,6 +71,7 @@ function GroupPanel({
   date: string;
 }) {
   const masuk = kind === "masuk";
+  const sections = groupBySectionThenTeamLeader(rows);
   return (
     <section
       data-testid={`jadwal-shifting-${kind}`}
@@ -98,15 +110,59 @@ function GroupPanel({
             : `Tidak ada yang libur pada pilihan ini untuk ${date}.`}
         </p>
       ) : (
-        <ul className="min-w-0">
-          {rows.map((row, index) => (
-            <RowItem
-              key={`${row.nama}-${row.channel}-${row.date}-${index}`}
-              row={row}
-              kind={kind}
-            />
+        <div className="flex min-w-0 flex-col gap-5 pt-3">
+          {sections.map((section) => (
+            <div
+              key={section.section || "__tanpa-layanan__"}
+              data-testid={`jadwal-shifting-${kind}-section`}
+              data-section={section.section}
+              className="min-w-0"
+            >
+              <h3
+                data-testid={`jadwal-shifting-${kind}-section-title`}
+                className="flex items-baseline justify-between gap-2 border-b border-border pb-1 text-sm font-semibold text-foreground"
+              >
+                <span className="min-w-0 truncate">
+                  {section.section || NO_SECTION_LABEL}
+                </span>
+                <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                  {section.count} orang
+                </span>
+              </h3>
+              <div className="flex min-w-0 flex-col gap-4 pt-2">
+                {section.groups.map((group) => (
+                  <div
+                    key={group.tl || "__tanpa-tl__"}
+                    data-testid={`jadwal-shifting-${kind}-group`}
+                    data-tl={group.tl}
+                    className="min-w-0"
+                  >
+                    <h4
+                      data-testid={`jadwal-shifting-${kind}-tl`}
+                      className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-1 text-[13px] font-semibold text-foreground"
+                    >
+                      <span className="min-w-0 truncate">
+                        {group.tl ? `TL ${group.tl}` : NO_TEAM_LEADER_LABEL}
+                      </span>
+                      <span className="text-xs font-normal tabular-nums text-muted-foreground">
+                        {group.rows.length} orang
+                      </span>
+                    </h4>
+                    <ul className="min-w-0">
+                      {group.rows.map((row, index) => (
+                        <RowItem
+                          key={`${row.nama}-${row.channel}-${row.date}-${index}`}
+                          row={row}
+                          kind={kind}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );

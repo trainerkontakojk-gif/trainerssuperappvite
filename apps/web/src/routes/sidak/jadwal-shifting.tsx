@@ -30,6 +30,7 @@ import {
   monthLabel,
   normalizeChannelSlug,
   normalizeSectionSlug,
+  orderBySectionThenTeamLeader,
   sectionFromSlug,
   shiftMonth,
   todaySectionOptions,
@@ -373,10 +374,16 @@ export default function SidakJadwalShiftingPage() {
   }
 
   const data = dayState.kind === "ready" ? dayState.data : null;
+  // Satu urutan untuk seluruh halaman: saring dulu (bagian layanan), lalu
+  // kelompokkan per layanan → TL → nama. Daftar masuk/libur dan tabel detail
+  // sama-sama memakai hasil ini, jadi orang yang sama tidak pindah posisi
+  // antar panel.
   const detailRows = useMemo(
     () =>
-      (data?.rows ?? []).filter((row) =>
-        matchesSection(row.channel, channelSlug),
+      orderBySectionThenTeamLeader(
+        (data?.rows ?? []).filter((row) =>
+          matchesSection(row.channel, channelSlug),
+        ),
       ),
     [data, channelSlug],
   );

@@ -165,10 +165,14 @@ test.describe("State data", () => {
     const rows = page.getByTestId("jadwal-shifting-row");
     await expect(rows, "baris jadwal tidak dirender").toHaveCount(3);
 
-    await expect(rows.nth(0)).toContainText(OVERNIGHT_AGENT.nama);
-    await expect(rows.nth(0)).toContainText(OVERNIGHT_AGENT.tl);
-    await expect(rows.nth(1)).toContainText(DAYTIME_AGENT.nama);
-    await expect(rows.nth(2)).toContainText(NO_ACTIVITY_AGENT.nama);
+    // Dicari per nama, bukan per indeks: urutan tabel ditentukan
+    // pengelompokan TL, bukan urutan baris dari sumber.
+    for (const agent of [OVERNIGHT_AGENT, DAYTIME_AGENT, NO_ACTIVITY_AGENT]) {
+      await expect(rows.filter({ hasText: agent.nama })).toHaveCount(1);
+    }
+    await expect(rows.filter({ hasText: OVERNIGHT_AGENT.nama })).toContainText(
+      OVERNIGHT_AGENT.tl,
+    );
 
     // Channel yang benar-benar ada di fixture harus terhitung, bukan di-hardcode.
     for (const channel of FIXTURE_CHANNELS) {
@@ -210,7 +214,9 @@ test.describe("State data", () => {
   }) => {
     const audit = await openJadwalShifting(page, { role: "trainer" });
 
-    const overnight = page.getByTestId("jadwal-shifting-row").nth(0);
+    const overnight = page
+      .getByTestId("jadwal-shifting-row")
+      .filter({ hasText: OVERNIGHT_AGENT.nama });
     // Label shift harus tampil apa adanya — UI tidak boleh menghitung ulang jam.
     await expect(overnight).toContainText(OVERNIGHT_AGENT.shift);
     await expect(
@@ -219,7 +225,9 @@ test.describe("State data", () => {
     ).toHaveAttribute("data-spans-midnight", "true");
 
     // Baris siang tidak boleh ikut ditandai.
-    const daytime = page.getByTestId("jadwal-shifting-row").nth(1);
+    const daytime = page
+      .getByTestId("jadwal-shifting-row")
+      .filter({ hasText: DAYTIME_AGENT.nama });
     await expect(daytime).toHaveAttribute("data-spans-midnight", "false");
 
     expectIsolation(audit);
@@ -915,6 +923,196 @@ test.describe("Format hari ini", () => {
       ).toBeVisible();
     }
     await page.keyboard.press("Escape");
+
+    expectIsolation(audit);
+  });
+
+  test("daftar dipecah per layanan, lalu per team leader dengan nama urut A–Z", async ({
+    page,
+  }) => {
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows: groupedRows() },
+    });
+    await expectPageShell(page);
+
+    // Fixture: Bagas (Call/Rina), Alya (Digital Chat/Rina), Citra (Email/Doni),
+    // Guntur (Leader/Doni, OFF). Urutan grup = urutan bagian layanan yang
+    // disepakati (Call → Digital Chat → Email → Leader), bukan urutan baris
+    // dari sumber — kalau tidak, bagian yang sama terpisah-pisah.
+    const masukSections = page.getByTestId("jadwal-shifting-masuk-section");
+    await expect(masukSections, "grup layanan di kelompok masuk").toHaveCount(
+      3,
+    );
+    await expect(masukSections.nth(0)).toHaveAttribute("data-section", "Call");
+    await expect(masukSections.nth(1)).toHaveAttribute(
+      "data-section",
+      "Digital Chat",
+    );
+    await expect(masukSections.nth(2)).toHaveAttribute("data-section", "Email");
+
+    // Team leader tetap jadi sub-judul DI DALAM layanan.
+    await expect(
+      masukSections.nth(0).getByTestId("jadwal-shifting-masuk-tl"),
+    ).toContainText("TL Rina Salim");
+    await expect(
+      masukSections.nth(2).getByTestId("jadwal-shifting-masuk-tl"),
+    ).toContainText("TL Doni Kurnia");
+
+    // Urutan baris: layanan dulu, baru nama agen.
+    const masukItems = page.getByTestId("jadwal-shifting-masuk-item");
+    await expect(masukItems).toHaveCount(3);
+    await expect(masukItems.nth(0)).toContainText("Bagas Prakoso");
+    await expect(masukItems.nth(1)).toContainText("Alya Pranoto");
+    await expect(masukItems.nth(2)).toContainText("Citra Wulandari");
+
+    // Kelompok libur memakai struktur yang sama; Guntur ada di bagian Leader.
+    const liburSections = page.getByTestId("jadwal-shifting-libur-section");
+    await expect(liburSections).toHaveCount(1);
+    await expect(liburSections.nth(0)).toHaveAttribute(
+      "data-section",
+      "Leader",
+    );
+    await expect(
+      liburSections.nth(0).getByTestId("jadwal-shifting-libur-tl"),
+    ).toContainText("TL Doni Kurnia");
+    await expect(
+      page.getByTestId("jadwal-shifting-libur-item").nth(0),
+    ).toContainText("Guntur Saputra");
+
+    expectIsolation(audit);
+  });
+
+  test("header layanan tetap tampil ketika satu bagian layanan dipilih", async ({
+    page,
+  }) => {
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows: groupedRows() },
+    });
+    await expectPageShell(page);
+
+    // Header tidak boleh muncul-hilang mengikuti filter: struktur daftar harus
+    // sama terbaca baik saat "Semua layanan" maupun saat satu bagian dipilih.
+    await selectSection(page, "all", "email");
+    const sections = page.getByTestId("jadwal-shifting-masuk-section");
+    await expect(sections).toHaveCount(1);
+    await expect(sections.nth(0)).toHaveAttribute("data-section", "Email");
+    await expect(sections.nth(0)).toContainText("TL Doni Kurnia");
+    await expect(page.getByTestId("jadwal-shifting-libur-section")).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId("jadwal-shifting-libur-empty")).toBeVisible();
+
+    expectIsolation(audit);
+  });
+
+  test("baris tanpa bagian layanan tetap tampil dan dikelompokkan paling akhir", async ({
+    page,
+  }) => {
+    const rows = [
+      {
+        nama: "Zulfa Ramadhani",
+        tl: "Rina Salim",
+        channel: "",
+        shift: "H",
+        shiftPrev: "",
+        date: FIXTURE_DATE,
+        activities: [],
+      },
+      {
+        nama: "Ahmad Fauzi",
+        tl: "Rina Salim",
+        channel: "Call",
+        shift: "H",
+        shiftPrev: "",
+        date: FIXTURE_DATE,
+        activities: [],
+      },
+    ];
+
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows },
+    });
+    await expectPageShell(page);
+
+    // `channel` kosong tetap ditampilkan (datanya ada), tapi tidak boleh
+    // menyelip di antara bagian layanan yang bernama.
+    const sections = page.getByTestId("jadwal-shifting-masuk-section");
+    await expect(sections).toHaveCount(2);
+    await expect(sections.nth(0)).toHaveAttribute("data-section", "Call");
+    await expect(sections.nth(1)).toHaveAttribute("data-section", "");
+    await expect(sections.nth(1)).toContainText("Tanpa layanan");
+    await expect(
+      page.getByTestId("jadwal-shifting-masuk-item").nth(1),
+    ).toContainText("Zulfa Ramadhani");
+
+    expectIsolation(audit);
+  });
+
+  test("agen tanpa team leader tetap tampil dan dikelompokkan paling akhir", async ({
+    page,
+  }) => {
+    const rows = [
+      {
+        nama: "Zulfa Ramadhani",
+        tl: "",
+        channel: "Call",
+        shift: "H",
+        shiftPrev: "",
+        date: FIXTURE_DATE,
+        activities: [],
+      },
+      {
+        nama: "Ahmad Fauzi",
+        tl: "Rina Salim",
+        channel: "Call",
+        shift: "H",
+        shiftPrev: "",
+        date: FIXTURE_DATE,
+        activities: [],
+      },
+    ];
+
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows },
+    });
+    await expectPageShell(page);
+
+    // Baris tanpa TL bukan sampah yang boleh disembunyikan: ia harus tetap
+    // terlihat, tapi tidak boleh menyelip di tengah grup TL yang bernama.
+    const groups = page.getByTestId("jadwal-shifting-masuk-group");
+    await expect(groups).toHaveCount(2);
+    await expect(groups.nth(0)).toHaveAttribute("data-tl", "Rina Salim");
+    await expect(groups.nth(1)).toHaveAttribute("data-tl", "");
+    await expect(groups.nth(1)).toContainText("Tanpa team leader");
+    await expect(page.getByTestId("jadwal-shifting-masuk-item")).toHaveCount(2);
+    await expect(
+      page.getByTestId("jadwal-shifting-masuk-item").nth(1),
+    ).toContainText("Zulfa Ramadhani");
+
+    expectIsolation(audit);
+  });
+
+  test("tabel detail memakai urutan layanan → team leader yang sama dengan daftar", async ({
+    page,
+  }) => {
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows: groupedRows() },
+    });
+    await expectPageShell(page);
+
+    // Tabel detail adalah panel penjelas di bawah daftar. Kalau urutannya beda,
+    // mata harus mencari ulang orang yang sama di dua tempat.
+    const detailRows = page.getByTestId("jadwal-shifting-row");
+    await expect(detailRows).toHaveCount(4);
+    await expect(detailRows.nth(0)).toContainText("Bagas Prakoso");
+    await expect(detailRows.nth(1)).toContainText("Alya Pranoto");
+    await expect(detailRows.nth(2)).toContainText("Citra Wulandari");
+    await expect(detailRows.nth(3)).toContainText("Guntur Saputra");
 
     expectIsolation(audit);
   });
