@@ -224,6 +224,20 @@ Verifikasi akhir: **38 / 38 lulus** (kasus kapitalisasi RED dulu: 1 gagal /
 `pnpm build` 3/3 task sukses, `git diff --check` bersih. Gate Pi dijalankan
 ulang setelah commit perbaikan.
 
+## Gate thermo-nuclear (Pi) — putaran kedua dan ketiga
+
+- Putaran 2 atas `e8bf6b0`: **NEEDS_FIX** — fixture urutan layanan masih searah
+  dengan ekspektasi (sortir layanan bisa dihapus tanpa membuat test gagal), dan
+  satu komentar helper basi. Keduanya ditutup di `582c931`.
+- Putaran 3 atas `582c931`: **PASS**, satu P3 — assertion "Hari ini hanya tabel"
+  belum menolak daftar tanpa heading. Ditutup dengan menolak testid panel lama
+  dan `ul`/`ol` di wilayah Hari ini; dibuktikan lewat mutation check (panel lama
+  disuntikkan → test gagal → dipulihkan identik).
+
+Ringkasnya: implementasi dipindahkan ke Pi coding agent, gate dijalankan sesi Pi
+terpisah yang read-only, dan Moy memverifikasi ulang hasilnya sendiri (E2E,
+typecheck, lint, build, serta mutation check independen) sebelum commit.
+
 ## Revisi pemilik — Hari ini hanya tabel detail dan urutan baris
 
 ### Requirement

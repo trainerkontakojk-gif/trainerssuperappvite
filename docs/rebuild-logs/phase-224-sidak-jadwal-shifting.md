@@ -62,6 +62,12 @@ Permintaan pemilik menggantikan daftar masuk/libur yang dicatat pada update sebe
 - Kalender bulanan tidak berubah; agen tetap diurutkan A–Z. Tidak ada perubahan API, shared types, proyeksi WFM, operasi tulis, atau pemanggilan AI.
 - Komentar helper layanan kini membedakan peringkat bagian kanonik dari nilai channel sumber yang tetap dirender.
 
+## Update 4 — 2026-09-30 — gate thermo-nuclear putaran ketiga
+
+Gate ketiga atas `582c931` memberi verdict **PASS** dengan satu temuan P3: assertion “Hari ini hanya tabel” masih hanya menolak heading `h2`–`h4`, sehingga daftar/panel lama tanpa heading bisa lolos. Assertion diperkuat: sekarang `data-testid` sisa panel Masuk/Libur ditolak eksplisit, dan `ul`/`ol` di dalam wilayah Hari ini tidak boleh ada.
+
+Dibuktikan dengan mutation check: elemen panel lama disuntikkan kembali ke route, test gagal dengan pesan “sisa panel Masuk/Libur tidak boleh dirender lagi”, lalu route dipulihkan identik. Verifikasi setelahnya: E2E **32 passed**, `tsc --noEmit` web, ESLint, Prettier, dan `git diff --check` lulus.
+
 ### E2E RED → GREEN dan daya tangkap urutan
 
 - RED sebelum implementasi: **30 passed / 2 failed** dari 32. Kontrak tabel-saja mendeteksi 22 elemen daftar/subjudul lama; test urutan mendeteksi urutan tabel lama yang mengikuti layanan/TL dan bukan prioritas shift.

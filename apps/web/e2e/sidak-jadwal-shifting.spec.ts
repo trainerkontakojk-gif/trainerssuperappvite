@@ -884,9 +884,25 @@ test.describe("Format hari ini", () => {
     const table = page.getByTestId("jadwal-shifting-table");
     await expect(table).toBeVisible();
     await expect(page.getByTestId("jadwal-shifting-row")).toHaveCount(4);
+
+    const todayView = page.getByTestId("jadwal-shifting-view-today");
+    await expect(todayView, "format Hari ini tidak dirender").toBeVisible();
     await expect(
-      page.locator("h2, h3, h4"),
+      todayView.locator("h2, h3, h4"),
       "panel dan subjudul pengelompokan tidak boleh tampil di luar tabel",
+    ).toHaveCount(0);
+    // Memeriksa heading saja tidak cukup: daftar/panel lama bisa kembali tanpa
+    // heading. Jadi dua hal diperiksa terpisah — sisa testid panel lama, dan
+    // daftar non-tabel (`ul`/`ol`) di dalam format Hari ini.
+    await expect(
+      page.locator(
+        '[data-testid^="jadwal-shifting-masuk"], [data-testid^="jadwal-shifting-libur"]',
+      ),
+      "sisa panel Masuk/Libur tidak boleh dirender lagi",
+    ).toHaveCount(0);
+    await expect(
+      todayView.locator("ul, ol"),
+      "format Hari ini hanya boleh berisi tabel, bukan daftar",
     ).toHaveCount(0);
     await expect(
       page.getByTestId("jadwal-shifting-row").filter({
