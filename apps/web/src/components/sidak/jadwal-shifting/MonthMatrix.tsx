@@ -70,13 +70,45 @@ const SUMMARY_FIELD_ALIAS: Record<
 /**
  * Lantai tinggi wadah dalam rem. Fungsinya HANYA mencegah matriks mengerut jadi
  * nol — kalau lantai lebih besar daripada ruang yang tersisa, lantai menang dan
- * tepi bawah wadah keluar layar. E2E memakai angka yang sama sebagai kontrak
- * (`FLOOR_REM`), jadi mengubahnya di sini akan menggagalkan test.
+ * tepi bawah wadah keluar area gulir. Nilai ini SATU-SATUNYA sumber: dipakai
+ * untuk `min-height` (inline) maupun batas bawah perhitungan tinggi.
+ * E2E memakai 5rem sebagai kontrak, jadi mengubah angka ini akan gagal di test.
  */
 export const FLOOR_REM = 5;
 
-/** Sisa ruang di bawah wadah supaya tepi bawahnya tidak menempel di tepi layar. */
+/** Sisa ruang di bawah wadah supaya tepi bawahnya tidak menempel di tepi area gulir. */
 const VIEWPORT_MARGIN_PX = 16;
+
+/**
+ * Area gulir yang BENAR-BENAR memotong isi halaman. Halaman ini tidak menggulir
+ * di window, melainkan di `<section aria-label="Konten halaman">`, dan `<main>`
+ * sudah menyisakan ruang untuk tab bar mobile.
+ *
+ * Tidak semua leluhur ber-`overflow-y: auto` itu area gulir: `overflow-x: hidden`
+ * membuat `overflow-y` ikut terhitung `auto` tanpa benar-benar memotong isi
+ * (pernah kejadian — pengukuran sempat memakai pembungkus setinggi 1780px alih-
+ * alih area gulir 744px). Karena itu yang dipilih adalah leluhur yang isinya
+ * melebihi kotaknya; kalau tidak ada, dipakai kandidat terdekat yang tingginya
+ * tidak melebihi layar.
+ */
+function findScrollport(element: HTMLElement): HTMLElement | null {
+  let fallback: HTMLElement | null = null;
+  let node = element.parentElement;
+  while (node && node !== document.body) {
+    const overflowY = getComputedStyle(node).overflowY;
+    const couldScroll = overflowY === "auto" || overflowY === "scroll";
+    if (
+      couldScroll &&
+      node.clientHeight > 0 &&
+      node.clientHeight <= window.innerHeight
+    ) {
+      if (node.scrollHeight > node.clientHeight + 1) return node;
+      fallback ??= node;
+    }
+    node = node.parentElement;
+  }
+  return fallback;
+}
 
 export function MonthMatrix({ month, rows }: Props) {
   const dates = useMemo(() => monthDates(month), [month]);
@@ -85,36 +117,54 @@ export function MonthMatrix({ month, rows }: Props) {
 
   /*
    * Tinggi wadah dihitung dari ruang yang BENAR-BENAR tersisa, bukan dari
-   * cadangan tetap. Cadangan tetap (dalam rem) ikut membesar saat teks
-   * diperbesar, sementara kontrol di atas matriks bisa membungkus dan tumbuh
-   * lebih cepat — sehingga tepi bawah wadah bisa kembali keluar layar.
+   * cadangan tetap: kontrol di atas matriks bisa tumbuh saat teks diperbesar,
+   * label membungkus, atau saat font baru selesai dimuat.
    *
-   * Posisinya dibaca dari koordinat DOKUMEN (bukan viewport) supaya tingginya
-   * tidak berubah-ubah saat halaman digulir. Pengukuran diulang saat viewport
-   * berubah dan setelah font selesai dimuat.
+   * Perhitungannya memakai koordinat ISI area gulir (posisi wadah relatif isi
+   * area gulir), bukan koordinat viewport, supaya tingginya TIDAK berubah saat
+   * pengguna menggulir — kalau memakai koordinat viewport, tinggi wadah akan
+   * ikut berubah-ubah dan terasa berkedip.
    */
   useEffect(() => {
     const region = regionRef.current;
     if (!region) return;
+
+    let cancelled = false;
+    let frame = 0;
+
     const applyHeight = () => {
+      if (cancelled) return;
       const rootFontSize =
         Number.parseFloat(
           getComputedStyle(document.documentElement).fontSize,
         ) || 16;
       const floor = FLOOR_REM * rootFontSize;
-      const top = region.getBoundingClientRect().top + window.scrollY;
-      const available = window.innerHeight - top - VIEWPORT_MARGIN_PX;
+      const regionRect = region.getBoundingClientRect();
+      const scrollport = findScrollport(region);
+      /*
+       * Tanpa suku `scrollTop`: kalau posisi gulir ikut dihitung, tinggi wadah
+       * berubah-ubah setiap kali halaman digulir dan tabelnya terasa berkedip.
+       * Dengan rumus ini, tepi bawah wadah sudah muat pada posisi gulir paling
+       * atas (kasus terburuk) — menggulir ke bawah hanya membuatnya makin muat.
+       */
+      const available = scrollport
+        ? scrollport.clientHeight -
+          (regionRect.top - scrollport.getBoundingClientRect().top) -
+          VIEWPORT_MARGIN_PX
+        : window.innerHeight -
+          (regionRect.top + window.scrollY) -
+          VIEWPORT_MARGIN_PX;
       setMaxHeight(Math.max(Math.round(floor), Math.round(available)));
     };
+
     /*
      * Semua pemicu dijadwalkan ke frame berikutnya: saat style berubah,
      * observer bisa terpanggil SEBELUM layout baru dihitung, dan mengukur di
      * saat itu menghasilkan tinggi yang basi (pernah kejadian: tepi bawah
      * meleset ~17px saat teks diperbesar).
      */
-    let frame = 0;
     const measure = () => {
-      if (frame !== 0) return;
+      if (cancelled || frame !== 0) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
         applyHeight();
@@ -138,6 +188,8 @@ export function MonthMatrix({ month, rows }: Props) {
         if (sibling !== region) observer.observe(sibling);
       }
     }
+    const scrollport = findScrollport(region);
+    if (scrollport) observer.observe(scrollport);
 
     // Perubahan CSS (mis. ukuran teks dasar) tidak selalu mengubah kotak elemen
     // yang dipantau, jadi perubahan pada <head> juga jadi pemicu.
@@ -145,9 +197,15 @@ export function MonthMatrix({ month, rows }: Props) {
     headObserver.observe(document.head, { childList: true, subtree: true });
 
     window.addEventListener("resize", measure);
+    // Area gulir bisa berubah tinggi tanpa jendela berubah (mis. header ikut
+    // menyesuaikan), jadi ukurannya ikut dipantau lewat listener scroll pasif.
+    // Catatan: TIDAK ada listener `scroll`. Pemicu gulir membuat tinggi wadah
+    // dihitung ulang setiap kali pengguna menggulir, dan tabelnya terasa
+    // berkedip. Perubahan ukuran area gulir sudah tertangkap ResizeObserver.
     void document.fonts.ready.then(measure).catch(() => undefined);
 
     return () => {
+      cancelled = true;
       if (frame !== 0) cancelAnimationFrame(frame);
       observer.disconnect();
       headObserver.disconnect();
@@ -204,7 +262,10 @@ export function MonthMatrix({ month, rows }: Props) {
       role="region"
       aria-label="Matriks jadwal per agen"
       tabIndex={0}
-      style={maxHeight === null ? undefined : { maxHeight: `${maxHeight}px` }}
+      style={{
+        minHeight: `${FLOOR_REM}rem`,
+        maxHeight: maxHeight === null ? undefined : `${maxHeight}px`,
+      }}
       /*
        * Tinggi dibatasi supaya scrollbar horizontal berada DI DALAM layar.
        * Sebelumnya wadahnya setinggi seluruh isi, jadi scrollbar horizontal
@@ -216,13 +277,13 @@ export function MonthMatrix({ month, rows }: Props) {
        * scrollbar melorot lagi. Kelas `max-h` di bawah hanya cadangan sebelum JS
        * jalan, jadi angkanya sengaja longgar.
        *
-       * `min-h-[5rem]` (= `FLOOR_REM`) sengaja kecil: fungsinya HANYA mencegah
+       * `min-height: 5rem` (= `FLOOR_REM`, inline) sengaja kecil: fungsinya HANYA mencegah
        * matriks mengerut jadi nol. Lantai yang lebih besar justru mengalahkan
        * batas atas dan mendorong scrollbar kembali ke bawah layar pada jendela
        * pendek — persis masalah yang mau dihilangkan.
        * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat.
        */
-      className="min-w-0 max-h-[calc(100dvh-34rem)] min-h-[5rem] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
+      className="min-w-0 max-h-[calc(100dvh-34rem)] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
     >
       <table className="w-max border-collapse text-sm">
         <caption className="sr-only">

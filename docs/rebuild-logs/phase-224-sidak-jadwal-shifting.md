@@ -246,3 +246,39 @@ Test baru: `dengan teks diperbesar, kontrol boleh tumbuh tetapi tepi bawah wadah
 tetap di dalam layar` (root font-size 14px → 20px di 480×800). Test ini sempat
 GAGAL dua kali selama pengerjaan (957px lalu 817px dari 800px) dan itu yang
 membuktikan perbaikannya benar-benar bekerja, bukan sekadar lolos.
+
+## Update 11 — 2026-09-30 — mengukur terhadap area gulir, bukan window
+
+Gate putaran kedelapan atas `05793bb` memberi verdict **NEEDS_FIX** dengan tiga
+temuan; yang pertama membongkar asumsi dasar.
+
+1. **P2 — halaman ini tidak menggulir di window.** Pengukuran memakai
+   `window.innerHeight`, padahal isi halaman menggulir di
+   `section[aria-label="Konten halaman"]` dan `<main>` sudah menyisakan ruang
+   untuk tab bar mobile. Akibatnya tepi bawah wadah bisa melewati tepi area
+   gulir dan tertutup tab bar di layar mobile.
+   Perbaikan: `findScrollport()` mencari area gulir yang benar-benar memotong
+   isi, dan tinggi dihitung dari `clientHeight` area gulir dikurangi posisi atas
+   wadah. Dua penjaga dipakai bersama: leluhur harus benar-benar memotong
+   (`scrollHeight > clientHeight`) dan tingginya tidak melebihi layar. Tanpa
+   penjaga, pengukuran sempat memakai pembungkus setinggi **1780px** alih-alih
+   area gulir **744px** (gejala: `max-height` jadi 1521px).
+   Suku `scrollTop` juga dihapus dari rumus dan listener `scroll` tidak dipakai,
+   supaya tinggi wadah tidak berubah-ubah saat pengguna menggulir.
+2. **P3 — pembersihan RAF belum lengkap.** Sekarang ada flag `cancelled` yang
+   dicek sebelum menjadwalkan maupun menjalankan pengukuran, dan frame yang
+   tertunda dibatalkan saat unmount.
+3. **P3 — `waitForTimeout(300)` di test rawan flaky.** Diganti `expect.poll`
+   yang menunggu pengukuran ulang benar-benar menghasilkan tinggi yang benar.
+
+E2E juga berubah: pengukuran kini dilakukan terhadap area gulir pada **posisi
+gulir paling atas** (kasus terburuk) dan sekali lagi setelah digulir penuh, plus
+cek tab bar mobile. `min-height` sekarang datang dari `FLOOR_REM` (satu sumber,
+inline) sehingga kelas CSS dan perhitungan JS tidak bisa berbeda.
+
+Mutation check: pengukuran dikembalikan ke window ⇒ 3 test gagal; pengukuran
+tidak ditunda ke frame berikutnya ⇒ 1 gagal; `FLOOR_REM` 5 → 14 ⇒ 9 gagal.
+Dua penjaga internal di `findScrollport()` (syarat "benar-benar memotong" dan
+"setinggi layar") **tidak** bisa dibuktikan terpisah lewat mutasi — masing-masing
+redundan di tata letak sekarang; yang terbukti lewat mutasi adalah perilaku
+akhirnya (mengukur terhadap area gulir, bukan window).

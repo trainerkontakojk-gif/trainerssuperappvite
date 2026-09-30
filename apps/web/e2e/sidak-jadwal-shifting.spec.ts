@@ -61,6 +61,83 @@ async function expectPageShell(page: import("@playwright/test").Page) {
 // Role gate — navigasi dan route
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Ukur kontrak wadah kalender TERHADAP AREA GULIR, bukan window: halaman ini
+ * menggulir di `<section aria-label="Konten halaman">` dan `<main>` sudah
+ * menyisakan ruang untuk tab bar mobile.
+ *
+ * Kasus TERBURUK adalah posisi gulir paling atas: di situ ruang di bawah puncak
+ * matriks paling sempit. Kalau tepi bawah wadah sudah muat di sana, menggulir
+ * ke bawah hanya membuatnya makin muat.
+ */
+async function measureCalendar(page: import("@playwright/test").Page): Promise<{
+  minHeight: number;
+  boxHeight: number;
+  roomBelow: number;
+  roomBelowAfterScroll: number;
+  fits: boolean;
+  tabBarTop: number | null;
+  overlapsTabBar: boolean;
+  scrollWidth: number;
+  clientWidth: number;
+  rootFontSize: number;
+}> {
+  return page.evaluate(() => {
+    const grid = document.querySelector(
+      '[data-testid="jadwal-shifting-calendar"]',
+    ) as HTMLElement;
+    const workspace = document.querySelector(
+      '[aria-label="Konten halaman"]',
+    ) as HTMLElement;
+    const tabBar = document.querySelector(
+      '[aria-label="Navigasi utama"]',
+    ) as HTMLElement | null;
+
+    const rootFontSize = Number.parseFloat(
+      getComputedStyle(document.documentElement).fontSize,
+    );
+    const floor = 5 * rootFontSize;
+
+    workspace.scrollTop = 0;
+    const workspaceRect = workspace.getBoundingClientRect();
+    const gridTopOffset = grid.getBoundingClientRect().top - workspaceRect.top;
+    const fits = gridTopOffset + floor + 16 <= workspace.clientHeight;
+    const roomBelow = Math.round(
+      workspaceRect.bottom - grid.getBoundingClientRect().bottom,
+    );
+
+    workspace.scrollTop = workspace.scrollHeight;
+    const roomBelowAfterScroll = Math.round(
+      workspace.getBoundingClientRect().bottom -
+        grid.getBoundingClientRect().bottom,
+    );
+
+    // Ukur tab bar pada posisi gulir paling atas: di situ tepi bawah wadah
+    // paling dekat dengan tab bar.
+    workspace.scrollTop = 0;
+    const gridBottom = grid.getBoundingClientRect().bottom;
+    const tabBarRect = tabBar ? tabBar.getBoundingClientRect() : null;
+    const tabBarTop =
+      tabBarRect && tabBarRect.height > 0 && tabBarRect.top < window.innerHeight
+        ? Math.round(tabBarRect.top)
+        : null;
+    const overlapsTabBar = tabBarTop !== null && gridBottom > tabBarTop;
+
+    return {
+      minHeight: Number.parseFloat(getComputedStyle(grid).minHeight),
+      boxHeight: grid.getBoundingClientRect().height,
+      roomBelow,
+      roomBelowAfterScroll,
+      fits,
+      tabBarTop,
+      overlapsTabBar,
+      scrollWidth: grid.scrollWidth,
+      clientWidth: grid.clientWidth,
+      rootFontSize,
+    };
+  });
+}
+
 test.describe("Role gate", () => {
   for (const role of ["admin", "trainer"] as const) {
     test(`role ${role} boleh membuka halaman lewat deep link`, async ({
@@ -1536,7 +1613,7 @@ test.describe("Format kalender (matriks agen × hari)", () => {
         overflowY: style.overflowY,
       };
     });
-    const viewportHeight = page.viewportSize()?.height ?? 0;
+    const scrollport = await measureCalendar(page);
 
     expect(
       metrics.scrollWidth,
@@ -1551,9 +1628,13 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       "isi lebih tinggi dari wadah supaya bisa digulir vertikal",
     ).toBeGreaterThan(metrics.clientHeight);
     expect(
-      metrics.bottom,
-      "tepi bawah wadah (tempat scrollbar horizontal) harus berada di dalam layar tanpa menggulir halaman",
-    ).toBeLessThanOrEqual(viewportHeight);
+      scrollport.roomBelow,
+      "tepi bawah wadah (tempat scrollbar horizontal) harus berada di dalam AREA GULIR — halaman ini menggulir di `Konten halaman`, bukan di window — pada posisi gulir paling atas",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      scrollport.overlapsTabBar,
+      "tepi bawah wadah tidak boleh tertutup tab bar mobile",
+    ).toBe(false);
 
     await grid.evaluate((el) => {
       el.scrollTop = 300;
@@ -1627,22 +1708,7 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       const grid = page.getByTestId("jadwal-shifting-calendar");
       await expect(grid).toBeVisible();
 
-      const metrics = await grid.evaluate((el) => {
-        const rect = el.getBoundingClientRect();
-        const style = getComputedStyle(el);
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-          boxHeight: rect.height,
-          clientHeight: el.clientHeight,
-          minHeight: Number.parseFloat(style.minHeight),
-          scrollWidth: el.scrollWidth,
-          clientWidth: el.clientWidth,
-          rootFontSize: Number.parseFloat(
-            getComputedStyle(document.documentElement).fontSize,
-          ),
-        };
-      });
+      const metrics = await measureCalendar(page);
 
       // 1rem = 14px di app ini, jadi lantai = 5rem = 70px (bukan 80px).
       const floor = FLOOR_REM * metrics.rootFontSize;
@@ -1656,28 +1722,32 @@ test.describe("Format kalender (matriks agen × hari)", () => {
         "matriks memang meluber horizontal di ukuran ini",
       ).toBeGreaterThan(metrics.clientWidth);
 
-      const muatDiLayar = metrics.top + floor <= height;
-      if (muatDiLayar) {
+      expect(
+        metrics.roomBelowAfterScroll,
+        "setelah area gulir digulir ke bawah, tepi bawah wadah tetap harus terlihat",
+      ).toBeGreaterThanOrEqual(0);
+
+      if (metrics.fits) {
         expect(
-          metrics.bottom,
-          "jendela masih memuat kontrol + lantai, jadi scrollbar horizontal harus di dalam layar",
-        ).toBeLessThanOrEqual(height);
-        // Wadah memakai sisa ruang sampai dasar layar (margin 16px), bukan
-        // cadangan tetap: kalau terlalu pendek, tabel jadi lebih kecil dari
-        // yang seharusnya; kalau terlalu tinggi, scrollbar melorot lagi.
-        const sisaRuang = height - metrics.top - metrics.boxHeight;
-        expect(
-          sisaRuang,
-          "tepi bawah wadah tidak boleh melewati layar",
+          metrics.roomBelow,
+          "di posisi gulir paling atas (kasus terburuk), tepi bawah wadah harus di dalam area gulir",
         ).toBeGreaterThanOrEqual(0);
         expect(
-          sisaRuang,
-          "wadah harus mengisi sisa ruang layar (margin ≤ 24px), bukan menyisakan celah besar",
+          metrics.roomBelow,
+          "wadah harus mengisi sisa ruang yang terlihat (margin ≤ 24px), bukan menyisakan celah besar",
         ).toBeLessThanOrEqual(24);
+        // Cek tab bar hanya masuk akal kalau matriks memang dimaksudkan
+        // terlihat penuh. Kalau kontrol di atas matriks saja sudah melebihi
+        // area gulir (mis. 390×400), matriks ada di bawah area terlihat sampai
+        // pengguna menggulir — bukan tab bar yang menutupinya.
+        expect(
+          metrics.overlapsTabBar,
+          "tepi bawah wadah tidak boleh tertutup tab bar mobile",
+        ).toBe(false);
       } else {
         expect(
           metrics.boxHeight,
-          "di jendela yang terlalu pendek, wadah harus tepat setinggi lantai — bukan tumbuh menutupi layar",
+          "di area gulir yang terlalu pendek, wadah harus tepat setinggi lantai — bukan tumbuh menutupi area gulir",
         ).toBeCloseTo(floor, 0);
       }
     });
@@ -1701,35 +1771,40 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
 
     await page.addStyleTag({ content: "html { font-size: 20px }" });
-    await page.waitForTimeout(300);
 
-    const metrics = await page
-      .getByTestId("jadwal-shifting-calendar")
-      .evaluate((el) => {
-        const rect = el.getBoundingClientRect();
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-          boxHeight: rect.height,
-          rootFontSize: Number.parseFloat(
-            getComputedStyle(document.documentElement).fontSize,
-          ),
-        };
-      });
+    // Tunggu pengukuran ulang benar-benar selesai (MutationObserver →
+    // requestAnimationFrame), bukan sekadar menunggu waktu tetap.
+    // Tunggu sampai pengukuran ulang SELESAI, bukan sekadar sampai ukuran teks
+    // berubah: MutationObserver → requestAnimationFrame butuh satu frame lagi.
+    await expect
+      .poll(
+        async () => {
+          const measured = await measureCalendar(page);
+          return measured.fits
+            ? measured.roomBelow >= 0 && measured.roomBelow <= 24
+            : Math.abs(measured.boxHeight - 5 * measured.rootFontSize) <= 2;
+        },
+        {
+          message:
+            "pengukuran ulang setelah teks diperbesar belum menghasilkan tinggi yang benar",
+          timeout: 5000,
+        },
+      )
+      .toBe(true);
 
-    // Teks benar-benar membesar (root font-size 20px, bukan 14px).
-    expect(metrics.rootFontSize).toBeCloseTo(20, 0);
+    const metrics = await measureCalendar(page);
     const floor = FLOOR_REM * metrics.rootFontSize;
-    const muatDiLayar = metrics.top + floor <= 800;
-    if (muatDiLayar) {
+
+    if (metrics.fits) {
       expect(
-        metrics.bottom,
-        "teks diperbesar tidak boleh membuat scrollbar horizontal keluar layar",
-      ).toBeLessThanOrEqual(800);
-      expect(800 - metrics.top - metrics.boxHeight).toBeLessThanOrEqual(24);
+        metrics.roomBelow,
+        "teks diperbesar tidak boleh membuat scrollbar horizontal keluar area gulir",
+      ).toBeGreaterThanOrEqual(0);
+      expect(metrics.roomBelow).toBeLessThanOrEqual(24);
     } else {
       expect(metrics.boxHeight).toBeCloseTo(floor, 0);
     }
+    expect(metrics.overlapsTabBar).toBe(false);
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

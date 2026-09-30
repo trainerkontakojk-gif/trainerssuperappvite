@@ -279,10 +279,11 @@ memiliki pemakai; pertahankan utilitas filter serta kalender yang masih dipakai.
 
 - Urutan tabel Hari ini: shift → layanan → jam mulai istirahat (slot `LB`
   pertama) → TL → nama. Baris tanpa istirahat selalu paling belakang.
-- Kalender: wadah dibatasi tinggi lewat **pengukuran adaptif**
-  (`maxHeight = tinggi layar − posisi atas wadah − 16px`, dengan lantai 5rem;
-  dibungkus `overflow-auto`), plus header tanggal `sticky top-0` dan kolom nama
-  opak + sticky kiri. Kelas `max-h-[calc(100dvh-34rem/28rem/24rem)]` tinggal
+- Kalender: wadah dibatasi tinggi lewat **pengukuran adaptif terhadap area
+  gulir halaman** (`maxHeight = tinggi area gulir − posisi atas wadah − 16px`,
+  dengan lantai 5rem; area gulir = `section[aria-label="Konten halaman"]`,
+  bukan window; dibungkus `overflow-auto`), plus header tanggal `sticky top-0`
+  dan kolom nama opak + sticky kiri. Kelas `max-h-[calc(100dvh-34rem/28rem/24rem)]` tinggal
   cadangan sebelum JS jalan. Hasilnya scrollbar horizontal terjangkau tanpa
   menggulir halaman dulu dan kode tanggal tidak tembus di belakang nama agen.
   Batas yang diakui: kalau jendela tidak cukup memuat kontrol di atas matriks +
@@ -299,9 +300,10 @@ tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → 
 
 - `SLOTS_PER_DAY = 96` adalah satu sumber kebenaran untuk batas slot aktivitas;
   dipakai `breakStartMinutes()` maupun `longBreakIntervals()`.
-- Tinggi wadah kalender dihitung dari ruang yang benar-benar tersisa
-  (`MonthMatrix.tsx`), bukan cadangan tetap, karena kontrol di atas matriks bisa
-  tumbuh saat teks diperbesar/membungkus. Kelas `max-h` 34/28/24rem hanya
+- Tinggi wadah kalender dihitung dari ruang yang benar-benar tersisa di area
+  gulir (`MonthMatrix.tsx`), bukan cadangan tetap dan bukan `window.innerHeight`,
+  karena halaman menggulir di `section[aria-label="Konten halaman"]` dan kontrol
+  di atas matriks bisa tumbuh saat teks diperbesar/membungkus. Kelas `max-h` 34/28/24rem hanya
   cadangan sebelum JS jalan. Lantai `5rem` (`FLOOR_REM`) sengaja kecil: kalau
   lebih besar dari ruang tersisa, lantai menang dan scrollbar melorot lagi.
   **1rem = 14px di app ini** (root font-size bukan 16px) — jangan hitung dengan
