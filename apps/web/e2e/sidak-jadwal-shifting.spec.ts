@@ -1629,10 +1629,13 @@ test.describe("Format kalender (matriks agen × hari)", () => {
 
       const metrics = await grid.evaluate((el) => {
         const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
         return {
-          top: Math.round(rect.top),
-          bottom: Math.round(rect.bottom),
+          top: rect.top,
+          bottom: rect.bottom,
+          boxHeight: rect.height,
           clientHeight: el.clientHeight,
+          minHeight: Number.parseFloat(style.minHeight),
           scrollWidth: el.scrollWidth,
           clientWidth: el.clientWidth,
           rootFontSize: Number.parseFloat(
@@ -1641,13 +1644,13 @@ test.describe("Format kalender (matriks agen × hari)", () => {
         };
       });
 
-      // 1rem = 14px di app ini (root font-size bukan 16px).
+      // 1rem = 14px di app ini, jadi lantai = 5rem = 70px (bukan 80px).
       const floor = FLOOR_REM * metrics.rootFontSize;
       expect(metrics.rootFontSize).toBeGreaterThan(0);
       expect(
-        metrics.clientHeight,
-        `lantai ${FLOOR_REM}rem menjaga matriks tidak mengerut jadi nol`,
-      ).toBeGreaterThanOrEqual(floor - 8);
+        metrics.minHeight,
+        `lantai di CSS harus ${FLOOR_REM}rem — kontrak yang sama dengan spec`,
+      ).toBeCloseTo(floor, 0);
       expect(
         metrics.scrollWidth,
         "matriks memang meluber horizontal di ukuran ini",
@@ -1659,14 +1662,75 @@ test.describe("Format kalender (matriks agen × hari)", () => {
           metrics.bottom,
           "jendela masih memuat kontrol + lantai, jadi scrollbar horizontal harus di dalam layar",
         ).toBeLessThanOrEqual(height);
+        // Wadah memakai sisa ruang sampai dasar layar (margin 16px), bukan
+        // cadangan tetap: kalau terlalu pendek, tabel jadi lebih kecil dari
+        // yang seharusnya; kalau terlalu tinggi, scrollbar melorot lagi.
+        const sisaRuang = height - metrics.top - metrics.boxHeight;
+        expect(
+          sisaRuang,
+          "tepi bawah wadah tidak boleh melewati layar",
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          sisaRuang,
+          "wadah harus mengisi sisa ruang layar (margin ≤ 24px), bukan menyisakan celah besar",
+        ).toBeLessThanOrEqual(24);
       } else {
         expect(
-          metrics.clientHeight,
-          "di jendela yang terlalu pendek, wadah harus tetap tepat setinggi lantai — bukan tumbuh menutupi layar",
-        ).toBeLessThanOrEqual(Math.ceil(floor) + 8);
+          metrics.boxHeight,
+          "di jendela yang terlalu pendek, wadah harus tepat setinggi lantai — bukan tumbuh menutupi layar",
+        ).toBeCloseTo(floor, 0);
       }
     });
   }
+
+  /**
+   * Kontrol di atas matriks bisa tumbuh tanpa viewport berubah — mis. saat
+   * pengguna memakai pengaturan "teks lebih besar". Cadangan ruang yang tetap
+   * tidak tahan terhadap ini; pengukuran adaptif harus tetap menjaga tepi bawah
+   * wadah di dalam layar.
+   */
+  test("dengan teks diperbesar, kontrol boleh tumbuh tetapi tepi bawah wadah tetap di dalam layar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 480, height: 800 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+    await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
+
+    await page.addStyleTag({ content: "html { font-size: 20px }" });
+    await page.waitForTimeout(300);
+
+    const metrics = await page
+      .getByTestId("jadwal-shifting-calendar")
+      .evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          boxHeight: rect.height,
+          rootFontSize: Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          ),
+        };
+      });
+
+    // Teks benar-benar membesar (root font-size 20px, bukan 14px).
+    expect(metrics.rootFontSize).toBeCloseTo(20, 0);
+    const floor = FLOOR_REM * metrics.rootFontSize;
+    const muatDiLayar = metrics.top + floor <= 800;
+    if (muatDiLayar) {
+      expect(
+        metrics.bottom,
+        "teks diperbesar tidak boleh membuat scrollbar horizontal keluar layar",
+      ).toBeLessThanOrEqual(800);
+      expect(800 - metrics.top - metrics.boxHeight).toBeLessThanOrEqual(24);
+    } else {
+      expect(metrics.boxHeight).toBeCloseTo(floor, 0);
+    }
+  });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({
     page,

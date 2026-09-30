@@ -214,3 +214,35 @@ temuan.
 Mutation check putaran ini: lantai dibalik ke 14rem → 3 test gagal (termasuk
 1280×400 yang dulu lolos); lantai dibuang → 2 test gagal; cadangan dasar kembali
 24rem → 2 test gagal.
+
+## Update 10 — 2026-09-30 — wadah kalender mengukur ruang, bukan menebak
+
+Gate putaran ketujuh atas `4a6b042` memberi verdict **NEEDS_FIX** dengan tiga
+temuan, dan temuan pertamanya menunjuk kelemahan mendasar.
+
+1. **P2 — cadangan tetap tidak tahan perubahan tinggi kontrol.** Batas tinggi
+   memakai cadangan tetap 34/28/24rem, sementara kontrol di atas matriks bisa
+   tumbuh (teks diperbesar, label membungkus, zoom). Selisih di layar sempit
+   hanya ~22px sebelum wadah melewati tepi layar. Perbaikannya: tinggi wadah
+   sekarang **diukur** — `maxHeight = window.innerHeight − posisi-atas-wadah −
+   16px`, dengan lantai 5rem — dan dihitung ulang saat viewport berubah, saat
+   elemen di atas matriks berubah ukuran (ResizeObserver pada parent + saudara
+   wadah), saat `<head>` berubah (MutationObserver), dan setelah font selesai
+   dimuat. Pengukuran dijadwalkan ke frame berikutnya (`requestAnimationFrame`)
+   karena observer bisa terpanggil sebelum layout baru dihitung — tanpa ini tepi
+   bawah sempat meleset ~17px saat teks diperbesar.
+   Kelas `max-h` lama tetap ada sebagai cadangan sebelum JS jalan.
+2. **P3 — toleransi ±8px membuat kontrak lantai tidak tepat.** Toleransi
+   dihapus: sekarang lantai di CSS harus tepat `5rem` (dicek dari
+   `getComputedStyle().minHeight`), tinggi wadah di jendela pendek harus tepat
+   setinggi lantai (`toBeCloseTo`), dan di jendela yang muat, sisa ruang di
+   bawah wadah harus 0–24px — terlalu pendek atau terlalu tinggi sama-sama
+   gagal.
+3. **P3 — plan masih memuat kontrak lama (`max-h-[calc(100dvh-24rem)]`,
+   mundur 24rem tunggal).** Bagian "Urutan tabel dan perilaku gulir" dan bagian
+   batas diperbarui; `docs/modules.md` juga menyebut pengukuran adaptif.
+
+Test baru: `dengan teks diperbesar, kontrol boleh tumbuh tetapi tepi bawah wadah
+tetap di dalam layar` (root font-size 14px → 20px di 480×800). Test ini sempat
+GAGAL dua kali selama pengerjaan (957px lalu 817px dari 800px) dan itu yang
+membuktikan perbaikannya benar-benar bekerja, bukan sekadar lolos.

@@ -279,10 +279,14 @@ memiliki pemakai; pertahankan utilitas filter serta kalender yang masih dipakai.
 
 - Urutan tabel Hari ini: shift → layanan → jam mulai istirahat (slot `LB`
   pertama) → TL → nama. Baris tanpa istirahat selalu paling belakang.
-- Kalender: wadah dibatasi tinggi (`max-h-[calc(100dvh-24rem)]`, `overflow-auto`)
-  dengan header tanggal `sticky top-0` dan kolom nama opak + sticky kiri, supaya
-  scrollbar horizontal terjangkau tanpa menggulir halaman dulu dan tidak ada
-  kode tanggal yang tembus di belakang nama agen.
+- Kalender: wadah dibatasi tinggi lewat **pengukuran adaptif**
+  (`maxHeight = tinggi layar − posisi atas wadah − 16px`, dengan lantai 5rem;
+  dibungkus `overflow-auto`), plus header tanggal `sticky top-0` dan kolom nama
+  opak + sticky kiri. Kelas `max-h-[calc(100dvh-34rem/28rem/24rem)]` tinggal
+  cadangan sebelum JS jalan. Hasilnya scrollbar horizontal terjangkau tanpa
+  menggulir halaman dulu dan kode tanggal tidak tembus di belakang nama agen.
+  Batas yang diakui: kalau jendela tidak cukup memuat kontrol di atas matriks +
+  lantai (mis. 390×400), yang dijamin hanya matriks tidak mengerut jadi nol.
 
 ### Koreksi urutan (2026-09-30)
 
@@ -295,11 +299,13 @@ tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → 
 
 - `SLOTS_PER_DAY = 96` adalah satu sumber kebenaran untuk batas slot aktivitas;
   dipakai `breakStartMinutes()` maupun `longBreakIntervals()`.
-- Batas tinggi wadah kalender responsif: `34rem` (dasar), `28rem` (≥768px),
-  `24rem` (≥1024px), dengan lantai `min-h-[5rem]`. Lantai sengaja kecil: kalau
-  lebih besar dari `max-h`, lantai menang dan scrollbar horizontal kembali
-  melorot ke bawah layar di jendela pendek. **1rem = 14px di app ini** (root
-  font-size bukan 16px) — jangan hitung dengan asumsi 16px.
+- Tinggi wadah kalender dihitung dari ruang yang benar-benar tersisa
+  (`MonthMatrix.tsx`), bukan cadangan tetap, karena kontrol di atas matriks bisa
+  tumbuh saat teks diperbesar/membungkus. Kelas `max-h` 34/28/24rem hanya
+  cadangan sebelum JS jalan. Lantai `5rem` (`FLOOR_REM`) sengaja kecil: kalau
+  lebih besar dari ruang tersisa, lantai menang dan scrollbar melorot lagi.
+  **1rem = 14px di app ini** (root font-size bukan 16px) — jangan hitung dengan
+  asumsi 16px.
 - Batas yang disadari dan diuji: syarat "tepi bawah wadah di dalam layar" hanya
   bisa dipenuhi kalau jendela memuat kontrol di atas matriks + lantai 5rem.
   Kalau tidak (mis. 1280×300, 390×400), yang dijamin adalah matriks tidak

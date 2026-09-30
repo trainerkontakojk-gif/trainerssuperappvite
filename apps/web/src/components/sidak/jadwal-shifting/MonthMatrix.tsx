@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JadwalShiftingMonthRow } from "@trainers/types";
 import { cn } from "cn";
 import {
@@ -67,8 +67,93 @@ const SUMMARY_FIELD_ALIAS: Record<
   work: "kerja",
 };
 
+/**
+ * Lantai tinggi wadah dalam rem. Fungsinya HANYA mencegah matriks mengerut jadi
+ * nol — kalau lantai lebih besar daripada ruang yang tersisa, lantai menang dan
+ * tepi bawah wadah keluar layar. E2E memakai angka yang sama sebagai kontrak
+ * (`FLOOR_REM`), jadi mengubahnya di sini akan menggagalkan test.
+ */
+export const FLOOR_REM = 5;
+
+/** Sisa ruang di bawah wadah supaya tepi bawahnya tidak menempel di tepi layar. */
+const VIEWPORT_MARGIN_PX = 16;
+
 export function MonthMatrix({ month, rows }: Props) {
   const dates = useMemo(() => monthDates(month), [month]);
+  const regionRef = useRef<HTMLElement | null>(null);
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+
+  /*
+   * Tinggi wadah dihitung dari ruang yang BENAR-BENAR tersisa, bukan dari
+   * cadangan tetap. Cadangan tetap (dalam rem) ikut membesar saat teks
+   * diperbesar, sementara kontrol di atas matriks bisa membungkus dan tumbuh
+   * lebih cepat — sehingga tepi bawah wadah bisa kembali keluar layar.
+   *
+   * Posisinya dibaca dari koordinat DOKUMEN (bukan viewport) supaya tingginya
+   * tidak berubah-ubah saat halaman digulir. Pengukuran diulang saat viewport
+   * berubah dan setelah font selesai dimuat.
+   */
+  useEffect(() => {
+    const region = regionRef.current;
+    if (!region) return;
+    const applyHeight = () => {
+      const rootFontSize =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        ) || 16;
+      const floor = FLOOR_REM * rootFontSize;
+      const top = region.getBoundingClientRect().top + window.scrollY;
+      const available = window.innerHeight - top - VIEWPORT_MARGIN_PX;
+      setMaxHeight(Math.max(Math.round(floor), Math.round(available)));
+    };
+    /*
+     * Semua pemicu dijadwalkan ke frame berikutnya: saat style berubah,
+     * observer bisa terpanggil SEBELUM layout baru dihitung, dan mengukur di
+     * saat itu menghasilkan tinggi yang basi (pernah kejadian: tepi bawah
+     * meleset ~17px saat teks diperbesar).
+     */
+    let frame = 0;
+    const measure = () => {
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        applyHeight();
+      });
+    };
+    applyHeight();
+
+    /*
+     * Ruang di atas matriks bisa berubah tanpa jendela berubah ukuran: teks
+     * diperbesar, label membungkus, atau font baru selesai dimuat. Karena itu
+     * yang dipantau bukan cuma viewport, tetapi juga elemen-elemen yang duduk di
+     * atas matriks — kalau tingginya berubah, tinggi wadah ikut dihitung ulang.
+     */
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.documentElement);
+    observer.observe(document.body);
+    const parent = region.parentElement;
+    if (parent) {
+      observer.observe(parent);
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling !== region) observer.observe(sibling);
+      }
+    }
+
+    // Perubahan CSS (mis. ukuran teks dasar) tidak selalu mengubah kotak elemen
+    // yang dipantau, jadi perubahan pada <head> juga jadi pemicu.
+    const headObserver = new MutationObserver(measure);
+    headObserver.observe(document.head, { childList: true, subtree: true });
+
+    window.addEventListener("resize", measure);
+    void document.fonts.ready.then(measure).catch(() => undefined);
+
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      observer.disconnect();
+      headObserver.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   // Satu agen = satu baris. Diberi nomor urut sesuai abjad nama supaya baris
   // tidak "berganti tempat" ketika tanggal bergeser.
@@ -115,25 +200,26 @@ export function MonthMatrix({ month, rows }: Props) {
   return (
     <section
       data-testid="jadwal-shifting-calendar"
+      ref={regionRef}
       role="region"
       aria-label="Matriks jadwal per agen"
       tabIndex={0}
+      style={maxHeight === null ? undefined : { maxHeight: `${maxHeight}px` }}
       /*
        * Tinggi dibatasi supaya scrollbar horizontal berada DI DALAM layar.
        * Sebelumnya wadahnya setinggi seluruh isi, jadi scrollbar horizontal
        * baru ketemu setelah menggulir halaman ke bawah — di matriks 30 agen itu
        * ~900px.
        *
-       * Cadangan ruangnya dibuat responsif karena kontrol di atas matriks
-       * menumpuk di layar sempit. Terukur di aplikasi ini (1rem = 14px, root
-       * font-size bukan 16px): ruang-atas 300px di ≥1024px, 368px di 768px,
-       * dan 454px di ≤480px — jadi cadangan 24rem/28rem/34rem menyisakan
-       * margin ~20px di semua ukuran layar itu.
+       * Nilai utamanya datang dari `maxHeight` hasil pengukuran (lihat effect di
+       * atas), jadi kontrol di atas matriks boleh setinggi apa pun tanpa membuat
+       * scrollbar melorot lagi. Kelas `max-h` di bawah hanya cadangan sebelum JS
+       * jalan, jadi angkanya sengaja longgar.
        *
-       * `min-h` sengaja kecil (5rem): fungsinya HANYA mencegah matriks mengerut
-       * jadi nol, bukan menjamin tinggi nyaman. Lantai yang lebih besar justru
-       * mengalahkan `max-h` dan mendorong scrollbar horizontal kembali ke bawah
-       * layar pada jendela pendek — persis masalah yang mau dihilangkan.
+       * `min-h-[5rem]` (= `FLOOR_REM`) sengaja kecil: fungsinya HANYA mencegah
+       * matriks mengerut jadi nol. Lantai yang lebih besar justru mengalahkan
+       * batas atas dan mendorong scrollbar kembali ke bawah layar pada jendela
+       * pendek — persis masalah yang mau dihilangkan.
        * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat.
        */
       className="min-w-0 max-h-[calc(100dvh-34rem)] min-h-[5rem] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
