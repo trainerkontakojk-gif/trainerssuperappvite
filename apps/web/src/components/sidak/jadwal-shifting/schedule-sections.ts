@@ -197,6 +197,24 @@ const sectionRank = new Map<string, number>(
   SCHEDULE_SECTIONS.map((section, index) => [section.toLowerCase(), index]),
 );
 
+/**
+ * `channel` datang apa adanya dari WFM, jadi huruf besar/kecilnya tidak bisa
+ * dipercaya. Label kanonik dipakai untuk bagian yang dikenal supaya `call` dan
+ * `Call` menjadi SATU grup — aturan yang sama dengan filter bagian layanan di
+ * UI, yang memang mencocokkan tanpa peduli kapitalisasi.
+ *
+ * Bagian di luar daftar yang disepakati dikembalikan apa adanya (sudah
+ * di-trim): memaksakan label yang tidak kita kenal justru menamai ulang data.
+ */
+const canonicalSection = new Map<string, string>(
+  SCHEDULE_SECTIONS.map((section) => [section.toLowerCase(), section] as const),
+);
+
+function canonicalizeSection(channel: string): string {
+  const trimmed = channel.trim();
+  return canonicalSection.get(trimmed.toLowerCase()) ?? trimmed;
+}
+
 function compareSections(a: string, b: string): number {
   if (a === b) return 0;
   const rankA = sectionRank.get(a.toLowerCase());
@@ -225,7 +243,7 @@ export function groupBySectionThenTeamLeader<
 >(rows: T[]): ScheduleSectionGroup<T>[] {
   const bySection = new Map<string, T[]>();
   for (const row of rows) {
-    const section = row.channel.trim();
+    const section = canonicalizeSection(row.channel);
     const bucket = bySection.get(section);
     if (bucket) bucket.push(row);
     else bySection.set(section, [row]);

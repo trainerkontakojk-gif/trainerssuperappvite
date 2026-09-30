@@ -39,3 +39,15 @@ Permintaan Fajar: daftar pada format **Hari ini** dirapikan ("contoh dari tim le
 - Bukti visual diambil dari Vite lokal dengan fixture sintetis dan network guard fail-closed; tidak ada host WFM/Supabase live yang diakses.
 
 Rilis tetap pada batas yang sama: produksi **NO-GO** sampai gate environment target di atas diverifikasi.
+
+## Update 2 — 2026-09-30 — gate thermo-nuclear (Pi) dan perbaikannya
+
+Gate `thermo-nuclear` dijalankan read-only lewat Pi (`pi -p --tools read,bash --thinking max`) atas commit `010e361`. Verdict awal: **NEEDS_FIX**, tiga temuan P2.
+
+1. **E2E belum membuktikan urutan.** Fixture grup hanya memuat satu agen per pasangan (layanan, TL), sehingga pengurutan nama di dalam grup dan pengurutan beberapa TL dalam satu layanan bisa rusak tanpa membuat test gagal. **Diperbaiki**: test baru dengan satu layanan berisi dua TL × dua agen dalam urutan input teracak, memeriksa grup, urutan datar daftar, dan tabel detail.
+2. **Kapitalisasi `channel` membuat grup kembar.** `call` dan `Call` menjadi dua header untuk layanan yang sama, sementara filter bagian layanan sudah mencocokkan tanpa peduli kapitalisasi. **Diperbaiki**: nama bagian yang dikenal dikanonikalisasi ke label `SCHEDULE_SECTIONS` sebelum grouping; bagian tak dikenal tetap apa adanya.
+3. **Baris ganda per agen dihitung sebagai beberapa "orang".** Keputusan Fajar: **status quo** — semua baris tetap tampil dan ikut terhitung, tidak dideduplikasi diam-diam, karena duplikat adalah cacat data sumber dan aturan konflik antar-baris belum ditetapkan. Keputusan ini ditulis eksplisit di `ScheduleGroups.tsx` dan `docs/modules.md` supaya tidak diangkat ulang sebagai temuan baru.
+
+Bukti bahwa test urutan benar-benar punya daya tangkap (mutation check): komparator nama, komparator TL, dan peringkat bagian layanan masing-masing dibalik satu per satu — ketiganya membuat test gagal, lalu dikembalikan.
+
+Verifikasi setelah perbaikan: **38 passed** (RED dulu untuk kasus kapitalisasi: 1 gagal / 37 lulus), `tsc --noEmit` web, ESLint, Prettier, `pnpm build` (3/3 task), dan `git diff --check` lulus. Gate Pi dijalankan ulang setelah commit perbaikan.

@@ -201,3 +201,24 @@ Verifikasi: E2E RED dulu tiap tahap (tahap TL: 2 gagal / 31 lulus; tahap tabel:
 `pnpm build` 3/3 task sukses, `git diff --check` bersih.
 Bukti visual diambil dengan fixture sintetis lokal (9 baris, 3 layanan berisi,
 3 TL + 1 tanpa TL).
+
+## Gate thermo-nuclear (Pi) — 2026-09-30
+
+Gate dijalankan read-only lewat Pi atas commit `010e361`
+(`pi -p --tools read,bash --thinking max`). Verdict awal **NEEDS_FIX**, tiga
+temuan P2, semuanya soal ketahanan — tidak ada temuan security atau kontrak.
+
+| Temuan                                                             | Tindakan                                                                                                            |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| E2E tidak membuktikan urutan (satu agen per pasangan layanan×TL)   | Diperbaiki: test baru 1 layanan × 2 TL × 2 agen, input teracak, memeriksa grup + urutan datar daftar + tabel detail |
+| Kapitalisasi `channel` menghasilkan grup kembar (`call` vs `Call`) | Diperbaiki: kanonikalisasi ke label `SCHEDULE_SECTIONS` sebelum grouping; bagian tak dikenal tetap apa adanya       |
+| Baris ganda per agen dihitung sebagai beberapa "orang"             | Status quo (keputusan Fajar): semua baris tampil dan terhitung, tanpa deduplikasi diam-diam; dicatat di kode + docs |
+
+Supaya temuan pertama tidak kembali, test urutan dibuktikan dengan mutation
+check: komparator nama, komparator TL, dan peringkat bagian layanan dibalik
+satu per satu — ketiganya membuat test gagal, lalu dikembalikan.
+
+Verifikasi akhir: **38 / 38 lulus** (kasus kapitalisasi RED dulu: 1 gagal /
+37 lulus), `tsc --noEmit` web bersih, ESLint bersih, Prettier dijalankan,
+`pnpm build` 3/3 task sukses, `git diff --check` bersih. Gate Pi dijalankan
+ulang setelah commit perbaikan.

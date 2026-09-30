@@ -983,6 +983,126 @@ test.describe("Format hari ini", () => {
     expectIsolation(audit);
   });
 
+  test("urutan layanan → TL → nama tetap benar walau urutan baris sumber acak", async ({
+    page,
+  }) => {
+    // Fixture ini SENGAJA lebih keras daripada fixture grup lain: satu bagian
+    // layanan punya DUA TL, dan tiap TL punya DUA agen, semuanya dikirim dalam
+    // urutan yang sudah diacak. Tanpa itu, "urut A–Z" cuma diuji pada grup yang
+    // isinya satu orang — urutan yang salah tidak akan pernah terdeteksi.
+    const rows = [
+      { nama: "Wulan Sari", tl: "Zainal Abidin", channel: "Call" },
+      { nama: "Arif Budiman", tl: "Rina Salim", channel: "Call" },
+      { nama: "Yusuf Maulana", tl: "Zainal Abidin", channel: "Call" },
+      { nama: "Bagas Prakoso", tl: "Rina Salim", channel: "Call" },
+      { nama: "Citra Wulandari", tl: "Doni Kurnia", channel: "Email" },
+      { nama: "Ahmad Fauzi", tl: "Doni Kurnia", channel: "Email" },
+    ].map((row) => ({
+      ...row,
+      shift: "H",
+      shiftPrev: "",
+      date: FIXTURE_DATE,
+      activities: [],
+    }));
+
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows },
+    });
+    await expectPageShell(page);
+
+    // Layanan tetap berurutan menurut daftar yang disepakati, bukan input.
+    const sections = page.getByTestId("jadwal-shifting-masuk-section");
+    await expect(sections).toHaveCount(2);
+    await expect(sections.nth(0)).toHaveAttribute("data-section", "Call");
+    await expect(sections.nth(1)).toHaveAttribute("data-section", "Email");
+
+    // Di dalam Call: TL urut A–Z (Rina Salim sebelum Zainal Abidin)...
+    const callGroups = sections
+      .nth(0)
+      .getByTestId("jadwal-shifting-masuk-group");
+    await expect(callGroups).toHaveCount(2);
+    await expect(callGroups.nth(0)).toHaveAttribute("data-tl", "Rina Salim");
+    await expect(callGroups.nth(1)).toHaveAttribute("data-tl", "Zainal Abidin");
+
+    // ...dan di dalam tiap TL namanya juga urut A–Z.
+    await expect(
+      callGroups.nth(0).getByTestId("jadwal-shifting-masuk-item"),
+    ).toHaveText([/Arif Budiman/, /Bagas Prakoso/]);
+    await expect(
+      callGroups.nth(1).getByTestId("jadwal-shifting-masuk-item"),
+    ).toHaveText([/Wulan Sari/, /Yusuf Maulana/]);
+
+    // Urutan datar untuk seluruh daftar.
+    const items = page.getByTestId("jadwal-shifting-masuk-item");
+    await expect(items).toHaveCount(6);
+    const expected = [
+      "Arif Budiman",
+      "Bagas Prakoso",
+      "Wulan Sari",
+      "Yusuf Maulana",
+      "Ahmad Fauzi",
+      "Citra Wulandari",
+    ];
+    for (const [index, nama] of expected.entries()) {
+      await expect(items.nth(index)).toContainText(nama);
+    }
+
+    // Tabel detail memakai urutan yang persis sama.
+    const detailRows = page.getByTestId("jadwal-shifting-row");
+    await expect(detailRows).toHaveCount(6);
+    for (const [index, nama] of expected.entries()) {
+      await expect(detailRows.nth(index)).toContainText(nama);
+    }
+
+    expectIsolation(audit);
+  });
+
+  test("channel dengan kapitalisasi berbeda digabung jadi satu bagian layanan", async ({
+    page,
+  }) => {
+    // `channel` datang apa adanya dari WFM, dan filter bagian layanan sudah
+    // mencocokkan tanpa peduli huruf besar/kecil. Pengelompokan harus memakai
+    // aturan yang sama: kalau tidak, "call" dan "Call" jadi DUA header untuk
+    // layanan yang sama.
+    const rows = [
+      { nama: "Ahmad Fauzi", tl: "Rina Salim", channel: "call" },
+      { nama: "Bagas Prakoso", tl: "Rina Salim", channel: "Call" },
+      { nama: "Citra Wulandari", tl: "Doni Kurnia", channel: "Social Media" },
+    ].map((row) => ({
+      ...row,
+      shift: "H",
+      shiftPrev: "",
+      date: FIXTURE_DATE,
+      activities: [],
+    }));
+
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows },
+    });
+    await expectPageShell(page);
+
+    const sections = page.getByTestId("jadwal-shifting-masuk-section");
+    await expect(sections).toHaveCount(2);
+    await expect(sections.nth(0)).toHaveAttribute("data-section", "Call");
+    await expect(sections.nth(0)).toContainText("2 orang");
+    // Bagian yang tidak ada di daftar yang disepakati tetap tampil, tapi tidak
+    // menyelip di depan bagian yang bernama.
+    await expect(sections.nth(1)).toHaveAttribute(
+      "data-section",
+      "Social Media",
+    );
+
+    const items = page.getByTestId("jadwal-shifting-masuk-item");
+    await expect(items).toHaveCount(3);
+    await expect(items.nth(0)).toContainText("Ahmad Fauzi");
+    await expect(items.nth(1)).toContainText("Bagas Prakoso");
+    await expect(items.nth(2)).toContainText("Citra Wulandari");
+
+    expectIsolation(audit);
+  });
+
   test("header layanan tetap tampil ketika satu bagian layanan dipilih", async ({
     page,
   }) => {

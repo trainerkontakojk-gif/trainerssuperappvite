@@ -30,6 +30,12 @@ import {
  * bagian layanan, dan di dalamnya per tim — urutan baris dari sumber WFM tidak
  * menjamin keduanya berkumpul. Karena layanan dan TL sudah jadi sub-judul,
  * keduanya tidak diulang di tiap baris.
+ *
+ * Angka "N orang" dihitung dari JUMLAH BARIS, bukan dari nama unik. WFM
+ * seharusnya mengirim satu baris per (agen, tanggal); kalau sumber mengirim
+ * baris ganda, keduanya tetap ditampilkan dan ikut terhitung. Itu keputusan
+ * sadar: menduplikasi-diam-diam akan menyembunyikan cacat data sumber, dan
+ * aturan konflik antar-baris (shift mana yang menang) tidak ditetapkan di sini.
  */
 type Props = {
   rows: JadwalShiftingRow[];
