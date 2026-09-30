@@ -29,6 +29,8 @@ import {
   monthLabel,
   normalizeChannelSlug,
   normalizeSectionSlug,
+  breakStartMinutes,
+  LONG_BREAK_CODE,
   orderScheduleRows,
   sectionFromSlug,
   shiftMonth,
@@ -167,7 +169,7 @@ function longBreakIntervals(
       activities
         .filter(
           (activity) =>
-            activity.value.trim().toUpperCase() === "LB" &&
+            activity.value.trim().toUpperCase() === LONG_BREAK_CODE &&
             Number.isSafeInteger(activity.slot) &&
             activity.slot >= 0 &&
             activity.slot < 96,
@@ -374,13 +376,18 @@ export default function SidakJadwalShiftingPage() {
 
   const data = dayState.kind === "ready" ? dayState.data : null;
   // Filter bagian tetap berjalan di klien, lalu baris tabel diurutkan menurut
-  // prioritas shift → layanan → TL → nama tanpa bergantung urutan sumber.
+  // prioritas layanan → shift → jam istirahat → TL → nama tanpa bergantung
+  // urutan sumber. Jadi seluruh baris satu layanan tampil berurutan dulu (di
+  // dalamnya per shift), baru layanan berikutnya. Jam istirahat dibaca dari
+  // slot `LB` pada grid aktivitas WFM, jadi yang break lebih dulu tampil lebih
+  // dulu di dalam layanan dan shift yang sama.
   const detailRows = useMemo(
     () =>
       orderScheduleRows(
         (data?.rows ?? []).filter((row) =>
           matchesSection(row.channel, channelSlug),
         ),
+        (row) => breakStartMinutes(row.activities),
       ),
     [data, channelSlug],
   );

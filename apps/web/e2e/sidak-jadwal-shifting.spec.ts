@@ -941,12 +941,14 @@ test.describe("Format hari ini", () => {
     expectIsolation(audit);
   });
 
-  test("urutan tabel mengikuti shift, layanan, TL, lalu nama dari baris acak", async ({
+  test("urutan tabel mengikuti layanan, shift, TL, lalu nama dari baris acak", async ({
     page,
   }) => {
     // Input sengaja berlawanan dengan urutan yang diharapkan: bagian tak dikenal
     // muncul lebih awal, Email mendahului Call, dan semua tingkat memiliki ties
     // yang cukup agar pengurutan yang dihilangkan atau dibalik terdeteksi.
+    // Layanan adalah kunci paling luar: SEMUA baris Call tampil berurutan
+    // (S1 → H → S2 → S3 → S4 → Off), baru Digital Chat, Email, dan Leader.
     const rows = [
       {
         nama: "Zeta Service H",
@@ -1036,28 +1038,33 @@ test.describe("Format hari ini", () => {
       ),
     );
     expect(actualOrder).toEqual([
-      "Shift S1",
+      // Call: shift lebih dulu di dalam layanan, baru bucket Off dan kode asing.
       "Call Arif H",
       "Call Zulu H",
       "Call Zainal H",
       "Call No TL H",
-      "Digital H",
-      "Email H",
-      "Leader H",
-      "Alpha Service H",
-      "Zeta Service H",
-      "Blank Section H",
-      "Shift S2",
-      "Shift S3",
       "Shift S4",
       "Call Leave",
       "Off Call",
       "Off no TL",
-      "Digital LBR",
-      "Email CUTI",
-      "Leader blank shift",
-      "Time Label",
       "TBCCI Label",
+      // Digital Chat
+      "Digital H",
+      "Digital LBR",
+      // Email
+      "Shift S1",
+      "Email H",
+      "Shift S3",
+      "Email CUTI",
+      "Time Label",
+      // Leader: H sebelum S2, dan shift kosong masuk bucket Off di belakang.
+      "Leader H",
+      "Shift S2",
+      "Leader blank shift",
+      // Bagian di luar daftar tetap tampil, di belakang dan A–Z.
+      "Alpha Service H",
+      "Zeta Service H",
+      "Blank Section H",
     ]);
 
     expectIsolation(audit);
@@ -1134,6 +1141,46 @@ test.describe("Format hari ini", () => {
     expectIsolation(audit);
   });
 
+  /**
+   * Urutan lengkapnya: layanan → shift → JAM ISTIRAHAT → TL → nama. Fixture ini
+   * sengaja membuat istirahat dan TL saling bertentangan (istirahat paling pagi
+   * punya TL yang paling akhir menurut abjad), supaya terbukti istirahat benar
+   * diurutkan sebelum TL, bukan sekadar kebetulan sama.
+   */
+  test("di dalam satu layanan: shift, lalu istirahat — yang break duluan lebih dulu", async ({
+    page,
+  }) => {
+    const breakSlot = (slot: number) => ({ slot, label: "", value: "LB" });
+    const rows = [
+      { nama: "Break Siang", tl: "Rina Salim", activities: [breakSlot(48)] },
+      { nama: "Tanpa Break", tl: "Rina Salim", activities: [] },
+      { nama: "Break Pagi", tl: "Rina Salim", activities: [breakSlot(40)] },
+      { nama: "Break Sore", tl: "Zainal Abidin", activities: [breakSlot(36)] },
+    ].map((row) => ({
+      ...row,
+      channel: "Call",
+      shift: "S2",
+      shiftPrev: "",
+      date: FIXTURE_DATE,
+    }));
+
+    await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows },
+    });
+    await expectPageShell(page);
+
+    const tableRows = page.getByTestId("jadwal-shifting-row");
+    await expect(tableRows).toHaveCount(4);
+    const order = await tableRows.evaluateAll((rows) =>
+      rows.map((row) => row.querySelector("td")?.textContent?.trim() ?? ""),
+    );
+    expect(
+      order,
+      "istirahat 09:00 → 10:00 → 12:00 → tanpa istirahat, dan urutan istirahat lebih dulu daripada TL",
+    ).toEqual(["Break Sore", "Break Pagi", "Break Siang", "Tanpa Break"]);
+  });
+
   test("bisa berpindah dari format hari ini ke kalender dan kembali", async ({
     page,
   }) => {
@@ -1168,6 +1215,21 @@ test.describe("Format hari ini", () => {
     expectIsolation(audit);
   });
 });
+
+/**
+ * Fixture kalender yang benar-benar meluber: 30 agen × 30 hari, sehingga tabel
+ * lebih lebar dan lebih tinggi dari layar. Dipakai untuk membuktikan perilaku
+ * gulir (horizontal maupun vertikal), bukan untuk menguji isi sel.
+ */
+const BIG_MATRIX_ROWS = Array.from({ length: 30 }, (_, agentIndex) =>
+  Array.from({ length: 30 }, (_, dayIndex) => ({
+    nama: `Agen Uji ${String(agentIndex + 1).padStart(2, "0")}`,
+    tl: `TL Uji ${String((agentIndex % 4) + 1)}`,
+    channel: "Call",
+    shift: dayIndex % 7 === 0 ? "OFF" : "S2",
+    date: `${FIXTURE_MONTH}-${String(dayIndex + 1).padStart(2, "0")}`,
+  })),
+).flat();
 
 test.describe("Format kalender (matriks agen × hari)", () => {
   test("barisnya agent dan kolomnya tanggal bulan terpilih, sel berisi kode shift", async ({
@@ -1409,6 +1471,138 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       "kalender harus selalu GET",
     ).toBe(true);
     expectIsolation(audit);
+  });
+
+  test("kolom nama yang sticky berlatar opak, sehingga tanggal tidak tembus", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+
+    const grid = page.getByTestId("jadwal-shifting-calendar");
+    await expect(grid).toBeVisible();
+
+    // Geser sedikit supaya label tanggal berada tepat di belakang kolom nama.
+    await grid.evaluate((el) => {
+      el.scrollLeft = 120;
+    });
+
+    const alpha = await page.evaluate(() => {
+      const cell = document.querySelector(
+        '[data-testid="jadwal-shifting-calendar"] thead th',
+      );
+      if (!cell) return null;
+      const background = getComputedStyle(cell).backgroundColor;
+      const slash = background.match(/\/\s*([0-9.]+)\s*\)/);
+      const rgba = background.match(/rgba\([^)]*,\s*([0-9.]+)\s*\)/);
+      const raw = slash?.[1] ?? rgba?.[1];
+      return raw === undefined ? 1 : Number(raw);
+    });
+
+    expect(
+      alpha,
+      "latar sel nama yang sticky harus opak; latar tembus membuat tanggal terbaca di belakang nama",
+    ).toBe(1);
+  });
+
+  test("wadah gulir dibatasi tinggi sehingga scroll horizontal terjangkau tanpa menggulir halaman", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+
+    const grid = page.getByTestId("jadwal-shifting-calendar");
+    await expect(grid).toBeVisible();
+
+    const metrics = await grid.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return {
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        top: rect.top,
+        bottom: rect.bottom,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+      };
+    });
+    const viewportHeight = page.viewportSize()?.height ?? 0;
+
+    expect(
+      metrics.scrollWidth,
+      "fixture harus benar-benar meluber horizontal",
+    ).toBeGreaterThan(metrics.clientWidth);
+    expect(metrics.overflowX, "wadah yang menggulir bukan `visible`").not.toBe(
+      "visible",
+    );
+    expect(
+      metrics.scrollHeight,
+      "isi lebih tinggi dari wadah supaya bisa digulir vertikal",
+    ).toBeGreaterThan(metrics.clientHeight);
+    expect(
+      metrics.bottom,
+      "tepi bawah wadah (tempat scrollbar horizontal) harus berada di dalam layar tanpa menggulir halaman",
+    ).toBeLessThanOrEqual(viewportHeight);
+
+    await grid.evaluate((el) => {
+      el.scrollTop = 300;
+    });
+    const positions = await page.evaluate(() => {
+      const cell = document.querySelector(
+        '[data-testid="jadwal-shifting-calendar"] thead th',
+      );
+      const region = document.querySelector(
+        '[data-testid="jadwal-shifting-calendar"]',
+      );
+      return {
+        headerTop: cell ? cell.getBoundingClientRect().top : null,
+        regionTop: region ? region.getBoundingClientRect().top : null,
+      };
+    });
+
+    expect(
+      positions.headerTop,
+      "header kalender tidak ditemukan",
+    ).not.toBeNull();
+    expect(
+      Math.abs(
+        (positions.headerTop as number) - (positions.regionTop as number),
+      ),
+      "header kolom harus tetap menempel di atas wadah saat isinya digulir",
+    ).toBeLessThanOrEqual(2);
+  });
+
+  test("di layar pendek tepi bawah wadah tetap di dalam layar", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+
+    const grid = page.getByTestId("jadwal-shifting-calendar");
+    await expect(grid).toBeVisible();
+
+    const bottom = await grid.evaluate((el) =>
+      Math.round(el.getBoundingClientRect().bottom),
+    );
+    const viewportHeight = page.viewportSize()?.height ?? 0;
+    expect(
+      bottom,
+      "scrollbar horizontal harus tetap terjangkau di layar pendek",
+    ).toBeLessThanOrEqual(viewportHeight);
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

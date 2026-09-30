@@ -270,3 +270,19 @@ memiliki pemakai; pertahankan utilitas filter serta kalender yang masih dipakai.
 - [x] Implementasi comparator harian dan hapus daftar/grouping mati.
 - [x] Mutation-check shift, layanan, TL, dan nama satu per satu melalui E2E.
 - [x] Perbarui docs/modul/log dan jalankan seluruh gate yang diminta pemilik.
+
+## Urutan tabel dan perilaku gulir (2026-09-30, lanjutan)
+
+- Urutan tabel Hari ini: shift → layanan → jam mulai istirahat (slot `LB`
+  pertama) → TL → nama. Baris tanpa istirahat selalu paling belakang.
+- Kalender: wadah dibatasi tinggi (`max-h-[calc(100dvh-24rem)]`, `overflow-auto`)
+  dengan header tanggal `sticky top-0` dan kolom nama opak + sticky kiri, supaya
+  scrollbar horizontal terjangkau tanpa menggulir halaman dulu dan tidak ada
+  kode tanggal yang tembus di belakang nama agen.
+
+### Koreksi urutan (2026-09-30)
+
+Kunci paling luar adalah **layanan**, bukan shift — dikoreksi pemilik setelah
+melihat hasilnya. Urutan: layanan (`Call → Digital Chat → Email → Leader` →
+bagian lain A–Z → kosong terakhir) → shift (`S1 → H → S2 → S3 → S4 → Off → kode
+tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → nama A–Z.

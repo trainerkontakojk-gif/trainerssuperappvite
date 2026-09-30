@@ -85,3 +85,51 @@ Dibuktikan dengan mutation check: elemen panel lama disuntikkan kembali ke route
 - `pnpm build`: exit 0, **3 successful / 3 total**; direktori `dist` dan `tsbuildinfo` yang sudah ada dipulihkan setelah build sesuai batas perubahan artefak.
 - Impeccable dan thermo-nuclear review: **PASS**, tanpa temuan sisa dalam scope. Screenshot mengonfirmasi tabel tunggal; E2E juga mencakup tabel aksesibel dan viewport sempit.
 - `git diff --check`: exit 0; tidak ada whitespace error.
+
+## Update 5 — 2026-09-30 — kalender bisa dipakai, urutan istirahat
+
+Dua keluhan pemakaian nyata dari Fajar.
+
+**1. Kolom nama kalender "samar" dan scrollbar horizontal tidak ketemu.**
+Kolom nama yang sticky memakai latar `bg-muted/60` (60% opak), jadi kode
+tanggal dari kolom sebelah terbaca menembus nama agen saat matriks digulir.
+Selain itu wadah matriks setinggi seluruh isi: pada 30 agen tingginya ~1412px
+sementara layar 800px, sehingga scrollbar horizontal baru ketemu setelah
+menggulir halaman ~900px.
+
+Perbaikan di `MonthMatrix.tsx`: kolom nama header jadi opak (`bg-muted`) dan
+header tanggal ikut menempel (`sticky top-0`); wadahnya dibatasi
+`max-h-[calc(100dvh-24rem)]` dengan `overflow-auto`, sehingga scrollbar
+horizontal selalu berada di dalam layar dan konteks kolom tetap terlihat saat
+isi digulir.
+
+**2. Urutan tabel Hari ini belum memakai jadwal istirahat.**
+Urutan sekarang: shift → bagian layanan → **jam mulai istirahat** → team leader
+→ nama. Jam istirahat dibaca dari slot `LB` pertama, jadi di dalam satu layanan
+yang break lebih dulu tampil lebih dulu; baris yang belum punya istirahat
+diletakkan paling belakang (bukan dianggap break 00:00). Helper
+`breakStartMinutes()` dan `LONG_BREAK_CODE` ditambahkan di `schedule-sections.ts`,
+dan kode `"LB"` yang tadinya literal di route sekarang memakai konstanta itu.
+
+Bukti: E2E `sidak-jadwal-shifting.spec.ts` **36 lulus** (3 test baru: urutan
+istirahat, latar kolom nama opak, wadah gulir dibatasi tinggi ditambah satu
+kasus layar 720px). Mutation check: comparator istirahat dibuang, latar nama
+dibuat tembus, dan batas tinggi dihapus — ketiganya membuat test terkait gagal.
+Dengan data asli WFM 30 Sep 2026 (78 baris), urutan yang terlihat: Call/S1
+istirahat 10:00 → 11:00, lalu Digital Chat/H 11:00 → 12:00 → 13:00.
+
+## Update 6 — 2026-09-30 — layanan jadi kunci urutan paling luar
+
+Koreksi dari pemilik: urutan yang benar adalah **seluruh baris satu layanan
+tampil berurutan lebih dulu**, di dalamnya baru urut per shift, lalu istirahat.
+Sebelumnya shift yang jadi kunci paling luar, sehingga baris Call muncul
+terpisah-pisah (Call/S1, lalu Call lagi di H) dan tabel terlihat tidak
+berurutan per layanan.
+
+Urutan final: **layanan → shift → jam mulai istirahat → TL → nama**.
+Perubahannya hanya menukar dua comparator di `orderScheduleRows()`; urutan shift
+dan aturan istirahat tidak berubah. Test `urutan tabel mengikuti layanan, shift,
+TL, lalu nama dari baris acak` diperbarui ke kontrak baru dan dibuktikan RED
+dulu, lalu GREEN. Mutation check: menukar kembali kedua comparator membuat test
+itu gagal. E2E penuh **36 lulus**, `tsc --noEmit`, ESLint, dan `pnpm build`
+(3/3 task) lulus.

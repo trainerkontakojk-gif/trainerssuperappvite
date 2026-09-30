@@ -118,7 +118,15 @@ export function MonthMatrix({ month, rows }: Props) {
       role="region"
       aria-label="Matriks jadwal per agen"
       tabIndex={0}
-      className="min-w-0 overflow-x-auto rounded-lg border border-border"
+      /*
+       * Tinggi dibatasi (± satu layar dikurangi tinggi header/filter) supaya
+       * scrollbar horizontal berada DI DALAM layar. Sebelumnya wadahnya
+       * setinggi seluruh isi, jadi scrollbar horizontal baru ketemu setelah
+       * menggulir halaman ke bawah — di matriks 30 agen itu ~900px.
+       * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat
+       * saat isinya digulir.
+       */
+      className="min-w-0 max-h-[calc(100dvh-24rem)] overflow-auto rounded-lg border border-border"
     >
       <table className="w-max border-collapse text-sm">
         <caption className="sr-only">
@@ -130,7 +138,7 @@ export function MonthMatrix({ month, rows }: Props) {
           <tr>
             <th
               scope="col"
-              className="sticky left-0 z-20 border-b border-r border-border bg-muted/60 px-3 py-2 text-left align-bottom"
+              className="sticky left-0 top-0 z-30 border-b border-r border-border bg-muted px-3 py-2 text-left align-bottom"
             >
               Agen
             </th>
@@ -139,7 +147,7 @@ export function MonthMatrix({ month, rows }: Props) {
                 key={date}
                 scope="col"
                 data-testid={`jadwal-shifting-matrix-col-${date}`}
-                className="min-w-[2.75rem] border-b border-border bg-muted/60 px-1 py-1.5 text-center align-bottom"
+                className="sticky top-0 z-20 min-w-[2.75rem] border-b border-border bg-muted px-1 py-1.5 text-center align-bottom"
               >
                 <span className="block text-[10px] font-medium uppercase text-muted-foreground">
                   {weekdayShort(date)}
@@ -152,7 +160,7 @@ export function MonthMatrix({ month, rows }: Props) {
             <th
               scope="col"
               data-testid="jadwal-shifting-summary-head"
-              className="w-[10.5rem] border-b border-l border-border bg-muted/60 px-2 py-1.5 text-center align-bottom"
+              className="sticky top-0 z-20 w-[10.5rem] border-b border-l border-border bg-muted px-2 py-1.5 text-center align-bottom"
             >
               <span className="grid grid-cols-[2.25rem_2.25rem_3rem_1fr] items-center">
                 {SUMMARY_FIELDS.map((field) => (

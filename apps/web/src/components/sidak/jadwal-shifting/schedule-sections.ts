@@ -129,18 +129,66 @@ function compareTeamLeaders(a: string, b: string): number {
 }
 
 /**
+ * Kode aktivitas istirahat panjang di grid WFM. Satu slot = 15 menit, jadi
+ * menit sejak 00:00 = `slot × 15`.
+ */
+export const LONG_BREAK_CODE = "LB";
+
+/**
+ * Menit sejak 00:00 saat istirahat panjang pertama dimulai, atau `null` kalau
+ * baris itu tidak punya istirahat yang terbaca.
+ *
+ * Dipakai sebagai kunci urutan: "siapa break duluan". Baris yang belum punya
+ * istirahat TIDAK ditebak dari shift-nya — `null` sengaja dibedakan dari 00:00
+ * supaya baris tanpa data selalu jatuh ke belakang, bukan tampil paling awal.
+ */
+export function breakStartMinutes(
+  activities: ReadonlyArray<{ slot: number; value: string }>,
+): number | null {
+  let earliest: number | null = null;
+  for (const activity of activities) {
+    if (activity.value.trim().toUpperCase() !== LONG_BREAK_CODE) continue;
+    if (!Number.isSafeInteger(activity.slot) || activity.slot < 0) continue;
+    if (earliest === null || activity.slot < earliest) earliest = activity.slot;
+  }
+  return earliest === null ? null : earliest * 15;
+}
+
+/** Istirahat tanpa data selalu paling belakang, bukan dianggap break 00:00. */
+function compareBreakStarts(a: number | null, b: number | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a - b;
+}
+
+/**
  * Urutkan setiap baris sendiri, bukan melalui grouping, agar tabel tidak
- * bergantung pada urutan sumber WFM. Bagian yang dikenal memakai peringkat
- * `SCHEDULE_SECTIONS` tanpa membedakan kapitalisasi; nilai sumber tetap dirender
- * apa adanya dan bagian lain tetap tampil di belakang.
+ * bergantung pada urutan sumber WFM. Bagian layanan adalah kunci PALING LUAR:
+ * seluruh baris satu layanan tampil berurutan lebih dulu, baru layanan
+ * berikutnya. Bagian yang dikenal memakai peringkat `SCHEDULE_SECTIONS` tanpa
+ * membedakan kapitalisasi; nilai sumber tetap dirender apa adanya dan bagian
+ * lain tetap tampil di belakang.
+ *
+ * `breakStartOf` (opsional) menyisipkan jam istirahat setelah shift: di dalam
+ * satu layanan dan shift yang sama, orang yang break lebih dulu tampil lebih
+ * dulu, baru diurutkan per TL dan nama. Kalender bulanan tidak mengirim
+ * `breakStartOf` karena barisnya memang tidak membawa aktivitas.
  */
 export function orderScheduleRows<
   T extends { shift: string; channel: string; tl: string; nama: string },
->(rows: T[]): T[] {
+>(rows: T[], breakStartOf?: (row: T) => number | null): T[] {
+  const breakStart = breakStartOf
+    ? new Map(rows.map((row) => [row, breakStartOf(row)]))
+    : null;
   return [...rows].sort(
     (a, b) =>
-      compareShift(a.shift, b.shift) ||
       compareSections(a.channel, b.channel) ||
+      compareShift(a.shift, b.shift) ||
+      compareBreakStarts(
+        breakStart?.get(a) ?? null,
+        breakStart?.get(b) ?? null,
+      ) ||
       compareTeamLeaders(a.tl, b.tl) ||
       nameCollator.compare(a.nama, b.nama),
   );
