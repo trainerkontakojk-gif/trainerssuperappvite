@@ -415,46 +415,61 @@ export default function SidakJadwalShiftingPage() {
     () => [...new Set(visibleMonthRows.map((row) => row.nama))],
     [visibleMonthRows],
   );
+  const pageHeader = (
+    <header className="flex min-w-0 flex-col gap-3">
+      <div className="min-w-0">
+        <h1 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+          Jadwal Shifting
+        </h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Dibaca langsung dari WFM Dash Pro. Hanya-baca.
+        </p>
+      </div>
+      <Tabs
+        value={view}
+        onValueChange={(next) =>
+          updateSearch({
+            view: next === "calendar" ? "calendar" : undefined,
+          })
+        }
+        className="w-full"
+      >
+        <TabsList
+          variant="line"
+          aria-label="Format tampilan jadwal"
+          className="w-full justify-start gap-1 sm:w-fit"
+        >
+          <TabsTrigger value="today" className="min-h-11 px-3 sm:px-4">
+            Hari ini
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="min-h-11 px-3 sm:px-4">
+            Kalender
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </header>
+  );
 
   return (
     <div
       data-testid="jadwal-shifting-page"
-      className="min-w-0 overflow-x-hidden pb-16"
+      className={
+        view === "calendar"
+          ? "h-full min-h-0 min-w-0 overflow-hidden"
+          : "min-w-0 overflow-x-hidden pb-16"
+      }
     >
-      <div className="mx-auto flex min-w-0 max-w-[110rem] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5">
-        <header className="flex min-w-0 flex-col gap-3">
-          <div className="min-w-0">
-            <h1 className="font-outfit text-xl font-bold tracking-tight text-foreground">
-              Jadwal Shifting
-            </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Dibaca langsung dari WFM Dash Pro. Hanya-baca.
-            </p>
-          </div>
-          <Tabs
-            value={view}
-            onValueChange={(next) =>
-              updateSearch({
-                view: next === "calendar" ? "calendar" : undefined,
-              })
-            }
-            className="w-full"
-          >
-            <TabsList
-              variant="line"
-              aria-label="Format tampilan jadwal"
-              className="w-full justify-start gap-1 sm:w-fit"
-            >
-              <TabsTrigger value="today" className="min-h-11 px-3 sm:px-4">
-                Hari ini
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="min-h-11 px-3 sm:px-4">
-                Kalender
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </header>
-
+      <div
+        data-testid={
+          view === "calendar" ? "jadwal-shifting-calendar-shell" : undefined
+        }
+        className={
+          view === "calendar"
+            ? "mx-auto flex h-full min-h-0 w-full max-w-[110rem] flex-col gap-[8px] p-[16px]"
+            : "mx-auto flex min-w-0 max-w-[110rem] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-5"
+        }
+      >
+        {view === "today" ? pageHeader : null}
         {view === "today" ? (
           <section
             data-testid="jadwal-shifting-view-today"
@@ -701,141 +716,93 @@ export default function SidakJadwalShiftingPage() {
             )}
           </section>
         ) : (
-          <section
-            data-testid="jadwal-shifting-view-calendar"
-            aria-label="Tampilan kalender"
-            className="flex min-w-0 flex-col gap-3"
-          >
-            <div className="flex min-w-0 flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Bulan jadwal
-                </span>
-                <div className="flex min-w-0 items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    data-testid="jadwal-shifting-month-prev"
-                    aria-label="Bulan sebelumnya"
-                    disabled={!activeMonth || monthState.kind === "loading"}
-                    onClick={() =>
-                      updateSearch({ month: shiftMonth(activeMonth, -1) })
-                    }
-                    className="min-h-11 w-11 px-0"
-                  >
-                    <ChevronLeft aria-hidden="true" className="size-5" />
-                  </Button>
-                  <span
-                    data-testid="jadwal-shifting-month-label"
-                    className="min-w-[9.5rem] text-center text-base font-bold tracking-tight text-foreground"
-                  >
-                    {activeMonth ? monthLabel(activeMonth) : "\u00a0"}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    data-testid="jadwal-shifting-month-next"
-                    aria-label="Bulan berikutnya"
-                    disabled={!activeMonth || monthState.kind === "loading"}
-                    onClick={() =>
-                      updateSearch({ month: shiftMonth(activeMonth, 1) })
-                    }
-                    className="min-h-11 w-11 px-0"
-                  >
-                    <ChevronRight aria-hidden="true" className="size-5" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+          <>
+            <section
+              data-testid="jadwal-shifting-calendar-controls"
+              aria-label="Kontrol kalender jadwal"
+              tabIndex={0}
+              className="flex min-h-0 min-w-0 max-h-[50%] shrink-0 flex-col gap-3 overflow-auto"
+            >
+              {pageHeader}
+              <div className="flex min-w-0 flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="flex min-w-0 flex-col gap-1.5">
-                  <label
-                    htmlFor="jadwal-shifting-agent-search"
-                    className="text-xs font-medium text-muted-foreground"
-                  >
-                    Cari nama
-                  </label>
-                  <div className="relative min-w-0">
-                    <Search
-                      aria-hidden="true"
-                      className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                      id="jadwal-shifting-agent-search"
-                      data-testid="jadwal-shifting-agent-search"
-                      type="search"
-                      placeholder="Nama agen"
-                      value={agentQuery}
-                      onChange={(event) => setAgentQuery(event.target.value)}
-                      className="h-[44px] w-full pl-9 sm:w-[13rem]"
-                    />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Bulan jadwal
+                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      data-testid="jadwal-shifting-month-prev"
+                      aria-label="Bulan sebelumnya"
+                      disabled={!activeMonth || monthState.kind === "loading"}
+                      onClick={() =>
+                        updateSearch({ month: shiftMonth(activeMonth, -1) })
+                      }
+                      className="min-h-11 w-11 px-0"
+                    >
+                      <ChevronLeft aria-hidden="true" className="size-5" />
+                    </Button>
+                    <span
+                      data-testid="jadwal-shifting-month-label"
+                      className="min-w-[9.5rem] text-center text-base font-bold tracking-tight text-foreground"
+                    >
+                      {activeMonth ? monthLabel(activeMonth) : "\u00a0"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      data-testid="jadwal-shifting-month-next"
+                      aria-label="Bulan berikutnya"
+                      disabled={!activeMonth || monthState.kind === "loading"}
+                      onClick={() =>
+                        updateSearch({ month: shiftMonth(activeMonth, 1) })
+                      }
+                      className="min-h-11 w-11 px-0"
+                    >
+                      <ChevronRight aria-hidden="true" className="size-5" />
+                    </Button>
                   </div>
                 </div>
-                <SectionFilter
-                  id="jadwal-shifting-section"
-                  label="Bagian layanan"
-                  value={sectionSlug}
-                  options={calendarSectionOptions()}
-                  onChange={(value) => updateSearch({ section: value })}
-                />
-              </div>
-            </div>
 
-            {monthState.kind === "idle" || monthState.kind === "loading" ? (
-              <div
-                className="flex flex-col gap-3"
-                data-testid="jadwal-shifting-month-state-loading"
-              >
-                <QaStatePanel
-                  type="loading"
-                  title="Memuat kalender jadwal"
-                  description="Mengambil jadwal satu bulan dari sumber WFM."
-                />
-                <Skeleton
-                  className="h-72 w-full rounded-lg motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <label
+                      htmlFor="jadwal-shifting-agent-search"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Cari nama
+                    </label>
+                    <div className="relative min-w-0">
+                      <Search
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <Input
+                        id="jadwal-shifting-agent-search"
+                        data-testid="jadwal-shifting-agent-search"
+                        type="search"
+                        placeholder="Nama agen"
+                        value={agentQuery}
+                        onChange={(event) => setAgentQuery(event.target.value)}
+                        className="h-[44px] w-full pl-9 sm:w-[13rem]"
+                      />
+                    </div>
+                  </div>
+                  <SectionFilter
+                    id="jadwal-shifting-section"
+                    label="Bagian layanan"
+                    value={sectionSlug}
+                    options={calendarSectionOptions()}
+                    onChange={(value) => updateSearch({ section: value })}
+                  />
+                </div>
               </div>
-            ) : monthState.kind === "error" ? (
-              <div data-testid="jadwal-shifting-month-state-error">
-                <QaStatePanel
-                  type="error"
-                  title="Kalender jadwal tidak dapat ditampilkan"
-                  description={monthState.message}
-                  action={
-                    monthState.code === "WFM_NOT_CONFIGURED" ? undefined : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="lg"
-                        onClick={() => void loadMonth(monthParam)}
-                        className="min-h-[44px]"
-                      >
-                        <RefreshCw
-                          data-icon="inline-start"
-                          aria-hidden="true"
-                        />
-                        <span>Coba lagi</span>
-                      </Button>
-                    )
-                  }
-                />
-              </div>
-            ) : monthData && monthData.rows.length === 0 ? (
-              <div data-testid="jadwal-shifting-month-state-empty">
-                <QaStatePanel
-                  type="empty"
-                  title="Belum ada jadwal pada bulan ini"
-                  description={`Sumber WFM tidak mengirim baris jadwal untuk ${monthLabel(
-                    monthData.month,
-                  )}. Coba pilih bulan lain.`}
-                />
-              </div>
-            ) : (
-              monthData && (
-                <div className="flex min-w-0 flex-col gap-2">
+
+              {monthData ? (
+                <>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span aria-live="polite">
                       {visibleMonthRows.length} baris untuk {agents.length} agen
@@ -855,7 +822,6 @@ export default function SidakJadwalShiftingPage() {
                       Diperbarui {formatAsOf(monthData.asOf)}
                     </span>
                   </div>
-
                   {monthData.truncated ? (
                     <div data-testid="jadwal-shifting-month-truncated">
                       <QaStatePanel
@@ -865,34 +831,113 @@ export default function SidakJadwalShiftingPage() {
                       />
                     </div>
                   ) : null}
+                </>
+              ) : null}
+              <div
+                data-testid="jadwal-shifting-calendar-notes"
+                className="flex flex-col gap-2"
+              >
+                <p className="text-xs text-muted-foreground">
+                  Satu bulan per permintaan. Rekap dihitung dari kode shift yang
+                  terbaca: cuti, off, TBCCI, dan sisanya hari kerja.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Hanya-baca: jadwal tidak disimpan di Trainers SuperApp, jadi
+                  perubahan di WFM baru terlihat setelah muat ulang.
+                </p>
+              </div>
+            </section>
 
-                  {agents.length === 0 ? (
-                    <QaStatePanel
-                      type="empty"
-                      title="Tidak ada agen yang cocok"
-                      description={`Tidak ada nama agen yang mengandung "${agentQuery.trim()}" pada bagian ini.`}
-                    />
-                  ) : (
-                    <MonthMatrix
-                      month={monthData.month}
-                      rows={visibleMonthRows}
-                    />
-                  )}
-
-                  <p className="text-xs text-muted-foreground">
-                    Satu bulan per permintaan. Rekap dihitung dari kode shift
-                    yang terbaca: cuti, off, TBCCI, dan sisanya hari kerja.
-                  </p>
+            <section
+              data-testid="jadwal-shifting-view-calendar"
+              aria-label="Tampilan kalender"
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            >
+              {monthState.kind === "idle" || monthState.kind === "loading" ? (
+                <div
+                  className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                  data-testid="jadwal-shifting-month-state-loading"
+                >
+                  <QaStatePanel
+                    type="loading"
+                    title="Memuat kalender jadwal"
+                    description="Mengambil jadwal satu bulan dari sumber WFM."
+                  />
+                  <Skeleton
+                    className="h-72 w-full shrink-0 rounded-lg motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
                 </div>
-              )
-            )}
-          </section>
+              ) : monthState.kind === "error" ? (
+                <div
+                  className="min-h-0 flex-1 overflow-auto"
+                  data-testid="jadwal-shifting-month-state-error"
+                >
+                  <QaStatePanel
+                    type="error"
+                    title="Kalender jadwal tidak dapat ditampilkan"
+                    description={monthState.message}
+                    action={
+                      monthState.code === "WFM_NOT_CONFIGURED" ? undefined : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          onClick={() => void loadMonth(monthParam)}
+                          className="min-h-[44px]"
+                        >
+                          <RefreshCw
+                            data-icon="inline-start"
+                            aria-hidden="true"
+                          />
+                          <span>Coba lagi</span>
+                        </Button>
+                      )
+                    }
+                  />
+                </div>
+              ) : monthData && monthData.rows.length === 0 ? (
+                <div
+                  className="min-h-0 flex-1 overflow-auto"
+                  data-testid="jadwal-shifting-month-state-empty"
+                >
+                  <QaStatePanel
+                    type="empty"
+                    title="Belum ada jadwal pada bulan ini"
+                    description={`Sumber WFM tidak mengirim baris jadwal untuk ${monthLabel(
+                      monthData.month,
+                    )}. Coba pilih bulan lain.`}
+                  />
+                </div>
+              ) : monthData && agents.length === 0 ? (
+                <div
+                  className="min-h-0 flex-1 overflow-auto"
+                  data-testid="jadwal-shifting-month-state-no-results"
+                >
+                  <QaStatePanel
+                    type="empty"
+                    title="Tidak ada agen yang cocok"
+                    description={`Tidak ada nama agen yang mengandung "${agentQuery.trim()}" pada bagian ini.`}
+                  />
+                </div>
+              ) : (
+                monthData && (
+                  <MonthMatrix
+                    month={monthData.month}
+                    rows={visibleMonthRows}
+                  />
+                )
+              )}
+            </section>
+          </>
         )}
 
-        <p className="text-xs text-muted-foreground">
-          Hanya-baca: jadwal tidak disimpan di Trainers SuperApp, jadi perubahan
-          di WFM baru terlihat setelah muat ulang.
-        </p>
+        {view === "today" ? (
+          <p className="text-xs text-muted-foreground">
+            Hanya-baca: jadwal tidak disimpan di Trainers SuperApp, jadi
+            perubahan di WFM baru terlihat setelah muat ulang.
+          </p>
+        ) : null}
       </div>
     </div>
   );

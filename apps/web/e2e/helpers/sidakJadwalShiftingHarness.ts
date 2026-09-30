@@ -526,6 +526,8 @@ export type JadwalApiBehavior =
       monthRows?: unknown[];
       truncated?: boolean;
       asOf?: string;
+      /** Delay a success response so loading states are observable in E2E. */
+      delayMs?: number;
     }
   | { kind: "empty" }
   | { kind: "error"; code: string; message: string; status: number }
@@ -789,6 +791,9 @@ export async function mockJadwalApi(
       await route.abort("failed");
       return;
     }
+    if (behavior.kind === "data" && behavior.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, behavior.delayMs));
+    }
     if (behavior.kind === "error") {
       await route.fulfill(
         toJson(
@@ -808,7 +813,9 @@ export async function mockJadwalApi(
       const month = url.searchParams.get("month") || FIXTURE_MONTH;
       const body = monthSuccessBody(
         month,
-        {},
+        behavior.kind === "data"
+          ? { truncated: behavior.truncated, asOf: behavior.asOf }
+          : {},
         behavior.kind === "data" ? behavior.monthRows : undefined,
       );
       if (behavior.kind === "empty") {

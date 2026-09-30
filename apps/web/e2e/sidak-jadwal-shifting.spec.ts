@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import {
   DAYTIME_AGENT,
   FIXTURE_CHANNELS,
@@ -41,8 +42,37 @@ test.beforeAll(async () => {
   await assertLocalDevOnlyTarget();
 });
 
-test.beforeEach(() => {
+const loopExitBrowserEvents = new WeakMap<
+  import("@playwright/test").Page,
+  { consoleErrors: string[]; pageErrors: string[] }
+>();
+
+test.beforeEach(({ page }, testInfo) => {
   resetCapturedJadwalRequests();
+  if (!testInfo.title.includes("[loop-exit]")) return;
+  const events = { consoleErrors: [] as string[], pageErrors: [] as string[] };
+  loopExitBrowserEvents.set(page, events);
+  page.on("console", (message) => {
+    if (message.type() === "error") events.consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => events.pageErrors.push(error.message));
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  const events = loopExitBrowserEvents.get(page);
+  if (!events) return;
+  await testInfo.attach("browser-events.json", {
+    body: JSON.stringify(
+      {
+        browserVersion: page.context().browser()?.version() ?? "unknown",
+        consoleErrors: events.consoleErrors,
+        pageErrors: events.pageErrors,
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
 });
 
 /** Halaman memuat judul kanonik + landmark utama, apa pun state-nya. */
@@ -61,94 +91,284 @@ async function expectPageShell(page: import("@playwright/test").Page) {
 // Role gate — navigasi dan route
 // ═══════════════════════════════════════════════════════════════════════════
 
-/**
- * Ukur kontrak wadah kalender TERHADAP AREA GULIR, bukan window: halaman ini
- * menggulir di `<section aria-label="Konten halaman">` dan `<main>` sudah
- * menyisakan ruang untuk tab bar mobile.
- *
- * Kasus TERBURUK adalah posisi gulir paling atas: di situ ruang di bawah puncak
- * matriks paling sempit. Kalau tepi bawah wadah sudah muat di sana, menggulir
- * ke bawah hanya membuatnya makin muat.
- */
-async function measureCalendar(page: import("@playwright/test").Page): Promise<{
-  minHeight: number;
-  boxHeight: number;
-  roomBelow: number;
-  roomBelowAfterScroll: number;
-  heightAfterScroll: number;
-  heightBeforeScroll: number;
-  visibleAfterScroll: boolean;
-  fits: boolean;
-  tabBarTop: number | null;
-  overlapsTabBar: boolean;
-  scrollWidth: number;
+type RectMetrics = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+};
+
+type ScrollerMetrics = {
+  rect: RectMetrics;
   clientWidth: number;
+  clientHeight: number;
+  scrollWidth: number;
+  scrollHeight: number;
+  scrollLeft: number;
+  scrollTop: number;
+  style: {
+    minHeight: string;
+    overflowX: string;
+    overflowY: string;
+    paddingTop: string;
+    paddingBottom: string;
+    paddingLeft: string;
+    paddingRight: string;
+    rowGap: string;
+  };
+};
+
+type SidebarRailMetrics = {
+  visible: boolean;
+  railContentHeight: number;
+  railBoxHeight: number;
+  overflow: number;
+  rect: RectMetrics;
+};
+
+type CalendarGeometry = {
+  viewport: { width: number; height: number };
   rootFontSize: number;
-}> {
+  windowScrollX: number;
+  windowScrollY: number;
+  documentElement: {
+    clientWidth: number;
+    clientHeight: number;
+    scrollWidth: number;
+    scrollHeight: number;
+  };
+  body: {
+    clientWidth: number;
+    clientHeight: number;
+    scrollWidth: number;
+    scrollHeight: number;
+  };
+  workspace: ScrollerMetrics;
+  shell: ScrollerMetrics;
+  controls: ScrollerMetrics;
+  slot: ScrollerMetrics;
+  matrix: ScrollerMetrics;
+  tabBar: { visible: boolean; rect: RectMetrics } | null;
+  sidebarRail: SidebarRailMetrics;
+};
+
+/** Read-only oracle: all geometry is observed without changing scroll state. */
+async function readCalendarGeometry(
+  page: import("@playwright/test").Page,
+): Promise<CalendarGeometry> {
   return page.evaluate(() => {
-    const grid = document.querySelector(
+    const rect = (element: HTMLElement) => {
+      const box = element.getBoundingClientRect();
+      return {
+        left: box.left,
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+      };
+    };
+    const required = (selector: string, label: string): HTMLElement => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) {
+        throw new Error(`[loop-exit] missing required ${label}: ${selector}`);
+      }
+      return element;
+    };
+    const capture = (element: HTMLElement): ScrollerMetrics => {
+      const style = getComputedStyle(element);
+      return {
+        rect: rect(element),
+        clientWidth: element.clientWidth,
+        clientHeight: element.clientHeight,
+        scrollWidth: element.scrollWidth,
+        scrollHeight: element.scrollHeight,
+        scrollLeft: element.scrollLeft,
+        scrollTop: element.scrollTop,
+        style: {
+          minHeight: style.minHeight,
+          overflowX: style.overflowX,
+          overflowY: style.overflowY,
+          paddingTop: style.paddingTop,
+          paddingBottom: style.paddingBottom,
+          paddingLeft: style.paddingLeft,
+          paddingRight: style.paddingRight,
+          rowGap: style.rowGap,
+        },
+      };
+    };
+    const sidebarRail = required(".sidebar-rail", "sidebar rail");
+    const sidebarRailStyle = getComputedStyle(sidebarRail);
+    const sidebarRailRect = rect(sidebarRail);
+    const sidebarRailVisible =
+      sidebarRailStyle.display !== "none" &&
+      sidebarRailStyle.visibility !== "hidden" &&
+      sidebarRailRect.width > 0 &&
+      sidebarRailRect.height > 0;
+    const railContentHeight = sidebarRailVisible ? sidebarRail.scrollHeight : 0;
+    const railBoxHeight = sidebarRailVisible ? sidebarRail.clientHeight : 0;
+    const workspace = required('[aria-label="Konten halaman"]', "workspace");
+    const shell = required(
+      '[data-testid="jadwal-shifting-calendar-shell"]',
+      "calendar shell",
+    );
+    const controls = required(
+      '[data-testid="jadwal-shifting-calendar-controls"]',
+      "calendar controls",
+    );
+    const slot = required(
+      '[data-testid="jadwal-shifting-view-calendar"]',
+      "calendar slot",
+    );
+    const matrix = required(
       '[data-testid="jadwal-shifting-calendar"]',
-    ) as HTMLElement;
-    const workspace = document.querySelector(
-      '[aria-label="Konten halaman"]',
-    ) as HTMLElement;
-    const tabBar = document.querySelector(
-      '[aria-label="Navigasi utama"]',
-    ) as HTMLElement | null;
-
-    const rootFontSize = Number.parseFloat(
-      getComputedStyle(document.documentElement).fontSize,
+      "calendar matrix",
     );
-    const floor = 5 * rootFontSize;
-
-    workspace.scrollTop = 0;
-    const workspaceRect = workspace.getBoundingClientRect();
-    const gridTopOffset = grid.getBoundingClientRect().top - workspaceRect.top;
-    const fits = gridTopOffset + floor + 16 <= workspace.clientHeight;
-    const roomBelow = Math.round(
-      workspaceRect.bottom - grid.getBoundingClientRect().bottom,
-    );
-
-    const heightBeforeScroll = grid.getBoundingClientRect().height;
-    workspace.scrollTop = workspace.scrollHeight;
-    const roomBelowAfterScroll = Math.round(
-      workspace.getBoundingClientRect().bottom -
-        grid.getBoundingClientRect().bottom,
-    );
-    const heightAfterScroll = grid.getBoundingClientRect().height;
-    // Kalau matriks sudah tergulir keluar dari area terlihat, `roomBelow`
-    // otomatis besar dan assertion-nya jadi kosong. Ini penjaganya.
-    const visibleAfterScroll =
-      grid.getBoundingClientRect().bottom >
-      workspace.getBoundingClientRect().top;
-
-    // Ukur tab bar pada posisi gulir paling atas: di situ tepi bawah wadah
-    // paling dekat dengan tab bar.
-    workspace.scrollTop = 0;
-    const gridBottom = grid.getBoundingClientRect().bottom;
-    const tabBarRect = tabBar ? tabBar.getBoundingClientRect() : null;
-    const tabBarTop =
-      tabBarRect && tabBarRect.height > 0 && tabBarRect.top < window.innerHeight
-        ? Math.round(tabBarRect.top)
-        : null;
-    const overlapsTabBar = tabBarTop !== null && gridBottom > tabBarTop;
-
+    const tabBar = document.querySelector('[aria-label="Navigasi utama"]');
+    const tabBarElement = tabBar instanceof HTMLElement ? tabBar : null;
+    const tabBarRect = tabBarElement ? rect(tabBarElement) : null;
+    const tabBarStyle = tabBarElement ? getComputedStyle(tabBarElement) : null;
     return {
-      minHeight: Number.parseFloat(getComputedStyle(grid).minHeight),
-      boxHeight: grid.getBoundingClientRect().height,
-      roomBelow,
-      roomBelowAfterScroll,
-      heightAfterScroll,
-      heightBeforeScroll,
-      visibleAfterScroll,
-      fits,
-      tabBarTop,
-      overlapsTabBar,
-      scrollWidth: grid.scrollWidth,
-      clientWidth: grid.clientWidth,
-      rootFontSize,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      rootFontSize: Number.parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      ),
+      windowScrollX: window.scrollX,
+      windowScrollY: window.scrollY,
+      documentElement: {
+        clientWidth: document.documentElement.clientWidth,
+        clientHeight: document.documentElement.clientHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+      },
+      body: {
+        clientWidth: document.body.clientWidth,
+        clientHeight: document.body.clientHeight,
+        scrollWidth: document.body.scrollWidth,
+        scrollHeight: document.body.scrollHeight,
+      },
+      workspace: capture(workspace),
+      shell: capture(shell),
+      controls: capture(controls),
+      slot: capture(slot),
+      matrix: capture(matrix),
+      tabBar:
+        tabBarElement && tabBarRect && tabBarStyle
+          ? {
+              visible:
+                tabBarStyle.display !== "none" &&
+                tabBarStyle.visibility !== "hidden" &&
+                tabBarRect.width > 0 &&
+                tabBarRect.height > 0 &&
+                tabBarRect.top < window.innerHeight &&
+                tabBarRect.bottom > 0,
+              rect: tabBarRect,
+            }
+          : null,
+      sidebarRail: {
+        visible: sidebarRailVisible,
+        railContentHeight,
+        railBoxHeight,
+        overflow: Math.max(0, railContentHeight - railBoxHeight),
+        rect: sidebarRailRect,
+      },
     };
   });
+}
+
+async function attachCalendarMetrics(
+  testInfo: import("@playwright/test").TestInfo,
+  name: string,
+  metrics: unknown,
+) {
+  const outputPath = testInfo.outputPath(name);
+  await writeFile(outputPath, `${JSON.stringify(metrics, null, 2)}\n`);
+  await testInfo.attach(name, {
+    path: outputPath,
+    contentType: "application/json",
+  });
+}
+
+function expectCalendarLayoutContract(metrics: CalendarGeometry) {
+  expect(metrics.windowScrollX).toBe(0);
+  expect(metrics.windowScrollY).toBe(0);
+  for (const [label, target] of [
+    ["workspace", metrics.workspace],
+    ["calendar shell", metrics.shell],
+  ] as const) {
+    expect(
+      target.scrollHeight,
+      `${label} must not scroll vertically`,
+    ).toBeLessThanOrEqual(target.clientHeight + 1);
+    expect(
+      target.scrollWidth,
+      `${label} must not scroll horizontally`,
+    ).toBeLessThanOrEqual(target.clientWidth + 1);
+    expect(target.scrollTop, `${label} scrollTop must stay zero`).toBe(0);
+    expect(target.scrollLeft, `${label} scrollLeft must stay zero`).toBe(0);
+  }
+  const documentHeightDelta =
+    metrics.documentElement.scrollHeight - metrics.viewport.height;
+  expect(
+    metrics.documentElement.scrollHeight,
+    "document height may exceed the viewport only by measured sidebar-rail overflow",
+  ).toBeLessThanOrEqual(
+    metrics.viewport.height + metrics.sidebarRail.overflow + 1,
+  );
+  expect(
+    Math.abs(documentHeightDelta - metrics.sidebarRail.overflow),
+    "document overflow must match sidebar-rail overflow within 2px",
+  ).toBeLessThanOrEqual(2);
+  expect(
+    metrics.documentElement.scrollWidth,
+    "document must not scroll horizontally",
+  ).toBeLessThanOrEqual(metrics.documentElement.clientWidth + 1);
+  expect(
+    metrics.body.scrollHeight,
+    "body may exceed the viewport only by measured sidebar-rail overflow",
+  ).toBeLessThanOrEqual(
+    metrics.viewport.height + metrics.sidebarRail.overflow + 1,
+  );
+  expect(
+    metrics.body.scrollWidth,
+    "body must not scroll horizontally",
+  ).toBeLessThanOrEqual(metrics.body.clientWidth + 1);
+  expect(metrics.windowScrollX).toBe(0);
+  expect(metrics.windowScrollY).toBe(0);
+
+  expect(metrics.shell.style.paddingTop).toBe("16px");
+  expect(metrics.shell.style.paddingBottom).toBe("16px");
+  expect(metrics.shell.style.paddingLeft).toBe("16px");
+  expect(metrics.shell.style.paddingRight).toBe("16px");
+  expect(metrics.shell.style.rowGap).toBe("8px");
+  const availableHeight =
+    metrics.shell.clientHeight -
+    Number.parseFloat(metrics.shell.style.paddingTop) -
+    Number.parseFloat(metrics.shell.style.paddingBottom);
+  expect(metrics.controls.rect.height).toBeLessThanOrEqual(
+    availableHeight / 2 + 1,
+  );
+  expect(metrics.slot.rect.height).toBeGreaterThanOrEqual(
+    availableHeight / 2 - 8 - 1,
+  );
+  expect(metrics.matrix.clientHeight).toBeGreaterThanOrEqual(64);
+  expect(metrics.matrix.style.minHeight).toBe("0px");
+  expect(["auto", "scroll"]).toContain(metrics.matrix.style.overflowX);
+  expect(["auto", "scroll"]).toContain(metrics.matrix.style.overflowY);
+
+  const { rect: matrix } = metrics.matrix;
+  const { rect: workspace } = metrics.workspace;
+  expect(matrix.left).toBeGreaterThanOrEqual(workspace.left - 1);
+  expect(matrix.right).toBeLessThanOrEqual(workspace.right + 1);
+  expect(matrix.top).toBeGreaterThanOrEqual(workspace.top - 1);
+  expect(matrix.bottom).toBeLessThanOrEqual(workspace.bottom + 1);
+  expect(workspace.bottom - matrix.bottom).toBeGreaterThanOrEqual(15);
+  expect(workspace.bottom - matrix.bottom).toBeLessThanOrEqual(17);
+  if (metrics.tabBar?.visible) {
+    expect(matrix.bottom).toBeLessThanOrEqual(metrics.tabBar.rect.top + 1);
+  }
 }
 
 test.describe("Role gate", () => {
@@ -1271,6 +1491,283 @@ test.describe("Format hari ini", () => {
     ).toEqual(["Break Sore", "Break Pagi", "Break Siang", "Tanpa Break"]);
   });
 
+  test("[loop-exit] urutan layanan, shift, LB, TL, nama dan interval memakai satu fixture bertentangan", async ({
+    page,
+  }) => {
+    const activity = (slot: number, value: string) => ({
+      slot,
+      label: "",
+      value,
+    });
+    const contractRows = [
+      {
+        nama: "Unknown Z Service",
+        tl: "",
+        channel: "Zeta Support",
+        shift: "OFF",
+        activities: [],
+      },
+      {
+        nama: "Call Foreign WFH",
+        tl: "Rina",
+        channel: "Call",
+        shift: "WFH",
+        activities: [],
+      },
+      {
+        nama: "Leader H",
+        tl: "Rina",
+        channel: "Leader",
+        shift: "H",
+        activities: [],
+      },
+      {
+        nama: "Off OFF",
+        tl: "Team Off",
+        channel: "Call",
+        shift: "OFF",
+        activities: [],
+      },
+      {
+        nama: "Call Break 12 TL A",
+        tl: "Ahmad",
+        channel: "Call",
+        shift: "H",
+        activities: [activity(48, "LB")],
+      },
+      {
+        nama: "Email H",
+        tl: "Rina",
+        channel: "Email",
+        shift: "H",
+        activities: [],
+      },
+      {
+        nama: "Call Break Tie Z",
+        tl: "Team Tie",
+        channel: "call",
+        shift: "H",
+        activities: [activity(40, "LB")],
+      },
+      {
+        nama: "Off LBR",
+        tl: "Team Off",
+        channel: "Call",
+        shift: "LBR",
+        activities: [],
+      },
+      {
+        nama: "Digital S1",
+        tl: "Rina",
+        channel: "Digital Chat",
+        shift: "S1",
+        activities: [],
+      },
+      {
+        nama: "Call No Break A",
+        tl: "Ahmad",
+        channel: "Call",
+        shift: "H",
+        activities: [],
+      },
+      {
+        nama: "Off LIBUR",
+        tl: "Team Off",
+        channel: "Call",
+        shift: "LIBUR",
+        activities: [],
+      },
+      {
+        nama: "Call S4",
+        tl: "Rina",
+        channel: "Call",
+        shift: "S4",
+        activities: [],
+      },
+      {
+        nama: "Call Break 00",
+        tl: "Zulu",
+        channel: "Call",
+        shift: "H",
+        activities: [activity(1, "LB"), activity(0, "lb")],
+      },
+      {
+        nama: "Call S2",
+        tl: "Rina",
+        channel: "Call",
+        shift: "S2",
+        activities: [],
+      },
+      {
+        nama: "Call Foreign AUX",
+        tl: "Rina",
+        channel: "Call",
+        shift: "AUX",
+        activities: [],
+      },
+      {
+        nama: "Off CUTI",
+        tl: "Team Off",
+        channel: "Call",
+        shift: "CUTI",
+        activities: [],
+      },
+      {
+        nama: "Call Break Tie A",
+        tl: "Team Tie",
+        channel: "Call",
+        shift: "H",
+        activities: [activity(40, "LB")],
+      },
+      {
+        nama: "Call Break 10 TL Z",
+        tl: "Zulu",
+        channel: "Call",
+        shift: "H",
+        activities: [activity(48, "LB"), activity(40, "LB")],
+      },
+      {
+        nama: "Call S3",
+        tl: "Rina",
+        channel: "Call",
+        shift: "S3",
+        activities: [],
+      },
+      {
+        nama: "Off Blank",
+        tl: "Team Off",
+        channel: "Call",
+        shift: "",
+        activities: [],
+      },
+      {
+        nama: "Call Invalid LB",
+        tl: "Zulu",
+        channel: "Call",
+        shift: "H",
+        activities: [
+          activity(-1, "LB"),
+          activity(96, "LB"),
+          activity(106, "LB"),
+          activity(12.5, "LB"),
+          activity(12, "Lunch"),
+        ],
+      },
+      {
+        nama: "Call S1 Slot Edge",
+        tl: "Rina",
+        channel: "Call",
+        shift: "S1",
+        activities: [
+          activity(95, "LB"),
+          activity(1, "LB"),
+          activity(0, "lb"),
+          activity(1, "LB"),
+          activity(-1, "LB"),
+          activity(96, "LB"),
+          activity(106, "LB"),
+          activity(12.5, "LB"),
+          activity(2, "Lunch"),
+        ],
+      },
+      {
+        nama: "Call Foreign Z",
+        tl: "Rina",
+        channel: "Call",
+        shift: "Z-X",
+        activities: [],
+      },
+      {
+        nama: "Call S1",
+        tl: "Rina",
+        channel: "Call",
+        shift: "S1",
+        activities: [],
+      },
+      {
+        nama: "Alpha Service",
+        tl: "Rina",
+        channel: "Alpha Support",
+        shift: "H",
+        activities: [],
+      },
+      {
+        nama: "Empty Service",
+        tl: "Rina",
+        channel: "",
+        shift: "S1",
+        activities: [],
+      },
+      {
+        nama: "Call Foreign TBCCI",
+        tl: "Rina",
+        channel: "Call",
+        shift: "TBCCI",
+        activities: [],
+      },
+    ].map((row) => ({ ...row, shiftPrev: "", date: FIXTURE_DATE }));
+
+    const audit = await openJadwalShifting(page, {
+      role: "trainer",
+      behavior: { kind: "data", rows: contractRows },
+    });
+    await expectPageShell(page);
+
+    const rows = page.getByTestId("jadwal-shifting-row");
+    const actualOrder = await rows.evaluateAll((tableRows) =>
+      tableRows.map(
+        (row) => row.querySelector("td")?.textContent?.trim() ?? "",
+      ),
+    );
+    expect(actualOrder).toEqual([
+      "Call S1 Slot Edge",
+      "Call S1",
+      "Call Break 00",
+      "Call Break Tie A",
+      "Call Break Tie Z",
+      "Call Break 10 TL Z",
+      "Call Break 12 TL A",
+      "Call No Break A",
+      "Call Invalid LB",
+      "Call S2",
+      "Call S3",
+      "Call S4",
+      "Off Blank",
+      "Off CUTI",
+      "Off LBR",
+      "Off LIBUR",
+      "Off OFF",
+      "Call Foreign AUX",
+      "Call Foreign TBCCI",
+      "Call Foreign WFH",
+      "Call Foreign Z",
+      "Digital S1",
+      "Email H",
+      "Leader H",
+      "Alpha Service",
+      "Unknown Z Service",
+      "Empty Service",
+    ]);
+
+    const edgeInterval = page
+      .getByTestId("jadwal-shifting-row")
+      .filter({ hasText: "Call S1 Slot Edge" })
+      .locator("td")
+      .nth(5)
+      .locator("dd")
+      .nth(1);
+    await expect(edgeInterval).toHaveText("00:00–00:30, 23:45–24:00");
+    const invalidInterval = page
+      .getByTestId("jadwal-shifting-row")
+      .filter({ hasText: "Call Invalid LB" })
+      .locator("td")
+      .nth(5)
+      .locator("dd")
+      .nth(1);
+    await expect(invalidInterval).toHaveText("—");
+    expectIsolation(audit);
+  });
+
   test("bisa berpindah dari format hari ini ke kalender dan kembali", async ({
     page,
   }) => {
@@ -1563,141 +2060,7 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     expectIsolation(audit);
   });
 
-  test("kolom nama yang sticky berlatar opak, sehingga tanggal tidak tembus", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openJadwalShifting(page, {
-      view: "calendar",
-      month: FIXTURE_MONTH,
-      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
-    });
-
-    const grid = page.getByTestId("jadwal-shifting-calendar");
-    await expect(grid).toBeVisible();
-
-    // Geser sedikit supaya label tanggal berada tepat di belakang kolom nama.
-    await grid.evaluate((el) => {
-      el.scrollLeft = 120;
-    });
-
-    const alpha = await page.evaluate(() => {
-      const cell = document.querySelector(
-        '[data-testid="jadwal-shifting-calendar"] thead th',
-      );
-      if (!cell) return null;
-      const background = getComputedStyle(cell).backgroundColor;
-      const slash = background.match(/\/\s*([0-9.]+)\s*\)/);
-      const rgba = background.match(/rgba\([^)]*,\s*([0-9.]+)\s*\)/);
-      const raw = slash?.[1] ?? rgba?.[1];
-      return raw === undefined ? 1 : Number(raw);
-    });
-
-    expect(
-      alpha,
-      "latar sel nama yang sticky harus opak; latar tembus membuat tanggal terbaca di belakang nama",
-    ).toBe(1);
-  });
-
-  test("wadah gulir dibatasi tinggi sehingga scroll horizontal terjangkau tanpa menggulir halaman", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openJadwalShifting(page, {
-      view: "calendar",
-      month: FIXTURE_MONTH,
-      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
-    });
-
-    const grid = page.getByTestId("jadwal-shifting-calendar");
-    await expect(grid).toBeVisible();
-
-    const metrics = await grid.evaluate((el) => {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return {
-        scrollWidth: el.scrollWidth,
-        clientWidth: el.clientWidth,
-        scrollHeight: el.scrollHeight,
-        clientHeight: el.clientHeight,
-        top: rect.top,
-        bottom: rect.bottom,
-        overflowX: style.overflowX,
-        overflowY: style.overflowY,
-      };
-    });
-    const scrollport = await measureCalendar(page);
-
-    expect(
-      metrics.scrollWidth,
-      "fixture harus benar-benar meluber horizontal",
-    ).toBeGreaterThan(metrics.clientWidth);
-    expect(
-      ["auto", "scroll"],
-      "wadah harus benar-benar bisa digulir; `visible`, `hidden`, dan `clip` semuanya membuat pengguna tidak bisa menggulir horizontal",
-    ).toContain(metrics.overflowX);
-    expect(
-      metrics.scrollHeight,
-      "isi lebih tinggi dari wadah supaya bisa digulir vertikal",
-    ).toBeGreaterThan(metrics.clientHeight);
-    expect(
-      scrollport.roomBelow,
-      "tepi bawah wadah (tempat scrollbar horizontal) harus berada di dalam AREA GULIR — halaman ini menggulir di `Konten halaman`, bukan di window — pada posisi gulir paling atas",
-    ).toBeGreaterThanOrEqual(0);
-    expect(
-      scrollport.overlapsTabBar,
-      "tepi bawah wadah tidak boleh tertutup tab bar mobile",
-    ).toBe(false);
-
-    await grid.evaluate((el) => {
-      el.scrollTop = 300;
-    });
-    const positions = await page.evaluate(() => {
-      const cell = document.querySelector(
-        '[data-testid="jadwal-shifting-calendar"] thead th',
-      );
-      const region = document.querySelector(
-        '[data-testid="jadwal-shifting-calendar"]',
-      );
-      return {
-        headerTop: cell ? cell.getBoundingClientRect().top : null,
-        regionTop: region ? region.getBoundingClientRect().top : null,
-      };
-    });
-
-    expect(
-      positions.headerTop,
-      "header kalender tidak ditemukan",
-    ).not.toBeNull();
-    expect(
-      Math.abs(
-        (positions.headerTop as number) - (positions.regionTop as number),
-      ),
-      "header kolom harus tetap menempel di atas wadah saat isinya digulir",
-    ).toBeLessThanOrEqual(2);
-  });
-
-  /**
-   * Ruang di atas matriks berbeda-beda menurut lebar (kontrol berbaris di
-   * ≥1024px, menumpuk di ≤480px) dan menurut tinggi jendela. Yang dijamin
-   * kontrak ini:
-   *
-   * 1. Selalu: matriks tidak mengerut jadi nol (`min-h-[5rem]`).
-   * 2. Selama jendela masih memuat kontrol di atas matriks + lantai itu, tepi
-   *    bawah wadah harus berada di dalam layar sehingga scrollbar horizontal
-   *    terjangkau tanpa menggulir halaman.
-   *
-   * Kalau (2) secara fisik tidak mungkin — mis. 390×400, karena kontrol di atas
-   * matriks saja sudah ~454px — maka yang diuji adalah tinggi wadah tepat
-   * setinggi lantai, BUKAN lebih: cadangan ruang tidak boleh berubah jadi
-   * cadangan palsu yang tetap mendorong scrollbar ke bawah layar.
-   */
-  // Kontrak lantai ditulis sebagai konstanta, bukan diambil dari pengukuran:
-  // kalau lantai di kode diperbesar (mis. jadi 14rem), test harus GAGAL — bukan
-  // ikut menyesuaikan diri dan meloloskan perilaku yang lebih buruk.
-  const FLOOR_REM = 5;
-
-  for (const { width, height } of [
+  const LOOP_EXIT_VIEWPORTS = [
     { width: 1280, height: 800 },
     { width: 1280, height: 720 },
     { width: 1024, height: 768 },
@@ -1707,178 +2070,415 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     { width: 1280, height: 400 },
     { width: 1280, height: 300 },
     { width: 390, height: 400 },
-  ]) {
-    test(`wadah gulir di ${width}×${height}: lantai dihormati dan tepi bawah di dalam layar selama jendela memuatnya`, async ({
+  ] as const;
+  const LOOP_EXIT_FONT_SIZES = [14, 20, 28] as const;
+
+  for (const viewport of LOOP_EXIT_VIEWPORTS) {
+    test(`[loop-exit] ${viewport.width}×${viewport.height} at font 14/20/28px`, async ({
       page,
-    }) => {
-      await page.setViewportSize({ width, height });
-      await openJadwalShifting(page, {
+    }, testInfo) => {
+      await page.setViewportSize(viewport);
+      const audit = await openJadwalShifting(page, {
         view: "calendar",
         month: FIXTURE_MONTH,
         behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
       });
+      await expectPageShell(page);
+      await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
+      const fontStyle = await page.addStyleTag({
+        content: `html { font-size: ${LOOP_EXIT_FONT_SIZES[0]}px !important; }`,
+      });
 
-      const grid = page.getByTestId("jadwal-shifting-calendar");
-      await expect(grid).toBeVisible();
+      for (const rootFontSize of LOOP_EXIT_FONT_SIZES) {
+        await fontStyle.evaluate((style, fontSize) => {
+          style.textContent = `html { font-size: ${fontSize}px !important; }`;
+        }, rootFontSize);
+        await expect
+          .poll(() =>
+            page.evaluate(() =>
+              Number.parseFloat(
+                getComputedStyle(document.documentElement).fontSize,
+              ),
+            ),
+          )
+          .toBe(rootFontSize);
 
-      const metrics = await measureCalendar(page);
-
-      // 1rem = 14px di app ini, jadi lantai = 5rem = 70px (bukan 80px).
-      const floor = FLOOR_REM * metrics.rootFontSize;
-      expect(metrics.rootFontSize).toBeGreaterThan(0);
-      expect(
-        metrics.minHeight,
-        `lantai di CSS harus ${FLOOR_REM}rem — kontrak yang sama dengan spec`,
-      ).toBeCloseTo(floor, 0);
-      expect(
-        metrics.scrollWidth,
-        "matriks memang meluber horizontal di ukuran ini",
-      ).toBeGreaterThan(metrics.clientWidth);
-
-      expect(
-        metrics.visibleAfterScroll,
-        "setelah digulir ke bawah, matriks masih terlihat — kalau tidak, pemeriksaan berikutnya kosong",
-      ).toBe(true);
-      expect(
-        metrics.roomBelowAfterScroll,
-        "setelah area gulir digulir ke bawah, tepi bawah wadah tetap harus terlihat",
-      ).toBeGreaterThanOrEqual(0);
-      expect(
-        metrics.heightAfterScroll,
-        "tinggi wadah tidak boleh berubah hanya karena halaman digulir",
-      ).toBeCloseTo(metrics.heightBeforeScroll, 0);
-
-      if (metrics.fits) {
-        expect(
-          metrics.roomBelow,
-          "di posisi gulir paling atas (kasus terburuk), tepi bawah wadah harus di dalam area gulir",
-        ).toBeGreaterThanOrEqual(0);
-        expect(
-          metrics.roomBelow,
-          "wadah harus mengisi sisa ruang yang terlihat (margin ≤ 24px), bukan menyisakan celah besar",
-        ).toBeLessThanOrEqual(24);
-        // Cek tab bar hanya masuk akal kalau matriks memang dimaksudkan
-        // terlihat penuh. Kalau kontrol di atas matriks saja sudah melebihi
-        // area gulir (mis. 390×400), matriks ada di bawah area terlihat sampai
-        // pengguna menggulir — bukan tab bar yang menutupinya.
-        expect(
-          metrics.overlapsTabBar,
-          "tepi bawah wadah tidak boleh tertutup tab bar mobile",
-        ).toBe(false);
-      } else {
-        expect(
-          metrics.boxHeight,
-          "di area gulir yang terlalu pendek, wadah harus tepat setinggi lantai — bukan tumbuh menutupi area gulir",
-        ).toBeCloseTo(floor, 0);
+        const metrics = await readCalendarGeometry(page);
+        await attachCalendarMetrics(
+          testInfo,
+          `layout-metrics-${rootFontSize}px.json`,
+          {
+            browserVersion: page.context().browser()?.version() ?? "unknown",
+            expectedFontSize: rootFontSize,
+            metrics,
+          },
+        );
+        expect(metrics.viewport).toEqual(viewport);
+        expect(metrics.rootFontSize).toBe(rootFontSize);
+        expect(metrics.matrix.scrollWidth).toBeGreaterThan(
+          metrics.matrix.clientWidth,
+        );
+        expect(metrics.matrix.scrollHeight).toBeGreaterThan(
+          metrics.matrix.clientHeight,
+        );
+        expectCalendarLayoutContract(metrics);
       }
+      expectIsolation(audit);
     });
   }
 
-  /**
-   * Kontrol di atas matriks bisa tumbuh tanpa viewport berubah — mis. saat
-   * pengguna memakai pengaturan "teks lebih besar". Cadangan ruang yang tetap
-   * tidak tahan terhadap ini; pengukuran adaptif harus tetap menjaga tepi bawah
-   * wadah di dalam layar.
-   */
-  test("dengan teks diperbesar, kontrol boleh tumbuh tetapi tepi bawah wadah tetap di dalam layar", async ({
+  test("[loop-exit] matriks dan kontrol benar-benar menggulir; keyboard mencapai filter dan Hari ini", async ({
     page,
-  }) => {
-    await page.setViewportSize({ width: 480, height: 800 });
-    await openJadwalShifting(page, {
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 400 });
+    const audit = await openJadwalShifting(page, {
       view: "calendar",
       month: FIXTURE_MONTH,
       behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
     });
-    await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
-
-    await page.addStyleTag({ content: "html { font-size: 20px }" });
-
-    // Tunggu pengukuran ulang benar-benar selesai (MutationObserver →
-    // requestAnimationFrame), bukan sekadar menunggu waktu tetap.
-    // Font HARUS benar-benar membesar — kalau tidak, seluruh test ini kosong.
-    // Dicek sebagai assertion keras, bukan bagian dari polling geometri.
+    await expectPageShell(page);
+    const controls = page.getByTestId("jadwal-shifting-calendar-controls");
+    const matrix = page.getByTestId("jadwal-shifting-calendar");
+    await expect(matrix).toBeVisible();
+    await page.addStyleTag({
+      content: "html { font-size: 28px !important; }",
+    });
     await expect
-      .poll(
-        async () =>
-          page.evaluate(() =>
-            Number.parseFloat(
-              getComputedStyle(document.documentElement).fontSize,
-            ),
+      .poll(() =>
+        page.evaluate(() =>
+          Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
           ),
-        { message: "teks harus benar-benar membesar ke 20px" },
+        ),
       )
-      .toBeCloseTo(20, 0);
+      .toBe(28);
 
-    // Tunggu sampai pengukuran ulang SELESAI, bukan sekadar sampai ukuran teks
-    // berubah: MutationObserver → requestAnimationFrame butuh satu frame lagi.
+    const initial = await readCalendarGeometry(page);
+    expectCalendarLayoutContract(initial);
+    const mobileScreenshotPath = testInfo.outputPath(
+      "calendar-mobile-large-text.png",
+    );
+    await page.screenshot({ path: mobileScreenshotPath, fullPage: false });
+    await testInfo.attach("calendar-mobile-large-text.png", {
+      path: mobileScreenshotPath,
+      contentType: "image/png",
+    });
+    expect(initial.matrix.scrollWidth).toBeGreaterThan(
+      initial.matrix.clientWidth,
+    );
+    expect(initial.matrix.scrollHeight).toBeGreaterThan(
+      initial.matrix.clientHeight,
+    );
+    expect(["auto", "scroll"]).toContain(initial.matrix.style.overflowX);
+    expect(["auto", "scroll"]).toContain(initial.matrix.style.overflowY);
+    expect(initial.controls.scrollHeight).toBeGreaterThan(
+      initial.controls.clientHeight,
+    );
+    expect(["auto", "scroll"]).toContain(initial.controls.style.overflowX);
+    expect(["auto", "scroll"]).toContain(initial.controls.style.overflowY);
+
+    expect(initial.matrix.scrollLeft).toBe(0);
+    expect(initial.matrix.scrollTop).toBe(0);
+    expect(initial.controls.scrollTop).toBe(0);
+    await matrix.focus();
+    await page.keyboard.press("ArrowRight");
     await expect
-      .poll(
-        async () => {
-          const measured = await measureCalendar(page);
-          return measured.fits
-            ? measured.roomBelow >= 0 && measured.roomBelow <= 24
-            : Math.abs(measured.boxHeight - 5 * measured.rootFontSize) <= 2;
-        },
-        {
-          message:
-            "pengukuran ulang setelah teks diperbesar belum menghasilkan tinggi yang benar",
-          timeout: 5000,
-        },
-      )
-      .toBe(true);
-
-    const metrics = await measureCalendar(page);
-    const floor = FLOOR_REM * metrics.rootFontSize;
-
-    if (metrics.fits) {
-      expect(
-        metrics.roomBelow,
-        "teks diperbesar tidak boleh membuat scrollbar horizontal keluar area gulir",
-      ).toBeGreaterThanOrEqual(0);
-      expect(metrics.roomBelow).toBeLessThanOrEqual(24);
-    } else {
-      expect(metrics.boxHeight).toBeCloseTo(floor, 0);
+      .poll(() => matrix.evaluate((el) => el.scrollLeft))
+      .toBeGreaterThan(0);
+    for (let step = 0; step < 5; step += 1) {
+      await page.keyboard.press("ArrowDown");
     }
-    expect(metrics.overlapsTabBar).toBe(false);
+    await expect
+      .poll(() => matrix.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+
+    await controls.focus();
+    await page.keyboard.press("End");
+    await expect
+      .poll(() => controls.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    const noteParagraphs = controls
+      .getByTestId("jadwal-shifting-calendar-notes")
+      .locator("p");
+    await noteParagraphs.nth(0).scrollIntoViewIfNeeded();
+    await expect(noteParagraphs.nth(0)).toBeInViewport();
+    await noteParagraphs.nth(1).scrollIntoViewIfNeeded();
+    await expect(noteParagraphs.nth(1)).toBeInViewport();
+
+    const afterScroll = await readCalendarGeometry(page);
+    expectCalendarLayoutContract(afterScroll);
+    expect(afterScroll.matrix.scrollLeft).toBeGreaterThan(
+      initial.matrix.scrollLeft,
+    );
+    expect(afterScroll.matrix.scrollTop).toBeGreaterThan(
+      initial.matrix.scrollTop,
+    );
+    expect(afterScroll.controls.scrollTop).toBeGreaterThan(
+      initial.controls.scrollTop,
+    );
+    expect(
+      Math.abs(afterScroll.matrix.rect.height - initial.matrix.rect.height),
+    ).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 480, height: 800 });
+    await page.addStyleTag({
+      content: "html { font-size: 20px !important; }",
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Number.parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          ),
+        ),
+      )
+      .toBe(20);
+    const afterResize = await readCalendarGeometry(page);
+    expectCalendarLayoutContract(afterResize);
+    await attachCalendarMetrics(testInfo, "scroll-metrics.json", {
+      initial,
+      afterScroll,
+      afterResize,
+    });
+
+    await controls.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    const agentSearch = page.getByTestId("jadwal-shifting-agent-search");
+    await agentSearch.focus();
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByTestId("jadwal-shifting-section-call"),
+    ).toBeFocused();
+    await expect(
+      page.getByTestId("jadwal-shifting-section-call"),
+    ).toBeInViewport();
+
+    const calendarTab = page.getByRole("tab", { name: "Kalender" });
+    await calendarTab.focus();
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("tab", { name: "Hari ini" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByTestId("jadwal-shifting-table")).toBeVisible();
+
+    expectIsolation(audit);
   });
 
-  /**
-   * Kasus dari temuan gate: pemicu pengukuran ulang (di sini teks diperbesar)
-   * datang SAAT halaman sedang digulir. Rumus yang memakai selisih visual
-   * mentah akan menghasilkan batas tinggi kelebihan sebesar jarak gulirnya.
-   */
-  test("pengukuran ulang saat halaman sedang digulir tetap menjaga tepi bawah di dalam area gulir", async ({
+  for (const theme of ["light", "dark"] as const) {
+    test(`[loop-exit] sticky corner and identity stay opaque in ${theme} mode`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      const audit = await openJadwalShifting(page, {
+        view: "calendar",
+        month: FIXTURE_MONTH,
+        behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+      });
+      const matrix = page.getByTestId("jadwal-shifting-calendar");
+      await expect(matrix).toBeVisible();
+      await page.evaluate((isDark) => {
+        document.documentElement.classList.toggle("dark", isDark);
+      }, theme === "dark");
+      await matrix.evaluate((el) => {
+        el.scrollLeft = 240;
+        el.scrollTop = 220;
+      });
+      await expect
+        .poll(() => matrix.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(0);
+      await expect
+        .poll(() => matrix.evaluate((el) => el.scrollTop))
+        .toBeGreaterThan(0);
+
+      const stickyMetrics = await page.evaluate(() => {
+        const matrixElement = document.querySelector<HTMLElement>(
+          '[data-testid="jadwal-shifting-calendar"]',
+        );
+        const corner = matrixElement?.querySelector<HTMLElement>(
+          "thead th:first-child",
+        );
+        const rowHeads = Array.from(
+          matrixElement?.querySelectorAll<HTMLElement>("tbody th") ?? [],
+        );
+        const rowHead = rowHeads.find((candidate) => {
+          const box = candidate.getBoundingClientRect();
+          const region = matrixElement?.getBoundingClientRect();
+          return Boolean(
+            region && box.bottom > region.top + 32 && box.top < region.bottom,
+          );
+        });
+        const sampleAlpha = (element: HTMLElement | undefined) => {
+          if (!element) return null;
+          const color = getComputedStyle(element).backgroundColor;
+          if (!color || !CSS.supports("color", color)) return null;
+          const canvas = document.createElement("canvas");
+          canvas.width = 1;
+          canvas.height = 1;
+          const context = canvas.getContext("2d");
+          if (!context) return null;
+          context.clearRect(0, 0, 1, 1);
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          return {
+            color,
+            alpha: context.getImageData(0, 0, 1, 1).data[3],
+            opacity: Number.parseFloat(getComputedStyle(element).opacity),
+          };
+        };
+        if (!matrixElement || !corner || !rowHead) return null;
+        const matrixRect = matrixElement.getBoundingClientRect();
+        const cornerRect = corner.getBoundingClientRect();
+        const rowRect = rowHead.getBoundingClientRect();
+        const style = getComputedStyle(matrixElement);
+        const borderTop = Number.parseFloat(style.borderTopWidth);
+        const borderLeft = Number.parseFloat(style.borderLeftWidth);
+        const x = rowRect.left + Math.min(12, rowRect.width / 2);
+        const y = rowRect.top + rowRect.height / 2;
+        const hit = document.elementsFromPoint(x, y);
+        return {
+          corner: sampleAlpha(corner),
+          rowHead: sampleAlpha(rowHead),
+          cornerTopDelta: Math.abs(
+            cornerRect.top - (matrixRect.top + borderTop),
+          ),
+          rowHeadLeftDelta: Math.abs(
+            rowRect.left - (matrixRect.left + borderLeft),
+          ),
+          hitIdentity: hit.some(
+            (element) => rowHead === element || rowHead.contains(element),
+          ),
+          matrixRect: {
+            left: matrixRect.left,
+            top: matrixRect.top,
+            right: matrixRect.right,
+            bottom: matrixRect.bottom,
+          },
+          hitPoint: { x, y },
+        };
+      });
+      expect(
+        stickyMetrics,
+        "corner/row identity metrics must exist",
+      ).not.toBeNull();
+      expect(stickyMetrics?.corner?.alpha).toBe(255);
+      expect(stickyMetrics?.rowHead?.alpha).toBe(255);
+      expect(stickyMetrics?.corner?.opacity).toBe(1);
+      expect(stickyMetrics?.rowHead?.opacity).toBe(1);
+      expect(stickyMetrics?.cornerTopDelta).toBeLessThanOrEqual(2);
+      expect(stickyMetrics?.rowHeadLeftDelta).toBeLessThanOrEqual(2);
+      expect(stickyMetrics?.hitIdentity).toBe(true);
+
+      const screenshotPath = testInfo.outputPath(`sticky-overlap-${theme}.png`);
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+      await testInfo.attach(`sticky-overlap-${theme}`, {
+        path: screenshotPath,
+        contentType: "image/png",
+      });
+      await attachCalendarMetrics(
+        testInfo,
+        `sticky-${theme}.json`,
+        stickyMetrics,
+      );
+      expectIsolation(audit);
+    });
+  }
+
+  test("[loop-exit] loading calendar states occupy the bounded result slot", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await openJadwalShifting(page, {
+    await page.setViewportSize({ width: 390, height: 400 });
+    const audit = await openJadwalShifting(page, {
       view: "calendar",
       month: FIXTURE_MONTH,
-      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+      behavior: { kind: "data", delayMs: 400, monthRows: MATRIX_ROWS },
     });
+    const slot = page.getByTestId("jadwal-shifting-view-calendar");
+    await expect(
+      page.getByTestId("jadwal-shifting-month-state-loading"),
+    ).toBeVisible();
+    await expect(slot).toBeVisible();
     await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
+    expectIsolation(audit);
+  });
 
-    // Gulir dulu, baru picu pengukuran ulang.
-    await page.evaluate(() => {
-      const workspace = document.querySelector(
-        '[aria-label="Konten halaman"]',
-      ) as HTMLElement;
-      workspace.scrollTop = 240;
+  test("[loop-exit] error calendar state stays reachable in the result slot", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 400 });
+    const audit = await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: {
+        kind: "error",
+        status: 502,
+        code: "WFM_UNAVAILABLE",
+        message: "Sumber jadwal WFM sedang tidak dapat dihubungi.",
+      },
     });
-    await page.addStyleTag({ content: "html { font-size: 18px }" });
-    await page.waitForTimeout(400);
+    const slot = page.getByTestId("jadwal-shifting-view-calendar");
+    await expect(slot).toBeVisible();
+    await expect(
+      page.getByTestId("jadwal-shifting-month-state-error"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /coba lagi/i }),
+    ).toBeVisible();
+    expectIsolation(audit);
+  });
 
-    const metrics = await measureCalendar(page);
-    expect(metrics.rootFontSize).toBeCloseTo(18, 0);
-    if (metrics.fits) {
-      expect(
-        metrics.roomBelow,
-        "tepi bawah wadah harus tetap di dalam area gulir walau pengukuran ulang terjadi saat digulir",
-      ).toBeGreaterThanOrEqual(0);
-      expect(metrics.roomBelow).toBeLessThanOrEqual(24);
-    } else {
-      expect(metrics.boxHeight).toBeCloseTo(5 * metrics.rootFontSize, 0);
-    }
+  test("[loop-exit] empty calendar state stays reachable in the result slot", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 400 });
+    const audit = await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "empty" },
+    });
+    await expect(
+      page.getByTestId("jadwal-shifting-view-calendar"),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("jadwal-shifting-month-state-empty"),
+    ).toBeVisible();
+    expectIsolation(audit);
+  });
+
+  test("[loop-exit] truncated warning and no-results state remain reachable", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 400 });
+    const audit = await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: {
+        kind: "data",
+        truncated: true,
+        monthRows: MATRIX_ROWS,
+      },
+    });
+    const controls = page.getByTestId("jadwal-shifting-calendar-controls");
+    await expect(controls).toBeVisible();
+    const warning = page.getByTestId("jadwal-shifting-month-truncated");
+    await expect(warning).toBeVisible();
+    await warning.scrollIntoViewIfNeeded();
+    await expect(warning).toBeInViewport();
+    const requestCount = capturedJadwalRequests().length;
+    await page
+      .getByTestId("jadwal-shifting-agent-search")
+      .fill("no matching agent");
+    await expect(page.getByText("Tidak ada agen yang cocok")).toBeVisible();
+    await expect(
+      page.getByTestId("jadwal-shifting-view-calendar"),
+    ).toBeVisible();
+    expect(capturedJadwalRequests()).toHaveLength(requestCount);
+    expect(await controls.evaluate((el) => el.scrollHeight)).toBeGreaterThan(
+      await controls.evaluate((el) => el.clientHeight),
+    );
+    expectIsolation(audit);
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

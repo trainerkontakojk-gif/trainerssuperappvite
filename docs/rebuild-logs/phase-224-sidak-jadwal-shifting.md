@@ -86,6 +86,12 @@ Dibuktikan dengan mutation check: elemen panel lama disuntikkan kembali ke route
 - Impeccable dan thermo-nuclear review: **PASS**, tanpa temuan sisa dalam scope. Screenshot mengonfirmasi tabel tunggal; E2E juga mencakup tabel aksesibel dan viewport sempit.
 - `git diff --check`: exit 0; tidak ada whitespace error.
 
+> **Riwayat historis—superseded:** Update 5–12 di bawah merekam temuan dan
+> perbaikan pada commit/iterasi saat itu. Deskripsi algoritme tinggi JS, lantai
+> 5rem, cadangan 34/28/24rem, dan kontrak `fits` bukan perilaku runtime maupun
+> acceptance aktif setelah **Update 13 — layout CSS lokal**. Bukti historisnya
+> tidak dihapus atau ditulis ulang sebagai verifikasi baru.
+
 ## Update 5 — 2026-09-30 — kalender bisa dipakai, urutan istirahat
 
 Dua keluhan pemakaian nyata dari Fajar.
@@ -200,10 +206,10 @@ temuan.
    - bila jendela memuat kontrol + lantai: tepi bawah ≤ tinggi layar;
    - bila tidak: tinggi wadah harus **tepat setinggi lantai**, bukan tumbuh
      menutupi layar.
-   E2E kini menguji **sembilan** ukuran layar (1280×800, 1280×720, 1024×768,
-   768×1024, 480×800, 390×844, 1280×400, 1280×300, 390×400) dengan konstanta
-   kontrak `FLOOR_REM = 5` (bukan angka hasil pengukuran), supaya memperbesar
-   lantai membuat test GAGAL alih-alih test menyesuaikan diri.
+     E2E kini menguji **sembilan** ukuran layar (1280×800, 1280×720, 1024×768,
+     768×1024, 480×800, 390×844, 1280×400, 1280×300, 390×400) dengan konstanta
+     kontrak `FLOOR_REM = 5` (bukan angka hasil pengukuran), supaya memperbesar
+     lantai membuat test GAGAL alih-alih test menyesuaikan diri.
 2. **P3 — `docs/modules.md` terlalu umum.** Klaim "scrollbar terjangkau" kini
    menyebut pengecualian viewport pendek beserta angka nyatanya.
 3. **P3 — klaim probe manual masih bercokol di bagian historis plan.** Dua
@@ -225,7 +231,7 @@ temuan, dan temuan pertamanya menunjuk kelemahan mendasar.
    tumbuh (teks diperbesar, label membungkus, zoom). Selisih di layar sempit
    hanya ~22px sebelum wadah melewati tepi layar. Perbaikannya: tinggi wadah
    sekarang **diukur** — `maxHeight = window.innerHeight − posisi-atas-wadah −
-   16px`, dengan lantai 5rem — dan dihitung ulang saat viewport berubah, saat
+16px`, dengan lantai 5rem — dan dihitung ulang saat viewport berubah, saat
    elemen di atas matriks berubah ukuran (ResizeObserver pada parent + saudara
    wadah), saat `<head>` berubah (MutationObserver), dan setelah font selesai
    dimuat. Pengukuran dijadwalkan ke frame berikutnya (`requestAnimationFrame`)
@@ -311,3 +317,131 @@ Test baru: "pengukuran ulang saat halaman sedang digulir tetap menjaga tepi bawa
 di dalam area gulir" — memicu pengukuran ulang (`<style>` di `<head>`) SAAT
 `scrollTop` bukan nol. Mutation check: koreksi `scrollTop` dibuang ⇒ test itu
 gagal (1).
+
+## Update 13 — 2026-09-30 — layout Kalender CSS lokal dan revisi D2
+
+Keputusan Fajar untuk batch ini: jangan mengubah shared `Layout.tsx`, `Sidebar.tsx`,
+atau CSS rail. D2 awal yang melarang seluruh document scroll direvisi: workspace
+dan shell Kalender tetap wajib tidak overflow/scroll; document overflow hanya
+boleh sama dengan overflow rail `.sidebar-rail` yang diukur pada viewport yang
+sama. Alasan, toleransi, metrik, dan kontrak pengganti tercatat lengkap di
+`plans/markdown/sidak-jadwal-shifting-loop-exit.md`.
+
+- Kalender kini membatasi kontrol ke setengah isi shell dengan gulir internal;
+  slot hasil dan matriks memakai flex/`min-h-0`, matriks menggulir pada kedua
+  sumbu. Pengukuran tinggi JS, observer, scheduler frame, batas rem, dan lantai
+  dihapus. Hari ini tetap pada layout dokumen.
+- Urutan Hari ini tetap layanan → shift → awal istirahat → TL → nama. Satu
+  fixture E2E kontradiktif membuktikan urutan literal dan interval valid/tidak
+  valid; unit order yang kini punya padanan UI dikurasi keluar, sedangkan unit
+  helper-only yang tak punya padanan dipertahankan. Manifest suite tidak diubah.
+- E2E RED sebelum perubahan produksi: 35 kasus, 29 gagal / 6 lulus; tidak ada
+  skip atau flaky. RED awal mendahului revisi D2 Fajar dan memakai oracle lama
+  yang melarang seluruh document scroll; hitungan itu bukan bukti untuk
+  pengecualian D2 aktif. GREEN sebelum kurasi: `green-final-v3` 35/35.
+  Sesudah tiga font diuji berurutan di dalam masing-masing kasus viewport (sesuai
+  plan), `green-final-v4`: 17/17 test lulus; sembilan kasus D1 masing-masing
+  mencakup font root 14/20/28px. Final seluruh spec dengan
+  `--repeat-each=2 --retries=0`: **100/100 passed, unexpected=0, flaky=0,
+  skipped=0**. Browser Chromium 148.0.7778.96. Kedua final artifacts dan RED
+  disimpan di `/tmp/sidak-loop-exit.B5TI0G` (`red-final.json`,
+  `green-final-v4.json`, `final-v2.json`, `final-v2-html/`).
+- Ada satu final-run eksploratif sebelum kurasi font: 136 test, 129 passed / 7
+  gagal saat route shell tidak ter-render dalam 5 detik atau menu tidak termuat;
+  artefak dipertahankan (`final.json`). Setelah satu kasus D1 memakai satu page
+  per viewport dan menguji ketiga font di dalamnya, run final baru selesai 100/100
+  tanpa retry/skip. Pada final, `pageErrors=[]`; dua pesan console 502 per run
+  hanya muncul pada state E2E yang sengaja memock API 502.
+- Visual Impeccable fallback audit dilakukan pada screenshot sintetis mobile
+  390×400/font 28 dan sticky light/dark; tidak ada blocker UI dalam scope. Ini
+  bukan klaim bahwa CLI/plugin Impeccable dijalankan.
+- Bukti D2 pada 1280×400/font 14px: workspace dan shell masing-masing
+  `clientHeight = scrollHeight = 344px`, tanpa scroll. Rail sidebar memiliki
+  `scrollHeight = 605px`, `clientHeight = 400px`, overflow 205px; document
+  `scrollHeight = 605px`. Perilaku rail berlaku lintas halaman dan ditunda agar
+  batch kalender tidak mengubah shell/global overflow. Seluruh workspace
+  acceptance tetap lulus; pengecualian document dibatasi oleh angka rail, bukan
+  pengecualian umum.
+- `Layout.tsx`, `Sidebar.tsx`, CSS rail, API/backend/types, dan
+  `schedule-sections.ts` tidak diubah. D8 `rg` pada MonthMatrix dan route exit 1
+  tanpa match; D9 protected-file diff exit 0; tracked `apps/web/test-results`
+  tidak berubah. `tsc --noEmit` web, `pnpm typecheck` (4/4), `pnpm lint` (4/4,
+  0 error), `pnpm build` (3/3), scoped Prettier, dan `git diff --check` lulus.
+  Lint mengeluarkan 8 warning API + 107 warning Web pada file lain; tidak ada
+  warning pada file batch. Build mencatat optional Tailwind output built-ins
+  dilewati dan tetap exit 0. Unit test tidak dijalankan sesuai guardrail.
+- Belum ada reviewer independen di sesi ini dan verdict/daftar sisa P3 putaran
+  10 tidak ditemukan. Karena itu semua bukti D1–D10 yang dapat dijalankan lulus,
+  tetapi plan belum bisa dinyatakan **siap push** sampai Fajar menyediakan
+  artefak P3 putaran 10 dan reviewer independen menutup exit gate. Tidak ada
+  commit, push, atau deploy.
+
+## Update 13 — 2026-09-30 — verifikasi pemeriksa + mutasi + triase P3 putaran 10
+
+Pemeriksa (Hermes) mengulang bukti batch ini **atas namanya sendiri**, bukan menerima
+laporan pelaksana begitu saja.
+
+**Gate dijalankan ulang segar (bukan cache Turbo):** `pnpm --filter @trainers/web exec
+tsc --noEmit` lulus; `pnpm turbo run typecheck --force` 4/4; `pnpm turbo run lint --force`
+4/4; `pnpm turbo run build --force` 3/3; Prettier scoped lulus; `git diff --check` lulus;
+tracked `apps/web/test-results` bersih; D8 `rg` 0 match di `MonthMatrix.tsx` dan route.
+
+**Mutation check oracle batch ini** (semua file dipulihkan byte-identik, dibuktikan `diff -q`):
+
+| Mutasi                                                        | Hasil                            | Arti                                                                                                 |
+| ------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Wadah matriks `overflow-auto` → `overflow-hidden`             | 3 test gagal                     | klaim "matriks benar-benar menggulir" bergigi                                                        |
+| Sel nama sticky `bg-background` → `bg-background/60`          | 5 test gagal                     | klaim "identitas opak" bergigi                                                                       |
+| Page div kalender kehilangan `h-full min-h-0 overflow-hidden` | 1 test gagal                     | kontrak struktural bergigi                                                                           |
+| Cap kontrol `max-h-[50%]` + clipping dibuang                  | 1 test gagal (kontrol 261 > 157) | batas 50% bergigi                                                                                    |
+| **Hanya `min-h-0` shell dibuang**                             | **0 test gagal**                 | sifatnya redundan di tata letak sekarang — dicatat sebagai keterbatasan, bukan diklaim sebagai bukti |
+
+**Celah jujur yang tidak ditutup:**
+
+1. Oracle D2 **revisi** tidak punya bukti RED di kode lama: RED awal memakai D2 historis
+   (larangan scroll dokumen menyeluruh). RED untuk bentuk revisi tidak dapat dijalankan
+   tanpa memuat ulang kode lama, sehingga digantikan mutation check di atas.
+2. Assertion khusus "dokumen tidak bergulir" **belum terbukti bergigi lewat mutasi**: setiap
+   mutasi yang memicu gulir dokumen gagal lebih dulu pada assertion kontrol/matriks. Sifatnya
+   _fail-safe_ yang hanya aktif bila dua pelindung (clipping + cap 50%) hilang bersamaan.
+
+**Triase 3 temuan P3 gate putaran 10** (daftar temuan disediakan pemeriksa; pelaksana tidak memilikinya):
+
+1. Koreksi `clientTop`/origin border pada rumus tinggi — **moot**: seluruh pengukuran JS dihapus (D8), tidak ada rumus tinggi lagi.
+2. Test gulir bisa lolos tanpa benar-benar menggulir — **tertutup**: spec membuktikan `scrollLeft`/`scrollTop` benar-benar naik (`toBeGreaterThan`) untuk matriks dan kontrol.
+3. Komentar kontradiktif "listener scroll pasif" — **tertutup**: `rg 'listener|passive|pasif'` pada `MonthMatrix.tsx` dan route = 0 match.
+
+**Insiden kecil:** satu run Playwright milik pemeriksa sempat menulis artefak ke
+`apps/web/test-results/`; artefak tracked dipulihkan dengan `git checkout --` dan direktori
+untracked dihapus, `git status` untuk path itu kembali bersih.
+
+## Update 14 — 2026-09-30 — hasil exit gate putaran 1 dan perbaikannya
+
+Reviewer independen (putaran exit 1) memberi **NEEDS_FIX: 1×P2 + 4×P3**. Dua temuan adalah
+kesalahan pemeriksa sendiri dan sudah diperbaiki:
+
+1. **P2 — Prettier gagal pada dua Markdown.** `plans/markdown/sidak-jadwal-shifting-loop-exit.md`
+   dan `docs/rebuild-logs/phase-224-sidak-jadwal-shifting.md` tidak terformat setelah pemeriksa
+   menambahkan _Update 13_. Pemeriksa sebelumnya hanya memeriksa file TS, sehingga gelap.
+   Perbaikan: `prettier --write` pada kesembilan file yang berubah → `prettier --check` **exit 0**.
+2. **P3 — status backlog P3 bertentangan.** Baris tabel backlog masih menyatakan _belum
+   terverifikasi_ padahal _Update 13_ mencatat triase tertutup/moot. Perbaikan: baris itu kini
+   mencatat triase dan status **ditutup**.
+
+Temuan P3 #2–#4 (RED D2 revisi tidak ada, mutasi belum mengisolasi assertion scroll dokumen,
+`min-h-0` shell tidak mutation-sensitive) **diterima reviewer sebagai P3 non-blocker** dan tetap
+tercatat terbuka di _Update 13_; tidak ada yang ditutup diam-diam.
+
+**Catatan penting tentang cakupan gate format.** Repo ini **tidak punya script `format:check`**;
+script yang ada hanya `format` = `prettier --write "**/*.{ts,tsx,md}"`. Menjalankan
+`prettier --check "**/*.{ts,tsx,md}"` repo-wide **gagal pada 1106 file** yang belum pernah
+diformat (keadaan lama, bukan akibat batch ini). Karena itu gate D10 diverifikasi **scoped ke
+file yang berubah**, dan itu yang exit 0. Klaim "seluruh repo terformat" tidak pernah dibuat.
+
+## Di luar cakupan dan tindak lanjut
+
+| Item / severity                                                                                | Bukti                                                                                                                                                                                                                                                                                                                                                                                 | Pemilik                                 | Alasan ditunda dan status                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sidebar rail overflow pada viewport pendek — backlog lintas halaman (D2 terukur)               | Pada 1280×400/font 14px: rail 605/400px (overflow 205px), document 605px; workspace/shell 344/344px. Perlu validasi tambahan di viewport tinggi di bawah konten rail ~605px.                                                                                                                                                                                                          | Fajar                                   | Shared-shell/sidebar berada di luar izin batch dan perubahan dapat memengaruhi navigasi lintas modul; tidak diperbaiki. Status: **ditunda**, revisi D2 secara eksplisit menerima hanya overflow rail terukur, bukan workspace scroll. |
+| Sisa P3 gate putaran 10 — tiga temuan, sudah ditriase                                          | Daftar temuan disediakan pemilik pada 2026-09-30 dan dicatat di _Update 13_ di atas: (1) koreksi border `clientTop` **moot** karena seluruh pengukuran JS dihapus (D8); (2) test gulir tanpa gulir nyata **tertutup** karena spec membuktikan `scrollLeft`/`scrollTop` benar-benar naik; (3) komentar `listener scroll pasif` **tertutup** (`rg listener\|passive\|pasif` = 0 match). | Pemilik batch (Fajar) menyetujui triase | Status: **ditutup — tidak ada P3 tersisa tanpa keputusan**. Baris ini menggantikan status _belum terverifikasi_ yang ditulis sebelum daftar temuan tersedia.                                                                          |
+| Unit helper-only (input activities null/undefined/non-array, immutability, comparator default) | Tidak ada jalur UI yang dapat mengobservasi kontrak isolated tersebut.                                                                                                                                                                                                                                                                                                                | Pemilik test                            | Dipertahankan; tidak menjalankan atau menambah test non-E2E sesuai guardrail.                                                                                                                                                         |

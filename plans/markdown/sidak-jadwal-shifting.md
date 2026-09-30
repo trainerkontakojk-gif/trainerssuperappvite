@@ -275,19 +275,23 @@ memiliki pemakai; pertahankan utilitas filter serta kalender yang masih dipakai.
 - [x] Mutation-check shift, layanan, TL, dan nama satu per satu melalui E2E.
 - [x] Perbarui docs/modul/log dan jalankan seluruh gate yang diminta pemilik.
 
-## Urutan tabel dan perilaku gulir (2026-09-30, lanjutan)
+## Urutan tabel dan perilaku gulir (2026-09-30, kontrak CSS lokal)
 
-- Urutan tabel Hari ini: shift → layanan → jam mulai istirahat (slot `LB`
+- Urutan tabel Hari ini: layanan → shift → jam mulai istirahat (slot `LB`
   pertama) → TL → nama. Baris tanpa istirahat selalu paling belakang.
-- Kalender: wadah dibatasi tinggi lewat **pengukuran adaptif terhadap area
-  gulir halaman** (`maxHeight = tinggi area gulir − posisi atas wadah − 16px`,
-  dengan lantai 5rem; area gulir = `section[aria-label="Konten halaman"]`,
-  bukan window; dibungkus `overflow-auto`), plus header tanggal `sticky top-0`
-  dan kolom nama opak + sticky kiri. Kelas `max-h-[calc(100dvh-34rem/28rem/24rem)]` tinggal
-  cadangan sebelum JS jalan. Hasilnya scrollbar horizontal terjangkau tanpa
-  menggulir halaman dulu dan kode tanggal tidak tembus di belakang nama agen.
-  Batas yang diakui: kalau jendela tidak cukup memuat kontrol di atas matriks +
-  lantai (mis. 390×400), yang dijamin hanya matriks tidak mengerut jadi nol.
+- Kalender memakai layout CSS lokal bounded di workspace: shell `h-full
+min-h-0 overflow-hidden`; kontrol `max-h-[50%] overflow-auto`; slot hasil
+  `flex-1 min-h-0`; matriks `flex-1 min-h-0 overflow-auto`. Tidak ada pengukuran
+  tinggi JavaScript, observer, frame scheduler, lantai `5rem`, atau cadangan
+  `34/28/24rem`. Header tanggal dan kolom nama tetap sticky dengan latar opak.
+  Kontrol dan matriks menggulir di dalam batasnya; Hari ini tetap memakai layout
+  dokumen. Workspace/shell tidak ikut menggulir dan matriks tetap di dalam
+  workspace, termasuk di atas tab bar bila terlihat.
+- Revisi D2 pemilik mengizinkan tinggi dokumen hanya sebesar overflow rail
+  sidebar bersama yang telah ada; batas itu diukur langsung dan tidak
+  disembunyikan. Pada 1280×400, workspace/shell 344px tanpa scroll, sementara
+  rail sidebar meluber 205px dan dokumen menjadi 605px. Kasus bersama ini
+  backlog phase-224; tidak mengubah Layout/sidebar untuk fitur kalender.
 
 ### Koreksi urutan (2026-09-30)
 
@@ -296,7 +300,10 @@ melihat hasilnya. Urutan: layanan (`Call → Digital Chat → Email → Leader` 
 bagian lain A–Z → kosong terakhir) → shift (`S1 → H → S2 → S3 → S4 → Off → kode
 tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → nama A–Z.
 
-### Batas yang dijaga (hasil gate putaran keempat)
+### Riwayat batas implementasi sebelum kontrak CSS lokal (superseded)
+
+Catatan berikut mempertahankan alasan historis dari gate sebelumnya; algoritme
+pengukuran, lantai, dan cadangan yang disebut bukan lagi kontrak runtime.
 
 - `SLOTS_PER_DAY = 96` adalah satu sumber kebenaran untuk batas slot aktivitas;
   dipakai `breakStartMinutes()` maupun `longBreakIntervals()`.
