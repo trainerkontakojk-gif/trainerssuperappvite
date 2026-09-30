@@ -1542,9 +1542,10 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       metrics.scrollWidth,
       "fixture harus benar-benar meluber horizontal",
     ).toBeGreaterThan(metrics.clientWidth);
-    expect(metrics.overflowX, "wadah yang menggulir bukan `visible`").not.toBe(
-      "visible",
-    );
+    expect(
+      ["auto", "scroll"],
+      "wadah harus benar-benar bisa digulir; `visible`, `hidden`, dan `clip` semuanya membuat pengguna tidak bisa menggulir horizontal",
+    ).toContain(metrics.overflowX);
     expect(
       metrics.scrollHeight,
       "isi lebih tinggi dari wadah supaya bisa digulir vertikal",
@@ -1582,10 +1583,64 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     ).toBeLessThanOrEqual(2);
   });
 
-  test("di layar pendek tepi bawah wadah tetap di dalam layar", async ({
+  /**
+   * Ruang di atas matriks berbeda-beda: di ≥1024px kontrol berbaris (300px),
+   * di 768px jadi 368px, dan di ≤480px menumpuk sampai 454px. Batas tinggi
+   * wadah harus tetap membuat scrollbar horizontal berada di dalam layar pada
+   * semua ukuran itu — bukan cuma di 1280×800.
+   */
+  for (const { width, height } of [
+    { width: 1280, height: 800 },
+    { width: 1280, height: 720 },
+    { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+    { width: 480, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`tepi bawah wadah tetap di dalam layar pada ${width}×${height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await openJadwalShifting(page, {
+        view: "calendar",
+        month: FIXTURE_MONTH,
+        behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+      });
+
+      const grid = page.getByTestId("jadwal-shifting-calendar");
+      await expect(grid).toBeVisible();
+
+      const metrics = await grid.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          top: Math.round(rect.top),
+          bottom: Math.round(rect.bottom),
+          clientHeight: el.clientHeight,
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+        };
+      });
+
+      expect(
+        metrics.bottom,
+        "scrollbar horizontal harus terjangkau tanpa menggulir halaman",
+      ).toBeLessThanOrEqual(height);
+      expect(
+        metrics.scrollWidth,
+        "matriks memang meluber horizontal di ukuran ini",
+      ).toBeGreaterThan(metrics.clientWidth);
+      expect(
+        metrics.clientHeight,
+        "matriks tidak boleh mengerut jadi nol",
+      ).toBeGreaterThan(0);
+      void metrics.top;
+    });
+  }
+
+  test("di jendela sangat pendek matriks tetap punya tinggi minimum", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1280, height: 400 });
     await openJadwalShifting(page, {
       view: "calendar",
       month: FIXTURE_MONTH,
@@ -1595,14 +1650,19 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     const grid = page.getByTestId("jadwal-shifting-calendar");
     await expect(grid).toBeVisible();
 
-    const bottom = await grid.evaluate((el) =>
-      Math.round(el.getBoundingClientRect().bottom),
-    );
-    const viewportHeight = page.viewportSize()?.height ?? 0;
+    const measurement = await grid.evaluate((el) => ({
+      clientHeight: el.clientHeight,
+      rootFontSize: Number.parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      ),
+    }));
+    // Aplikasi ini memakai root font-size 14px, jadi 14rem = 196px, bukan 224px.
+    const floor = 14 * measurement.rootFontSize;
+    expect(measurement.rootFontSize).toBeGreaterThan(0);
     expect(
-      bottom,
-      "scrollbar horizontal harus tetap terjangkau di layar pendek",
-    ).toBeLessThanOrEqual(viewportHeight);
+      measurement.clientHeight,
+      `lantai 14rem (= ${floor}px di root ${measurement.rootFontSize}px) menjaga matriks tetap terbaca`,
+    ).toBeGreaterThanOrEqual(floor - 8);
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

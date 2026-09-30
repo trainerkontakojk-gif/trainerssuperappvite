@@ -119,14 +119,20 @@ export function MonthMatrix({ month, rows }: Props) {
       aria-label="Matriks jadwal per agen"
       tabIndex={0}
       /*
-       * Tinggi dibatasi (± satu layar dikurangi tinggi header/filter) supaya
-       * scrollbar horizontal berada DI DALAM layar. Sebelumnya wadahnya
-       * setinggi seluruh isi, jadi scrollbar horizontal baru ketemu setelah
-       * menggulir halaman ke bawah — di matriks 30 agen itu ~900px.
-       * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat
-       * saat isinya digulir.
+       * Tinggi dibatasi supaya scrollbar horizontal berada DI DALAM layar.
+       * Sebelumnya wadahnya setinggi seluruh isi, jadi scrollbar horizontal
+       * baru ketemu setelah menggulir halaman ke bawah — di matriks 30 agen itu
+       * ~900px.
+       *
+       * Cadangan ruangnya dibuat responsif karena kontrol di atas matriks
+       * menumpuk di layar sempit. Terukur di aplikasi ini (1rem = 14px, root
+       * font-size bukan 16px): ruang-atas 300px di ≥1024px, 368px di 768px,
+       * dan 454px di ≤480px — jadi cadangan 24rem/28rem/34rem menyisakan
+       * margin ~20px di semua ukuran layar itu. `min-h` menjaga matriks tidak
+       * mengerut jadi nol di jendela yang sangat pendek.
+       * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat.
        */
-      className="min-w-0 max-h-[calc(100dvh-24rem)] overflow-auto rounded-lg border border-border"
+      className="min-w-0 max-h-[calc(100dvh-34rem)] min-h-[14rem] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
     >
       <table className="w-max border-collapse text-sm">
         <caption className="sr-only">

@@ -31,6 +31,7 @@ import {
   normalizeSectionSlug,
   breakStartMinutes,
   LONG_BREAK_CODE,
+  SLOTS_PER_DAY,
   orderScheduleRows,
   sectionFromSlug,
   shiftMonth,
@@ -172,7 +173,7 @@ function longBreakIntervals(
             activity.value.trim().toUpperCase() === LONG_BREAK_CODE &&
             Number.isSafeInteger(activity.slot) &&
             activity.slot >= 0 &&
-            activity.slot < 96,
+            activity.slot < SLOTS_PER_DAY,
         )
         .map((activity) => activity.slot),
     ),

@@ -135,6 +135,15 @@ function compareTeamLeaders(a: string, b: string): number {
 export const LONG_BREAK_CODE = "LB";
 
 /**
+ * Jumlah slot aktivitas dalam satu hari (24 jam ÷ 15 menit). Slot di luar
+ * rentang ini tidak pernah dirender oleh tampilan (`longBreakIntervals()` di
+ * route memakai batas yang sama), jadi pengurutan wajib memakai batas yang sama
+ * juga — kalau tidak, baris bisa diurutkan seolah punya istirahat yang tidak
+ * pernah muncul di kolom jam.
+ */
+export const SLOTS_PER_DAY = 96;
+
+/**
  * Menit sejak 00:00 saat istirahat panjang pertama dimulai, atau `null` kalau
  * baris itu tidak punya istirahat yang terbaca.
  *
@@ -143,12 +152,14 @@ export const LONG_BREAK_CODE = "LB";
  * supaya baris tanpa data selalu jatuh ke belakang, bukan tampil paling awal.
  */
 export function breakStartMinutes(
-  activities: ReadonlyArray<{ slot: number; value: string }>,
+  activities: ReadonlyArray<{ slot: number; value: string }> | null | undefined,
 ): number | null {
+  if (!Array.isArray(activities)) return null;
   let earliest: number | null = null;
   for (const activity of activities) {
     if (activity.value.trim().toUpperCase() !== LONG_BREAK_CODE) continue;
-    if (!Number.isSafeInteger(activity.slot) || activity.slot < 0) continue;
+    if (!Number.isSafeInteger(activity.slot)) continue;
+    if (activity.slot < 0 || activity.slot >= SLOTS_PER_DAY) continue;
     if (earliest === null || activity.slot < earliest) earliest = activity.slot;
   }
   return earliest === null ? null : earliest * 15;

@@ -111,12 +111,17 @@ diletakkan paling belakang (bukan dianggap break 00:00). Helper
 `breakStartMinutes()` dan `LONG_BREAK_CODE` ditambahkan di `schedule-sections.ts`,
 dan kode `"LB"` yang tadinya literal di route sekarang memakai konstanta itu.
 
-Bukti: E2E `sidak-jadwal-shifting.spec.ts` **36 lulus** (3 test baru: urutan
-istirahat, latar kolom nama opak, wadah gulir dibatasi tinggi ditambah satu
-kasus layar 720px). Mutation check: comparator istirahat dibuang, latar nama
-dibuat tembus, dan batas tinggi dihapus — ketiganya membuat test terkait gagal.
-Dengan data asli WFM 30 Sep 2026 (78 baris), urutan yang terlihat: Call/S1
-istirahat 10:00 → 11:00, lalu Digital Chat/H 11:00 → 12:00 → 13:00.
+Bukti yang bisa direproduksi dari commit ini: E2E
+`sidak-jadwal-shifting.spec.ts` (test urutan istirahat, latar kolom nama opak,
+wadah gulir dibatasi tinggi di enam ukuran layar, lantai tinggi di jendela
+pendek) dan unit test `sidak-jadwal-shifting-order.test.ts`. Mutation check:
+comparator istirahat dibuang, latar nama dibuat tembus, dan batas tinggi dihapus
+— ketiganya membuat test terkait gagal.
+
+Klaim "data asli WFM 78 baris" pada versi pertama catatan ini berasal dari
+pengamatan manual di luar repo (query baca-saja ke upstream WFM) dan **tidak
+bisa direproduksi dari commit**; anggap sebagai pengamatan belum terverifikasi,
+bukan bukti.
 
 ## Update 6 — 2026-09-30 — layanan jadi kunci urutan paling luar
 
@@ -131,5 +136,30 @@ Perubahannya hanya menukar dua comparator di `orderScheduleRows()`; urutan shift
 dan aturan istirahat tidak berubah. Test `urutan tabel mengikuti layanan, shift,
 TL, lalu nama dari baris acak` diperbarui ke kontrak baru dan dibuktikan RED
 dulu, lalu GREEN. Mutation check: menukar kembali kedua comparator membuat test
-itu gagal. E2E penuh **36 lulus**, `tsc --noEmit`, ESLint, dan `pnpm build`
-(3/3 task) lulus.
+itu gagal.
+
+## Update 7 — 2026-09-30 — menutup temuan gate thermo-nuclear putaran keempat
+
+Gate putaran keempat atas `66c8641` memberi verdict **NEEDS_FIX** dengan empat
+temuan; semuanya dikerjakan.
+
+1. **P2 — batas slot istirahat tidak seragam.** `breakStartMinutes()` menerima
+   slot berapa pun ≥ 0, sementara `longBreakIntervals()` di route hanya
+   merender slot 0–95. Akibatnya baris bisa diurutkan seolah punya istirahat
+   yang tidak pernah muncul di kolom jam. Sekarang keduanya memakai konstanta
+   bersama `SLOTS_PER_DAY = 96`; helper juga menolak `activities` yang hilang,
+   bukan array, atau berisi slot bukan bilangan bulat.
+2. **P2 — batas tinggi wadah hanya teruji di satu ukuran layar.** Diukur ulang:
+   ruang di atas matriks 300px (≥1024px), 368px (768px), dan 454px (≤480px) —
+   jadi `100dvh - 24rem` tidak cukup di layar sempit. Cadangan sekarang
+   responsif (`34rem` dasar, `28rem` ≥768px, `24rem` ≥1024px) dengan lantai
+   `min-h-[14rem]` supaya matriks tidak mengerut jadi nol di jendela pendek.
+   E2E kini memeriksa tepi bawah wadah di enam ukuran layar (1280×800, 1280×720,
+   1024×768, 768×1024, 480×800, 390×844) plus satu kasus jendela 400px.
+   Catatan yang sempat salah: root font-size aplikasi ini 14px, bukan 16px, jadi
+   `rem` di CSS ini 14px — perhitungan pertama keliru karena mengasumsikan 16px.
+3. **P3 — uji gulir terlalu longgar.** `overflowX !== "visible"` juga meloloskan
+   `hidden`/`clip`; sekarang harus `auto` atau `scroll`.
+4. **P3 — klaim "data asli" tanpa bukti.** Klaim itu ditandai sebagai pengamatan
+   di luar repo yang belum terverifikasi (lihat Update 5) dan digantikan bukti
+   yang bisa direproduksi dari commit.

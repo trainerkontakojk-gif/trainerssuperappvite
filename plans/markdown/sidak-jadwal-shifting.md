@@ -286,3 +286,13 @@ Kunci paling luar adalah **layanan**, bukan shift — dikoreksi pemilik setelah
 melihat hasilnya. Urutan: layanan (`Call → Digital Chat → Email → Leader` →
 bagian lain A–Z → kosong terakhir) → shift (`S1 → H → S2 → S3 → S4 → Off → kode
 tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → nama A–Z.
+
+### Batas yang dijaga (hasil gate putaran keempat)
+
+- `SLOTS_PER_DAY = 96` adalah satu sumber kebenaran untuk batas slot aktivitas;
+  dipakai `breakStartMinutes()` maupun `longBreakIntervals()`.
+- Batas tinggi wadah kalender responsif: `34rem` (dasar), `28rem` (≥768px),
+  `24rem` (≥1024px), dengan lantai `min-h-[14rem]`. **1rem = 14px di app ini**
+  (root font-size bukan 16px) — jangan hitung dengan asumsi 16px.
+- Uji gulir harus memastikan `overflow` bernilai `auto`/`scroll`, bukan sekadar
+  "bukan visible".
