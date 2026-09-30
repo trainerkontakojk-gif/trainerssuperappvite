@@ -591,11 +591,10 @@ export function jadwalSuccessBody(
 export const FIXTURE_MONTH = "2026-09";
 
 /**
- * Baris OFF/Libur ditambahkan supaya pengelompokan "masuk" versus "libur"
- * benar-benar membuktikan diri: tanpa baris non-masuk, kedua kelompok tidak
- * akan pernah bisa dibedakan oleh test.
+ * Baris sintetis untuk format harian: campuran layanan dan satu kode Off agar
+ * tabel tetap membuktikan bahwa baris non-kerja tidak disembunyikan.
  */
-export function groupedRows() {
+export function dailyRows() {
   return [
     ...normalizedRows(),
     {

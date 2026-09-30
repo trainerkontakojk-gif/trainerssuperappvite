@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/table";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { MonthMatrix } from "../../components/sidak/jadwal-shifting/MonthMatrix";
-import { ScheduleGroups } from "../../components/sidak/jadwal-shifting/ScheduleGroups";
 import { SectionFilter } from "../../components/sidak/jadwal-shifting/SectionFilter";
 import {
   calendarSectionOptions,
@@ -30,7 +29,7 @@ import {
   monthLabel,
   normalizeChannelSlug,
   normalizeSectionSlug,
-  orderBySectionThenTeamLeader,
+  orderScheduleRows,
   sectionFromSlug,
   shiftMonth,
   todaySectionOptions,
@@ -40,7 +39,7 @@ import {
  * `/sidak/jadwal-shifting` — tampilan read-only jadwal shifting WFM Dash Pro
  * dalam DUA format:
  *
- *   1. **Hari ini** — siapa masuk dan siapa libur pada satu tanggal, dengan
+ *   1. **Hari ini** — satu tabel detail jadwal untuk tanggal terpilih, dengan
  *      pilihan bagian layanan (Semua, Call, Digital Chat, Email, Leader).
  *   2. **Kalender** — satu bulan penuh untuk empat bagian itu, lengkap dengan
  *      hitungan masuk/libur per tanggal dan detail nama pada tanggal terpilih.
@@ -374,13 +373,11 @@ export default function SidakJadwalShiftingPage() {
   }
 
   const data = dayState.kind === "ready" ? dayState.data : null;
-  // Satu urutan untuk seluruh halaman: saring dulu (bagian layanan), lalu
-  // kelompokkan per layanan → TL → nama. Daftar masuk/libur dan tabel detail
-  // sama-sama memakai hasil ini, jadi orang yang sama tidak pindah posisi
-  // antar panel.
+  // Filter bagian tetap berjalan di klien, lalu baris tabel diurutkan menurut
+  // prioritas shift → layanan → TL → nama tanpa bergantung urutan sumber.
   const detailRows = useMemo(
     () =>
-      orderBySectionThenTeamLeader(
+      orderScheduleRows(
         (data?.rows ?? []).filter((row) =>
           matchesSection(row.channel, channelSlug),
         ),
@@ -590,8 +587,6 @@ export default function SidakJadwalShiftingPage() {
                       />
                     </div>
                   ) : null}
-
-                  <ScheduleGroups rows={detailRows} date={data.date} />
 
                   {/*
                     Region inilah yang harus jadi scroller horizontal, BUKAN wrapper

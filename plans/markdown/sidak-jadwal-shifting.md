@@ -162,10 +162,11 @@ lint, build, Prettier, dan `git diff --check` (file yang dimodifikasi saja).
 - [x] Implementasikan tampilan tiga bidang pada format harian saja.
 - [x] Jalankan focused E2E, typecheck, lint, build, format, diff-check, dan inspeksi tampilan.
 
-## Urutan daftar harian — layanan → team leader (2026-09-30)
+## Urutan daftar harian — layanan → team leader (2026-09-30; superseded)
 
-Permintaan: daftar pada format **Hari ini** dirapikan — "contoh dari tim leader atau
-layanan". Keputusan Fajar (dua putaran):
+Bagian ini mencatat keputusan historis yang kemudian digantikan oleh revisi
+pemilik di bawah: **Hari ini hanya memakai tabel detail**, tanpa daftar Masuk/Libur
+dan tanpa subjudul layanan/TL.
 
 1. Kelompokkan **per team leader**, nama agen urut A–Z di dalamnya.
 2. Lalu tambah **pengelompokan per layanan** sebagai tingkat TERATAS:
@@ -222,3 +223,36 @@ Verifikasi akhir: **38 / 38 lulus** (kasus kapitalisasi RED dulu: 1 gagal /
 37 lulus), `tsc --noEmit` web bersih, ESLint bersih, Prettier dijalankan,
 `pnpm build` 3/3 task sukses, `git diff --check` bersih. Gate Pi dijalankan
 ulang setelah commit perbaikan.
+
+## Revisi pemilik — Hari ini hanya tabel detail dan urutan baris
+
+### Requirement
+
+- Format **Hari ini** hanya menampilkan tabel detail sebagai satu-satunya daftar.
+  Panel `ScheduleGroups`, pemisahan Masuk/Libur, dan subjudul layanan/TL dihapus.
+- Urutan tabel per baris: shift `S1 → H → S2 → S3 → S4 → Off → kode tak dikenal`;
+  layanan `Call → Digital Chat → Email → Leader → layanan lain`; TL A–Z dengan TL
+  kosong terakhir; nama agen A–Z.
+- `Off` hanya mencakup shift kosong, `OFF`, `LIBUR`, `LBR`, dan `CUTI`.
+  Kode/label lain (termasuk `TBCCI` dan rentang jam) tetap tampil sesudah Off,
+  diurutkan A–Z di antara kode tak dikenal.
+- Pencocokan layanan dikenal tidak peka kapitalisasi; layanan tak dikenal tetap
+  tampil di belakang daftar kanonik. Filter layanan tetap berjalan.
+- Format **Kalender** tidak berubah; baris agen tetap A–Z. Loading, kosong, gagal,
+  truncated, dan hanya-baca tetap sama.
+- Tidak mengubah API, shared types, proyeksi WFM, operasi tulis, atau AI.
+
+### Design
+
+Gunakan satu comparator leksikografis atas field barisnya sendiri (shift,
+layanan, TL, nama), tanpa pengelompokan tambahan atau ketergantungan pada urutan
+sumber WFM. Hapus `ScheduleGroups.tsx` dan helper grouping yang tidak lagi
+memiliki pemakai; pertahankan utilitas filter serta kalender yang masih dipakai.
+
+### Tasklist
+
+- [x] Tulis E2E RED untuk tabel-saja dan semua tingkat urutan dengan fixture yang
+      layanan input-nya berlawanan dari urutan kanonik serta memuat layanan tak dikenal.
+- [x] Implementasi comparator harian dan hapus daftar/grouping mati.
+- [x] Mutation-check shift, layanan, TL, dan nama satu per satu melalui E2E.
+- [x] Perbarui docs/modul/log dan jalankan seluruh gate yang diminta pemilik.
