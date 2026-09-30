@@ -1637,7 +1637,13 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     });
   }
 
-  test("di jendela sangat pendek matriks tetap punya tinggi minimum", async ({
+  /**
+   * Dua sifat yang harus dipegang bersama di jendela pendek: matriks tidak
+   * mengerut jadi nol (lantai `min-h-[5rem]`), dan lantai itu tidak boleh
+   * mendorong tepi bawah wadah keluar layar (yang akan mengembalikan masalah
+   * scrollbar tak terjangkau). Di 1280×400 keduanya bisa dipenuhi sekaligus.
+   */
+  test("di jendela 400px: matriks tidak mengerut jadi nol dan tepi bawah tetap di dalam layar", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 400 });
@@ -1652,17 +1658,47 @@ test.describe("Format kalender (matriks agen × hari)", () => {
 
     const measurement = await grid.evaluate((el) => ({
       clientHeight: el.clientHeight,
+      bottom: Math.round(el.getBoundingClientRect().bottom),
       rootFontSize: Number.parseFloat(
         getComputedStyle(document.documentElement).fontSize,
       ),
     }));
-    // Aplikasi ini memakai root font-size 14px, jadi 14rem = 196px, bukan 224px.
-    const floor = 14 * measurement.rootFontSize;
+    // Aplikasi ini memakai root font-size 14px, jadi 5rem = 70px, bukan 80px.
+    const floor = 5 * measurement.rootFontSize;
     expect(measurement.rootFontSize).toBeGreaterThan(0);
     expect(
       measurement.clientHeight,
-      `lantai 14rem (= ${floor}px di root ${measurement.rootFontSize}px) menjaga matriks tetap terbaca`,
+      `lantai 5rem (= ${floor}px di root ${measurement.rootFontSize}px) menjaga matriks tidak mengerut jadi nol`,
     ).toBeGreaterThanOrEqual(floor - 8);
+    expect(
+      measurement.bottom,
+      "lantai tinggi tidak boleh mendorong tepi bawah wadah keluar layar",
+    ).toBeLessThanOrEqual(400);
+  });
+
+  /**
+   * Batas yang disadari: di jendela setinggi 300px, ruang di atas matriks saja
+   * sudah menghabiskan hampir seluruh layar, jadi `max-h` bisa jatuh ke nol.
+   * Di sini yang dijamin hanya lantai — matriks tidak boleh menghilang.
+   */
+  test("di jendela 300px matriks tidak menghilang walau batas atas jatuh ke nol", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 300 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+
+    const grid = page.getByTestId("jadwal-shifting-calendar");
+    await expect(grid).toBeVisible();
+
+    const clientHeight = await grid.evaluate((el) => el.clientHeight);
+    expect(
+      clientHeight,
+      "tanpa lantai, tinggi jatuh ke nol dan matriks tidak terlihat sama sekali",
+    ).toBeGreaterThanOrEqual(60);
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

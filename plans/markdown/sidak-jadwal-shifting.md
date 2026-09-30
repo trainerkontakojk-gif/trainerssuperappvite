@@ -9,9 +9,13 @@ Buat laman operasional read-only di SIDAK untuk melihat jadwal shifting agen dar
 **Fakta terverifikasi**
 
 - Login kustom WFM melalui `google.script.run.checkLogin(username, password)` berhasil pada uji terbatas. Slot username/password tersedia di vault; nilai tidak dicetak atau disimpan.
-- Fajar mengizinkan pembacaan jadwal WFM yang diperlukan secara read-only; data baris tidak boleh dicetak ke chat atau disimpan sebagai fixture/artefak. Pada 29 September 2026, request langsung ke host Supabase WFM membaca 78 baris untuk satu tanggal; isi jadwal tidak dimasukkan ke repo/fixture.
+- Fajar mengizinkan pembacaan jadwal WFM yang diperlukan secara read-only; data baris tidak boleh dicetak ke chat atau disimpan sebagai fixture/artefak. Isi jadwal tidak dimasukkan ke repo/fixture.
 - Fajar menetapkan MVP hanya untuk role `admin` dan `trainer`; leader dan agent tidak termasuk.
 - Sumber Apps Script yang diberikan menunjukkan `getScheduleFromSupabase(dateStr, channel)` sudah membaca tabel Supabase, sementara file yang diperiksa tidak menunjukkan handler `doPost(e)`. Request langsung Supabase untuk satu tanggal berhasil; adapter Node lama yang mencoba POST `f.req` gagal `WFM_INVALID_RESPONSE`. Ganti adapter ke direct PostgREST; tidak perlu meminta pemilik WFM mencari `f.req` atau membagikan ulang credential.
+
+**Pengamatan belum terverifikasi (di luar repo)**
+
+- Pada 29 September 2026, request read-only manual ke host Supabase WFM sempat membaca 78 baris untuk satu tanggal. Angka itu **tidak bisa direproduksi dari commit mana pun** (tidak ada fixture atau skrip yang menyimpannya di repo), jadi dicatat sebagai pengamatan, bukan bukti — jangan dipakai sebagai dasar keputusan.
 
 **Hasil yang diminta**
 
@@ -292,7 +296,12 @@ tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → 
 - `SLOTS_PER_DAY = 96` adalah satu sumber kebenaran untuk batas slot aktivitas;
   dipakai `breakStartMinutes()` maupun `longBreakIntervals()`.
 - Batas tinggi wadah kalender responsif: `34rem` (dasar), `28rem` (≥768px),
-  `24rem` (≥1024px), dengan lantai `min-h-[14rem]`. **1rem = 14px di app ini**
-  (root font-size bukan 16px) — jangan hitung dengan asumsi 16px.
+  `24rem` (≥1024px), dengan lantai `min-h-[5rem]`. Lantai sengaja kecil: kalau
+  lebih besar dari `max-h`, lantai menang dan scrollbar horizontal kembali
+  melorot ke bawah layar di jendela pendek. **1rem = 14px di app ini** (root
+  font-size bukan 16px) — jangan hitung dengan asumsi 16px.
+- Batas yang disadari: di jendela setinggi ±300px, ruang di atas matriks sudah
+  menghabiskan layar sehingga `max-h` bisa jatuh ke nol; di ukuran itu yang
+  dijamin hanya lantai (matriks tidak menghilang).
 - Uji gulir harus memastikan `overflow` bernilai `auto`/`scroll`, bukan sekadar
   "bukan visible".

@@ -128,11 +128,15 @@ export function MonthMatrix({ month, rows }: Props) {
        * menumpuk di layar sempit. Terukur di aplikasi ini (1rem = 14px, root
        * font-size bukan 16px): ruang-atas 300px di ≥1024px, 368px di 768px,
        * dan 454px di ≤480px — jadi cadangan 24rem/28rem/34rem menyisakan
-       * margin ~20px di semua ukuran layar itu. `min-h` menjaga matriks tidak
-       * mengerut jadi nol di jendela yang sangat pendek.
+       * margin ~20px di semua ukuran layar itu.
+       *
+       * `min-h` sengaja kecil (5rem): fungsinya HANYA mencegah matriks mengerut
+       * jadi nol, bukan menjamin tinggi nyaman. Lantai yang lebih besar justru
+       * mengalahkan `max-h` dan mendorong scrollbar horizontal kembali ke bawah
+       * layar pada jendela pendek — persis masalah yang mau dihilangkan.
        * `overflow-auto` + header sticky membuat konteks kolom tetap terlihat.
        */
-      className="min-w-0 max-h-[calc(100dvh-34rem)] min-h-[14rem] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
+      className="min-w-0 max-h-[calc(100dvh-34rem)] min-h-[5rem] overflow-auto rounded-lg border border-border md:max-h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-24rem)]"
     >
       <table className="w-max border-collapse text-sm">
         <caption className="sr-only">

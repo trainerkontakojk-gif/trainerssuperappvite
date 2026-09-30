@@ -163,3 +163,24 @@ temuan; semuanya dikerjakan.
 4. **P3 — klaim "data asli" tanpa bukti.** Klaim itu ditandai sebagai pengamatan
    di luar repo yang belum terverifikasi (lihat Update 5) dan digantikan bukti
    yang bisa direproduksi dari commit.
+
+## Update 8 — 2026-09-30 — menutup temuan gate putaran kelima
+
+Gate putaran kelima atas `2220a2e` memberi verdict **NEEDS_FIX** dengan dua
+temuan.
+
+1. **P2 — lantai tinggi mengalahkan batas atas di jendela pendek.** `min-h-[14rem]`
+   lebih besar daripada `max-h` di jendela 400px, sehingga lantai menang dan
+   tepi bawah wadah tetap keluar layar — tujuan "scrollbar horizontal
+   terjangkau" batal di jendela pendek. Lantai diturunkan ke `min-h-[5rem]`;
+   fungsinya sekarang hanya mencegah matriks mengerut jadi nol, bukan menjamin
+   tinggi nyaman. E2E memeriksa dua sifat terpisah: di 1280×400 tinggi ≥ lantai
+   **dan** tepi bawah ≤ 400; di 1280×300 hanya lantai yang dijamin (batas atas
+   bisa jatuh ke nol karena ruang di atas sudah menghabiskan layar) — batas ini
+   ditulis terbuka di komentar test.
+2. **P3 — klaim "78 baris" masih bercokol di bagian "Fakta terverifikasi" plan.**
+   Baris itu dikeluarkan dari daftar fakta dan dipindah ke blok **Pengamatan
+   belum terverifikasi (di luar repo)**, sejalan dengan catatan di Update 5.
+
+Mutation check: lantai dibalik ke `14rem` → test 400px gagal; lantai dibuang →
+test 300px gagal.
