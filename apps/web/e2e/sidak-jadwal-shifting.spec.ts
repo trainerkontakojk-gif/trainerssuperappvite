@@ -75,6 +75,9 @@ async function measureCalendar(page: import("@playwright/test").Page): Promise<{
   boxHeight: number;
   roomBelow: number;
   roomBelowAfterScroll: number;
+  heightAfterScroll: number;
+  heightBeforeScroll: number;
+  visibleAfterScroll: boolean;
   fits: boolean;
   tabBarTop: number | null;
   overlapsTabBar: boolean;
@@ -106,11 +109,18 @@ async function measureCalendar(page: import("@playwright/test").Page): Promise<{
       workspaceRect.bottom - grid.getBoundingClientRect().bottom,
     );
 
+    const heightBeforeScroll = grid.getBoundingClientRect().height;
     workspace.scrollTop = workspace.scrollHeight;
     const roomBelowAfterScroll = Math.round(
       workspace.getBoundingClientRect().bottom -
         grid.getBoundingClientRect().bottom,
     );
+    const heightAfterScroll = grid.getBoundingClientRect().height;
+    // Kalau matriks sudah tergulir keluar dari area terlihat, `roomBelow`
+    // otomatis besar dan assertion-nya jadi kosong. Ini penjaganya.
+    const visibleAfterScroll =
+      grid.getBoundingClientRect().bottom >
+      workspace.getBoundingClientRect().top;
 
     // Ukur tab bar pada posisi gulir paling atas: di situ tepi bawah wadah
     // paling dekat dengan tab bar.
@@ -128,6 +138,9 @@ async function measureCalendar(page: import("@playwright/test").Page): Promise<{
       boxHeight: grid.getBoundingClientRect().height,
       roomBelow,
       roomBelowAfterScroll,
+      heightAfterScroll,
+      heightBeforeScroll,
+      visibleAfterScroll,
       fits,
       tabBarTop,
       overlapsTabBar,
@@ -1723,9 +1736,17 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       ).toBeGreaterThan(metrics.clientWidth);
 
       expect(
+        metrics.visibleAfterScroll,
+        "setelah digulir ke bawah, matriks masih terlihat — kalau tidak, pemeriksaan berikutnya kosong",
+      ).toBe(true);
+      expect(
         metrics.roomBelowAfterScroll,
         "setelah area gulir digulir ke bawah, tepi bawah wadah tetap harus terlihat",
       ).toBeGreaterThanOrEqual(0);
+      expect(
+        metrics.heightAfterScroll,
+        "tinggi wadah tidak boleh berubah hanya karena halaman digulir",
+      ).toBeCloseTo(metrics.heightBeforeScroll, 0);
 
       if (metrics.fits) {
         expect(
@@ -1774,6 +1795,20 @@ test.describe("Format kalender (matriks agen × hari)", () => {
 
     // Tunggu pengukuran ulang benar-benar selesai (MutationObserver →
     // requestAnimationFrame), bukan sekadar menunggu waktu tetap.
+    // Font HARUS benar-benar membesar — kalau tidak, seluruh test ini kosong.
+    // Dicek sebagai assertion keras, bukan bagian dari polling geometri.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() =>
+            Number.parseFloat(
+              getComputedStyle(document.documentElement).fontSize,
+            ),
+          ),
+        { message: "teks harus benar-benar membesar ke 20px" },
+      )
+      .toBeCloseTo(20, 0);
+
     // Tunggu sampai pengukuran ulang SELESAI, bukan sekadar sampai ukuran teks
     // berubah: MutationObserver → requestAnimationFrame butuh satu frame lagi.
     await expect
@@ -1805,6 +1840,45 @@ test.describe("Format kalender (matriks agen × hari)", () => {
       expect(metrics.boxHeight).toBeCloseTo(floor, 0);
     }
     expect(metrics.overlapsTabBar).toBe(false);
+  });
+
+  /**
+   * Kasus dari temuan gate: pemicu pengukuran ulang (di sini teks diperbesar)
+   * datang SAAT halaman sedang digulir. Rumus yang memakai selisih visual
+   * mentah akan menghasilkan batas tinggi kelebihan sebesar jarak gulirnya.
+   */
+  test("pengukuran ulang saat halaman sedang digulir tetap menjaga tepi bawah di dalam area gulir", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openJadwalShifting(page, {
+      view: "calendar",
+      month: FIXTURE_MONTH,
+      behavior: { kind: "data", monthRows: BIG_MATRIX_ROWS },
+    });
+    await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
+
+    // Gulir dulu, baru picu pengukuran ulang.
+    await page.evaluate(() => {
+      const workspace = document.querySelector(
+        '[aria-label="Konten halaman"]',
+      ) as HTMLElement;
+      workspace.scrollTop = 240;
+    });
+    await page.addStyleTag({ content: "html { font-size: 18px }" });
+    await page.waitForTimeout(400);
+
+    const metrics = await measureCalendar(page);
+    expect(metrics.rootFontSize).toBeCloseTo(18, 0);
+    if (metrics.fits) {
+      expect(
+        metrics.roomBelow,
+        "tepi bawah wadah harus tetap di dalam area gulir walau pengukuran ulang terjadi saat digulir",
+      ).toBeGreaterThanOrEqual(0);
+      expect(metrics.roomBelow).toBeLessThanOrEqual(24);
+    } else {
+      expect(metrics.boxHeight).toBeCloseTo(5 * metrics.rootFontSize, 0);
+    }
   });
 
   test("kode shift yang tidak dikenal tetap ditampilkan utuh, bukan dianggap libur", async ({

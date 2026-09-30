@@ -142,14 +142,22 @@ export function MonthMatrix({ month, rows }: Props) {
       const regionRect = region.getBoundingClientRect();
       const scrollport = findScrollport(region);
       /*
-       * Tanpa suku `scrollTop`: kalau posisi gulir ikut dihitung, tinggi wadah
-       * berubah-ubah setiap kali halaman digulir dan tabelnya terasa berkedip.
-       * Dengan rumus ini, tepi bawah wadah sudah muat pada posisi gulir paling
-       * atas (kasus terburuk) — menggulir ke bawah hanya membuatnya makin muat.
+       * Offset dihitung dalam KOORDINAT ISI area gulir, yaitu posisi visual
+       * ditambah `scrollTop`. Tanpa suku `scrollTop`, selisih visual mengecil
+       * saat halaman digulir, sehingga pengukuran ulang di tengah gulir
+       * (resize area gulir, teks diperbesar, font selesai dimuat) menghasilkan
+       * `maxHeight` kelebihan sebesar jarak gulirnya.
+       *
+       * Dengan suku itu, hasilnya tidak bergantung posisi gulir sama sekali,
+       * DAN sama dengan kondisi terburuk (halaman pada posisi paling atas):
+       * tepi bawah wadah sudah muat di sana, dan menggulir ke bawah hanya
+       * membuatnya makin muat.
        */
       const available = scrollport
         ? scrollport.clientHeight -
-          (regionRect.top - scrollport.getBoundingClientRect().top) -
+          (regionRect.top -
+            scrollport.getBoundingClientRect().top +
+            scrollport.scrollTop) -
           VIEWPORT_MARGIN_PX
         : window.innerHeight -
           (regionRect.top + window.scrollY) -
@@ -199,9 +207,10 @@ export function MonthMatrix({ month, rows }: Props) {
     window.addEventListener("resize", measure);
     // Area gulir bisa berubah tinggi tanpa jendela berubah (mis. header ikut
     // menyesuaikan), jadi ukurannya ikut dipantau lewat listener scroll pasif.
-    // Catatan: TIDAK ada listener `scroll`. Pemicu gulir membuat tinggi wadah
-    // dihitung ulang setiap kali pengguna menggulir, dan tabelnya terasa
-    // berkedip. Perubahan ukuran area gulir sudah tertangkap ResizeObserver.
+    // Catatan: tidak ada listener `scroll` — memang disengaja. Tinggi wadah
+    // sudah tidak bergantung posisi gulir (lihat komentar rumus di atas), dan
+    // menghitung ulang setiap kali pengguna menggulir hanya membuat tabelnya
+    // terasa berkedip. Perubahan ukuran area gulir ditangkap ResizeObserver.
     void document.fonts.ready.then(measure).catch(() => undefined);
 
     return () => {

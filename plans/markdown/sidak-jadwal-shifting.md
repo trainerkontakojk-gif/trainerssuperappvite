@@ -303,7 +303,9 @@ tak dikenal`) → jam mulai istirahat (`LB`) → TL A–Z (kosong terakhir) → 
 - Tinggi wadah kalender dihitung dari ruang yang benar-benar tersisa di area
   gulir (`MonthMatrix.tsx`), bukan cadangan tetap dan bukan `window.innerHeight`,
   karena halaman menggulir di `section[aria-label="Konten halaman"]` dan kontrol
-  di atas matriks bisa tumbuh saat teks diperbesar/membungkus. Kelas `max-h` 34/28/24rem hanya
+  di atas matriks bisa tumbuh saat teks diperbesar/membungkus. Posisi wadah
+  dihitung dalam koordinat ISI (`+ scrollport.scrollTop`), bukan selisih visual,
+  supaya pengukuran ulang di tengah gulir tidak menghasilkan tinggi berlebih. Kelas `max-h` 34/28/24rem hanya
   cadangan sebelum JS jalan. Lantai `5rem` (`FLOOR_REM`) sengaja kecil: kalau
   lebih besar dari ruang tersisa, lantai menang dan scrollbar melorot lagi.
   **1rem = 14px di app ini** (root font-size bukan 16px) — jangan hitung dengan

@@ -282,3 +282,32 @@ Dua penjaga internal di `findScrollport()` (syarat "benar-benar memotong" dan
 "setinggi layar") **tidak** bisa dibuktikan terpisah lewat mutasi — masing-masing
 redundan di tata letak sekarang; yang terbukti lewat mutasi adalah perilaku
 akhirnya (mengukur terhadap area gulir, bukan window).
+
+## Update 12 — 2026-09-30 — koreksi posisi gulir pada rumus tinggi
+
+Gate putaran kesembilan atas `2b6cf32` memberi verdict **NEEDS_FIX** dengan tiga
+temuan; yang pertama adalah kesalahan matematis yang kubuat sendiri di update
+sebelumnya.
+
+1. **P2 — selisih visual dipakai sebagai posisi isi.** Rumus memakai
+   `regionRect.top − scrollportRect.top`, padahal itu posisi VISUAL: saat halaman
+   digulir sejauh `s`, nilainya mengecil `s` sehingga pengukuran ulang di tengah
+   gulir (resize area gulir, teks diperbesar, font selesai dimuat) menghasilkan
+   `maxHeight` kelebihan `s` — tepi bawah wadah bisa melewati area gulir.
+   Perbaikan: posisi dihitung dalam KOORDINAT ISI (`… + scrollport.scrollTop`).
+   Hasilnya sekaligus tidak bergantung posisi gulir dan sama dengan kondisi
+   terburuk (halaman di posisi paling atas), sehingga listener `scroll` tetap
+   tidak diperlukan. Catatan: suku `scrollTop` yang tadinya kupakai berbentuk
+   `− scrollTop`, yang justru membatalkan koreksinya — itu penyebabnya.
+2. **P3 — jalur lolos palsu di E2E.** `roomBelowAfterScroll >= 0` juga benar bila
+   matriks sudah tergulir keluar dari area terlihat → ditambah penjaga
+   `visibleAfterScroll` dan pemeriksaan bahwa tinggi wadah tidak berubah karena
+   gulir. Test teks diperbesar juga tidak lagi bisa lolos tanpa pembesaran
+   benar-benar terjadi: ukuran font diperiksa sebagai assertion keras sebelum
+   geometri dipoll.
+3. **P3 — komentar bertentangan** soal "listener scroll pasif" → dibersihkan.
+
+Test baru: "pengukuran ulang saat halaman sedang digulir tetap menjaga tepi bawah
+di dalam area gulir" — memicu pengukuran ulang (`<style>` di `<head>`) SAAT
+`scrollTop` bukan nol. Mutation check: koreksi `scrollTop` dibuang ⇒ test itu
+gagal (1).
