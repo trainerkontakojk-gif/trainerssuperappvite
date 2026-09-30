@@ -592,6 +592,7 @@ Header yang berlaku sekarang:
 
 | Header                                                        | Sumber                         |
 | ------------------------------------------------------------- | ------------------------------ |
+| `Content-Security-Policy` (lihat bagian berikut)               | `vercel.json`                  |
 | `X-Content-Type-Options: nosniff`                              | `vercel.json`                  |
 | `X-Frame-Options: DENY`                                        | `vercel.json`                  |
 | `Referrer-Policy: strict-origin-when-cross-origin`             | `vercel.json`                  |
@@ -602,28 +603,49 @@ Header yang berlaku sekarang:
 HSTS sengaja tidak ditulis di `vercel.json`: nilai apa pun di sana menggantikan
 default Vercel, dan nilai yang lebih lemah menurunkan kebijakan production.
 
-#### Content-Security-Policy: belum diaktifkan
+#### Font di-host sendiri dan Content-Security-Policy aktif
 
-CSP sengaja belum dipasang karena konfigurasi lamanya (`style-src 'self'
-'unsafe-inline'`, `font-src 'self' data:`) akan memblokir Google Fonts yang
-dipakai UI: `apps/web/index.html` memuat stylesheet `fonts.googleapis.com` dan
-berkas `fonts.gstatic.com`, dan `apps/web/src/routes/landing.css` memakai
-`@import` ke host yang sama. Mengaktifkannya apa adanya membuat Inter, Outfit,
-dan JetBrains Mono tidak termuat di production.
+UI memakai Inter, Outfit, dan JetBrains Mono. Sejak CSP diaktifkan, ketiga
+keluarga font itu di-host sendiri, tidak lagi diambil dari Google Fonts:
 
-Untuk mengaktifkan CSP nanti, pilih salah satu:
+- `apps/web/public/fonts/{inter,outfit,jetbrains-mono}-latin-var.woff2` —
+  variable font subset latin (~118 KB total), salinan berkas yang sebelumnya
+  dilayani Google Fonts (Inter v20, Outfit v15, JetBrains Mono v24).
+- `apps/web/public/fonts/OFL-*.txt` dan `LICENSES.md` — lisensi SIL OFL 1.1.
+  Wajib ikut saat redistribusi, jangan dihapus.
+- `apps/web/src/fonts.css` — deklarasi `@font-face` (`font-weight: 300 900`
+  untuk Inter/Outfit, `300 700` untuk JetBrains Mono, `font-display: swap`,
+  `unicode-range` subset latin sama seperti Google), diimpor dari
+  `src/main.tsx` sebelum `index.css`.
+- `index.html` dan `src/routes/landing.css` tidak lagi memuat
+  `fonts.googleapis.com` / `fonts.gstatic.com`, termasuk `preconnect`-nya.
 
-1. Tambahkan host font ke CSP (`style-src ... https://fonts.googleapis.com`,
-   `font-src ... https://fonts.gstatic.com`) — cepat, CSP jadi kurang ketat.
-2. Self-host font (unduh `.woff2` ke `apps/web/public/fonts`, muat lewat CSS
-   lokal) lalu pertahankan CSP ketat — kerja lebih banyak, ketergantungan pihak
-   ketiga hilang.
+Karena font sudah dari origin sendiri, CSP tidak perlu melonggarkan
+`style-src` maupun `font-src`:
 
-`connect-src` juga wajib memuat host API, Supabase, dan WebSocket production
-sebelum CSP diaktifkan.
+- `style-src 'self' 'unsafe-inline'`, `font-src 'self' data:`.
+- `connect-src` memuat `https://*.up.railway.app`, `https://*.supabase.co`,
+  `wss://*.up.railway.app`, dan `wss://*.vercel.app`; sudah dicocokkan dengan
+  origin produksi nyata (API `trainerssuperappapi.up.railway.app`, Supabase
+  `ruosnjmtywcrghjgqugz.supabase.co`). **Tambahkan host di sini sebelum memakai
+  layanan eksternal baru**, jika tidak CSP akan memblokirnya.
+- `media-src` mengizinkan `https://*.supabase.co` supaya rekaman bisa diputar.
+- `script-src 'self'` — tidak ada script inline; jangan menambahkan inline
+  script tanpa menyesuaikan policy ini.
 
-Untuk memeriksa header pada deployment yang dilindungi Vercel Authentication
-(preview), pakai `vercel curl <path> --deployment <url> -i`.
+Cara memverifikasi CSP setelah mengubah UI:
+
+1. `pnpm --filter @trainers/web build`, lalu sajikan `dist/` sambil menerapkan
+   header dari `apps/web/public/serve.json`.
+2. Buka dengan browser: konsol tidak melaporkan pelanggaran CSP, tidak ada
+   permintaan ke `fonts.googleapis.com`/`fonts.gstatic.com`, dan font termuat
+   dari `/fonts/*.woff2`.
+3. Setelah deploy, `vercel curl / --deployment <url> -i` untuk memastikan
+   header CSP benar-benar terkirim.
+
+Catatan: nama berkas font tidak ber-hash sehingga **tidak** diberi
+`Cache-Control: immutable` (aturan itu hanya untuk `/assets/*`). Jika font
+diperbarui, naikkan versi pada nama berkasnya lalu sesuaikan `fonts.css`.
 
 ### OAuth Callback Route
 

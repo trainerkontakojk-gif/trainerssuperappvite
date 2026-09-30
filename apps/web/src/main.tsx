@@ -5,6 +5,7 @@ import { router } from "./router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { initAuth } from "./store/authInit";
 import { Toaster } from "sonner";
+import "./fonts.css";
 import "./index.css";
 
 initAuth();
