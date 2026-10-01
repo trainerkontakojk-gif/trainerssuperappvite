@@ -112,6 +112,8 @@ Planning size is proportional; spec-driven thinking and mandatory evidence for b
 
 Update canonical documentation when the task changes architecture, a public/API/schema contract, deployment or operations, or user-visible behavior that is not already documented. A regression fix that restores an existing documented contract does not need a new phase-history entry. Docs/config-only work can update only the affected index or canonical instruction file; it does not inherit product verification gates.
 
+Documentation-instruction-only work is limited to `docs/`, `AGENTS.md`, `GEMINI.md`, or an actually mirrored Wiki. Do not change product code, tests, package manifests, migrations, generated graphs, or secrets for docs-only work. Explicit user authorization for Pi-local harness files is a narrow harness-task scope, not authorization to change product configuration.
+
 Keep summaries in their owning document. Do not copy a test matrix, route inventory, model registry, phase history, or detailed lane/tool policy into `AGENTS.md`, `GEMINI.md`, or `docs/README.md`.
 
 ### Wiki gate
@@ -150,7 +152,9 @@ Existing code and tests are sufficient for an internal refactor that does not ch
 
 ## 6. Execution and evidence
 
-- Start by loading `trainers-superapp-tdd` for any Lane B/C/D behavior work and classifying the lane, then writing the required mini-spec or persisted plan. If scope expands across a trust boundary, reclassify upward before continuing. Editing before lane classification is a violation — stop and load the skill.
+- Start with task intake: identify the goal, observable acceptance, exact owned scope, and likely risk lane. For Lane B/C/D behavior work load `trainers-superapp-tdd` before final lane classification or editing, then write the required mini-spec or persisted plan. If scope expands across a trust boundary, reclassify upward before continuing. Editing before lane classification is a violation — stop and load the skill.
+- Read relevant required docs, skills, and source once per task; reread only when changed, missing after compaction, or required by a gate. Keep discovery narrow (targeted `rg`, imports/callers, relevant tests); bound command output. Do not indiscriminately load histories, Wiki, archives, full logs, or every skill. Batch independent reads where useful.
+- For Pi operation and cache evaluation, follow [`PI_HARNESS.md`](PI_HARNESS.md). Keep stable policy/resources in the reusable prefix and volatile task/Git/log/time data in user/tool messages. Continue a named persistent session for related work; start a fresh session for unrelated tasks. Do not reload or compact solely to chase cache ratios; automatic compaction remains enabled unless explicitly configured otherwise.
 - For behavior work, follow RED → confirm failure → smallest GREEN change → REFACTOR while green, using Playwright E2E as the default regression test under Fajar's E2E-first rule. Keep the E2E with the owning module/spec. If E2E cannot prove a distinct contract, stop and ask Fajar before using a non-E2E test.
 - Preserve intentional dirty work. Do not reset, clean, stash, overwrite, or attribute unrelated changes to the current task. Workers edit only assigned paths.
 - Record exact commands and exit codes. A report must never claim a command ran unless it actually ran.
@@ -166,6 +170,10 @@ Run only the gates applicable to the selected lane. Stop at the first new or une
 - When the E2E proves the same contract as an existing unit test, remove that superseded unit test and its entries from suite manifests in the same scoped change. Do not bulk-delete unrelated legacy tests.
 - Do not add or routinely run Vitest/unit suites (`test:affected`, `test:targeted`, `test:core`, `test:fast`, or `test:full`) as the default regression check. If a distinct invariant cannot be meaningfully, safely, and reliably proved end-to-end, ask Fajar before adding/running any non-E2E test; include the exact invariant, limitation, and smallest proposed alternative.
 - Typecheck, lint, and build remain compile/quality checks, not substitutes for E2E behavior evidence. Root `pnpm typecheck` is Turbo typechecking and must finish without emitted files and exit 0.
+
+### Test curation and budget
+
+Before changing coverage, search the owning suite. Merge overlapping tests and remove obsolete or duplicate tests only after replacement coverage is verified. Prefer one E2E per distinct observable contract, not one per CSS class or branch. Add coverage only for a distinct bug, contract, boundary, failure mode, or security need; do not add snapshots, oversized fixtures, or parallel suites just to increase counts. Never add unit-test entries to `scripts/test-core.json` or `scripts/test-fast.json`. Unrelated legacy suite entries remain unless separately approved for removal; only remove a superseded entry after equivalent E2E coverage is verified.
 
 ### Final integration checks
 

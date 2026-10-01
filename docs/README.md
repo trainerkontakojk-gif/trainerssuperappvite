@@ -6,6 +6,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 
 - [`AGENTS.md`](../AGENTS.md) — concise project guardrails for every harness.
 - [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) — detailed source-of-truth, risk-lane, planning, knowledge-tool, and verification policy.
+- [`docs/PI_HARNESS.md`](PI_HARNESS.md) — Pi startup/continuation, prompt-cache workflow, and offline usage measurement.
 - [`GEMINI.md`](../GEMINI.md) — Gemini-host adapter only.
 - [`docs/PHASE_PROGRESS.md`](PHASE_PROGRESS.md) — historical phase record, not runtime instructions.
 - [`DESIGN.md`](../DESIGN.md) → [`docs/design.md`](design.md) — root design pointer and canonical design system.
