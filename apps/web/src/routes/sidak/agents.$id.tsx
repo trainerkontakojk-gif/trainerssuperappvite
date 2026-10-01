@@ -4,7 +4,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
-  ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -231,19 +230,14 @@ export default function SidakAgentDetailPage() {
           onTabChange={handleTabChange}
           panels={{
             summary: (
-              <div className="flex min-w-0 flex-col gap-6">
-                <div className="flex items-start gap-3">
-                  <Badge variant="outline" className="size-10 shrink-0 rounded-xl bg-muted p-0 text-muted-foreground">
-                    <ShieldCheck className="size-5" aria-hidden="true" />
-                  </Badge>
-                  <div className="min-w-0">
-                    <h2 className="font-outfit text-xl font-bold tracking-tight text-foreground">
-                      Ringkasan skor
-                    </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Skor, pengurang, dan diagnosis pada periode yang dipilih.
-                    </p>
-                  </div>
+              <div className="flex min-w-0 flex-col gap-5">
+                <div className="border-b border-border pb-5">
+                  <h2 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+                    Ringkasan skor
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Skor, pengurang, dan diagnosis pada periode yang dipilih.
+                  </p>
                 </div>
 
                 <AgentPerformanceQuickview
@@ -269,25 +263,41 @@ export default function SidakAgentDetailPage() {
                     />
                   </Card>
                 ) : (
-                  <div className="flex flex-col gap-6">
-                    <MonthRail
-                      summaries={monthlySummaries}
-                      selectedMonth={selectedMonth}
-                      onMonthSelect={handleMonthSelect}
-                    />
-                    {latestPeriod && (
-                      <AgentAuditDossier
-                        finalScore={latestPeriod.finalScore}
-                        sessionCount={latestPeriod.sessionCount}
-                        findingsCount={latestPeriod.findingsCount}
-                        previousScore={previousPeriod?.finalScore ?? null}
-                        monthLabel={activeLabel}
-                        tickets={topTickets}
-                        causes={activeRootCauses}
-                        rootCauseMonthLabel={rootCauseScopeLabel}
+                  <section
+                    aria-labelledby="agent-monthly-score-heading"
+                    className="flex min-w-0 flex-col gap-4 border-t border-border pt-5"
+                  >
+                    <div>
+                      <h3
+                        id="agent-monthly-score-heading"
+                        className="font-outfit text-lg font-bold tracking-tight text-foreground"
+                      >
+                        Nilai skor per bulan
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Pilih bulan untuk melihat skor, tiket pengurang, dan akar masalah.
+                      </p>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-4">
+                      <MonthRail
+                        summaries={monthlySummaries}
+                        selectedMonth={selectedMonth}
+                        onMonthSelect={handleMonthSelect}
                       />
-                    )}
-                  </div>
+                      {latestPeriod && (
+                        <AgentAuditDossier
+                          finalScore={latestPeriod.finalScore}
+                          sessionCount={latestPeriod.sessionCount}
+                          findingsCount={latestPeriod.findingsCount}
+                          previousScore={previousPeriod?.finalScore ?? null}
+                          monthLabel={activeLabel}
+                          tickets={topTickets}
+                          causes={activeRootCauses}
+                          rootCauseMonthLabel={rootCauseScopeLabel}
+                        />
+                      )}
+                    </div>
+                  </section>
                 )}
               </div>
             ),

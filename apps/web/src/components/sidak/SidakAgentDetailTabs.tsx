@@ -48,9 +48,8 @@ export default function SidakAgentDetailTabs({
       className="min-w-0 flex-col"
     >
       <TabsList
-        variant="line"
         aria-label="Bagian profil agen"
-        className="flex h-auto min-h-11 !w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-none border-b border-border p-0 no-scrollbar"
+        className="flex h-auto min-h-12 w-fit max-w-full min-w-0 justify-start gap-1 overflow-x-auto rounded-lg border border-border bg-muted/40 p-1 no-scrollbar"
       >
         {SIDAK_AGENT_DETAIL_TABS.map((tab) => (
           <TabsTrigger
@@ -63,7 +62,7 @@ export default function SidakAgentDetailTabs({
                 SIDAK_AGENT_DETAIL_TABS.findIndex((item) => item.id === tab.id),
               )
             }
-            className="h-11 min-h-11 flex-none shrink-0 rounded-none px-4 text-sm font-semibold"
+            className="h-10 min-h-10 flex-none shrink-0 rounded-md border border-transparent px-4 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:bg-background/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background data-active:border-border data-active:bg-background data-active:font-semibold data-active:text-foreground data-active:shadow-none motion-reduce:transition-none"
           >
             {tab.label}
           </TabsTrigger>

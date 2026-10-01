@@ -173,6 +173,13 @@ Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang 
 - State tanpa data harus menyatakan kondisi sebenarnya (`Belum diaudit`), bukan angka, tren, atau placeholder yang mengarang data.
 - Konten terakhir harus tetap dapat discroll melewati fixed bottom navigation dengan ruang aman yang memadai.
 
+### Detail Agen (SIDAK)
+
+- Navigasi `Ringkasan`, `Tren`, `Temuan`, dan `Simulasi` harus tampak sebagai kontrol interaktif, bukan teks navigasi biasa: tampilkan state aktif yang jelas serta state hover dan focus yang terlihat.
+- Pertahankan lebar tiap tab sesuai labelnya. Pada layar sempit, izinkan grup tab digulir horizontal tanpa memotong label atau target interaksi.
+- Susun Ringkasan dengan hierarki eksplisit: judul dan deskripsi, Quickview performa, lalu nilai skor per bulan. Gunakan divider dan jarak section untuk mengelompokkan konten; hindari badge dekoratif atau kartu tambahan yang tidak menambah makna.
+- Jelaskan fungsi pemilih bulan, lalu tampilkan detail skor, tiket pengurang, dan akar masalah untuk bulan yang dipilih.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`
