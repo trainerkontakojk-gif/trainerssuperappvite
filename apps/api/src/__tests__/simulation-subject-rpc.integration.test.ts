@@ -16,6 +16,10 @@ const MIGRATION_PATHS = [
     process.cwd(),
     "../../supabase/migrations/20260910000853_pdkt_mailbox_subject_intent_cleanup.sql",
   ),
+  path.resolve(
+    process.cwd(),
+    "../../supabase/migrations/20260930120000_fix_pdkt_mailbox_subject_intent_cleanup_role_guard.sql",
+  ),
 ];
 
 const ACTOR_ID = randomUUID();
@@ -156,6 +160,7 @@ beforeAll(async () => {
   await c.query(`
     CREATE ROLE authenticated NOLOGIN;
     CREATE ROLE anon NOLOGIN;
+    CREATE ROLE authenticator NOLOGIN;
     CREATE ROLE service_role NOLOGIN BYPASSRLS;
     CREATE SCHEMA auth;
     CREATE OR REPLACE FUNCTION auth.uid()
@@ -279,6 +284,7 @@ beforeAll(async () => {
       WITH CHECK (created_by_user_id = auth.uid());
 
     GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, service_role;
+    GRANT service_role TO authenticator;
     GRANT SELECT ON public.profiles, public.profiler_peserta TO authenticated;
     GRANT SELECT, INSERT, UPDATE ON public.ketik_history, public.pdkt_history,
       public.telefun_history, public.pdkt_mailbox_items TO authenticated;
@@ -464,6 +470,59 @@ describe("simulation-subject migration on disposable PostgreSQL", () => {
       anon_can_execute: false,
       service_role_can_execute: true,
     });
+  });
+
+  it("lets the scheduled PostgREST caller clean up when the role claim arrives as JSON", async () => {
+    // Production shape: PostgREST connects as `authenticator`, exposes the
+    // verified claims as the JSON GUC `request.jwt.claims`, and switches the
+    // request to the JWT role. The legacy `request.jwt.claim.role` GUC is not
+    // set, which is what made every scheduled cleanup log FORBIDDEN.
+    const consumedToken = randomUUID();
+    await withRole("service_role", TRAINER_ID, async () => {
+      await db.client.query(
+        `INSERT INTO public.pdkt_mailbox_subject_intents
+           (token, actor_id, subject_type, subject_peserta_id, subject_name,
+            client_request_id, expires_at, consumed_at)
+         VALUES ($1, $2, 'participant', $3, 'Consumed', $4,
+                 now() + interval '30 minutes', now())`,
+        [consumedToken, TRAINER_ID, PARTICIPANT_ID, randomUUID()],
+      );
+    });
+
+    await db.client.query("BEGIN");
+    try {
+      await db.client.query("SET LOCAL SESSION AUTHORIZATION authenticator");
+      await db.client.query(
+        "SELECT set_config('request.jwt.claims', $1, true)",
+        [JSON.stringify({ role: "service_role" })],
+      );
+      await db.client.query("SET LOCAL ROLE service_role");
+      const cleanup = await db.client.query(
+        "SELECT public.cleanup_pdkt_mailbox_subject_intents() AS deleted",
+      );
+      expect(Number(cleanup.rows[0].deleted)).toBeGreaterThanOrEqual(1);
+    } finally {
+      await db.client.query("ROLLBACK");
+    }
+  });
+
+  it("still refuses a JSON role claim that is not the service role", async () => {
+    await db.client.query("BEGIN");
+    try {
+      await db.client.query("SET LOCAL SESSION AUTHORIZATION authenticator");
+      await db.client.query(
+        "SELECT set_config('request.jwt.claims', $1, true)",
+        [JSON.stringify({ role: "authenticated" })],
+      );
+      await db.client.query("SET LOCAL ROLE service_role");
+      await expect(
+        db.client.query(
+          "SELECT public.cleanup_pdkt_mailbox_subject_intents()",
+        ),
+      ).rejects.toThrow(/service-role only/);
+    } finally {
+      await db.client.query("ROLLBACK");
+    }
   });
 
   it("collapses same-target PDKT retries and rejects legacy/different-target replays", async () => {
