@@ -38,6 +38,24 @@ erDiagram
 
 ## Tabel Utama
 
+### `qa_temuan` — tanggal bisnis (opsional)
+
+| Kolom | Tipe | Arti |
+| --- | --- | --- |
+| `tanggal_layanan` | `date NULL` | Kapan layanan/interaksi yang ditinjau benar-benar terjadi. Dasar mode **Agent** pada heatmap. |
+| `tanggal_sampel` | `date NULL` | Kapan QA memeriksa sampel dan menetapkan temuan. Dasar mode **QA** pada heatmap. |
+
+Aturan yang berlaku:
+
+- **NULL berarti "belum diisi"**, bukan "tidak berlaku". Kolom kosong tidak pernah diisi default.
+- **Tidak ada backfill.** Baris lama tetap NULL. `created_at`/`updated_at` **tidak** dipakai sebagai pengganti — keduanya mencatat kapan baris masuk sistem, bukan kapan interaksi terjadi.
+- **Tanpa constraint silang.** Tidak ada CHECK yang mengikat tanggal ke periode audit atau mengurutkan sampel setelah layanan; keduanya perlu persetujuan terpisah.
+- **Tidak ada perubahan** pada index, constraint duplikat, policy RLS, atau grant. Policy `read_all`/`write_trainer` yang ada sudah berlaku karena tidak membedakan kolom.
+- **Format**: API selalu mengirim `YYYY-MM-DD` dan memvalidasinya sebagai tanggal kalender nyata (`2026-02-30` ditolak, leap day mengikuti tahun). Kontrak bersama: `tanggalSchema` di `packages/types/src/sidak.ts`.
+- **Penyimpanan per baris.** Satu tiket dapat punya beberapa baris (satu per parameter); tanggal ikut per baris, tidak ada deduplikasi per tiket.
+
+Migration: `20261001120000_add_temuan_business_dates.sql` (nullable `DATE`, idempotent). **Diterapkan ke target `ruosnjmtywcrghjgqugz` pada 2026-10-02** dan tercatat sebagai history `applied`; kolom `date NULL` + komentar terverifikasi, RLS/policy dan grant tidak berubah.
+
 **Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/`. Migration Phase 4 di bawah adalah artifact repository yang additive dan transactional; keberadaannya di tree tidak berarti sudah diterapkan ke database remote.
 
 **Core Migrations (000–017):**

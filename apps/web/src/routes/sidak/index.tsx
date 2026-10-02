@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   BarChart3,
   CalendarClock,
+  CalendarDays,
   LayoutDashboard,
   LineChart,
   Users,
@@ -53,6 +54,15 @@ const CARDS = [
     desc: "Jadwal harian agen dari WFM Dash Pro dalam tampilan hanya-baca.",
     icon: CalendarClock,
     href: "/sidak/jadwal-shifting",
+    managerOnly: true,
+  },
+  {
+    // Kartu landing untuk heatmap; akses tiga lapis admin+trainer (kartu ini,
+    // nav, dan route guard). Mode `qa` di halaman tetap bukan role `qa`.
+    title: "Heatmap Ketidaksesuaian",
+    desc: "Peta intensitas temuan per tanggal layanan atau tanggal sampel untuk membaca sebaran ketidaksesuaian sepanjang tahun.",
+    icon: CalendarDays,
+    href: "/sidak/heatmap",
     managerOnly: true,
   },
 ];

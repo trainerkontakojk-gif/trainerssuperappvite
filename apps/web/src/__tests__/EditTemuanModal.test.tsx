@@ -20,6 +20,8 @@ describe("EditTemuanModal", () => {
         onFormChange={vi.fn()}
         onSave={vi.fn()}
         onClose={onClose}
+        tanggalLayanan={null}
+        tanggalSampel={null}
       />,
     );
 

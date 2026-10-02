@@ -495,6 +495,30 @@ pnpm --filter @trainers/web test -- ketik                     # KETIK landing pa
 supabase migration up
 ```
 
+### SIDAK business dates — bounded rollout (`20261001120000`)
+
+Perubahan tanggal bisnis SIDAK (heatmap) adalah **schema-first**: migrasi harus
+diterapkan ke Supabase target **sebelum** API yang memetakan `tanggal_layanan`/
+`tanggal_sampel` di-deploy dan **sebelum** commit fitur di-`push` ke `main`,
+karena API lama tidak mengetahui kolom ini dan API baru akan gagal bila kolom
+belum ada. Untuk SIDAK ini **hanya** `20261001120000_add_temuan_business_dates.sql`
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` + `COMMENT`, idempotent, tanpa
+default/backfill/RLS/grant) yang boleh diterapkan.
+
+**Jangan** memakai `supabase db push` (atau `migration up --include-all`) untuk
+rilis ini. Preflight rilis 2026-10-02 membuktikan ada **enam** migrasi lokal yang
+tertunda di remote (`20260823000000`, `20260903000000`, `20260904150000`,
+`20260921143009`, `20260930120000`, `20261001120000`) dan satu versi remote-only
+(`20260908093728`) tanpa file lokal, sehingga `db push` berhenti dengan
+`Remote migration versions not found in local migrations directory` dan akan
+menerapkan migrasi yang tidak terkait bila dipaksa.
+
+Jalur aman (setelah gerbang menyetujui): link hanya ke
+`--project-ref ruosnjmtywcrghjgqugz` (ref target terkonfirmasi), terapkan
+**satu file** dengan `supabase db query --linked -f supabase/migrations/20261001120000_add_temuan_business_dates.sql`,
+lalu catat bookshelf history dengan `supabase migration repair --linked --status applied 20261001120000`.
+Tidak ada migrasi lain, DDL/DML remote, atau `db push`.
+
 1. `000_profiles_core.sql` — profiles table + auto-create trigger
 2. `001_sidak_core.sql` — SIDAK tables
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT + AI usage logging + pricing

@@ -19,6 +19,14 @@ export const SIDAK_CHILDREN = [
     allowedRoles: ["trainer", "admin"],
   },
   {
+    // Volume temuan ketidaksesuaian per hari. Admin+trainer saja, sama seperti
+    // Input Temuan dan Jadwal Shifting. Nama menu "QA" di dalam halaman bukan
+    // berarti role `qa` punya akses.
+    to: "/sidak/heatmap",
+    label: "Heatmap",
+    allowedRoles: ["trainer", "admin"],
+  },
+  {
     to: "/sidak/input",
     label: "Input Temuan",
     allowedRoles: ["trainer", "admin"],

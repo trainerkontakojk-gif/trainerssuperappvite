@@ -55,7 +55,7 @@ const REPO_ROOT = path.resolve(
   "../../../..",
 );
 
-const APP_ORIGIN = "http://localhost:3005";
+const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
 const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
 
@@ -338,6 +338,16 @@ const WEIGHTS = Object.fromEntries(
   ]),
 ) as Record<ServiceType, ServiceWeight>;
 
+/**
+ * Seam E2E untuk regresi invarian ekspor: mengisi tanggal bisnis ke baris
+ * temuan agent-1 yang di-mock, supaya bisa dibandingkan CSV/MD sebelum vs
+ * sesudah tanggal diisi. Default MATI; tidak mengubah perilaku spec lain.
+ */
+let exportDatesEnabled = false;
+export function setExportDates(enabled: boolean): void {
+  exportDatesEnabled = enabled;
+}
+
 const agentFixture: AgentDetailData = {
   peserta: {
     id: AGENT_ID,
@@ -601,6 +611,23 @@ const agentFixture: AgentDetailData = {
   initialService: SERVICE,
   initialTrendRange: { start: 1, end: 2 },
 };
+
+/**
+ * Fixture agent-1 dengan/tanpa tanggal bisnis pada baris temuan. Dipakai HANYA
+ * oleh seam `setExportDates`; default `exportDatesEnabled=false` mengembalikan
+ * objek yang sama seperti semula.
+ */
+function projectAgentFixture(): AgentDetailData {
+  if (!exportDatesEnabled) return agentFixture;
+  return {
+    ...agentFixture,
+    temuan: agentFixture.temuan.map((item, index) => ({
+      ...item,
+      tanggal_layanan: `2026-0${(index % 9) + 1}-05`,
+      tanggal_sampel: `2026-0${(index % 9) + 1}-09`,
+    })),
+  } as AgentDetailData;
+}
 
 /**
  * Agen kedua yang **hanya** berbeda pada nama. Semua koleksi lain sengaja
@@ -1391,7 +1418,7 @@ async function assertLocalDevOnlyTarget(): Promise<void> {
   } catch (error) {
     throw new Error(
       `[preflight] tidak ada listener dev di ${APP_ORIGIN}: ${(error as Error).message}. ` +
-        `Jalankan dev server lokal apps/web (port 3005) sebelum E2E.`,
+        `Jalankan dev server lokal apps/web (origin ${APP_ORIGIN}) sebelum E2E.`,
       { cause: error },
     );
   }
@@ -1516,7 +1543,7 @@ async function mockAgentApi(page: Page, audit: NetworkAudit) {
     audit.mockedApi.push(request.label);
 
     if (endpoint.id === "agentDetail") {
-      await route.fulfill(toJson({ success: true, data: agentFixture }));
+      await route.fulfill(toJson({ success: true, data: projectAgentFixture() }));
       return;
     }
     if (endpoint.id === "agentDetailUnsafeName") {

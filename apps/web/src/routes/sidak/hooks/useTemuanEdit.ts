@@ -19,6 +19,8 @@ export function useTemuanEdit({
   const [editNilai, setEditNilai] = useState(3);
   const [editKetidaksesuaian, setEditKetidaksesuaian] = useState("");
   const [editSebaiknya, setEditSebaiknya] = useState("");
+  const [editTanggalLayanan, setEditTanggalLayanan] = useState("");
+  const [editTanggalSampel, setEditTanggalSampel] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -27,11 +29,15 @@ export function useTemuanEdit({
     nilai: number;
     ketidaksesuaian?: string | null;
     sebaiknya?: string | null;
+    tanggal_layanan?: string | null;
+    tanggal_sampel?: string | null;
   }) => {
     setEditingId(item.id);
     setEditNilai(item.nilai);
     setEditKetidaksesuaian(item.ketidaksesuaian ?? "");
     setEditSebaiknya(item.sebaiknya ?? "");
+    setEditTanggalLayanan(item.tanggal_layanan ?? "");
+    setEditTanggalSampel(item.tanggal_sampel ?? "");
     setDeletingId(null);
   };
 
@@ -45,6 +51,10 @@ export function useTemuanEdit({
         nilai: editNilai,
         ketidaksesuaian: editKetidaksesuaian || null,
         sebaiknya: editSebaiknya || null,
+        // String kosong berarti "kosongkan tanggal" di baris ini saja, bukan
+        // mengubah tanggal parameter lain pada tiket yang sama.
+        tanggal_layanan: editTanggalLayanan || null,
+        tanggal_sampel: editTanggalSampel || null,
       }}));
       setTemuan((prev) =>
         prev.map((t) =>
@@ -54,6 +64,8 @@ export function useTemuanEdit({
                 nilai: editNilai,
                 ketidaksesuaian: editKetidaksesuaian,
                 sebaiknya: editSebaiknya,
+                tanggal_layanan: editTanggalLayanan || null,
+                tanggal_sampel: editTanggalSampel || null,
               }
             : t
         )
@@ -95,6 +107,10 @@ export function useTemuanEdit({
     setEditKetidaksesuaian,
     editSebaiknya,
     setEditSebaiknya,
+    editTanggalLayanan,
+    setEditTanggalLayanan,
+    editTanggalSampel,
+    setEditTanggalSampel,
     deletingId,
     setDeletingId,
     savingEdit,

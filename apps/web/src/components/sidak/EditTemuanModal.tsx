@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -16,6 +17,8 @@ interface EditForm {
   nilai: number;
   ketidaksesuaian: string;
   sebaiknya: string;
+  tanggal_layanan?: string;
+  tanggal_sampel?: string;
 }
 
 interface Props {
@@ -26,6 +29,9 @@ interface Props {
   onFormChange: (field: keyof EditForm, value: any) => void;
   onSave: () => void;
   onClose: () => void;
+  /** Tanggal tersimpan pada baris ini; `null` berarti belum diisi. */
+  tanggalLayanan: string | null;
+  tanggalSampel: string | null;
 }
 
 const NILAI_OPTIONS = [
@@ -50,6 +56,8 @@ export default function EditTemuanModal({
   onFormChange,
   onSave,
   onClose,
+  tanggalLayanan,
+  tanggalSampel,
 }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -172,6 +180,56 @@ export default function EditTemuanModal({
               placeholder="Saran perbaikan..."
               className="min-h-24 resize-y bg-background text-sm leading-relaxed text-foreground"
             />
+          </div>
+
+          {/*
+            Tanggal ditampilkan terpisah dari input di bawah supaya "belum diisi"
+            terlihat jelas tanpa harus membuka editor. Edit hanya berlaku pada
+            baris temuan ini.
+          */}
+          <div className="flex flex-col gap-2">
+            <Label>Tanggal temuan</Label>
+            <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-border px-3 py-2">
+                <dt className="text-xs text-muted-foreground">Tanggal layanan</dt>
+                <dd className="text-sm text-foreground">
+                  {tanggalLayanan ?? "Belum diisi"}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-border px-3 py-2">
+                <dt className="text-xs text-muted-foreground">Tanggal sampel</dt>
+                <dd className="text-sm text-foreground">
+                  {tanggalSampel ?? "Belum diisi"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-temuan-tanggal-layanan">
+                Tanggal layanan
+              </Label>
+              <Input
+                id="edit-temuan-tanggal-layanan"
+                type="date"
+                value={form.tanggal_layanan ?? ""}
+                onChange={(event) =>
+                  onFormChange("tanggal_layanan", event.target.value)
+                }
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-temuan-tanggal-sampel">Tanggal sampel</Label>
+              <Input
+                id="edit-temuan-tanggal-sampel"
+                type="date"
+                value={form.tanggal_sampel ?? ""}
+                onChange={(event) =>
+                  onFormChange("tanggal_sampel", event.target.value)
+                }
+              />
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
 
@@ -53,6 +53,13 @@ export function useTemuanForm({
 }: UseTemuanFormParams) {
   const [showForm, setShowForm] = useState(false);
   const [noTiket, setNoTiket] = useState("");
+  /**
+   * Tanggal bisnis diisi SEKALI di level tiket, lalu dikirim ke setiap item
+   * parameter. String kosong berarti "belum diisi" dan dinormalisasi menjadi
+   * `undefined` saat request supaya tidak pernah terkirim sebagai `""`.
+   */
+  const [tanggalLayanan, setTanggalLayanan] = useState("");
+  const [tanggalSampel, setTanggalSampel] = useState("");
   const [entries, setEntries] = useState<FormEntry[]>([newEntry()]);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -66,10 +73,23 @@ export function useTemuanForm({
 
   const resetForm = () => {
     setNoTiket("");
+    setTanggalLayanan("");
+    setTanggalSampel("");
     setEntries([newEntry()]);
     setShowForm(false);
     setErrorMsg(null);
   };
+
+  /**
+   * Ganti konteks (agent / periode / layanan) berarti temuan ini untuk konteks
+   * yang berbeda, jadi tanggal yang terisi tidak boleh ikut terbawa. Hanya
+   * tanggal yang di-reset — input lain sengaja dibiarkan agar draft tidak
+   * hilang tanpa sebab.
+   */
+  useEffect(() => {
+    setTanggalLayanan("");
+    setTanggalSampel("");
+  }, [selectedAgent?.id, selectedPeriod?.id, selectedService]);
 
   const handleSave = async () => {
     if (!selectedAgent || !selectedPeriod) return;
@@ -113,12 +133,16 @@ export function useTemuanForm({
     setPreviewing(true);
     setErrorMsg(null);
     try {
+      const tanggalLayananValue = tanggalLayanan.trim() || undefined;
+      const tanggalSampelValue = tanggalSampel.trim() || undefined;
       const temuanList = entries.map((entry) => ({
         indicator_id: entry.indicator_id,
         no_tiket: normalizedTicket || undefined,
         nilai: entry.nilai,
         ketidaksesuaian: entry.ketidaksesuaian || undefined,
         sebaiknya: entry.sebaiknya || undefined,
+        tanggal_layanan: tanggalLayananValue,
+        tanggal_sampel: tanggalSampelValue,
       }));
       const preview: any = await unwrapResponse(await sidakClient.temuan.batch.preview.$post({
         json: {
@@ -207,6 +231,10 @@ export function useTemuanForm({
     setShowForm,
     noTiket,
     setNoTiket,
+    tanggalLayanan,
+    setTanggalLayanan,
+    tanggalSampel,
+    setTanggalSampel,
     entries,
     setEntries,
     saving,

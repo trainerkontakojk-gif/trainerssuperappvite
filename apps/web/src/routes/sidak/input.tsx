@@ -916,7 +916,11 @@ export default function SidakInputPage() {
                     <SidakInputManualForm
                       entries={formHook.entries}
                       noTiket={formHook.noTiket}
+                      tanggalLayanan={formHook.tanggalLayanan}
+                      tanggalSampel={formHook.tanggalSampel}
                       onSetNoTiket={formHook.setNoTiket}
+                      onSetTanggalLayanan={formHook.setTanggalLayanan}
+                      onSetTanggalSampel={formHook.setTanggalSampel}
                       onUpdateEntry={formHook.updateEntry}
                       onAddEntry={() =>
                         formHook.setEntries((prev) => [...prev, newEntry()])
@@ -1008,6 +1012,8 @@ export default function SidakInputPage() {
                   editNilai={editHook.editNilai}
                   editKetidaksesuaian={editHook.editKetidaksesuaian}
                   editSebaiknya={editHook.editSebaiknya}
+                  editTanggalLayanan={editHook.editTanggalLayanan}
+                  editTanggalSampel={editHook.editTanggalSampel}
                   deletingId={editHook.deletingId}
                   canEdit={role !== "leader"}
                   onStartEdit={editHook.startEdit}
@@ -1017,6 +1023,8 @@ export default function SidakInputPage() {
                   setEditNilai={editHook.setEditNilai}
                   setEditKetidaksesuaian={editHook.setEditKetidaksesuaian}
                   setEditSebaiknya={editHook.setEditSebaiknya}
+                  setEditTanggalLayanan={editHook.setEditTanggalLayanan}
+                  setEditTanggalSampel={editHook.setEditTanggalSampel}
                 />
               )}
             </motion.div>

@@ -18,6 +18,72 @@ export type Category = z.infer<typeof categorySchema>;
 export const scoringModeSchema = z.enum(["weighted", "flat", "no_category"]);
 export type ScoringMode = z.infer<typeof scoringModeSchema>;
 
+/* ── Heatmap ketidaksesuaian ─────────────────────────────────────────────── */
+
+/**
+ * Mode heatmap menentukan kolom tanggal yang dipakai, BUKAN nama kolom bebas.
+ * `agent` = tanggal layanan (kapan interaksi bermasalah terjadi),
+ * `qa`     = tanggal sampel (kapan QA memeriksa/menetapkan temuan).
+ *
+ * Nama mode `qa` TIDAK memberi akses role `qa`; endpoint ini hanya untuk
+ * admin dan trainer.
+ */
+export const sidakHeatmapModeSchema = z.enum(["agent", "qa"]);
+export type SidakHeatmapMode = z.infer<typeof sidakHeatmapModeSchema>;
+
+/** Allowlist mode -> kolom tanggal. Nama kolom tidak pernah datang dari input. */
+export const HEATMAP_DATE_COLUMN: Record<SidakHeatmapMode, "tanggal_layanan" | "tanggal_sampel"> = {
+  agent: "tanggal_layanan",
+  qa: "tanggal_sampel",
+};
+
+export const sidakHeatmapQuerySchema = z.object({
+  mode: sidakHeatmapModeSchema,
+  year: z.coerce.number().int().min(2000).max(2100),
+  service_type: serviceTypeSchema.optional(),
+});
+export type SidakHeatmapQuery = z.infer<typeof sidakHeatmapQuerySchema>;
+
+export interface SidakHeatmapResponse {
+  mode: SidakHeatmapMode;
+  year: number;
+  serviceType: ServiceType | null;
+  dateBasis: "tanggal_layanan" | "tanggal_sampel";
+  days: Array<{ date: string; count: number }>;
+  totalFindings: number;
+  /**
+   * Temuan countable tanpa tanggal mode terpilih pada SELURUH periode untuk
+   * filter layanan tersebut — bukan cuma tahun terpilih. Tanggal kosong tidak
+   * bisa diatribusikan ke tahun mana pun, jadi ruang lingkupnya harus
+   * dinyatakan eksplisit di UI.
+   */
+  missingDateFindingsAllPeriods: number;
+}
+
+/**
+ * Tanggal kalender opsional untuk `qa_temuan`, format `YYYY-MM-DD`.
+ *
+ * `z.string().date()` memvalidasi tanggal ITU ADA di kalender, bukan hanya
+ * bentuk string-nya: `2026-02-28` sah, `2026-02-30` ditolak, dan leap day
+ * mengikuti tahun (`2024-02-29` sah, `2026-02-29` ditolak karena 2026 bukan
+ * leap year). Format ambigu seperti `03/04/2026` dan timestamp
+ * `2026-02-28T00:00:00Z` juga ditolak, jadi tidak ada tebakan tanggal.
+ *
+ * NULL berarti "belum diisi" — bukan "tidak berlaku". Karena itu kolomnya
+ * nullable dan TIDAK ada default `CURRENT_DATE`: data lama harus tetap kosong,
+ * bukan diisi diam-diam dengan tanggal saat baris disentuh.
+ */
+export const tanggalSchema = z.string().date(
+  "Tanggal harus format YYYY-MM-DD dan tanggal kalender yang nyata",
+);
+
+/** Kedua tanggal bisnis pada satu baris temuan. */
+export const temuanTanggalSchema = z.object({
+  tanggal_layanan: tanggalSchema.nullable().optional(),
+  tanggal_sampel: tanggalSchema.nullable().optional(),
+});
+export type TemuanTanggal = z.infer<typeof temuanTanggalSchema>;
+
 export const qaPeriodSchema = z.object({
   id: z.string().uuid(),
   month: z.number().int().min(1).max(12),
@@ -71,7 +137,7 @@ export const qaTemuanSchema = z.object({
   created_at: z.string().optional(),
   qa_indicators: qaIndicatorSchema.partial().optional(),
   qa_periods: qaPeriodSchema.partial().optional(),
-});
+}).extend(temuanTanggalSchema.shape);
 export type QATemuan = z.infer<typeof qaTemuanSchema>;
 
 export const createTemuanBatchSchema = z.object({
@@ -81,17 +147,37 @@ export const createTemuanBatchSchema = z.object({
   no_tiket: z.string().nullable().optional(),
   items: z
     .array(
-      z.object({
-        indicator_id: z.string().uuid(),
-        nilai: z.number().int().min(0).max(3),
-        ketidaksesuaian: z.string().nullable().optional(),
-        sebaiknya: z.string().nullable().optional(),
-        no_tiket: z.string().nullable().optional(),
-      }),
+      z
+        .object({
+          indicator_id: z.string().uuid(),
+          nilai: z.number().int().min(0).max(3),
+          ketidaksesuaian: z.string().nullable().optional(),
+          sebaiknya: z.string().nullable().optional(),
+          no_tiket: z.string().nullable().optional(),
+        })
+        .extend(temuanTanggalSchema.shape),
     )
     .min(1),
 });
 export type CreateTemuanBatch = z.infer<typeof createTemuanBatchSchema>;
+
+/**
+ * Bentuk update per baris temuan, dipakai bersama oleh route `PUT /temuan/:id`.
+ *
+ * Perbedaan `undefined` vs `null` itu disengaja dan punya arti:
+ *   - key tidak dikirim → pertahankan nilai existing (termasuk tanggal);
+ *   - `null` eksplisit → hapus nilai, termasuk mengosongkan tanggal;
+ *   - string tanggal → set ke tanggal itu, dan harus tanggal kalender nyata.
+ *
+ * Karena semua field opsional, `{}` juga sah; service yang memutuskan
+ * "pertahankan atau hapus", bukan schema.
+ */
+export const updateTemuanSchema = z.object({
+  nilai: z.number().int().min(0).max(3).optional(),
+  ketidaksesuaian: z.string().nullable().optional(),
+  sebaiknya: z.string().nullable().optional(),
+}).extend(temuanTanggalSchema.shape);
+export type UpdateTemuan = z.infer<typeof updateTemuanSchema>;
 
 export const serviceWeightSchema = z.object({
   service_type: serviceTypeSchema,

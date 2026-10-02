@@ -49,7 +49,11 @@ interface Entry {
 interface Props {
   entries: Entry[];
   noTiket: string;
+  tanggalLayanan: string;
+  tanggalSampel: string;
   onSetNoTiket: (v: string) => void;
+  onSetTanggalLayanan: (v: string) => void;
+  onSetTanggalSampel: (v: string) => void;
   onUpdateEntry: (uid: string, patch: Record<string, any>) => void;
   onAddEntry: () => void;
   onRemoveEntry: (uid: string) => void;
@@ -77,7 +81,11 @@ export { newEntry };
 export default function SidakInputManualForm({
   entries,
   noTiket,
+  tanggalLayanan,
+  tanggalSampel,
   onSetNoTiket,
+  onSetTanggalLayanan,
+  onSetTanggalSampel,
   onUpdateEntry,
   onAddEntry,
   onRemoveEntry,
@@ -112,6 +120,55 @@ export default function SidakInputManualForm({
             className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
           />
         </div>
+
+        {/*
+          Tanggal diisi sekali di level tiket dan berlaku untuk semua parameter
+          di bawah. Dipisah dari No. Tiket karena tidak selalu ada tiket, dan
+          labelnya menyatakan opsional karena kosong berarti "belum diisi" —
+          bukan berarti tidak berlaku.
+        */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label
+              htmlFor="temuan-tanggal-layanan"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+            >
+              Tanggal layanan — opsional
+            </label>
+            <input
+              id="temuan-tanggal-layanan"
+              type="date"
+              value={tanggalLayanan}
+              onChange={(e) => onSetTanggalLayanan(e.target.value)}
+              className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Kapan layanan yang ditinjau benar-benar terjadi.
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="temuan-tanggal-sampel"
+              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+            >
+              Tanggal sampel — opsional
+            </label>
+            <input
+              id="temuan-tanggal-sampel"
+              type="date"
+              value={tanggalSampel}
+              onChange={(e) => onSetTanggalSampel(e.target.value)}
+              className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Kapan QA memeriksa sampel dan menetapkan temuan ini.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Keduanya boleh dikosongkan. Tanggal kosong berarti belum diisi — bukan
+          berarti layanan tidak pernah terjadi.
+        </p>
 
         <div className="space-y-4">
           {entries.map((entry, idx) => (

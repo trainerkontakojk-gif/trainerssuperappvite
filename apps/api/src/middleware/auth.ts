@@ -14,6 +14,8 @@ export interface AuthProfile {
 export type AuthVariables = {
   user: User;
   profile: AuthProfile;
+  /** JWT mentah user, dipakai route yang butuh RLS aktif. */
+  token: string;
 };
 
 function buildForbidden(code: string, message: string) {
@@ -115,5 +117,8 @@ export const authMiddleware = async (
 
   c.set("user", user);
   c.set("profile", profile);
+  // Token disimpan agar route bisa membangun user client (RLS aktif).
+  // Disimpan apa adanya — jangan pernah di-log.
+  c.set("token", token);
   await next();
 };

@@ -37,6 +37,8 @@ interface TemuanItem {
   ketidaksesuaian: string | null;
   sebaiknya: string | null;
   no_tiket: string | null;
+  tanggal_layanan?: string | null;
+  tanggal_sampel?: string | null;
 }
 
 export interface PhantomSessionItem {

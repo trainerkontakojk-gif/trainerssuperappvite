@@ -351,6 +351,8 @@ export default function SidakAgentDetailPage() {
         }
         onSave={handleEditSave}
         onClose={() => setEditingTemuan(null)}
+        tanggalLayanan={editingTemuan?.tanggal_layanan ?? null}
+        tanggalSampel={editingTemuan?.tanggal_sampel ?? null}
       />
     </div>
   );

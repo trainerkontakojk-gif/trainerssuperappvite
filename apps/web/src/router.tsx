@@ -25,6 +25,7 @@ const SidakLanding = lazy(() => import("./routes/sidak/index"));
 const SidakDashboard = lazy(() => import("./routes/sidak/dashboard"));
 const SidakForecast = lazy(() => import("./routes/sidak/forecast"));
 const SidakInput = lazy(() => import("./routes/sidak/input"));
+const SidakHeatmap = lazy(() => import("./routes/sidak/heatmap"));
 const SidakRanking = lazy(() => import("./routes/sidak/ranking"));
 const SidakSettings = lazy(() => import("./routes/sidak/settings"));
 const SidakPeriods = lazy(() => import("./routes/sidak/periods"));
@@ -245,6 +246,14 @@ const sidakPeriodsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/periods",
   component: SidakPeriods,
+  beforeLoad: requireRole(["trainer", "admin"]),
+});
+
+const sidakHeatmapRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sidak/heatmap",
+  component: SidakHeatmap,
+  // Admin + trainer saja: tiga lapis (nav, beforeLoad, requireRole backend).
   beforeLoad: requireRole(["trainer", "admin"]),
 });
 
@@ -638,6 +647,7 @@ const routeTree = rootRoute.addChildren([
   sidakRankingRoute,
   sidakSettingsRoute,
   sidakPeriodsRoute,
+  sidakHeatmapRoute,
   sidakJadwalShiftingRoute,
   sidakAgentsRoute,
   sidakAgentDetailRoute,

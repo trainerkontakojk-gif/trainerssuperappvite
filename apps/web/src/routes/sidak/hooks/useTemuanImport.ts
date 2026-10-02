@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import {
   formatQAIndicatorName,
+  tanggalSchema,
   type QAIndicator,
   type QAPeriod,
   type QATemuan,
@@ -111,6 +112,10 @@ export function useTemuanImport({
         { key: "nilai", header: "Nilai (0-3)", width: 13 },
         { key: "ktdk", header: "Ketidaksesuaian", width: 42 },
         { key: "sbknya", header: "Sebaiknya", width: 42 },
+        // Dua kolom baru ditaruh DI BELAKANG lima kolom lama supaya template
+        // lama tetap terbaca dan tidak perlu diunduh ulang.
+        { key: "tglLayanan", header: "Tanggal Layanan (YYYY-MM-DD)", width: 24 },
+        { key: "tglSampel", header: "Tanggal Sampel (YYYY-MM-DD)", width: 24 },
       ];
       const headerRow = ws.getRow(1);
       headerRow.eachCell((cell: any) => {
@@ -128,6 +133,22 @@ export function useTemuanImport({
           sbknya: i === 0 ? "Contoh perbaikan" : "",
         });
       });
+
+      // Petunjuk ditaruh di sheet TERPISAH ("Petunjuk") yang tetap terlihat,
+      // BUKAN sebagai baris di "Input Temuan". Parser membaca setiap baris yang
+      // tidak kosong sebagai baris data, jadi catatan di sheet yang sama membuat
+      // template hasil unduhan menghasilkan baris error "Parameter kosong" dan
+      // alur kanonik download → isi → upload gagal. Sheet terpisah menjaga
+      // "Input Temuan" tetap kolom-eksak 7 kolom dan bebas baris non-data.
+      const help = wb.addWorksheet("Petunjuk");
+      help.getColumn(1).width = 96;
+      help.getCell("A1").value =
+        "Kolom Tanggal Layanan dan Tanggal Sampel OPSIONAL — boleh dikosongkan.";
+      help.getCell("A2").value =
+        "Kosong berarti tanggal belum diisi, bukan tidak berlaku. Format: YYYY-MM-DD.";
+      help.getCell("A3").value =
+        'Isi hanya baris pada sheet "Input Temuan". Baris contoh boleh diubah atau dihapus.';
+      help.getCell("A1").font = { italic: true, size: 10 };
 
       const paramCount = activeIndicators.length;
       for (let r = 2; r <= 101; r++) {
@@ -173,11 +194,71 @@ export function useTemuanImport({
     setImportFile(file);
     setParsing(true);
     try {
-      const { readWorkbookRaw } = await import("../../../lib/excel-utils");
+      const { readWorkbookRawValues, toDateOnlyUTC } = await import(
+        "../../../lib/excel-utils"
+      );
       const buffer = await file.arrayBuffer();
-      const { names, sheets } = await readWorkbookRaw(buffer);
+      const { names, sheets } = await readWorkbookRawValues(buffer);
       const sheetName = names.find((n) => n === "Input Temuan") ?? names[0];
       const rows = sheets[sheetName] ?? [];
+
+      /**
+       * Kolom dibaca berdasarkan HEADER, bukan posisi. Template lima kolom lama
+       * tidak punya kolom tanggal sama sekali, jadi indeks posisi akan membuat
+       * kolom `Sebaiknya` terbaca sebagai tanggal.
+       */
+      const headerRow = (rows[0] ?? []).map((c) =>
+        String(c ?? "").trim().toLowerCase(),
+      );
+      const colOf = (header: string) => headerRow.indexOf(header);
+      const colTiket = colOf("no. tiket");
+      const colParam = colOf("parameter / sub-parameter");
+      const colNilai = colOf("nilai (0-3)");
+      const colKtdk = colOf("ketidaksesuaian");
+      const colSbk = colOf("sebaiknya");
+      const colTglLayanan = colOf("tanggal layanan (yyyy-mm-dd)");
+      const colTglSampel = colOf("tanggal sampel (yyyy-mm-dd)");
+
+      const cellAt = (row: unknown[], index: number): unknown =>
+        index >= 0 ? row[index] : undefined;
+
+      /**
+       * Terjemahkan sel tanggal menjadi `YYYY-MM-DD`, atau null bila kosong.
+       *
+       * - `Date` (sel Excel berformat tanggal) -> getter UTC, tanpa pergeseran.
+       * - teks harus ISO DAN tanggal kalender nyata (divalidasi `tanggalSchema`,
+       *   jadi `2026-02-30` dan `03/04/2026` ditolak).
+       * - angka TIDAK ditebak sebagai serial Excel; formatnya ambigu.
+       */
+      const readTanggal = (
+        row: unknown[],
+        index: number,
+        label: string,
+      ): { value: string | null; error: string } => {
+        const raw = cellAt(row, index);
+        if (raw === null || raw === undefined || raw === "") {
+          return { value: null, error: "" };
+        }
+        const fromExcel = toDateOnlyUTC(raw);
+        const text = fromExcel ?? (typeof raw === "string" ? raw.trim() : "");
+        if (!text) {
+          if (typeof raw === "number") {
+            return {
+              value: null,
+              error: `${label} diisi angka (${raw}) — format tanggal tidak bisa dipastikan. Gunakan teks YYYY-MM-DD.`,
+            };
+          }
+          return { value: null, error: `${label} tidak valid.` };
+        }
+        const parsed = tanggalSchema.safeParse(text);
+        if (!parsed.success) {
+          return {
+            value: null,
+            error: `${label} "${text}" tidak valid. Gunakan YYYY-MM-DD dengan tanggal yang nyata.`,
+          };
+        }
+        return { value: text, error: "" };
+      };
       const paramMap = new Map(
         activeIndicators.map((indicator) => [
           formatQAIndicatorName(indicator).toLowerCase().trim(),
@@ -190,11 +271,11 @@ export function useTemuanImport({
         const row = rows[i];
         if (row.every((c) => c === "" || c === null || c === undefined))
           continue;
-        const no_tiket = String(row[0] ?? "").trim();
-        const paramName = String(row[1] ?? "").trim();
-        const nilaiRaw = row[2];
-        const ketidaksesuaian = String(row[3] ?? "").trim();
-        const sebaiknya = String(row[4] ?? "").trim();
+        const no_tiket = String(cellAt(row, colTiket) ?? "").trim();
+        const paramName = String(cellAt(row, colParam) ?? "").trim();
+        const nilaiRaw = cellAt(row, colNilai);
+        const ketidaksesuaian = String(cellAt(row, colKtdk) ?? "").trim();
+        const sebaiknya = String(cellAt(row, colSbk) ?? "").trim();
         let error = "";
         let indicator_id: string | null = null;
         let nilai: number | null = null;
@@ -218,6 +299,14 @@ export function useTemuanImport({
           nilai = nilaiNum;
         }
 
+        const tglLayanan = readTanggal(row, colTglLayanan, "Tanggal Layanan");
+        const tglSampel = readTanggal(row, colTglSampel, "Tanggal Sampel");
+        // Tanggal salah memblokir import (tidak dikosongkan diam-diam), tapi
+        // error tanggal tidak menimpa error kolom lain.
+        if (tglLayanan.error || tglSampel.error) {
+          error = error || tglLayanan.error || tglSampel.error;
+        }
+
         result.push({
           rowNum: i + 1,
           no_tiket,
@@ -226,6 +315,8 @@ export function useTemuanImport({
           nilai,
           ketidaksesuaian,
           sebaiknya,
+          tanggal_layanan: tglLayanan.value,
+          tanggal_sampel: tglSampel.value,
           error,
         });
       }
@@ -275,6 +366,11 @@ export function useTemuanImport({
         ketidaksesuaian: r.ketidaksesuaian || null,
         sebaiknya: r.sebaiknya || null,
         no_tiket: r.no_tiket || null,
+        // String kosong tidak mungkin muncul di sini: `readTanggal` sudah
+        // mengubahnya menjadi `null`, jadi backend menerima tanggal nyata atau
+        // tidak mengirim apa pun.
+        tanggal_layanan: r.tanggal_layanan || null,
+        tanggal_sampel: r.tanggal_sampel || null,
       }));
       const preview = (await unwrapResponse(
         await sidakClient.temuan.batch.preview.$post({

@@ -642,7 +642,7 @@ function readPdfPages(bytes: Buffer): {
       Number(match[1]),
     );
   }
-  if (pageObjects.length === 0) return { texts: [], contents: [] };
+  if (pageObjects.length === 0) return { texts: [], contents: [], runs: [] };
 
   const pages = pageObjects.map((page) => {
     const body = objectBody(page);
@@ -3869,7 +3869,7 @@ test.describe("SIDAK agent report download nyata", () => {
     });
     expect(unmockedApi).toEqual({ failed: true, status: 0 });
     expect(audit.blockedApi).toContain(
-      "GET http://localhost:3005/api/v1/sidak/agents/agent-1/tidak-ada",
+      `GET ${APP_ORIGIN}/api/v1/sidak/agents/agent-1/tidak-ada`,
     );
 
     // (3) Host eksternal yang reachable (example.com) tidak boleh keluar dari mesin.

@@ -8,6 +8,8 @@ export interface TemuanItem {
   ketidaksesuaian?: string | null;
   sebaiknya?: string | null;
   no_tiket?: string | null;
+  tanggal_layanan?: string | null;
+  tanggal_sampel?: string | null;
   [key: string]: unknown;
 }
 
@@ -26,6 +28,8 @@ export interface TemuanGroupCardProps {
   editNilai: number;
   editKetidaksesuaian: string;
   editSebaiknya: string;
+  editTanggalLayanan: string;
+  editTanggalSampel: string;
   deletingId: string | null;
   canEdit: boolean;
   onStartEdit: (item: TemuanItem) => void;
@@ -35,6 +39,8 @@ export interface TemuanGroupCardProps {
   setEditNilai: (v: number) => void;
   setEditKetidaksesuaian: (v: string) => void;
   setEditSebaiknya: (v: string) => void;
+  setEditTanggalLayanan: (v: string) => void;
+  setEditTanggalSampel: (v: string) => void;
 }
 
 const NILAI_OPTIONS = [
@@ -57,9 +63,11 @@ const NILAI_LABEL_COLOR: Record<number, string> = {
 
 export default function TemuanGroupCard({
   group, gIdx, indicatorLabelMap, categoryMap, editingId, editNilai,
-  editKetidaksesuaian, editSebaiknya, deletingId, canEdit,
+  editKetidaksesuaian, editSebaiknya, editTanggalLayanan, editTanggalSampel,
+  deletingId, canEdit,
   onStartEdit, onCancelEdit, onSaveEdit, onDelete,
   setEditNilai, setEditKetidaksesuaian, setEditSebaiknya,
+  setEditTanggalLayanan, setEditTanggalSampel,
 }: TemuanGroupCardProps) {
   return (
     <article className="min-w-0 border border-border rounded-xl overflow-hidden bg-surface">
@@ -123,6 +131,38 @@ export default function TemuanGroupCard({
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor={`edit-tanggal-layanan-${item.id}`}
+                        className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide"
+                      >
+                        Tanggal layanan
+                      </label>
+                      <input
+                        id={`edit-tanggal-layanan-${item.id}`}
+                        type="date"
+                        value={editTanggalLayanan}
+                        onChange={(e) => setEditTanggalLayanan(e.target.value)}
+                        className="w-full bg-transparent border border-border rounded-lg px-3 py-1.5 text-xs outline-none focus:border-foreground text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`edit-tanggal-sampel-${item.id}`}
+                        className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide"
+                      >
+                        Tanggal sampel
+                      </label>
+                      <input
+                        id={`edit-tanggal-sampel-${item.id}`}
+                        type="date"
+                        value={editTanggalSampel}
+                        onChange={(e) => setEditTanggalSampel(e.target.value)}
+                        className="w-full bg-transparent border border-border rounded-lg px-3 py-1.5 text-xs outline-none focus:border-foreground text-foreground"
+                      />
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
@@ -166,6 +206,19 @@ export default function TemuanGroupCard({
                           {item.sebaiknya}
                         </p>
                       )}
+                      {/*
+                        Tanggal selalu ditampilkan, termasuk saat kosong. Kalau
+                        hanya dirender ketika terisi, pengguna tidak bisa
+                        membedakan "belum diisi" dari "sudah diisi lalu terhapus".
+                      */}
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/70">Tanggal layanan: </span>
+                        {item.tanggal_layanan || "Belum diisi"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/70">Tanggal sampel: </span>
+                        {item.tanggal_sampel || "Belum diisi"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">

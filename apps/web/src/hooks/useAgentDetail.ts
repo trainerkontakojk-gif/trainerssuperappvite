@@ -44,6 +44,8 @@ export interface TemuanDisplayItem {
   ketidaksesuaian: string | null;
   sebaiknya: string | null;
   no_tiket: string | null;
+  tanggal_layanan?: string | null;
+  tanggal_sampel?: string | null;
 }
 
 export interface PhantomSessionDisplayItem {
@@ -59,6 +61,8 @@ export interface EditFormState {
   nilai: number;
   ketidaksesuaian: string;
   sebaiknya: string;
+  tanggal_layanan: string;
+  tanggal_sampel: string;
 }
 
 const MONTHS_FULL = [
@@ -107,6 +111,8 @@ export function useAgentDetail(agentId: string) {
     nilai: 3,
     ketidaksesuaian: "",
     sebaiknya: "",
+    tanggal_layanan: "",
+    tanggal_sampel: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -271,6 +277,8 @@ export function useAgentDetail(agentId: string) {
           ketidaksesuaian: t.ketidaksesuaian ?? null,
           sebaiknya: t.sebaiknya ?? null,
           no_tiket: t.no_tiket ?? null,
+          tanggal_layanan: t.tanggal_layanan ?? null,
+          tanggal_sampel: t.tanggal_sampel ?? null,
         };
       })
       .filter((t) => t.month > 0);
@@ -694,6 +702,8 @@ export function useAgentDetail(agentId: string) {
       nilai: item.nilai,
       ketidaksesuaian: item.ketidaksesuaian ?? "",
       sebaiknya: item.sebaiknya ?? "",
+      tanggal_layanan: item.tanggal_layanan ?? "",
+      tanggal_sampel: item.tanggal_sampel ?? "",
     });
   }, []);
 
@@ -701,10 +711,21 @@ export function useAgentDetail(agentId: string) {
     if (!editingTemuan) return;
     setIsSubmitting(true);
     try {
+      /**
+       * Input `type="date"` mengembalikan `""` saat dikosongkan, dan `""` BUKAN
+       * tanggal yang valid — backend akan menolaknya. Jadi tanggal kosong harus
+       * dikirim sebagai `null` ("belum diisi"), sama seperti `useTemuanEdit`.
+       * Tanpa ini, user yang sekadar menghapus tanggal mendapat error 400.
+       */
+      const payload = {
+        ...editForm,
+        tanggal_layanan: editForm.tanggal_layanan || null,
+        tanggal_sampel: editForm.tanggal_sampel || null,
+      };
       await unwrapResponse(
         sidakClient.temuan[":id"].$put({
           param: { id: editingTemuan.id },
-          json: editForm,
+          json: payload,
         }),
       );
       setEditingTemuan(null);

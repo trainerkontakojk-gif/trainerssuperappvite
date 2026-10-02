@@ -16,9 +16,11 @@ import {
 } from "./period-scoring-context";
 import {
   formatQAIndicatorName,
+  type CreateTemuanBatch,
   type QATemuan,
   type ServiceType,
   type ServiceWeight,
+  type UpdateTemuan,
 } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 
@@ -27,22 +29,17 @@ export interface ValidationError {
   error: string;
 }
 
+/**
+ * Satu baris temuan, persis seperti bentuk di shared contract. Bentuk item
+ * TIDAK dideklarasikan ulang di sini supaya tanggal tidak bisa hilang di
+ * service padahal ada di schema (atau sebaliknya).
+ */
+export type TemuanBatchItem = CreateTemuanBatch["items"][number];
+
 export interface PreviewResult {
-  valid: {
-    indicator_id: string;
-    nilai: number;
-    ketidaksesuaian?: string | null;
-    sebaiknya?: string | null;
-    no_tiket?: string | null;
-  }[];
+  valid: TemuanBatchItem[];
   invalid: ValidationError[];
-  skipped: {
-    indicator_id: string;
-    nilai: number;
-    ketidaksesuaian?: string | null;
-    sebaiknya?: string | null;
-    no_tiket?: string | null;
-  }[];
+  skipped: TemuanBatchItem[];
   stats: { valid_count: number; invalid_count: number; skipped_count: number };
   active_rule_version_id?: string | null;
 }
@@ -187,19 +184,9 @@ export async function createPerfectScoreSession(
   return data ?? [];
 }
 
-export async function validateTemuanBatch(items: {
-  peserta_id: string;
-  period_id: string;
-  service_type: ServiceType;
-  no_tiket?: string | null;
-  items: {
-    indicator_id: string;
-    nilai: number;
-    ketidaksesuaian?: string | null;
-    sebaiknya?: string | null;
-    no_tiket?: string | null;
-  }[];
-}): Promise<PreviewResult> {
+export async function validateTemuanBatch(
+  items: CreateTemuanBatch,
+): Promise<PreviewResult> {
   const [activeVersion, validIndicators, existing] = await Promise.all([
     resolveEffectiveRuleVersionForPeriod(items.service_type, items.period_id),
 
@@ -303,19 +290,7 @@ export async function validateTemuanBatch(items: {
 }
 
 export async function createTemuanBatch(
-  items: {
-    peserta_id: string;
-    period_id: string;
-    service_type: ServiceType;
-    no_tiket?: string | null;
-    items: {
-      indicator_id: string;
-      nilai: number;
-      ketidaksesuaian?: string | null;
-      sebaiknya?: string | null;
-      no_tiket?: string | null;
-    }[];
-  },
+  items: CreateTemuanBatch,
   userId?: string,
   userName?: string,
 ): Promise<{ inserted: number; skipped: number; total: number }> {
@@ -353,6 +328,13 @@ export async function createTemuanBatch(
       ketidaksesuaian: item.ketidaksesuaian ?? null,
       sebaiknya: item.sebaiknya ?? null,
       rule_version_id: ruleVersionId,
+      /**
+       * Tanggal bisnis disimpan PER BARIS, mengikuti input apa adanya. `?? null`
+       * hanya menerjemahkan "tidak dikirim" menjadi NULL; tidak ada default
+       * `CURRENT_DATE`, jadi data lama tidak pernah ikut terisi.
+       */
+      tanggal_layanan: item.tanggal_layanan ?? null,
+      tanggal_sampel: item.tanggal_sampel ?? null,
     };
   });
 
@@ -627,20 +609,28 @@ export async function refreshDashboardSummary(
   };
 }
 
-export async function updateTemuan(
-  id: string,
-  updates: {
-    nilai?: number;
-    ketidaksesuaian?: string | null;
-    sebaiknya?: string | null;
-  },
-) {
+export async function updateTemuan(id: string, updates: UpdateTemuan) {
+  /**
+   * Field yang tidak ada di payload dibuang, bukan dikirim sebagai `undefined`.
+   * Pembedaan ini adalah kontrak update: "tidak dikirim" berarti PERTAHANKAN
+   * nilai existing, sedangkan `null` eksplisit berarti HAPUS. Mengirim key
+   * bernilai `undefined` berisiko mengubah kolom yang tidak dimaksud jadi NULL.
+   */
+  const patch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) patch[key] = value;
+  }
+
   const { data, error } = await supabaseAdmin
     .from("qa_temuan")
-    .update(updates)
+    .update(patch)
     .eq("id", id)
     .select()
     .single();
+  // Tidak ada cabang khusus tanggal di sini: format tanggal sudah divalidasi
+  // Zod di shared contract SEBELUM service dipanggil, jadi error tanggal tidak
+  // akan pernah sampai ke lapisan ini. Menebak dari `error.message` hanya
+  // menambah jalur yang tidak bisa diuji dan bisa menimpa pesan lain.
   if (error) throw new Error(`Gagal update temuan: ${error.message}`);
   return data;
 }

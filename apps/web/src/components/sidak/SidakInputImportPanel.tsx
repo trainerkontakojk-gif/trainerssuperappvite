@@ -16,6 +16,9 @@ export interface ParsedImportRow {
   nilai: number | null;
   ketidaksesuaian: string;
   sebaiknya: string;
+  /** `null` berarti "belum diisi" — kolomnya opsional, bukan wajib kosong. */
+  tanggal_layanan: string | null;
+  tanggal_sampel: string | null;
   error: string;
 }
 
@@ -246,6 +249,14 @@ export default function SidakInputImportPanel({
                               </span>
                             )}
                           </div>
+                          {/* Tanggal ikut ditampilkan di preview supaya user
+                              bisa 확인 sebelum mengimpor, bukan baru tahu
+                              setelah disimpan. Kosong tampil sebagai "Belum diisi". */}
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Tanggal layanan:{" "}
+                            {row.tanggal_layanan || "Belum diisi"} · Tanggal
+                            sampel: {row.tanggal_sampel || "Belum diisi"}
+                          </p>
                           {row.error && (
                             <p className="text-[10px] text-red-500 mt-1">
                               {row.error}

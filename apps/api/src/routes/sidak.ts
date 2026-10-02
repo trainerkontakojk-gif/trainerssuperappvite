@@ -8,6 +8,7 @@ import { sidakRuleVersions } from "./sidak/rule-versions";
 import { sidakReports } from "./sidak/reports";
 import { sidakSimulations } from "./sidak/simulations";
 import { sidakJadwalShifting } from "./sidak/jadwal-shifting";
+import { sidakHeatmap } from "./sidak/heatmap";
 
 type Variables = { user: User; profile: any };
 
@@ -21,5 +22,6 @@ sidak.route("/", sidakRuleVersions);
 sidak.route("/", sidakReports);
 sidak.route("/", sidakSimulations);
 sidak.route("/", sidakJadwalShifting);
+sidak.route("/", sidakHeatmap);
 
 export { sidak };

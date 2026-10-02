@@ -523,7 +523,7 @@ export type JadwalApiBehavior =
       kind: "data";
       rows?: unknown[];
       /** Baris bulan khusus test ini; `month` di dalam baris tetap dipakai. */
-      monthRows?: unknown[];
+      monthRows?: readonly unknown[];
       truncated?: boolean;
       asOf?: string;
       /** Delay a success response so loading states are observable in E2E. */
@@ -686,12 +686,19 @@ export function monthRows(month: string = FIXTURE_MONTH) {
 export function monthSuccessBody(
   month: string,
   overrides: { truncated?: boolean; asOf?: string } = {},
-  rowsOverride?: unknown[],
+  // `readonly` dipakai agar spec boleh mengirim literal `as const`; tanpa itu
+  // setiap pemanggilan dengan fixture konstan gagal typecheck.
+  rowsOverride?: readonly unknown[],
 ) {
-  const rows = rowsOverride ?? monthRows(month);
+  const rows = (rowsOverride ?? monthRows(month)) as readonly Record<
+    string,
+    unknown
+  >[];
   const [year, monthNumber] = month.split("-").map(Number);
   const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-  const channels = [...new Set(rows.map((row) => row.channel))].sort();
+  const channels = [
+    ...new Set(rows.map((row) => String(row.channel ?? "")).filter(Boolean)),
+  ].sort();
   return {
     success: true,
     data: {

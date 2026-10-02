@@ -4,7 +4,10 @@ import { User } from "@supabase/supabase-js";
 import { requireRole } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
-import { createTemuanBatchSchema } from "@trainers/types";
+import {
+  createTemuanBatchSchema,
+  updateTemuanSchema,
+} from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -108,18 +111,17 @@ sidakTemuan.post(
 sidakTemuan.put("/temuan/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
-  const parsed = z
-    .object({
-      nilai: z.number().int().min(0).max(3).optional(),
-      ketidaksesuaian: z.string().nullable().optional(),
-      sebaiknya: z.string().nullable().optional(),
-    })
-    .safeParse(body);
+  // Schema update dipakai BERBAGAI dengan service dan spec, supaya validasi
+  // tanggal tidak hanya berlaku pada satu jalur PUT.
+  const parsed = updateTemuanSchema.safeParse(body);
   if (!parsed.success) {
     return c.json(
       {
         success: false,
-        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues[0]?.message ?? "Data tidak valid",
+        },
       },
       400,
     );

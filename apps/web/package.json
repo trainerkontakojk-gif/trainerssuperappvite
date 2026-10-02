@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node ../../scripts/deployment/guard-no-railway-dev.mjs && vite",
     "build": "tsc && vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.e2e.json",
     "test": "vitest run",
     "test:targeted": "vitest run --config vitest.config.fast.ts --changed",
     "test:core": "node ../../scripts/test-core.mjs web",
@@ -60,6 +60,7 @@
     "tailwindcss": "^4.0.7",
     "typescript": "^5.0.0",
     "vite": "^8.1.0",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "@types/node": "^22.19.19"
   }
 }

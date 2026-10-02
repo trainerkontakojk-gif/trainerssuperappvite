@@ -676,11 +676,10 @@ test.describe("Filter tanggal", () => {
     await input.fill(requested);
     await input.press("Enter");
     await expect
-      .poll(
-        () => capturedJadwalRequests().at(-1)?.date,
-        { timeout: 10_000 },
-        "tanggal yang dipilih tidak terkirim ke API",
-      )
+      .poll(() => capturedJadwalRequests().at(-1)?.date, {
+        timeout: 10_000,
+        message: "tanggal yang dipilih tidak terkirim ke API",
+      })
       .toBe(requested);
 
     expect(

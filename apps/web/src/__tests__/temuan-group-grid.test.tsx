@@ -28,6 +28,10 @@ describe("TemuanGroupGrid", () => {
         setEditNilai={vi.fn()}
         setEditKetidaksesuaian={vi.fn()}
         setEditSebaiknya={vi.fn()}
+        editTanggalLayanan=""
+        editTanggalSampel=""
+        setEditTanggalLayanan={vi.fn()}
+        setEditTanggalSampel={vi.fn()}
       />,
     );
 

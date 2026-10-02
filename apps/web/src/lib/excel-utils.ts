@@ -150,6 +150,59 @@ export async function readWorkbookRaw(data: ArrayBuffer): Promise<RawWorkbook> {
   return { names, sheets };
 }
 
+/**
+ * Baca workbook tanpa meratakan nilai sel menjadi teks.
+ *
+ * Diperlukan importer SIDAK karena ia harus TAHU apakah sebuah sel adalah
+ * tanggal Excel asli (objek `Date`), teks ISO, atau angka serial. Versi
+ * `readWorkbookRaw` meratakan semuanya lewat `cellText`, sehingga informasi itu
+ * hilang dan angka serial tidak bisa dibedakan dari tanggal.
+ *
+ * Sengaja ADDITIF: `cellText` dan `readWorkbookRaw` tidak diubah karena
+ * dipakai caller lain di luar fitur ini. Perbedaan konversi tanggal antara
+ * `cellText` (getter lokal) dan `toDateOnlyUTC` (getter UTC) sengaja tidak
+ * dirapikan di sini.
+ */
+export async function readWorkbookRawValues(data: ArrayBuffer): Promise<{
+  names: string[];
+  sheets: Record<string, unknown[][]>;
+}> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(data);
+  const names: string[] = [];
+  const sheets: Record<string, unknown[][]> = {};
+  wb.eachSheet((ws) => {
+    names.push(ws.name);
+    const rows: unknown[][] = [];
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      const cells: unknown[] = [];
+      for (let c = 1; c <= Math.max(row.cellCount, 1); c++) {
+        cells.push(row.getCell(c).value);
+      }
+      rows.push(cells);
+    });
+    sheets[ws.name] = rows;
+  });
+  return { names, sheets };
+}
+
+/**
+ * Konversi sel tanggal Excel menjadi `YYYY-MM-DD` dengan getter UTC.
+ *
+ * ExcelJS mengembalikan tanggal sebagai `Date` yang mewakili tengah malam UTC.
+ * Mengambil bagian tanggalnya dengan getter LOKAL (`getDate()`) menggeser nilai
+ * satu hari ke belakang di timezone negatif — bug yang tidak terlihat dari
+ * mesin Penalty Calculation developer di Asia. Getter UTC tidak pernah bergeser.
+ */
+export function toDateOnlyUTC(value: unknown): string | null {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return null;
+  const y = value.getUTCFullYear();
+  const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(value.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Build an .xlsx buffer from flat row objects (header = first object's keys, order preserved). */
 export async function buildFlatWorkbookBuffer(
   sheetName: string,
