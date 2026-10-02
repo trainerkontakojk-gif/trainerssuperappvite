@@ -37,6 +37,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 
 Command meanings only; E2E policy, target-safety checks, tier exceptions, and verification gates live in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) §7.
 
+- **E2E harnesses and fixture rules** — [`e2e-testing.md`](e2e-testing.md): the two sanctioned patterns, the `mockAuth` UI-only contract, and the measurement/fixture traps.
 - **Runtime behavior** — focused Playwright E2E: `pnpm --filter @trainers/web test:e2e -- <focused-spec>`. Run only after verifying all targets are local/test-only and disposable.
 - **Legacy unit-suite commands** — `pnpm test:affected`, `pnpm test:targeted`, `pnpm test:core`, `pnpm test:fast`, and `pnpm test:full` remain in the repository but are not default verification for new work. Do not add unit tests or run these suites without Fajar's explicit approval.
 - **`pnpm lint` / `pnpm typecheck` / `pnpm build` / `git diff --check`** — compile/quality gates when the selected lane requires them; they do not replace E2E behavior evidence.

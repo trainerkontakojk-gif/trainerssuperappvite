@@ -431,4 +431,33 @@ test.describe("Edit tanggal di detail agent (EditTemuanModal)", () => {
 
     expect(a.blockedExternal).toEqual([]);
   });
+
+  test("modal menjebak fokus: Tab berputar dan Escape menutup tanpa menyimpan", async ({ page }) => {
+    const a = await openModal(page, {
+      row: { tanggal_layanan: "2026-01-05", tanggal_sampel: null },
+    });
+
+    const closeButton = page.getByRole("button", { name: "Tutup edit temuan" });
+    const saveButton = page.getByRole("button", { name: /Simpan Perubahan/ });
+
+    // Fokus awal masuk ke dalam dialog, bukan tertinggal di halaman belakang.
+    await expect(closeButton).toBeFocused();
+
+    // Shift+Tab dari elemen pertama berputar ke elemen terakhir DI DALAM dialog.
+    await page.keyboard.press("Shift+Tab");
+    await expect(saveButton).toBeFocused();
+
+    // Tab dari elemen terakhir kembali ke elemen pertama — fokus tidak kabur ke
+    // halaman belakang.
+    await page.keyboard.press("Tab");
+    await expect(closeButton).toBeFocused();
+
+    // Escape menutup dialog dan tidak mengirim update apa pun.
+    await page.keyboard.press("Escape");
+    await expect(closeButton).toBeHidden();
+    expect(lastAgentUpdate()).toBeNull();
+
+    expect(a.blockedExternal).toEqual([]);
+    expect(a.blockedApi).toEqual([]);
+  });
 });

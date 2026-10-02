@@ -29,7 +29,7 @@ interface RenderProps {
 function renderSidebar({ pathname, flyoutOpen, flyoutModule }: RenderProps) {
   const mockProfile = { role: "admin", full_name: "Test Admin" };
   const mockSession = { user: { email: "admin@test.com" } };
-  
+
   const setMobileMenuOpen = vi.fn();
   const openMaintenance = vi.fn();
   const setTheme = vi.fn();
@@ -53,11 +53,21 @@ function renderSidebar({ pathname, flyoutOpen, flyoutModule }: RenderProps) {
       setFlyoutOpen={setFlyoutOpen}
       flyoutModule={flyoutModule}
       setFlyoutModule={setFlyoutModule}
-    />
+    />,
   );
 }
 
-describe("Sidebar Active & Open Decoupling", () => {
+/**
+ * HANYA kontrak TAMPILAN yang tersisa di sini.
+ *
+ * Empat kontrak perilaku (pemisahan `data-active` vs `data-open` untuk SIDAK,
+ * Management, dan halaman SIDAK) sudah dibuktikan browser-level di
+ * `e2e/sidebar-nav-state.spec.ts`; salinan unitnya dihapus supaya tidak ada dua
+ * versi yang bisa saling menyimpang. Assertion class responsif di bawah tidak
+ * bisa dibuktikan lewat E2E secara jujur (butuh mengukur breakpoint), jadi tetap.
+ */
+
+describe("Sidebar (kontrak tampilan)", () => {
   it("hides the sidebar shell below desktop breakpoints", () => {
     const { container } = renderSidebar({
       pathname: "/dashboard",
@@ -73,83 +83,5 @@ describe("Sidebar Active & Open Decoupling", () => {
       "shrink-0",
       "lg:flex",
     );
-  });
-
-  it("shows Profiler as data-active, and SIDAK/Management as inactive/closed when on Profiler page and no flyouts open", () => {
-    const { container } = renderSidebar({
-      pathname: "/profiler",
-      flyoutOpen: false,
-      flyoutModule: null,
-    });
-
-    // Profiler links to "/profiler"
-    const profilerItem = container.querySelector('a[href="/profiler"]');
-    expect(profilerItem).not.toBeNull();
-    // Attribute values in jsdom are strings
-    expect(profilerItem?.getAttribute("data-active")).toBe("true");
-
-    // SIDAK and Management buttons
-    const buttons = container.querySelectorAll("button.sidebar-rail-item");
-    expect(buttons.length).toBeGreaterThanOrEqual(2);
-    
-    const sidakBtn = buttons[0];
-    const managementBtn = buttons[1];
-
-    expect(sidakBtn.getAttribute("data-active")).toBe("false");
-    expect(sidakBtn.getAttribute("data-open")).toBe("false");
-
-    expect(managementBtn.getAttribute("data-active")).toBe("false");
-    expect(managementBtn.getAttribute("data-open")).toBe("false");
-  });
-
-  it("keeps Profiler as data-active and marks SIDAK as data-open (not data-active) when on Profiler page and SIDAK flyout is open", () => {
-    const { container } = renderSidebar({
-      pathname: "/profiler",
-      flyoutOpen: true,
-      flyoutModule: "sidak",
-    });
-
-    const profilerItem = container.querySelector('a[href="/profiler"]');
-    expect(profilerItem?.getAttribute("data-active")).toBe("true");
-
-    const buttons = container.querySelectorAll("button.sidebar-rail-item");
-    const sidakBtn = buttons[0];
-    
-    expect(sidakBtn.getAttribute("data-active")).toBe("false");
-    expect(sidakBtn.getAttribute("data-open")).toBe("true");
-  });
-
-  it("marks SIDAK as data-active and data-open when on SIDAK page and SIDAK flyout is open", () => {
-    const { container } = renderSidebar({
-      pathname: "/sidak/ranking",
-      flyoutOpen: true,
-      flyoutModule: "sidak",
-    });
-
-    const profilerItem = container.querySelector('a[href="/profiler"]');
-    expect(profilerItem?.getAttribute("data-active")).toBe("false");
-
-    const buttons = container.querySelectorAll("button.sidebar-rail-item");
-    const sidakBtn = buttons[0];
-
-    expect(sidakBtn.getAttribute("data-active")).toBe("true");
-    expect(sidakBtn.getAttribute("data-open")).toBe("true");
-  });
-
-  it("keeps Profiler as data-active and marks Management as data-open (not data-active) when on Profiler page and Management flyout is open", () => {
-    const { container } = renderSidebar({
-      pathname: "/profiler",
-      flyoutOpen: true,
-      flyoutModule: "management",
-    });
-
-    const profilerItem = container.querySelector('a[href="/profiler"]');
-    expect(profilerItem?.getAttribute("data-active")).toBe("true");
-
-    const buttons = container.querySelectorAll("button.sidebar-rail-item");
-    const managementBtn = buttons[1];
-
-    expect(managementBtn.getAttribute("data-active")).toBe("false");
-    expect(managementBtn.getAttribute("data-open")).toBe("true");
   });
 });

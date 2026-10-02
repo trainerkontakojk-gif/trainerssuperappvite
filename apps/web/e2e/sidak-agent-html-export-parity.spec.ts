@@ -150,6 +150,23 @@ test.describe("SIDAK agent report: paritas live vs unduhan", () => {
       "kalimat temuan tidak terlihat di halaman live, jadi paritas teksnya tidak bisa dibandingkan",
     ).toContain(HOSTILE_FINDING_TEXT);
 
+    // (1b) Sesi bersih (phantom) juga harus terbaca di tab Temuan sebagai
+    // "Sesi tanpa temuan" dengan skor agregatnya. Halaman live yang tidak
+    // memuatnya berarti kontrak tab Temuan hilang, bukan sekadar beda format.
+    await page
+      .getByRole("button", { name: /Januari 2026/ })
+      .first()
+      .click();
+    const phantomText = await visibleLiveText(page);
+    expect(
+      phantomText,
+      "sesi tanpa temuan tidak terlihat di halaman live",
+    ).toContain("Sesi tanpa temuan");
+    expect(
+      phantomText,
+      "skor sesi tanpa temuan tidak terlihat di halaman live",
+    ).toContain("Skor audit 100");
+
     // (2) Dua file yang benar-benar diunduh lewat menu, bukan generator.
     const staticFile = await exportFromMenu(page, "HTML Statis", "parity");
     const interactiveFile = await exportFromMenu(

@@ -44,7 +44,7 @@ import type {
   SidakAgentQuickviewResponse,
 } from "@trainers/types";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
-import { buildMockAuth, mockSupabaseAuth } from "./mockAuth";
+import { buildMockAuth, mockSupabaseAuth, type MockAuthOptions } from "./mockAuth";
 
 /**
  * Akar repo. Helper ini berada di `apps/web/e2e/helpers/`, jadi satu level
@@ -127,6 +127,12 @@ const MOCKED_API: ReadonlyArray<MockedEndpoint> = [
     id: "folderAgents",
     method: "GET",
     pathPattern: /^\/api\/v1\/sidak\/folders\/[^/]+\/agents$/,
+  },
+  {
+    // Hanya dipanggil penjaga route untuk role leader: modul harus `approved`.
+    id: "meAccessStatus",
+    method: "GET",
+    path: "/api/v1/me/access-status",
   },
 ];
 
@@ -1503,15 +1509,23 @@ async function installNetworkGuard(page: Page, audit: NetworkAudit) {
  * Glob di-anchor ke origin dev Supabase supaya tidak ikut sebagai mock modul
  * lokal lain.
  */
-async function tapSupabaseMocks(page: Page, audit: NetworkAudit) {
+async function tapSupabaseMocks(
+  page: Page,
+  audit: NetworkAudit,
+  auth: MockAuthOptions = {},
+) {
+  // Route di sini didaftarkan SETELAH `mockSupabaseAuth`, jadi milik fixture ini
+  // yang menang. Karena itu role harus diteruskan: sebelumnya `buildMockAuth()`
+  // dipanggil tanpa opsi sehingga profil selalu `trainer` dan uji berbasis role
+  // mustahil dilakukan.
   await page.route(`${SUPABASE_ORIGIN}/auth/v1/user*`, async (route) => {
-    const { authUser } = buildMockAuth();
+    const { authUser } = buildMockAuth(auth);
     audit.mockedAuth.push(shapeRequest(route.request()).label);
     await route.fulfill(toJson({ user: authUser }));
   });
 
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/profiles*`, async (route) => {
-    const { authProfile } = buildMockAuth();
+    const { authProfile } = buildMockAuth(auth);
     audit.mockedAuth.push(shapeRequest(route.request()).label);
     await route.fulfill(
       toJson([authProfile], 200, { "content-range": "0-0/1" }),
@@ -1598,6 +1612,18 @@ async function mockAgentApi(page: Page, audit: NetworkAudit) {
       );
       return;
     }
+    if (endpoint.id === "meAccessStatus") {
+      await route.fulfill(
+        toJson({
+          success: true,
+          data: {
+            sidak: { status: "approved", module: "sidak", created_at: null },
+            ktp: { status: "approved", module: "ktp", created_at: null },
+          },
+        }),
+      );
+      return;
+    }
     if (endpoint.id === "folders") {
       await route.fulfill(toJson({ success: true, data: foldersFixture }));
       return;
@@ -1610,20 +1636,25 @@ async function openAgentDetail(
   page: Page,
   audit: NetworkAudit,
   agent: { id: string; name: string } = { id: AGENT_ID, name: AGENT_NAME },
-  options: { expectQuickviewRequest?: boolean } = {},
+  options: { expectQuickviewRequest?: boolean; role?: string } = {},
 ) {
   // Default: quickview memang dipanggil. Agen tanpa data audit tidak memanggil
   //nya, jadi pemanggil boleh mematikan probe itu — dengan=args eksplisit, bukan
   //ditebak dari isi fixture.
   const expectQuickviewRequest = options.expectQuickviewRequest ?? true;
-  await mockSupabaseAuth(page);
-  await tapSupabaseMocks(page, audit);
+  const auth: MockAuthOptions = { role: options.role ?? "trainer" };
+  await mockSupabaseAuth(page, auth);
+  await tapSupabaseMocks(page, audit, auth);
   await mockAgentApi(page, audit);
   await installNetworkGuard(page, audit);
   await page.goto(`/sidak/agents/${agent.id}`);
+  // Budget eksplisit untuk assertion pertama halaman terberat ini: pada dev
+  // server dengan module graph yang baru berubah, Vite meng-optimasi ulang
+  // dependency dan paint pertama bisa melewati default `expect.timeout` 5s.
+  // Assertion-nya tidak dilonggarkan, hanya diberi waktu lebih.
   await expect(
     page.getByRole("heading", { name: agent.name, level: 1 }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 20000 });
   // Bukti mock auth dipakai: halaman tidak pernah dialihkan ke /unauthorized.
   await expect(page).toHaveURL(new RegExp(`/sidak/agents/${agent.id}$`));
   // Bukti halaman dilayani fixture lokal, bukan backend nyata.

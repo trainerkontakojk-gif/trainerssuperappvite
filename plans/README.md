@@ -35,6 +35,7 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 | 021  | Profiler Subroutes shadcn Alignment | P1 | L | 001p | DONE |
 | 022  | KETIK shadcn Alignment | P1 | L | 001 | DONE |
 | 023  | Telefun Readability + UsageModal shadcn | P1 | M | 021, 022 | DONE |
+| 025  | Migrate Web Unit Tests to E2E        | P2       | XL     | 016, test-audit-curation | IN PROGRESS (10 files migrated; Waves 1-2 done; Wave 3 PDKT + Telefun history/scoring done) |
 
 ## Dependency notes
 
@@ -47,6 +48,7 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 - Plan 015 changes the user-level Pi orchestrator skill and requires explicit confirmation before editing outside the repository.
 - Plan 016 changes package/Turbo verification commands only after the lane policy is canonical; its focused, affected, typecheck, lint, core, and build gates now pass.
 - Plan 017 depends on the canonical instructions and lane definitions so tool triggers are not duplicated.
+- Plan 025 deletes web Vitest files only after the replacement Playwright spec is green; it builds on Plan 016's E2E-first gate and the `test-audit-curation` curation batch. It must not run `test:core`/`test:fast`/`test:targeted`/`test:full`.
 
 ## Findings considered and rejected
 
