@@ -13,6 +13,7 @@
 - **Depends on**: `plans/markdown/test-audit-curation.md` (prior curation batch), `plans/markdown/e2e-mocked-auth-contract.md` (mocked-auth contract), Plan 016 (test feedback loop / E2E gates)
 - **Category**: tests, e2e, debt
 - **Planned at**: commit `1c92197`, clean working tree
+- **Outcome**: **PARTIAL — deliberately stopped** (2026-10-02). Delivered 10 unit files retired, 1 narrowed, and 13 E2E specs/harnesses; the original target (~80 unit files, 16 specs) was not reachable because assertion-level triage showed most remaining candidates are appearance-only or branch matrices E2E cannot prove honestly. Open items are dispositioned in §Closure and moved to Plans 026–027.
 
 ## Why this matters
 
@@ -535,6 +536,30 @@ New findings:
 - [~] Wave 3 — Telefun: spec #13 `telefun-history.spec.ts` delivered (5 passed); `telefun-history-subject` retired. #14/#15 (settings, live) and the transcript/profile/review branch matrices remain.
 
 [Showing lines 1-476 of 526 (50.0KB limit). Use offset=477 to continue.]
+
+## Closure
+
+Closed as **PARTIAL — deliberately stopped** on 2026-10-02. The tasklist above is frozen at that point; the items below are dispositioned, not forgotten.
+
+**Delivered**: 10 unit files retired, 1 narrowed, 13 E2E specs/harnesses added; E2E spec count 17 → 28, web unit count 174 → 164. Findings: the mocked-auth contract (P1), the agent fixture that always served a trainer profile, the cold-Vite-graph flake, and the snake_case fixture trap.
+
+**Target specs**: 5 of the 16 in the table were delivered (`profiler`, `activities`, `usage`, `ketik-flow`, `telefun-history`), plus 7 specs that were not in the table but had better value: `authenticated-shell`, `landing-auth`, `sidebar-nav-state`, `sidak-agent-detail`, `sidak-landing`, `sidak-reports-ai`, `pdkt-flow`.
+
+**Open items and where they went**:
+
+| Open item                                                                                                                                                                                    | Disposition                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sidak-agent-detail-temuan-parity` (exact score digits)                                                                                                                                      | **Keep.** Bare-digit assertions are not meaningful end-to-end; its other 3 contracts are E2E-proven.                                                     |
+| "Narrow 11 mixed files"                                                                                                                                                                      | **Not started.** Dedup work, not new coverage; deliberately left out of scope.                                                                           |
+| `LandingAuthClient` (3 remaining contracts)                                                                                                                                                  | **Keep.** Transient checking state, hidden-while-checking, stale-user-after-logout.                                                                      |
+| Tier C appearance files                                                                                                                                                                      | **Keep by decision.** No action was ever required.                                                                                                       |
+| `access-approval` (spec #6)                                                                                                                                                                  | **Moved to `plans/027-access-approval-e2e-spec.md`.**                                                                                                    |
+| `monitoring` (spec #16)                                                                                                                                                                      | **Moved to `plans/026-monitoring-e2e-spec.md`.** It was the last module with zero E2E and was not yet in the tasklist.                                   |
+| `pdkt-mailbox` / `pdkt-simulation` / `pdkt-settings` (#10–#12), `telefun-settings` / `telefun-live` (#14–#15), `sidak-dashboard` / `sidak-agents` / `sidak-input` / `sidak-settings` (#1–#4) | **Deferred without a plan.** Each needs mailbox/settings fixtures plus mutations, or is a branch matrix; re-open only if the surface changes materially. |
+
+**Why the original target was unreachable**: see §Revised tactic. The unit suite is saturated with CSS-class and focus/attribute assertions woven into behaviour tests, and the plan's ~80-file figure assumed those could be replaced by E2E. They cannot be, honestly.
+
+Follow-up plans: `plans/026-monitoring-e2e-spec.md` and `plans/027-access-approval-e2e-spec.md` — one finish line each.
 
 ## Commands you will need
 

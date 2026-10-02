@@ -28,6 +28,9 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
   been requested yet.
 - `expectedThirdPartyHosts` declares known decorative assets (for example the OJK logo on the KETIK
   and PDKT landings). They are still aborted — no egress — but not counted as unexpected traffic.
+- **Mock resolution is first-match-wins.** The harness resolves `/api` mocks with `.find()`, so an
+  override list must be spread **before** the defaults. An override appended last is silently
+  ignored, and the resulting failure looks like a product bug rather than a fixture mistake.
 - Run `assertLocalDevOnlyTarget()` in `beforeAll`; it proves the target is this repo’s Vite dev
   server and that the `/api` proxy points at loopback.
 
@@ -52,6 +55,13 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
 - **Text matching is substring-based:** `getByText(string)` and `getByRole(name)` both match
   substrings, so `"Gemini 3.5 Flash"` also matches `"Gemini 3.5 Flash Lite"` and `"Lainnya"` also
   matches `"+ Tambah Kategori Lainnya"`. Scope the locator to a dialog and use `exact: true`.
+- **Number formatting follows the browser locale.** `toLocaleString()` renders `15000` as `15,000`
+  under en-US, so a text assertion such as `/15\.000/` fails for a reason unrelated to the app.
+  Assert the input value or another locale-independent property instead.
+- **A 401 is usually not an inline error.** A global session handler can react before the
+  component’s own error path, so the user-visible outcome is a return to the landing page rather
+  than the friendly text a `mapError` helper would produce. Assert the outcome the user actually
+  gets — it is the stronger contract anyway.
 
 ## Repository hygiene
 

@@ -10,32 +10,34 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 
 ## Execution order & status
 
-| Plan | Title                            | Priority | Effort | Depends on | Status |
-| ---- | -------------------------------- | -------- | ------ | ---------- | ------ |
-| 001  | Unify Design Tokens              | P1       | M      | —          | DONE   |
-| 002  | Decompose Layout                 | P1       | M      | 001        | DONE   |
-| 003  | Redesign Sidebar                 | P1       | M      | 002        | DONE   |
-| 004  | Redesign Header                  | P1       | M      | 002        | DONE   |
-| 005  | Redesign Mobile Nav              | P1       | M      | 002        | DONE   |
-| 006  | Motion Primitives                | P1       | M      | 001        | DONE   |
-| 007  | Redesign Dashboard Bento         | P1       | L      | 001, 006   | DONE   |
-| 008  | Users Radical Redesign           | P1       | M      | 001        | DONE   |
-| 011  | Activity Logs UI Refactor        | P2       | S      | 001        | DONE   |
-| 012  | Hide Sidebar on Mobile           | P2       | S      | 005        | DONE   |
-| 001p | Profiler UI Radical Redesign     | P1       | M      | 008        | DONE   |
-| 002s | SIDAK Module Radical Redesign    | P1       | L      | 001, 007   | DONE   |
-| 013  | Canonicalize Agent Instructions  | P1       | S      | —          | DONE   |
-| 014  | Add Risk-Based Workflow Lanes    | P1       | S      | 013        | DONE   |
-| 015  | Reduce Orchestrator Token Cost   | P1       | M      | 013        | DONE   |
-| 016  | Tighten Test Feedback Loop       | P1       | M      | 014        | DONE   |
-| 017  | Make Knowledge Tools Conditional | P1       | S      | 013, 014   | DONE   |
-| 019  | Fix image-size Advisory (audit 2026-08-23) | P1 | S   | —          | BLOCKED (upstream: patched 2.0.3 never published; dep unreachable — see plan) |
-| 018  | Unify Spreadsheet Lib (audit 2026-08-23)   | P2 | M   | —          | DONE   |
-| 020  | Unify AI Pricing Constants (audit 2026-08-23) | P1 | M | —          | DONE   |
-| 021  | Profiler Subroutes shadcn Alignment | P1 | L | 001p | DONE |
-| 022  | KETIK shadcn Alignment | P1 | L | 001 | DONE |
-| 023  | Telefun Readability + UsageModal shadcn | P1 | M | 021, 022 | DONE |
-| 025  | Migrate Web Unit Tests to E2E        | P2       | XL     | 016, test-audit-curation | IN PROGRESS (10 files migrated; Waves 1-2 done; Wave 3 PDKT + Telefun history/scoring done) |
+| Plan | Title                                         | Priority | Effort | Depends on               | Status                                                                                  |
+| ---- | --------------------------------------------- | -------- | ------ | ------------------------ | --------------------------------------------------------------------------------------- |
+| 001  | Unify Design Tokens                           | P1       | M      | —                        | DONE                                                                                    |
+| 002  | Decompose Layout                              | P1       | M      | 001                      | DONE                                                                                    |
+| 003  | Redesign Sidebar                              | P1       | M      | 002                      | DONE                                                                                    |
+| 004  | Redesign Header                               | P1       | M      | 002                      | DONE                                                                                    |
+| 005  | Redesign Mobile Nav                           | P1       | M      | 002                      | DONE                                                                                    |
+| 006  | Motion Primitives                             | P1       | M      | 001                      | DONE                                                                                    |
+| 007  | Redesign Dashboard Bento                      | P1       | L      | 001, 006                 | DONE                                                                                    |
+| 008  | Users Radical Redesign                        | P1       | M      | 001                      | DONE                                                                                    |
+| 011  | Activity Logs UI Refactor                     | P2       | S      | 001                      | DONE                                                                                    |
+| 012  | Hide Sidebar on Mobile                        | P2       | S      | 005                      | DONE                                                                                    |
+| 001p | Profiler UI Radical Redesign                  | P1       | M      | 008                      | DONE                                                                                    |
+| 002s | SIDAK Module Radical Redesign                 | P1       | L      | 001, 007                 | DONE                                                                                    |
+| 013  | Canonicalize Agent Instructions               | P1       | S      | —                        | DONE                                                                                    |
+| 014  | Add Risk-Based Workflow Lanes                 | P1       | S      | 013                      | DONE                                                                                    |
+| 015  | Reduce Orchestrator Token Cost                | P1       | M      | 013                      | DONE                                                                                    |
+| 016  | Tighten Test Feedback Loop                    | P1       | M      | 014                      | DONE                                                                                    |
+| 017  | Make Knowledge Tools Conditional              | P1       | S      | 013, 014                 | DONE                                                                                    |
+| 019  | Fix image-size Advisory (audit 2026-08-23)    | P1       | S      | —                        | BLOCKED (upstream: patched 2.0.3 never published; dep unreachable — see plan)           |
+| 018  | Unify Spreadsheet Lib (audit 2026-08-23)      | P2       | M      | —                        | DONE                                                                                    |
+| 020  | Unify AI Pricing Constants (audit 2026-08-23) | P1       | M      | —                        | DONE                                                                                    |
+| 021  | Profiler Subroutes shadcn Alignment           | P1       | L      | 001p                     | DONE                                                                                    |
+| 022  | KETIK shadcn Alignment                        | P1       | L      | 001                      | DONE                                                                                    |
+| 023  | Telefun Readability + UsageModal shadcn       | P1       | M      | 021, 022                 | DONE                                                                                    |
+| 025  | Migrate Web Unit Tests to E2E                 | P2       | XL     | 016, test-audit-curation | CLOSED (partial) — 10 unit files retired, 13 E2E specs; open items in the plan §Closure |
+| 026  | Monitoring E2E Spec (first coverage)          | P2       | M      | 025                      | DONE — 5 passed, hermetic; unit files kept by design                                    |
+| 027  | Access Approval E2E Spec                      | P2       | L      | 025                      | TODO                                                                                    |
 
 ## Dependency notes
 
@@ -49,6 +51,7 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 - Plan 016 changes package/Turbo verification commands only after the lane policy is canonical; its focused, affected, typecheck, lint, core, and build gates now pass.
 - Plan 017 depends on the canonical instructions and lane definitions so tool triggers are not duplicated.
 - Plan 025 deletes web Vitest files only after the replacement Playwright spec is green; it builds on Plan 016's E2E-first gate and the `test-audit-curation` curation batch. It must not run `test:core`/`test:fast`/`test:targeted`/`test:full`.
+- Plans 026 and 027 split the remaining high-value work out of Plan 025, one finish line each: 026 gives Monitoring its first browser coverage, 027 covers the approval surfaces. Both reuse `apps/web/e2e/helpers/hermeticShell.ts`; see `docs/e2e-testing.md`.
 
 ## Findings considered and rejected
 
