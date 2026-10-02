@@ -253,13 +253,82 @@ test.describe("Halaman Heatmap", () => {
     await expect(page.getByText("12 temuan")).toBeVisible();
   });
 
-  test("legenda selalu berpasangan dengan warna", async ({ page }) => {
+  test("legenda intensitas mengikuti sebaran data, bukan ambang tetap", async ({ page }) => {
+    // Volume rendah. Ambang lama akan menampilkan bucket "6–10" dan "11+"
+    // yang kosong, sehingga warna tidak lagi menjelaskan perbedaan antar hari.
+    behaviour = {
+      kind: "data",
+      counts: {
+        "2026-01-01": 1,
+        "2026-01-02": 1,
+        "2026-01-03": 2,
+        "2026-01-04": 3,
+        "2026-01-05": 3,
+      },
+      missing: 0,
+    };
     await open(page, "trainer");
-    const legend = page.getByText("Intensitas temuan");
-    await expect(legend).toBeVisible();
-    for (const label of ["0", "1–2", "3–5", "6–10", "11+"]) {
-      await expect(page.getByRole("list").getByText(label, { exact: true })).toBeVisible();
+
+    await expect(page.getByText("Intensitas temuan")).toBeVisible();
+    const legendList = page
+      .getByText("Intensitas temuan")
+      .locator("..")
+      .getByRole("list");
+    await expect(legendList.getByText("0", { exact: true })).toBeVisible();
+
+    // Hari bernilai maksimum (3) harus punya bucket positif, dan label itu ada
+    // di legenda — legenda diturunkan dari data, bukan dari ambang tetap.
+    const maxDay = page.getByRole("button", { name: "05/01/2026: 3 temuan" });
+    await expect(maxDay).toBeVisible();
+    const maxBucket = await maxDay.getAttribute("data-intensity");
+    expect(maxBucket).not.toBe("0");
+    await expect(
+      legendList.getByText(maxBucket ?? "", { exact: true }),
+    ).toBeVisible();
+
+    // Tidak ada bucket di atas nilai maksimum data (3) — itu bucket mati.
+    await expect(legendList.getByText("6–10", { exact: true })).toHaveCount(0);
+    await expect(legendList.getByText("11+", { exact: true })).toHaveCount(0);
+  });
+
+  test("setiap bucket legenda terisi dan mencakup rentang data", async ({ page }) => {
+    // 12 hari aktif berjumlah 1..12: kuantil harus menyebar, bukan menumpuk.
+    const counts: Record<string, number> = {};
+    for (let i = 1; i <= 12; i++) {
+      counts[`2026-01-${String(i).padStart(2, "0")}`] = i;
     }
+    behaviour = { kind: "data", counts, missing: 0 };
+    await open(page, "trainer");
+    // Tunggu data benar-benar ter-render sebelum membaca bucket hari.
+    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+
+    const labels = await page
+      .locator("[data-intensity]")
+      .evaluateAll((els) =>
+        els.map((el) => el.getAttribute("data-intensity") ?? ""),
+      );
+    const positive = labels.filter((label) => label !== "0");
+    const distinct = [...new Set(positive)].sort();
+
+    // Variasi 1..12 harus menghasilkan lebih dari satu bucket positif.
+    expect(distinct.length).toBeGreaterThanOrEqual(4);
+    // Tidak ada bucket positif yang kosong: itu tanda ambang tidak representatif.
+    for (const label of distinct) {
+      expect(positive.filter((item) => item === label).length).toBeGreaterThan(0);
+    }
+
+    // Legenda dan hari memakai bucket yang sama (satu sumber kebenaran).
+    const legendList = page
+      .getByText("Intensitas temuan")
+      .locator("..")
+      .getByRole("list");
+    await expect(legendList.locator("li")).toHaveCount(distinct.length + 1); // + bucket 0
+
+    // Hari dengan nilai maksimum harus berada di bucket teratas, bukan tengah.
+    const maxDay = await page
+      .getByRole("button", { name: "12/01/2026: 12 temuan" })
+      .getAttribute("data-intensity");
+    expect(maxDay).toMatch(/\+$/);
   });
 
   test("role leader tidak bisa membuka halaman heatmap", async ({ page }) => {

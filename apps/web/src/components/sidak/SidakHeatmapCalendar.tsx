@@ -11,28 +11,97 @@ import { useMemo } from "react";
 
 export type HeatmapDay = { date: string; count: number };
 
-/** Legenda tetap — satu sumber kebenaran untuk warna dan teks. */
-const LEGEND: ReadonlyArray<{ label: string; min: number; max: number | null }> = [
-  { label: "0", min: 0, max: 0 },
-  { label: "1–2", min: 1, max: 2 },
-  { label: "3–5", min: 3, max: 5 },
-  { label: "6–10", min: 6, max: 10 },
-  { label: "11+", min: 11, max: null },
-];
+/** Bucket intensitas hasil turunan data, bukan ambang tetap. */
+type IntensityBucket = {
+  label: string;
+  min: number;
+  max: number | null;
+  level: 0 | 1 | 2 | 3 | 4;
+};
 
-function legendBucket(count: number) {
-  return LEGEND.find(
-    (b) => count >= b.min && (b.max === null || count <= b.max),
-  )!;
+/**
+ * Susun bucket intensitas dari sebaran data tahun aktif, bukan ambang tetap.
+ *
+ * Bucket `0` selalu ada. Hari yang punya temuan dibagi memakai kuartil,
+ * sehingga tiap warna mewakili porsi hari yang sebanding dan skalanya tetap
+ * terbaca berapa pun volume temuannya. Ambang yang bertabrakan digabung supaya
+ * tidak pernah muncul bucket kosong.
+ */
+function buildIntensityBuckets(counts: readonly number[]): IntensityBucket[] {
+  const zero: IntensityBucket = { label: "0", min: 0, max: 0, level: 0 };
+
+  const positive = counts.filter((count) => count > 0).sort((a, b) => a - b);
+  if (positive.length === 0) return [zero];
+
+  const min = positive[0];
+  const max = positive[positive.length - 1];
+  const cuts = [
+    ...new Set(
+      [
+        quantile(positive, 0.25),
+        quantile(positive, 0.5),
+        quantile(positive, 0.75),
+      ].filter((cut) => cut >= min && cut < max),
+    ),
+  ].sort((a, b) => a - b);
+
+  const ranges: Array<{ min: number; max: number | null }> = [];
+  let start = min;
+  for (const cut of cuts) {
+    if (cut < start) continue;
+    ranges.push({ min: start, max: cut });
+    start = cut + 1;
+  }
+  // Sisa di atas potongan terakhir menjadi bucket terbuka.
+  if (start <= max) ranges.push({ min: start, max: null });
+
+  return [
+    zero,
+    ...ranges.map((range, index) => {
+      // Warna disebar merata sehingga bucket tertinggi selalu paling kuat.
+      const level = (ranges.length === 1
+        ? 4
+        : Math.round((index / (ranges.length - 1)) * 3) +
+          1) as IntensityBucket["level"];
+      const label =
+        range.max === null
+          ? range.min === max
+            ? `${range.min}`
+            : `${range.min}+`
+          : range.min === range.max
+            ? `${range.min}`
+            : `${range.min}–${range.max}`;
+      return { label, min: range.min, max: range.max, level };
+    }),
+  ];
 }
 
-/** Kelas warna per bucket. Token existing saja, tanpa hex hardcode. */
-const BUCKET_CLASS: Record<string, string> = {
-  "0": "bg-background border border-border text-muted-foreground",
-  "1–2": "bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300",
-  "3–5": "bg-orange-500/20 border border-orange-500/40 text-orange-700 dark:text-orange-300",
-  "6–10": "bg-rose-500/20 border border-rose-500/40 text-rose-700 dark:text-rose-300",
-  "11+": "bg-rose-600 text-white border border-rose-600",
+/** Kuantil "nearest-rank", dijaga tetap di dalam batas array. */
+function quantile(sorted: readonly number[], fraction: number): number {
+  const index = Math.min(
+    sorted.length - 1,
+    Math.floor(fraction * sorted.length),
+  );
+  return sorted[index];
+}
+
+/** Bucket yang memuat sebuah count. Rentang selalu menutup semua nilai. */
+function bucketForCount(count: number, buckets: readonly IntensityBucket[]) {
+  return (
+    buckets.find(
+      (bucket) =>
+        count >= bucket.min && (bucket.max === null || count <= bucket.max),
+    ) ?? buckets[buckets.length - 1]
+  );
+}
+
+/** Kelas warna per tingkat intensitas. Token existing saja, tanpa hex hardcode. */
+const LEVEL_CLASS: Record<IntensityBucket["level"], string> = {
+  0: "bg-background border border-border text-muted-foreground",
+  1: "bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300",
+  2: "bg-orange-500/20 border border-orange-500/40 text-orange-700 dark:text-orange-300",
+  3: "bg-rose-500/20 border border-rose-500/40 text-rose-700 dark:text-rose-300",
+  4: "bg-rose-600 text-white border border-rose-600",
 };
 
 const WEEKDAY_LABELS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
@@ -68,6 +137,10 @@ export default function SidakHeatmapCalendar({
   );
 
   const total = days.reduce((sum, d) => sum + d.count, 0);
+  const buckets = useMemo(
+    () => buildIntensityBuckets(days.map((d) => d.count)),
+    [days],
+  );
 
   return (
     <div className="space-y-6">
@@ -75,11 +148,11 @@ export default function SidakHeatmapCalendar({
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Intensitas temuan</span>
         <ul className="flex flex-wrap items-center gap-2">
-          {LEGEND.map((b) => (
+          {buckets.map((b) => (
             <li key={b.label} className="flex items-center gap-1.5">
               <span
                 aria-hidden="true"
-                className={`size-4 rounded ${BUCKET_CLASS[b.label]}`}
+                className={`size-4 rounded ${LEVEL_CLASS[b.level]}`}
               />
               <span>{b.label}</span>
             </li>
@@ -127,7 +200,7 @@ export default function SidakHeatmapCalendar({
                   const day = dayIndex + 1;
                   const iso = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const count = countByDate.get(iso) ?? 0;
-                  const bucket = legendBucket(count);
+                  const bucket = bucketForCount(count, buckets);
                   const isSelected = selectedDate === iso;
 
                   return (
@@ -137,7 +210,8 @@ export default function SidakHeatmapCalendar({
                       onClick={() => onSelectDay?.({ date: iso, count })}
                       aria-label={`${formatTanggal(iso)}: ${count} temuan`}
                       aria-current={isSelected ? "date" : undefined}
-                      className={`flex aspect-square items-center justify-center rounded text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${BUCKET_CLASS[bucket.label]} ${isSelected ? "ring-2 ring-foreground" : ""}`}
+                      data-intensity={bucket.label}
+                      className={`flex aspect-square items-center justify-center rounded text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${LEVEL_CLASS[bucket.level]} ${isSelected ? "ring-2 ring-foreground" : ""}`}
                     >
                       {/* Angka hari sekaligus pembawa intensitas, jadi warna
                           tidak pernah menjadi satu-satunya pembawa makna. */}

@@ -113,7 +113,7 @@ Ringkasan tanggal terpilih
 
 - Kalender bulanan tujuh kolom, disusun responsif untuk satu tahun.
 - React/CSS dan komponen existing; tidak perlu dependency heatmap baru.
-- Legenda konsisten: 0, 1–2, 3–5, 6–10, 11+.
+- Legenda intensitas diturunkan dari sebaran data tahun aktif (kuartil hari bertemuan), bukan ambang tetap: bucket `0` selalu ada, sisanya membagi hari bertemuan sehingga tiap warna mewakili porsi hari yang sebanding dan tidak ada bucket kosong di atas nilai maksimum. Legenda selalu menampilkan rentang aktual.
 - Tanggal/count terbaca lewat hover, focus, dan tap; jangan hanya mengandalkan warna.
 - Gunakan token existing, light/dark, focus terlihat, kontras AA, dan target sentuh nyaman.
 - Loading, error/retry, tanpa temuan, dan tanggal belum diisi harus dibedakan.
@@ -470,6 +470,29 @@ Angka historis pada catatan fase di atas berasal dari run yang berbeda dan
 **tidak** dibandingkan sebagai bug. Bukti run repair final ini:
 E2E fitur **83 passed** (DB/route 47 + UI mock 36) dan regresi ekspor
 **31 passed**.
+
+## Addendum 2026-10-02 — Legenda intensitas adaptif
+
+Permintaan pengguna: intensitas temuan disesuaikan agar lebih representatif.
+Ambang tetap `0, 1–2, 3–5, 6–10, 11+` tidak representatif ketika volume harian
+sudah puluhan (hampir semua hari jatuh di `11+`) atau sangat rendah (bucket atas
+kosong). Lane B, UI-only: tidak ada perubahan schema/API/RLS.
+
+**Kontrak baru** (`apps/web/src/components/sidak/SidakHeatmapCalendar.tsx`):
+
+- Bucket `0` selalu ada.
+- Hari bertemuan dibagi memakai kuartil (`p25`, `p50`, `p75`) sehingga tiap
+  warna mewakili porsi hari yang sebanding.
+- Ambang yang bertabrakan digabung; tidak ada bucket kosong di atas nilai
+  maksimum. Bucket terbuka diberi label `N+`.
+- Legenda diturunkan dari data tahun aktif yang sedang tampil (mengikuti filter
+  tahun/layanan), dan setiap hari membawa `data-intensity` berisi label bucket —
+  legenda dan kalender memakai satu sumber kebenaran.
+
+**Bukti:** `apps/web/e2e/sidak-heatmap.spec.ts` 14 hijau. RED terbukti: dua test
+baru gagal dulu (bucket `6–10`/`11+` masih tampil; `data-intensity` belum ada),
+lalu GREEN tanpa melonggarkan assertion. `pnpm --filter @trainers/web typecheck`
+exit 0. Lint file yang diubah: 0 error, 0 warning.
 
 ## Instruksi Handoff untuk Model Pelaksana
 
