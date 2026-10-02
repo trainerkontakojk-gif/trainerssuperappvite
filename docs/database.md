@@ -49,6 +49,7 @@ Aturan yang berlaku:
 
 - **NULL berarti "belum diisi"**, bukan "tidak berlaku". Kolom kosong tidak pernah diisi default.
 - **Tidak ada backfill.** Baris lama tetap NULL. `created_at`/`updated_at` **tidak** dipakai sebagai pengganti — keduanya mencatat kapan baris masuk sistem, bukan kapan interaksi terjadi.
+- **Satuan heatmap**: `no_tiket` (nullable) menjadi dasar satuan **Tiket** — heatmap menghitung `distinct no_tiket` per hari; baris tanpa nomor tiket tetap dihitung per baris. Tanpa kolom itu, satuan Tiket tidak mungkin. Tidak ada constraint baru untuk mode ini.
 - **Tanpa constraint silang.** Tidak ada CHECK yang mengikat tanggal ke periode audit atau mengurutkan sampel setelah layanan; keduanya perlu persetujuan terpisah.
 - **Tidak ada perubahan** pada index, constraint duplikat, policy RLS, atau grant. Policy `read_all`/`write_trainer` yang ada sudah berlaku karena tidak membedakan kolom.
 - **Format**: API selalu mengirim `YYYY-MM-DD` dan memvalidasinya sebagai tanggal kalender nyata (`2026-02-30` ditolak, leap day mengikuti tahun). Kontrak bersama: `tanggalSchema` di `packages/types/src/sidak.ts`.

@@ -31,6 +31,15 @@ export type ScoringMode = z.infer<typeof scoringModeSchema>;
 export const sidakHeatmapModeSchema = z.enum(["agent", "qa"]);
 export type SidakHeatmapMode = z.infer<typeof sidakHeatmapModeSchema>;
 
+/**
+ * Satuan hitung heatmap.
+ * `parameter` = satu baris countable = satu temuan (perilaku lama).
+ * `tiket`    = distinct `no_tiket` per hari; baris tanpa nomor tiket tetap
+ *              dihitung per baris karena tidak bisa dikelompokkan.
+ */
+export const sidakHeatmapCountBySchema = z.enum(["parameter", "tiket"]);
+export type SidakHeatmapCountBy = z.infer<typeof sidakHeatmapCountBySchema>;
+
 /** Allowlist mode -> kolom tanggal. Nama kolom tidak pernah datang dari input. */
 export const HEATMAP_DATE_COLUMN: Record<SidakHeatmapMode, "tanggal_layanan" | "tanggal_sampel"> = {
   agent: "tanggal_layanan",
@@ -41,6 +50,8 @@ export const sidakHeatmapQuerySchema = z.object({
   mode: sidakHeatmapModeSchema,
   year: z.coerce.number().int().min(2000).max(2100),
   service_type: serviceTypeSchema.optional(),
+  count_by: sidakHeatmapCountBySchema.default("parameter"),
+  agent_id: z.string().uuid().optional(),
 });
 export type SidakHeatmapQuery = z.infer<typeof sidakHeatmapQuerySchema>;
 
@@ -49,6 +60,10 @@ export interface SidakHeatmapResponse {
   year: number;
   serviceType: ServiceType | null;
   dateBasis: "tanggal_layanan" | "tanggal_sampel";
+  /** Satuan hitung yang dipakai respons ini. */
+  countBy: SidakHeatmapCountBy;
+  /** Filter agent yang dipakai respons ini, `null` bila semua agent. */
+  agentId: string | null;
   days: Array<{ date: string; count: number }>;
   totalFindings: number;
   /**

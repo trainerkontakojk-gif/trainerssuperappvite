@@ -27,10 +27,17 @@ type Behavior =
   | { kind: "slow"; delayMs: number }
   | { kind: "stale" };
 
-type Captured = { mode: string; year: string; service_type: string | null };
+type Captured = {
+  mode: string;
+  year: string;
+  service_type: string | null;
+  count_by: string | null;
+};
 
 const captured: Captured[] = [];
 let behaviour: Behavior = { kind: "data" };
+/** Status modul SIDAK untuk leader pada `/me/access-status`. */
+let sidakAccess: "none" | "approved" = "none";
 
 /**
  * Kalender penuh satu tahun, dengan hitungan sesuai `counts`.
@@ -84,7 +91,7 @@ async function installMocks(page: Page, role: string) {
       toJson({
         success: true,
         data: {
-          sidak: { status: "none", module: "sidak", created_at: null },
+          sidak: { status: sidakAccess, module: "sidak", created_at: null },
           ktp: { status: "none", module: "ktp", created_at: null },
         },
       }),
@@ -97,6 +104,7 @@ async function installMocks(page: Page, role: string) {
       mode: url.searchParams.get("mode") ?? "",
       year: url.searchParams.get("year") ?? "",
       service_type: url.searchParams.get("service_type"),
+      count_by: url.searchParams.get("count_by"),
     });
 
     if (behaviour.kind === "error") {
@@ -175,6 +183,7 @@ async function open(page: Page, role = "trainer") {
 test.beforeEach(() => {
   captured.length = 0;
   behaviour = { kind: "data", counts: {}, missing: 0 };
+  sidakAccess = "none";
 });
 
 test.describe("Halaman Heatmap", () => {
@@ -207,6 +216,17 @@ test.describe("Halaman Heatmap", () => {
 
     await page.locator("#heatmap-service").selectOption("slik");
     await expect.poll(() => captured.at(-1)?.service_type).toBe("slik");
+  });
+
+  test("toggle satuan mengirim count_by", async ({ page }) => {
+    await open(page, "trainer");
+    await expect.poll(() => captured.at(-1)?.count_by).toBe("parameter");
+
+    await page.getByRole("button", { name: "Tiket", exact: true }).click();
+    await expect.poll(() => captured.at(-1)?.count_by).toBe("tiket");
+
+    await page.getByRole("button", { name: "Parameter", exact: true }).click();
+    await expect.poll(() => captured.at(-1)?.count_by).toBe("parameter");
   });
 
   test("tahun tanpa temuan menampilkan kondisi kosong, bukan error", async ({ page }) => {
@@ -250,7 +270,14 @@ test.describe("Halaman Heatmap", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByTestId("heatmap-selected-day")).toContainText("9 Januari 2026");
-    await expect(page.getByText("12 temuan")).toBeVisible();
+    // Scope ke kartu "Tanggal dipilih": kartu Insight kini juga memuat teks
+    // "N temuan", jadi pencarian global menjadi ambigu.
+    await expect(
+      page
+        .getByTestId("heatmap-selected-day")
+        .locator("..")
+        .getByText("12 temuan"),
+    ).toBeVisible();
   });
 
   test("legenda intensitas mengikuti sebaran data, bukan ambang tetap", async ({ page }) => {
@@ -331,9 +358,61 @@ test.describe("Halaman Heatmap", () => {
     expect(maxDay).toMatch(/\+$/);
   });
 
-  test("role leader tidak bisa membuka halaman heatmap", async ({ page }) => {
+  test("insight merangkum hari tersibuk, tersepi aktif, hari-dalam-minggu, bulan, dan rentang", async ({ page }) => {
+    behaviour = {
+      kind: "data",
+      counts: {
+        "2026-01-05": 3, // Senin
+        "2026-01-06": 1, // Selasa
+        "2026-01-12": 5, // Senin
+        "2026-02-03": 2, // Selasa
+      },
+      missing: 0,
+    };
+    await open(page, "trainer");
+
+    const insights = page.getByTestId("heatmap-insights");
+    await expect(insights).toBeVisible();
+
+    const busiestDay = page.getByTestId("insight-busiest-day");
+    await expect(busiestDay).toContainText("12 Januari 2026");
+    await expect(busiestDay).toContainText("5 temuan");
+
+    const quietestDay = page.getByTestId("insight-quietest-active-day");
+    await expect(quietestDay).toContainText("6 Januari 2026");
+    await expect(quietestDay).toContainText("1 temuan");
+
+    const busiestWeekday = page.getByTestId("insight-busiest-weekday");
+    await expect(busiestWeekday).toContainText("Senin");
+    await expect(busiestWeekday).toContainText("8 temuan");
+
+    const busiestMonth = page.getByTestId("insight-busiest-month");
+    await expect(busiestMonth).toContainText("Januari");
+    await expect(busiestMonth).toContainText("9 temuan");
+
+    await expect(page.getByTestId("insight-active-days")).toContainText("4");
+    await expect(page.getByTestId("insight-active-days")).toContainText("365");
+    await expect(page.getByTestId("insight-average")).toContainText("2,8");
+
+    const range = page.getByTestId("insight-active-range");
+    await expect(range).toContainText("5 Jan");
+    await expect(range).toContainText("3 Feb");
+  });
+
+  test("leader dengan modul SIDAK disetujui bisa membuka halaman heatmap", async ({ page }) => {
+    sidakAccess = "approved";
     await open(page, "leader");
-    await expect(page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+    ).toBeVisible();
+  });
+
+  test("leader tanpa persetujuan modul diarahkan keluar dari heatmap", async ({ page }) => {
+    sidakAccess = "none";
+    await open(page, "leader");
+    await expect(
+      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+    ).toHaveCount(0);
   });
 
   test("admin diizinkan membuka halaman heatmap", async ({ page }) => {

@@ -8,6 +8,7 @@ const panels: Record<SidakAgentDetailTab, ReactNode> = {
   summary: <p>Ringkasan panel</p>,
   trend: <p>Tren panel</p>,
   temuan: <p>Temuan panel</p>,
+  heatmap: <p>Heatmap panel</p>,
   simulations: <p>Simulasi panel</p>,
 };
 

@@ -1130,7 +1130,11 @@ function heatmapEnv(): HeatmapEnv {
 }
 
 /** Route heatmap berada di router sendiri (bukan bagian dari `sidakTemuan`). */
-async function mountHeatmapRouter(role: string | undefined, token: string) {
+async function mountHeatmapRouter(
+  role: string | undefined,
+  token: string,
+  userId = "user-test",
+) {
   // Pin env loopback HANYA selama import modul route (yang meng-import `lib/env`
   // + `supabaseAdmin`). Tanpa ini, worker yang di-restart Playwright bisa
   // mengevaluasi `lib/env` tanpa `VITE_SUPABASE_URL` dan keluar dengan exit 1.
@@ -1150,7 +1154,7 @@ async function mountHeatmapRouter(role: string | undefined, token: string) {
   }
   const app = new Hono<TestEnv>()
     .use("*", async (c, next) => {
-      c.set("user", { id: "user-test", email: "e2e@local.test" });
+      c.set("user", { id: userId, email: "e2e@local.test" });
       c.set("profile", { role, full_name: "Uji Role" });
       // Token dikirim sebagai parameter, bukan dibaca dari scope luar: variabel
       // `trainerToken` hidup di dalam describe, sehingga membacanya dari sini
@@ -1228,10 +1232,12 @@ async function seedRows(
   pesertaId: string,
   indicatorId: string,
   rows: Array<{
+    indicator_id?: string;
     service_type?: string;
     nilai: number;
     ketidaksesuaian?: string | null;
     is_phantom_padding?: boolean;
+    no_tiket?: string | null;
     tanggal_layanan?: string | null;
     tanggal_sampel?: string | null;
   }>,
@@ -1239,12 +1245,12 @@ async function seedRows(
   const payload = rows.map((r) => ({
     peserta_id: pesertaId,
     period_id: periodId,
-    indicator_id: indicatorId,
+    indicator_id: r.indicator_id ?? indicatorId,
     service_type: r.service_type ?? "slik",
     nilai: r.nilai,
     ketidaksesuaian: r.ketidaksesuaian ?? "",
     sebaiknya: "",
-    no_tiket: null,
+    no_tiket: r.no_tiket ?? null,
     is_phantom_padding: r.is_phantom_padding ?? false,
     tanggal_layanan: r.tanggal_layanan ?? null,
     tanggal_sampel: r.tanggal_sampel ?? null,
@@ -1253,29 +1259,87 @@ async function seedRows(
   if (error) throw error;
 }
 
+/**
+ * Beri seorang leader scope SIDAK lewat rantai access_groups yang sama dengan
+ * produksi: request approved → request_groups → access_group_items.
+ */
+function seedLeaderSidakScope(
+  userId: string,
+  pesertaId: string,
+  serviceTypes: string[] = [],
+): string {
+  const groupId = sqlUuid(
+    `INSERT INTO public.access_groups (name, description, is_active)
+     VALUES ('e2e-heatmap-leader-${Date.now()}-${Math.floor(Math.random() * 1e6)}', 'e2e', true)
+     RETURNING id;`,
+  );
+  sql(
+    `INSERT INTO public.access_group_items (access_group_id, field_name, field_value, is_active)
+     VALUES ('${groupId}', 'peserta_id', '${pesertaId}', true);`,
+  );
+  for (const serviceType of serviceTypes) {
+    sql(
+      `INSERT INTO public.access_group_items (access_group_id, field_name, field_value, is_active)
+       VALUES ('${groupId}', 'service_type', '${serviceType}', true);`,
+    );
+  }
+  const requestId = sqlUuid(
+    `INSERT INTO public.leader_access_requests (leader_user_id, module, status)
+     VALUES ('${userId}', 'sidak', 'approved')
+     RETURNING id;`,
+  );
+  sql(
+    `INSERT INTO public.leader_access_request_groups (request_id, access_group_id)
+     VALUES ('${requestId}', '${groupId}');`,
+  );
+  return groupId;
+}
+
 test.describe("Heatmap agregasi", () => {
   let fx: TemuanFixture;
   let trainerToken: string;
   let leaderToken: string;
   let trainerUserId: string;
   let leaderUserId: string;
+  let lockedLeaderUserId: string;
+  let lockedLeaderToken: string;
+
+  let otherPesertaId: string | null = null;
+  const leaderGroupIds: string[] = [];
 
   test.beforeAll(async () => {
     fx = fixtureSetup();
     const trainer = await createUserWithJwt("trainer");
     const leader = await createUserWithJwt("leader");
+    const lockedLeader = await createUserWithJwt("leader");
     trainerToken = trainer.token;
     leaderUserId = leader.userId;
     trainerUserId = trainer.userId;
     leaderToken = leader.token;
+    lockedLeaderUserId = lockedLeader.userId;
+    lockedLeaderToken = lockedLeader.token;
+
+    // Scope leader: satu tanpa lock layanan, satu terkunci ke `call`.
+    leaderGroupIds.push(seedLeaderSidakScope(leaderUserId, fx.pesertaId));
+    leaderGroupIds.push(
+      seedLeaderSidakScope(lockedLeaderUserId, fx.pesertaId, ["call"]),
+    );
   });
 
   test.afterAll(async () => {
+    if (otherPesertaId) {
+      sql(`DELETE FROM public.profiler_peserta WHERE id = '${otherPesertaId}';`);
+    }
     if (fx?.pesertaId) {
       sql(`DELETE FROM public.profiler_peserta WHERE id = '${fx.pesertaId}';`);
       sql(`DELETE FROM public.profiler_folders WHERE name = '${fx.folderName}';`);
     }
-    for (const id of [trainerUserId, leaderUserId]) {
+    if (leaderGroupIds.length > 0) {
+      sql(
+        `DELETE FROM public.access_groups WHERE id IN ('${leaderGroupIds.join("','")}');`,
+      );
+    }
+    for (const id of [trainerUserId, leaderUserId, lockedLeaderUserId]) {
       if (id) await admin().auth.admin.deleteUser(id);
     }
   });
@@ -1294,6 +1358,141 @@ test.describe("Heatmap agregasi", () => {
     });
     const day = res.days.find((d) => d.date === "2026-01-05")!;
     expect(day.count).toBeGreaterThanOrEqual(3);
+  });
+
+  test("satuan per-tiket menghitung distinct no_tiket per hari", async () => {
+    const beforeParam = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+    });
+    const beforeTicket = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      countBy: "tiket",
+    });
+
+    const day = "2026-05-05";
+    // Satu tiket boleh punya banyak parameter, tapi constraint unik DB
+    // membedakannya lewat `indicator_id` — jadi tiap baris memakai indikator
+    // berbeda dengan nomor tiket yang sama.
+    await seedRows(fx.periodId, fx.pesertaId, fx.indicators[0]!, [
+      { indicator_id: fx.indicators[0]!, nilai: 1, ketidaksesuaian: "A", no_tiket: "TKT-SAME", tanggal_layanan: day },
+      { indicator_id: fx.indicators[1]!, nilai: 1, ketidaksesuaian: "B", no_tiket: "TKT-SAME", tanggal_layanan: day },
+      { indicator_id: fx.indicators[2]!, nilai: 1, ketidaksesuaian: "C", no_tiket: "TKT-SAME", tanggal_layanan: day },
+      { indicator_id: fx.indicators[3]!, nilai: 1, ketidaksesuaian: "D", no_tiket: "TKT-OTHER", tanggal_layanan: day },
+      // Tanpa nomor tiket tidak bisa dikelompokkan → dihitung per baris.
+      { indicator_id: fx.indicators[0]!, nilai: 1, ketidaksesuaian: "E", no_tiket: null, tanggal_layanan: day },
+    ]);
+
+    const afterParam = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+    });
+    const afterTicket = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      countBy: "tiket",
+    });
+
+    const countAt = (
+      res: Awaited<ReturnType<typeof getSidakHeatmap>>,
+      date: string,
+    ) => res.days.find((d) => d.date === date)!.count;
+
+    // Parameter: 5 baris baru = 5 temuan. Tiket: 3 (TKT-SAME, TKT-OTHER, null).
+    expect(countAt(afterParam, day) - countAt(beforeParam, day)).toBe(5);
+    expect(countAt(afterTicket, day) - countAt(beforeTicket, day)).toBe(3);
+    expect(afterTicket.countBy).toBe("tiket");
+    expect(afterTicket.totalFindings).toBe(
+      afterTicket.days.reduce((sum, d) => sum + d.count, 0),
+    );
+  });
+
+  test("satuan per-tiket juga berlaku pada temuan tanpa tanggal", async () => {
+    const beforeParam = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+    });
+    const beforeTicket = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      countBy: "tiket",
+    });
+
+    await seedRows(fx.periodId, fx.pesertaId, fx.indicators[0]!, [
+      { indicator_id: fx.indicators[0]!, nilai: 1, ketidaksesuaian: "N1", no_tiket: "TKT-NULL" },
+      { indicator_id: fx.indicators[1]!, nilai: 1, ketidaksesuaian: "N2", no_tiket: "TKT-NULL" },
+      { indicator_id: fx.indicators[2]!, nilai: 1, ketidaksesuaian: "N3", no_tiket: null },
+    ]);
+
+    const afterParam = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+    });
+    const afterTicket = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      countBy: "tiket",
+    });
+
+    expect(
+      afterParam.missingDateFindingsAllPeriods -
+        beforeParam.missingDateFindingsAllPeriods,
+    ).toBe(3);
+    expect(
+      afterTicket.missingDateFindingsAllPeriods -
+        beforeTicket.missingDateFindingsAllPeriods,
+    ).toBe(2);
+  });
+
+  test("filter agent_id hanya menghitung agent tersebut", async () => {
+    otherPesertaId = sqlUuid(
+      `INSERT INTO public.profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
+       VALUES ('${fx.folderName}', 'Agen Kedua E2E', 'Tim Uji', 'Agent', 2)
+       RETURNING id;`,
+    );
+    const day = "2026-06-06";
+    await seedRows(fx.periodId, otherPesertaId, fx.indicators[0]!, [
+      { nilai: 1, ketidaksesuaian: "Agent lain", tanggal_layanan: day },
+    ]);
+
+    const all = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+    });
+    const onlyOther = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      agentId: otherPesertaId,
+    });
+    const onlyFirst = await getSidakHeatmap({
+      supabase: userClient(trainerToken),
+      mode: "agent",
+      year: 2026,
+      agentId: fx.pesertaId,
+    });
+
+    const countAt = (
+      res: Awaited<ReturnType<typeof getSidakHeatmap>>,
+      date: string,
+    ) => res.days.find((d) => d.date === date)!.count;
+
+    expect(countAt(all, day)).toBeGreaterThanOrEqual(1);
+    expect(countAt(onlyOther, day)).toBe(1);
+    expect(onlyOther.totalFindings).toBe(1);
+    expect(onlyOther.agentId).toBe(otherPesertaId);
+    // Agent pertama tidak punya baris pada tanggal itu.
+    expect(countAt(onlyFirst, day)).toBe(0);
   });
 
   test("mode memakai kolom tanggal yang berbeda", async () => {
@@ -1596,11 +1795,56 @@ test.describe("Heatmap agregasi", () => {
     ).rejects.toThrow("probe: halaman kedua gagal");
   });
 
-  test("role leader ditolak oleh route heatmap", async () => {
-    const call = await mountHeatmapRouter("leader", trainerToken);
+  test("leader hanya melihat agent dalam scope-nya", async () => {
+    const call = await mountHeatmapRouter("leader", leaderToken, leaderUserId);
     const res = await call("/heatmap?mode=agent&year=2026");
-    expect(res.status).toBe(403);
-    expect(res.body.error?.code).toBe("FORBIDDEN");
+    expect(res.status).toBe(200);
+    const data = res.body.data as {
+      agentId: string | null;
+      days: Array<{ date: string; count: number }>;
+    };
+    const countAt = (date: string) =>
+      data.days.find((d) => d.date === date)!.count;
+
+    // Hari milik agent dalam scope terlihat…
+    expect(countAt("2026-01-05")).toBeGreaterThanOrEqual(1);
+    // …dan hari milik agent di luar scope TIDAK terlihat (baris 2026-06-06
+    // dibuat oleh test `filter agent_id` pada agent kedua).
+    expect(countAt("2026-06-06")).toBe(0);
+  });
+
+  test("leader ditolak meminta agent di luar scope, diizinkan di dalam scope", async () => {
+    expect(otherPesertaId).not.toBeNull();
+    const call = await mountHeatmapRouter("leader", leaderToken, leaderUserId);
+
+    const forbidden = await call(
+      `/heatmap?mode=agent&year=2026&agent_id=${otherPesertaId}`,
+    );
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.error?.code).toBe("FORBIDDEN");
+
+    const allowed = await call(
+      `/heatmap?mode=agent&year=2026&agent_id=${fx.pesertaId}`,
+    );
+    expect(allowed.status).toBe(200);
+  });
+
+  test("leader terkunci layanan ditolak meminta layanan lain", async () => {
+    const call = await mountHeatmapRouter(
+      "leader",
+      lockedLeaderToken,
+      lockedLeaderUserId,
+    );
+    const forbidden = await call(
+      "/heatmap?mode=agent&year=2026&service_type=slik",
+    );
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.error?.code).toBe("FORBIDDEN");
+
+    const allowed = await call(
+      "/heatmap?mode=agent&year=2026&service_type=call",
+    );
+    expect(allowed.status).toBe(200);
   });
 
   test("parameter tidak valid ditolak 400", async () => {
@@ -1610,6 +1854,8 @@ test.describe("Heatmap agregasi", () => {
       "/heatmap?mode=agent&year=abc",
       "/heatmap?mode=agent&year=1800",
       "/heatmap?mode=agent&year=2026&service_type=invalid",
+      "/heatmap?mode=agent&year=2026&count_by=bogus",
+      "/heatmap?mode=agent&year=2026&agent_id=not-a-uuid",
     ]) {
       const res = await call(query);
       expect(res.status, query).toBe(400);

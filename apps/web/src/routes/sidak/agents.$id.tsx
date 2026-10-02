@@ -30,6 +30,7 @@ import EditTemuanModal from "../../components/sidak/EditTemuanModal";
 import MonthRail from "../../components/sidak/MonthRail";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import SidakAgentDetailTabs from "../../components/sidak/SidakAgentDetailTabs";
+import SidakAgentHeatmapPanel from "../../components/sidak/SidakAgentHeatmapPanel";
 import type { SidakAgentDetailTab } from "../../components/sidak/sidak-agent-detail-tabs.constants";
 import SidakSimulationHistory from "../../components/sidak/SidakSimulationHistory";
 
@@ -335,6 +336,13 @@ export default function SidakAgentDetailPage() {
                   onDelete={handleDelete}
                 />
               </div>
+            ),
+            heatmap: (
+              <SidakAgentHeatmapPanel
+                agentId={id}
+                year={selectedYear}
+                serviceType={selectedService}
+              />
             ),
             simulations: <SidakSimulationHistory agentId={id} />,
           }}

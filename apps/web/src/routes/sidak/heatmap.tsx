@@ -1,44 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientResponse } from "hono/client";
-import { getErrorMessage, sidakClient, unwrapResponse } from "../../lib/api";
+import { getErrorMessage } from "../../lib/api";
+import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "../../components/sidak/SidakHeatmapCalendar";
+import SidakHeatmapInsights from "../../components/sidak/SidakHeatmapInsights";
 import {
   VALID_SERVICE_TYPES,
-  type ApiResponse,
+  type SidakHeatmapCountBy,
   type SidakHeatmapMode,
   type SidakHeatmapResponse,
   type ServiceType,
 } from "@trainers/types";
-
-/**
- * Facade bertipe untuk endpoint heatmap.
- *
- * Router Hono modul SIDAK belum di-chain, sehingga `AppType` tidak membawa rute
- * heatmap (lihat catatan yang sama di `lib/api/rpc-client.ts`). Facade lokal ini
- * menegakkan bentuk query/response di sisi web tanpa mengembalikan helper lama:
- * seluruh request tetap lewat `sidakClient`, jadi auth, redirect 401, dan deteksi
- * fallback HTML (`rpcFetch`) tetap berlaku.
- */
-type HeatmapRpcResponse = ClientResponse<
-  ApiResponse<SidakHeatmapResponse>,
-  number,
-  "json"
->;
-type HeatmapClient = {
-  heatmap: {
-    $get(args: {
-      query: {
-        mode: SidakHeatmapMode;
-        year: string;
-        service_type?: ServiceType;
-      };
-      signal?: AbortSignal;
-    }): Promise<HeatmapRpcResponse>;
-  };
-};
-const heatmapClient = sidakClient as unknown as HeatmapClient;
 
 const YEARS = [2024, 2025, 2026];
 
@@ -53,6 +26,7 @@ function formatTanggalPanjang(iso: string) {
 
 export default function SidakHeatmap() {
   const [mode, setMode] = useState<SidakHeatmapMode>("agent");
+  const [countBy, setCountBy] = useState<SidakHeatmapCountBy>("parameter");
   const [year, setYear] = useState<number>(2026);
   const [serviceType, setServiceType] = useState<ServiceType | "">("");
   const [selected, setSelected] = useState<HeatmapDay | null>(null);
@@ -72,18 +46,15 @@ export default function SidakHeatmap() {
     setLoading(true);
     setError(null);
     try {
-      const query: {
-        mode: SidakHeatmapMode;
-        year: string;
-        service_type?: ServiceType;
-      } = { mode, year: String(year) };
-      if (serviceType) query.service_type = serviceType;
-      // `unwrapResponse` membuka envelope `{ success, data }` dan melempar
+      // `fetchSidakHeatmap` membuka envelope `{ success, data }` dan melempar
       // `ApiError` untuk `{ success: false }`, jadi halaman tidak pernah
       // menampilkan heatmap kosong saat query gagal.
-      const data = await unwrapResponse(
-        await heatmapClient.heatmap.$get({ query }),
-      );
+      const data = await fetchSidakHeatmap({
+        mode,
+        year,
+        countBy,
+        serviceType: serviceType || undefined,
+      });
       if (generation === generationRef.current) setHeatmap(data);
     } catch (e) {
       if (generation === generationRef.current) {
@@ -92,7 +63,7 @@ export default function SidakHeatmap() {
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
-  }, [mode, year, serviceType]);
+  }, [mode, year, serviceType, countBy]);
 
   useEffect(() => {
     void load();
@@ -108,7 +79,7 @@ export default function SidakHeatmap() {
    */
   useEffect(() => {
     setSelected(null);
-  }, [mode, year, serviceType]);
+  }, [mode, year, serviceType, countBy]);
 
   const retry = useCallback(() => {
     void load();
@@ -155,6 +126,34 @@ export default function SidakHeatmap() {
                 onClick={() => setMode(value)}
                 className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
                   mode === value
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Satuan
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                ["parameter", "Parameter"],
+                ["tiket", "Tiket"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={countBy === value}
+                onClick={() => setCountBy(value)}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+                  countBy === value
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-background text-foreground hover:bg-muted"
                 }`}
@@ -284,6 +283,8 @@ export default function SidakHeatmap() {
               )}
             </div>
           </div>
+
+          <SidakHeatmapInsights days={heatmap.days} />
 
           <SidakHeatmapCalendar
             year={heatmap.year}

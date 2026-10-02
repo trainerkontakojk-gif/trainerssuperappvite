@@ -34,12 +34,15 @@ const MOCKED_API: RegExp[] = [
   /^\/api\/v1\/sidak\/agents\/[^/]+$/,
   /^\/api\/v1\/sidak\/agents\/[^/]+\/quickview$/,
   /^\/api\/v1\/sidak\/temuan\/[^/]+$/,
+  /^\/api\/v1\/sidak\/heatmap$/,
 ];
 
 export type AgentAudit = {
   mockedApi: string[];
   blockedApi: string[];
   blockedExternal: string[];
+  /** Query string heatmap yang diminta tab Heatmap (untuk asersi agent_id). */
+  heatmapQueries?: string[];
 };
 
 export const AGENT_ID = "cccccccc-3333-4333-8333-cccccccccccc";
@@ -162,6 +165,10 @@ export type OpenAgentOptions = {
   role?: string;
   /** Bila true, PUT temuan membalas 500 supaya error bisa diuji. */
   failUpdate?: boolean;
+  /** Status modul SIDAK untuk leader pada `/me/access-status`. */
+  sidakAccess?: "none" | "approved";
+  /** Hitungan heatmap per tanggal yang dibalas endpoint heatmap. */
+  heatmapCounts?: Record<string, number>;
 };
 
 export async function openAgentDetail(
@@ -169,7 +176,12 @@ export async function openAgentDetail(
   audit: AgentAudit,
   opts: OpenAgentOptions = {},
 ): Promise<void> {
-  const { role = "trainer", failUpdate = false } = opts;
+  const {
+    role = "trainer",
+    failUpdate = false,
+    sidakAccess = "none",
+    heatmapCounts = {},
+  } = opts;
 
   await mockSupabaseAuth(page, { role });
 
@@ -179,7 +191,7 @@ export async function openAgentDetail(
       toJson({
         success: true,
         data: {
-          sidak: { status: "none", module: "sidak", created_at: null },
+          sidak: { status: sidakAccess, module: "sidak", created_at: null },
           ktp: { status: "none", module: "ktp", created_at: null },
         },
       }),
@@ -233,6 +245,38 @@ export async function openAgentDetail(
       );
     },
   );
+
+  // Heatmap per-agent (tab Heatmap). Kalender penuh satu tahun.
+  await page.route(`${APP_ORIGIN}/api/v1/sidak/heatmap?*`, async (route) => {
+    audit.mockedApi.push("heatmap");
+    const url = new URL(route.request().url());
+    (audit.heatmapQueries ??= []).push(url.search);
+    const year = Number(url.searchParams.get("year") ?? "2026");
+    const days: Array<{ date: string; count: number }> = [];
+    for (let month = 1; month <= 12; month++) {
+      const perMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      for (let day = 1; day <= perMonth; day++) {
+        const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        days.push({ date: iso, count: heatmapCounts[iso] ?? 0 });
+      }
+    }
+    await route.fulfill(
+      toJson({
+        success: true,
+        data: {
+          mode: url.searchParams.get("mode") ?? "agent",
+          year,
+          serviceType: url.searchParams.get("service_type"),
+          dateBasis: "tanggal_layanan",
+          countBy: url.searchParams.get("count_by") ?? "parameter",
+          agentId: url.searchParams.get("agent_id"),
+          days,
+          totalFindings: days.reduce((sum, d) => sum + d.count, 0),
+          missingDateFindingsAllPeriods: 0,
+        },
+      }),
+    );
+  });
 
   // PUT/DELETE temuan pada baris yang spesifik (lihat catatan urutan di bawah).
   await page.route(

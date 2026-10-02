@@ -389,7 +389,7 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
     expect(trainerRows.data ?? []).toHaveLength(2);
   });
 
-  test("role leader ditolak oleh route temuan dan route heatmap", async () => {
+  test("role leader ditolak oleh route temuan (batch)", async () => {
     const call = await mountTemuanRouter("leader");
     const denied = await call("/temuan/batch", {
       method: "POST",

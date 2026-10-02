@@ -253,8 +253,13 @@ const sidakHeatmapRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/heatmap",
   component: SidakHeatmap,
-  // Admin + trainer saja: tiga lapis (nav, beforeLoad, requireRole backend).
-  beforeLoad: requireRole(["trainer", "admin"]),
+  // Admin/trainer (semua data) + leader (hanya scope tim-nya). Leader tetap
+  // harus punya modul SIDAK disetujui — tiga lapis: nav, beforeLoad, backend.
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "admin", "leader"],
+    "sidak",
+    "/sidak",
+  ),
 });
 
 const sidakJadwalShiftingRoute = createRoute({
