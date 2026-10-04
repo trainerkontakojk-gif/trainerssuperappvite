@@ -62,29 +62,42 @@ export default function SidakHeatmapInsights({
       className="space-y-3 rounded-xl border border-border bg-surface p-4"
     >
       <div>
-        <h2 className="text-sm font-semibold text-foreground">Insight</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Ringkasan volume temuan pada tahun terpilih. Ini bukan tingkat
-          kesalahan — tidak ada pembanding jumlah layanan.
+        <h2 className="text-sm font-semibold text-foreground">
+          Pola temuan ketidaksesuaian
+        </h2>
+        <p className="mt-1 max-w-[75ch] text-sm text-foreground">
+          Dalam periode ini, jumlah temuan harian tertinggi tercatat pada{" "}
+          <span className="font-semibold">
+            {formatInsightDateLong(data.busiestDay.date)}
+          </span>
+          , sebanyak{" "}
+          <span className="font-semibold">
+            {INTEGER.format(data.busiestDay.count)} temuan.
+          </span>
+        </p>
+        <p className="mt-1 max-w-[75ch] text-xs text-muted-foreground">
+          Angka-angka ini menunjukkan volume temuan, bukan tingkat
+          ketidaksesuaian. Saat membandingkan periode, pertimbangkan juga jumlah
+          layanan atau audit serta banyaknya hari pada tiap periode.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <InsightCard
           id="busiest-day"
-          label="Hari tersibuk"
+          label="Tanggal dengan temuan terbanyak"
           value={formatInsightDateLong(data.busiestDay.date)}
           detail={`${INTEGER.format(data.busiestDay.count)} temuan`}
         />
         <InsightCard
           id="quietest-active-day"
-          label="Hari aktif tersepi"
+          label="Hari dengan temuan paling sedikit"
           value={formatInsightDateLong(data.quietestActiveDay.date)}
           detail={`${INTEGER.format(data.quietestActiveDay.count)} temuan`}
         />
         {data.busiestWeekday && (
           <InsightCard
             id="busiest-weekday"
-            label="Hari dalam minggu tersibuk"
+            label="Hari pekan dengan total temuan tertinggi"
             value={data.busiestWeekday.label}
             detail={`${INTEGER.format(data.busiestWeekday.total)} temuan`}
           />
@@ -92,29 +105,29 @@ export default function SidakHeatmapInsights({
         {data.busiestMonth && (
           <InsightCard
             id="busiest-month"
-            label="Bulan tertinggi"
+            label="Bulan dengan total temuan tertinggi"
             value={data.busiestMonth.label}
             detail={`${INTEGER.format(data.busiestMonth.total)} temuan`}
           />
         )}
         <InsightCard
           id="active-days"
-          label="Hari aktif"
+          label="Hari yang memiliki temuan"
           value={INTEGER.format(data.activeDays)}
-          detail={`dari ${INTEGER.format(data.activeDays + data.emptyDays)} hari`}
+          detail={`dari ${INTEGER.format(data.activeDays + data.emptyDays)} hari kalender`}
         />
         <InsightCard
           id="average"
-          label="Rata-rata"
+          label="Rata-rata pada hari dengan temuan"
           value={DECIMAL.format(data.averagePerActiveDay ?? 0)}
-          detail="temuan per hari aktif"
+          detail="temuan per hari"
         />
         {data.activeRange && (
           <InsightCard
             id="active-range"
-            label="Rentang aktif"
+            label="Rentang tanggal temuan"
             value={`${formatInsightDateShort(data.activeRange.from)} – ${formatInsightDateShort(data.activeRange.to)}`}
-            detail="tanggal aktif pertama–terakhir"
+            detail="tanggal pertama hingga terakhir dengan temuan"
           />
         )}
       </div>

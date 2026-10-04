@@ -358,7 +358,7 @@ test.describe("Halaman Heatmap", () => {
     expect(maxDay).toMatch(/\+$/);
   });
 
-  test("insight merangkum hari tersibuk, tersepi aktif, hari-dalam-minggu, bulan, dan rentang", async ({ page }) => {
+  test("insight menjelaskan pola volume temuan dengan narasi yang kontekstual", async ({ page }) => {
     behaviour = {
       kind: "data",
       counts: {
@@ -373,28 +373,44 @@ test.describe("Halaman Heatmap", () => {
 
     const insights = page.getByTestId("heatmap-insights");
     await expect(insights).toBeVisible();
+    await expect(
+      insights.getByRole("heading", { name: "Pola temuan ketidaksesuaian" }),
+    ).toBeVisible();
+    await expect(insights).toContainText(
+      "Dalam periode ini, jumlah temuan harian tertinggi tercatat pada 12 Januari 2026, sebanyak 5 temuan.",
+    );
+    await expect(insights).toContainText(
+      "Angka-angka ini menunjukkan volume temuan, bukan tingkat ketidaksesuaian. Saat membandingkan periode, pertimbangkan juga jumlah layanan atau audit serta banyaknya hari pada tiap periode.",
+    );
 
     const busiestDay = page.getByTestId("insight-busiest-day");
+    await expect(busiestDay).toContainText("Tanggal dengan temuan terbanyak");
     await expect(busiestDay).toContainText("12 Januari 2026");
     await expect(busiestDay).toContainText("5 temuan");
 
     const quietestDay = page.getByTestId("insight-quietest-active-day");
+    await expect(quietestDay).toContainText("Hari dengan temuan paling sedikit");
     await expect(quietestDay).toContainText("6 Januari 2026");
     await expect(quietestDay).toContainText("1 temuan");
 
     const busiestWeekday = page.getByTestId("insight-busiest-weekday");
+    await expect(busiestWeekday).toContainText("Hari pekan dengan total temuan tertinggi");
     await expect(busiestWeekday).toContainText("Senin");
     await expect(busiestWeekday).toContainText("8 temuan");
 
     const busiestMonth = page.getByTestId("insight-busiest-month");
+    await expect(busiestMonth).toContainText("Bulan dengan total temuan tertinggi");
     await expect(busiestMonth).toContainText("Januari");
     await expect(busiestMonth).toContainText("9 temuan");
 
+    await expect(page.getByTestId("insight-active-days")).toContainText("Hari yang memiliki temuan");
     await expect(page.getByTestId("insight-active-days")).toContainText("4");
     await expect(page.getByTestId("insight-active-days")).toContainText("365");
+    await expect(page.getByTestId("insight-average")).toContainText("Rata-rata pada hari dengan temuan");
     await expect(page.getByTestId("insight-average")).toContainText("2,8");
 
     const range = page.getByTestId("insight-active-range");
+    await expect(range).toContainText("Rentang tanggal temuan");
     await expect(range).toContainText("5 Jan");
     await expect(range).toContainText("3 Feb");
   });
