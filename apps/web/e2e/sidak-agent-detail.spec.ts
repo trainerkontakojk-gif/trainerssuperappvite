@@ -184,6 +184,25 @@ test.describe("Detail agent SIDAK: tab", () => {
     ).toHaveCount(0);
   });
 
+  test("accordion temuan menutup kembali saat layanan audit berubah", async ({
+    page,
+  }) => {
+    const audit = startAudit();
+    await openAgentDetail(page, audit);
+    const panel = await openTemuanTab(page);
+    const february = panel
+      .getByRole("button")
+      .filter({ hasText: "Februari 2026" })
+      .first();
+
+    await expect(february).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("combobox", { name: "Pilihan layanan audit" }).click();
+    await page.getByRole("option", { name: "Chat", exact: true }).click();
+
+    await expect(february).toContainText("2 temuan");
+    await expect(february).toHaveAttribute("aria-expanded", "false");
+  });
+
   test("tabel benchmark menampilkan baris total dan parameter", async ({ page }) => {
     const audit = startAudit();
     await openAgentDetail(page, audit);

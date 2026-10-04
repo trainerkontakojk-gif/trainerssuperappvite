@@ -26,3 +26,14 @@ Menyamakan bagian riwayat temuan detil pada halaman detail agent SIDAK dengan le
 - **Linting:** Berhasil dijalankan dengan `pnpm --filter @trainers/web lint` (0 error).
 - **Frontend Tests:** `pnpm --filter @trainers/web test` berhasil meluluskan semua 17 file test (76 test case).
 - **Backend Tests:** `pnpm --filter @trainers/api test` meluluskan seluruh 16 file test (239 test case).
+
+## 4. Follow-up Regression Fix (2026-10-04)
+
+- State accordion Temuan kini di-reset saat tahun atau layanan audit berubah melalui `key` pada `AgentTemuanTab`, dengan nilai yang menggabungkan `selectedYear` dan `selectedService`.
+- E2E regresi di `apps/web/e2e/sidak-agent-detail.spec.ts` mengubah layanan Call ke Chat dan memastikan accordion bulan kembali tertutup. Tes dikonfirmasi gagal sebelum perbaikan (`aria-expanded="true"`) lalu lulus setelah perbaikan.
+- Verifikasi:
+  - `pnpm --filter @trainers/web exec playwright test -g 'accordion temuan menutup kembali saat layanan audit berubah' e2e/sidak-agent-detail.spec.ts` — 1 passed.
+  - `pnpm --filter @trainers/web exec playwright test e2e/sidak-agent-detail.spec.ts` — 8 passed.
+  - `pnpm --filter @trainers/web typecheck` — lulus.
+  - `pnpm --filter @trainers/web lint` — lulus, 0 error dan 107 warning.
+  - `git diff --check` — lulus.

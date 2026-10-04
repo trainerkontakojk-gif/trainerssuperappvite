@@ -327,6 +327,7 @@ export default function SidakAgentDetailPage() {
                   </div>
                 </div>
                 <AgentTemuanTab
+                  key={`${selectedYear}-${selectedService}`}
                   items={temuanDisplayItems}
                   phantomSessions={phantomSessionDisplayItems}
                   loading={loading}
