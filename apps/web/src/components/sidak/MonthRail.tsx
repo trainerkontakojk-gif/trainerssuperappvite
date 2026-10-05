@@ -1,8 +1,23 @@
-import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import {
+  SIDAK_QA_TARGET,
+  SIDAK_SCORE_FILL,
+  sidakScoreTone,
+} from "../../utils/sidakScoreStatus";
 
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agt",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
 
 interface MonthSummary {
   month: number;
@@ -17,76 +32,125 @@ interface Props {
   onMonthSelect: (month: number) => void;
 }
 
-function scoreIndicatorClass(score: number): string {
-  if (score >= 85) return "[&_[data-slot=progress-indicator]]:bg-emerald-600";
-  if (score >= 70) return "[&_[data-slot=progress-indicator]]:bg-amber-600";
-  return "[&_[data-slot=progress-indicator]]:bg-rose-600";
-}
-
-export default function MonthRail({ summaries, selectedMonth, onMonthSelect }: Props) {
+/**
+ * Grafik batang skor Jan–Des dengan garis target QA. Bulan berdata adalah
+ * tombol pemilih bulan; bulan tanpa audit tampil sebagai slot kosong.
+ */
+export default function MonthRail({
+  summaries,
+  selectedMonth,
+  onMonthSelect,
+}: Props) {
   if (summaries.length === 0) return null;
 
-  const sorted = [...summaries].sort((a, b) => a.month - b.month);
-  const hasBelowQaTarget = sorted.some((summary) => summary.finalScore < 95);
+  const byMonth = new Map(summaries.map((summary) => [summary.month, summary]));
+  const year = summaries[0]!.year;
+  const belowTarget = summaries.filter(
+    (summary) => summary.finalScore < SIDAK_QA_TARGET,
+  ).length;
+
+  // Sumbu bawah dibulatkan ke kelipatan 10 di bawah skor terendah supaya
+  // selisih antarbulan terlihat, tapi tidak pernah di atas 60.
+  const lowest = Math.min(...summaries.map((summary) => summary.finalScore));
+  const floor = Math.max(0, Math.min(60, Math.floor((lowest - 5) / 10) * 10));
+  const toPct = (score: number) =>
+    Math.max(
+      2,
+      Math.min(100, ((Math.min(100, score) - floor) / (100 - floor)) * 100),
+    );
+  const targetPct = toPct(SIDAK_QA_TARGET);
 
   return (
-    <div className="overflow-x-auto no-scrollbar">
-      {hasBelowQaTarget && (
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-          <AlertTriangle className="size-3.5 text-amber-700 dark:text-amber-300" aria-hidden="true" />
-          <span>QA di bawah target 95%</span>
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <p>
+          {belowTarget > 0
+            ? `${belowTarget} dari ${summaries.length} bulan di bawah target QA ${SIDAK_QA_TARGET}%`
+            : `Semua bulan memenuhi target QA ${SIDAK_QA_TARGET}%`}
+        </p>
+        <p className="tabular-nums" aria-hidden="true">
+          Skala grafik {floor}–100%
+        </p>
+      </div>
+
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          data-testid="qa-target-line"
+          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/40"
+          style={{
+            bottom: `calc(1.75rem + (100% - 3.25rem) * ${targetPct / 100})`,
+          }}
+        >
+          <span className="absolute -top-2.5 right-0 bg-background pl-1.5 text-[11px] font-medium text-foreground/70">
+            Target {SIDAK_QA_TARGET}%
+          </span>
         </div>
-      )}
-      <div className="flex min-w-max items-end gap-1.5 border-b border-border/50 pb-1">
-        {sorted.map((p) => {
-          const isActive = selectedMonth === p.month;
-          const monthLabel = `${MONTHS_SHORT[p.month - 1]} ${p.year}`;
-          const isBelowQaTarget = p.finalScore < 95;
-          return (
-            <Button
-              key={`${p.month}-${p.year}`}
-              type="button"
-              variant={isActive ? "secondary" : "ghost"}
-              size="lg"
-              onClick={() => onMonthSelect(p.month)}
-              aria-pressed={isActive}
-              aria-label={`Pilih bulan ${monthLabel}, skor ${p.finalScore.toFixed(1)} persen, ${p.findingsCount} temuan${isBelowQaTarget ? ", QA di bawah target 95 persen" : ""}`}
-              className={`group relative min-h-16 min-w-[88px] h-auto items-start rounded-xl border px-2 pb-2.5 pt-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none ${
-                isActive
-                  ? "border-border bg-muted/50 text-foreground"
-                  : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/30 hover:text-foreground"
-              }`}
-            >
-              <div className={`mb-1 text-xs font-semibold ${isActive ? "text-primary" : "text-muted-foreground"}`}>
-                {MONTHS_SHORT[p.month - 1]}
-              </div>
 
-              <div className="flex items-end gap-0.5 leading-none tabular-nums">
-                <span className={`text-base font-bold tracking-tight ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
-                  {p.finalScore.toFixed(1)}
-                </span>
-                <span className="pb-0.5 text-xs font-semibold text-muted-foreground">%</span>
-              </div>
+        <div className="grid grid-cols-12 gap-1 sm:gap-2">
+          {MONTHS_SHORT.map((label, index) => {
+            const month = index + 1;
+            const summary = byMonth.get(month);
 
-              {isBelowQaTarget && (
-                <span
-                  role="img"
-                  aria-label="Skor QA di bawah target 95 persen"
-                  title="Skor QA di bawah target 95 persen"
-                  className="ml-1 inline-flex size-4 shrink-0 text-amber-700 dark:text-amber-300"
+            if (!summary) {
+              return (
+                <div
+                  key={month}
+                  className="flex h-48 flex-col items-center gap-1 sm:h-56"
                 >
-                  <AlertTriangle className="size-4" aria-hidden="true" />
-                </span>
-              )}
+                  <span className="h-5" />
+                  <span className="flex w-full flex-1 items-end justify-center">
+                    <span className="h-px w-full bg-border" />
+                  </span>
+                  <span className="flex h-6 items-center text-[11px] text-muted-foreground/70 sm:text-xs">
+                    {label}
+                  </span>
+                </div>
+              );
+            }
 
-              <Progress
-                value={Math.max(20, Math.min(100, p.finalScore))}
-                aria-hidden="true"
-                className={`absolute bottom-0 left-2.5 right-2.5 h-1 gap-0 ${scoreIndicatorClass(p.finalScore)} [&_[data-slot=progress-track]]:h-1 [&_[data-slot=progress-indicator]]:transition-none`}
-              />
-            </Button>
-          );
-        })}
+            const isActive = selectedMonth === month;
+            const isBelowQaTarget = summary.finalScore < SIDAK_QA_TARGET;
+            const tone = sidakScoreTone(summary.finalScore);
+
+            return (
+              <button
+                key={month}
+                type="button"
+                onClick={() => onMonthSelect(month)}
+                aria-pressed={isActive}
+                aria-label={`Pilih bulan ${label} ${year}, skor ${summary.finalScore.toFixed(1)} persen, ${summary.findingsCount} temuan${isBelowQaTarget ? ", QA di bawah target 95 persen" : ""}`}
+                className={`group flex h-48 flex-col items-center gap-1 rounded-lg px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none sm:h-56 ${
+                  isActive ? "bg-muted ring-1 ring-border" : "hover:bg-muted/60"
+                }`}
+              >
+                <span
+                  className={`flex h-5 items-end text-[10px] font-semibold tabular-nums sm:text-xs ${
+                    isActive ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {summary.finalScore.toFixed(1)}
+                </span>
+                <span className="flex w-full flex-1 items-end justify-center">
+                  <span
+                    data-bar
+                    className={`block w-full max-w-10 rounded-t-md ${SIDAK_SCORE_FILL[tone]}`}
+                    style={{ height: `${toPct(summary.finalScore)}%` }}
+                  />
+                </span>
+                <span
+                  className={`flex h-6 items-center text-[11px] sm:text-xs ${
+                    isActive
+                      ? "font-semibold text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

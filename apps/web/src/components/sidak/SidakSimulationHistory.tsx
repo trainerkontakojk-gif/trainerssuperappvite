@@ -207,10 +207,10 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
                 id="sidak-simulation-history-title"
                 className="font-outfit text-lg font-bold tracking-tight text-foreground"
               >
-                Riwayat Simulasi
+                Riwayat simulasi
               </CardTitle>
               <CardDescription className="text-sm text-muted-foreground">
-                Sesi yang tercatat untuk peserta agent ini.
+                Sesi KETIK, PDKT, dan Telefun milik agen ini.
               </CardDescription>
             </div>
           </div>
@@ -243,7 +243,9 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
             <Alert variant="destructive" className="border-destructive/25 bg-destructive/5">
               <AlertTriangle aria-hidden="true" />
               <AlertTitle>Riwayat simulasi belum dapat dimuat</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                Periksa koneksi, lalu coba lagi.
+              </AlertDescription>
               <Button
                 type="button"
                 variant="outline"
@@ -265,7 +267,9 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
                 </EmptyMedia>
                 <EmptyTitle>Belum ada riwayat simulasi</EmptyTitle>
                 <EmptyDescription>
-                  Tidak ada sesi {module === "all" ? "" : MODULE_LABELS[module]} untuk peserta ini.
+                  {module === "all"
+                    ? "Agen ini belum punya sesi simulasi yang tercatat."
+                    : `Agen ini belum punya sesi ${MODULE_LABELS[module]} yang tercatat.`}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

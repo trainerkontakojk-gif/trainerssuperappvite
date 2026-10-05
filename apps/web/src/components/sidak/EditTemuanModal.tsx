@@ -165,19 +165,19 @@ export default function EditTemuanModal({
               value={form.ketidaksesuaian}
               onChange={(event) => onFormChange("ketidaksesuaian", event.target.value)}
               rows={4}
-              placeholder="Deskripsi ketidaksesuaian..."
+              placeholder="Contoh: Agen tidak memverifikasi tanggal lahir nasabah"
               className="min-h-24 resize-y bg-background text-sm leading-relaxed text-foreground"
             />
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-temuan-sebaiknya">Sebaiknya</Label>
+            <Label htmlFor="edit-temuan-sebaiknya">Rekomendasi</Label>
             <Textarea
               id="edit-temuan-sebaiknya"
               value={form.sebaiknya}
               onChange={(event) => onFormChange("sebaiknya", event.target.value)}
               rows={4}
-              placeholder="Saran perbaikan..."
+              placeholder="Contoh: Verifikasi tiga data identitas sebelum memberi informasi"
               className="min-h-24 resize-y bg-background text-sm leading-relaxed text-foreground"
             />
           </div>

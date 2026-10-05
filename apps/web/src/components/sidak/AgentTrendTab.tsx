@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { AgentComparisonTable } from "@trainers/types";
-import { TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,15 +43,14 @@ export default function AgentTrendTab({
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const trendRangeLabel =
-    labels.length > 0 ? `${labels[0]} - ${labels[labels.length - 1]}` : "";
+    labels.length > 0 ? `${labels[0]}–${labels[labels.length - 1]}` : "";
 
   if (loading) {
     return (
       <Card className="flex min-h-[24rem] items-center justify-center border-border bg-surface p-4 ring-0 sm:p-6">
         <QaStatePanel
           type="loading"
-          title="Memuat tren performa agen"
-          description="Riwayat penilaian sedang disiapkan."
+          title="Memuat tren temuan"
           className="w-full max-w-lg"
         />
       </Card>
@@ -64,8 +62,8 @@ export default function AgentTrendTab({
       <Card className="border-border bg-surface p-4 ring-0 sm:p-6">
         <QaStatePanel
           type="empty"
-          title="Data tren belum tersedia"
-          description="Tren akan muncul setelah ada penilaian pada periode yang dipilih."
+          title="Belum ada data tren"
+          description="Tren muncul setelah ada audit pada rentang bulan yang dipilih."
         />
       </Card>
     );
@@ -103,15 +101,13 @@ export default function AgentTrendTab({
       <CardHeader className="border-b border-border p-4 sm:p-6">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-              <TrendingUp className="h-4 w-4" aria-hidden="true" />
-              Tren Kinerja {trendRangeLabel ? `• ${trendRangeLabel}` : ""}
-            </div>
-            <CardTitle className="font-outfit text-xl font-bold tracking-tight sm:text-2xl">
-              Pergerakan skor per periode audit
+            <CardTitle className="font-outfit text-lg font-bold tracking-tight">
+              Tren temuan per bulan
             </CardTitle>
-            <CardDescription className="mt-2 text-sm text-muted-foreground">
-              Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.
+            <CardDescription className="mt-1 text-sm text-muted-foreground">
+              Jumlah temuan {trendRangeLabel ? `${trendRangeLabel} ` : ""}
+              ({labels.length} bulan berdata). Pilih satu parameter untuk
+              melihat polanya.
             </CardDescription>
           </div>
         </div>
@@ -131,7 +127,7 @@ export default function AgentTrendTab({
             aria-pressed={activeFilter === null}
             className="min-h-11 rounded-xl px-3 text-sm font-semibold motion-reduce:transition-none"
           >
-            Ringkasan
+            Semua parameter
           </Button>
           <Button
             type="button"
@@ -153,7 +149,7 @@ export default function AgentTrendTab({
               }}
               aria-hidden="true"
             />
-            Total Temuan
+            Total saja
           </Button>
           {paramDatasets.map((ds) => {
             const isActive = activeFilter === ds.label;
@@ -196,35 +192,6 @@ export default function AgentTrendTab({
           />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-border pt-6 md:grid-cols-3">
-          <div className="border-b border-border pb-4 md:col-span-1 md:border-b-0 md:border-r md:pb-0 md:pr-6">
-            <p className="mb-2 text-xs font-semibold text-muted-foreground">
-              Total Periode
-            </p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight tabular-nums">
-                {labels.length}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                periode aktif
-              </span>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 md:col-span-2 md:pl-2">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-primary">
-              <Zap className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="mb-1 text-xs font-semibold text-primary">
-                Ringkasan Tren
-              </p>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Gunakan pola naik-turun setiap parameter untuk menentukan fokus
-                coaching pada periode berikutnya.
-              </p>
-            </div>
-          </div>
-        </div>
         <AgentComparisonTableView comparisonTable={comparisonTable} embedded />
       </CardContent>
     </Card>

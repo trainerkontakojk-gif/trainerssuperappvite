@@ -31,6 +31,7 @@ const MOCKED_API: RegExp[] = [
   // Diminta `useAgentDetail` setelah `peserta.batch_name` terisi. Tanpa ini
   // request di-abort dan链 effect-nya tidak pernah selesai.
   /^\/api\/v1\/sidak\/folders\/[^/]+\/agents$/,
+  /^\/api\/v1\/sidak\/agents$/,
   /^\/api\/v1\/sidak\/agents\/[^/]+$/,
   /^\/api\/v1\/sidak\/agents\/[^/]+\/quickview$/,
   /^\/api\/v1\/sidak\/temuan\/[^/]+$/,
@@ -43,6 +44,10 @@ export type AgentAudit = {
   blockedExternal: string[];
   /** Query string heatmap yang diminta tab Heatmap (untuk asersi agent_id). */
   heatmapQueries?: string[];
+  /** Query string detail agent (tahun, layanan, rentang tren). */
+  detailQueries?: string[];
+  /** Query string direktori agen yang diminta pemilih agen. */
+  directoryQueries?: string[];
 };
 
 export const AGENT_ID = "cccccccc-3333-4333-8333-cccccccccccc";
@@ -169,6 +174,23 @@ export type OpenAgentOptions = {
   sidakAccess?: "none" | "approved";
   /** Hitungan heatmap per tanggal yang dibalas endpoint heatmap. */
   heatmapCounts?: Record<string, number>;
+  /**
+   * Ganti payload `AgentDetailData` default. Dipakai spec tata letak yang
+   * butuh beberapa bulan, tiket, dan akar masalah sekaligus.
+   */
+  detailPayload?: () => unknown;
+  /** Ganti payload quickview default (ranking + forecast). */
+  quickviewPayload?: unknown;
+  /** Daftar agen yang dibalas endpoint folder agents. */
+  folderAgents?: Array<{ id: string; nama: string }>;
+  /** Daftar folder yang dibalas endpoint folders. */
+  folders?: Array<{ id: string; name: string }>;
+  /** Bila diisi, quickview membalas status error ini. */
+  quickviewFailStatus?: number;
+  /** Quickview baru dibalas setelah promise ini selesai (uji state loading). */
+  quickviewGate?: Promise<void>;
+  /** Agen yang dibalas direktori `GET /sidak/agents` (pemilih agen). */
+  directoryAgents?: unknown[];
 };
 
 export async function openAgentDetail(
@@ -181,6 +203,13 @@ export async function openAgentDetail(
     failUpdate = false,
     sidakAccess = "none",
     heatmapCounts = {},
+    detailPayload = agentDetailPayload,
+    quickviewPayload,
+    folderAgents = [],
+    folders = [],
+    quickviewFailStatus,
+    quickviewGate,
+    directoryAgents = [],
   } = opts;
 
   await mockSupabaseAuth(page, { role });
@@ -202,21 +231,35 @@ export async function openAgentDetail(
     `${APP_ORIGIN}/api/v1/sidak/folders/*/agents*`,
     async (route) => {
       audit.mockedApi.push("folder-agents");
-      await route.fulfill(toJson({ success: true, data: [] }));
+      await route.fulfill(toJson({ success: true, data: folderAgents }));
     },
   );
 
   await page.route(`${APP_ORIGIN}/api/v1/sidak/folders*`, async (route) => {
     audit.mockedApi.push("folders");
-    await route.fulfill(toJson({ success: true, data: [] }));
+    await route.fulfill(toJson({ success: true, data: folders }));
   });
+
+  // Direktori agen untuk pemilih agen. Predikat path persis supaya tidak
+  // menangkap `/sidak/agents/:id`.
+  await page.route(
+    (url) => url.origin === APP_ORIGIN && url.pathname === "/api/v1/sidak/agents",
+    async (route) => {
+      audit.mockedApi.push("agent-directory");
+      (audit.directoryQueries ??= []).push(new URL(route.request().url()).search);
+      await route.fulfill(
+        toJson({ success: true, data: { agents: directoryAgents, batches: [] } }),
+      );
+    },
+  );
 
   // Detail agent: satu payload besar.
   await page.route(
     `${APP_ORIGIN}/api/v1/sidak/agents/${AGENT_ID}?*`,
     async (route) => {
       audit.mockedApi.push("agent-detail");
-      await route.fulfill(toJson({ success: true, data: agentDetailPayload() }));
+      (audit.detailQueries ??= []).push(new URL(route.request().url()).search);
+      await route.fulfill(toJson({ success: true, data: detailPayload() }));
     },
   );
 
@@ -224,13 +267,23 @@ export async function openAgentDetail(
     `${APP_ORIGIN}/api/v1/sidak/agents/${AGENT_ID}/quickview*`,
     async (route) => {
       audit.mockedApi.push("agent-quickview");
+      if (quickviewGate) await quickviewGate;
+      if (quickviewFailStatus) {
+        await route.fulfill(
+          toJson(
+            { success: false, error: { code: "QUICKVIEW_ERROR", message: "Network failure" } },
+            quickviewFailStatus,
+          ),
+        );
+        return;
+      }
       await route.fulfill(
         toJson({
           success: true,
           // Bentuk WAJIB mengikuti `SidakAgentQuickviewResponse`. Versi awal
           // memakai `{rank, totalAgents, ...}` sehingga komponen membaca
           // `data.context.agentId` dari undefined dan halaman crash total.
-          data: {
+          data: quickviewPayload ?? {
             context: {
               agentId: AGENT_ID,
               year: 2026,

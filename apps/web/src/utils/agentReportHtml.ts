@@ -51,6 +51,7 @@ import type {
   RootCauseResult,
   SidakAgentQuickviewResponse,
 } from "@trainers/types";
+import { sidakScoreLabel, sidakScoreTone } from "./sidakScoreStatus";
 
 // ---------------------------------------------------------------------------
 // Kontrak bersama (di-re-export oleh `exportAgentReport.ts`)
@@ -191,19 +192,13 @@ export function nilaiLabel(nilai: number): string {
 
 type Tone = "ok" | "warn" | "bad";
 
-/** Ambang status yang sama dengan `scoreColor`/`scoreLabel` di aplikasi. */
+/** Ambang status sama dengan halaman detail agent (`sidakScoreStatus`). */
 function scoreTone(score: number): Tone {
-  const safe = finiteNumber(score);
-  if (safe >= 85) return "ok";
-  if (safe >= 70) return "warn";
-  return "bad";
+  return sidakScoreTone(finiteNumber(score));
 }
 
 function scoreLabel(score: number): string {
-  const tone = scoreTone(score);
-  if (tone === "ok") return "Baik";
-  if (tone === "warn") return "Cukup";
-  return "Perlu Perhatian";
+  return sidakScoreLabel(finiteNumber(score));
 }
 
 function deltaTone(delta: number | null): Tone | "flat" {

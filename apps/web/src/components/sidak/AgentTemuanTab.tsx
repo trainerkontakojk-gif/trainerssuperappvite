@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   BarChart2,
@@ -58,6 +58,16 @@ interface Props {
   canEdit?: boolean;
   onEdit: (item: TemuanItem) => void;
   onDelete: (id: string) => void;
+  /** Permintaan membuka satu tiket (dari ringkasan). `nonce` baru = permintaan baru. */
+  focusRequest?: TemuanFocusRequest | null;
+}
+
+export interface TemuanFocusRequest {
+  month: number;
+  year: number;
+  /** Kunci tiket: nomor tiket huruf besar, atau `audit-<id>` untuk audit tanpa tiket. */
+  ticketKey: string;
+  nonce: number;
 }
 
 const MONTHS_FULL = [
@@ -83,8 +93,35 @@ export default function AgentTemuanTab({
   canEdit = false,
   onEdit,
   onDelete,
+  focusRequest = null,
 }: Props) {
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
+  const [appliedNonce, setAppliedNonce] = useState<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Buka bulan tiket yang diminta saat render (bukan di effect) supaya grup
+  // tiketnya sudah ada di DOM ketika effect scroll di bawah berjalan.
+  if (focusRequest && focusRequest.nonce !== appliedNonce) {
+    setAppliedNonce(focusRequest.nonce);
+    const key = focusRequest.month + "-" + focusRequest.year;
+    if (!openMonths.has(key)) setOpenMonths(new Set(openMonths).add(key));
+  }
+
+  useEffect(() => {
+    if (!focusRequest || focusRequest.nonce !== appliedNonce) return;
+    const monthKey = focusRequest.month + "-" + focusRequest.year;
+    const target = Array.from(
+      rootRef.current?.querySelectorAll<HTMLElement>("[data-ticket-key]") ?? [],
+    ).find(
+      (el) =>
+        el.dataset.ticketKey === focusRequest.ticketKey &&
+        el.dataset.monthKey === monthKey,
+    );
+    if (!target) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
+    target.focus({ preventScroll: true });
+  }, [focusRequest, appliedNonce]);
 
   if (items.length === 0 && phantomSessions.length === 0) {
     if (loading) {
@@ -153,7 +190,7 @@ export default function AgentTemuanTab({
   };
 
   return (
-    <Card className="border-border bg-surface py-0 ring-0" aria-busy={loading}>
+    <Card ref={rootRef} className="border-border bg-surface py-0 ring-0" aria-busy={loading}>
       <CardContent className="flex flex-col gap-4 p-4 sm:p-6">
         {loading ? (
           <p role="status" className="text-sm text-muted-foreground">
@@ -236,7 +273,14 @@ export default function AgentTemuanTab({
                   className="flex flex-col gap-6 px-2 pt-4 sm:px-4"
                 >
                   {Object.entries(tickets).map(([ticketKey, ticket], ticketIndex) => (
-                    <section key={ticketKey} className="flex flex-col gap-4">
+                    <section
+                      key={ticketKey}
+                      data-ticket-key={ticketKey}
+                      data-month-key={key}
+                      tabIndex={-1}
+                      aria-label={"Tiket " + ticket.label}
+                      className="flex scroll-mt-6 flex-col gap-4 rounded-lg outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-4 focus:ring-offset-surface"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <span className="w-6 shrink-0 text-sm font-semibold text-muted-foreground">
@@ -253,7 +297,7 @@ export default function AgentTemuanTab({
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {ticket.items.length} parameter
+                          {ticket.items.length} temuan
                         </span>
                       </div>
 
@@ -267,7 +311,7 @@ export default function AgentTemuanTab({
                                   {item.nilai}
                                 </span>
                                 <span className="text-xs font-semibold text-muted-foreground">
-                                  Poin
+                                  dari 3
                                 </span>
                               </div>
 

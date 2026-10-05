@@ -83,6 +83,7 @@ import type {
   TrendSeries,
 } from "./agentReportHtml";
 import { comparisonScopeLabel } from "./exportAgentReport";
+import { sidakScoreLabel, sidakScoreTone } from "./sidakScoreStatus";
 
 /**
  * Snapshot laporan yang dipakai PDF. Sengaja identik dengan snapshot HTML
@@ -742,18 +743,13 @@ function yearText(value: unknown, fallback = 0): string {
   return String(Math.trunc(safeNumber(value, fallback)));
 }
 
+/** Ambang status sama dengan halaman detail agent (`sidakScoreStatus`). */
 function scoreTone(score: number): Tone {
-  const safe = safeNumber(score);
-  if (safe >= 85) return "ok";
-  if (safe >= 70) return "warn";
-  return "bad";
+  return sidakScoreTone(safeNumber(score));
 }
 
 function scoreLabel(score: number): string {
-  const tone = scoreTone(score);
-  if (tone === "ok") return "Baik";
-  if (tone === "warn") return "Cukup";
-  return "Perlu Perhatian";
+  return sidakScoreLabel(safeNumber(score));
 }
 
 function deltaTone(value: number | null): Tone | null {

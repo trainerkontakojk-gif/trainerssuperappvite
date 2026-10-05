@@ -117,35 +117,6 @@ export function useAgentDetail(agentId: string) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
-  const [agentsInTeam, setAgentsInTeam] = useState<
-    { id: string; nama: string }[]
-  >([]);
-  const [selectedTeam, setSelectedTeam] = useState("");
-  const [loadingAgents, setLoadingAgents] = useState(false);
-
-  const isStaffRole =
-    role === "trainer" || role === "admin" || role === "leader";
-
-  // Fetch folders on mount
-  const [foldersLoaded, setFoldersLoaded] = useState(false);
-  useEffect(() => {
-    if (!isStaffRole) {
-      setFoldersLoaded(true);
-      return;
-    }
-    (
-      unwrapResponse(sidakClient.folders.$get()) as Promise<
-        { id: string; name: string }[]
-      > as any
-    )
-      .then((res: any) => {
-        setTeams(res ?? []);
-        setFoldersLoaded(true);
-      })
-      .catch(() => setFoldersLoaded(true));
-  }, [isStaffRole]);
-
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
     p.set("year", String(selectedYear));
@@ -177,33 +148,6 @@ export function useAgentDetail(agentId: string) {
     if (selectedService && (svcs as string[]).includes(selectedService)) return;
     setSelectedService(svcs[0]);
   }, [data, selectedService]);
-
-  // Init selectedTeam from peserta data once loaded
-  useEffect(() => {
-    if (!data || !foldersLoaded || isStaffRole === false) return;
-    const initTeam = data.peserta?.batch_name ?? data.peserta?.tim ?? "";
-    if (initTeam) setSelectedTeam(initTeam);
-  }, [data, foldersLoaded, isStaffRole]);
-
-  // Fetch agents when selectedTeam changes
-  useEffect(() => {
-    if (!selectedTeam || !isStaffRole) {
-      setAgentsInTeam([]);
-      return;
-    }
-    setLoadingAgents(true);
-    const encoded = encodeURIComponent(selectedTeam);
-    (
-      unwrapResponse(
-        sidakClient.folders[":folder"].agents.$get({
-          param: { folder: encoded },
-        }),
-      ) as Promise<any>
-    )
-      .then((res) => setAgentsInTeam(res ?? []))
-      .catch(() => setAgentsInTeam([]))
-      .finally(() => setLoadingAgents(false));
-  }, [selectedTeam, isStaffRole]);
 
   const monthlySummaries = useMemo(() => {
     if (!periodSummaries) return [];
@@ -776,10 +720,6 @@ export function useAgentDetail(agentId: string) {
     setTrendEndMonth(end);
   }, []);
 
-  const handleTeamChange = useCallback((team: string) => {
-    setSelectedTeam(team);
-  }, []);
-
   const handleAgentChange = useCallback((newAgentId: string) => {
     window.location.assign(`/sidak/agents/${newAgentId}`);
   }, []);
@@ -804,11 +744,6 @@ export function useAgentDetail(agentId: string) {
     masaKerja,
     availableServiceTypes,
     monthsFull: MONTHS_FULL,
-    teams,
-    agentsInTeam,
-    selectedTeam,
-    loadingAgents,
-    handleTeamChange,
     handleAgentChange,
     editingTemuan,
     editForm,
