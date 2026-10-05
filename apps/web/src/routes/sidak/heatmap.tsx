@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getErrorMessage } from "../../lib/api";
+import { SERVICE_LABELS } from "../../lib/scoring";
 import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import SidakHeatmapCalendar, {
   type HeatmapDay,
@@ -245,21 +246,23 @@ export default function SidakHeatmap() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-surface p-4">
               <p className="text-xs text-muted-foreground">
-                Total temuan ({heatmap.year})
+                Total temuan {heatmap.year}
               </p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
                 {heatmap.totalFindings}
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Tanggal belum diisi</p>
+              <p className="text-xs text-muted-foreground">Temuan tanpa tanggal</p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
                 {heatmap.missingDateFindingsAllPeriods}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Seluruh periode, layanan
-                {heatmap.serviceType ? ` ${heatmap.serviceType}` : " semua"}.
-                Tidak bisa diatribusikan ke tahun tertentu.
+                Dari semua tahun,{" "}
+                {heatmap.serviceType
+                  ? `layanan ${SERVICE_LABELS[heatmap.serviceType as ServiceType] ?? heatmap.serviceType}`
+                  : "semua layanan"}
+                ; tidak tampil di kalender karena tanggalnya kosong.
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
@@ -273,7 +276,7 @@ export default function SidakHeatmap() {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Pilih salah satu tanggal di kalender
+                  Pilih tanggal di kalender untuk melihat jumlah temuannya.
                 </p>
               )}
               {selected && (

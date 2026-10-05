@@ -162,8 +162,7 @@ export default function SidakHeatmapCalendar({
 
       {total === 0 && (
         <p className="text-sm text-muted-foreground">
-          Tidak ada temuan tercatat pada tahun {year} untuk tanggal yang
-          dipilih.
+          Belum ada temuan bertanggal di {year} untuk filter ini.
         </p>
       )}
 

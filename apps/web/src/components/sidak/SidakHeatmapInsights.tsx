@@ -55,6 +55,8 @@ export default function SidakHeatmapInsights({
     return null;
   }
 
+  const year = data.busiestDay.date.slice(0, 4);
+
   return (
     <section
       data-testid="heatmap-insights"
@@ -66,68 +68,76 @@ export default function SidakHeatmapInsights({
           Pola temuan ketidaksesuaian
         </h2>
         <p className="mt-1 max-w-[75ch] text-sm text-foreground">
-          Dalam periode ini, jumlah temuan harian tertinggi tercatat pada{" "}
+          Sepanjang {year} tercatat{" "}
+          <span className="font-semibold">
+            {INTEGER.format(data.total)} temuan
+          </span>{" "}
+          pada {INTEGER.format(data.activeDays)} hari. Puncaknya{" "}
           <span className="font-semibold">
             {formatInsightDateLong(data.busiestDay.date)}
-          </span>
-          , sebanyak{" "}
-          <span className="font-semibold">
-            {INTEGER.format(data.busiestDay.count)} temuan.
-          </span>
+          </span>{" "}
+          dengan {INTEGER.format(data.busiestDay.count)} temuan.
+          {data.busiestWeekday && data.busiestMonth ? (
+            <>
+              {" "}
+              Temuan paling banyak jatuh pada hari{" "}
+              {data.busiestWeekday.label} dan bulan {data.busiestMonth.label}.
+            </>
+          ) : null}
         </p>
         <p className="mt-1 max-w-[75ch] text-xs text-muted-foreground">
-          Angka-angka ini menunjukkan volume temuan, bukan tingkat
-          ketidaksesuaian. Saat membandingkan periode, pertimbangkan juga jumlah
-          layanan atau audit serta banyaknya hari pada tiap periode.
+          Angka ini jumlah temuan, bukan tingkat kesalahan, karena belum
+          dibandingkan dengan jumlah layanan atau audit. Hari atau bulan dengan
+          audit lebih banyak wajar mencatat temuan lebih banyak.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <InsightCard
           id="busiest-day"
-          label="Tanggal dengan temuan terbanyak"
+          label="Tanggal temuan terbanyak"
           value={formatInsightDateLong(data.busiestDay.date)}
           detail={`${INTEGER.format(data.busiestDay.count)} temuan`}
         />
         <InsightCard
           id="quietest-active-day"
-          label="Hari dengan temuan paling sedikit"
+          label="Tanggal temuan paling sedikit"
           value={formatInsightDateLong(data.quietestActiveDay.date)}
-          detail={`${INTEGER.format(data.quietestActiveDay.count)} temuan`}
+          detail={`${INTEGER.format(data.quietestActiveDay.count)} temuan · dihitung dari hari yang ada temuannya`}
         />
         {data.busiestWeekday && (
           <InsightCard
             id="busiest-weekday"
-            label="Hari pekan dengan total temuan tertinggi"
+            label="Hari terbanyak dalam sepekan"
             value={data.busiestWeekday.label}
-            detail={`${INTEGER.format(data.busiestWeekday.total)} temuan`}
+            detail={`${INTEGER.format(data.busiestWeekday.total)} temuan dari semua hari ${data.busiestWeekday.label}`}
           />
         )}
         {data.busiestMonth && (
           <InsightCard
             id="busiest-month"
-            label="Bulan dengan total temuan tertinggi"
+            label="Bulan terbanyak"
             value={data.busiestMonth.label}
             detail={`${INTEGER.format(data.busiestMonth.total)} temuan`}
           />
         )}
         <InsightCard
           id="active-days"
-          label="Hari yang memiliki temuan"
-          value={INTEGER.format(data.activeDays)}
+          label="Hari dengan temuan"
+          value={`${INTEGER.format(data.activeDays)} hari`}
           detail={`dari ${INTEGER.format(data.activeDays + data.emptyDays)} hari kalender`}
         />
         <InsightCard
           id="average"
-          label="Rata-rata pada hari dengan temuan"
-          value={DECIMAL.format(data.averagePerActiveDay ?? 0)}
-          detail="temuan per hari"
+          label="Rata-rata harian"
+          value={`${DECIMAL.format(data.averagePerActiveDay ?? 0)} temuan`}
+          detail="per hari yang ada temuannya"
         />
         {data.activeRange && (
           <InsightCard
             id="active-range"
-            label="Rentang tanggal temuan"
+            label="Rentang temuan"
             value={`${formatInsightDateShort(data.activeRange.from)} – ${formatInsightDateShort(data.activeRange.to)}`}
-            detail="tanggal pertama hingga terakhir dengan temuan"
+            detail="dari temuan pertama sampai terakhir"
           />
         )}
       </div>

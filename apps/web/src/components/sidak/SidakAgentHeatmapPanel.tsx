@@ -58,7 +58,7 @@ export default function SidakAgentHeatmapPanel({
       if (generation === generationRef.current) setData(res);
     } catch (e) {
       if (generation === generationRef.current) {
-        setError(getErrorMessage(e, "Gagal memuat heatmap agent."));
+        setError(getErrorMessage(e, "Heatmap belum dapat dimuat. Coba lagi beberapa saat."));
       }
     } finally {
       if (generation === generationRef.current) setLoading(false);
@@ -84,13 +84,14 @@ export default function SidakAgentHeatmapPanel({
             Heatmap temuan
           </h2>
           <p className="mt-1 max-w-[75ch] text-sm text-muted-foreground">
-            Sebaran volume temuan agent ini per tanggal layanan pada tahun dan
-            layanan yang dipilih. Volume temuan, bukan tingkat kesalahan.
+            Jumlah temuan agen ini per tanggal layanan, untuk tahun dan
+            layanan yang dipilih. Angka menunjukkan banyaknya temuan, bukan
+            tingkat kesalahan.
           </p>
         </div>
         <fieldset className="shrink-0">
-          <legend className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Satuan
+          <legend className="text-xs font-medium text-muted-foreground">
+            Hitung per
           </legend>
           <div className="mt-1.5 flex gap-2">
             {(
@@ -148,19 +149,20 @@ export default function SidakAgentHeatmapPanel({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-surface p-4">
               <p className="text-xs text-muted-foreground">
-                Total temuan ({data.year})
+                Total temuan {data.year}
               </p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
                 {data.totalFindings}
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Tanggal belum diisi</p>
+              <p className="text-xs text-muted-foreground">Temuan tanpa tanggal</p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
                 {data.missingDateFindingsAllPeriods}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Seluruh periode, tidak bisa diatribusikan ke tahun tertentu.
+                Dari semua tahun; tidak tampil di kalender karena tanggalnya
+                kosong.
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
@@ -179,7 +181,7 @@ export default function SidakAgentHeatmapPanel({
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Pilih salah satu tanggal di kalender
+                  Pilih tanggal di kalender untuk melihat jumlah temuannya.
                 </p>
               )}
             </div>
