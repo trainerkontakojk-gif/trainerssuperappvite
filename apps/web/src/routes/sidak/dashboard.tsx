@@ -2,29 +2,16 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
-import type {
-  DashboardData,
-  SidakBatchForecastSnapshot,
-  SidakForecastLookupResult,
-  SidakForecastLookupStatus,
-  SidakForecastSeries,
-} from "@trainers/types";
 import {
-  BarChart3,
-  RefreshCw,
-  Loader2,
-  AlertTriangle,
-  LineChart,
-  ArrowRight,
-  PieChart,
-  Search,
-  Target,
-  Sparkles,
-  ArrowUp,
-  Eye,
-  EyeOff,
-} from "lucide-react";
-import { ForecastActionButton } from "../../components/sidak/ForecastActionButton";
+  VALID_SERVICE_TYPES,
+  type DashboardData,
+  type ServiceType,
+  type SidakBatchForecastSnapshot,
+  type SidakForecastLookupResult,
+  type SidakForecastLookupStatus,
+  type SidakForecastSeries,
+} from "@trainers/types";
+import { RefreshCw, Loader2, AlertTriangle, ArrowUp } from "lucide-react";
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
 import { SERVICE_LABELS, DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
@@ -35,17 +22,19 @@ import {
 } from "../../lib/sidak-folder-options";
 import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
-import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
-import ParetoChart from "../../components/sidak/ParetoChart";
-import FatalDonutChart from "../../components/sidak/FatalDonutChart";
 import TopAgentsTable from "../../components/sidak/TopAgentsTable";
 import DashboardFilters from "../../components/sidak/DashboardFilters";
+import SidakConditionSummary from "../../components/sidak/SidakConditionSummary";
+import SidakDashboardHeatmap from "../../components/sidak/SidakDashboardHeatmap";
+import SidakDashboardPanel from "../../components/sidak/SidakDashboardPanel";
+import SidakParameterRanking from "../../components/sidak/SidakParameterRanking";
+import { MONTH_SHORT } from "../../components/sidak/heatmap-insights";
 
 function DashboardSkeleton() {
   return (
     <div
       data-testid="sidak-dashboard-skeleton"
-      className="space-y-6 animate-pulse"
+      className="space-y-6 motion-safe:animate-pulse"
     >
       <div className="rounded-2xl border border-border bg-surface p-3">
         <div className="h-[120px] rounded-xl bg-muted/40" />
@@ -55,7 +44,7 @@ function DashboardSkeleton() {
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
-            className="min-h-[286px] rounded-2xl border border-border bg-surface p-6"
+            className="min-h-[170px] rounded-xl border border-border bg-surface p-4"
           >
             <div className="flex items-start justify-between">
               <div className="h-12 w-12 rounded-full bg-muted/60" />
@@ -87,6 +76,7 @@ function DashboardSkeleton() {
 }
 
 export default function SidakDashboardPage() {
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const maxVisibleParameters = 2;
   const [selectedService, setSelectedService] = useState("call");
   const [selectedFolder, setSelectedFolder] = useState("ALL");
@@ -116,7 +106,7 @@ export default function SidakDashboardPage() {
     return p.toString();
   }, [selectedService, selectedFolder, selectedYear, startMonth, endMonth]);
 
-  const { data, loading, refetch } = useApi<DashboardData>(
+  const { data, loading, error, refetch } = useApi<DashboardData>(
     `/sidak/dashboard?${queryParams}`,
   );
 
@@ -298,6 +288,12 @@ export default function SidakDashboardPage() {
     [data?.availableServices],
   );
   const availableYears = data?.availableYears ?? [new Date().getFullYear()];
+  const heatmapServiceType = VALID_SERVICE_TYPES.find(
+    (service): service is ServiceType => service === selectedService,
+  );
+  const heatmapServiceLabel = heatmapServiceType
+    ? SERVICE_LABELS[heatmapServiceType] || heatmapServiceType
+    : "Semua layanan";
 
   // Normalize invalid selections
   useEffect(() => {
@@ -400,8 +396,6 @@ export default function SidakDashboardPage() {
       id: "total-defects",
       label: "Total Temuan QA",
       value: summary?.totalDefects ?? 0,
-      icon: Search,
-      color: "orange" as const,
       desc: "Kumulatif temuan parameter",
       deltaUnit: "relative-percent" as const,
       lowerIsBetter: true,
@@ -410,8 +404,6 @@ export default function SidakDashboardPage() {
       id: "avg-defects",
       label: "Rata-rata Temuan per Agen",
       value: (summary?.avgDefectsPerAudit ?? 0).toFixed(1),
-      icon: Target,
-      color: "red" as const,
       desc: "Rasio temuan / sesi audit",
       deltaUnit: "relative-percent" as const,
       lowerIsBetter: true,
@@ -420,8 +412,6 @@ export default function SidakDashboardPage() {
       id: "avg-score",
       label: "Rata-rata Skor",
       value: `${(summary?.avgAgentScore ?? 0).toFixed(1)}%`,
-      icon: BarChart3,
-      color: "blue" as const,
       desc: "Kualitas performa rata-rata",
       deltaUnit: "percentage-point" as const,
       lowerIsBetter: false,
@@ -430,8 +420,6 @@ export default function SidakDashboardPage() {
       id: "compliance",
       label: complianceLabel,
       value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`,
-      icon: Sparkles,
-      color: "emerald" as const,
       desc:
         startMonth !== endMonth
           ? `${Math.round(summary?.complianceCount ?? 0)} agen dengan skor ≥ 95 (rata-rata per bulan)`
@@ -441,11 +429,62 @@ export default function SidakDashboardPage() {
     },
   ];
 
+  const serviceLabel =
+    SERVICE_LABELS[selectedService as keyof typeof SERVICE_LABELS] ||
+    selectedService;
+  const folderLabel =
+    selectedFolder === "ALL"
+      ? "Semua tim"
+      : (folders.find((folder) => folder.id === selectedFolder)?.name ??
+        "Tim terpilih");
+  const monthRangeLabel =
+    startMonth && endMonth
+      ? startMonth === endMonth
+        ? MONTH_SHORT[startMonth - 1]
+        : `${MONTH_SHORT[startMonth - 1]}–${MONTH_SHORT[endMonth - 1]}`
+      : "Sepanjang";
+  const scopeLine = `${serviceLabel} · ${folderLabel} · ${monthRangeLabel} ${selectedYear}`;
+  const chipClass = (active: boolean, disabled: boolean) =>
+    `inline-flex min-h-[44px] max-w-full items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-8 ${
+      active
+        ? "border-foreground bg-foreground text-background"
+        : disabled
+          ? "cursor-not-allowed border-border text-muted-foreground opacity-50"
+          : "border-border text-fg2 hover:bg-muted hover:text-foreground"
+    }`;
+
   return (
-    <div className="bg-background min-h-full overflow-x-hidden">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 w-full space-y-6">
+    <div className="bg-background min-h-full">
+      <div className="@container/dashboard mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-outfit text-[1.75rem] leading-tight font-bold tracking-[-0.03em] text-balance text-foreground focus:outline-none"
+            >
+              Dashboard SIDAK
+            </h1>
+            <p className="mt-1 text-sm text-fg2">{scopeLine}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            disabled={loading}
+            aria-busy={loading}
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={`size-4 ${loading ? "motion-safe:animate-spin" : ""}`}
+            />
+            {loading ? "Memperbarui data…" : "Perbarui data"}
+          </button>
+        </header>
+
         {/* Filter Bar */}
         <DashboardFilters
+          showHeader={false}
           selectedService={selectedService}
           onServiceChange={(svc) => {
             setSelectedService(svc);
@@ -474,6 +513,30 @@ export default function SidakDashboardPage() {
           leaderLockedService={leaderLockedService}
           availableServices={availableServices}
         />
+
+        {error && data && (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Pembaruan data gagal.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Data terakhir yang berhasil dimuat tetap ditampilkan.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              disabled={loading}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Coba lagi
+            </button>
+          </div>
+        )}
 
         {/* Loading (initial) */}
         {loading && !data && <DashboardSkeleton />}
@@ -521,144 +584,70 @@ export default function SidakDashboardPage() {
         )}
 
         {data && hasSummary && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Loading overlay during re-fetch */}
-            {loading && data && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                <span className="ml-2 text-sm text-muted-foreground">
-                  Memperbarui data...
-                </span>
-              </div>
+          <div className="space-y-5">
+            {loading && (
+              <p
+                role="status"
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2
+                  aria-hidden="true"
+                  className="size-4 text-foreground motion-safe:animate-spin"
+                />
+                Memperbarui data…
+              </p>
             )}
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {KPI_CARDS.map((kpi) => (
-                <KpiCard
-                  key={kpi.id}
-                  label={kpi.label}
-                  value={kpi.value}
-                  icon={kpi.icon}
-                  color={kpi.color}
-                  delta={buildDelta(kpi.id, kpi.deltaUnit, kpi.lowerIsBetter)}
-                  desc={kpi.desc}
-                  sparklineData={sparklines[kpi.id]}
-                />
-              ))}
-            </div>
-
-            {/* Top Agents & Severity Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-              {/* Top Agents (2/3 span) */}
-              <div className="lg:col-span-2">
-                <div className="bg-surface p-4 rounded-2xl border border-border h-full">
-                  <TopAgentsTable
-                    agents={data.topAgents.slice(0, 5)}
-                    serviceType={selectedService}
-                    selectedYear={selectedYear}
+            <section
+              aria-labelledby="sidak-kpi-title"
+              className="rounded-xl border border-border bg-surface-elevated"
+            >
+              <h2 id="sidak-kpi-title" className="sr-only">
+                Indikator utama
+              </h2>
+              <div className="grid grid-cols-2 @[1040px]/dashboard:grid-cols-4 [&>*]:border-border [&>*:nth-child(even)]:border-l [&>*:nth-child(n+3)]:border-t @[1040px]/dashboard:[&>*:nth-child(n+2)]:border-l @[1040px]/dashboard:[&>*:nth-child(n+3)]:border-t-0">
+                {KPI_CARDS.map((kpi) => (
+                  <KpiCard
+                    key={kpi.id}
+                    label={kpi.label}
+                    value={kpi.value}
+                    delta={buildDelta(kpi.id, kpi.deltaUnit, kpi.lowerIsBetter)}
+                    desc={kpi.desc}
+                    sparklineData={sparklines[kpi.id]}
                   />
-                </div>
+                ))}
               </div>
-              {/* Severity Donut (1/3 span) */}
-              <div className="bg-surface p-4 rounded-2xl border border-border">
-                <div className="flex items-center gap-3 mb-6">
-                  <PieChart className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-outfit text-base font-bold text-foreground">
-                      Komposisi Severity
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Parameter Kritikal vs Non-Kritikal
-                    </p>
-                  </div>
-                </div>
-                {data.donutData && data.donutData.total > 0 ? (
-                  <FatalDonutChart
-                    critical={data.donutData.critical}
-                    nonCritical={data.donutData.nonCritical}
-                    total={data.donutData.total}
-                  />
-                ) : (
-                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 grayscale opacity-60">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                      <PieChart className="w-6 h-6 text-muted-foreground/40" />
-                    </div>
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                      Belum Ada Data
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+            </section>
 
-            {/* Analysis Workspace (Full Width Stack) */}
-            <div className="space-y-6 lg:space-y-8">
-              {/* Trend Section */}
-              <div className="bg-surface p-4 rounded-2xl border border-border">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                  <div className="flex items-center gap-3">
-                    <LineChart className="w-5 h-5 shrink-0 text-muted-foreground" />
-                    <div>
-                      <h2 className="font-outfit text-lg font-bold">
-                        Tren Kualitas, Parameter & Forecast
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Fluktuasi temuan berdasarkan parameter QA
-                      </p>
-                    </div>
-                  </div>
+            <SidakConditionSummary
+              data={data}
+              forecast={{
+                status: forecastStatus,
+                loading: forecastLoading,
+                summary: totalForecastSummary ?? null,
+                horizonMonths:
+                  forecastResult?.series.total.forecast.length ?? 3,
+                hasEnoughPeriods: data.paramTrend.labels.length >= 2,
+                onUpdate: handleUpdateForecast,
+              }}
+            />
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {hasForecastPrediction && (
-                      <button
-                        type="button"
-                        aria-pressed={showForecastPrediction}
-                        aria-label={
-                          showForecastPrediction
-                            ? "Sembunyikan Prediksi"
-                            : "Tampilkan Prediksi"
-                        }
-                        onClick={() =>
-                          setShowForecastPrediction((prev) => !prev)
-                        }
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        {showForecastPrediction ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                        {showForecastPrediction
-                          ? "Sembunyikan Prediksi"
-                          : "Tampilkan Prediksi"}
-                      </button>
-                    )}
-                    <ForecastActionButton
-                      status={forecastStatus}
-                      loading={forecastLoading}
-                      disabled={
-                        forecastLoading ||
-                        !data ||
-                        data.paramTrend.labels.length < 2
-                      }
-                      onClick={handleUpdateForecast}
-                    />
-                  </div>
-                </div>
-
+            <div className="grid items-stretch gap-5 @[1040px]/dashboard:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]">
+              <SidakDashboardPanel
+                id="sidak-trend-title"
+                title="Tren temuan"
+                description="Jumlah temuan per periode, maksimal dua seri sekaligus"
+                busy={forecastLoading}
+              >
                 {!data.paramTrend || !data.paramTrend.labels?.length ? (
-                  <div className="h-[400px] flex flex-col items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                    <p className="text-sm text-muted-foreground font-medium">
+                  <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border">
+                    <p className="text-sm text-muted-foreground">
                       Data tren tidak tersedia untuk filter ini
                     </p>
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-center gap-1.5 pb-2">
-                      <span className="text-[11px] font-semibold text-muted-foreground mr-2 uppercase tracking-wide">
-                        Parameter:
-                      </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         aria-pressed={showTotalTrend}
@@ -667,23 +656,17 @@ export default function SidakDashboardPage() {
                           if (!canShowTotalTrend) return;
                           setShowTotalTrend((prev) => !prev);
                         }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
-                          showTotalTrend
-                            ? "bg-foreground text-background border-foreground scale-105 z-10"
-                            : !canShowTotalTrend
-                              ? "bg-transparent border-border/40 text-muted-foreground/50 cursor-not-allowed opacity-60"
-                              : "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
-                        }`}
+                        className={chipClass(
+                          showTotalTrend,
+                          !canShowTotalTrend,
+                        )}
                         title={
                           !canShowTotalTrend
                             ? "Maksimal 2 data tampil. Nonaktifkan salah satu parameter terlebih dahulu."
                             : undefined
                         }
                       >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${showTotalTrend ? "bg-background" : "bg-muted-foreground/30"}`}
-                        />
-                        <span>Total Temuan</span>
+                        Total Temuan
                       </button>
                       {data.paramTrend.datasets
                         .filter((ds) => !ds.isTotal)
@@ -694,6 +677,8 @@ export default function SidakDashboardPage() {
                           return (
                             <button
                               key={ds.label}
+                              type="button"
+                              aria-pressed={!isHidden}
                               disabled={disableActivation}
                               onClick={() => {
                                 if (disableActivation) return;
@@ -706,29 +691,24 @@ export default function SidakDashboardPage() {
                                   return next;
                                 });
                               }}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
-                                isHidden
-                                  ? disableActivation
-                                    ? "bg-transparent border-border/40 text-muted-foreground/50 cursor-not-allowed opacity-60"
-                                    : "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
-                                  : "bg-foreground text-background border-foreground scale-105 z-10"
-                              }`}
+                              className={chipClass(
+                                !isHidden,
+                                disableActivation,
+                              )}
                               title={
                                 disableActivation
                                   ? "Maksimal 2 parameter aktif. Nonaktifkan salah satu terlebih dahulu."
                                   : undefined
                               }
                             >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : "bg-background"}`}
-                              />
-                              <span className="max-w-[120px] truncate">
+                              <span className="min-w-0 text-left whitespace-normal">
                                 {ds.label}
                               </span>
                             </button>
                           );
                         })}
                       <button
+                        type="button"
                         onClick={() => {
                           if (visibleSeriesCount > 0) {
                             setHiddenParams(defaultHiddenParams);
@@ -753,22 +733,38 @@ export default function SidakDashboardPage() {
                             ),
                           );
                         }}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
+                        className="inline-flex min-h-[44px] items-center rounded-md px-2 text-xs font-medium text-fg2 underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
                       >
                         {visibleSeriesCount > 0
                           ? "Sembunyikan Semua"
                           : totalParameterCount > maxVisibleParameters
                             ? "Tampilkan 2 Parameter"
-                            : "Tampilkan Semua"}{" "}
-                        <ArrowRight
-                          className={`w-3 h-3 transition-transform duration-200 ${visibleSeriesCount > 0 ? "rotate-90" : ""}`}
-                        />
+                            : "Tampilkan Semua"}
                       </button>
+                      {hasForecastPrediction && (
+                        <button
+                          type="button"
+                          aria-pressed={showForecastPrediction}
+                          onClick={() =>
+                            setShowForecastPrediction((prev) => !prev)
+                          }
+                          className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-xs font-medium text-fg2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`w-5 border-t-2 border-dashed ${showForecastPrediction ? "border-foreground" : "border-fg3/50"}`}
+                          />
+                          Garis proyeksi
+                        </button>
+                      )}
                     </div>
-                    <div className="h-[360px] w-full mt-2 relative">
+                    <div className="relative mt-4 h-[300px] w-full">
                       {forecastLoading && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/50 backdrop-blur-[1px] rounded-xl">
-                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-surface-elevated/80">
+                          <Loader2
+                            aria-hidden="true"
+                            className="size-6 text-foreground motion-safe:animate-spin"
+                          />
                         </div>
                       )}
                       <ParamTrendChart
@@ -781,66 +777,50 @@ export default function SidakDashboardPage() {
                         forecastResults={selectedForecastSeriesList}
                       />
                     </div>
-
-                    {showForecastPrediction &&
-                      forecastResult &&
-                      totalForecastSummary && (
-                        <ForecastInsightPanel
-                          forecastResult={forecastResult}
-                          summary={totalForecastSummary}
-                          horizonMonths={
-                            forecastResult.series.total.forecast.length
-                          }
-                        />
-                      )}
                   </>
                 )}
-              </div>
+              </SidakDashboardPanel>
+              <TopAgentsTable
+                agents={data.topAgents}
+                serviceType={selectedService}
+                selectedYear={selectedYear}
+              />
+            </div>
 
-              {/* Pareto */}
-              <div className="bg-surface p-4 rounded-2xl border border-border">
-                <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="w-5 h-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <h2 className="font-outfit text-lg font-bold text-foreground">
-                      Root Cause Analysis
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Prinsip Pareto: 80% temuan biasanya berasal dari 20%
-                      kategori utama
-                    </p>
-                  </div>
-                </div>
-                {paretoViewModel.chartData.length > 0 ? (
-                  <ParetoChart
-                    data={paretoViewModel.chartData}
-                    insight={paretoViewModel.insight}
-                    serviceLabel={
-                      SERVICE_LABELS[
-                        selectedService as keyof typeof SERVICE_LABELS
-                      ] || selectedService
-                    }
-                  />
-                ) : (
-                  <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                    <p className="text-sm text-muted-foreground font-medium">
-                      Data kategori temuan belum tersedia
-                    </p>
-                  </div>
-                )}
-              </div>
+            <div className="grid items-stretch gap-5 @[880px]/dashboard:grid-cols-2">
+              <SidakParameterRanking
+                viewModel={paretoViewModel}
+                serviceLabel={serviceLabel}
+              />
+              <SidakDashboardHeatmap
+                year={selectedYear}
+                serviceType={heatmapServiceType}
+                serviceLabel={heatmapServiceLabel}
+              />
             </div>
           </div>
         )}
+        <button
+          type="button"
+          aria-label="Kembali ke atas"
+          onClick={(event) => {
+            const reducedMotion = window.matchMedia(
+              "(prefers-reduced-motion: reduce)",
+            ).matches;
+            headingRef.current?.focus({ preventScroll: true });
+            event.currentTarget
+              .closest<HTMLElement>('[aria-label="Konten halaman"]')
+              ?.scrollTo({
+                top: 0,
+                behavior: reducedMotion ? "auto" : "smooth",
+              });
+          }}
+          className="ml-auto flex min-h-[44px] items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-fg2 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <ArrowUp aria-hidden="true" className="size-4" />
+          Kembali ke atas
+        </button>
       </div>
-
-      {/* Mobile FAB */}
-      <button
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-6 right-6 z-[100] md:hidden w-14 h-14 rounded-2xl bg-foreground text-background flex items-center justify-center hover:opacity-90 transition-all"
-      >
-        <ArrowUp className="w-6 h-6" />
-      </button>
     </div>
   );
 }
