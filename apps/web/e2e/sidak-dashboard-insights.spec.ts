@@ -136,8 +136,9 @@ const HEATMAP_DATA = {
   days: [
     { date: `${YEAR}-05-02`, count: 8 },
     { date: `${YEAR}-05-03`, count: 4 },
+    { date: `${YEAR}-05-06`, count: 3 },
   ],
-  totalFindings: 12,
+  totalFindings: 15,
   missingDateFindingsAllPeriods: 2,
 };
 
@@ -255,7 +256,7 @@ const PANEL_TITLES = [
   "Tren temuan",
   "Agen dengan temuan terbanyak",
   "Parameter teratas",
-  "Pola temuan tahunan",
+  "Pola temuan mingguan",
 ];
 const MONTH_SHORT = [
   "Jan",
@@ -433,7 +434,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
           if (density === "dense" && width >= 1024) {
             // The yearly chart grows with its panel instead of leaving a gap.
             const heatmapGap = await page
-              .getByRole("region", { name: "Pola temuan tahunan" })
+              .getByRole("region", { name: "Pola temuan mingguan" })
               .evaluate((panel) => {
                 const stats = panel.querySelector(
                   "[aria-label='Statistik pola harian']",
@@ -687,34 +688,39 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     expect(heatmapRequest).toContain("service_type=call");
     expect(heatmapRequest).not.toContain("folder_ids");
     expect(heatmapRequest).not.toContain("startMonth");
-    const heatmap = page.getByRole("region", { name: "Pola temuan tahunan" });
+    const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
     await expect(
       heatmap.getByText(`Puncak: 2 Mei ${YEAR} · 8 temuan`),
     ).toBeVisible();
     await expect(
-      heatmap.getByText(/tahun penuh.*filter tim\/bulan.*akses akun/i),
+      heatmap.getByText(
+        /tahun penuh.*volume temuan, bukan rate.*filter tim\/bulan.*akses akun/i,
+      ),
     ).toBeVisible();
+    // Weekday distribution, not a second monthly chart next to Tren temuan.
     await expect(
-      heatmap.getByRole("img", { name: /Mei: 12 temuan/ }),
+      heatmap.getByRole("img", {
+        name: `Temuan per hari dalam minggu ${YEAR}: Senin: 0 temuan, Selasa: 0 temuan, Rabu: 3 temuan, Kamis: 0 temuan, Jumat: 0 temuan, Sabtu: 8 temuan, Minggu: 4 temuan`,
+      }),
     ).toBeVisible();
+    await expect(heatmap.getByRole("img", { name: /Mei:/ })).toHaveCount(0);
     const heatmapStats = heatmap.getByRole("list", {
       name: "Statistik pola harian",
     });
     await expect(heatmapStats.getByText("Hari dengan temuan")).toBeVisible();
     await expect(
-      heatmapStats.getByText("2 hari", { exact: true }),
+      heatmapStats.getByText("3 hari", { exact: true }),
     ).toBeVisible();
     await expect(
       heatmapStats.getByText("Rata-rata per hari aktif"),
     ).toBeVisible();
     await expect(
-      heatmapStats.getByText("6 temuan", { exact: true }),
+      heatmapStats.getByText("5 temuan", { exact: true }),
     ).toBeVisible();
+    await expect(heatmapStats.getByText("Porsi akhir pekan")).toBeVisible();
+    await expect(heatmapStats.getByText("80%", { exact: true })).toBeVisible();
     await expect(
-      heatmapStats.getByText("Hari tersibuk (volume)"),
-    ).toBeVisible();
-    await expect(
-      heatmapStats.getByText("Sabtu · 8 temuan", { exact: true }),
+      heatmapStats.getByText("12 dari 15 temuan", { exact: true }),
     ).toBeVisible();
     await expect(heatmap.locator("details")).toHaveCount(0);
     await expect(
@@ -974,7 +980,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/sidak/heatmap?mode=agent"]);
 
-    const heatmap = page.getByRole("region", { name: "Pola temuan tahunan" });
+    const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
     await expect(heatmap.getByRole("alert")).toContainText(
       "Heatmap tidak dapat dimuat.",
     );
@@ -1014,7 +1020,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/sidak/heatmap?mode=agent"]);
 
-    const heatmap = page.getByRole("region", { name: "Pola temuan tahunan" });
+    const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
     await expect(
       heatmap.getByText(`Belum ada temuan pada heatmap tahun ${YEAR}.`),
     ).toBeVisible();

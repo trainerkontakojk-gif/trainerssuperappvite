@@ -4,7 +4,7 @@ import type { ServiceType, SidakHeatmapResponse } from "@trainers/types";
 import { getErrorMessage } from "../../lib/api";
 import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import {
-  MONTH_SHORT,
+  WEEKDAY_FULL,
   buildHeatmapInsights,
   formatInsightDateLong,
 } from "./heatmap-insights";
@@ -18,6 +18,11 @@ interface Props {
 
 const INTEGER = new Intl.NumberFormat("id-ID");
 const DECIMAL = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
+const PERCENT = new Intl.NumberFormat("id-ID", {
+  style: "percent",
+  maximumFractionDigits: 0,
+});
+const WEEKDAY_SHORT = WEEKDAY_FULL.map((label) => label.slice(0, 3));
 
 export default function SidakDashboardHeatmap({
   year,
@@ -62,20 +67,14 @@ export default function SidakDashboardHeatmap({
     () => (data ? buildHeatmapInsights(data.days) : null),
     [data],
   );
-  const monthTotals = useMemo(() => {
-    const totals = new Array<number>(12).fill(0);
-    for (const day of data?.days ?? []) {
-      const month = Number(day.date.slice(5, 7));
-      if (month >= 1 && month <= 12) totals[month - 1] += day.count;
-    }
-    return totals;
-  }, [data]);
-  const maxMonth = Math.max(...monthTotals);
+  const weekdayTotals = insights?.weekdayTotals ?? new Array<number>(7).fill(0);
+  const maxWeekday = Math.max(...weekdayTotals);
+  const weekendTotal = weekdayTotals[5]! + weekdayTotals[6]!;
 
   return (
     <SidakDashboardPanel
       id="sidak-dashboard-heatmap-title"
-      title="Pola temuan tahunan"
+      title="Pola temuan mingguan"
       description={`${serviceLabel} · ${year} · per tanggal layanan`}
       busy={loading}
       action={
@@ -88,7 +87,7 @@ export default function SidakDashboardHeatmap({
         <div aria-live="polite" data-testid="dashboard-heatmap-loading">
           <p className="sr-only">Memuat pola harian…</p>
           <div className="flex h-28 items-end gap-1.5 motion-safe:animate-pulse">
-            {monthTotals.map((_, index) => (
+            {weekdayTotals.map((_, index) => (
               <div
                 key={index}
                 className="flex-1 rounded-t bg-muted"
@@ -130,37 +129,55 @@ export default function SidakDashboardHeatmap({
           </div>
           <div
             role="img"
-            aria-label={`Temuan per bulan ${year}: ${monthTotals
-              .map((total, index) => `${MONTH_SHORT[index]}: ${total} temuan`)
+            aria-label={`Temuan per hari dalam minggu ${year}: ${weekdayTotals
+              .map((total, index) => `${WEEKDAY_FULL[index]}: ${total} temuan`)
               .join(", ")}`}
             className="mt-5 flex min-h-0 flex-1 flex-col"
           >
-            <div className="relative min-h-28 flex-1 border-b border-border">
-              <div className="absolute inset-0 flex items-end gap-1.5">
-                {monthTotals.map((total, index) => (
-                  <div
-                    key={MONTH_SHORT[index]}
-                    title={`${MONTH_SHORT[index]} ${year}: ${INTEGER.format(total)} temuan`}
-                    className={`flex-1 rounded-t-[3px] ${
-                      total === maxMonth ? "bg-foreground" : "bg-foreground/25"
-                    }`}
-                    style={{
-                      height:
-                        total > 0
-                          ? `${Math.max(4, (total / maxMonth) * 100)}%`
-                          : "2px",
-                    }}
-                  />
-                ))}
+            <div className="relative min-h-32 flex-1 border-b border-border">
+              <div className="absolute inset-0 flex items-end gap-2 pt-5">
+                {weekdayTotals.map((total, index) => {
+                  const isPeak = total === maxWeekday;
+                  return (
+                    <div
+                      key={WEEKDAY_FULL[index]}
+                      title={`${WEEKDAY_FULL[index]}: ${INTEGER.format(total)} temuan`}
+                      className="flex h-full flex-1 items-end"
+                    >
+                      <div
+                        className={`relative w-full rounded-t-[3px] ${
+                          isPeak ? "bg-foreground" : "bg-foreground/45"
+                        }`}
+                        style={{
+                          height:
+                            total > 0
+                              ? `${Math.max(4, (total / maxWeekday) * 100)}%`
+                              : "2px",
+                        }}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`absolute inset-x-0 bottom-full mb-1 text-center text-[11px] leading-4 tabular-nums ${
+                            isPeak
+                              ? "font-semibold text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {INTEGER.format(total)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="mt-1.5 flex gap-1.5 text-center text-[11px] text-muted-foreground">
-              {MONTH_SHORT.map((label) => (
+            <div
+              aria-hidden="true"
+              className="mt-1.5 flex gap-2 text-center text-[11px] text-muted-foreground"
+            >
+              {WEEKDAY_SHORT.map((label) => (
                 <span key={label} className="flex-1">
-                  <span className="@[480px]/dashboard:hidden">{label[0]}</span>
-                  <span className="hidden @[480px]/dashboard:inline">
-                    {label}
-                  </span>
+                  {label}
                 </span>
               ))}
             </div>
@@ -169,22 +186,23 @@ export default function SidakDashboardHeatmap({
             aria-label="Statistik pola harian"
             className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4"
           >
-            {[
-              {
-                label: "Hari dengan temuan",
-                value: `${INTEGER.format(insights.activeDays)} hari`,
-              },
-              {
-                label: "Rata-rata per hari aktif",
-                value: `${DECIMAL.format(insights.averagePerActiveDay ?? 0)} temuan`,
-              },
-              {
-                label: "Hari tersibuk (volume)",
-                value: insights.busiestWeekday
-                  ? `${insights.busiestWeekday.label} · ${INTEGER.format(insights.busiestWeekday.total)} temuan`
-                  : "—",
-              },
-            ].map((stat) => (
+            {(
+              [
+                {
+                  label: "Hari dengan temuan",
+                  value: `${INTEGER.format(insights.activeDays)} hari`,
+                },
+                {
+                  label: "Rata-rata per hari aktif",
+                  value: `${DECIMAL.format(insights.averagePerActiveDay ?? 0)} temuan`,
+                },
+                {
+                  label: "Porsi akhir pekan",
+                  value: PERCENT.format(weekendTotal / insights.total),
+                  detail: `${INTEGER.format(weekendTotal)} dari ${INTEGER.format(insights.total)} temuan`,
+                },
+              ] as { label: string; value: string; detail?: string }[]
+            ).map((stat) => (
               <li key={stat.label} className="min-w-0">
                 <p className="text-xs leading-4 text-muted-foreground">
                   {stat.label}
@@ -192,6 +210,11 @@ export default function SidakDashboardHeatmap({
                 <p className="mt-1 text-sm font-semibold text-foreground tabular-nums">
                   {stat.value}
                 </p>
+                {stat.detail && (
+                  <p className="mt-0.5 text-xs leading-4 text-muted-foreground tabular-nums">
+                    {stat.detail}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
@@ -202,8 +225,8 @@ export default function SidakDashboardHeatmap({
         </p>
       )}
       <p className="mt-auto pt-4 text-xs leading-5 text-muted-foreground">
-        Tahun penuh · filter tim/bulan tidak berlaku · cakupan akses akun tetap
-        berlaku.
+        Tahun penuh · volume temuan, bukan rate · filter tim/bulan tidak berlaku
+        · cakupan akses akun tetap berlaku.
       </p>
     </SidakDashboardPanel>
   );

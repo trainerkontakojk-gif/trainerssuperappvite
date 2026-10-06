@@ -9,7 +9,7 @@ import type { HeatmapDay } from "./SidakHeatmapCalendar";
  * definisinya tidak bercabang.
  */
 
-const WEEKDAY_FULL = [
+export const WEEKDAY_FULL = [
   "Senin",
   "Selasa",
   "Rabu",
@@ -79,6 +79,8 @@ export interface HeatmapInsights {
   busiestDay: { date: string; count: number } | null;
   quietestActiveDay: { date: string; count: number } | null;
   busiestWeekday: { label: string; total: number } | null;
+  /** Volume per hari dalam minggu, Senin = 0 … Minggu = 6. */
+  weekdayTotals: number[];
   busiestMonth: { label: string; total: number } | null;
   activeRange: { from: string; to: string } | null;
 }
@@ -99,6 +101,7 @@ export function buildHeatmapInsights(
       busiestDay: null,
       quietestActiveDay: null,
       busiestWeekday: null,
+      weekdayTotals: new Array<number>(7).fill(0),
       busiestMonth: null,
       activeRange: null,
     };
@@ -136,6 +139,7 @@ export function buildHeatmapInsights(
       label: WEEKDAY_FULL[busiestWeekdayIndex]!,
       total: weekdayTotals[busiestWeekdayIndex]!,
     },
+    weekdayTotals,
     busiestMonth: {
       label: MONTH_FULL[busiestMonthIndex]!,
       total: monthTotals[busiestMonthIndex]!,
