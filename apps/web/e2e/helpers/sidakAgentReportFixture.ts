@@ -191,6 +191,17 @@ const LONG_TEXT_SENTENCES: readonly string[] = [
 ];
 
 /**
+ * Catatan temuan yang diketik dengan Enter (baris baru `\r\n` dan `\n`, plus
+ * satu tab). Ini bentuk data nyata dari form input; pemisah baris adalah spasi
+ * putih, bukan karakter tak-tercetak, jadi tidak boleh muncul sebagai penanda
+ * `[U+000A]`/`[U+000D]`/`[U+0009]` di laporan.
+ */
+const MULTILINE_FINDING_LINES: readonly string[] = [
+  "Agen menutup sesi sebelum konfirmasi nominal.",
+  "Pelanggan harus menelepon ulang.\n-\tNominal akhir tidak disebut.",
+];
+
+/**
  * Teks temuan panjang. Diulang beberapa kali secara sengaja: supaya satu blok
  * temuan benar-benar harus MELEWATI batas halaman, bukan hanya "/ada teks
  * panjang". Head dan tail-nya dipisahkan oleh banyak baris, jadi head di satu
@@ -752,8 +763,7 @@ const longTextAgentFixture: AgentDetailData = {
       service_type: "call",
       no_tiket: LONG_TEXT_TICKET_2,
       nilai: 2,
-      ketidaksesuaian:
-        "Agen menutup sesi sebelum mengonfirmasi nominal akhir kepada pelanggan.",
+      ketidaksesuaian: MULTILINE_FINDING_LINES.join("\r\n"),
       sebaiknya:
         "Konfirmasi nominal akhir dan waktu pencairan secara eksplisit.",
       tahun: YEAR,
@@ -1774,9 +1784,9 @@ const REPORT_FACTS: readonly string[] = [
   AGENT_NAME,
   "Tim Call",
   "Batch 7",
-  `Tahun ${YEAR} • Layanan CALL`,
-  "01/2026",
-  "02/2026",
+  `Layanan Call • Tahun ${YEAR}`,
+  "Januari 2026",
+  "Februari 2026",
   REAL_TICKET,
   INDICATOR_NAME,
   "Akurasi jawaban",
@@ -2046,6 +2056,7 @@ export {
   TIE_PEER_A,
   TIE_PEER_B,
   LONG_TEXT_HEAD,
+  MULTILINE_FINDING_LINES,
   LONG_TEXT_TAIL,
   LONG_TEXT_FINDING,
   HOSTILE_UNICODE_TEXT,

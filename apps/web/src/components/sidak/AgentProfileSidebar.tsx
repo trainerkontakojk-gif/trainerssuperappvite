@@ -6,7 +6,6 @@ import {
   Code,
   Download,
   FileDown,
-  FileText,
   Plus,
   RefreshCw,
   Table,
@@ -73,24 +72,16 @@ const exportOptions: Array<{
   description: string;
 }> = [
   {
-    format: "csv",
-    label: "CSV",
+    format: "xlsx",
+    label: "Excel (.xlsx)",
     icon: <Table aria-hidden="true" />,
-    // Jujur soal bentuk filenya: CSV ini multi-seksi, bukan satu tabel datar.
-    description:
-      "Beberapa tabel dalam satu file: profil, skor bulanan, temuan, tiket, akar masalah",
-  },
-  {
-    format: "md",
-    label: "Markdown (.md)",
-    icon: <FileText aria-hidden="true" />,
-    description: "Teks terstruktur untuk dokumentasi atau wiki",
+    description: "Satu sheet per bagian, siap diolah di Excel atau Google Sheets",
   },
   {
     format: "html-interactive",
     label: "HTML Interaktif",
     icon: <Code aria-hidden="true" />,
-    description: "Halaman web dengan grafik yang bisa difilter",
+    description: "Halaman web dengan tab per bagian laporan",
   },
   {
     format: "html-static",

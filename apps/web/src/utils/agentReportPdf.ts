@@ -1,105 +1,67 @@
 /**
- * Laporan audit agen (SIDAK) - generator PDF A4 dengan teks yang bisa dicari.
+ * Laporan audit agen (SIDAK) — generator PDF A4 dengan teks yang bisa dicari.
  *
- * Ini unduhan PDF LANGSUNG, bukan dialog cetak peramban: `jsPDF` (dependency web
- * yang sudah ada) menulis dokumen biner dari snapshot yang sama dengan HTML/CSV,
- * lalu hook mengunduhnya sebagai Blob `application/pdf`.
+ * Unduhan PDF LANGSUNG, bukan dialog cetak: `jsPDF` (dependency web yang sudah
+ * ada, diimpor dinamis) menulis dokumen biner dari snapshot yang sama dengan
+ * HTML dan Excel, lalu hook mengunduhnya sebagai Blob `application/pdf`.
  *
  * Aturan yang dijaga di sini:
- *  - **Teks asli, bukan gambar.** Tidak ada `html2canvas`/raster: seluruh isi
- *    laporan ditulis sebagai operator teks jsPDF, jadi bisa diseleksi, dicari,
- *    dan disalin di pembaca PDF mana pun. Grafik tren hanya garis vektor, dan
- *    angkanya tetap hadir lengkap di tabel "Data tren".
- *  - **A4 portrait, satu sumber isi.** Hirarki dokumen sama dengan varian HTML
- *    (identitas -> ringkasan eksekutif -> bulanan -> tiket -> akar masalah ->
- *    skor -> tren temuan + benchmark -> seluruh temuan -> colophon), dan tiap
- *    seksi memakai helper `*ScopeLabel` yang sama dengan CSV/MD/HTML sehingga
- *    "cakupan seksi" hanya punya satu definisi.
- *  - **Paginasi jujur.** Judul seksi tidak pernah menggantung di dasar halaman,
- *    header tabel berulang saat tabel terbelah, satu baris tabel tidak pernah
- *    keluar dari area cetak, dan setiap halaman memakai footer
- *    "Halaman X dari N". Teks panjang mengalir per baris, sehingga panjang
- *    tidak pernah berarti terpotong.
- *  - **Teks aman untuk font standar, tanpa kehilangan bukti.** Font standar PDF
- *    (Helvetica) hanya bisa menencetak WinAnsi. Semua teks dari data pengguna
- *    dilewatkan `pdfSafeText()`: handful simbol umum dipetakan ke ejaan
- *    Indonesia, dan setiap titik kode yang tidak punya glyph — termasuk
- *    karakter kontrol — dicetak sebagai penanda `[U+XXXX]`: terlihat, bisa
- *    dicari, dan bisa dibalik persis ke karakter aslinya. Tanpa sanitasi jsPDF
- *    menulis byte rusak yang membuat glyph tidak bisa dipetakan ke Unicode;
- *    menukar karakter itu dengan spasi lebih buruk lagi, karena bukti pengguna
- *    hilang tanpa jejak.
- *  - **Hierarki yang bisa dipindai.** Nomor tiket adalah identifier laporan,
- *    jadi ia dicetak paling besar dan paling tebal di dalam blok temuan
- *    (pita berlabel "NO TIKET"), sementara nama parameter dan nilai tetap
- *    lengkap tapi tipografinya proporsional. Skor periode aktif tetap angka
- *    utama blok ringkasan tanpa mengambil alih halaman.
- *  - **Dua keluarga tren, dua seksi.** "Perkembangan Skor" memakai skor yang
- *    dihitung backend (`monthlySummaries`: final, non-critical, critical),
- *    masing-masing satu grafik + satu tabel. "Tren Temuan" memakai
- *    `personalTrend`, yang berisi JUMLAH TEMUAN per periode — bukan skor — dan
- *    hanya memuat grafik temuan, bukan satu pun garis skor.
- *  - **Satu metrik satu grafik.** Tiga metrik skor tidak pernah digabung dalam
- *    satu trendline; di seksi temuan, `Total Temuan` (agregat) dan rincian per
- *    parameter (komponen) juga terpisah: masing-masing punya grafik, judul,
- *    satuan sumbu, legenda, dan tabel data lengkapnya sendiri. Angka yang
- *    digambar persis sama dengan sumbernya, jadi tidak ada data turunan yang
- *    dikarang.
- *  - **Tanpa aset remote.** Tidak ada font eksternal, gambar, atau permintaan
- *    jaringan; avatar berupa inisial seperti di HTML.
- *  - **Tanpa angka karangan.** Bagian yang tidak punya isi dinyatakan eksplisit
- *    ("Tidak ada ... pada cakupan ini"), bukan diisi nol atau placeholder.
- *    Sesi tanpa temuan (`is_phantom_padding`) tidak pernah ikut karena snapshot
- *    tidak pernah meneruskannya, dan colophon menyatakan hal itu terbuka.
+ *  - **Urutan baca sama dengan HTML.** Identitas → Kesimpulan Utama →
+ *    Ringkasan (posisi, skor bulan terpilih, rekap bulanan, tiket, akar
+ *    masalah) → Perkembangan Skor → Tren Temuan (total, per parameter,
+ *    perbandingan) → Detail Temuan per parameter → catatan kaki. Label,
+ *    cakupan, kesimpulan, dan arah baik/buruk datang dari `agentReportModel`.
+ *  - **Teks asli, bukan gambar.** Seluruh isi ditulis sebagai operator teks;
+ *    grafik hanya garis vektor dan angkanya tetap ada di tabel.
+ *  - **Paginasi jujur.** Judul tidak menggantung di dasar halaman, header tabel
+ *    berulang saat tabel terbelah, baris tabel tidak pernah keluar dari area
+ *    cetak, dan setiap halaman memakai footer "Halaman X dari N".
+ *  - **Teks aman untuk font standar tanpa kehilangan bukti.** Helvetica hanya
+ *    mencetak WinAnsi; titik kode tanpa glyph dicetak sebagai penanda
+ *    `[U+XXXX]` yang bisa dicari dan dibalik.
+ *  - **Tanpa aset remote dan tanpa angka karangan.** Bagian kosong dinyatakan
+ *    eksplisit; sesi tanpa temuan tidak pernah jadi baris temuan.
  */
 
 import type { jsPDF as JsPdfDocument } from "jspdf";
-import type {
-  AgentDetailData,
-  AgentPeriodSummary,
-  RootCauseResult,
-  SidakAgentQuickviewResponse,
-} from "@trainers/types";
+import type { SidakAgentQuickviewResponse } from "@trainers/types";
 import {
-  MONTHS_FULL,
+  QA_TARGET,
   SCORE_EMPTY_NOTE,
-  SCORE_UNIT_LABEL,
-  TREND_PARAMETER_TABLE_CAPTION,
-  TREND_TOTAL_TABLE_CAPTION,
+  TREND_EMPTY_NOTE,
   TREND_UNIT_LABEL,
-  buildScoreTrend,
+  buildHighlights,
+  comparisonDelta,
   computeTenure,
-  groupTrendSeries,
-  monthScopeLabel,
-  nilaiLabel,
-  trendScopeLabel,
-  yearServiceScopeLabel,
-  yearToDateScopeLabel,
-} from "./agentReportHtml";
-import type {
-  AgentHtmlExportContext,
-  TicketScoreExport,
-  TemuanDisplayItemExport,
-  TrendSeries,
-} from "./agentReportHtml";
-import { comparisonScopeLabel } from "./exportAgentReport";
+  countAxis,
+  findingDeltaTone,
+  findingTrend,
+  finiteNumber,
+  formatNumber,
+  formatPercentDelta,
+  formatPointDelta,
+  groupFindingsByParameter,
+  jabatanLabel,
+  monthLabel,
+  nilaiText,
+  qaStatusLabel,
+  reportScopes,
+  resolveActiveMonth,
+  resolveActiveScore,
+  scoreAxis,
+  scoreDeltaTone,
+  scoreTrend,
+  serviceLabel,
+  yearText,
+  type AgentReportSnapshot,
+  type ReportScopes,
+  type Tone,
+  type TrendSeries,
+} from "./agentReportModel";
 import { sidakScoreLabel, sidakScoreTone } from "./sidakScoreStatus";
 
-/**
- * Snapshot laporan yang dipakai PDF. Sengaja identik dengan snapshot HTML
- * (tanpa `variant`, yang hanya relevan untuk perilaku HTML): PDF, HTML, CSV, dan
- * MD harus selalu melihat data yang sama dari state UI yang sama.
- */
-export interface AgentReportPdfInput {
-  data: AgentDetailData;
-  monthlySummaries: AgentPeriodSummary[];
-  temuanDisplayItems: TemuanDisplayItemExport[];
-  topTickets: TicketScoreExport[];
-  activeRootCauses: RootCauseResult[];
-  selectedYear: number;
-  selectedService: string;
-  context: AgentHtmlExportContext;
-}
+/** Snapshot laporan yang dipakai PDF: sama dengan HTML, tanpa `variant`. */
+export type AgentReportPdfInput = AgentReportSnapshot;
 
 // ---------------------------------------------------------------------------
 // Geometri & tipografi (mm untuk tata letak, pt untuk ukuran font)
@@ -121,7 +83,6 @@ const FONT = "helvetica";
 const LINE_FACTOR = 1.4;
 
 type Rgb = [number, number, number];
-type Tone = "ok" | "warn" | "bad" | "flat";
 
 /** Palet yang sama dengan stylesheet laporan HTML (`agentReportHtml.ts`). */
 const INK: Rgb = [15, 23, 42];
@@ -134,9 +95,6 @@ const WASH: Rgb = [241, 245, 249];
 const TONE_OK: Rgb = [4, 120, 87];
 const TONE_WARN: Rgb = [180, 83, 9];
 const TONE_BAD: Rgb = [190, 18, 60];
-
-/** Ambang QA yang sama dengan `MonthRail`/`AgentAuditDossier` di aplikasi. */
-const QA_TARGET = 95;
 
 const mm = (points: number): number => (points * 25.4) / 72;
 const line = (size: number): number => mm(size * LINE_FACTOR);
@@ -231,7 +189,11 @@ function unprintableMarker(code: number): string {
  * lebih banyak baris.
  */
 function pdfSafeText(value: unknown): string {
-  let text = String(value ?? "");
+  // Enter dan tab dari catatan yang diketik adalah spasi putih, bukan karakter
+  // tak-tercetak: tanpa ini setiap pindah baris tercetak sebagai "[U+000A]".
+  // Pemisah baris yang ingin dipertahankan sudah dipecah lebih dulu oleh
+  // `wrapPdfText`.
+  let text = String(value ?? "").replace(/[\t\r\n]/g, " ");
   for (const [pattern, replacement] of UNICODE_REPLACEMENTS) {
     text = text.replace(pattern, replacement);
   }
@@ -351,6 +313,23 @@ function wrapPdfText(
   measure: Measure,
   font: "normal" | "bold" = "normal",
   size = 8.5,
+): string[] {
+  // Baris baru di data (catatan yang diketik dengan Enter) dipertahankan
+  // sebagai baris baru; baris kosong di antaranya tidak dicetak.
+  const lines = String(text ?? "")
+    .split(/\r\n|\r|\n/)
+    .filter((part) => part.trim() !== "")
+    .flatMap((part) => wrapLine(part, maxWidth, measure, font, size));
+  return lines.length > 0 ? lines : [""];
+}
+
+/** Bungkus SATU baris teks (tanpa pemisah baris) pada lebar kolom. */
+function wrapLine(
+  text: string,
+  maxWidth: number,
+  measure: Measure,
+  font: "normal" | "bold",
+  size: number,
 ): string[] {
   const lines: string[] = [];
   for (const word of pdfSafeText(text).split(" ")) {
@@ -550,14 +529,19 @@ class PdfDocument {
    * harus ikut dalam halaman yang sama, jadi judul tidak pernah menggantung
    * sendirian di dasar halaman dengan isinya di halaman berikutnya.
    */
-  heading(title: string, scope: string | undefined, keepWith: number): void {
+  heading(
+    title: string,
+    scope: string | undefined,
+    keepWith: number,
+    size = 12,
+  ): void {
     const scopeLines = scope
       ? wrapPdfText(scope, CONTENT_WIDTH, this.measure, "normal", 7.5)
       : [];
     this.ensureSpace(
-      line(11) + scopeLines.length * line(7.5) + 4 + Math.max(0, keepWith),
+      line(size) + scopeLines.length * line(7.5) + 4 + Math.max(0, keepWith),
     );
-    this.paragraph(title, { font: "bold", size: 11, color: INK });
+    this.paragraph(title, { font: "bold", size, color: INK });
     for (const item of scopeLines) {
       this.writeLine(item, MARGIN_LEFT, { size: 7.5, color: INK_FAINT });
     }
@@ -591,9 +575,19 @@ class PdfDocument {
       this.doc.setFont(FONT, "bold");
       this.doc.setFontSize(7);
       this.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+      // Header memakai titik jangkar yang sama dengan sel: kolom rata kanan
+      // dijangkar di tepi kanan kolom, bukan di tepi kirinya. Sebelumnya header
+      // rata kanan dijangkar di tepi KIRI sehingga bergeser satu kolom ke kiri
+      // dari angkanya.
       let x = MARGIN_LEFT;
       spec.columns.forEach((column, index) => {
-        this.write(column.header, x + paddingX, column.align ?? "left");
+        const align = column.align ?? "left";
+        this.doc.text(
+          pdfSafeText(column.header),
+          align === "right" ? x + widths[index] - paddingX : x + paddingX,
+          this.y + paddingY,
+          { align, baseline: "top" },
+        );
         x += widths[index];
       });
       this.doc.setDrawColor(LINE_STRONG[0], LINE_STRONG[1], LINE_STRONG[2]);
@@ -721,61 +715,63 @@ function columnWidths(columns: PdfColumn[]): number[] {
   return widths;
 }
 
+
 // ---------------------------------------------------------------------------
-// Nilai & pelabelan
+// Blok teks
 // ---------------------------------------------------------------------------
 
-function safeNumber(
-  value: unknown,
-  fallback = 0,
-  min = -Infinity,
-  max = Infinity,
-): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, value));
-}
-
-function numberText(value: unknown, fallback = 0): string {
-  return String(safeNumber(value, fallback));
-}
-
-function yearText(value: unknown, fallback = 0): string {
-  return String(Math.trunc(safeNumber(value, fallback)));
-}
-
-/** Ambang status sama dengan halaman detail agent (`sidakScoreStatus`). */
-function scoreTone(score: number): Tone {
-  return sidakScoreTone(safeNumber(score));
-}
-
-function scoreLabel(score: number): string {
-  return sidakScoreLabel(safeNumber(score));
-}
-
-function deltaTone(value: number | null): Tone | null {
-  if (value === null) return null;
-  if (value > 0) return "ok";
-  if (value < 0) return "bad";
-  return "flat";
-}
-
-function formatNilai(nilai: number): string {
-  return `${nilai} (${nilaiLabel(nilai)})`;
-}
-
-function monthYear(month: number | null, year: number): string {
-  const index = Math.trunc(safeNumber(month, 0, 0, 12));
-  if (index < 1) return "belum ada";
-  return `${MONTHS_FULL[index - 1]} ${yearText(year)}`;
-}
-
-/** Langkah sumbu "bulat" supaya label sumbu tidak memotong tinggi plot. */
-function niceStep(maxValue: number): number {
-  const safe = Math.max(1, maxValue);
-  for (const step of [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000]) {
-    if (Math.ceil(safe / step) <= 5) return step;
+/** Baris berpoin: poin di margin, teks membungkus dengan indentasi. */
+function bullet(
+  pdf: PdfDocument,
+  text: string,
+  style: { size?: number; color?: Rgb } = {},
+): void {
+  const size = style.size ?? 9;
+  const indent = 5;
+  const lines = wrapPdfText(
+    text,
+    CONTENT_WIDTH - indent,
+    pdf.measure,
+    "normal",
+    size,
+  );
+  pdf.ensureSpace(line(size) * Math.min(2, lines.length));
+  const color = style.color ?? INK;
+  pdf.doc.setFont(FONT, "bold");
+  pdf.doc.setFontSize(size);
+  pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
+  pdf.doc.text("•", MARGIN_LEFT + 1, pdf.cursor, { baseline: "top" });
+  for (const item of lines) {
+    pdf.writeLine(item, MARGIN_LEFT + indent, { size, color });
   }
-  return Math.ceil(safe / 5 / 1000) * 1000;
+  pdf.moveTo(pdf.cursor + 1);
+}
+
+/** Label kecil di atas angka besar (statistik berderet). */
+function statRow(
+  pdf: PdfDocument,
+  stats: Array<{ term: string; value: string; tone: Tone | null }>,
+): void {
+  const column = CONTENT_WIDTH / stats.length;
+  pdf.ensureSpace(line(7) + line(10) + 2);
+  const top = pdf.cursor;
+  stats.forEach(({ term, value, tone }, index) => {
+    const x = MARGIN_LEFT + column * index;
+    pdf.doc.setFont(FONT, "normal");
+    pdf.doc.setFontSize(7);
+    pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
+    pdf.doc.text(pdfSafeText(term), x, top, { baseline: "top" });
+    const color = tone ? toneColor(tone) : INK;
+    pdf.doc.setFont(FONT, "bold");
+    pdf.doc.setFontSize(10);
+    pdf.doc.setTextColor(color[0], color[1], color[2]);
+    pdf.doc.text(pdfSafeText(value), x, top + line(7), { baseline: "top" });
+  });
+  pdf.moveTo(top + line(7) + line(10) + 2);
+}
+
+function note(pdf: PdfDocument, text: string, gapAfter = 2): void {
+  pdf.paragraph(text, { size: 7.5, color: INK_MUTE, gapAfter });
 }
 
 // ---------------------------------------------------------------------------
@@ -785,30 +781,37 @@ function niceStep(maxValue: number): number {
 function buildMasthead(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
-  masaKerja: string,
-  serviceLabel: string,
+  scopes: ReportScopes,
+  dateStr: string,
 ): void {
   const peserta = input.data.peserta;
   const initial = (peserta.nama.trim().charAt(0) || "?").toUpperCase();
-  // Identitas + ringkasan executive kerasikan: tidak ada halaman sampul
-  // terpisah, blok pertama halaman 1 langsung berisi isi laporan.
-  pdf.ensureSpace(58);
+  pdf.ensureSpace(50);
+  const top = pdf.cursor;
 
+  // Inisial dan nama SEBARIS: kotak di kiri, identitas di kanannya.
   pdf.doc.setFillColor(WASH[0], WASH[1], WASH[2]);
   pdf.doc.setDrawColor(LINE_STRONG[0], LINE_STRONG[1], LINE_STRONG[2]);
   pdf.doc.setLineWidth(0.2);
-  pdf.doc.rect(MARGIN_LEFT, pdf.cursor, 13, 13, "FD");
+  pdf.doc.rect(MARGIN_LEFT, top, 14, 14, "FD");
   pdf.doc.setFont(FONT, "bold");
   pdf.doc.setFontSize(13);
   pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
-  pdf.doc.text(pdfSafeText(initial), MARGIN_LEFT + 6.5, pdf.cursor + 6.5, {
+  pdf.doc.text(pdfSafeText(initial), MARGIN_LEFT + 7, top + 7, {
     align: "center",
     baseline: "middle",
   });
-  pdf.moveTo(pdf.cursor + 17);
 
-  const nameX = MARGIN_LEFT + 17;
-  const nameWidth = CONTENT_WIDTH - 17;
+  const nameX = MARGIN_LEFT + 18;
+  const nameWidth = CONTENT_WIDTH - 18;
+  pdf.moveTo(top);
+  pdf.paragraph("LAPORAN AUDIT AGENT", {
+    x: nameX,
+    width: nameWidth,
+    font: "bold",
+    size: 7,
+    color: INK_FAINT,
+  });
   pdf.paragraph(peserta.nama, {
     x: nameX,
     width: nameWidth,
@@ -817,22 +820,27 @@ function buildMasthead(
     color: INK,
     lineHeight: mm(17 * 1.2),
   });
-  pdf.paragraph("Laporan Audit Agent", {
+  pdf.paragraph(scopes.header, {
     x: nameX,
     width: nameWidth,
     size: 9,
     color: INK_MUTE,
   });
-  pdf.paragraph(
-    `Tahun ${yearText(input.selectedYear)} \u2022 Layanan ${serviceLabel}`,
-    { x: nameX, width: nameWidth, size: 8.5, color: INK_MUTE, gapAfter: 3 },
-  );
+  // Waktu pembuatan ditulis di identitas, bukan di blok penutup tersendiri:
+  // blok penutup yang tidak muat bisa membuat halaman terakhir berisi itu saja.
+  pdf.paragraph(`Dibuat ${dateStr} dari SIDAK`, {
+    x: nameX,
+    width: nameWidth,
+    size: 7,
+    color: INK_FAINT,
+  });
+  pdf.moveTo(Math.max(pdf.cursor, top + 14) + 4);
 
   const meta: Array<[string, string]> = [
     ["Tim", peserta.tim],
     ["Batch", peserta.batch_name],
-    ["Jabatan", peserta.jabatan || "Agent"],
-    ["Masa kerja", masaKerja],
+    ["Jabatan", jabatanLabel(peserta.jabatan)],
+    ["Masa kerja", computeTenure(peserta.bergabung_date)],
   ];
   const columnWidth = CONTENT_WIDTH / meta.length;
   const metaTop = pdf.cursor;
@@ -842,117 +850,28 @@ function buildMasthead(
     pdf.doc.setFontSize(7);
     pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
     pdf.doc.text(pdfSafeText(term), x, metaTop, { baseline: "top" });
-    const valueLines = wrapPdfText(
-      value,
-      columnWidth - 2,
-      pdf.measure,
-      "bold",
-      8.5,
+    wrapPdfText(value, columnWidth - 2, pdf.measure, "bold", 9).forEach(
+      (item, lineIndex) => {
+        pdf.doc.setFont(FONT, "bold");
+        pdf.doc.setFontSize(9);
+        pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
+        pdf.doc.text(item, x, metaTop + line(7) + lineIndex * line(9), {
+          baseline: "top",
+        });
+      },
     );
-    valueLines.forEach((item, lineIndex) => {
-      pdf.doc.setFont(FONT, "bold");
-      pdf.doc.setFontSize(8.5);
-      pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
-      pdf.doc.text(item, x, metaTop + line(7) + lineIndex * line(8.5), {
-        baseline: "top",
-      });
-    });
   });
-  pdf.moveTo(metaTop + line(7) + line(8.5) * 2);
-  pdf.rule(INK, 2, 5);
+  pdf.moveTo(metaTop + line(7) + line(9) * 2);
+  pdf.rule(INK, 1, 5);
 }
 
-function buildActiveScore(
+function buildHighlightsSection(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
-  activeMonth: number | null,
 ): void {
-  const summaries = input.monthlySummaries;
-  if (summaries.length === 0) {
-    pdf.paragraph("Ringkasan skor belum tersedia untuk cakupan ini.", {
-      color: INK_MUTE,
-    });
-    return;
-  }
-  const latest =
-    (activeMonth
-      ? summaries.find((summary) => summary.month === activeMonth)
-      : null) ?? summaries[summaries.length - 1];
-  const index = summaries.findIndex((summary) => summary.id === latest.id);
-  const previous = index > 0 ? summaries[index - 1] : null;
-  const delta = previous ? latest.finalScore - previous.finalScore : null;
-  const safeScore = safeNumber(latest.finalScore, 0, 0, 100);
-  const monthIndex = Math.trunc(safeNumber(latest.month, 1, 1, 12));
-  const periodLabel = `${MONTHS_FULL[monthIndex - 1]?.slice(0, 3) ?? ""} ${numberText(latest.year)}`;
-
-  pdf.paragraph("Skor Periode Aktif", { font: "bold", size: 9, color: INK });
-  pdf.paragraph(
-    monthScopeLabel(input.selectedService, input.selectedYear, activeMonth),
-    { size: 7.5, color: INK_FAINT, gapAfter: 2 },
-  );
-  pdf.ensureSpace(46);
-
-  const top = pdf.cursor;
-  pdf.doc.setFont(FONT, "normal");
-  pdf.doc.setFontSize(7.5);
-  pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
-  pdf.doc.text(pdfSafeText(periodLabel), MARGIN_LEFT, top, { baseline: "top" });
-  // Skor tetap jadi angka utama blok ini, tapi tidak lagi mendominasi seluruh
-  // dokumen: nama agen (17pt) dan nomor tiket (11.5pt) harus tetap bisa dibaca
-  // tanpa diambil alih oleh angka.
-  pdf.doc.setFont(FONT, "bold");
-  pdf.doc.setFontSize(19);
-  pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
-  pdf.doc.text(`${safeScore.toFixed(1)}%`, MARGIN_LEFT, top + line(8), {
-    baseline: "top",
-  });
-  const scoreBottom = top + line(8) + mm(19 * 1.05);
-  pdf.doc.setFontSize(8);
-  const statusColor = toneColor(scoreTone(latest.finalScore));
-  pdf.doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-  pdf.doc.text(
-    pdfSafeText(scoreLabel(latest.finalScore)),
-    MARGIN_LEFT,
-    scoreBottom,
-    {
-      baseline: "top",
-    },
-  );
-
-  // Meter tipis: angka tetap angka, meter hanya penanda posisi terhadap 100.
-  const meterY = scoreBottom + line(8) + 1.5;
-  pdf.doc.setFillColor(WASH[0], WASH[1], WASH[2]);
-  pdf.doc.rect(MARGIN_LEFT, meterY, CONTENT_WIDTH, 2, "F");
-  pdf.doc.setFillColor(INK[0], INK[1], INK[2]);
-  pdf.doc.rect(MARGIN_LEFT, meterY, (CONTENT_WIDTH * safeScore) / 100, 2, "F");
-  pdf.moveTo(meterY + 6);
-
-  const stats: Array<[string, string, Tone | null]> = [
-    ["Sesi", numberText(latest.sessionCount), null],
-    ["Temuan", numberText(latest.findingsCount), null],
-    [
-      "Selisih periode sebelumnya",
-      delta === null
-        ? "\u2014"
-        : `${delta > 0 ? "+" : ""}${safeNumber(delta).toFixed(1)}%`,
-      delta === null ? null : deltaTone(delta),
-    ],
-  ];
-  const statColumn = CONTENT_WIDTH / stats.length;
-  const statTop = pdf.cursor;
-  stats.forEach(([term, value, tone], index) => {
-    const x = MARGIN_LEFT + statColumn * index;
-    pdf.doc.setFont(FONT, "normal");
-    pdf.doc.setFontSize(7);
-    pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
-    pdf.doc.text(pdfSafeText(term), x, statTop, { baseline: "top" });
-    const color = tone ? toneColor(tone) : INK;
-    pdf.doc.setFont(FONT, "bold");
-    pdf.doc.setFontSize(9.5);
-    pdf.doc.setTextColor(color[0], color[1], color[2]);
-    pdf.doc.text(pdfSafeText(value), x, statTop + line(7), { baseline: "top" });
-  });
-  pdf.moveTo(statTop + line(7) + line(9.5) + 1);
+  pdf.heading("Kesimpulan Utama", undefined, 20);
+  for (const item of buildHighlights(input)) bullet(pdf, item);
+  pdf.rule(LINE, 2, 5);
 }
 
 function buildStanding(pdf: PdfDocument, input: AgentReportPdfInput): void {
@@ -961,28 +880,24 @@ function buildStanding(pdf: PdfDocument, input: AgentReportPdfInput): void {
   const rank = (
     metric: SidakAgentQuickviewResponse["combinedTeam"],
   ): { value: string; note: string } => {
-    if (!metric) return { value: "\u2014", note: "Peringkat belum tersedia" };
+    if (!metric) return { value: "—", note: "Peringkat belum tersedia" };
     if (metric.rank != null) {
       return {
-        value: `#${numberText(metric.rank)} dari ${numberText(metric.total)}`,
+        value: `#${formatNumber(metric.rank)} dari ${formatNumber(metric.total)}`,
         note: metric.scopeLabel,
       };
     }
     return {
-      value: "\u2014",
+      value: "—",
       note:
-        safeNumber(metric.total) > 0
+        finiteNumber(metric.total) > 0
           ? "Belum masuk peringkat pada cakupan ini"
           : "Belum ada agen pembanding",
     };
   };
   const combined = rank(quickview.combinedTeam);
   const leader = rank(quickview.leaderTeam);
-  pdf.paragraph("Posisi Performa", { font: "bold", size: 9, color: INK });
-  pdf.paragraph(
-    `Tahun ${yearText(input.selectedYear)} \u2022 Layanan ${input.selectedService.toUpperCase() || "\u2014"}`,
-    { size: 7.5, color: INK_FAINT, gapAfter: 2 },
-  );
+  pdf.heading("Posisi Performa", undefined, 20, 10);
   pdf.table({
     columns: [
       { header: "Cakupan", weight: 1, minWidth: 32 },
@@ -993,88 +908,125 @@ function buildStanding(pdf: PdfDocument, input: AgentReportPdfInput): void {
       ["Tim Gabungan", combined.value, combined.note],
       ["Tim Leader", leader.value, leader.note],
       [
-        "Forecast 3 bulan",
-        quickview.forecast?.label ?? "\u2014",
-        quickview.forecast?.supportingText ?? "Forecast belum tersedia",
+        "Perkiraan 3 bulan",
+        quickview.forecast?.label ?? "—",
+        quickview.forecast?.supportingText ?? "Perkiraan belum tersedia",
       ],
     ],
   });
 }
 
-function buildMonthlyTable(pdf: PdfDocument, input: AgentReportPdfInput): void {
-  pdf.paragraph(
-    yearServiceScopeLabel(input.selectedService, input.selectedYear),
-    { size: 7.5, color: INK_FAINT },
+function buildActiveScore(pdf: PdfDocument, input: AgentReportPdfInput): void {
+  const active = resolveActiveScore(
+    input.monthlySummaries,
+    resolveActiveMonth(input),
   );
-  if (input.monthlySummaries.length === 0) {
-    pdf.paragraph("Ringkasan bulanan belum tersedia untuk cakupan ini.", {
-      color: INK_MUTE,
-    });
+  pdf.heading("Skor Bulan Terpilih", undefined, 30, 10);
+  if (!active) {
+    note(pdf, "Belum ada skor untuk tahun dan layanan ini.");
     return;
   }
+  const { current, previous, delta } = active;
+  const score = finiteNumber(current.finalScore, 0, 0, 100);
+  pdf.ensureSpace(30);
+  const top = pdf.cursor;
+  pdf.doc.setFont(FONT, "normal");
+  pdf.doc.setFontSize(8);
+  pdf.doc.setTextColor(INK_FAINT[0], INK_FAINT[1], INK_FAINT[2]);
+  pdf.doc.text(pdfSafeText(monthLabel(current.month, current.year)), MARGIN_LEFT, top, {
+    baseline: "top",
+  });
+  pdf.doc.setFont(FONT, "bold");
+  pdf.doc.setFontSize(22);
+  pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
+  pdf.doc.text(formatNumber(score), MARGIN_LEFT, top + line(8), {
+    baseline: "top",
+  });
+  const statusTop = top + line(8) + mm(22 * 1.1);
+  const statusColor = toneColor(sidakScoreTone(score));
+  pdf.doc.setFontSize(8);
+  pdf.doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+  pdf.doc.text(
+    pdfSafeText(`${sidakScoreLabel(score)} (target ${QA_TARGET})`),
+    MARGIN_LEFT,
+    statusTop,
+    { baseline: "top" },
+  );
+  pdf.moveTo(statusTop + line(8) + 3);
+  statRow(pdf, [
+    { term: "Sesi diaudit", value: formatNumber(current.sessionCount), tone: null },
+    { term: "Temuan", value: formatNumber(current.findingsCount), tone: null },
+    {
+      term: previous
+        ? `Dibanding ${monthLabel(previous.month, previous.year)}`
+        : "Dibanding bulan sebelumnya",
+      value: delta === null ? "—" : formatPointDelta(delta),
+      tone: delta === null ? null : scoreDeltaTone(delta),
+    },
+  ]);
+}
+
+function buildMonthlyTable(pdf: PdfDocument, input: AgentReportPdfInput): void {
+  if (input.monthlySummaries.length === 0) return;
   pdf.table({
-    caption: "Ringkasan Skor Bulanan",
+    caption: "Rekap Skor Bulanan",
     columns: [
-      { header: "Bulan", weight: 1.1, minWidth: 18 },
-      { header: "Skor Final", weight: 0.9, minWidth: 17, align: "right" },
-      { header: "NC Score", weight: 0.9, minWidth: 17, align: "right" },
-      { header: "CR Score", weight: 0.9, minWidth: 17, align: "right" },
+      { header: "Bulan", weight: 1.2, minWidth: 26 },
+      { header: "Skor Final", weight: 0.8, minWidth: 18, align: "right" },
+      { header: "Skor Non-Critical", weight: 1, minWidth: 26, align: "right" },
+      { header: "Skor Critical", weight: 0.9, minWidth: 20, align: "right" },
       { header: "Sesi", weight: 0.5, minWidth: 10, align: "right" },
-      { header: "Temuan", weight: 0.6, minWidth: 12, align: "right" },
+      { header: "Temuan", weight: 0.6, minWidth: 13, align: "right" },
       {
-        header: "Status QA",
-        weight: 1,
-        minWidth: 22,
+        header: "Status",
+        weight: 1.2,
+        minWidth: 30,
         tone: (rowIndex) =>
-          safeNumber(input.monthlySummaries[rowIndex]?.finalScore) < QA_TARGET
+          finiteNumber(input.monthlySummaries[rowIndex]?.finalScore) < QA_TARGET
             ? "warn"
             : "ok",
       },
     ],
     rows: input.monthlySummaries.map((summary) => [
-      summary.label,
-      numberText(summary.finalScore),
-      numberText(summary.nonCriticalScore),
-      numberText(summary.criticalScore),
-      numberText(summary.sessionCount),
-      numberText(summary.findingsCount),
-      safeNumber(summary.finalScore) < QA_TARGET
-        ? `Di bawah target ${QA_TARGET}%`
-        : `Sesuai target ${QA_TARGET}%`,
+      monthLabel(summary.month, summary.year),
+      formatNumber(summary.finalScore),
+      formatNumber(summary.nonCriticalScore),
+      formatNumber(summary.criticalScore),
+      formatNumber(summary.sessionCount),
+      formatNumber(summary.findingsCount),
+      qaStatusLabel(summary.finalScore),
     ]),
   });
+  note(
+    pdf,
+    "Sesi tanpa temuan dihitung pada kolom Sesi, tetapi tidak ditampilkan sebagai temuan.",
+  );
 }
 
 function buildTicketsTable(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
-  activeMonth: number | null,
+  scopes: ReportScopes,
 ): void {
-  pdf.paragraph(
-    monthScopeLabel(input.selectedService, input.selectedYear, activeMonth),
-    { size: 7.5, color: INK_FAINT },
-  );
+  pdf.heading("Tiket Pengurang Skor Terbesar", scopes.tickets, 14, 10);
   if (input.topTickets.length === 0) {
-    pdf.paragraph("Tidak ada tiket yang menurunkan skor pada cakupan ini.", {
-      color: INK_MUTE,
-    });
+    note(pdf, "Tidak ada tiket yang menurunkan skor pada bulan ini.");
     return;
   }
   pdf.table({
-    caption: "Tiket Pengurang Skor Terbesar",
     columns: [
       { header: "#", weight: 0.25, minWidth: 7, align: "right" },
-      { header: "No Tiket", weight: 1.1, minWidth: 28, emphasis: true },
+      { header: "No Tiket", weight: 1.1, minWidth: 30, emphasis: true },
       { header: "Parameter Terberat", weight: 1.7, minWidth: 42 },
-      { header: "Score Deduction", weight: 0.9, minWidth: 24, align: "right" },
+      { header: "Pengurangan Skor", weight: 0.9, minWidth: 26, align: "right" },
       { header: "Jumlah Temuan", weight: 0.8, minWidth: 22, align: "right" },
     ],
     rows: input.topTickets.map((ticket, index) => [
       String(index + 1),
       ticket.no_tiket,
       ticket.heaviestParam,
-      safeNumber(ticket.scoreDeduction).toFixed(1),
-      numberText(ticket.findingCount),
+      formatNumber(ticket.scoreDeduction, 1),
+      formatNumber(ticket.findingCount),
     ]),
   });
 }
@@ -1082,709 +1034,461 @@ function buildTicketsTable(
 function buildRootCauses(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
-  activeMonth: number | null,
+  scopes: ReportScopes,
 ): void {
-  pdf.paragraph(
-    yearToDateScopeLabel(
-      input.selectedService,
-      input.selectedYear,
-      activeMonth,
-    ),
-    { size: 7.5, color: INK_FAINT },
-  );
+  pdf.heading("Akar Masalah", scopes.rootCauses, 14, 10);
   if (input.activeRootCauses.length === 0) {
-    pdf.paragraph(
-      "Belum ditemukan pola akar masalah yang dominan pada cakupan ini.",
-      { color: INK_MUTE },
-    );
+    note(pdf, "Belum ada pola akar masalah yang menonjol.");
     return;
   }
   input.activeRootCauses.forEach((cause, index) => {
-    const critical = safeNumber(cause.criticalFindingsCount);
-    const facts = [
-      `${numberText(cause.findingsCount)} temuan`,
-      `${numberText(cause.affectedTickets)} tiket`,
-      critical > 0 ? `${numberText(critical)} critical` : "",
-    ]
-      .filter(Boolean)
-      .join(" \u2022 ");
-    pdf.paragraph(
-      `${index + 1}. ${cause.label} (prioritas ${numberText(cause.priority)})`,
-      { font: "bold", size: 9, color: INK },
-    );
-    pdf.paragraph(facts, { size: 7.5, color: INK_MUTE });
-    if (cause.matchedKeywords?.[0]) {
-      pdf.paragraph(`Keyword: ${cause.matchedKeywords[0]}`, {
-        size: 7.5,
-        color: INK_FAINT,
-      });
-    }
-    pdf.paragraph(`Rekomendasi: ${cause.recommendation}`, {
-      size: 8.5,
-      gapAfter: 1,
+    const critical = finiteNumber(cause.criticalFindingsCount);
+    pdf.ensureSpace(line(9.5) + line(7.5) + line(9) * 2);
+    pdf.paragraph(`${index + 1}. ${cause.label}`, {
+      font: "bold",
+      size: 9.5,
+      color: INK,
     });
+    pdf.paragraph(
+      [
+        `${formatNumber(cause.findingsCount)} temuan`,
+        `${formatNumber(cause.affectedTickets)} tiket`,
+        critical > 0 ? `${formatNumber(critical)} critical` : "",
+      ]
+        .filter(Boolean)
+        .join(" • "),
+      { size: 7.5, color: INK_MUTE },
+    );
+    pdf.paragraph(cause.recommendation, { size: 9, gapAfter: 1 });
     const references = cause.ticketReferences ?? [];
     if (references.length > 0) {
       pdf.paragraph(
-        `Tiket terkait (${numberText(references.length)}): ` +
+        "Tiket terkait: " +
           references
-            .map((reference) =>
-              [
-                reference.no_tiket,
-                reference.periodLabel,
-                `${numberText(reference.findingsCount)} temuan`,
-                reference.criticalFindingsCount > 0
-                  ? `${numberText(reference.criticalFindingsCount)} critical`
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" \u2022 "),
+            .map(
+              (reference) =>
+                `${reference.no_tiket} (${reference.periodLabel}, ${formatNumber(reference.findingsCount)} temuan)`,
             )
             .join("; "),
         { size: 7.5, color: INK_MUTE, gapAfter: 1 },
       );
     }
-    for (const item of cause.evidence ?? []) {
-      pdf.paragraph(
-        `Bukti: ${item.no_tiket ?? "-"} \u2022 ${item.indicatorName} \u2022 nilai ${numberText(item.nilai)} (${nilaiLabel(item.nilai)})${item.text ? ` \u2014 ${item.text}` : ""}`,
-        { size: 7.5, color: INK_MUTE, indent: 3, gapAfter: 0.5 },
-      );
-    }
-    pdf.paragraph("", { size: 4 });
+    pdf.moveTo(pdf.cursor + 2);
   });
 }
 
-/** [pola garis, lebar garis] per seri; seri total ditebalkan tanpa pola. */
-const DASH_PATTERNS: ReadonlyArray<{ pattern: number[]; width: number }> = [
-  { pattern: [], width: 0.6 },
-  { pattern: [2, 1.5], width: 0.3 },
-  { pattern: [1, 1.2], width: 0.3 },
-  { pattern: [4, 1.5, 1, 1.5], width: 0.3 },
-  { pattern: [3, 1, 1, 1], width: 0.3 },
-  { pattern: [1, 1], width: 0.4 },
-];
+// ---------------------------------------------------------------------------
+// Grafik
+// ---------------------------------------------------------------------------
 
-/**
- * Gaya seri pada posisi tertentu. Seri total memakai pola kosong (tebal),
- * seri rincian SELALU memakai pola garis yang tidak kosong: laporan juga dibaca
- * saat dicetak hitam-putih, jadi pembeda warna saja tidak boleh jadi satu-
- *-satunya pembeda dua parameter.
- */
-function lineDash(index: number, emphasis: boolean) {
-  return emphasis
-    ? DASH_PATTERNS[0]
-    : DASH_PATTERNS[1 + (index % (DASH_PATTERNS.length - 1))];
-}
-
-function seriesPattern(index: number, emphasis: boolean): number[] {
-  return emphasis ? [] : lineDash(index, false).pattern;
-}
-
-/** `#0f766e` → `[15, 118, 110]`, supaya warna seri PDF sama dengan HTML. */
-function hexRgb(hex: string): Rgb {
-  const value = hex.replace("#", "");
-  const full =
-    value.length === 3
-      ? value
-          .split("")
-          .map((char) => char + char)
-          .join("")
-      : value;
-  const parsed = Number.parseInt(full, 16);
-  if (!Number.isFinite(parsed)) return INK_MUTE;
-  return [(parsed >> 16) & 0xff, (parsed >> 8) & 0xff, parsed & 0xff];
-}
-
-interface PdfTrendChart {
-  /** Judul yang dilihat pembaca: metrik + satuan, bukan "Grafik". */
+interface PdfChart {
+  x: number;
+  width: number;
   title: string;
-  /** Satu kalimat yang menjelaskan apa yang diukur grafik ini. */
-  note: string;
-  /** Satuan sumbu Y, ditulis di atas plot ("Jumlah temuan" / "Skor (0-100)"). */
-  unit: string;
-  caption: string;
-  series: TrendSeries[];
+  unit?: string;
   labels: string[];
+  series: TrendSeries;
+  axis: { min: number; max: number; step: number };
+  target?: number;
+  plotHeight: number;
+}
+
+function chartHeight(chart: PdfChart): number {
+  return line(9) + (chart.unit ? line(6.5) : 0) + chart.plotHeight + line(6.5) + 2;
 }
 
 /**
- * Tinggi satu blok grafik tren (mm), dipakai untuk `ensureSpace` supaya plot,
- * label periode, label nilai, dan legenda tidak pernah terbelah batas halaman.
+ * Grafik garis satu seri di kolom `x`/`width`: judul, angka sumbu, garis target
+ * putus-putus (skor), label periode yang tidak saling menimpa, dan nilai di
+ * atas titik bila jaraknya cukup. Mengembalikan tepi bawahnya.
  */
-function trendChartHeight(
-  pdf: PdfDocument,
-  chart: PdfTrendChart,
-  legendLines: number,
-): number {
-  const plotHeight = 34;
-  return (
-    line(9.5) +
-    line(7.5) +
-    line(6.5) + // label satuan
-    plotHeight +
-    line(6.5) + // label periode
-    legendLines * line(7.5) +
-    line(7) // keterangan grafik
-  );
-}
+function drawChart(pdf: PdfDocument, chart: PdfChart, top: number): number {
+  const { labels, series, axis } = chart;
+  const doc = pdf.doc;
+  doc.setFont(FONT, "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  doc.text(pdfSafeText(chart.title), chart.x, top, { baseline: "top" });
+  let cursor = top + line(9);
+  if (chart.unit) {
+    doc.setFontSize(6.5);
+    doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+    doc.text(pdfSafeText(chart.unit), chart.x, cursor, { baseline: "top" });
+    cursor += line(6.5);
+  }
 
-/**
- * Legenda yang menempel di bawah plot: satu baris per seri, memakai potongan
- * garis dengan pola yang sama dengan garis di grafik, jadi pembaca bisa
- * mencocokkan garisnya tanpa bergantung pada warna. Label panjang membungkus
- * dengan indentasi, bukan terpotong.
- */
-function drawTrendLegend(
-  pdf: PdfDocument,
-  chart: PdfTrendChart,
-  top: number,
-): number {
-  const swatchWidth = 6;
-  const gap = 1.5;
-  const indent = MARGIN_LEFT + swatchWidth + gap;
-  // Kursor dipindah ke atas legenda lebih dulu: `writeLine` menulis pada kursor
-  // dokumen, jadi tanpa ini legenda digambar di dalam area plot.
-  pdf.moveTo(top);
-  chart.series.forEach((series, seriesIndex) => {
-    const y = pdf.cursor;
-    const color = hexRgb(series.color);
-    pdf.doc.setDrawColor(color[0], color[1], color[2]);
-    pdf.doc.setLineWidth(lineDash(seriesIndex, series.emphasis).width);
-    pdf.doc.setLineDashPattern(seriesPattern(seriesIndex, series.emphasis), 0);
-    pdf.doc.line(MARGIN_LEFT, y - 0.6, MARGIN_LEFT + swatchWidth, y - 0.6);
-    pdf.doc.setLineDashPattern([], 0);
-    wrapPdfText(
-      series.label,
-      CONTENT_WIDTH - swatchWidth - gap,
-      pdf.measure,
-      "bold",
-      7.5,
-    ).forEach((item) => {
-      pdf.writeLine(item, indent, { font: "bold", size: 7.5, color: INK });
-    });
-  });
-  return pdf.cursor;
-}
-
-/** Jumlah baris legenda untuk sebuah grafik (dipakai untuk pagination). */
-function trendLegendLineCount(pdf: PdfDocument, chart: PdfTrendChart): number {
-  return chart.series.reduce(
-    (sum, series) =>
-      sum +
-      wrapPdfText(series.label, CONTENT_WIDTH - 7.5, pdf.measure, "bold", 7.5)
-        .length,
-    0,
-  );
-}
-
-/**
- * Grafik tren vektor: judul, satuan sumbu Y, kisi + angka sumbu, label periode
- * yang tidak pernah saling tumpang tindih, nilai di atas tiap titik, lalu
- * legenda. Satu grafik = satu kelompok seri, jadi tiga metrik skor maupun
- * agregat (Total Temuan) dan rincian (per parameter) tidak pernah digabung
- * dalam satu trendline.
- */
-function drawTrendChart(pdf: PdfDocument, chart: PdfTrendChart): void {
-  const { labels, series } = chart;
-  const plotHeight = 34;
-  const axisWidth = 9;
-  // Sisakan ruang di kanan supaya label periode terakhir tidak menyentuh tepi
-  // margin.
-  const labelRoom = 5;
-  const legendLines = trendLegendLineCount(pdf, chart);
-  pdf.ensureSpace(trendChartHeight(pdf, chart, legendLines) + 2);
-
-  pdf.paragraph(chart.title, { font: "bold", size: 9.5, color: INK });
-  pdf.paragraph(chart.note, { size: 7.5, color: INK_MUTE });
-
-  const unitTop = pdf.cursor;
-  pdf.doc.setFont(FONT, "bold");
-  pdf.doc.setFontSize(6.5);
-  pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
-  pdf.doc.text(pdfSafeText(chart.unit), MARGIN_LEFT, unitTop, {
-    baseline: "top",
-  });
-  pdf.moveTo(unitTop + line(6.5));
-
-  const plotLeft = MARGIN_LEFT + axisWidth;
-  const plotTop = pdf.cursor;
-  const plotWidth = CONTENT_WIDTH - axisWidth - labelRoom;
-  const values = series.flatMap((item) =>
-    item.data.filter((value): value is number => value !== null),
-  );
-  const maxValue = Math.max(1, ...values);
-  const step = niceStep(maxValue);
-  const tickMax = step * Math.max(1, Math.ceil(maxValue / step));
+  const axisWidth = 8;
+  const plotLeft = chart.x + axisWidth;
+  const plotWidth = chart.width - axisWidth - 3;
+  const plotTop = cursor + 1.5;
+  const span = Math.max(1, axis.max - axis.min);
   const yFor = (value: number) =>
-    plotTop + plotHeight - (value / tickMax) * plotHeight;
+    plotTop +
+    chart.plotHeight -
+    ((Math.min(axis.max, Math.max(axis.min, value)) - axis.min) / span) *
+      chart.plotHeight;
+  // Titik ujung diberi jarak dari tepi plot supaya label nilainya tidak
+  // menabrak angka sumbu Y.
+  const inset = Math.min(4, plotWidth / 10);
   const xFor = (index: number) =>
     labels.length === 1
       ? plotLeft + plotWidth / 2
-      : plotLeft + (index / (labels.length - 1)) * plotWidth;
+      : plotLeft + inset + (index / (labels.length - 1)) * (plotWidth - inset * 2);
 
-  const gridCount = Math.max(1, Math.round(tickMax / step));
-  for (let index = 0; index <= gridCount; index += 1) {
-    const value = step * index;
+  for (let value = axis.min; value <= axis.max + 0.0001; value += axis.step) {
     const y = yFor(value);
-    pdf.doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-    pdf.doc.setLineWidth(0.15);
-    pdf.doc.line(plotLeft, y, plotLeft + plotWidth, y);
-    pdf.doc.setFont(FONT, "normal");
-    pdf.doc.setFontSize(6.5);
-    pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
-    pdf.doc.text(String(value), plotLeft - 1.5, y, {
+    doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+    doc.setLineWidth(0.15);
+    doc.line(plotLeft, y, plotLeft + plotWidth, y);
+    doc.setFont(FONT, "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+    doc.text(formatNumber(value), plotLeft - 1.5, y, {
       align: "right",
       baseline: "middle",
     });
   }
 
-  // Label periode: hanya yang tidak akan saling menimpa. Ujung kiri/kanan
-  // selalu dicetak (rata kiri/rata kanan) supaya tidak keluar dari margin.
-  const labelWidths = labels.map((item) =>
+  if (chart.target !== undefined) {
+    const y = yFor(chart.target);
+    doc.setDrawColor(TONE_WARN[0], TONE_WARN[1], TONE_WARN[2]);
+    doc.setLineWidth(0.35);
+    doc.setLineDashPattern([1.5, 1], 0);
+    doc.line(plotLeft, y, plotLeft + plotWidth, y);
+    // Keterangan target sejajar judul, di luar area plot: tidak pernah
+    // menimpa titik data yang dekat dengan target.
+    const legendRight = chart.x + chart.width;
+    doc.line(legendRight - 17, top + 1.6, legendRight - 12, top + 1.6);
+    doc.setLineDashPattern([], 0);
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(6);
+    doc.setTextColor(TONE_WARN[0], TONE_WARN[1], TONE_WARN[2]);
+    doc.text(`Target ${chart.target}`, legendRight, top + 0.3, {
+      align: "right",
+      baseline: "top",
+    });
+  }
+
+  // Label periode: hanya yang tidak akan saling menimpa; ujung selalu dicetak.
+  const widths = labels.map((item) =>
     pdf.measure(pdfSafeText(item), "normal", 6.5),
   );
   const spacing =
-    labels.length > 1 ? plotWidth / (labels.length - 1) : plotWidth;
+    labels.length > 1 ? (plotWidth - inset * 2) / (labels.length - 1) : plotWidth;
   const stride = Math.max(
     1,
-    Math.ceil((Math.max(...labelWidths) + 2) / Math.max(spacing, 0.01)),
+    Math.ceil((Math.max(0, ...widths) + 2) / Math.max(spacing, 0.01)),
   );
   const lastIndex = labels.length - 1;
-  let previousDrawn = -1;
   labels.forEach((item, index) => {
     const isEdge = index === 0 || index === lastIndex;
-    const onStride = index % stride === 0;
-    if (!isEdge && !onStride) return;
-    // Label yang terlalu dekat dengan label terakhir dilewati: dua label
-    // yang tumpang tindih lebih buruk daripada satu label yang dilewati.
-    if (onStride && !isEdge && lastIndex - previousDrawn < stride * 0.7) return;
+    if (!isEdge && index % stride !== 0) return;
+    if (!isEdge && lastIndex - index < stride * 0.7) return;
+    // Ujung kiri/kanan rata ke tepi plot supaya tidak keluar dari kolomnya.
     const align =
-      index === 0 ? "left" : index === lastIndex ? "right" : "center";
-    pdf.doc.setFont(FONT, "normal");
-    pdf.doc.setFontSize(6.5);
-    pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
-    pdf.doc.text(pdfSafeText(item), xFor(index), plotTop + plotHeight + 1.5, {
+      labels.length === 1
+        ? "center"
+        : index === 0 && inset < 3
+          ? "left"
+          : index === lastIndex && inset < 3
+            ? "right"
+            : "center";
+    doc.setFont(FONT, "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
+    doc.text(pdfSafeText(item), xFor(index), plotTop + chart.plotHeight + 1.5, {
       align,
       baseline: "top",
     });
-    previousDrawn = index;
   });
 
-  // Label nilai hanya digambar kalau jaraknya cukup lega; kalau tidak, angka
-  // saling tumpang tindih dan grafik justru makin sulit dibaca.
-  const showValues = spacing >= 9;
-  series.forEach((seriesItem, seriesIndex) => {
-    const color = hexRgb(seriesItem.color);
-    pdf.doc.setDrawColor(color[0], color[1], color[2]);
-    pdf.doc.setLineWidth(lineDash(seriesIndex, seriesItem.emphasis).width);
-    pdf.doc.setLineDashPattern(
-      seriesPattern(seriesIndex, seriesItem.emphasis),
-      0,
+  doc.setDrawColor(INK[0], INK[1], INK[2]);
+  doc.setLineWidth(0.5);
+  for (let position = 1; position < labels.length; position += 1) {
+    const previous = series.data[position - 1];
+    const value = series.data[position];
+    if (previous == null || value == null) continue;
+    doc.line(xFor(position - 1), yFor(previous), xFor(position), yFor(value));
+  }
+  const showValues = spacing >= 7;
+  series.data.forEach((value, position) => {
+    if (value == null) return;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(INK[0], INK[1], INK[2]);
+    doc.setLineWidth(0.25);
+    doc.circle(xFor(position), yFor(value), 0.8, "FD");
+    if (!showValues) return;
+    const nearTop = yFor(value) <= plotTop + 2.5;
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(INK[0], INK[1], INK[2]);
+    doc.text(
+      formatNumber(value),
+      xFor(position),
+      yFor(value) + (nearTop ? 1.3 : -1.3),
+      { align: "center", baseline: nearTop ? "top" : "bottom" },
     );
-    for (let position = 1; position < labels.length; position += 1) {
-      const previousValue = seriesItem.data[position - 1];
-      const value = seriesItem.data[position];
-      // Periode tanpa data (null) tidak pernah disambung ke periode berikutnya.
-      if (previousValue == null || value == null) continue;
-      if (!Number.isFinite(previousValue) || !Number.isFinite(value)) continue;
-      pdf.doc.line(
-        xFor(position - 1),
-        yFor(previousValue),
-        xFor(position),
-        yFor(value),
-      );
-    }
-    pdf.doc.setLineDashPattern([], 0);
-    for (let position = 0; position < labels.length; position += 1) {
-      const value = seriesItem.data[position];
-      if (value == null || !Number.isFinite(value)) continue;
-      pdf.doc.setFillColor(255, 255, 255);
-      pdf.doc.setDrawColor(color[0], color[1], color[2]);
-      pdf.doc.setLineWidth(0.2);
-      pdf.doc.circle(xFor(position), yFor(value), 0.9, "FD");
-      if (!showValues) continue;
-      // Hanya nilai yang menyentuh PUNCUK plot yang dicetak di bawah titik.
-      // Nilai di dasar plot (nol) juga dicetak di bawah akan menabrak label
-      // periode yang tepat di bawah sumbu X.
-      const atTop = yFor(value) <= plotTop + 2;
-      pdf.doc.setFont(FONT, "bold");
-      pdf.doc.setFontSize(6.5);
-      pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
-      pdf.doc.text(
-        String(value),
-        xFor(position),
-        yFor(value) + (atTop ? 1.4 : -1.4),
-        {
-          align: "center",
-          baseline: atTop ? "top" : "bottom",
-        },
-      );
-    }
   });
-
-  const afterPlot = plotTop + plotHeight + line(6.5) + 1;
-  const afterLegend = drawTrendLegend(pdf, chart, afterPlot);
-  pdf.moveTo(afterLegend);
-  pdf.paragraph(
-    `Grafik menampilkan ${labels.length} periode dan ${series.length} seri data. Nilai lengkapnya ada pada tabel ${chart.caption}.`,
-    { size: 7, color: INK_FAINT, gapAfter: 2 },
-  );
-
-  pdf.table({
-    caption: chart.caption,
-    columns: ["Periode", ...series.map((item) => item.label)].map(
-      (label, index) => ({
-        header: label,
-        weight: index === 0 ? 0.8 : 1,
-        minWidth: index === 0 ? 16 : 20,
-        align: index === 0 ? ("left" as const) : ("right" as const),
-      }),
-    ),
-    rows: labels.map((item, index) => [
-      item,
-      ...series.map((seriesItem) => {
-        const value = seriesItem.data[index];
-        return typeof value === "number" && Number.isFinite(value)
-          ? numberText(value)
-          : "\u2014";
-      }),
-    ]),
-  });
+  return plotTop + chart.plotHeight + line(6.5) + 2;
 }
 
-/**
- * Seksi "Perkembangan Skor" — skor dari `monthlySummaries`, bukan dari
- * `personalTrend`. Tiga metrik (final, non-critical, critical) masing-masing
- * satu grafik vektor + satu tabel, jadi tidak ada trendline yang mencampur tiga
- * sumber hitungan berbeda dan tidak ada tabel yang ikut memuat kolom metrik
- * lain.
- */
 function buildScoreTrendSection(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
 ): void {
-  const { labels, charts } = buildScoreTrend({
-    monthlySummaries: input.monthlySummaries,
-    selectedYear: input.selectedYear,
-  });
+  const { labels, charts } = scoreTrend(input);
+  pdf.heading("Perkembangan Skor", undefined, 50);
   if (labels.length === 0) {
-    pdf.paragraph(SCORE_EMPTY_NOTE, { color: INK_MUTE });
+    note(pdf, SCORE_EMPTY_NOTE);
     return;
   }
-  pdf.paragraph(
-    trendScopeLabel(input.selectedService, input.selectedYear, labels),
-    { size: 7.5, color: INK_FAINT },
+  note(
+    pdf,
+    `Satu grafik per jenis skor. Garis putus-putus menandai target ${QA_TARGET}; angka lengkapnya ada di tabel Rekap Skor Bulanan.`,
   );
-  for (const chart of charts) {
-    drawTrendChart(pdf, {
-      title: chart.title,
-      note: chart.note,
-      unit: SCORE_UNIT_LABEL,
-      caption: chart.tableCaption,
-      series: [chart.series],
-      labels,
-    });
-  }
+  const gap = 6;
+  const width = (CONTENT_WIDTH - gap * (charts.length - 1)) / charts.length;
+  const specs: PdfChart[] = charts.map((chart, index) => ({
+    x: MARGIN_LEFT + index * (width + gap),
+    width,
+    title: chart.title,
+    labels,
+    series: chart.series,
+    axis: scoreAxis(chart.series.data),
+    target: QA_TARGET,
+    plotHeight: 30,
+  }));
+  pdf.ensureSpace(Math.max(...specs.map(chartHeight)));
+  const top = pdf.cursor;
+  const bottoms = specs.map((spec) => drawChart(pdf, spec, top));
+  pdf.moveTo(Math.max(...bottoms) + 4);
 }
 
-/**
- * Seksi "Tren Temuan" — `personalTrend`, yaitu JUMLAH TEMUAN per periode.
- *
- * Tidak ada satu pun garis skor di sini: seksi skor sudah punya grafik dan
- * tabelnya sendiri di atas. Tabel perbandingan temuan ikut di sini karena
- * isinya juga hitungan temuan.
- */
 function buildFindingsTrendSection(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
+  scopes: ReportScopes,
 ): void {
-  const { labels, total, parameters } = groupTrendSeries(input.data);
+  const { labels, total, parameters } = findingTrend(input.data);
+  pdf.heading("Tren Temuan", undefined, 40);
   if (labels.length === 0 || (total === null && parameters.length === 0)) {
-    pdf.paragraph("Data tren belum tersedia untuk konteks ini.", {
-      color: INK_MUTE,
+    note(pdf, TREND_EMPTY_NOTE);
+  } else {
+    if (total) {
+      const spec: PdfChart = {
+        x: MARGIN_LEFT,
+        width: CONTENT_WIDTH,
+        title: "Total Temuan per Bulan",
+        unit: TREND_UNIT_LABEL,
+        labels,
+        series: total,
+        axis: countAxis(total.data),
+        plotHeight: 32,
+      };
+      pdf.ensureSpace(chartHeight(spec));
+      pdf.moveTo(drawChart(pdf, spec, pdf.cursor) + 3);
+    }
+    const sum = (series: TrendSeries) =>
+      series.data.reduce<number>((acc, value) => acc + (value ?? 0), 0);
+    const cell = (value: number | null) =>
+      value === null ? "—" : formatNumber(value);
+    const rows = [
+      ...(total ? [total] : []),
+      ...parameters,
+    ].map((series) => [
+      series.label,
+      ...series.data.map(cell),
+      formatNumber(sum(series)),
+    ]);
+    pdf.table({
+      caption: "Temuan per Parameter",
+      columns: [
+        { header: "Parameter", weight: 3, minWidth: 40 },
+        ...labels.map((label) => ({
+          header: label,
+          weight: 1,
+          minWidth: 9,
+          align: "right" as const,
+        })),
+        { header: "Total", weight: 1, minWidth: 11, align: "right" as const },
+      ],
+      rows,
+      totalRows: total ? [0] : [],
     });
-    return;
   }
-  pdf.paragraph(
-    trendScopeLabel(input.selectedService, input.selectedYear, labels),
-    {
-      size: 7.5,
-      color: INK_FAINT,
-    },
-  );
-
-  if (total) {
-    drawTrendChart(pdf, {
-      title: "Jumlah Total Temuan per Periode",
-      note: "Agregat seluruh temuan pada cakupan ini, satu titik per periode.",
-      unit: TREND_UNIT_LABEL,
-      caption: TREND_TOTAL_TABLE_CAPTION,
-      series: [total],
-      labels,
-    });
-  }
-  if (parameters.length > 0) {
-    drawTrendChart(pdf, {
-      title: "Jumlah Temuan per Parameter",
-      note:
-        "Satu seri per parameter penilaian. Semua seri memakai satuan yang sama (" +
-        TREND_UNIT_LABEL.toLowerCase() +
-        " per periode), jadi boleh dibaca sebagai pembanding langsung.",
-      unit: TREND_UNIT_LABEL,
-      caption: TREND_PARAMETER_TABLE_CAPTION,
-      series: parameters,
-      labels,
-    });
-  }
+  buildComparisonTable(pdf, input, scopes);
 }
 
 function buildComparisonTable(
   pdf: PdfDocument,
   input: AgentReportPdfInput,
+  scopes: ReportScopes,
 ): void {
   const table = input.data.comparisonTable;
   if (!table || table.rows.length === 0) return;
-  const delta = (agentCount: number, average: number): number | null => {
-    const agent = safeNumber(agentCount);
-    const mean = safeNumber(average);
-    if (mean === 0) return agent === 0 ? 0 : null;
-    return safeNumber(((agent - mean) / mean) * 100);
-  };
-  const formatDelta = (value: number | null): string => {
-    if (value === null) return "\u2014";
-    const rounded = Math.round(safeNumber(value) * 10) / 10;
-    if (rounded === 0) return "0%";
-    return `${rounded > 0 ? "+" : "-"}${Math.abs(rounded).toFixed(1)}%`;
-  };
-  const totalRow = table.rows.find((row) => row.key === "total");
-  const peers = `${numberText(totalRow?.teamAgentCount)} agen tim / ${numberText(totalRow?.serviceAgentCount)} agen layanan sama`;
-  // Cakupan benchmark memakai kalimat yang sama dengan CSV/MD
-  // (`comparisonScopeLabel`), jadi ketiga format tidak berbeda cerita tentang
-  // periode mana yang dibandingkan.
-  pdf.paragraph(
-    [comparisonScopeLabel(input.data), peers].filter(Boolean).join(" \u2022 "),
-    { size: 7.5, color: INK_FAINT },
-  );
+  pdf.heading("Perbandingan dengan Tim dan Layanan", scopes.comparison, 20, 10);
+  const deltas = table.rows.map((row) => ({
+    team: comparisonDelta(row.agentCount, row.teamAverage),
+    service: comparisonDelta(row.agentCount, row.serviceAverage),
+  }));
   pdf.table({
-    caption: "Perbandingan Temuan",
     columns: [
       { header: "Parameter", weight: 1.8, minWidth: 44 },
-      { header: "Agen Ini", weight: 0.7, minWidth: 16, align: "right" },
-      { header: "Rata-rata Tim", weight: 0.8, minWidth: 20, align: "right" },
+      { header: "Agen ini", weight: 0.6, minWidth: 14, align: "right" },
+      { header: "Rata-rata tim", weight: 0.8, minWidth: 20, align: "right" },
+      { header: "Rata-rata layanan", weight: 0.9, minWidth: 25, align: "right" },
       {
-        header: "Rata-rata Service",
-        weight: 0.9,
-        minWidth: 24,
-        align: "right",
-      },
-      {
-        header: "% vs Tim",
-        weight: 0.7,
-        minWidth: 16,
-        align: "right",
-        tone: (rowIndex) => {
-          const row = table.rows[rowIndex];
-          return row ? deltaTone(delta(row.agentCount, row.teamAverage)) : null;
-        },
-      },
-      {
-        header: "% vs Service",
+        header: "Selisih vs tim",
         weight: 0.8,
-        minWidth: 20,
+        minWidth: 21,
         align: "right",
-        tone: (rowIndex) => {
-          const row = table.rows[rowIndex];
-          return row
-            ? deltaTone(delta(row.agentCount, row.serviceAverage))
-            : null;
-        },
+        tone: (rowIndex) =>
+          findingDeltaTone(
+            table.rows[rowIndex]?.agentCount ?? 0,
+            deltas[rowIndex]?.team ?? null,
+          ),
+      },
+      {
+        header: "Selisih vs layanan",
+        weight: 0.9,
+        minWidth: 26,
+        align: "right",
+        tone: (rowIndex) =>
+          findingDeltaTone(
+            table.rows[rowIndex]?.agentCount ?? 0,
+            deltas[rowIndex]?.service ?? null,
+          ),
       },
     ],
-    rows: table.rows.map((row) => [
+    rows: table.rows.map((row, index) => [
       row.label,
-      numberText(row.agentCount),
-      safeNumber(row.teamAverage).toFixed(1),
-      safeNumber(row.serviceAverage).toFixed(1),
-      formatDelta(delta(row.agentCount, row.teamAverage)),
-      formatDelta(delta(row.agentCount, row.serviceAverage)),
+      formatNumber(row.agentCount),
+      formatNumber(row.teamAverage, 1),
+      formatNumber(row.serviceAverage, 1),
+      formatPercentDelta(deltas[index].team),
+      formatPercentDelta(deltas[index].service),
     ]),
     totalRows: table.rows
       .map((row, index) => (row.key === "total" ? index : -1))
       .filter((index) => index >= 0),
   });
-}
-
-function buildFindings(pdf: PdfDocument, input: AgentReportPdfInput): void {
-  pdf.paragraph(
-    yearServiceScopeLabel(input.selectedService, input.selectedYear),
-    { size: 7.5, color: INK_FAINT },
+  note(
+    pdf,
+    "Hijau = temuan lebih sedikit dari rata-rata (lebih baik). Merah = lebih banyak.",
   );
-  const items = input.temuanDisplayItems;
-  if (items.length === 0) {
-    pdf.paragraph("Tidak ada temuan untuk cakupan ini.", { color: INK_MUTE });
-    return;
-  }
-
-  const grouped = new Map<string, TemuanDisplayItemExport[]>();
-  for (const item of items) {
-    const key = `${item.year}-${String(item.month).padStart(2, "0")}`;
-    const bucket = grouped.get(key) ?? [];
-    bucket.push(item);
-    grouped.set(key, bucket);
-  }
-
-  for (const [, monthItems] of Array.from(grouped.entries()).sort(([a], [b]) =>
-    b.localeCompare(a),
-  )) {
-    const first = monthItems[0];
-    const tickets = new Map<
-      string,
-      { label: string; items: TemuanDisplayItemExport[] }
-    >();
-    for (const item of monthItems) {
-      const raw = (item.no_tiket ?? "").trim();
-      const key = raw ? raw.toUpperCase() : `audit-${item.id}`;
-      const ticket = tickets.get(key) ?? {
-        label: raw ? raw.toUpperCase() : "AUDIT INTERNAL",
-        items: [],
-      };
-      ticket.items.push(item);
-      tickets.set(key, ticket);
-    }
-    pdf.paragraph(
-      `${monthYear(first.month, first.year)} \u2014 ${numberText(monthItems.length)} temuan, ${numberText(tickets.size)} tiket`,
-      { font: "bold", size: 9.5, color: INK, gapAfter: 1 },
-    );
-    for (const ticket of tickets.values()) {
-      drawTicketBand(pdf, ticket.label, ticket.items.length);
-      for (const item of ticket.items) {
-        // Nama parameter + nilai: lengkap dan proporsional, tapi tidak pernah
-        // lebih besar atau lebih tebal daripada nomor tiket di pitanya.
-        pdf.paragraph(
-          `${formatNilai(item.nilai)} \u2014 ${item.indicatorName}`,
-          {
-            font: "bold",
-            size: 9,
-            color: INK,
-            indent: 3,
-          },
-        );
-        pdf.paragraph(`Ketidaksesuaian: ${item.ketidaksesuaian ?? "\u2014"}`, {
-          size: 9,
-          indent: 3,
-          gapAfter: 0.5,
-        });
-        pdf.paragraph(`Sebaiknya: ${item.sebaiknya ?? "\u2014"}`, {
-          size: 9,
-          indent: 3,
-          gapAfter: 1.5,
-        });
-      }
-    }
-  }
 }
+
+// ---------------------------------------------------------------------------
+// Detail temuan
+// ---------------------------------------------------------------------------
 
 /**
- * Pita identitas per tiket: label "NO TIKET", nomor tiket, dan jumlah parameter
- * di dalam bidang abu muda. Nomor tiket dicetak paling besar dan paling tebal
- * di blok temuan — itu identifier yang dicari pembaca saat membaca audit, dan
- * sebelumnya ia tenggelam di antara nama parameter.
- *
- * Pita ini adalah satu blok: pita tidak pernah menggantung sendirian di dasar
- * halaman, dan pita selalu membawa minimal satu baris temuan bersamanya.
+ * Pita satu parameter: nama parameter (tebal) di kiri, ringkasan jumlah dan
+ * kategori di kanan. Pita selalu membawa minimal dua baris isi bersamanya.
  */
-function drawTicketBand(
-  pdf: PdfDocument,
-  label: string,
-  itemCount: number,
-): void {
+function drawGroupBand(pdf: PdfDocument, title: string, facts: string): void {
   const paddingX = 3;
-  const paddingY = 2;
-  const labelSize = 7;
-  const codeSize = 11.5;
-  const labelText = "NO TIKET";
-  const labelWidth = pdf.measure(labelText, "bold", labelSize);
-  const note = `${numberText(itemCount)} parameter`;
-  // Nomor tiket yang panjang membungkus di dalam pita, bukan meluber melewati
-  // margin kanan. Ruang sisanya dipakai untuk jumlah parameter di tepi kanan.
-  const code = wrapPdfText(
-    label,
-    CONTENT_WIDTH - paddingX * 2 - labelWidth - 2 - 30,
+  const paddingY = 1.8;
+  const size = 10;
+  const factsWidth = pdf.measure(pdfSafeText(facts), "normal", 7.5) + 2;
+  const titleLines = wrapPdfText(
+    title,
+    CONTENT_WIDTH - paddingX * 2 - factsWidth - 4,
     pdf.measure,
     "bold",
-    codeSize,
+    size,
   );
-  const bandHeight = paddingY * 2 + line(codeSize) * code.length;
-  // Pita + satu baris temuan pertama harus muat bersama; kalau tidak, pindah
-  // halaman sekarang juga.
-  pdf.ensureSpace(bandHeight + line(9) + 2);
-
+  const bandHeight = paddingY * 2 + line(size) * titleLines.length;
+  pdf.ensureSpace(bandHeight + line(9) * 2 + 2);
   const top = pdf.cursor;
   pdf.doc.setFillColor(WASH[0], WASH[1], WASH[2]);
   pdf.doc.setDrawColor(LINE_STRONG[0], LINE_STRONG[1], LINE_STRONG[2]);
   pdf.doc.setLineWidth(0.2);
   pdf.doc.rect(MARGIN_LEFT, top, CONTENT_WIDTH, bandHeight, "FD");
-
-  const textTop = top + paddingY;
   pdf.doc.setFont(FONT, "bold");
-  pdf.doc.setFontSize(labelSize);
-  pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
-  pdf.doc.text(labelText, MARGIN_LEFT + paddingX, textTop, { baseline: "top" });
-
-  pdf.doc.setFont(FONT, "bold");
-  pdf.doc.setFontSize(codeSize);
+  pdf.doc.setFontSize(size);
   pdf.doc.setTextColor(INK[0], INK[1], INK[2]);
-  code.forEach((item, index) => {
-    pdf.doc.text(
-      item,
-      MARGIN_LEFT + paddingX + labelWidth + 2,
-      textTop + index * line(codeSize),
-      {
-        baseline: "top",
-      },
-    );
+  titleLines.forEach((item, index) => {
+    pdf.doc.text(item, MARGIN_LEFT + paddingX, top + paddingY + index * line(size), {
+      baseline: "top",
+    });
   });
-
   pdf.doc.setFont(FONT, "normal");
   pdf.doc.setFontSize(7.5);
   pdf.doc.setTextColor(INK_MUTE[0], INK_MUTE[1], INK_MUTE[2]);
-  pdf.doc.text(note, PAGE_WIDTH - MARGIN_RIGHT - paddingX, textTop, {
-    align: "right",
-    baseline: "top",
-  });
-  pdf.moveTo(top + bandHeight + 1);
+  pdf.doc.text(
+    pdfSafeText(facts),
+    PAGE_WIDTH - MARGIN_RIGHT - paddingX,
+    top + paddingY + 0.6,
+    { align: "right", baseline: "top" },
+  );
+  pdf.moveTo(top + bandHeight + 2);
 }
 
-function buildColophon(
-  pdf: PdfDocument,
-  input: AgentReportPdfInput,
-  dateStr: string,
-  serviceLabel: string,
-): void {
-  const notes: string[] = [
-    `Dihasilkan pada ${dateStr} dari halaman SIDAK saat laporan diunduh. Tiap bagian menyatakan cakupan periodenya sendiri di bawah judulnya.`,
-    "Sesi tanpa temuan (clean session) tidak ditampilkan sebagai baris temuan, tiket, atau parameter; hanya angka agregat Sesi pada rekap bulanan yang ikut, sesuai perhitungan backend.",
-    "Angka agregat sesi berasal dari penilaian backend dan tidak dihitung ulang oleh laporan ini.",
-  ];
-  // Colophon adalah satu blok: kalau tidak muat, ia pindah halaman utuh
-  // daripada terbelah sehingga penyimpulan laporan terpisah dari paragrafnya.
-  const blockHeight =
-    7 +
-    line(7.5) +
-    notes.reduce(
-      (sum, note) =>
-        sum +
-        wrapPdfText(note, CONTENT_WIDTH, pdf.measure, "normal", 7).length *
-          line(7),
-      0,
-    );
-  pdf.ensureSpace(blockHeight + 8);
-  pdf.rule(LINE, 4, 3);
-  pdf.paragraph(
-    `Laporan Audit SIDAK \u2022 ${input.data.peserta.nama} \u2022 Tahun ${yearText(input.selectedYear)} \u2022 Layanan ${serviceLabel}`,
-    { font: "bold", size: 7.5, color: INK_MUTE },
+function buildFindings(pdf: PdfDocument, input: AgentReportPdfInput): void {
+  pdf.heading("Detail Temuan", undefined, 30);
+  const groups = groupFindingsByParameter(input.temuanDisplayItems);
+  if (groups.length === 0) {
+    note(pdf, "Tidak ada temuan pada tahun dan layanan ini.");
+    return;
+  }
+  note(
+    pdf,
+    `${formatNumber(input.temuanDisplayItems.length)} temuan di ${formatNumber(groups.length)} parameter, paling sering lebih dulu. Temuan dengan catatan yang sama digabung dan daftar tiketnya ditulis di bawahnya.`,
+    3,
   );
-  for (const note of notes) pdf.paragraph(note, { size: 7, color: INK_FAINT });
+  for (const group of groups) {
+    drawGroupBand(
+      pdf,
+      group.parameter,
+      [
+        `${formatNumber(group.count)} temuan`,
+        group.category,
+        group.criticalCount > 0 && group.category !== "Critical"
+          ? `${formatNumber(group.criticalCount)} critical`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" • "),
+    );
+    group.entries.forEach((entry, index) => {
+      if (index > 0) pdf.rule(LINE, 0.5, 2);
+      pdf.paragraph(`Ketidaksesuaian: ${entry.ketidaksesuaian}`, {
+        size: 9,
+        indent: 3,
+        gapAfter: 0.5,
+      });
+      // "Sebaiknya" + daftar tiketnya adalah satu unit: daftar tiket tidak
+      // boleh jatuh sendirian ke halaman berikutnya tanpa konteksnya.
+      const fixLines = wrapPdfText(
+        `Sebaiknya: ${entry.sebaiknya}`,
+        CONTENT_WIDTH - 3,
+        pdf.measure,
+        "normal",
+        9,
+      ).length;
+      pdf.ensureSpace(
+        Math.min(
+          fixLines * line(9) + 1 + entry.occurrences.length * line(8),
+          CONTENT_BOTTOM - MARGIN_TOP,
+        ),
+      );
+      pdf.paragraph(`Sebaiknya: ${entry.sebaiknya}`, {
+        size: 9,
+        color: INK,
+        indent: 3,
+        gapAfter: 1,
+      });
+      for (const occurrence of entry.occurrences) {
+        pdf.paragraph(
+          `${occurrence.ticket} — ${monthLabel(occurrence.month, occurrence.year)} — Nilai ${nilaiText(occurrence.nilai)}`,
+          { size: 8, color: INK_MUTE, indent: 6 },
+        );
+      }
+      pdf.moveTo(pdf.cursor + 1.5);
+    });
+    pdf.moveTo(pdf.cursor + 2);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1792,11 +1496,8 @@ function buildColophon(
 // ---------------------------------------------------------------------------
 
 /**
- * Bangun PDF A4 portrait dari snapshot yang sama dengan format lain.
- *
- * `jsPDF` diimpor secara dinamis di dalam fungsi ini: pengguna yang hanya
- * mengunduh CSV/MD/HTML tidak pernah memuat pustaka PDF. Kegagalan import
- * maupun kegagalan pembuatan dilempar apa adanya supaya pemanggil menampilkan
+ * Bangun PDF A4 portrait dari snapshot yang sama dengan format lain. Kegagalan
+ * impor maupun pembuatan dilempar apa adanya supaya pemanggil menampilkan
  * umpan balik error dan tidak pernah mengunduh file kosong.
  */
 export async function generateAgentReportPdf(
@@ -1814,8 +1515,10 @@ export async function generateAgentReportPdf(
   });
 
   const peserta = input.data.peserta;
-  const masaKerja = computeTenure(peserta.bergabung_date);
-  const serviceLabel = input.selectedService.toUpperCase() || "\u2014";
+  const scopes = reportScopes(input);
+  const service = serviceLabel(input.selectedService);
+  const year = yearText(input.selectedYear);
+  const activeMonth = resolveActiveMonth(input);
   const dateStr = new Date().toLocaleString("id-ID", {
     year: "numeric",
     month: "long",
@@ -1823,18 +1526,12 @@ export async function generateAgentReportPdf(
     hour: "2-digit",
     minute: "2-digit",
   });
-  const activeMonth =
-    input.context.selectedMonth ??
-    input.monthlySummaries[input.monthlySummaries.length - 1]?.month ??
-    null;
 
-  // Metadata memakai teks yang sudah disanitasi supaya judul/subject tidak
-  // pernah memuat byte yang tidak bisa dibaca pembaca PDF mana pun.
   doc.setProperties({
     title: `Laporan Audit Agent - ${pdfSafeText(peserta.nama)}`,
-    subject: `Tahun ${yearText(input.selectedYear)} - Layanan ${serviceLabel} - Bulan ${monthYear(activeMonth, input.selectedYear)}`,
+    subject: `Tahun ${year} - Layanan ${service} - Bulan ${activeMonth ? monthLabel(activeMonth, year) : "belum ada"}`,
     author: "SIDAK",
-    keywords: `audit, sidak, ${yearText(input.selectedYear)}, ${input.selectedService}`,
+    keywords: `audit, sidak, ${year}, ${service}`,
     creator: "Trainers SuperApp - Laporan Audit SIDAK",
   });
 
@@ -1842,40 +1539,25 @@ export async function generateAgentReportPdf(
     doc,
     {
       left: "Laporan Audit SIDAK",
-      right: `${pdfSafeText(peserta.nama)} \u2022 Tahun ${yearText(input.selectedYear)} \u2022 ${serviceLabel}`,
+      right: `${pdfSafeText(peserta.nama)} • Layanan ${service} • ${year}`,
     },
     createMeasurer(doc),
   );
   pdf.begin();
 
-  buildMasthead(pdf, input, masaKerja, serviceLabel);
-  pdf.heading(
-    "Ringkasan",
-    `Tahun ${yearText(input.selectedYear)} \u2022 Layanan ${serviceLabel} \u2022 Bulan terpilih ${monthYear(activeMonth, input.selectedYear)}`,
-    // Blok skor periode aktif adalah isi pertama seksi ini.
-    40,
-  );
-  buildActiveScore(pdf, input, activeMonth);
+  buildMasthead(pdf, input, scopes, dateStr);
+  buildHighlightsSection(pdf, input);
+
+  pdf.heading("Ringkasan", undefined, 40);
   buildStanding(pdf, input);
+  buildActiveScore(pdf, input);
   buildMonthlyTable(pdf, input);
-  buildTicketsTable(pdf, input, activeMonth);
-  buildRootCauses(pdf, input, activeMonth);
+  buildTicketsTable(pdf, input, scopes);
+  buildRootCauses(pdf, input, scopes);
 
-  // Isi pertama seksi ini adalah blok grafik skor pertama: judul, satuan,
-  // plot, label periode, nilai, dan legenda harus utuh di halaman yang sama.
-  pdf.heading("Perkembangan Skor", undefined, 62);
   buildScoreTrendSection(pdf, input);
-
-  // Isi seksi ini adalah grafik JUMLAH TEMUAN (bukan skor) + tabel benchmark.
-  pdf.heading("Tren Temuan", undefined, 62);
-  buildFindingsTrendSection(pdf, input);
-  buildComparisonTable(pdf, input);
-
-  // Isi pertama seksi ini adalah satu blok periode + pita tiket + temuan.
-  pdf.heading("Riwayat Temuan", undefined, 34);
+  buildFindingsTrendSection(pdf, input, scopes);
   buildFindings(pdf, input);
-
-  buildColophon(pdf, input, dateStr, serviceLabel);
   pdf.finalize();
 
   return doc.output("arraybuffer") as ArrayBuffer;

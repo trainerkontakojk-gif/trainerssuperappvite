@@ -1,4 +1,56 @@
-# Feature Request — Agent Detail Export: CSV / MD / HTML / PDF
+# Feature Request — Agent Detail Export: Excel / HTML / PDF
+
+> **Pembaruan 2026-10-06 — keterbacaan laporan (plan
+> [`plans/markdown/sidak-agent-report-readability.md`](../plans/markdown/sidak-agent-report-readability.md)).**
+> Bagian ini **menggantikan** kontrak lama di bawahnya bila bertentangan.
+>
+> - **Format:** menu **Unduh Laporan** sekarang menawarkan **empat** format:
+>   **Excel (.xlsx)**, HTML Interaktif, HTML Statis, dan PDF. **CSV dan Markdown
+>   dihapus** (disetujui Fajar) dan digantikan Excel. Seluruh bagian "CSV",
+>   "MD", "Kontrak CSV multi-seksi", prefiks `[teks] `, dan baris `// Cakupan:`
+>   di bawah adalah **riwayat**, bukan kontrak aktif.
+> - **Excel:** sheet `Ringkasan` (identitas, cakupan, Kesimpulan Utama),
+>   `Skor Bulanan`, `Temuan`, `Tiket`, `Akar Masalah`, `Tren Temuan`,
+>   `Perbandingan`. Header tebal + beku + filter otomatis, angka disimpan
+>   sebagai angka, label manusiawi. Teks yang diawali `=`/`+`/`-`/`@` disimpan
+>   sebagai sel string (`exceljs` tidak pernah diberi objek `{ formula }`), jadi
+>   tidak pernah dievaluasi sebagai formula. Sheet tanpa data berisi satu
+>   kalimat kosong yang jujur. `exceljs` diimpor dinamis.
+> - **Model bersama:** `apps/web/src/utils/agentReportModel.ts` memegang kamus
+>   label (layanan `Call`, jabatan via `labelJabatan`, kategori
+>   `Critical`/`Non-critical`, nilai `Kritis`/`Tidak Sesuai`/`Perlu
+>   Perbaikan`/`Sesuai`, bulan `Februari 2026`, angka gaya Indonesia), cakupan,
+>   **Kesimpulan Utama** deterministik (skor bulan terpilih vs target 95 dalam
+>   poin, capaian target tahun ini, parameter temuan terbanyak, fokus coaching
+>   dari akar masalah teratas — tanpa AI), pengelompokan temuan per parameter,
+>   dan arah baik/buruk. HTML, PDF, dan Excel memakai modul ini.
+> - **Cakupan:** ditulis sekali di header (`Layanan Call • Tahun 2026 • Bulan
+>   terpilih Februari 2026`). Seksi hanya menulis cakupan bila berbeda: tiket
+>   (`Hanya Februari 2026`), akar masalah (`Januari s.d. Februari 2026`), dan
+>   perbandingan (cakupan `comparisonTable.scope` dari backend).
+> - **HTML/PDF:** urutan baca identitas → Kesimpulan Utama → Ringkasan (posisi,
+>   skor bulan terpilih + selisih dalam **poin**, Rekap Skor Bulanan, tiket,
+>   akar masalah) → Perkembangan Skor → Tren Temuan → Detail Temuan. Satu metrik
+>   skor tetap satu grafik, tetapi sumbu di-zoom dan ada garis **target 95**;
+>   tabel data per grafik skor dihapus karena angkanya sama dengan Rekap Skor
+>   Bulanan. Tren temuan = satu grafik total + **tabel** parameter × bulan
+>   (menggantikan grafik garis per parameter dan filter seri). Perbandingan:
+>   temuan **lebih sedikit** dari rata-rata = hijau, **lebih banyak** = merah
+>   (sebelumnya terbalik). Detail Temuan dikelompokkan **per parameter**;
+>   catatan yang sama digabung dengan daftar kemunculan (nomor tiket di depan,
+>   bulan, nilai). Pita "NO TIKET" per tiket tidak ada lagi.
+> - **PDF:** header kolom rata kanan kini dijangkar di tepi kanan kolom (dulu
+>   bergeser satu kolom ke kiri); judul "Akar Masalah" tercetak; waktu
+>   pembuatan ada di identitas dan catatan sesi tanpa temuan di bawah Rekap
+>   Skor Bulanan, sehingga tidak ada halaman terakhir yang hanya berisi penutup;
+>   "Sebaiknya" + daftar tiketnya tidak pernah terpisah halaman. Catatan yang
+>   diketik dengan Enter tidak lagi tercetak sebagai `[U+000A]`: baris baru
+>   dipertahankan dan tab menjadi spasi.
+> - **Regresi E2E:** `sidak-agent-report-readability.spec.ts` (6),
+>   `sidak-agent-report-download.spec.ts` (25), `sidak-agent-html-export-parity.spec.ts`
+>   (2), `sidak-agent-report-date-invariance.spec.ts` (2, kini membandingkan
+>   isi sheet Excel). Test CSV/MD dihapus atau dipindah ke Excel; test formula
+>   CSV digantikan test formula Excel. Unit test non-E2E tidak ditambah.
 
 ## Status
 
@@ -306,8 +358,11 @@ yang dipecah per karakter.
   menuliskan penanda itu. Batas ini diketahui, diterima, dan sengaja tidak
   diperbaiki — memperjelas ambiguitas itu butuh escape atau kode penanda kedua
   yang mengubah kontrak keluaran PDF yang baru saja disetujui.
-- **Karakter kontrol** (tab, carriage return) juga ditandai, bukan dibuang,
-  supaya jejaknya tercatat.
+- **Baris baru dan tab bukan karakter tak-tercetak** (sejak 2026-10-06).
+  Catatan yang diketik dengan Enter dulu tercetak sebagai `[U+000A]`/`[U+000D]`.
+  Sekarang pemisah baris (`\n`, `\r\n`, `\r`) dipertahankan sebagai baris baru
+  di PDF dan HTML (`white-space: pre-line`), dan tab menjadi spasi. Karakter
+  kontrol lain tetap ditandai `[U+XXXX]`.
 - **Kotak inisial di header** (13 mm) bisa melebar kalau inisial nama agen
   sendiri merupakan karakter tak-tercetak; ini kosmetik, dan nama lengkapnya
   tetap tercetak utuh di sampingnya.

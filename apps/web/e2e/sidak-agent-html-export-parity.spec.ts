@@ -22,8 +22,8 @@
  *      serta zoom 200%. Bukti live-side ini hilang bersama refaktor ini kalau
  *      spec dibuang.
  *   3. **Dokumen unduhan layak direview mata.** Screenshot desktop + mobile
- *      untuk kedua varian, termasuk keadaan tersaring (tab Tren + filter seri
- *      + disclosure temuan terbuka), sebagai artefak di luar repo.
+ *      untuk kedua varian, termasuk keadaan terbuka (tab Tren + disclosure
+ *      temuan terbuka), sebagai artefak di luar repo.
  *
  * Yang SENGAJA tidak diuji di sini: kesetaraan piksel dengan aplikasi, hex
  * warna, atau ukuran font. Kontrak paritas di atas adalah soal isi dan
@@ -356,14 +356,11 @@ test.describe("SIDAK agent report: paritas live vs unduhan", () => {
       const offline = await readReportOffline(context, interactiveFile);
       const document = offline.page;
       await document.getByRole("tab", { name: "Tren" }).click();
-      await document.getByRole("button", { name: INDICATOR_NAME }).click();
       await expect(
-        document
-          .locator('[data-chart-series][data-series-key="series-1"]')
-          .first(),
-      ).toBeVisible();
+        document.getByRole("table", { name: /Temuan per Parameter/ }),
+      ).toContainText(INDICATOR_NAME);
       await document.getByRole("tab", { name: "Temuan" }).click();
-      const disclosure = document.locator("details.findings-period").first();
+      const disclosure = document.locator("details.finding-group").first();
       await disclosure.locator("summary").click();
       await expect(disclosure).toHaveAttribute("open", "");
       await captureViewportShot(

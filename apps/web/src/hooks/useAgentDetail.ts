@@ -476,59 +476,49 @@ export function useAgentDetail(agentId: string) {
 
       let objectUrl: string | null = null;
       try {
-        const {
-          generateCSV,
-          generateMD,
-          generateHTML,
-          buildAgentReportFileName,
-        } = await import("../utils/exportAgentReport");
+        const { generateHTML, buildAgentReportFileName } = await import(
+          "../utils/exportAgentReport"
+        );
 
         /**
-         * Cakupan dibaca dari state yang sama dengan yang tampil di layar, bukan
-         * dari argumen terpisah, sehingga label cakupan tidak pernah berbeda dari
-         * angka yang sedang dilihat pengguna. Nilai ini hanya menambah label —
-         * isi baris data tetap berasal dari perhitungan yang sudah ada.
+         * Snapshot yang sama untuk Excel dan PDF: state yang sedang tampil di
+         * layar, jadi isi laporan tidak pernah berbeda dari yang dilihat
+         * pengguna.
          */
-        const scope = { service: selectedService, month: selectedMonth };
+        const snapshot = {
+          data,
+          monthlySummaries,
+          temuanDisplayItems,
+          topTickets,
+          activeRootCauses,
+          selectedYear,
+          selectedService,
+          context: exportContext,
+        };
         let content: string | null = null;
         let mimeType: string;
         let extension: string;
         /**
-         * Blob biner (PDF) memakai jalur sendiri: tidak ada prefix BOM, dan
-         * MIME-nya `application/pdf` tanpa `charset`. Empat format teks
-         * sebelumnya tetap memakai BOM UTF-8 seperti sebelumnya.
+         * Blob biner (Excel, PDF) memakai jalur sendiri: tanpa prefix BOM dan
+         * tanpa `charset`. HTML tetap teks ber-BOM UTF-8.
          */
         let binaryContent: ArrayBuffer | null = null;
 
         // Dispatch eksplisit: format yang tidak dikenal gagal keras, bukan
         // diam-diam jatuh ke cabang HTML.
         switch (format) {
-          case "csv":
-            content = generateCSV(
-              data,
-              monthlySummaries,
-              temuanDisplayItems,
-              topTickets,
-              activeRootCauses,
-              selectedYear,
-              scope,
+          case "xlsx": {
+            // Generator Excel diimpor terpisah supaya `exceljs` hanya dimuat
+            // saat Excel dipilih.
+            const { generateAgentReportXlsx } = await import(
+              "../utils/agentReportXlsx"
             );
-            mimeType = "text/csv;charset=utf-8;";
-            extension = "csv";
+            binaryContent = await generateAgentReportXlsx(snapshot);
+            mimeType =
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            extension = "xlsx";
             break;
-          case "md":
-            content = generateMD(
-              data,
-              monthlySummaries,
-              temuanDisplayItems,
-              topTickets,
-              activeRootCauses,
-              selectedYear,
-              scope,
-            );
-            mimeType = "text/markdown;charset=utf-8;";
-            extension = "md";
-            break;
+          }
           case "html-interactive":
           case "html-static": {
             const variant =
@@ -558,16 +548,7 @@ export function useAgentDetail(agentId: string) {
             const { generateAgentReportPdf } = await import(
               "../utils/agentReportPdf"
             );
-            binaryContent = await generateAgentReportPdf({
-              data,
-              monthlySummaries,
-              temuanDisplayItems,
-              topTickets,
-              activeRootCauses,
-              selectedYear,
-              selectedService,
-              context: exportContext,
-            });
+            binaryContent = await generateAgentReportPdf(snapshot);
             mimeType = "application/pdf";
             extension = "pdf";
             break;
@@ -624,7 +605,6 @@ export function useAgentDetail(agentId: string) {
     [
       data,
       selectedYear,
-      selectedMonth,
       monthlySummaries,
       temuanDisplayItems,
       topTickets,

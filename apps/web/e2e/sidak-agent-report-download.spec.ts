@@ -2,6 +2,7 @@ import { expect, test, type Download, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { writeFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
+import ExcelJS from "exceljs";
 import path from "node:path";
 import {
   AGENT_NAME,
@@ -25,7 +26,6 @@ import {
   CHAT_TICKET_B,
   CLEAN_SESSION_TICKET,
   EXPORT_ERROR_TITLE,
-  FORMULA_SAMPLES,
   HOSTILE_FINDING_TEXT,
   HOSTILE_RECOMMENDATION_TEXT,
   INDICATOR_NAME,
@@ -155,234 +155,38 @@ function expectUtf8Bom(file: ExportedFile) {
 }
 
 /**
- * Baris sebuah seksi CSV: baris header skema diikutkan, lalu baris data sampai
- * baris kosong atau baris seksi berikutnya. Skema multi-seksi yang disengaja
- * (keputusan Fajar: CSV tetap multi-seksi) dibaca apa adanya, bukan
- * dinormalkan menjadi tabel tunggal.
+ * Isi workbook Excel yang diunduh: nama sheet → baris (nilai sel apa adanya,
+ * tanpa kolom indeks 0 milik exceljs). Dibaca dari file di disk, bukan dari
+ * generator.
  */
-function csvSectionRows(text: string, sectionName: string): string[] {
-  const lines = text.split("\n");
-  const start = lines.findIndex((line) => line.trim() === `# ${sectionName}`);
+async function workbookRows(
+  file: ExportedFile,
+): Promise<Record<string, unknown[][]>> {
   expect(
-    start,
-    `seksi CSV "# ${sectionName}" tidak ada`,
-  ).toBeGreaterThanOrEqual(0);
-  const rows: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.startsWith("# ")) break;
-    rows.push(line);
+    file.bytes.subarray(0, 2).toString("latin1"),
+    `${file.filename} bukan file zip/xlsx`,
+  ).toBe("PK");
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(file.path);
+  const book: Record<string, unknown[][]> = {};
+  workbook.eachSheet((sheet) => {
+    const rows: unknown[][] = [];
+    sheet.eachRow({ includeEmpty: false }, (row) => {
+      rows.push((row.values as unknown[]).slice(1));
+    });
+    book[sheet.name] = rows;
+  });
+  return book;
+}
+
+/** Blok identitas sheet "Ringkasan" sebagai pasangan label → nilai. */
+function summaryFacts(book: Record<string, unknown[][]>): Record<string, unknown> {
+  const facts: Record<string, unknown> = {};
+  for (const row of book["Ringkasan"] ?? []) {
+    if (row.length === 2 && typeof row[0] === "string") facts[row[0]] = row[1];
   }
-  return rows;
+  return facts;
 }
-
-/** Baris header skema (elemen pertama) sebuah seksi CSV. */
-function csvSectionHeaderRow(text: string, sectionName: string): string {
-  const [header] = csvSectionRows(text, sectionName);
-  return header;
-}
-
-/**
- * Urutan seksi CSV setelah blok profil, apa adanya. Ini kontrak skema yang
- * tidak boleh berubah: menambah cakupan tidak boleh menambah/menggeser/mengubah
- * seksi maupun baris header skema.
- */
-function csvSectionNames(text: string): string[] {
-  return text
-    .split("\n")
-    .filter((line) => line.startsWith("# "))
-    .map((line) => line.slice(2).trim())
-    .filter((name) => !name.startsWith("Laporan Audit Agent -"));
-}
-
-/** Kontrak skema enam seksi + baris header kolomnya. */
-const CSV_SECTION_SCHEMA: ReadonlyArray<readonly [string, string]> = [
-  ["Ringkasan Skor Bulanan", "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan"],
-  [
-    "Detail Temuan",
-    "Bulan,Tahun,Indikator,Kategori,Nilai,Ketidaksesuaian,Sebaiknya,No Tiket",
-  ],
-  [
-    "Tiket Pengurang Skor Terbesar",
-    "No Tiket,Score Deduction,Jumlah Temuan,Parameter Terberat",
-  ],
-  [
-    "Akar Masalah",
-    "Label,Prioritas,Jumlah Temuan,Tiket Terdampak,Temuan Critical,Rata-rata Nilai,Rekomendasi",
-  ],
-  ["Perkembangan Skor", `Periode,Total Temuan,${INDICATOR_NAME}`],
-  [
-    "Perbandingan Temuan",
-    "Parameter,Agent Ini,Rata-rata Tim,Rata-rata Service",
-  ],
-];
-
-function expectCsvSectionSchema(text: string) {
-  expect(csvSectionNames(text)).toEqual(
-    CSV_SECTION_SCHEMA.map(([name]) => name),
-  );
-  for (const [name, header] of CSV_SECTION_SCHEMA) {
-    expect(csvSectionHeaderRow(text, name), `header seksi "${name}"`).toBe(
-      header,
-    );
-  }
-}
-
-/**
- * Parser RFC4180 minimal, berdiri sendiri. Tujuannya BUKAN merekonstruksi tabel
- * (CSV ini multi-seksi secara sengaja), melainkan membuktikan dua hal pada file
- * yang benar-benar diunduh: tidak ada tanda kutip yang menggantung (satu karakter
- * terlewat membuat seluruh file tak terbaca spreadsheet), dan nilai yang berisi
- * kutip kembali utuh setelah di-parse.
- */
-function parseCsvRecords(text: string): {
-  records: string[][];
-  unterminated: boolean;
-} {
-  const records: string[][] = [];
-  let record: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  const source = text.replace(/^\uFEFF/, "");
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    if (inQuotes) {
-      if (char !== '"') {
-        field += char;
-      } else if (source[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        inQuotes = false;
-      }
-      continue;
-    }
-    if (char === '"') inQuotes = true;
-    else if (char === ",") {
-      record.push(field);
-      field = "";
-    } else if (char === "\n") {
-      record.push(field);
-      records.push(record);
-      record = [];
-      field = "";
-    } else if (char !== "\r") field += char;
-  }
-  if (field !== "" || record.length > 0) {
-    record.push(field);
-    records.push(record);
-  }
-  return { records, unterminated: inQuotes };
-}
-
-function expectCsvParseable(file: ExportedFile): string[][] {
-  const { records, unterminated } = parseCsvRecords(file.text);
-  expect(
-    unterminated,
-    `${file.filename} punya tanda kutip menggantung — spreadsheet akan gagal mem-parse seluruh file`,
-  ).toBe(false);
-  expect(records.length).toBeGreaterThan(10);
-  return records;
-}
-
-// ---------------------------------------------------------------------------
-// Invarian formula spreadsheet (data-integrity CSV)
-// ---------------------------------------------------------------------------
-
-/**
- * Pemicu formula. Kalau karakter pertama sebuah sel adalah salah satunya,
- * spreadsheet bisa memperlakukan sel itu sebagai formula — bukan sebagai teks.
- * Hasil audit: pengapitan tanda kutip BUKAN netralisasi, jadi yang diuji di
- * sini adalah karakter pertamanya, bukan tanda kutipnya.
- */
-const FORMULA_TRIGGERS: readonly string[] = ["=", "+", "-", "@", "\t", "\r"];
-
-/**
- * Angka biasa (tanda opsional) bukan formula: sel seperti `-1.5` atau `+3`
- * HARUS tetap angka di spreadsheet. Eksempsi ini yang menjaga kolom numerik
- * tidak berubah jenis datanya.
- */
-const PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
-
-/**
- * Penanda netralisasi formula yang harus disisipkan exporter. Bentuknya
- * diikat di sini supaya test benar-benar mengukur keputusan implementasi, bukan
- * "ada karakter apa pun di depan nilai"; motif dan alasannya ada di
- * `apps/web/src/utils/exportAgentReport.ts`.
- */
-const CSV_FORMULA_PREFIX = "[teks] ";
-
-/**
- * Semua field hasil-parse yang masih diawali pemicu formula, apa adanya.
- *
- * Dipakai sebagai invarian SELURUH FILE, bukan cuma sel fixture: sel
- * bermasalah harus ditemukan dari mana saja asalnya, termasuk dari nama agen,
- * nomor tiket, atau label akar masalah.
- */
-function csvFormulaRiskyFields(records: string[][]): string[] {
-  const risky: string[] = [];
-  for (const record of records) {
-    for (const field of record) {
-      if (field === "" || PLAIN_NUMBER.test(field)) continue;
-      if (FORMULA_TRIGGERS.includes(field[0])) risky.push(field);
-    }
-  }
-  return risky;
-}
-
-/**
- * Semua field hasil parse yang BERAKHIRAN nilai contoh. Pencarian lewat suffix
- * (bukan kesamaan penuh) supaya sel yang sudah dinetralisasi pun ikut ketemu;
- * pemeriksaannya nanti memeriksa bahwa bagian sebelum nilai itu persis satu
- * penanda, sehingga prefiks tidak bisa berupa apa pun yang lain.
- */
-function csvCellsEndingWith(records: string[][], suffix: string): string[] {
-  return records.flat().filter((field) => field.endsWith(suffix));
-}
-
-/**
- * Baris komentar cakupan tepat sebelum heading seksi (`// Cakupan: ...`).
- * Cakupan adalah metadata dokumen di batas non-tabel, bukan kolom tabel, jadi
- * `csvSectionRows` tidak menghitungnya sebagai baris data.
- */
-function csvSectionScope(text: string, sectionName: string): string | null {
-  const lines = text.split("\n");
-  const start = lines.findIndex((line) => line.trim() === `# ${sectionName}`);
-  expect(start, `seksi CSV "# ${sectionName}" tidak ada`).toBeGreaterThan(0);
-  return lines[start - 1].startsWith("//") ? lines[start - 1] : null;
-}
-
-/** Baris cakupan (`_Cakupan: ..._`) tepat setelah heading `##` sebuah blok MD. */
-function mdSectionScope(text: string, heading: string): string | null {
-  const lines = text.split("\n");
-  const start = lines.indexOf(`## ${heading}`);
-  expect(start, `heading MD "## ${heading}" tidak ada`).toBeGreaterThanOrEqual(
-    0,
-  );
-  for (const line of lines.slice(start + 1)) {
-    if (line.startsWith("## ")) break;
-    if (line.startsWith("_") && line.endsWith("_") && line.length > 2) {
-      return line;
-    }
-  }
-  return null;
-}
-
-/** Tag/tabel yang boleh self-contained: HTML export tidak boleh menarik resource remote. */
-
-// ═══════════════════════════════════════════════════════════════════════════
-// FASE 3 — HTML Statis & HTML Interaktif sebagai laporan profesional.
-// Plan: `.hermes/plans/2026-09-27_201056-sidak-agent-report-exports.md` Fase 3.
-//
-// Semua kontrak fase ini diukur dari FILE YANG DIUNDUH, dibuka offline lewat
-// `file://` di konteks browser TERPISA (tanpa mock app, tanpa network guard),
-// lalu diamati lewat perilaku yang bisa dilihat pembaca: tidak ada kontrol
-// palsu, isi kedua varian sama, navigasi tab jalan dari keyboard, cetak
-// membuka semua bagian, dan tabel data tren benar-benar bisa diakses.
-//
-// Yang SENGAJA tidak diuji: kesamaan piksel dengan aplikasi, ukuran font
-// tertentu, atau hex warna tertentu. Ukuran|score|warna adalah detail visual
-// yang boleh berubah; kontrak fase ini adalah perilaku & isi.
-// ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * Papan kontrol UI yang tidak mungkin bekerja pada file unduhan offline.
@@ -433,33 +237,24 @@ function missingPrintedFacts(text: string): string[] {
 }
 
 /**
- * Caption tabel data tren yang harus muncul PADA FILE YANG DIUNDUH. Ditulis
+ * Label grafik dan tabel yang harus muncul PADA FILE YANG DIUNDUH. Ditulis
  * literal di sini, bukan diimpor dari generator: kalau test mengimpor
  * konstanta yang sama dengan produk, ia hanya mengukur bahwa produk konsisten
  * dengan dirinya sendiri, bukan bahwa pembaca mendapat label yang benar.
- */
-const TREND_TOTAL_TABLE_CAPTION = "Data tren \u2014 Total Temuan per Periode";
-const TREND_PARAMETER_TABLE_CAPTION = "Data tren \u2014 Temuan per Parameter";
-
-/**
- * Judul grafik skor, satuan sumbu, dan caption tabelnya — juga literal,
- * dengan alasan yang sama seperti di atas.
  *
  * Seksi skor dan seksi tren temuan adalah dua hal berbeda: yang pertama
  * mengukur skor (`periodSummaries`), yang kedua menghitung jumlah temuan
- * (`personalTrend`). Label di sini adalah batas yang harus dijaga: tidak ada
- * satu pun label keluarga temuan yang boleh muncul di seksi skor, dan tidak
- * ada satu pun label skor yang boleh muncul di seksi tren temuan.
+ * (`personalTrend`). Satu metrik skor satu grafik; jumlah temuan per parameter
+ * berupa tabel. Angka skor lengkap ada di tabel Rekap Skor Bulanan, jadi grafik
+ * skor tidak lagi punya tabel data sendiri.
  */
-const SCORE_FINAL_CHART_TITLE = "Skor Final per Periode";
-const SCORE_NON_CRITICAL_CHART_TITLE = "Skor Non-Critical (NC) per Periode";
-const SCORE_CRITICAL_CHART_TITLE = "Skor Critical (CR) per Periode";
-const SCORE_FINAL_TABLE_CAPTION = "Data skor \u2014 Skor Final per Periode";
-const SCORE_NON_CRITICAL_TABLE_CAPTION =
-  "Data skor \u2014 Skor Non-Critical (NC) per Periode";
-const SCORE_CRITICAL_TABLE_CAPTION =
-  "Data skor \u2014 Skor Critical (CR) per Periode";
-const SCORE_UNIT = "Skor (0-100)";
+const TREND_TOTAL_CHART_TITLE = "Total Temuan per Bulan";
+const TREND_PARAMETER_TABLE_CAPTION = "Temuan per Parameter";
+const MONTHLY_TABLE_CAPTION = "Rekap Skor Bulanan";
+const SCORE_FINAL_CHART_TITLE = "Skor Final";
+const SCORE_NON_CRITICAL_CHART_TITLE = "Skor Non-Critical";
+const SCORE_CRITICAL_CHART_TITLE = "Skor Critical";
+const SCORE_UNIT = "Skor";
 const FINDING_COUNT_UNIT = "Jumlah temuan";
 
 /**
@@ -1065,152 +860,6 @@ test.describe("SIDAK agent report download nyata", () => {
     }
   });
 
-  test("Menu Unduh Laporan menghasilkan CSV asli: nama file, BOM, isi, dan scope", async ({
-    page,
-  }) => {
-    const audit = startAudit();
-    await openAgentDetail(page, audit);
-
-    const file = await exportFromMenu(page, "CSV");
-
-    // (1) Nama file dari state UI (nama agen + tahun audit terpilih).
-    expect(file.filename).toBe(`Laporan_Audit_${AGENT_NAME}_${YEAR}.csv`);
-
-    // (2) BOM.
-    expectUtf8Bom(file);
-
-    // (3) Blok profil: identitas dari fixture, tahun dari context UI.
-    expect(
-      file.text.startsWith(`# Laporan Audit Agent - ${AGENT_NAME}\n`),
-    ).toBe(true);
-    expect(file.text).toContain("Nama,Alya Pranoto\n");
-    expect(file.text).toContain("Tim,Tim Call\n");
-    expect(file.text).toContain("Batch,Batch 7\n");
-    // `Masa Kerja` dihitung dari tanggal hari ini, jadi labelnya saja yang
-    // diassert; nilainya tidak boleh dikarang di test.
-    expect(file.text).toMatch(/^Masa Kerja,.+$/m);
-    expect(file.text).toContain(`Tahun Laporan,${YEAR}\n`);
-
-    // (4) Ringkasan bulanan: kedua bulan, angka dari fixture.
-    expect(csvSectionRows(file.text, "Ringkasan Skor Bulanan")).toEqual([
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-      "01/2026,82,84,80,1,0",
-      "02/2026,91,92,90,2,1",
-    ]);
-
-    // (5) Detail temuan: satu baris riil,/teks berbahaya tetap ter-quote dan
-    //     kutip ganda digandakan (baris utuh, bukan terpotong newline).
-    const temuanRows = csvSectionRows(file.text, "Detail Temuan");
-    expect(temuanRows).toHaveLength(2);
-    expect(temuanRows[0]).toBe(
-      "Bulan,Tahun,Indikator,Kategori,Nilai,Ketidaksesuaian,Sebaiknya,No Tiket",
-    );
-    const temuanRow = temuanRows[1];
-    expect(
-      temuanRow.startsWith(
-        `Februari,${YEAR},${INDICATOR_NAME},critical,1 (TIDAK SESUAI),"`,
-      ),
-    ).toBe(true);
-    expect(temuanRow.endsWith(`,${REAL_TICKET}`)).toBe(true);
-    // Tanda kutip di dalam teks menjadi `""`; koma membuat sel terbungkus `"`.
-    expect(temuanRow).toContain('"" tenor 12 bulan""');
-    expect(temuanRow).toContain(HOSTILE_FINDING_TEXT.replace(/"/g, '""'));
-
-    // (6) Tiket pengurang skor + akar masalah tetap ikut untuk bulan terpilih.
-    //     Nilai dediksi dihitung hook dari bobot indikator, jadi bentuknya
-    //     (satu desimal, jumlah temuan, parameter terberat) yang diassert.
-    const ticketRows = csvSectionRows(
-      file.text,
-      "Tiket Pengurang Skor Terbesar",
-    );
-    expect(ticketRows[0]).toBe(
-      "No Tiket,Score Deduction,Jumlah Temuan,Parameter Terberat",
-    );
-    expect(ticketRows).toHaveLength(2);
-    expect(ticketRows[1]).toMatch(
-      new RegExp(`^${REAL_TICKET},\\d+\\.\\d,1,${INDICATOR_NAME}$`),
-    );
-    expect(csvSectionRows(file.text, "Akar Masalah")[0]).toContain(
-      "Label,Prioritas",
-    );
-    expect(file.text).toContain("Akurasi jawaban");
-
-    // (7) Tren + benchmark, dan label cakupan benchmark.
-    const trendRows = csvSectionRows(file.text, "Perkembangan Skor");
-    expect(trendRows[0]).toBe(`Periode,Total Temuan,${INDICATOR_NAME}`);
-    expect(trendRows.slice(1)).toEqual(["Jan,0,0", "Feb,1,1"]);
-    const comparisonRows = csvSectionRows(file.text, "Perbandingan Temuan");
-    expect(comparisonRows[0]).toBe(
-      "Parameter,Agent Ini,Rata-rata Tim,Rata-rata Service",
-    );
-    expect(comparisonRows.slice(1)).toEqual([
-      "Total Temuan,1,2,3",
-      `${INDICATOR_NAME},1,1,2`,
-    ]);
-
-    // (8) Keputusan Fajar: sesi tanpa temuan tidak diekspor.
-    expect(file.text).not.toContain(CLEAN_SESSION_TICKET);
-
-    expectNoApplicationTraffic(audit);
-  });
-
-  test("Menu Unduh Laporan menghasilkan Markdown asli dengan heading dan cakupan benchmark", async ({
-    page,
-  }) => {
-    const audit = startAudit();
-    await openAgentDetail(page, audit);
-
-    const file = await exportFromMenu(page, "Markdown");
-
-    expect(file.filename).toBe(`Laporan_Audit_${AGENT_NAME}_${YEAR}.md`);
-    expectUtf8Bom(file);
-
-    // Struktur dokumen: judul + satu `##` per blok laporan.
-    expect(file.text).toContain(`# Laporan Audit Agent: ${AGENT_NAME}`);
-    for (const heading of [
-      "## Profil Agent",
-      "## Ringkasan Skor Bulanan",
-      "## Detail Temuan",
-      "## Tiket Pengurang Skor Terbesar",
-      "## Akar Masalah",
-      "## Perkembangan Skor",
-      "## Perbandingan Temuan",
-    ]) {
-      expect(file.text, `heading hilang: ${heading}`).toContain(heading);
-    }
-
-    // Isi: baris bulanan, temuan, tiket, akar masalah, tren.
-    expect(file.text).toContain("| 01/2026 | 82 | 84 | 80 | 1 | 0 |");
-    expect(file.text).toContain("| 02/2026 | 91 | 92 | 90 | 2 | 1 |");
-    expect(file.text).toContain(
-      `| Februari | ${YEAR} | ${INDICATOR_NAME} | critical | 1 (TIDAK SESUAI) |`,
-    );
-    // Sel tabel yang berisi koma DAN `|` harus tetap utuh sebagai satu sel:
-    // di Markdown, `|` adalah PEMBATAS KOLOM, jadi kalau tidak di-escape satu
-    // catatan agen memecah baris tabel menjadi kolom palsu.
-    expect(file.text).toContain(HOSTILE_FINDING_TEXT.replace("|", "\\|"));
-    expect(
-      file.text,
-      "pipe di dalam nilai harus di-escape di MD",
-    ).not.toContain(HOSTILE_FINDING_TEXT);
-    expect(file.text).toMatch(
-      new RegExp(
-        `\\| 1 \\| ${REAL_TICKET} \\| \\d+\\.\\d \\| 1 \\| ${INDICATOR_NAME} \\|`,
-      ),
-    );
-    expect(file.text).toContain("### Akurasi jawaban");
-    expect(file.text).toContain("- **Prioritas**: 6");
-    expect(file.text).toContain("| Feb | 1 | 1 |");
-
-    // Scope benchmark: bulan, tahun, layanan, tim — dari `comparisonTable.scope`.
-    expect(file.text).toContain(`_Jan-Feb ${YEAR} • Layanan Call • Tim Call_`);
-
-    // Keputusan Fajar: sesi tanpa temuan tidak diekspor.
-    expect(file.text).not.toContain(CLEAN_SESSION_TICKET);
-
-    expectNoApplicationTraffic(audit);
-  });
-
   test("Menu Unduh Laporan menghasilkan HTML Statis self-contained dengan semua panel terbuka", async ({
     page,
   }) => {
@@ -1227,17 +876,19 @@ test.describe("SIDAK agent report download nyata", () => {
     // Varian statis: semua panel audit terbuka (tidak ada `hidden`).
     expect(file.text).toContain('data-report-variant="static"');
     expect(file.text).not.toMatch(/data-report-panel="[a-z]+"[^>]*\shidden/);
-    expect(file.text).toContain('<details class="findings-period" open>');
+    expect(file.text).toMatch(
+      /<details class="finding-group" data-finding-group="[^"]+" open>/,
+    );
 
     // Identitas + scope dari state UI.
     expect(file.text).toContain(`<title>Laporan Audit - ${AGENT_NAME}</title>`);
     // Cakupan dokumen dinyatakan sebagai teks biasa (bukan kontrol select palsu).
-    expect(file.text).toContain(`Tahun ${YEAR} • Layanan CALL`);
-    expect(file.text).toContain("Layanan audit</dt>");
+    expect(file.text).toContain(`Layanan Call • Tahun ${YEAR}`);
 
     // Isi laporan benar-benar ada, bukan kerangka kosong.
-    expect(file.text).toContain("Ringkasan Skor Bulanan");
-    expect(file.text).toContain("Riwayat Temuan");
+    expect(file.text).toContain("Kesimpulan Utama");
+    expect(file.text).toContain("Rekap Skor Bulanan");
+    expect(file.text).toContain("Detail Temuan");
     expect(file.text).toContain(REAL_TICKET);
     expect(file.text).toContain("Akurasi jawaban");
 
@@ -1292,7 +943,9 @@ test.describe("SIDAK agent report download nyata", () => {
       '<h2 class="panel-title" id="report-panel-temuanTren-title">Tren Temuan</h2>',
     );
     // Disclosure temuan tertutup secara default (bukan `open`).
-    expect(file.text).toContain('<details class="findings-period">');
+    expect(file.text).toMatch(
+      /<details class="finding-group" data-finding-group="[^"]+">/,
+    );
     // Interaktivitas inline, bukan fetch resource luar.
     expect(file.text).toContain("<script>");
     for (const pattern of REMOTE_RESOURCE_PATTERNS) {
@@ -1303,7 +956,7 @@ test.describe("SIDAK agent report download nyata", () => {
     }
 
     // Konten tetap sama dengan statis: identitas, scope, temuan, akar masalah.
-    expect(file.text).toContain(`Tahun ${YEAR} • Layanan CALL`);
+    expect(file.text).toContain(`Layanan Call • Tahun ${YEAR}`);
     expect(file.text).toContain(REAL_TICKET);
     expect(file.text).toContain("Akurasi jawaban");
     expect(file.text).toContain("&lt;script&gt;");
@@ -1377,26 +1030,23 @@ test.describe("SIDAK agent report download nyata", () => {
         await document.locator("script").count(),
         "HTML Statis tidak boleh menjalankan JavaScript apa pun",
       ).toBe(0);
-      // Tabel bulanan dan tabel data tren bukan sekadar ada: keduanya terlihat.
+      // Tabel bulanan dan tabel temuan per parameter terlihat, dengan label
+      // bulan yang manusiawi.
       const monthlyTable = document.getByRole("table", {
-        name: /Ringkasan Skor Bulanan/i,
+        name: /Rekap Skor Bulanan/i,
       });
       await expect(monthlyTable).toBeVisible();
-      await expect(monthlyTable).toContainText("01/2026");
-      await expect(monthlyTable).toContainText("02/2026");
-      // Grafik tren berarti tabel data, masing-masing milik grafiknya: tiga
-      // grafik skor + dua grafik jumlah temuan.
-      for (const caption of [
-        SCORE_FINAL_TABLE_CAPTION,
-        SCORE_NON_CRITICAL_TABLE_CAPTION,
-        SCORE_CRITICAL_TABLE_CAPTION,
-        TREND_TOTAL_TABLE_CAPTION,
-        TREND_PARAMETER_TABLE_CAPTION,
-      ]) {
-        await expect(
-          document.getByRole("table", { name: captionPattern(caption) }),
-        ).toBeVisible();
+      await expect(monthlyTable).toContainText("Januari 2026");
+      await expect(monthlyTable).toContainText("Februari 2026");
+      await expect(
+        document.getByRole("table", { name: captionPattern(TREND_PARAMETER_TABLE_CAPTION) }),
+      ).toBeVisible();
+      // Tiga grafik skor (satu metrik satu grafik) masing-masing dengan garis
+      // target, plus satu grafik total temuan.
+      for (const name of [/Grafik skor final/i, /Grafik skor non-critical/i, /Grafik skor critical/i, /Grafik jumlah seluruh temuan/i]) {
+        await expect(document.getByRole("img", { name })).toBeVisible();
       }
+      expect(await document.locator("[data-target-line]").count()).toBe(3);
 
       // (4) Tidak meluber horizontal di mobile maupun desktop.
       await captureViewportShot(document, dir, "statis-1440.png", {
@@ -1509,7 +1159,7 @@ test.describe("SIDAK agent report download nyata", () => {
     expectNoApplicationTraffic(audit);
   });
 
-  test("HTML Interaktif: tab keyboard-accessible, filter tren bekerja, dan cetak membuka semua bagian", async ({
+  test("HTML Interaktif: tab keyboard-accessible, disclosure temuan bekerja, dan cetak membuka semua bagian", async ({
     page,
     browser,
   }) => {
@@ -1524,7 +1174,7 @@ test.describe("SIDAK agent report download nyata", () => {
     const dir = reportArtifactDir("interaktif");
 
     // Kontrol yang tersisa di varian interaktif HANYA yang benar-benar bekerja
-    // (tab, filter, disclosure). Tidak ada yang meniru tombol aplikasi.
+    // (tab dan disclosure). Tidak ada yang meniru tombol aplikasi.
     for (const rule of FAUX_CHROME) {
       if (rule.variant !== "both") continue;
       expect(
@@ -1588,90 +1238,31 @@ test.describe("SIDAK agent report download nyata", () => {
       await expect(summaryTab).toHaveAttribute("aria-selected", "true");
       await expect(summaryPanel).toBeVisible();
 
-      // (3) Filter seri tren: tombol nyata dengan aria-pressed, dan grafik
-      //     benar-benar menyaring seri (bukan hanya berubah warna tombol).
+      // (3) Tren temuan: grafik total + tabel per parameter (bukan grafik
+      //     spaghetti yang perlu filter seri). Tidak ada tombol filter lagi.
       await trenTab.click();
-      const parameterFilter = document.getByRole("button", {
-        name: INDICATOR_NAME,
+      await expect(document.locator(".trend-filters")).toHaveCount(0);
+      const parameterTable = document.getByRole("table", {
+        name: captionPattern(TREND_PARAMETER_TABLE_CAPTION),
       });
-      const parameterSeries = document.locator(
-        '[data-chart-series][data-series-key="series-1"]',
-      );
-      const totalSeries = document.locator(
-        '[data-chart-series][data-series-total="true"]',
-      );
-      await expect(parameterFilter).toHaveAttribute("aria-pressed", "false");
-      await parameterFilter.click();
-      await expect(parameterFilter).toHaveAttribute("aria-pressed", "true");
-      await expect(parameterSeries.first()).toBeVisible();
-      await expect(totalSeries.first()).toBeHidden();
-      // Grafik yang tidak punya seri terpilih ikut disembunyikan: sumbu kosong
-      // tanpa garis lebih buruk daripada tidak menampilkannya.
+      await expect(parameterTable).toBeVisible();
+      await expect(parameterTable).toContainText(INDICATOR_NAME);
+      await expect(parameterTable).toContainText("Jan");
+      await expect(parameterTable).toContainText("Feb");
       await expect(
-        document.locator('[data-chart-figure="total"]'),
-      ).toBeHidden();
-      await expect(
-        document.locator('[data-chart-figure="parameter"]'),
-      ).toBeVisible();
-      await parameterFilter.click();
-      await expect(totalSeries.first()).toBeVisible();
-      // "Ringkasan" mengembalikan kedua grafik.
-      await expect(
-        document.locator('[data-chart-figure="total"]'),
-      ).toBeVisible();
-      await expect(
-        document.locator('[data-chart-figure="parameter"]'),
-      ).toBeVisible();
-
-      // (3b) Filter seri milik panelnya sendiri. Menyaring parameter di seksi
-      //      Tren Temuan tidak boleh menyaring grafik skor di panel lain, dan
-      //      panel skor tidak punya filter sama sekali — tiap grafik skor cuma
-      //      punya satu seri, jadi tidak ada yang bisa disaring.
-      await parameterFilter.click();
-      await expect(
-        document.locator('[data-chart-figure="score-final"]'),
-        "filter seri seksi tren tidak boleh menyaring grafik skor",
-      ).not.toHaveAttribute("hidden", "");
-      await expect(
-        scorePanel.locator(".trend-filters"),
-        "panel skor tidak punya filter seri",
-      ).toHaveCount(0);
-      await parameterFilter.click();
-      await trenTab.click();
-
-      // (4) Grafik tetap bisa dibaca tanpa warna: tiap grafik punya tabel data
-      //     dengan caption sendiri yang memuat angka tiap periode.
-      for (const caption of [
-        TREND_TOTAL_TABLE_CAPTION,
-        TREND_PARAMETER_TABLE_CAPTION,
-      ]) {
-        const trendTable = document.getByRole("table", {
-          name: captionPattern(caption),
-        });
-        await expect(trendTable).toBeVisible();
-        await expect(trendTable.locator("caption")).toBeVisible();
-        await expect(trendTable).toContainText("Jan");
-        await expect(trendTable).toContainText("Feb");
-      }
-      await expect(
-        document.getByRole("img", { name: /Grafik tren total temuan/i }),
-      ).toBeVisible();
-      await expect(
-        document.getByRole("img", {
-          name: /Grafik tren temuan per parameter/i,
-        }),
+        document.getByRole("img", { name: /Grafik jumlah seluruh temuan/i }),
       ).toBeVisible();
 
       // (5) Disclosure opsional: tertutup secara default tapi isinya nyata.
       await temuanTab.click();
       await expect(temuanPanel).toBeVisible();
       const findingsDisclosure = document
-        .locator("details.findings-period")
+        .locator("details.finding-group")
         .first();
       await expect(findingsDisclosure).toBeVisible();
       expect(
         await findingsDisclosure.evaluate((node) => node.hasAttribute("open")),
-        "disclosure periode temuan harus tertutup secara default",
+        "disclosure parameter temuan harus tertutup secara default",
       ).toBe(false);
       await findingsDisclosure.locator("summary").click();
       await expect(findingsDisclosure).toHaveAttribute("open", "");
@@ -1686,11 +1277,6 @@ test.describe("SIDAK agent report download nyata", () => {
       await expect(summaryPanel).toBeVisible();
       await expect(trendPanel).toBeVisible();
       await expect(temuanPanel).toBeVisible();
-      await expect(
-        document.getByRole("table", {
-          name: captionPattern(TREND_TOTAL_TABLE_CAPTION),
-        }),
-      ).toBeVisible();
       await expect(
         document.getByRole("table", {
           name: captionPattern(TREND_PARAMETER_TABLE_CAPTION),
@@ -1729,7 +1315,7 @@ test.describe("SIDAK agent report download nyata", () => {
   // FASE 3 gate repair — pagination cetak dibaca dari PDF peramban.
   // ═══════════════════════════════════════════════════════════════════════
 
-  test("Cetak laporan: lima halaman A4, semua temuan ikut, dan tidak ada halaman terakhir khusus colophon", async ({
+  test("Cetak laporan: ringkas (maks. empat halaman A4), semua temuan ikut, dan tidak ada halaman terakhir khusus colophon", async ({
     page,
     browser,
   }) => {
@@ -1752,7 +1338,7 @@ test.describe("SIDAK agent report download nyata", () => {
       // tidak pernah benar-benar diuji; di sini keadaan default ikut diuji.
       expect(
         await document
-          .locator("details.findings-period")
+          .locator("details.finding-group")
           .first()
           .evaluate((node) => node.hasAttribute("open")),
         "fixture harus menguji disclosure yang tadinya tertutup",
@@ -1797,20 +1383,16 @@ test.describe("SIDAK agent report download nyata", () => {
         "decoder PDF gagal memetakan kode glyph ke Unicode; read-back tidak sah",
       ).toBe(false);
 
-      // (3) Fixture ini jadi 5 halaman A4. Angka ini terikat fixture
-      //     (1 agen, 1 bulan ber-temuan, 1 akar masalah) DAN pada isi dua
-      //     seksi tren: tiga grafik skor (final, non-critical, critical) plus
-      //     dua grafik jumlah temuan (total, per parameter), masing-masing
-      //     dengan judul, satuan, legenda, dan tabelnya sendiri. Tiap grafik
-      //     harus utuh di satu halaman, jadi lima grafik + lima tabel tidak
-      //     bisa dipadatkan lagi. Kalau fixture berubah, assertion inilah yang
-      //     menyesuaikan — kontrak di (4) dan (5) yang tidak bergantung pada
-      //     jumlah halaman.
+      // (3) Laporan ringkas: fixture ini (1 agen, 2 bulan, 1 akar masalah)
+      //     muat dalam paling banyak empat halaman A4. Sebelumnya lima halaman,
+      //     karena tiap grafik skor membawa tabel datanya sendiri dan tren per
+      //     parameter digambar sebagai grafik terpisah. Kontrak di (4) dan (5)
+      //     yang menjamin pemadatan tidak memotong isi.
       expect(
         pages.length,
-        "laporan+cetak+colophon harus muat 5 halaman A4; read-back:\n" +
+        "laporan+cetak+colophon harus muat maksimal 4 halaman A4 (sebelumnya 5); read-back:\n" +
           pages.map((text, index) => `[p${index + 1}] ${text}`).join("\n"),
-      ).toBe(5);
+      ).toBeLessThanOrEqual(4);
 
       // (4) Tidak ada halaman terakhir yang isinya HANYA colophon. Kandidat
       //     colophon = awalan. Kandidat isi = teks halaman yang bukan awal
@@ -1844,13 +1426,13 @@ test.describe("SIDAK agent report download nyata", () => {
         HOSTILE_RECOMMENDATION_TEXT,
         REAL_TICKET,
         "Akurasi jawaban",
-        "Keyword: tenor",
-        "Ringkasan Skor Bulanan",
-        SCORE_FINAL_TABLE_CAPTION,
-        SCORE_NON_CRITICAL_TABLE_CAPTION,
-        SCORE_CRITICAL_TABLE_CAPTION,
-        "Data tren",
-        "Perbandingan Temuan",
+        "Kesimpulan Utama",
+        MONTHLY_TABLE_CAPTION,
+        SCORE_FINAL_CHART_TITLE,
+        SCORE_NON_CRITICAL_CHART_TITLE,
+        SCORE_CRITICAL_CHART_TITLE,
+        TREND_PARAMETER_TABLE_CAPTION,
+        "Perbandingan dengan Tim dan Layanan",
       ]) {
         expect(
           printedIncludes(printedText, detail),
@@ -2063,42 +1645,24 @@ test.describe("SIDAK agent report download nyata", () => {
   // langsung. Opsi PDF sengaja TIDAK disentuh di fase ini.
   // ═══════════════════════════════════════════════════════════════════════
 
-  test("CSV menyatakan cakupan tiap seksi dan skeletanya tetap enam seksi saat bulan berubah", async ({
+  test("Excel menyatakan cakupan bulan terpilih dan sheet per-bulan mengikuti pilihan bulan", async ({
     page,
   }) => {
     const audit = startAudit();
     await openAgentDetail(page, audit);
 
     // Default: layanan Call, bulan terakhir = Februari.
-    const feb = await exportFromMenu(page, "CSV", "csv-bulan-februari");
-    expect(feb.filename).toBe(`Laporan_Audit_${AGENT_NAME}_${YEAR}.csv`);
-    expectUtf8Bom(feb);
-    expectCsvSectionSchema(feb.text);
-
-    // Blok profil(key/value, non-tabel) menyatakan layanan terpilih.
-    expect(feb.text).toContain(`Tahun Laporan,${YEAR}\n`);
-    expect(feb.text).toContain("Layanan Audit,CALL\n");
-
-    // Cakupan tiap seksi; default = layanan Call + bulan Februari.
-    expect(csvSectionScope(feb.text, "Ringkasan Skor Bulanan")).toBe(
-      `// Cakupan: Layanan CALL • Tahun ${YEAR}`,
-    );
-    expect(csvSectionScope(feb.text, "Detail Temuan")).toBe(
-      `// Cakupan: Layanan CALL • Tahun ${YEAR}`,
-    );
-    expect(csvSectionScope(feb.text, "Tiket Pengurang Skor Terbesar")).toBe(
-      `// Cakupan: Layanan CALL • Tahun ${YEAR} • Bulan terpilih Februari ${YEAR}`,
-    );
-    expect(csvSectionScope(feb.text, "Akar Masalah")).toBe(
-      `// Cakupan: Layanan CALL • Tahun berjalan s.d. Februari ${YEAR}`,
-    );
-    expect(csvSectionScope(feb.text, "Perkembangan Skor")).toBe(
-      `// Cakupan: Layanan CALL • Tahun ${YEAR} • Periode Jan - Feb`,
-    );
-    // Benchmark memakai cakupan yang dideklarasikan `comparisonTable.scope`.
-    expect(csvSectionScope(feb.text, "Perbandingan Temuan")).toBe(
-      `// Cakupan: Tahun ${YEAR} • Layanan Call • Tim Call • Periode Jan-Feb`,
-    );
+    const feb = await exportFromMenu(page, "Excel", "xlsx-bulan-februari");
+    expect(feb.filename).toBe(`Laporan_Audit_${AGENT_NAME}_${YEAR}.xlsx`);
+    const febBook = await workbookRows(feb);
+    expect(summaryFacts(febBook)).toMatchObject({
+      Layanan: "Call",
+      Tahun: YEAR,
+      "Bulan terpilih": `Februari ${YEAR}`,
+      "Cakupan tiket": `Hanya Februari ${YEAR}`,
+      "Cakupan akar masalah": `Januari s.d. Februari ${YEAR}`,
+      "Cakupan perbandingan": `Januari – Februari ${YEAR} • Layanan Call • Tim Call (4 agen di tim, 8 agen di layanan)`,
+    });
 
     // Ganti bulan ke Januari lewat MonthRail nyata, bukan set state internal.
     const januaryChip = page.getByRole("button", {
@@ -2107,49 +1671,46 @@ test.describe("SIDAK agent report download nyata", () => {
     await januaryChip.click();
     await expect(januaryChip).toHaveAttribute("aria-pressed", "true");
 
-    const jan = await exportFromMenu(page, "CSV", "csv-bulan-januari");
+    const jan = await exportFromMenu(page, "Excel", "xlsx-bulan-januari");
+    const janBook = await workbookRows(jan);
 
-    // (1) Skema enam seksi + baris header kolom tidak berubah sama sekali.
-    expectCsvSectionSchema(jan.text);
+    // (1) Sheet dan header kolom tidak berubah.
+    expect(Object.keys(janBook)).toEqual(Object.keys(febBook));
     // (2) Temuan tetap cakupan tahun+layanan: tidak ikut menyempit ke bulan.
-    expect(csvSectionRows(jan.text, "Detail Temuan")).toEqual(
-      csvSectionRows(feb.text, "Detail Temuan"),
-    );
-    // (3) Seksi per-bulan mengikuti bulan terpilih.
-    expect(csvSectionScope(jan.text, "Tiket Pengurang Skor Terbesar")).toBe(
-      `// Cakupan: Layanan CALL • Tahun ${YEAR} • Bulan terpilih Januari ${YEAR}`,
-    );
-    expect(csvSectionScope(jan.text, "Akar Masalah")).toBe(
-      `// Cakupan: Layanan CALL • Tahun berjalan s.d. Januari ${YEAR}`,
-    );
-    // (4) Januari tidak punya temuan/akar masalah → header saja, tanpa baris
-    //     dan tanpa angka karangan.
-    expect(csvSectionRows(jan.text, "Tiket Pengurang Skor Terbesar")).toEqual([
-      "No Tiket,Score Deduction,Jumlah Temuan,Parameter Terberat",
+    expect(janBook["Temuan"]).toEqual(febBook["Temuan"]);
+    // (3) Cakupan per-bulan mengikuti bulan terpilih.
+    expect(summaryFacts(janBook)).toMatchObject({
+      "Bulan terpilih": `Januari ${YEAR}`,
+      "Cakupan tiket": `Hanya Januari ${YEAR}`,
+      "Cakupan akar masalah": `Januari s.d. Januari ${YEAR}`,
+    });
+    // (4) Januari tidak punya tiket/akar masalah → kalimat kosong yang jujur,
+    //     bukan baris angka karangan.
+    expect(janBook["Tiket"].slice(1)).toEqual([
+      ["Tidak ada tiket yang menurunkan skor pada bulan ini."],
     ]);
-    expect(csvSectionRows(jan.text, "Akar Masalah")).toEqual([
-      "Label,Prioritas,Jumlah Temuan,Tiket Terdampak,Temuan Critical,Rata-rata Nilai,Rekomendasi",
+    expect(janBook["Akar Masalah"].slice(1)).toEqual([
+      ["Belum ada pola akar masalah yang menonjol."],
     ]);
-    // (5) Ringkasan bulanan tetap semua bulan pada tahun+layanan.
-    expect(csvSectionRows(jan.text, "Ringkasan Skor Bulanan")).toEqual([
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-      "01/2026,82,84,80,1,0",
-      "02/2026,91,92,90,2,1",
+    // (5) Skor bulanan tetap semua bulan pada tahun+layanan.
+    expect(janBook["Skor Bulanan"].slice(1)).toEqual([
+      [`Januari ${YEAR}`, 82, 84, 80, 1, 0, "Di bawah target 95"],
+      [`Februari ${YEAR}`, 91, 92, 90, 2, 1, "Di bawah target 95"],
     ]);
 
     expectNoApplicationTraffic(audit);
   });
 
-  test("CSV dan MD mengikuti layanan audit yang dipilih tanpa membocorkan data layanan lain", async ({
+  test("Excel mengikuti layanan audit yang dipilih tanpa membocorkan data layanan lain", async ({
     page,
   }) => {
     const audit = startAudit();
     await openAgentDetail(page, audit);
 
-    const csvCall = await exportFromMenu(page, "CSV", "layanan-call-csv");
-    const mdCall = await exportFromMenu(page, "MD", "layanan-call-md");
-    expect(csvCall.text).toContain("Layanan Audit,CALL\n");
-    expect(mdCall.text).toContain(`_Cakupan: Layanan CALL •`);
+    const call = await workbookRows(
+      await exportFromMenu(page, "Excel", "layanan-call-xlsx"),
+    );
+    expect(summaryFacts(call).Layanan).toBe("Call");
 
     // Ganti layanan lewat Select nyata di ContextControlBar. `combobox` dipakai
     // agar tidak ikut mencocokkan wrapper `role="group"` yang memakai label sama.
@@ -2160,49 +1721,24 @@ test.describe("SIDAK agent report download nyata", () => {
     await page.getByRole("option", { name: "Chat" }).click();
     await expect(serviceSelect).toContainText("Chat");
 
-    const csvChat = await exportFromMenu(page, "CSV", "layanan-chat-csv");
-    const mdChat = await exportFromMenu(page, "MD", "layanan-chat-md");
-
-    // (1) Cakupan layanan mengikuti UI pada kedua format.
-    expect(csvChat.text).toContain("Layanan Audit,CHAT\n");
-    expect(csvChat.text).not.toContain("Layanan Audit,CALL\n");
-    expect(mdChat.text).toContain(`_Cakupan: Layanan CHAT •`);
-    expect(mdChat.text).not.toContain(`_Cakupan: Layanan CALL •`);
-    expect(
-      csvSectionScope(csvChat.text, "Tiket Pengurang Skor Terbesar"),
-    ).toContain("Layanan CHAT");
-    expect(csvSectionScope(csvChat.text, "Akar Masalah")).toContain(
-      "Layanan CHAT",
+    const chat = await workbookRows(
+      await exportFromMenu(page, "Excel", "layanan-chat-xlsx"),
     );
 
-    // (2) Skema tetap enam seksi di kedua layanan.
-    expectCsvSectionSchema(csvChat.text);
+    // (1) Cakupan layanan mengikuti UI.
+    expect(summaryFacts(chat).Layanan).toBe("Chat");
 
-    // (3) Data bulanan mengikuti layanan terpilih.
-    expect(csvSectionRows(csvChat.text, "Ringkasan Skor Bulanan")).toEqual([
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-      "02/2026,88,89,87,3,2",
+    // (2) Data bulanan mengikuti layanan terpilih.
+    expect(chat["Skor Bulanan"].slice(1)).toEqual([
+      [`Februari ${YEAR}`, 88, 89, 87, 3, 2, "Di bawah target 95"],
     ]);
 
-    // (4) Temuan tidak bocor lintas layanan, di CSV maupun MD.
-    const chatFindings = csvSectionRows(csvChat.text, "Detail Temuan");
-    expect(chatFindings).toHaveLength(3);
-    expect(chatFindings.join("\n")).toContain(CHAT_TICKET_A);
-    expect(chatFindings.join("\n")).toContain(CHAT_TICKET_B);
-    expect(csvChat.text).not.toContain(REAL_TICKET);
-    expect(mdChat.text).toContain(CHAT_TICKET_A);
-    expect(mdChat.text).not.toContain(REAL_TICKET);
-    expect(csvCall.text).toContain(REAL_TICKET);
-    expect(csvCall.text).not.toContain(CHAT_TICKET_A);
-    expect(mdCall.text).not.toContain(CHAT_TICKET_A);
-
-    // (5) MD juga menyatakan cakupan bulan untuk seksi per-bulan.
-    expect(mdSectionScope(mdChat.text, "Tiket Pengurang Skor Terbesar")).toBe(
-      `_Cakupan: Layanan CHAT • Tahun ${YEAR} • Bulan terpilih Februari ${YEAR}_`,
-    );
-    expect(mdSectionScope(mdChat.text, "Detail Temuan")).toBe(
-      `_Cakupan: Layanan CHAT • Tahun ${YEAR}_`,
-    );
+    // (3) Temuan tidak bocor lintas layanan.
+    const chatTickets = chat["Temuan"].slice(1).map((row) => row[1]);
+    expect(chatTickets.sort()).toEqual([CHAT_TICKET_A, CHAT_TICKET_B]);
+    expect(JSON.stringify(chat)).not.toContain(REAL_TICKET);
+    expect(JSON.stringify(call)).toContain(REAL_TICKET);
+    expect(JSON.stringify(call)).not.toContain(CHAT_TICKET_A);
 
     expectNoApplicationTraffic(audit);
   });
@@ -2213,33 +1749,23 @@ test.describe("SIDAK agent report download nyata", () => {
     const audit = startAudit();
     await openAgentDetail(page, audit);
 
-    const csv = await exportFromMenu(page, "CSV", "sesi-bersih-csv");
-    const md = await exportFromMenu(page, "MD", "sesi-bersih-md");
+    const file = await exportFromMenu(page, "Excel", "sesi-bersih-xlsx");
+    const book = await workbookRows(file);
 
     // Angka agregat sesi dari backend diteruskan apa adanya:
     // Januari = 1 sesi tanpa temuan, Februari = 2 sesi dengan 1 temuan.
-    expect(csvSectionRows(csv.text, "Ringkasan Skor Bulanan")).toEqual([
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-      "01/2026,82,84,80,1,0",
-      "02/2026,91,92,90,2,1",
+    expect(book["Skor Bulanan"].slice(1).map((row) => row.slice(0, 6))).toEqual([
+      [`Januari ${YEAR}`, 82, 84, 80, 1, 0],
+      [`Februari ${YEAR}`, 91, 92, 90, 2, 1],
     ]);
-    expect(md.text).toContain("| 01/2026 | 82 | 84 | 80 | 1 | 0 |");
-    expect(md.text).toContain("| 02/2026 | 91 | 92 | 90 | 2 | 1 |");
 
     // Bukti `Sesi` bukan hasil hitung baris yang diekspor: Februari punya
     // 2 sesi tapi hanya 1 baris temuan dan 1 baris tiket.
-    expect(csvSectionRows(csv.text, "Detail Temuan")).toHaveLength(2);
-    expect(
-      csvSectionRows(csv.text, "Tiket Pengurang Skor Terbesar"),
-    ).toHaveLength(2);
+    expect(book["Temuan"]).toHaveLength(2);
+    expect(book["Tiket"]).toHaveLength(2);
 
     // Sebaliknya: sesi bersih tidak pernah muncul sebagai baris.
-    for (const file of [csv, md]) {
-      expect(
-        file.text,
-        `${file.filename} memuat nomor tiket sesi bersih`,
-      ).not.toContain(CLEAN_SESSION_TICKET);
-    }
+    expect(JSON.stringify(book)).not.toContain(CLEAN_SESSION_TICKET);
 
     expectNoApplicationTraffic(audit);
   });
@@ -2253,35 +1779,20 @@ test.describe("SIDAK agent report download nyata", () => {
       name: UNSAFE_NAME,
     });
 
-    const file = await exportFromMenu(page, "CSV", "nama-berbahaya");
+    const file = await exportFromMenu(page, "Excel", "nama-berbahaya");
 
     // Nama file aman: satu garis bawah per rangkaian karakter berbahaya.
     expect(file.filename).toBe(
-      `Laporan_Audit_${UNSAFE_NAME_FILE_PART}_${YEAR}.csv`,
+      `Laporan_Audit_${UNSAFE_NAME_FILE_PART}_${YEAR}.xlsx`,
     );
     expect(file.filename).not.toMatch(/[/\\:*?"<>|]/);
 
     // Sanitasi hanya menyentuh nama file: isi laporan tetap memakai nama
-    // BERBAHAYA apa adanya dan tetap lengkap. Baris CSV-nya di-quote RFC4180
-    // karena nama itu memuat kutip, jadi ekspektasinya bukan string telanjang.
-    expect(file.text).toContain(
-      `# Laporan Audit Agent - "${UNSAFE_NAME.replace(/"/g, '""')}"\n`,
-    );
-    expect(file.text).toContain(`Nama,"${UNSAFE_NAME.replace(/"/g, '""')}"\n`);
-    expectCsvSectionSchema(file.text);
-    expect(file.text).toContain(REAL_TICKET);
-
-    // Kontrak "CSV tetap bisa di-parse": kutip di dalam nilai tidak boleh
-    // merusak struktur file, dan nilainya harus kembali utuh setelah di-parse.
-    const records = expectCsvParseable(file);
-    expect(
-      records.find((record) => record[0] === "Nama")?.[1],
-      "nama agen tidak kembali utuh setelah CSV di-parse",
-    ).toBe(UNSAFE_NAME);
-    expect(
-      records.some((record) => record.includes(HOSTILE_FINDING_TEXT)),
-      "teks temuan berisi tanda kutip tidak kembali utuh setelah CSV di-parse",
-    ).toBe(true);
+    // BERBAHAYA apa adanya, dan teks temuan berisi kutip kembali utuh.
+    const book = await workbookRows(file);
+    expect(summaryFacts(book).Nama).toBe(UNSAFE_NAME);
+    const finding = book["Temuan"].find((row) => row[1] === REAL_TICKET);
+    expect(finding?.[6]).toBe(HOSTILE_FINDING_TEXT);
 
     expectNoApplicationTraffic(audit);
   });
@@ -2319,7 +1830,7 @@ test.describe("SIDAK agent report download nyata", () => {
 
     const trigger = page.getByRole("button", { name: "Unduh Laporan" });
     await trigger.click();
-    const item = page.getByRole("menuitem").filter({ hasText: "CSV" });
+    const item = page.getByRole("menuitem").filter({ hasText: "Excel" });
     await expect(item).toBeEnabled();
     await item.click();
 
@@ -2346,210 +1857,6 @@ test.describe("SIDAK agent report download nyata", () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // FASE 5 — data-integrity CSV: tidak ada sel yang dibaca spreadsheet
-  // sebagai formula, sementara angka dan skema enam seksi tidak berubah.
-  //
-  // Diawali dari hasil audit: `csvEscape` lama hanya mengapit tanda kutip
-  // nilai yang diawali `=`, `+`, `-`, atau `@`. Pengapitan tanda kutip
-  // terbukti BUKAN netralisasi formula, jadi klaim "CSV aman dari formula"
-  // tidak pernah benar. Fixture di sini sengaja berisi nilai yang benar-benar
-  // dievaluasi spreadsheet kalau dibaca apa adanya.
-  // ═══════════════════════════════════════════════════════════════════════
-
-  test("CSV dari fixture berformula: tidak ada sel formula di seluruh file, angka tetap angka, skema enam seksi utuh", async ({
-    page,
-  }) => {
-    const audit = startAudit();
-    await openAgentDetail(page, audit, {
-      id: LONG_TEXT_AGENT_ID,
-      name: LONG_TEXT_AGENT_NAME,
-    });
-
-    const file = await exportFromMenu(page, "CSV", "csv-formula");
-
-    // (1) Bentuk file tidak berubah: BOM UTF-8, enam seksi, dan baris header
-    //     skema tiap seksi. Mitigasi baru bekerja di level isi sel, bukan di
-    //     level struktur dokumen.
-    expectUtf8Bom(file);
-    expect(csvSectionNames(file.text)).toEqual(
-      CSV_SECTION_SCHEMA.map(([name]) => name),
-    );
-    expect(csvSectionHeaderRow(file.text, "Ringkasan Skor Bulanan")).toBe(
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-    );
-    expect(csvSectionHeaderRow(file.text, "Detail Temuan")).toBe(
-      "Bulan,Tahun,Indikator,Kategori,Nilai,Ketidaksesuaian,Sebaiknya,No Tiket",
-    );
-    // Seksi tren agen ini punya tiga seri, jadi header-nya mengikuti data.
-    expect(csvSectionHeaderRow(file.text, "Perkembangan Skor")).toBe(
-      `Periode,Total Temuan,${INDICATOR_NAME},Kepatuhan prosedur`,
-    );
-
-    // (2) File tetap CSV RFC4180 yang bisa di-parse utuh.
-    const records = expectCsvParseable(file);
-
-    // (3) INVIARIAN UTAMA, diukur terhadap SELURUH file: tidak ada satu pun
-    //     field hasil parse yang diawali pemicu formula. Ini yang diuji,
-    //     bukan tanda kutipnya — karena tanda kutip sudah terbukti bukan
-    //     netralisasi.
-    const risky = csvFormulaRiskyFields(records);
-    expect(
-      risky,
-      `sel yang masih dibaca spreadsheet sebagai formula: ${JSON.stringify(risky)}`,
-    ).toEqual([]);
-
-    // (4) Tidak ada data yang hilang: nilai contoh aslinya tetap utuh di
-    //     belakang penanda, jadi menghapus penanda memulihkan teks apa adanya.
-    for (const sample of FORMULA_SAMPLES) {
-      const cells = csvCellsEndingWith(records, sample.value);
-      expect(
-        cells.length,
-        `nilai contoh "${sample.value}" hilang dari CSV (harus tetap utuh di dalam sel)`,
-      ).toBeGreaterThan(0);
-      for (const cell of cells) {
-        const prefix = cell.slice(0, cell.length - sample.value.length);
-        expect(
-          prefix,
-          `sel untuk pemicu "${sample.trigger}" harus persis satu penanda ` +
-            `[teks] + ruang di depan nilai aslinya, bukan "${cell}"`,
-        ).toBe(CSV_FORMULA_PREFIX);
-        expect(
-          cell.slice(CSV_FORMULA_PREFIX.length),
-          "nilai setelah penanda harus sama persis dengan nilai fixture",
-        ).toBe(sample.value);
-      }
-    }
-    // Penanda hanya boleh muncul pada sel yang benar-benar perlu dinetralisasi.
-    // Kalau jumlahnya lebih, mitigasi berubah jadi "anotasi semua teks" dan
-    // laporan jadi tidak jujur soal data mana yang berisiko.
-    expect(
-      file.text.split(CSV_FORMULA_PREFIX).length - 1,
-      "penanda [teks] muncul di sel lain, padahal sel itu tidak berawalan pemicu formula",
-    ).toBe(FORMULA_SAMPLES.length);
-
-    // (5) Angka kolom numerik tidak berubah BITE demi byte: kolom skor harus
-    //     tetap angka, bukan teks yang diawali tanda.
-    expect(csvSectionRows(file.text, "Ringkasan Skor Bulanan")).toEqual([
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-      "01/2026,82,84,80,1,0",
-      "02/2026,91,92,90,2,1",
-      "03/2026,74.5,79,70,4,2",
-    ]);
-
-    // (6) Artefak review: file CSV yang BENAR-BENAR diunduh, untuk dibuka di
-    //     konsumen spreadsheet lokal (bukan string dari generator).
-    const dir = reportArtifactDir("csv-formula");
-    const copy = path.join(dir, file.filename);
-    writeFileSync(copy, file.bytes);
-    console.log(`[artifact] ${copy} (${file.bytes.length} byte)`);
-
-    expectNoApplicationTraffic(audit);
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // PLACEHOLDER INTERNAL — penanda `[teks] ` tidak boleh menempel pada nilai
-  // yang bukan pemicu formula.
-  //
-  // Dua nilai yang sama-sama diawali `-` diuji dari file yang BENAR-BENAR
-  // diunduh, karena keduanya hanya bisa dibedakan di posisinya masing-masing:
-  //   - `-`   : placeholder internal `computeTenure()` untuk agen tanpa
-  //             `bergabung_date`. Bukan formula, jadi penanda hanya
-  //             mengaburkan nilai yang sebenarnya.
-  //   - `-1-1`: pemicu formula asli dari fixture. Harus tetap dilindungi.
-  //
-  // Kalau penandanya dihapus sekalian untuk semua sel berawalan `-`, file ini
-  // masih hijau di assertion kedua tapi kembali membuka formula; kalau
-  // placeholder-nya dibiarkan, assertion pertama yang gagal. Test ini ada
-  // supaya keduanya tidak bisa lolos tanpa dibedakan.
-  // ═══════════════════════════════════════════════════════════════════════
-
-  test("CSV: placeholder internal `-` tetap polos, pemicu formula `-1-1` tetap dilindungi", async ({
-    page,
-  }) => {
-    // (1) Agen tanpa `bergabung_date` → `Masa Kerja` berisi placeholder `-`.
-    const emptyAudit = startAudit();
-    await openAgentDetail(
-      page,
-      emptyAudit,
-      { id: EMPTY_AGENT_ID, name: EMPTY_AGENT_NAME },
-      // Agen tanpa periode tidak memanggil endpoint quickview sama sekali.
-      { expectQuickviewRequest: false },
-    );
-    const empty = await exportFromMenu(page, "CSV", "placeholder");
-
-    expectUtf8Bom(empty);
-
-    const tenureLine = empty.text
-      .split("\n")
-      .find((line) => line.startsWith("Masa Kerja,"));
-    // Nilai placeholder harus terbaca apa adanya. `\"-\"` juga salah: sel
-    // yang diapit tanda kutip bukan bentuk yang pernah dipakai dokumen ini.
-    expect(
-      tenureLine,
-      "baris `Masa Kerja` hilang dari CSV agen tanpa tanggal bergabung",
-    ).toBe("Masa Kerja,-");
-
-    // Tidak ada satu pun nilai di laporan ini yang perlu dinetralisasi, jadi
-    // penanda tidak boleh muncul sama sekali. Pengecualian placeholder harus
-    // berputar di level NILAI, bukan di level dokumen.
-    expect(
-      empty.text.split(CSV_FORMULA_PREFIX).length - 1,
-      "penanda [teks] muncul di laporan yang tidak punya nilai berawalan pemicu",
-    ).toBe(0);
-
-    // Skema seksi tidak bergeser: agen tanpa tren/benchmark memang hanya
-    // menulis empat seksi (kontrak lama), tapi urutan dan namanya tetap.
-    expect(csvSectionNames(empty.text)).toEqual([
-      "Ringkasan Skor Bulanan",
-      "Detail Temuan",
-      "Tiket Pengurang Skor Terbesar",
-      "Akar Masalah",
-    ]);
-
-    expectNoApplicationTraffic(emptyAudit);
-
-    // (2) Agen dengan fixture berformula: pengecualian placeholder harus
-    //     sempit. Sel `-1-1` masih perlu penanda, persis seperti pemicu lain.
-    const formulaAudit = startAudit();
-    await openAgentDetail(page, formulaAudit, {
-      id: LONG_TEXT_AGENT_ID,
-      name: LONG_TEXT_AGENT_NAME,
-    });
-    const formula = await exportFromMenu(page, "CSV", "placeholder");
-
-    expectUtf8Bom(formula);
-    // Skema enam seksi utuh untuk agen yang datanya lengkap.
-    expect(csvSectionNames(formula.text)).toEqual(
-      CSV_SECTION_SCHEMA.map(([name]) => name),
-    );
-
-    const negativeSample = FORMULA_SAMPLES.find(
-      (sample) => sample.trigger === "-",
-    );
-    expect(
-      negativeSample,
-      "fixture formula kehilangan sampel pemicu `-`",
-    ).toBeDefined();
-    const negativeCells = csvCellsEndingWith(
-      expectCsvParseable(formula),
-      negativeSample!.value,
-    );
-    expect(
-      negativeCells.length,
-      `nilai pemicu "${negativeSample!.value}" hilang dari CSV`,
-    ).toBeGreaterThan(0);
-    for (const cell of negativeCells) {
-      expect(
-        cell,
-        `pemicu "${negativeSample!.value}" harus tetap dinetralisasi ` +
-          `dengan satu penanda [teks] + ruang, bukan "${cell}"`,
-      ).toBe(`${CSV_FORMULA_PREFIX}${negativeSample!.value}`);
-    }
-
-    expectNoApplicationTraffic(formulaAudit);
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════
   // FASE 4 — PDF. Menu → generator → Blob biner → file yang diunduh.
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -2559,8 +1866,7 @@ test.describe("SIDAK agent report download nyata", () => {
     const audit = startAudit();
     await openAgentDetail(page, audit);
 
-    // Kontrak: lima format termasuk PDF. Test ini lahir dari RED Fase 1
-    // (`menu Unduh Laporan belum punya opsi PDF`) dan sekarang harus hijau.
+    // Kontrak: empat format (Excel, HTML Interaktif, HTML Statis, PDF).
     const trigger = page.getByRole("button", { name: "Unduh Laporan" });
     await trigger.click();
     // `allTextContents()` tidak menunggu render menu, jadi jumlah item
@@ -2568,10 +1874,10 @@ test.describe("SIDAK agent report download nyata", () => {
     const menuItems = page.getByRole("menuitem");
     await expect(
       menuItems,
-      `menu Unduh Laporan harus punya lima format termasuk PDF; isi menu: ${JSON.stringify(
+      `menu Unduh Laporan harus punya empat format termasuk PDF; isi menu: ${JSON.stringify(
         await menuItems.allTextContents(),
       )}`,
-    ).toHaveCount(5);
+    ).toHaveCount(4);
     const menuLabels = (await menuItems.allTextContents()).map((label) =>
       label.trim(),
     );
@@ -2605,7 +1911,7 @@ test.describe("SIDAK agent report download nyata", () => {
     expect(file.bytes.length).toBeLessThan(2_000_000);
 
     // (3) Blob yang benar-benar diterima browser: `application/pdf` dan
-    //     tidak nol byte. PDF tidak memakai prefix BOM seperti 4 format teks.
+    //     tidak nol byte. PDF tidak memakai prefix BOM seperti HTML.
     expect(blobs, "tidak ada blob yang dibuat untuk unduhan PDF").toHaveLength(
       1,
     );
@@ -2618,7 +1924,7 @@ test.describe("SIDAK agent report download nyata", () => {
     const info = readPdfInfo(file.bytes);
     expect(info.Title ?? "", "/Title PDF").toContain(AGENT_NAME);
     expect(info.Subject ?? "", "/Subject PDF").toContain(String(YEAR));
-    expect(info.Subject ?? "", "/Subject PDF").toContain("CALL");
+    expect(info.Subject ?? "", "/Subject PDF").toContain("Layanan Call");
     expect(info.Author ?? "", "/Author PDF").toContain("SIDAK");
     expect(info.Producer ?? "", "/Producer PDF").not.toBe("");
 
@@ -2655,10 +1961,11 @@ test.describe("SIDAK agent report download nyata", () => {
       "Tim Call",
       "Batch 7",
       `Tahun ${YEAR}`,
-      "Layanan CALL",
-      "Ringkasan Skor Bulanan",
-      "01/2026",
-      "02/2026",
+      "Layanan Call",
+      "Kesimpulan Utama",
+      MONTHLY_TABLE_CAPTION,
+      "Januari 2026",
+      "Februari 2026",
     ]) {
       expect(
         printedIncludes(firstPage, fact),
@@ -2673,8 +1980,8 @@ test.describe("SIDAK agent report download nyata", () => {
       `tiket riil tidak ikut di PDF; read-back: ${whole}`,
     ).toBe(true);
     expect(
-      /TKT-2026-0142[\s\S]{0,80}?\d+\.\d/.test(whole),
-      "kolom Score Deduction tidak ikut di PDF",
+      /TKT-2026-0142[\s\S]{0,80}?\d+(,\d)?/.test(whole),
+      "kolom Pengurangan Skor tidak ikut di PDF",
     ).toBe(true);
 
     // (8) Halaman terakhir: seluruh temuan (tiket, indikator, nilai, teks
@@ -2718,9 +2025,10 @@ test.describe("SIDAK agent report download nyata", () => {
     // Setiap seksi menyatakan cakupannya sendiri; tidak boleh ada satu periode
     // yang lendoh ke seluruh dokumen.
     for (const scope of [
-      `Layanan CALL • Tahun ${YEAR}`,
+      `Layanan Call • Tahun ${YEAR}`,
       "Bulan terpilih Februari 2026",
-      `Tahun berjalan s.d. Februari 2026`,
+      "Hanya Februari 2026",
+      `Januari s.d. Februari 2026`,
     ]) {
       expect(
         printedIncludes(whole, scope),
@@ -2817,15 +2125,24 @@ test.describe("SIDAK agent report download nyata", () => {
         .map((text, index) => `[p${index + 1}] ${text.slice(0, 120)}`)
         .join("\n")}`,
     ).toBeGreaterThanOrEqual(2);
-    // Dokumen berakhir bersih: kalimat terakhir colophon ada di halaman
-    // terakhir, jadi tidak ada blok yang menggantung di akhir file.
-    const lastPage = pages[pages.length - 1];
+    // Identitas mencatat waktu pembuatan di halaman pertama, dan catatan sesi
+    // tanpa temuan ikut di dokumen (di bawah rekap bulanan). Tidak ada blok
+    // penutup tersendiri yang bisa jatuh sendirian ke halaman terakhir.
+    expect(
+      printedIncludes(pages[0], "dari SIDAK"),
+      `halaman pertama tidak mencatat waktu pembuatan; read-back: ${pages[0].slice(0, 300)}`,
+    ).toBe(true);
     expect(
       printedIncludes(
-        lastPage,
-        "Angka agregat sesi berasal dari penilaian backend dan tidak dihitung ulang oleh laporan ini.",
+        whole,
+        "Sesi tanpa temuan dihitung pada kolom Sesi, tetapi tidak ditampilkan sebagai temuan.",
       ),
-      `halaman terakhir tidak ditutup colophon; read-back: ${lastPage.slice(0, 300)}`,
+      "catatan sesi tanpa temuan hilang dari PDF",
+    ).toBe(true);
+    const lastPage = pages[pages.length - 1];
+    expect(
+      printedIncludes(lastPage, "Sebaiknya:"),
+      `daftar tiket terakhir terpisah dari temuannya; read-back: ${lastPage.slice(0, 300)}`,
     ).toBe(true);
 
     // (2) Token tanpa spasi yang lebih lebar dari kolom harus dipecah per
@@ -2842,7 +2159,7 @@ test.describe("SIDAK agent report download nyata", () => {
       LONG_TEXT_TICKET,
       LONG_TEXT_TICKET_2,
       LONG_TEXT_AGENT_NAME,
-      "03/2026",
+      "Maret 2026",
       "Kepatuhan prosedur",
     ]) {
       expect(
@@ -2907,12 +2224,27 @@ test.describe("SIDAK agent report download nyata", () => {
       printedIncludes(whole, UNSUPPORTED_IN_TOKEN_ASCII_TAIL),
       "akhir token tanpa spasi hilang dari PDF",
     ).toBe(true);
+    // Paragraf boleh mengalir melewati batas halaman; header/footer halaman
+    // yang terselip di antara dua baris token bukan bagian dari tokennya.
+    const flowing = pages
+      .map((text) =>
+        text
+          .replace(`Laporan Audit SIDAK ${LONG_TEXT_AGENT_NAME} • Layanan Call • ${YEAR}`, "")
+          .replace(/Laporan Audit SIDAK Halaman \d+ dari \d+/, ""),
+      )
+      .join("\n");
+    const markedToken = UNSUPPORTED_IN_TOKEN.replace(
+      "ệ",
+      unsupportedMarker("U+1EC7"),
+    );
     expect(
-      printedIncludes(
-        whole,
-        UNSUPPORTED_IN_TOKEN.replace("ệ", unsupportedMarker("U+1EC7")),
-      ),
-      "token tanpa spasi terpotong di batas kolom",
+      printedIncludes(flowing, markedToken),
+      `token tanpa spasi terpotong di batas kolom; sekitar token: ${
+        flowing.slice(
+          Math.max(0, flowing.indexOf(UNSUPPORTED_IN_TOKEN_ASCII_HEAD) - 20),
+          flowing.indexOf(UNSUPPORTED_IN_TOKEN_ASCII_HEAD) + 260,
+        )
+      }`,
     ).toBe(true);
 
     // (4d) Karakter yang DIDUKUNG WinAnsi tetap utuh di kalimat yang sama:
@@ -2962,17 +2294,14 @@ test.describe("SIDAK agent report download nyata", () => {
     expectNoApplicationTraffic(audit);
   });
 
-  test("PDF: nomor tiket jadi identifier utama, dan tiap metrik tren punya grafik + tabel sendiri", async ({
+  test("PDF: temuan dikelompokkan per parameter dengan nomor tiket di depan, dan dua keluarga tren tetap terpisah", async ({
     page,
   }) => {
     const audit = startAudit();
     // Fixture teks panjang dipakai di sini karena personalTrend-nya punya
-    // TIGA seri (total + dua parameter) dan tiga periode: pemisahan
-    // agregat/rincian baru berarti kalau tabel parameter memuat kedua kolom
-    // parameter dan tabel total tidak memuat satupun. Riwayat skornya juga
-    // tiga periode, dan periode ketiga punya nilai desimal — jadi keenryaannya
-    // sebagai skor (bukan jumlah temuan) bisa diuji dengan angka yang tidak
-    // mungkin tertukar dengan hitungan temuan.
+    // TIGA seri (total + dua parameter) dan tiga periode, dan riwayat skornya
+    // punya nilai desimal (74,5) yang tidak mungkin tertukar dengan hitungan
+    // temuan.
     await openAgentDetail(page, audit, {
       id: LONG_TEXT_AGENT_ID,
       name: LONG_TEXT_AGENT_NAME,
@@ -2988,164 +2317,80 @@ test.describe("SIDAK agent report download nyata", () => {
       "tidak ada run teks per halaman untuk diperiksa",
     ).toBe(pdfPages.texts.length);
 
-    // (1) Nomor tiket: identifier terkuat di blok temuan. Yang diukur adalah
-    //     run teks yang benar-benar ditulis — label "NO TIKET", lalu nomor
-    //     tiket pada ukuran lebih besar, lalu nama parameter pada ukuran lebih
-    //     kecil. Nomor yang sama juga muncul di tabel tiket pada 8pt, jadi
-    //     yang dibaca adalah run tepat setelah label pita, bukan kecocokan
-    //     pertama.
-    const bands: Array<{ code: PdfTextRun; index: number }> = [];
-    runs.forEach((run, index) => {
-      if (run.text !== "NO TIKET") return;
-      const code = runs
-        .slice(index + 1, index + 3)
-        .find(
-          (candidate) =>
-            candidate.text.trim() !== "" && !/parameter$/.test(candidate.text),
-        );
-      if (code) bands.push({ code, index });
-    });
-    expect(
-      bands.length,
-      `pita "NO TIKET" tidak ditemukan di PDF; run: ${JSON.stringify(
-        runs.slice(0, 40).map((run) => run.text),
-      )}`,
-    ).toBeGreaterThan(0);
-    const bandCodes = bands.map((band) => band.code.text);
-    for (const ticket of [LONG_TEXT_TICKET, LONG_TEXT_TICKET_2]) {
-      expect(
-        bandCodes.some((code) => printedIncludes(code, ticket)),
-        `nomor tiket ${ticket} tidak punya pita sendiri; pita yang terbaca: ${JSON.stringify(
-          bandCodes,
-        )}`,
-      ).toBe(true);
-    }
-    for (const band of bands) {
-      expect(
-        band.code.baseFont,
-        `nomor tiket "${band.code.text}" harus dicetak bold, bukan font reguler`,
-      ).toMatch(/bold/i);
-    }
-
-    const parameterRun = runs.find(
-      (run) => run.text.includes(INDICATOR_NAME) && run.text.includes("("),
-    );
-    expect(
-      parameterRun,
-      "baris parameter (nilai + nama parameter) tidak ditemukan",
-    ).toBeDefined();
-    const smallestTicket = bands.reduce(
-      (min, band) => (band.code.size < min ? band.code.size : min),
-      Number.POSITIVE_INFINITY,
-    );
-    expect(
-      smallestTicket,
-      `nomor tiket (${smallestTicket}pt) harus lebih besar daripada nama parameter/nilai (${parameterRun!.size}pt)`,
-    ).toBeGreaterThan(parameterRun!.size);
-    // Bandingkan juga terhadap nama agen di masthead: skor/angka tidak boleh
-    // mendominasi dokumen sampai nomor tiket jadi teks kecil di antaranya.
-    const nameRun = runs.find((run) => run.text === LONG_TEXT_AGENT_NAME);
-    expect(nameRun, "nama agen tidak ditemukan di masthead").toBeDefined();
-    expect(
-      smallestTicket,
-      `nomor tiket (${smallestTicket}pt) harus cukup besar untuk dipindai (>= 11pt), bukan tenggelam di antara teks 7-9pt`,
-    ).toBeGreaterThanOrEqual(11);
-
-    // (2) DUA KELUARGA TREN, DUA SEKSI. Urutan run = urutan dokumen untuk
-    //     generator ini, jadi batas antar seksi bisa dibaca dari posisi judul
-    //     seksi dan judul grafik:
-    //       Perkembangan Skor -> [skor final, NC, CR] -> Tren Temuan ->
-    //       [total temuan, per parameter] -> Perbandingan Temuan.
-    //    Seksi "Perkembangan Skor" tidak boleh memuat satu pun label keluarga
-    //     temuan, dan sebaliknya: itulah pembeda antara grafik skor dan
-    //     grafik jumlah temuan.
-    const titleIndex = (title: string) =>
-      runs.findIndex((run) => run.text === title);
+    const indexAfter = (title: string, from = 0) =>
+      runs.findIndex((run, index) => index > from && run.text === title);
     const regionOf = (from: number, to: number) =>
       runs
         .slice(from, to)
         .map((run) => run.text)
         .join(" ");
 
-    const scoreHeading = titleIndex("Perkembangan Skor");
-    const findingTrendHeading = titleIndex("Tren Temuan");
-    const comparisonCaption = titleIndex("Perbandingan Temuan");
-    const totalTitle = titleIndex("Jumlah Total Temuan per Periode");
-    const paramTitle = titleIndex("Jumlah Temuan per Parameter");
-    const totalCaption = titleIndex(TREND_TOTAL_TABLE_CAPTION);
-    const paramCaption = titleIndex(TREND_PARAMETER_TABLE_CAPTION);
-    const finalTitle = titleIndex(SCORE_FINAL_CHART_TITLE);
-    const nonCriticalTitle = titleIndex(SCORE_NON_CRITICAL_CHART_TITLE);
-    const criticalTitle = titleIndex(SCORE_CRITICAL_CHART_TITLE);
+    // (1) Detail temuan per parameter: tiap parameter punya pita bold yang
+    //     lebih besar dari teks isi, dan setiap kemunculan dimulai dengan
+    //     nomor tiket supaya tiket mudah dipindai.
+    const detailHeading = indexAfter("Detail Temuan");
+    expect(detailHeading, "judul Detail Temuan tidak ada").toBeGreaterThan(0);
+    const detailRuns = runs.slice(detailHeading);
+    for (const parameter of [INDICATOR_NAME, "Kepatuhan prosedur"]) {
+      const band = detailRuns.find((run) => run.text === parameter);
+      expect(band, `pita parameter "${parameter}" tidak ada`).toBeDefined();
+      expect(band!.baseFont, `pita "${parameter}" harus bold`).toMatch(/bold/i);
+      expect(band!.size).toBeGreaterThanOrEqual(10);
+    }
+    for (const ticket of [LONG_TEXT_TICKET, LONG_TEXT_TICKET_2]) {
+      expect(
+        detailRuns.some((run) => run.text.startsWith(ticket)),
+        `kemunculan temuan untuk ${ticket} harus dimulai dengan nomor tiketnya`,
+      ).toBe(true);
+    }
+
+    // (2) DUA KELUARGA TREN, DUA SEKSI, dalam urutan dokumen:
+    //       Perkembangan Skor -> [Skor Final, Non-Critical, Critical] ->
+    //       Tren Temuan -> [Total Temuan per Bulan, Temuan per Parameter] ->
+    //       Detail Temuan.
+    const scoreHeading = indexAfter("Perkembangan Skor");
+    const finalTitle = indexAfter(SCORE_FINAL_CHART_TITLE, scoreHeading);
+    const nonCriticalTitle = indexAfter(SCORE_NON_CRITICAL_CHART_TITLE, scoreHeading);
+    const criticalTitle = indexAfter(SCORE_CRITICAL_CHART_TITLE, scoreHeading);
+    const findingTrendHeading = indexAfter("Tren Temuan", scoreHeading);
+    const totalTitle = indexAfter(TREND_TOTAL_CHART_TITLE, findingTrendHeading);
+    const paramCaption = indexAfter(TREND_PARAMETER_TABLE_CAPTION, findingTrendHeading);
     for (const [label, index] of [
       ["heading seksi skor", scoreHeading],
-      ["heading seksi tren temuan", findingTrendHeading],
-      ["judul grafik total temuan", totalTitle],
-      ["judul grafik temuan per parameter", paramTitle],
       ["judul grafik skor final", finalTitle],
       ["judul grafik skor non-critical", nonCriticalTitle],
       ["judul grafik skor critical", criticalTitle],
+      ["heading seksi tren temuan", findingTrendHeading],
+      ["judul grafik total temuan", totalTitle],
+      ["caption tabel temuan per parameter", paramCaption],
     ] as const) {
-      expect(index, `${label} tidak ada di PDF yang diunduh`).toBeGreaterThan(
-        0,
-      );
+      expect(index, `${label} tidak ada di PDF yang diunduh`).toBeGreaterThan(0);
     }
-    // Urutan di atas juga bukti bahwa grafik jumlah temuan TIDAK lagi hidup di
-    // seksi "Perkembangan Skor".
     expect(scoreHeading).toBeLessThan(finalTitle);
     expect(finalTitle).toBeLessThan(nonCriticalTitle);
     expect(nonCriticalTitle).toBeLessThan(criticalTitle);
     expect(criticalTitle).toBeLessThan(findingTrendHeading);
     expect(findingTrendHeading).toBeLessThan(totalTitle);
-    expect(totalTitle).toBeLessThan(paramTitle);
-    expect(paramTitle).toBeLessThan(comparisonCaption);
+    expect(totalTitle).toBeLessThan(paramCaption);
+    expect(paramCaption).toBeLessThan(detailHeading);
 
-    // Satuan sumbu Y tertulis sebagai teks di setiap grafik (bukan hanya
-    // angka kisi), jadi pembaca tahu apa yang diukur: tiga grafik skor memakai
-    // satuan skor, dua grafik temuan memakai satuan jumlah temuan.
-    const unitCount = (text: string) =>
-      runs.filter((run) => run.text === text).length;
+    // Satu grafik jumlah temuan → satuan "Jumlah temuan" tertulis sekali;
+    // tiap grafik skor punya garis target 95 dengan keterangannya.
     expect(
-      unitCount(SCORE_UNIT),
-      `satuan sumbu "${SCORE_UNIT}" harus tertulis sekali per grafik skor; ditemukan ${unitCount(SCORE_UNIT)}`,
-    ).toBe(3);
-    expect(
-      unitCount(FINDING_COUNT_UNIT),
-      `satuan sumbu "${FINDING_COUNT_UNIT}" harus tertulis sekali per grafik temuan; ditemukan ${unitCount(FINDING_COUNT_UNIT)}`,
-    ).toBe(2);
-
+      runs.filter((run) => run.text === FINDING_COUNT_UNIT).length,
+      `satuan "${FINDING_COUNT_UNIT}" harus tertulis sekali`,
+    ).toBe(1);
     const scoreRegion = regionOf(scoreHeading, findingTrendHeading);
-    const findingTrendRegion = regionOf(
-      findingTrendHeading,
-      Math.max(comparisonCaption, paramTitle),
-    );
-    const totalRegion = regionOf(totalTitle, paramTitle);
-    const afterParam = regionOf(paramCaption, comparisonCaption);
-
-    // (2a) Seksi skor: tiga metrik, tiga grafik, tiga tabel, dan angkanya adalah
-    //      SKOR asli dari riwayat bulanan — bukan jumlah temuan.
-    // Tiap metrik punya judul dan tabelnya sendiri: caption tabelnya muncul
-    // sebagai SATU run teks di dalam seksi skor. Run dengan kalimat "Nilai
-    // lengkapnya ada pada tabel ..." milik figure yang sama bukan caption
-    // kedua, jadi yang dihitung di sini memang caption tabelnya saja. Kalau
-    // salah satu hilang atau digabung, hitungannya berubah.
-    for (const caption of [
-      SCORE_FINAL_TABLE_CAPTION,
-      SCORE_NON_CRITICAL_TABLE_CAPTION,
-      SCORE_CRITICAL_TABLE_CAPTION,
-    ]) {
-      const captionRuns = runs
+    expect(
+      runs
         .slice(scoreHeading, findingTrendHeading)
-        .filter((run) => run.text === caption);
-      expect(
-        captionRuns.length,
-        `caption "${caption}" harus jadi tepat satu run teks di seksi skor; ditemukan ${captionRuns.length}`,
-      ).toBe(1);
-      expect(
-        printedIncludes(scoreRegion, caption),
-        `caption "${caption}" hilang dari seksi Perkembangan Skor`,
-      ).toBe(true);
-    }
+        .filter((run) => run.text === "Target 95").length,
+      "tiap grafik skor harus menandai target 95",
+    ).toBe(3);
+
+    // (2a) Seksi skor memuat skor asli dari riwayat bulanan — bukan jumlah
+    //      temuan — dan desimal tertulis utuh gaya Indonesia (74,5).
+    const asText = (value: number) => String(value).replace(".", ",");
     for (const period of LONG_TEXT_SCORE_HISTORY) {
       for (const value of [
         period.finalScore,
@@ -3153,21 +2398,14 @@ test.describe("SIDAK agent report download nyata", () => {
         period.criticalScore,
       ]) {
         expect(
-          printedIncludes(scoreRegion, String(value)),
+          printedIncludes(scoreRegion, asText(value)),
           `skor ${value} (${period.period}) tidak muncul di seksi Perkembangan Skor; region: ${scoreRegion}`,
         ).toBe(true);
       }
     }
-    // Nilai desimal harus utuh sebagai angka, bukan terpenggal jadi "74" + ".5"
-    // di batas kolom.
-    expect(
-      printedIncludes(scoreRegion, "74.5"),
-      "skor desimal 74.5 tidak terbaca utuh di seksi skor",
-    ).toBe(true);
+    expect(printedIncludes(scoreRegion, "74,5")).toBe(true);
     for (const foreign of [
-      "Jumlah Temuan",
       "Total Temuan",
-      "Data tren",
       FINDING_COUNT_UNIT,
       INDICATOR_NAME,
       "Kepatuhan prosedur",
@@ -3178,81 +2416,35 @@ test.describe("SIDAK agent report download nyata", () => {
       ).not.toContain(foreign);
     }
 
-    // (2b) Sebaliknya, seksi tren temuan tidak boleh memuat satu pun label
-    //      skor, dan tabelnya tetap terpisah per metrik.
+    // (2b) Seksi tren temuan tidak memuat label maupun angka skor.
+    const findingTrendRegion = regionOf(findingTrendHeading, detailHeading);
     for (const foreign of [
-      SCORE_FINAL_CHART_TITLE,
       SCORE_NON_CRITICAL_CHART_TITLE,
       SCORE_CRITICAL_CHART_TITLE,
-      "Data skor",
-      SCORE_UNIT,
+      "Target 95",
     ]) {
       expect(
         findingTrendRegion,
-        `seksi Tren Temuan ikut memuat "${foreign}" — seksi ini harus soal jumlah temuan saja`,
+        `seksi Tren Temuan ikut memuat "${foreign}"`,
       ).not.toContain(foreign);
     }
-    // Angka skor tidak boleh berdiri sebagai jumlah temuan di seksi ini.
-    for (const period of LONG_TEXT_SCORE_HISTORY) {
-      for (const value of [
-        period.finalScore,
-        period.nonCriticalScore,
-        period.criticalScore,
-      ]) {
-        expect(
-          printedIncludes(findingTrendRegion, String(value)),
-          `skor ${value} bocor ke seksi Tren Temuan; region: ${findingTrendRegion}`,
-        ).toBe(false);
-      }
-    }
-    expect(totalCaption, "caption tabel total tren tidak ada").toBeGreaterThan(
-      0,
-    );
     expect(
-      paramCaption,
-      "caption tabel parameter tren tidak ada",
-    ).toBeGreaterThan(0);
-    // Tabel total hanya punya kolom "Total Temuan"; tidak boleh bocor
-    // nama parameter. Tabel parameter punya kedua parameter dan tidak boleh
-    // memuat kolom total — kalau iya, dua metrik yang tidak sebanding
-    // kembali digabung menjadi satu trendline/tabel.
-    expect(
-      totalRegion,
-      "grafik/tabel total ikut memuat nama parameter — dua metrik digabung",
-    ).not.toContain(INDICATOR_NAME);
-    expect(totalRegion, "tabel total tidak memuat kolomnya sendiri").toContain(
-      "Total Temuan",
-    );
-    expect(
-      afterParam,
-      "tabel parameter tidak memuat kedua parameternya",
-    ).toContain(INDICATOR_NAME);
-    expect(afterParam, "tabel parameter tidak memuat kolom kedua").toContain(
-      "Kepatuhan prosedur",
-    );
-    expect(
-      afterParam,
-      "tabel parameter ikut memuat kolom total — agregat dan rincian digabung",
-    ).not.toContain("Total Temuan");
+      printedIncludes(findingTrendRegion, "74,5"),
+      "skor desimal bocor ke seksi Tren Temuan",
+    ).toBe(false);
 
-    // (3) Tabel data tiap grafik lengkap: setiap periode hadir di kedua
-    //     keluarga tren, lengkap dengan angkanya (termasuk yang bernilai 0).
+    // (3) Tabel per parameter memuat baris total dan kedua parameter, dengan
+    //     setiap periode.
+    const paramRegion = regionOf(paramCaption, detailHeading);
+    for (const label of ["Total Temuan", INDICATOR_NAME, "Kepatuhan prosedur"]) {
+      expect(paramRegion, `tabel parameter tidak memuat "${label}"`).toContain(label);
+    }
     for (const period of ["Jan", "Feb", "Mar"]) {
-      expect(
-        scoreRegion,
-        `label periode "${period}" hilang dari seksi Perkembangan Skor`,
-      ).toContain(period);
-      expect(
-        totalRegion,
-        `label periode "${period}" hilang dari grafik/tabel total`,
-      ).toContain(period);
-      expect(
-        afterParam,
-        `label periode "${period}" hilang dari grafik/tabel parameter`,
-      ).toContain(period);
+      expect(scoreRegion, `periode "${period}" hilang dari seksi skor`).toContain(period);
+      expect(paramRegion, `periode "${period}" hilang dari tabel parameter`).toContain(period);
     }
     expect(
-      printedIncludes(whole, `${LONG_TEXT_TICKET_2}`),
+      printedIncludes(whole, LONG_TEXT_TICKET_2),
       "tiket periode lain ikut hilang dari PDF",
     ).toBe(true);
 
@@ -3266,7 +2458,7 @@ test.describe("SIDAK agent report download nyata", () => {
     expectNoApplicationTraffic(audit);
   });
 
-  test("HTML Statis: grafik skor & tren temuan terpisah lengkap, nomor tiket dominan, dan cetak tidak memotong tabel", async ({
+  test("HTML Statis: grafik skor dengan target, tren temuan sebagai tabel, nomor tiket menonjol, dan cetak tidak memotong tabel", async ({
     page,
     browser,
   }) => {
@@ -3292,11 +2484,9 @@ test.describe("SIDAK agent report download nyata", () => {
         `error saat membuka offline: ${offline.consoleErrors.join(" | ")}`,
       ).toEqual([]);
 
-      // (1) Dua seksi tren, dan di dalamnya satu metrik satu grafik. Seksi skor
-      //     memuat tiga grafik skor; seksi tren temuan memuat dua grafik
-      //     jumlah temuan. Pemisahan ini yang membuat tidak ada grafik
-      //     jumlah temuan yang berakhir hidup di bawah judul "Perkembangan
-      //     Skor".
+      // (1) Dua seksi tren. Seksi skor memuat tiga grafik skor (satu metrik
+      //     satu grafik); seksi tren temuan memuat satu grafik total dan tabel
+      //     per parameter — tidak ada grafik per parameter yang saling menimpa.
       const scorePanel = document.locator('[data-report-panel="trend"]');
       const findingTrendPanel = document.locator(
         '[data-report-panel="temuanTren"]',
@@ -3314,214 +2504,45 @@ test.describe("SIDAK agent report download nyata", () => {
         ),
         critical: scorePanel.locator('[data-chart-figure="score-critical"]'),
       };
-      for (const [metric, figure] of Object.entries(scoreFigures)) {
-        await expect(
-          figure,
-          `grafik skor "${metric}" tidak ada tepat satu kali`,
-        ).toHaveCount(1);
+      const scoreTitles = {
+        final: SCORE_FINAL_CHART_TITLE,
+        nonCritical: SCORE_NON_CRITICAL_CHART_TITLE,
+        critical: SCORE_CRITICAL_CHART_TITLE,
+      } as const;
+      const scoreValues = {
+        final: AGENT_SCORE_HISTORY.map((row) => row.finalScore),
+        nonCritical: AGENT_SCORE_HISTORY.map((row) => row.nonCriticalScore),
+        critical: AGENT_SCORE_HISTORY.map((row) => row.criticalScore),
+      };
+      for (const metric of ["final", "nonCritical", "critical"] as const) {
+        const figure = scoreFigures[metric];
+        await expect(figure, `grafik skor "${metric}"`).toHaveCount(1);
         await expect(
           findingTrendPanel.locator(`[data-chart-figure="score-${metric}"]`),
-          `grafik skor "${metric}" tidak boleh hidup di seksi Tren Temuan`,
         ).toHaveCount(0);
-      }
-      await expect(scoreFigures.final.locator(".chart-title")).toHaveText(
-        SCORE_FINAL_CHART_TITLE,
-      );
-      await expect(scoreFigures.nonCritical.locator(".chart-title")).toHaveText(
-        SCORE_NON_CRITICAL_CHART_TITLE,
-      );
-      await expect(scoreFigures.critical.locator(".chart-title")).toHaveText(
-        SCORE_CRITICAL_CHART_TITLE,
-      );
-
-      const totalFigure = findingTrendPanel.locator(
-        '[data-chart-figure="total"]',
-      );
-      const paramFigure = findingTrendPanel.locator(
-        '[data-chart-figure="parameter"]',
-      );
-      await expect(totalFigure).toHaveCount(1);
-      await expect(paramFigure).toHaveCount(1);
-      await expect(totalFigure.locator(".chart-title")).toHaveText(
-        "Jumlah Total Temuan per Periode",
-      );
-      await expect(paramFigure.locator(".chart-title")).toHaveText(
-        "Jumlah Temuan per Parameter",
-      );
-      // Tidak ada satu pun grafik jumlah temuan di seksi skor.
-      for (const figure of [
-        '[data-chart-figure="total"]',
-        '[data-chart-figure="parameter"]',
-      ]) {
+        await expect(figure.locator(".chart-title")).toHaveText(
+          scoreTitles[metric],
+        );
+        await expect(figure.locator("svg .chart-unit")).toHaveText(SCORE_UNIT);
+        // Garis target 95, dan sumbu di-zoom (tidak dimulai dari 0) supaya
+        // naik-turun skor terlihat.
+        await expect(figure.locator("[data-target-line]")).toHaveCount(1);
+        await expect(figure.locator("svg")).toContainText("Target 95");
         await expect(
-          scorePanel.locator(figure),
-          `grafik temuan ${figure} tidak boleh hidup di seksi Perkembangan Skor`,
-        ).toHaveCount(0);
-      }
-      // (2) Tiap grafik punya nama yang bisa diumumkan, satuan sumbu, label
-      //     periode, nilai di atas titik, dan legenda di dalam figure-nya.
-      await expect(
-        document.getByRole("img", { name: /Grafik tren skor final/i }),
-      ).toBeVisible();
-      await expect(
-        document.getByRole("img", {
-          name: /Grafik tren skor non-critical/i,
-        }),
-      ).toBeVisible();
-      await expect(
-        document.getByRole("img", { name: /Grafik tren skor critical/i }),
-      ).toBeVisible();
-      await expect(
-        document.getByRole("img", { name: /Grafik tren total temuan/i }),
-      ).toBeVisible();
-      await expect(
-        document.getByRole("img", {
-          name: /Grafik tren temuan per parameter/i,
-        }),
-      ).toBeVisible();
-      for (const figure of [
-        totalFigure,
-        paramFigure,
-        ...Object.values(scoreFigures),
-      ]) {
-        await expect(figure.locator("svg .chart-value")).toHaveCount(2);
-        await expect(figure.locator(".chart-legend")).toBeVisible();
+          figure.locator("svg .chart-axis-label").first(),
+        ).not.toHaveText("0");
+        await expect(figure.locator("svg .chart-value")).toHaveText(
+          scoreValues[metric].map(String),
+        );
         await expect(figure.locator("svg")).toContainText("Jan");
         await expect(figure.locator("svg")).toContainText("Feb");
-      }
-      for (const figure of [totalFigure, paramFigure]) {
-        await expect(figure.locator("svg .chart-unit")).toHaveText(
-          FINDING_COUNT_UNIT,
-        );
-      }
-      for (const figure of Object.values(scoreFigures)) {
-        await expect(figure.locator("svg .chart-unit")).toHaveText(SCORE_UNIT);
-      }
-      await expect(totalFigure.locator(".chart-legend-item")).toHaveText([
-        "Total Temuan",
-      ]);
-      await expect(paramFigure.locator(".chart-legend-item")).toHaveText([
-        INDICATOR_NAME,
-      ]);
-      // Legenda grafik skor: satu seri per grafik, tidak pernah digabung.
-      await expect(scoreFigures.final.locator(".chart-legend-item")).toHaveText(
-        ["Skor Final"],
-      );
-      await expect(
-        scoreFigures.nonCritical.locator(".chart-legend-item"),
-      ).toHaveText(["Skor Non-Critical (NC)"]);
-      await expect(
-        scoreFigures.critical.locator(".chart-legend-item"),
-      ).toHaveText(["Skor Critical (CR)"]);
-
-      // (3) Tiap grafik punya tabel data lengkapnya sendiri, dan tidak ada
-      //     kolom dari metrik lain yang ikut nyasar. Sel tabel skor dibaca
-      //     satu per satu terhadap riwayat skor fixture: kalau seksi ini
-      //     kebetulan menampilkan jumlah temuan, angkanya langsung berbeda.
-      const scoreTables = [
-        {
-          caption: SCORE_FINAL_TABLE_CAPTION,
-          values: AGENT_SCORE_HISTORY.map((row) => row.finalScore),
-        },
-        {
-          caption: SCORE_NON_CRITICAL_TABLE_CAPTION,
-          values: AGENT_SCORE_HISTORY.map((row) => row.nonCriticalScore),
-        },
-        {
-          caption: SCORE_CRITICAL_TABLE_CAPTION,
-          values: AGENT_SCORE_HISTORY.map((row) => row.criticalScore),
-        },
-      ];
-      for (const { caption, values } of scoreTables) {
-        const table = document.getByRole("table", {
-          name: captionPattern(caption),
-        });
-        await expect(table).toBeVisible();
-        await expect(table.locator("tbody tr")).toHaveCount(
-          AGENT_SCORE_HISTORY.length,
-        );
-        for (const [index, period] of AGENT_SCORE_HISTORY.entries()) {
-          const row = table.locator("tbody tr").nth(index);
-          await expect(row.locator("th")).toHaveText(period.period);
-          await expect(
-            row.locator("td"),
-            `tabel "${caption}" baris ${period.period} harus berisi skor, bukan jumlah temuan`,
-          ).toHaveText([String(values[index])]);
-        }
-        // Kolom temuan tidak boleh ikut nyasar ke tabel skor.
-        await expect(
-          table,
-          `tabel "${caption}" ikut memuat kolom temuan`,
-        ).not.toContainText("Total Temuan");
-      }
-      // Sebaliknya, tabel tren temuan tidak boleh memuat angka skor.
-      for (const [caption, counts] of [
-        [TREND_TOTAL_TABLE_CAPTION, AGENT_FINDING_COUNTS],
-        [TREND_PARAMETER_TABLE_CAPTION, AGENT_FINDING_COUNTS],
-      ] as const) {
-        const table = document.getByRole("table", {
-          name: captionPattern(caption),
-        });
-        await expect(table).toBeVisible();
-        await expect(table.locator("tbody tr")).toHaveCount(counts.length);
-        for (const [index, count] of counts.entries()) {
-          await expect(
-            table.locator("tbody tr").nth(index).locator("td"),
-            `tabel "${caption}" harus berisi jumlah temuan`,
-          ).toHaveText([String(count)]);
-        }
-        for (const period of AGENT_SCORE_HISTORY) {
-          for (const score of [
-            period.finalScore,
-            period.nonCriticalScore,
-            period.criticalScore,
-          ]) {
-            await expect(
-              table,
-              `skor ${score} bocor ke tabel "${caption}"`,
-            ).not.toContainText(String(score));
-          }
-        }
-      }
-      const totalTable = document.getByRole("table", {
-        name: captionPattern(TREND_TOTAL_TABLE_CAPTION),
-      });
-      const paramTable = document.getByRole("table", {
-        name: captionPattern(TREND_PARAMETER_TABLE_CAPTION),
-      });
-      for (const table of [totalTable, paramTable]) {
-        await expect(table).toContainText("Jan");
-        await expect(table).toContainText("Feb");
-      }
-      await expect(totalTable).toContainText("Total Temuan");
-      await expect(
-        totalTable,
-        "tabel total ikut memuat kolom parameter — dua metrik digabung",
-      ).not.toContainText(INDICATOR_NAME);
-      await expect(paramTable).toContainText(INDICATOR_NAME);
-      await expect(
-        paramTable,
-        "tabel parameter ikut memuat kolom total — agregat dan rincian digabung",
-      ).not.toContainText("Total Temuan");
-      // Grafik skor tidak boleh memuat label/metrik keluarga temuan, dan tiap
-      // grafik hanya boleh memuat judul metriknya sendiri — dua metrik skor
-      // lain yang bocor ke sini berarti trendlinenya sudah digabung.
-      const scoreTitles = [
-        SCORE_FINAL_CHART_TITLE,
-        SCORE_NON_CRITICAL_CHART_TITLE,
-        SCORE_CRITICAL_CHART_TITLE,
-      ];
-      for (const [metric, ownTitle] of [
-        ["final", SCORE_FINAL_CHART_TITLE],
-        ["nonCritical", SCORE_NON_CRITICAL_CHART_TITLE],
-        ["critical", SCORE_CRITICAL_CHART_TITLE],
-      ] as const) {
-        const figure = scoreFigures[metric];
         for (const foreign of [
           INDICATOR_NAME,
           "Total Temuan",
           FINDING_COUNT_UNIT,
-          ...scoreTitles.filter((title) => title !== ownTitle),
+          ...Object.values(scoreTitles).filter(
+            (title) => title !== scoreTitles[metric],
+          ),
         ]) {
           await expect(
             figure,
@@ -3529,62 +2550,96 @@ test.describe("SIDAK agent report download nyata", () => {
           ).not.toContainText(foreign);
         }
       }
+      for (const name of [
+        /Grafik skor final/i,
+        /Grafik skor non-critical/i,
+        /Grafik skor critical/i,
+        /Grafik jumlah seluruh temuan/i,
+      ]) {
+        await expect(document.getByRole("img", { name })).toBeVisible();
+      }
 
-      // (4) Nomor tiket adalah elemen terkuat di blok temuan: kontras penuh,
-      //     lebih besar dari nama parameter dan dari nilai, dan diberi label.
-      const ticketCode = document.locator(".finding-ticket-head .ticket-code");
-      await expect(ticketCode).toHaveCount(1);
-      await expect(ticketCode).toHaveText(REAL_TICKET);
+      const totalFigure = findingTrendPanel.locator(
+        '[data-chart-figure="total"]',
+      );
+      await expect(totalFigure).toHaveCount(1);
+      await expect(totalFigure.locator(".chart-title")).toHaveText(
+        TREND_TOTAL_CHART_TITLE,
+      );
+      await expect(totalFigure.locator("svg .chart-unit")).toHaveText(
+        FINDING_COUNT_UNIT,
+      );
+      await expect(totalFigure.locator("svg .chart-value")).toHaveText(
+        AGENT_FINDING_COUNTS.map(String),
+      );
       await expect(
-        document.locator(".finding-ticket-head .ticket-label").first(),
-      ).toHaveText("No Tiket");
-      const typography = await document
-        .locator(".finding-ticket-head")
-        .first()
-        .evaluate((node) => {
-          const read = (selector: string) => {
-            const target = node.ownerDocument.querySelector(selector);
-            if (!target) return null;
-            const style = getComputedStyle(target);
-            return {
-              size: Number.parseFloat(style.fontSize),
-              weight: Number(style.fontWeight),
-              color: style.color,
-            };
-          };
-          const band = getComputedStyle(node);
-          return {
-            code: read(".finding-ticket-head .ticket-code"),
-            name: read(".finding-name"),
-            value: read(".finding-value strong"),
-            bandBackground: band.backgroundColor,
-          };
-        });
-      expect(
-        typography.code,
-        "nomor tiket tidak punya tipografi",
-      ).not.toBeNull();
-      expect(
-        typography.code!.size,
-        `nomor tiket (${typography.code!.size}px) harus lebih besar daripada nama parameter (${typography.name!.size}px)`,
-      ).toBeGreaterThan(typography.name!.size);
-      expect(
-        typography.code!.size,
-        `nomor tiket (${typography.code!.size}px) harus lebih besar daripada nilai (${typography.value!.size}px)`,
-      ).toBeGreaterThan(typography.value!.size);
-      expect(typography.code!.weight).toBeGreaterThanOrEqual(700);
-      expect(
-        contrastRatio(typography.code!.color, typography.bandBackground),
-        `kontras nomor tiket terhadap pita terlalu rendah: ${typography.code!.color} di ${typography.bandBackground}`,
-      ).toBeGreaterThanOrEqual(7);
-      // Label "No Tiket" sengaja kecil dan pucat: yang kuat adalah
-      // nomornya sendiri, bukan labelnya.
-      expect(typography.name!.size).toBeLessThanOrEqual(typography.code!.size);
+        document.locator('[data-chart-figure="parameter"]'),
+      ).toHaveCount(0);
+      await expect(scorePanel.locator('[data-chart-figure="total"]')).toHaveCount(0);
 
-      // (5) Cetak: lebar konten A4 diukur sebagai viewport CSS (186mm @96dpi
-      //     = 703px). Di media print tidak ada yang menggulir, jadi tabel
-      //     yang lebih lebar dari kertas akan terpotong di tepi kanan; di sini
-      //     itu diukur sebagai overflow dokumen.
+      // (2) Tabel per parameter: baris total lebih dulu lalu tiap parameter,
+      //     satu kolom per periode + total. Tidak ada angka skor yang nyasar.
+      const paramTable = document.getByRole("table", {
+        name: captionPattern(TREND_PARAMETER_TABLE_CAPTION),
+      });
+      await expect(paramTable).toBeVisible();
+      const countCells = [
+        ...AGENT_FINDING_COUNTS.map(String),
+        String(AGENT_FINDING_COUNTS.reduce((sum, value) => sum + value, 0)),
+      ];
+      await expect(paramTable.locator("tbody tr")).toHaveCount(2);
+      await expect(paramTable.locator("tbody tr").nth(0).locator("th")).toHaveText(
+        "Total Temuan",
+      );
+      await expect(paramTable.locator("tbody tr").nth(0).locator("td")).toHaveText(
+        countCells,
+      );
+      await expect(paramTable.locator("tbody tr").nth(1).locator("th")).toHaveText(
+        INDICATOR_NAME,
+      );
+      await expect(paramTable.locator("tbody tr").nth(1).locator("td")).toHaveText(
+        countCells,
+      );
+      for (const period of AGENT_SCORE_HISTORY) {
+        for (const score of [
+          period.finalScore,
+          period.nonCriticalScore,
+          period.criticalScore,
+        ]) {
+          await expect(
+            paramTable,
+            `skor ${score} bocor ke tabel temuan per parameter`,
+          ).not.toContainText(String(score));
+        }
+      }
+
+      // (3) Nomor tiket menonjol di daftar kemunculan temuan: lebih tebal dan
+      //     berkontras penuh dibanding teks di sekitarnya.
+      const occurrence = document
+        .locator(`[data-finding-group="${INDICATOR_NAME}"] .occurrences li`)
+        .first();
+      const ticketCode = occurrence.locator(".ticket-code");
+      await expect(ticketCode).toHaveText(REAL_TICKET);
+      const typography = await occurrence.evaluate((node) => {
+        const code = node.querySelector(".ticket-code")!;
+        const item = getComputedStyle(node);
+        const codeStyle = getComputedStyle(code);
+        return {
+          codeWeight: Number(codeStyle.fontWeight),
+          itemWeight: Number(item.fontWeight),
+          codeColor: codeStyle.color,
+          background: getComputedStyle(node.ownerDocument.body).backgroundColor,
+        };
+      });
+      expect(typography.codeWeight).toBeGreaterThanOrEqual(700);
+      expect(typography.codeWeight).toBeGreaterThan(typography.itemWeight);
+      expect(
+        contrastRatio(typography.codeColor, typography.background),
+        `kontras nomor tiket terlalu rendah: ${typography.codeColor} di ${typography.background}`,
+      ).toBeGreaterThanOrEqual(7);
+
+      // (4) Cetak: lebar konten A4 diukur sebagai viewport CSS (186mm @96dpi
+      //     = 703px). Tabel yang lebih lebar dari kertas akan terpotong.
       await document.emulateMedia({ media: "print" });
       await document.setViewportSize({ width: 703, height: 1000 });
       await expectNoHorizontalOverflow(document, "HTML Statis cetak A4");
@@ -3612,15 +2667,12 @@ test.describe("SIDAK agent report download nyata", () => {
       );
       const printedText = printedReadBack(printed.pages);
       for (const fact of [
+        "Kesimpulan Utama",
+        MONTHLY_TABLE_CAPTION,
         SCORE_FINAL_CHART_TITLE,
         SCORE_NON_CRITICAL_CHART_TITLE,
         SCORE_CRITICAL_CHART_TITLE,
-        "Jumlah Total Temuan per Periode",
-        "Jumlah Temuan per Parameter",
-        SCORE_FINAL_TABLE_CAPTION,
-        SCORE_NON_CRITICAL_TABLE_CAPTION,
-        SCORE_CRITICAL_TABLE_CAPTION,
-        TREND_TOTAL_TABLE_CAPTION,
+        TREND_TOTAL_CHART_TITLE,
         TREND_PARAMETER_TABLE_CAPTION,
         REAL_TICKET,
       ]) {
@@ -3630,7 +2682,7 @@ test.describe("SIDAK agent report download nyata", () => {
         ).toBe(true);
       }
 
-      // (6) Artefak layar: desktop + mobile, tanpa overflow horizontal.
+      // (5) Artefak layar: desktop + mobile, tanpa overflow horizontal.
       await document.emulateMedia({ media: "screen" });
       await captureViewportShot(document, dir, "statis-hierarki-1440.png", {
         width: 1440,
@@ -3713,11 +2765,11 @@ test.describe("SIDAK agent report download nyata", () => {
     for (const pageIndex of distinctPages) {
       for (const header of [
         "Parameter",
-        "Agen Ini",
-        "Rata-rata Tim",
-        "Rata-rata Service",
-        "% vs Tim",
-        "% vs Service",
+        "Agen ini",
+        "Rata-rata tim",
+        "Rata-rata layanan",
+        "Selisih vs tim",
+        "Selisih vs layanan",
       ]) {
         expect(
           printedIncludes(pages[pageIndex], header),
@@ -3973,7 +3025,7 @@ test.describe("SIDAK agent report download nyata", () => {
   // terlihat mata di browser, bukan dari kelas CSS atau atribut SVG.
   // ═══════════════════════════════════════════════════════════════════════
 
-  test("Menu Unduh Laporan tidak terpotong di layar sempit dan semua lima format tetap terjangkau", async ({
+  test("Menu Unduh Laporan tidak terpotong di layar sempit dan semua empat format tetap terjangkau", async ({
     page,
   }) => {
     const audit = startAudit();
@@ -4009,8 +3061,8 @@ test.describe("SIDAK agent report download nyata", () => {
         `menu terpotong bawah viewport di ${width}px: ${JSON.stringify(box)} vs ${viewport!.height}`,
       ).toBe(true);
 
-      // Lima format, dan yang terakhir (PDF) benar-benar terlihat.
-      await expect(page.getByRole("menuitem")).toHaveCount(5);
+      // Empat format, dan yang terakhir (PDF) benar-benar terlihat.
+      await expect(page.getByRole("menuitem")).toHaveCount(4);
       const lastItem = page.getByRole("menuitem", { name: /PDF/ });
       await expect(lastItem).toBeVisible();
       const lastBox = await lastItem.boundingBox();
@@ -4074,16 +3126,15 @@ test.describe("SIDAK agent report download nyata", () => {
       );
 
       // (2) Grafik benar-benar dirender — bukan dokumen tanpa sumbu.
-      expect(file.text).toContain('<svg class="trend-chart"');
-      // (3) Setiap nilai seri tetap TERLIHAT di tabel data tren, termasuk
-      //     periode yang tidak punya angka: pembaca harus bisa membedakan
-      //     "tidak ada data" dari "nol". Label seri diuji dalam bentuk yang
-      //     benar-benar keluar dari file, jadi label BERBAHAYA ikut ter-escape.
-      expect(file.text).toContain("Data tren");
+      expect(file.text).toContain('<svg class="trend-chart');
+      // (3) Setiap nilai seri tetap TERLIHAT di tabel temuan per parameter,
+      //     termasuk periode yang tidak punya angka: pembaca harus bisa
+      //     membedakan "tidak ada data" dari "nol". Label seri diuji dalam
+      //     bentuk yang benar-benar keluar dari file, jadi label BERBAHAYA
+      //     ikut ter-escape.
+      expect(file.text).toContain(TREND_PARAMETER_TABLE_CAPTION);
       expect(file.text).toContain(agent.seriesLabelInFile);
       expect(file.text).toContain("Feb");
-      // (4) Label cakupan tren masih jujur: periode nyata, bukan karangan.
-      expect(file.text).toMatch(/Total Periode/);
 
       expectNoApplicationTraffic(audit);
     }
@@ -4101,65 +3152,56 @@ test.describe("SIDAK agent report download nyata", () => {
       { expectQuickviewRequest: false },
     );
 
-    // (1) Ketiga format tetap menghasilkan file yang ADA isinya. Unduhan kosong
+    // (1) Format tetap menghasilkan file yang ADA isinya. Unduhan kosong
     //     yang "berhasil" adalah kegagalan yang lebih buruk daripada error.
-    const csv = await exportFromMenu(page, "CSV", "kosong");
-    const md = await exportFromMenu(page, "Markdown", "kosong");
+    const xlsx = await exportFromMenu(page, "Excel", "kosong");
     const html = await exportFromMenu(page, "HTML Statis", "kosong");
-
-    expect(csv.bytes.length).toBeGreaterThan(0);
-    expect(md.bytes.length).toBeGreaterThan(0);
+    expect(xlsx.bytes.length).toBeGreaterThan(0);
     expect(html.bytes.length).toBeGreaterThan(0);
 
-    // (2) Identitas tetap terbaca di semua format — ini satu-satunya isi yang
-    //     benar-benar ada.
-    for (const [label, file] of [
-      ["CSV", csv],
-      ["MD", md],
-      ["HTML", html],
-    ] as const) {
-      expect(file.text, `${label} kehilangan nama agen`).toContain(
-        EMPTY_AGENT_NAME,
-      );
-    }
-    expect(csv.text).toContain(`Tahun Laporan,${YEAR}\n`);
+    // (2) Identitas tetap terbaca — ini satu-satunya isi yang benar-benar ada.
+    const book = await workbookRows(xlsx);
+    expect(summaryFacts(book).Nama).toBe(EMPTY_AGENT_NAME);
+    expect(summaryFacts(book).Tahun).toBe(YEAR);
+    expect(html.text).toContain(EMPTY_AGENT_NAME);
 
     // (3) Seksi kosong dinyatakan eksplisit, bukan diisi nol. Ini bedanya
-    //     "tidak ada data" dengan "nilaianya nol", dan keduanya tidak boleh
-    //     tercampur dalam laporan.
-    expect(md.text).toContain("## Ringkasan Skor Bulanan");
-    expect(md.text).toContain("Tidak ada data ringkasan");
-    expect(md.text).toContain("## Detail Temuan");
-    expect(md.text).toContain("Tidak ada temuan");
-    expect(md.text).toContain("Tidak ada tiket");
-    expect(md.text).toContain("Belum ditemukan pola akar masalah");
-    // Seksi tren + benchmark hanya ditulis kalau datanya ada.
-    expect(md.text).not.toContain("## Perkembangan Skor");
-    expect(md.text).not.toContain("## Perbandingan Temuan");
+    //     "tidak ada data" dengan "nilainya nol". Sheet tetap ada dengan
+    //     header-nya, tapi baris datanya adalah satu kalimat kosong yang jujur.
+    expect(Object.keys(book)).toEqual([
+      "Ringkasan",
+      "Skor Bulanan",
+      "Temuan",
+      "Tiket",
+      "Akar Masalah",
+      "Tren Temuan",
+      "Perbandingan",
+    ]);
+    expect(book["Skor Bulanan"].slice(1)).toEqual([
+      ["Belum ada skor untuk tahun dan layanan ini."],
+    ]);
+    expect(book["Temuan"].slice(1)).toEqual([
+      ["Tidak ada temuan pada tahun dan layanan ini."],
+    ]);
+    expect(book["Tiket"].slice(1)).toEqual([
+      ["Tidak ada tiket yang menurunkan skor pada bulan ini."],
+    ]);
+    expect(book["Akar Masalah"].slice(1)).toEqual([
+      ["Belum ada pola akar masalah yang menonjol."],
+    ]);
 
     // HTML menyatakan tiap seksi kosong dengan kalimatnya sendiri, dan tren
     // yang tidak punya data tidak dikarang jadi garis lurus.
-    expect(html.text).toContain("Tidak ada temuan untuk cakupan ini.");
-    expect(html.text).toContain(
-      "Tidak ada tiket yang menurunkan skor pada cakupan ini.",
-    );
-    expect(html.text).toContain("Data tren belum tersedia untuk konteks ini.");
-    // Seksi skor menyatakan kosongnya sendiri, bukan diisi garis lurus.
-    expect(html.text).toContain(
-      "Riwayat skor belum tersedia untuk konteks ini.",
-    );
-    expect(html.text).not.toContain("## Perkembangan Skor");
-
-    // (4) Skema enam seksi TETAP ditulis Even saat datanya kosong — inilah
-    //     bentuk multi-seksi CSV yang jadi keputusan produk — tapi tanpa satu
-    //     pun baris data. Angka tidak dikarang: tidak ada `0` yang berdiri di
-    //     tempat data yang belum pernah ada.
-    expect(csv.text).toContain("# Ringkasan Skor Bulanan");
-    expect(csv.text).toContain(
-      "Bulan,Skor Final,NC Score,CR Score,Sesi,Temuan",
-    );
-    expect(csv.text).not.toMatch(/^\d{2}\/\d{4},/m);
-    expect(csv.text).not.toContain(",TIDAK SESUAI");
+    for (const sentence of [
+      "Belum ada skor audit pada 2026.",
+      "Tidak ada temuan pada tahun dan layanan ini.",
+      "Tidak ada tiket yang menurunkan skor pada bulan ini.",
+      "Data tren temuan belum tersedia untuk tahun dan layanan ini.",
+      "Riwayat skor belum tersedia untuk tahun dan layanan ini.",
+    ]) {
+      expect(html.text, `kalimat kosong hilang: ${sentence}`).toContain(sentence);
+    }
+    expect(html.text).not.toContain("<svg");
     expect(html.text).not.toContain("T-");
 
     expectNoApplicationTraffic(audit);
