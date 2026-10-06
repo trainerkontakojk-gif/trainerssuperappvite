@@ -2,7 +2,7 @@ import { Context, Next } from "hono";
 import { createUserClient, supabaseAdmin } from "../lib/supabase";
 import { normalizeAuthProfileStatus } from "../lib/profile";
 import { User } from "@supabase/supabase-js";
-import type { UserProfile } from "@trainers/types";
+import { normalizeRole, type UserProfile } from "@trainers/types";
 
 export interface AuthProfile {
   status: string | null;
@@ -115,8 +115,14 @@ export const authMiddleware = async (
     );
   }
 
+  const role = normalizeRole(profile.role);
+  if (!role)
+    return c.json(
+      buildForbidden("FORBIDDEN", "Anda tidak memiliki akses ke resource ini."),
+      403,
+    );
   c.set("user", user);
-  c.set("profile", profile);
+  c.set("profile", { ...profile, role });
   // Token disimpan agar route bisa membangun user client (RLS aktif).
   // Disimpan apa adanya — jangan pernah di-log.
   c.set("token", token);

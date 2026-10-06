@@ -1,3 +1,8 @@
+import {
+  resolveAccountScope,
+  isAccountInScope,
+} from "../../services/access/scope";
+import { getActor } from "../../middleware/role";
 import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -26,7 +31,8 @@ export function createReplayAnnotationChecksum(
       text,
     }))
     .sort((a, b) => {
-      if (a.timestamp_ms !== b.timestamp_ms) return a.timestamp_ms - b.timestamp_ms;
+      if (a.timestamp_ms !== b.timestamp_ms)
+        return a.timestamp_ms - b.timestamp_ms;
       return `${a.category}:${a.moment ?? ""}:${a.text}`.localeCompare(
         `${b.category}:${b.moment ?? ""}:${b.text}`,
       );
@@ -39,8 +45,7 @@ const telefunAnnotations = new Hono<{ Variables: Variables }>();
 
 telefunAnnotations.get("/annotations/:id", async (c) => {
   const sessionId = c.req.param("id");
-  const user = c.get("user");
-  const profile = c.get("profile");
+
   const adminClient = createAdminClient();
 
   try {
@@ -61,8 +66,12 @@ telefunAnnotations.get("/annotations/:id", async (c) => {
       );
     }
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && session.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        session.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,
@@ -116,8 +125,7 @@ telefunAnnotations.post(
   ),
   async (c) => {
     const sessionId = c.req.param("id");
-    const user = c.get("user");
-    const profile = c.get("profile");
+
     const adminClient = createAdminClient();
     const body = c.req.valid("json");
 
@@ -139,8 +147,12 @@ telefunAnnotations.post(
         );
       }
 
-      const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-      if (!isManager && session.user_id !== user.id) {
+      if (
+        !isAccountInScope(
+          resolveAccountScope(getActor(c), "telefun.manage"),
+          session.user_id,
+        )
+      ) {
         return c.json(
           {
             success: false,
@@ -186,8 +198,7 @@ telefunAnnotations.post(
 
 telefunAnnotations.delete("/annotations/:annotationId", async (c) => {
   const annotationId = c.req.param("annotationId");
-  const user = c.get("user");
-  const profile = c.get("profile");
+
   const adminClient = createAdminClient();
 
   try {
@@ -208,8 +219,12 @@ telefunAnnotations.delete("/annotations/:annotationId", async (c) => {
       );
     }
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && annotation.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        annotation.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,
@@ -267,16 +282,34 @@ export const REPLAY_ANNOTATION_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          timestamp_ms: { type: "number", description: "Waktu dalam milidetik pada rekaman" },
+          timestamp_ms: {
+            type: "number",
+            description: "Waktu dalam milidetik pada rekaman",
+          },
           category: {
             type: "string",
-            enum: ["strength", "improvement_area", "critical_moment", "technique_used"],
+            enum: [
+              "strength",
+              "improvement_area",
+              "critical_moment",
+              "technique_used",
+            ],
           },
           moment: {
             type: "string",
-            enum: ["missed_empathy", "good_de_escalation", "long_pause", "interruption", "technique_usage"],
+            enum: [
+              "missed_empathy",
+              "good_de_escalation",
+              "long_pause",
+              "interruption",
+              "technique_usage",
+            ],
           },
-          text: { type: "string", description: "Deskripsi maksimal 500 karakter", maxLength: 500 },
+          text: {
+            type: "string",
+            description: "Deskripsi maksimal 500 karakter",
+            maxLength: 500,
+          },
         },
         required: ["timestamp_ms", "category", "moment", "text"],
       },
@@ -301,7 +334,6 @@ export const REPLAY_ANNOTATION_SCHEMA = {
 telefunAnnotations.post("/annotations/generate/:id", async (c) => {
   const sessionId = c.req.param("id");
   const user = c.get("user");
-  const profile = c.get("profile");
   const adminClient = createAdminClient();
 
   try {
@@ -315,17 +347,27 @@ telefunAnnotations.post("/annotations/generate/:id", async (c) => {
     if (sessionError) throw sessionError;
     if (!session) {
       return c.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." } },
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
+        },
         404,
       );
     }
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && session.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        session.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,
-          error: { code: "UNAUTHORIZED", message: "Anda tidak memiliki akses ke sesi ini." },
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Anda tidak memiliki akses ke sesi ini.",
+          },
         },
         403,
       );
@@ -337,7 +379,10 @@ telefunAnnotations.post("/annotations/generate/:id", async (c) => {
       return c.json(
         {
           success: false,
-          error: { code: "NO_RECORDING", message: "Tidak ada rekaman agen untuk sesi ini." },
+          error: {
+            code: "NO_RECORDING",
+            message: "Tidak ada rekaman agen untuk sesi ini.",
+          },
         },
         400,
       );
@@ -351,13 +396,18 @@ telefunAnnotations.post("/annotations/generate/:id", async (c) => {
       return c.json(
         {
           success: false,
-          error: { code: "DOWNLOAD_FAILED", message: "Gagal mengunduh rekaman." },
+          error: {
+            code: "DOWNLOAD_FAILED",
+            message: "Gagal mengunduh rekaman.",
+          },
         },
         500,
       );
     }
 
-    const base64Audio = Buffer.from(await audioData.arrayBuffer()).toString("base64");
+    const base64Audio = Buffer.from(await audioData.arrayBuffer()).toString(
+      "base64",
+    );
 
     // 3. Call Gemini for annotations
     const prompt = `Analisis rekaman telepon simulasi layanan konsumen berikut.
@@ -399,7 +449,10 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
       ],
       responseMimeType: "application/json",
       responseSchema: REPLAY_ANNOTATION_SCHEMA,
-      usageContext: { module: "telefun", action: "replay-annotation-generation" },
+      usageContext: {
+        module: "telefun",
+        action: "replay-annotation-generation",
+      },
       userId: user.id,
     });
 
@@ -419,7 +472,10 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
       return c.json(
         {
           success: false,
-          error: { code: "NO_ANNOTATIONS", message: "AI tidak menghasilkan anotasi." },
+          error: {
+            code: "NO_ANNOTATIONS",
+            message: "AI tidak menghasilkan anotasi.",
+          },
         },
         500,
       );
@@ -453,15 +509,18 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
     // 6. Update coaching summary
     const checksum = createReplayAnnotationChecksum(annotationRows);
 
-    const { error: rpcError } = await adminClient.rpc("upsert_telefun_coaching_summary", {
-      p_session_id: sessionId,
-      p_recommendations: recommendations.map((r: any) => ({
-        text: r.text,
-        priority: r.priority,
-      })),
-      p_ai_annotation_count: annotationRows.length,
-      p_ai_annotation_checksum: checksum,
-    });
+    const { error: rpcError } = await adminClient.rpc(
+      "upsert_telefun_coaching_summary",
+      {
+        p_session_id: sessionId,
+        p_recommendations: recommendations.map((r: any) => ({
+          text: r.text,
+          priority: r.priority,
+        })),
+        p_ai_annotation_count: annotationRows.length,
+        p_ai_annotation_checksum: checksum,
+      },
+    );
 
     if (rpcError) {
       throw new Error(`Gagal menyimpan coaching summary: ${rpcError.message}`);

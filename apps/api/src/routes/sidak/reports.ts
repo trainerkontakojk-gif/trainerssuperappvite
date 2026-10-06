@@ -1,7 +1,8 @@
+import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
@@ -15,7 +16,7 @@ const sidakReports = new Hono<{ Variables: Variables }>();
 // ── Reports ──────────────────────────────────────────────
 sidakReports.post(
   "/reports/data",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -51,6 +52,7 @@ sidakReports.post(
       });
       return c.json({ success: true, data: rows });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         { success: false, error: { code: "REPORT_ERROR", message: e.message } },
         400,
@@ -61,7 +63,7 @@ sidakReports.post(
 
 sidakReports.post(
   "/reports/ai/generate",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   aiRateLimitMiddleware,
   async (c: any) => {
     const user = c.get("user");
@@ -89,6 +91,7 @@ sidakReports.post(
       );
       return c.json({ success: true, data: result });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       const isNoData = e.message.includes("Tidak ada data");
       const code = isNoData ? "NO_DATA" : "REPORT_ERROR";
       return c.json(
@@ -101,7 +104,7 @@ sidakReports.post(
 
 sidakReports.post(
   "/reports/ai/export-docx",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -141,9 +144,8 @@ sidakReports.post(
       );
     }
     try {
-      const { buildAiReportDocx } = await import(
-        "../../lib/report-docx-builder"
-      );
+      const { buildAiReportDocx } =
+        await import("../../lib/report-docx-builder");
       const buf = await buildAiReportDocx(parsed.data);
       return c.newResponse(new Uint8Array(buf), 200, {
         "Content-Type":
@@ -151,6 +153,7 @@ sidakReports.post(
         "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.docx"`,
       });
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,
@@ -164,7 +167,7 @@ sidakReports.post(
 
 sidakReports.post(
   "/reports/ai/export-html",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -203,6 +206,7 @@ sidakReports.post(
         "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.html"`,
       });
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,
@@ -216,7 +220,7 @@ sidakReports.post(
 
 sidakReports.post(
   "/reports/ai/chart-data",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -251,6 +255,7 @@ sidakReports.post(
       });
       return c.json({ success: true, data: chartData });
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,
@@ -265,7 +270,7 @@ sidakReports.post(
 // ── Report Archives ─────────────────────────────────
 sidakReports.post(
   "/reports/ai/save",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const user = c.get("user");
     const body = await c.req.json();
@@ -312,7 +317,7 @@ sidakReports.post(
 
 sidakReports.get(
   "/reports/archives",
-  requireRole("admin", "trainer", "leader", "agent"),
+  requireCapability("sidak.archives.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -326,7 +331,7 @@ sidakReports.get(
 
 sidakReports.get(
   "/reports/archives/:id",
-  requireRole("admin", "trainer", "leader", "agent"),
+  requireCapability("sidak.archives.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -354,7 +359,7 @@ sidakReports.get(
 
 sidakReports.delete(
   "/reports/archives/:id",
-  requireRole("admin", "trainer", "leader", "agent"),
+  requireCapability("sidak.archives.delete"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -373,7 +378,7 @@ sidakReports.delete(
 
 sidakReports.post(
   "/reports/ai/export-pdf",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.reports.generate"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -435,6 +440,7 @@ sidakReports.post(
         "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.pdf"`,
       });
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,

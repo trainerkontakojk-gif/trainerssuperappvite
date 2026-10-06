@@ -1,7 +1,8 @@
+import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import {
   getSidakAgentSimulationDetail,
   getSidakAgentSimulationHistory,
@@ -66,13 +67,16 @@ function dataError(error: unknown, fallback: string) {
 
 sidakSimulations.get(
   "/agents/:id/simulations",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const agentId = c.req.param("id");
     const parsedAgentId = agentIdSchema.safeParse(agentId);
     const parsedQuery = moduleSchema.safeParse(c.req.query("module") ?? "all");
     if (!parsedAgentId.success || !parsedQuery.success) {
-      return c.json(validationError("Konteks riwayat simulasi tidak valid."), 400);
+      return c.json(
+        validationError("Konteks riwayat simulasi tidak valid."),
+        400,
+      );
     }
 
     const user = c.get("user");
@@ -85,6 +89,7 @@ sidakSimulations.get(
         agentId: parsedAgentId.data,
       });
     } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       if (error instanceof SidakSimulationAccessError) {
         return c.json(accessError(error), error.status);
       }
@@ -126,6 +131,7 @@ sidakSimulations.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       const response = dataError(error, "Gagal memuat riwayat simulasi.");
       return c.json(response.body, response.status);
     }
@@ -134,17 +140,22 @@ sidakSimulations.get(
 
 sidakSimulations.get(
   "/agents/:id/simulations/:module/:historyId",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const parsedAgentId = agentIdSchema.safeParse(c.req.param("id"));
-    const parsedModule = simulationModuleSchema.safeParse(c.req.param("module"));
+    const parsedModule = simulationModuleSchema.safeParse(
+      c.req.param("module"),
+    );
     const parsedHistoryId = historyIdSchema.safeParse(c.req.param("historyId"));
     if (
       !parsedAgentId.success ||
       !parsedModule.success ||
       !parsedHistoryId.success
     ) {
-      return c.json(validationError("Konteks detail simulasi tidak valid."), 400);
+      return c.json(
+        validationError("Konteks detail simulasi tidak valid."),
+        400,
+      );
     }
 
     const user = c.get("user");
@@ -157,6 +168,7 @@ sidakSimulations.get(
         agentId: parsedAgentId.data,
       });
     } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       if (error instanceof SidakSimulationAccessError) {
         return c.json(accessError(error), error.status);
       }
@@ -194,6 +206,7 @@ sidakSimulations.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       const response = dataError(error, "Gagal memuat detail simulasi.");
       return c.json(response.body, response.status);
     }

@@ -1,6 +1,7 @@
 import type { TopAgentData } from "@trainers/types";
 import { supabaseAdmin } from "../lib/supabase";
 import * as sidakService from "./sidak-service";
+import { applyPesertaScope, pesertaScopeFromIds } from "./access/scope";
 
 export type RankingPeriodMode = "ytd" | "alltime" | string;
 
@@ -113,9 +114,10 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
         if (effectiveServiceType && effectiveServiceType !== "all") {
           temuanQuery = temuanQuery.eq("service_type", effectiveServiceType);
         }
-        if (accessibleIds && accessibleIds.length > 0) {
-          temuanQuery = temuanQuery.in("peserta_id", accessibleIds);
-        }
+        temuanQuery = applyPesertaScope(
+          temuanQuery,
+          pesertaScopeFromIds(accessibleIds),
+        );
         const { data: page, error: pageError } = await temuanQuery;
         if (pageError) throw new Error(pageError.message);
         if (!page || page.length === 0) {

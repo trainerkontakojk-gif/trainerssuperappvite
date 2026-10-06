@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
@@ -118,8 +119,7 @@ export async function getAgents(params: {
       if (params.batch_name) q = q.eq("batch_name", params.batch_name);
       if (params.tim) q = q.eq("tim", params.tim);
       if (params.search) q = q.ilike("nama", `%${params.search}%`);
-      if (params.agent_ids && params.agent_ids.length > 0)
-        q = q.in("id", params.agent_ids);
+      q = applyPesertaScope(q, pesertaScopeFromIds(params.agent_ids), "id");
 
       if (excludedIds.length > 0) {
         q = q.not("id", "in", `(${excludedIds.join(",")})`);

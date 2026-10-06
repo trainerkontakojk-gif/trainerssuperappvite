@@ -1,7 +1,8 @@
+import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { serviceTypeSchema, type ServiceType } from "@trainers/types";
 
@@ -19,7 +20,7 @@ async function resolveSidakFilterScope(
 
 sidakForecast.post(
   "/forecast/agents",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.forecast.generate"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -82,6 +83,7 @@ sidakForecast.post(
 
       return c.json({ success: true, data: result });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         {
           success: false,

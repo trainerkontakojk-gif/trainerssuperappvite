@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env.js";
 import type { TelefunTranscriptEntry } from "@trainers/types";
@@ -84,9 +85,7 @@ export async function createSession(
   };
 
   if (subject?.type === "participant") {
-    if (
-      !["admin", "trainer"].includes((profile.role ?? "").trim().toLowerCase())
-    ) {
+    if (!can(normalizeRole(profile.role), "simulation.subject.select")) {
       throw new Error("Hanya admin/trainer yang dapat memilih peserta.");
     }
 

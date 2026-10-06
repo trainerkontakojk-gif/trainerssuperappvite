@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "../lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllPages } from "../lib/supabase-pagination";
-import { getLeaderScopeSnapshot } from "./leader-access-service";
+import { normalizeRole } from "@trainers/types";
+import { resolveDataScope, scopePesertaIds } from "./access/scope";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
 import type {
   ProfilerYear,
@@ -10,9 +11,6 @@ import type {
   ProfilerTim,
   ProfilerUpcomingBirthday,
 } from "@trainers/types";
-
-const TRAINER_ROLES = ["admin", "trainer"] as const;
-const LEADER_ROLES = ["leader"] as const;
 
 type ScopedFolderReference = Pick<
   ProfilerFolder,
@@ -29,23 +27,9 @@ export async function getAccessiblePesertaIds(
   userId: string,
   role: string,
 ): Promise<string[] | null> {
-  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
-
-  if (role === "agent") {
-    const { data } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("id")
-      .eq("trainer_id", userId)
-      .maybeSingle();
-    return data ? [data.id] : [];
-  }
-
-  if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const snapshot = await getLeaderScopeSnapshot(userId, "ktp");
-    return snapshot.pesertaIds;
-  }
-
-  return [];
+  return scopePesertaIds(
+    await resolveDataScope({ id: userId, role: normalizeRole(role) }, "ktp"),
+  );
 }
 
 // ── Years ────────────────────────────────────────────────

@@ -1,7 +1,8 @@
+import { ScopeUnavailableError } from "../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../middleware/role";
+import { requireCapability } from "../middleware/role";
 import * as profilerService from "../services/profiler-service";
 import { logActivity } from "../services/activity-log-service";
 import { getUserClient } from "./pdkt/route-utils";
@@ -17,13 +18,13 @@ async function resolveKtpScope(c: any): Promise<string[] | null> {
 }
 
 // ── Years ────────────────────────────────────────────────
-profiler.get("/years", requireRole("admin", "trainer", "leader"), async (c) => {
+profiler.get("/years", requireCapability("profiler.read"), async (c) => {
   const scope = await resolveKtpScope(c);
   const years = await profilerService.getYears(scope);
   return c.json({ success: true, data: years });
 });
 
-profiler.post("/years", requireRole("admin", "trainer"), async (c) => {
+profiler.post("/years", requireCapability("profiler.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({ year: z.number().int().min(2000).max(2100) })
@@ -47,39 +48,40 @@ profiler.post("/years", requireRole("admin", "trainer"), async (c) => {
   return c.json({ success: true, data: year }, 201);
 });
 
-profiler.delete("/years/:id", requireRole("admin", "trainer"), async (c) => {
-  const id = c.req.param("id");
-  const user = c.get("user");
-  try {
-    await profilerService.deleteYear(id);
-    await logActivity({
-      user_id: user.id,
-      user_name: user.email ?? "",
-      action: `Menghapus Folder Tahun ID: ${id}`,
-      module: "KTP",
-      type: "delete",
-    });
-    return c.json({ success: true, data: null });
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "DELETE_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
-
-// ── Folders ──────────────────────────────────────────────
-profiler.get(
-  "/folders",
-  requireRole("admin", "trainer", "leader"),
+profiler.delete(
+  "/years/:id",
+  requireCapability("profiler.write"),
   async (c) => {
-    const scope = await resolveKtpScope(c);
-    const folders = await profilerService.getFolders(scope);
-    return c.json({ success: true, data: folders });
+    const id = c.req.param("id");
+    const user = c.get("user");
+    try {
+      await profilerService.deleteYear(id);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus Folder Tahun ID: ${id}`,
+        module: "KTP",
+        type: "delete",
+      });
+      return c.json({ success: true, data: null });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        { success: false, error: { code: "DELETE_ERROR", message: e.message } },
+        400,
+      );
+    }
   },
 );
 
-profiler.post("/folders", requireRole("admin", "trainer"), async (c) => {
+// ── Folders ──────────────────────────────────────────────
+profiler.get("/folders", requireCapability("profiler.read"), async (c) => {
+  const scope = await resolveKtpScope(c);
+  const folders = await profilerService.getFolders(scope);
+  return c.json({ success: true, data: folders });
+});
+
+profiler.post("/folders", requireCapability("profiler.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({
@@ -107,7 +109,7 @@ profiler.post("/folders", requireRole("admin", "trainer"), async (c) => {
   return c.json({ success: true, data: folder }, 201);
 });
 
-profiler.put("/folders/:id", requireRole("admin", "trainer"), async (c) => {
+profiler.put("/folders/:id", requireCapability("profiler.write"), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
   const parsed = z.object({ name: z.string().min(1) }).safeParse(body);
@@ -123,6 +125,7 @@ profiler.put("/folders/:id", requireRole("admin", "trainer"), async (c) => {
     const folder = await profilerService.renameFolder(id, parsed.data.name);
     return c.json({ success: true, data: folder });
   } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
     return c.json(
       { success: false, error: { code: "UPDATE_ERROR", message: e.message } },
       400,
@@ -130,30 +133,35 @@ profiler.put("/folders/:id", requireRole("admin", "trainer"), async (c) => {
   }
 });
 
-profiler.delete("/folders/:id", requireRole("admin", "trainer"), async (c) => {
-  const id = c.req.param("id");
-  const user = c.get("user");
-  try {
-    await profilerService.deleteFolder(id);
-    await logActivity({
-      user_id: user.id,
-      user_name: user.email ?? "",
-      action: `Menghapus Folder KTP ID: ${id}`,
-      module: "KTP",
-      type: "delete",
-    });
-    return c.json({ success: true, data: null });
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "DELETE_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
+profiler.delete(
+  "/folders/:id",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    try {
+      await profilerService.deleteFolder(id);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus Folder KTP ID: ${id}`,
+        module: "KTP",
+        type: "delete",
+      });
+      return c.json({ success: true, data: null });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        { success: false, error: { code: "DELETE_ERROR", message: e.message } },
+        400,
+      );
+    }
+  },
+);
 
 profiler.post(
   "/folders/duplicate",
-  requireRole("admin", "trainer"),
+  requireCapability("profiler.write"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -177,6 +185,7 @@ profiler.post(
       );
       return c.json({ success: true, data: result }, 201);
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         { success: false, error: { code: "COPY_ERROR", message: e.message } },
         400,
@@ -186,52 +195,44 @@ profiler.post(
 );
 
 // ── Counts ───────────────────────────────────────────────
-profiler.get(
-  "/counts",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const scope = await resolveKtpScope(c);
-    const counts = await profilerService.getFolderCounts(scope);
-    return c.json({ success: true, data: counts });
-  },
-);
+profiler.get("/counts", requireCapability("profiler.read"), async (c) => {
+  const scope = await resolveKtpScope(c);
+  const counts = await profilerService.getFolderCounts(scope);
+  return c.json({ success: true, data: counts });
+});
 
 // ── Peserta ──────────────────────────────────────────────
-profiler.get(
-  "/peserta",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const batch_name = c.req.query("batch_name");
-    const tim = c.req.query("tim");
-    const search = c.req.query("search");
-    const limit = c.req.query("limit")
-      ? parseInt(c.req.query("limit")!)
-      : undefined;
-    const offset = c.req.query("offset")
-      ? parseInt(c.req.query("offset")!)
-      : undefined;
+profiler.get("/peserta", requireCapability("profiler.read"), async (c) => {
+  const batch_name = c.req.query("batch_name");
+  const tim = c.req.query("tim");
+  const search = c.req.query("search");
+  const limit = c.req.query("limit")
+    ? parseInt(c.req.query("limit")!)
+    : undefined;
+  const offset = c.req.query("offset")
+    ? parseInt(c.req.query("offset")!)
+    : undefined;
 
-    const scope = await resolveKtpScope(c);
-    const result = await profilerService.getPeserta(
-      {
-        batch_name,
-        tim,
-        search,
-        limit,
-        offset,
-      },
-      scope,
-    );
-    return c.json({
-      success: true,
-      data: { items: result.data, total: result.total },
-    });
-  },
-);
+  const scope = await resolveKtpScope(c);
+  const result = await profilerService.getPeserta(
+    {
+      batch_name,
+      tim,
+      search,
+      limit,
+      offset,
+    },
+    scope,
+  );
+  return c.json({
+    success: true,
+    data: { items: result.data, total: result.total },
+  });
+});
 
 profiler.get(
   "/peserta/global-pool",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("profiler.read"),
   async (c) => {
     const excludeBatch = c.req.query("exclude_batch");
     const scope = await resolveKtpScope(c);
@@ -245,7 +246,7 @@ profiler.get(
 
 profiler.get(
   "/peserta/upcoming-birthdays",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("profiler.read"),
   async (c) => {
     const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 5;
     const scope = await resolveKtpScope(c);
@@ -256,7 +257,7 @@ profiler.get(
 
 profiler.get(
   "/peserta/batch/:batchName",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("profiler.read"),
   async (c) => {
     const batchName = c.req.param("batchName");
     const scope = await resolveKtpScope(c);
@@ -265,58 +266,59 @@ profiler.get(
   },
 );
 
-profiler.get("/peserta/options", requireRole("admin", "trainer"), async (c) => {
-  const raw = (c.req.query("search") ?? "").trim();
-  if (raw.length < 2 || raw.length > 100) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Pencarian minimal 2 dan maksimal 100 karakter",
-        },
-      },
-      400,
-    );
-  }
-  try {
-    const scope = await resolveKtpScope(c);
-    const data = await profilerService.searchPesertaOptions(
-      raw,
-      scope,
-      getUserClient(c),
-    );
-    return c.json({ success: true, data });
-  } catch (_e: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "SEARCH_ERROR", message: "Gagal mencari peserta." },
-      },
-      500,
-    );
-  }
-});
-
 profiler.get(
-  "/peserta/:id",
-  requireRole("admin", "trainer", "leader"),
+  "/peserta/options",
+  requireCapability("simulation.subject.select"),
   async (c) => {
-    const id = c.req.param("id");
+    const raw = (c.req.query("search") ?? "").trim();
+    if (raw.length < 2 || raw.length > 100) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Pencarian minimal 2 dan maksimal 100 karakter",
+          },
+        },
+        400,
+      );
+    }
     try {
       const scope = await resolveKtpScope(c);
-      const peserta = await profilerService.getPesertaById(id, scope);
-      return c.json({ success: true, data: peserta });
-    } catch (e: any) {
+      const data = await profilerService.searchPesertaOptions(
+        raw,
+        scope,
+        getUserClient(c),
+      );
+      return c.json({ success: true, data });
+    } catch (_e: any) {
       return c.json(
-        { success: false, error: { code: "NOT_FOUND", message: e.message } },
-        404,
+        {
+          success: false,
+          error: { code: "SEARCH_ERROR", message: "Gagal mencari peserta." },
+        },
+        500,
       );
     }
   },
 );
 
-profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
+profiler.get("/peserta/:id", requireCapability("profiler.read"), async (c) => {
+  const id = c.req.param("id");
+  try {
+    const scope = await resolveKtpScope(c);
+    const peserta = await profilerService.getPesertaById(id, scope);
+    return c.json({ success: true, data: peserta });
+  } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
+    return c.json(
+      { success: false, error: { code: "NOT_FOUND", message: e.message } },
+      404,
+    );
+  }
+});
+
+profiler.post("/peserta", requireCapability("profiler.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({
@@ -373,6 +375,7 @@ profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
     });
     return c.json({ success: true, data: peserta }, 201);
   } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
     return c.json(
       { success: false, error: { code: "CREATE_ERROR", message: e.message } },
       400,
@@ -380,7 +383,7 @@ profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
   }
 });
 
-profiler.put("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
+profiler.put("/peserta/:id", requireCapability("profiler.write"), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
   const user = c.get("user");
@@ -395,6 +398,7 @@ profiler.put("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
     });
     return c.json({ success: true, data: peserta });
   } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
     return c.json(
       { success: false, error: { code: "UPDATE_ERROR", message: e.message } },
       400,
@@ -402,164 +406,192 @@ profiler.put("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
   }
 });
 
-profiler.delete("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
-  const id = c.req.param("id");
-  const user = c.get("user");
-  try {
-    await profilerService.deletePeserta(id);
-    await logActivity({
-      user_id: user.id,
-      user_name: user.email ?? "",
-      action: `Menghapus Peserta ID: ${id}`,
-      module: "KTP",
-      type: "delete",
-    });
-    return c.json({ success: true, data: null });
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "DELETE_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
+profiler.delete(
+  "/peserta/:id",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    try {
+      await profilerService.deletePeserta(id);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus Peserta ID: ${id}`,
+        module: "KTP",
+        type: "delete",
+      });
+      return c.json({ success: true, data: null });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        { success: false, error: { code: "DELETE_ERROR", message: e.message } },
+        400,
+      );
+    }
+  },
+);
 
-profiler.post("/peserta/bulk", requireRole("admin", "trainer"), async (c) => {
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      items: z
-        .array(
-          z.object({
-            batch_name: z.string().min(1),
-            nama: z.string().min(1),
-            tim: z.string().min(1),
-            jabatan: z.string().min(1),
-          }),
-        )
-        .min(1),
-    })
-    .safeParse(body);
-  if (!parsed.success)
-    return c.json(
-      {
-        success: false,
-        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
-      },
-      400,
-    );
-  try {
-    const result = await profilerService.bulkCreatePeserta(parsed.data.items);
-    return c.json({ success: true, data: result }, 201);
-  } catch (e: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "BULK_INSERT_ERROR", message: e.message },
-      },
-      400,
-    );
-  }
-});
+profiler.post(
+  "/peserta/bulk",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        items: z
+          .array(
+            z.object({
+              batch_name: z.string().min(1),
+              nama: z.string().min(1),
+              tim: z.string().min(1),
+              jabatan: z.string().min(1),
+            }),
+          )
+          .min(1),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      const result = await profilerService.bulkCreatePeserta(parsed.data.items);
+      return c.json({ success: true, data: result }, 201);
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        {
+          success: false,
+          error: { code: "BULK_INSERT_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
-profiler.post("/peserta/copy", requireRole("admin", "trainer"), async (c) => {
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      peserta_ids: z.array(z.string().uuid()).min(1),
-      target_batch_name: z.string().min(1),
-    })
-    .safeParse(body);
-  if (!parsed.success)
-    return c.json(
-      {
-        success: false,
-        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
-      },
-      400,
-    );
-  try {
-    const peserta = await profilerService.copyPesertaToFolder(
-      parsed.data.peserta_ids,
-      parsed.data.target_batch_name,
-    );
-    return c.json({ success: true, data: peserta }, 201);
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "COPY_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
+profiler.post(
+  "/peserta/copy",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        peserta_ids: z.array(z.string().uuid()).min(1),
+        target_batch_name: z.string().min(1),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      const peserta = await profilerService.copyPesertaToFolder(
+        parsed.data.peserta_ids,
+        parsed.data.target_batch_name,
+      );
+      return c.json({ success: true, data: peserta }, 201);
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        { success: false, error: { code: "COPY_ERROR", message: e.message } },
+        400,
+      );
+    }
+  },
+);
 
-profiler.post("/peserta/move", requireRole("admin", "trainer"), async (c) => {
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      peserta_ids: z.array(z.string().uuid()).min(1),
-      target_batch_name: z.string().min(1),
-    })
-    .safeParse(body);
-  if (!parsed.success)
-    return c.json(
-      {
-        success: false,
-        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
-      },
-      400,
-    );
-  try {
-    const moved = await profilerService.movePesertaToBatch(
-      parsed.data.peserta_ids,
-      parsed.data.target_batch_name,
-    );
-    await logActivity({
-      user_id: c.get("user").id,
-      user_name: c.get("user").email ?? "",
-      action: `Memindahkan ${parsed.data.peserta_ids.length} peserta ke batch: ${parsed.data.target_batch_name}`,
-      module: "KTP",
-      type: "edit",
-    });
-    return c.json({ success: true, data: { moved } });
-  } catch (e: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "MOVE_ERROR", message: e.message },
-      },
-      400,
-    );
-  }
-});
+profiler.post(
+  "/peserta/move",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        peserta_ids: z.array(z.string().uuid()).min(1),
+        target_batch_name: z.string().min(1),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      const moved = await profilerService.movePesertaToBatch(
+        parsed.data.peserta_ids,
+        parsed.data.target_batch_name,
+      );
+      await logActivity({
+        user_id: c.get("user").id,
+        user_name: c.get("user").email ?? "",
+        action: `Memindahkan ${parsed.data.peserta_ids.length} peserta ke batch: ${parsed.data.target_batch_name}`,
+        module: "KTP",
+        type: "edit",
+      });
+      return c.json({ success: true, data: { moved } });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        {
+          success: false,
+          error: { code: "MOVE_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
-profiler.put("/peserta/reorder", requireRole("admin", "trainer"), async (c) => {
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      peserta_ids: z.array(z.string().uuid()),
-    })
-    .safeParse(body);
-  if (!parsed.success)
-    return c.json(
-      {
-        success: false,
-        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
-      },
-      400,
-    );
-  try {
-    await profilerService.reorderPeserta(parsed.data.peserta_ids);
-    return c.json({ success: true, data: null });
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "REORDER_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
+profiler.put(
+  "/peserta/reorder",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        peserta_ids: z.array(z.string().uuid()),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      await profilerService.reorderPeserta(parsed.data.peserta_ids);
+      return c.json({ success: true, data: null });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        {
+          success: false,
+          error: { code: "REORDER_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
 profiler.post(
   "/peserta/bulk-reorder",
-  requireRole("admin", "trainer"),
+  requireCapability("profiler.write"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -586,6 +618,7 @@ profiler.post(
       await profilerService.bulkReorderPeserta(parsed.data.updates);
       return c.json({ success: true, data: null });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         {
           success: false,
@@ -598,13 +631,13 @@ profiler.post(
 );
 
 // ── Teams ────────────────────────────────────────────────
-profiler.get("/teams", requireRole("admin", "trainer", "leader"), async (c) => {
+profiler.get("/teams", requireCapability("profiler.read"), async (c) => {
   const scope = await resolveKtpScope(c);
   const teams = await profilerService.getTeams(scope);
   return c.json({ success: true, data: teams });
 });
 
-profiler.post("/teams", requireRole("admin", "trainer"), async (c) => {
+profiler.post("/teams", requireCapability("profiler.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({ nama: z.string().min(1) }).safeParse(body);
   if (!parsed.success)
@@ -626,6 +659,7 @@ profiler.post("/teams", requireRole("admin", "trainer"), async (c) => {
     });
     return c.json({ success: true, data: team }, 201);
   } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
     return c.json(
       { success: false, error: { code: "CREATE_ERROR", message: e.message } },
       400,
@@ -633,25 +667,30 @@ profiler.post("/teams", requireRole("admin", "trainer"), async (c) => {
   }
 });
 
-profiler.delete("/teams/:id", requireRole("admin", "trainer"), async (c) => {
-  const id = c.req.param("id");
-  const user = c.get("user");
-  try {
-    await profilerService.deleteTeam(id);
-    await logActivity({
-      user_id: user.id,
-      user_name: user.email ?? "",
-      action: `Menghapus Tim ID: ${id}`,
-      module: "KTP",
-      type: "delete",
-    });
-    return c.json({ success: true, data: null });
-  } catch (e: any) {
-    return c.json(
-      { success: false, error: { code: "DELETE_ERROR", message: e.message } },
-      400,
-    );
-  }
-});
+profiler.delete(
+  "/teams/:id",
+  requireCapability("profiler.write"),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    try {
+      await profilerService.deleteTeam(id);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus Tim ID: ${id}`,
+        module: "KTP",
+        type: "delete",
+      });
+      return c.json({ success: true, data: null });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        { success: false, error: { code: "DELETE_ERROR", message: e.message } },
+        400,
+      );
+    }
+  },
+);
 
 export { profiler };

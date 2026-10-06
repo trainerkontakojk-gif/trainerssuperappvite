@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { randomUUID } from "node:crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -13,8 +14,6 @@ import {
   toPdktSimulationConfig,
   toPdktSimulationScenario,
 } from "./scenario-projections";
-
-const MAILBOX_MANAGER_ROLES = new Set(["admin", "trainer"]);
 
 type BulkDeleteResult = {
   successCount: number;
@@ -117,7 +116,9 @@ export function canDeletePdktMailboxItem(
 ): boolean {
   const role = (actor.role || "").toLowerCase().trim();
   const creatorId = item.created_by_user_id || item.user_id;
-  return MAILBOX_MANAGER_ROLES.has(role) || creatorId === actor.id;
+  return (
+    can(normalizeRole(role), "pdkt.mailbox.manageAll") || creatorId === actor.id
+  );
 }
 
 /**

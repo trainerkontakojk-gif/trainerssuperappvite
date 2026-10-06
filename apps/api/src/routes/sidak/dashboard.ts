@@ -1,8 +1,13 @@
+import {
+  isPesertaInScope,
+  pesertaScopeFromIds,
+} from "../../services/access/scope";
+import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import { serviceTypeSchema } from "@trainers/types";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { getRankingData } from "../../services/sidak-ranking-service";
 
@@ -24,34 +29,30 @@ async function resolveSidakFilterScope(
 }
 
 // ── Agents ─────────────────────────────────────────────
-sidakDashboard.get(
-  "/agents",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const year = c.req.query("year")
-      ? parseInt(c.req.query("year")!)
-      : new Date().getFullYear();
-    const showAll = c.req.query("show_all") === "true";
-    const accessibleIds = await sidakService.getAccessibleAgentIds(
-      user.id,
-      profile?.role ?? "",
-    );
-    const filterScope = await resolveSidakFilterScope(c);
-    const result = await sidakService.getAgentDirectorySummary(
-      year,
-      accessibleIds ?? undefined,
-      showAll,
-      filterScope?.allowedServices ?? undefined,
-    );
-    return c.json({ success: true, data: result });
-  },
-);
+sidakDashboard.get("/agents", requireCapability("sidak.read"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const year = c.req.query("year")
+    ? parseInt(c.req.query("year")!)
+    : new Date().getFullYear();
+  const showAll = c.req.query("show_all") === "true";
+  const accessibleIds = await sidakService.getAccessibleAgentIds(
+    user.id,
+    profile?.role ?? "",
+  );
+  const filterScope = await resolveSidakFilterScope(c);
+  const result = await sidakService.getAgentDirectorySummary(
+    year,
+    accessibleIds ?? undefined,
+    showAll,
+    filterScope?.allowedServices ?? undefined,
+  );
+  return c.json({ success: true, data: result });
+});
 
 sidakDashboard.get(
   "/agents/:id/quickview",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const parsed = agentQuickviewQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
@@ -74,7 +75,7 @@ sidakDashboard.get(
       user.id,
       profile?.role ?? "",
     );
-    if (accessibleAgentIds && !accessibleAgentIds.includes(agentId)) {
+    if (!isPesertaInScope(pesertaScopeFromIds(accessibleAgentIds), agentId)) {
       return c.json(
         {
           success: false,
@@ -98,6 +99,7 @@ sidakDashboard.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       const message =
         error instanceof Error
           ? error.message
@@ -115,7 +117,7 @@ sidakDashboard.get(
 
 sidakDashboard.get(
   "/agents/:id",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -134,7 +136,7 @@ sidakDashboard.get(
       user.id,
       profile?.role ?? "",
     );
-    if (accessibleIds && !accessibleIds.includes(id)) {
+    if (!isPesertaInScope(pesertaScopeFromIds(accessibleIds), id)) {
       return c.json(
         {
           success: false,
@@ -159,6 +161,7 @@ sidakDashboard.get(
       );
       return c.json({ success: true, data: detail });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         { success: false, error: { code: "NOT_FOUND", message: e.message } },
         404,
@@ -170,7 +173,7 @@ sidakDashboard.get(
 // ── Dashboard ──────────────────────────────────────────
 sidakDashboard.get(
   "/dashboard",
-  requireRole("admin", "trainer", "leader", "agent"),
+  requireCapability("sidak.dashboard.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -215,7 +218,7 @@ sidakDashboard.get(
 
 sidakDashboard.post(
   "/dashboard/refresh-summary",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.summary.refresh"),
   async (c) => {
     const body = await c.req.json();
     const parsed = z
@@ -239,6 +242,7 @@ sidakDashboard.post(
       );
       return c.json({ success: true, data: result });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         {
           success: false,
@@ -252,7 +256,7 @@ sidakDashboard.post(
 
 sidakDashboard.post(
   "/dashboard/forecast",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.forecast.generate"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -322,6 +326,7 @@ sidakDashboard.post(
       });
       return c.json({ success: true, data: result });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         {
           success: false,
@@ -335,7 +340,7 @@ sidakDashboard.post(
 
 sidakDashboard.get(
   "/dashboard/available-years",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -348,6 +353,7 @@ sidakDashboard.get(
       );
       return c.json({ success: true, data: years });
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,
@@ -361,7 +367,7 @@ sidakDashboard.get(
 
 sidakDashboard.get(
   "/dashboard/trend",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -400,6 +406,7 @@ sidakDashboard.get(
         return c.json({ success: true, data: { trendMap } });
       }
     } catch (error: any) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
         {
           success: false,
@@ -414,7 +421,7 @@ sidakDashboard.get(
 // ── Service Weights ────────────────────────────────────
 sidakDashboard.get(
   "/service-weights",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const weights = await sidakService.getServiceWeights();
     return c.json({ success: true, data: weights });
@@ -423,7 +430,7 @@ sidakDashboard.get(
 
 sidakDashboard.put(
   "/service-weights/:serviceType",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const serviceType = c.req.param("serviceType");
     const body = await c.req.json();
@@ -450,6 +457,7 @@ sidakDashboard.put(
       );
       return c.json({ success: true, data: result });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         { success: false, error: { code: "UPDATE_ERROR", message: e.message } },
         400,
@@ -459,62 +467,59 @@ sidakDashboard.put(
 );
 
 // ── Ranking ──────────────────────────────────────────────
-sidakDashboard.get(
-  "/ranking",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const period = c.req.query("period") || "ytd";
-    const service_type = c.req.query("service_type") || "call";
-    const year = c.req.query("year")
-      ? parseInt(c.req.query("year")!)
-      : new Date().getFullYear();
-    const folder = c.req.query("folder") || "ALL";
+sidakDashboard.get("/ranking", requireCapability("sidak.read"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const period = c.req.query("period") || "ytd";
+  const service_type = c.req.query("service_type") || "call";
+  const year = c.req.query("year")
+    ? parseInt(c.req.query("year")!)
+    : new Date().getFullYear();
+  const folder = c.req.query("folder") || "ALL";
 
-    const accessibleIds = await sidakService.getAccessibleAgentIds(
-      user.id,
-      profile?.role ?? "",
+  const accessibleIds = await sidakService.getAccessibleAgentIds(
+    user.id,
+    profile?.role ?? "",
+  );
+  if (accessibleIds && accessibleIds.length === 0) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Anda belum memiliki scope agent SIDAK yang disetujui.",
+        },
+      },
+      403,
     );
-    if (accessibleIds && accessibleIds.length === 0) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "FORBIDDEN",
-            message: "Anda belum memiliki scope agent SIDAK yang disetujui.",
-          },
-        },
-        403,
-      );
-    }
+  }
 
-    const filterScope = await resolveSidakFilterScope(c);
+  const filterScope = await resolveSidakFilterScope(c);
 
-    try {
-      const data = await getRankingData({
-        period,
-        service_type,
-        year,
-        folder,
-        accessibleIds,
-        filterScope,
-      });
+  try {
+    const data = await getRankingData({
+      period,
+      service_type,
+      year,
+      folder,
+      accessibleIds,
+      filterScope,
+    });
 
-      return c.json({
-        success: true,
-        data,
-      });
-    } catch (e: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "SERVER_ERROR", message: e.message },
-        },
-        500,
-      );
-    }
-  },
-);
+    return c.json({
+      success: true,
+      data,
+    });
+  } catch (e: any) {
+    if (e instanceof ScopeUnavailableError) throw e;
+    return c.json(
+      {
+        success: false,
+        error: { code: "SERVER_ERROR", message: e.message },
+      },
+      500,
+    );
+  }
+});
 
 export { sidakDashboard };

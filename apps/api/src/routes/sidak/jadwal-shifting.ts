@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { User } from "@supabase/supabase-js";
 import type { ApiResponse, JadwalShiftingResponse } from "@trainers/types";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import {
   fetchWfmSchedule,
   fetchWfmScheduleMonth,
@@ -102,14 +102,14 @@ function respondUpstreamError(c: JadwalContext, error: unknown) {
  *
  * Satu hari jadwal WFM untuk role `admin` dan `trainer` saja.
  *
- * Otorisasi naik di `requireRole`, jadi Hono menghentikan request SEBELUM
+ * Otorisasi naik di `requireCapability`, jadi Hono menghentikan request SEBELUM
  * handler ini berjalan — adapter upstream tidak pernah dipanggil untuk role
  * lain. Itu yang membuat "ditolak" dan "tidak menyentuh WFM" adalah hal yang
  * sama, bukan dua hal yang harus dipercaya.
  */
 sidakJadwalShifting.get(
   "/jadwal-shifting",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.schedule.read"),
   async (c) => {
     const requestedDate = c.req.query("date");
 
@@ -134,7 +134,7 @@ sidakJadwalShifting.get(
  */
 sidakJadwalShifting.get(
   "/jadwal-shifting/month",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.schedule.read"),
   async (c) => {
     const requestedMonth = c.req.query("month");
 

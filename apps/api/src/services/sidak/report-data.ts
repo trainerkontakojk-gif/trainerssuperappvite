@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
@@ -62,8 +63,11 @@ export async function getDataReportRows(params: {
       if (params.year) q = q.eq("tahun", params.year);
       if (params.pesertaId) q = q.eq("peserta_id", params.pesertaId);
       if (params.indicatorId) q = q.eq("indicator_id", params.indicatorId);
-      if (params.agent_ids && params.agent_ids.length > 0)
-        q = q.in("peserta_id", params.agent_ids);
+      q = applyPesertaScope(
+        q,
+        pesertaScopeFromIds(params.agent_ids),
+        "peserta_id",
+      );
 
       if (excludedIds.length > 0) {
         q = q.not("peserta_id", "in", `(${excludedIds.join(",")})`);

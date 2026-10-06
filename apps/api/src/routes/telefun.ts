@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../middleware/role";
+import { requireCapability } from "../middleware/role";
 import { telefunSessions } from "./telefun/sessions";
 import { telefunCapabilities } from "./telefun/capabilities";
 import { telefunRecordings } from "./telefun/recordings";
@@ -12,7 +12,7 @@ type Variables = { user: User; profile: any };
 const telefun = new Hono<{ Variables: Variables }>();
 
 // Semua route Telefun hanya untuk admin/trainer — agent & leader tidak diizinkan
-telefun.use("*", requireRole("admin", "trainer"));
+telefun.use("*", requireCapability("telefun.use"));
 
 telefun.route("/", telefunCapabilities);
 telefun.route("/", telefunSessions);
@@ -24,7 +24,13 @@ telefun.route("/", telefunRemuxRecording);
 export { telefun };
 
 // Re-export helpers for test backward compatibility
-export { buildTelefunSessionInsertPayload, buildTelefunSessionUpdatePayload } from "./telefun/sessions";
-export { buildTelefunFeedbackSummary, isTelefunRecordingPathOwnedBySession } from "./telefun/recordings";
+export {
+  buildTelefunSessionInsertPayload,
+  buildTelefunSessionUpdatePayload,
+} from "./telefun/sessions";
+export {
+  buildTelefunFeedbackSummary,
+  isTelefunRecordingPathOwnedBySession,
+} from "./telefun/recordings";
 export { buildTelefunSettingsUpsertPayload } from "./telefun/settings";
 export { buildSeekablePath } from "./telefun/remux-recording";

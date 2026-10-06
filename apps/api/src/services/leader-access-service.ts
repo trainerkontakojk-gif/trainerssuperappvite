@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "../lib/supabase";
-import type { ServiceType } from "@trainers/types";
 
 export type ApprovalStatus =
   | "none"
@@ -22,13 +21,7 @@ export interface LeaderAccessStatusItem {
   created_at: string | null;
 }
 
-export interface LeaderScopeSnapshot {
-  requestIds: string[];
-  pesertaIds: string[];
-  batchNames: string[];
-  tims: string[];
-  serviceTypes: ServiceType[];
-}
+export type { LeaderScopeSnapshot } from "./access/leader-scope";
 
 export async function fetchLeaderModuleRequests(
   userId: string,
@@ -53,15 +46,13 @@ export function resolveEffectiveModuleStatus(
 ): ApprovalStatus {
   const hasApproved = rows.some(
     (r) =>
-      r.status === "approved" &&
-      (r.module === module || r.module === "all"),
+      r.status === "approved" && (r.module === module || r.module === "all"),
   );
   if (hasApproved) return "approved";
 
   const hasPending = rows.some(
     (r) =>
-      r.status === "pending" &&
-      (r.module === module || r.module === "all"),
+      r.status === "pending" && (r.module === module || r.module === "all"),
   );
   if (hasPending) return "pending";
 
@@ -83,9 +74,7 @@ export function resolveEffectiveModuleCreatedAt(
   if (status === "none") return null;
 
   const row = rows.find(
-    (r) =>
-      (r.module === module || r.module === "all") &&
-      r.status === status,
+    (r) => (r.module === module || r.module === "all") && r.status === status,
   );
   return row?.created_at ?? null;
 }
@@ -103,45 +92,9 @@ export async function getApprovedRequestIds(
   return rows
     .filter(
       (r) =>
-        r.status === "approved" &&
-        (r.module === module || r.module === "all"),
+        r.status === "approved" && (r.module === module || r.module === "all"),
     )
     .map((r) => r.id);
 }
 
-export async function getLeaderScopeSnapshot(
-  userId: string,
-  module: string,
-): Promise<LeaderScopeSnapshot> {
-  const empty: LeaderScopeSnapshot = {
-    requestIds: [],
-    pesertaIds: [],
-    batchNames: [],
-    tims: [],
-    serviceTypes: [],
-  };
-
-  const { data, error } = await supabaseAdmin.rpc(
-    "get_leader_scope_snapshot",
-    {
-      p_leader_user_id: userId,
-      p_module: module,
-    },
-  );
-
-  if (error) throw new Error(error.message);
-
-  const row = Array.isArray(data) ? data[0] : null;
-  if (!row) return empty;
-
-  return {
-    requestIds: row.request_ids ?? [],
-    pesertaIds: row.peserta_ids ?? [],
-    batchNames: row.batch_names ?? [],
-    tims: row.tims ?? [],
-    serviceTypes: (row.service_types ?? []).filter(
-      (s: string): s is ServiceType =>
-        ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(s),
-    ),
-  };
-}
+export { getLeaderScopeSnapshot } from "./access/leader-scope";

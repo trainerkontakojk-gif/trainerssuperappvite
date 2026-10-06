@@ -1,7 +1,12 @@
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
-import { getLeaderScopeSnapshot } from "../leader-access-service";
-import { TRAINER_ROLES, LEADER_ROLES } from "./shared-constants";
+import { normalizeRole } from "@trainers/types";
+import {
+  resolveDataScope,
+  scopePesertaIds,
+  applyPesertaScope,
+  pesertaScopeFromIds,
+} from "../access/scope";
 import type { ServiceType } from "@trainers/types";
 
 export interface SidakFolderRow {
@@ -93,7 +98,9 @@ async function getChildFolderRowsByParentIds(
 async function getParentFolderRows(
   folders: SidakFolderRow[],
 ): Promise<SidakFolderRow[]> {
-  const parentIds = [...new Set(folders.map((folder) => folder.parent_id).filter(Boolean))];
+  const parentIds = [
+    ...new Set(folders.map((folder) => folder.parent_id).filter(Boolean)),
+  ];
   if (parentIds.length === 0) return [];
 
   const parents = await fetchAllPages<SidakFolderRow>({
@@ -147,49 +154,28 @@ export async function getAccessibleAgentIds(
   userId: string,
   role: string,
 ): Promise<string[] | null> {
-  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
-
-  if (role === "agent") {
-    const { data } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("id")
-      .eq("trainer_id", userId)
-      .maybeSingle();
-    return data ? [data.id] : [];
-  }
-
-  if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const snapshot = await getLeaderScopeSnapshot(userId, "sidak");
-    return snapshot.pesertaIds;
-  }
-
-  return [];
+  return scopePesertaIds(
+    await resolveDataScope({ id: userId, role: normalizeRole(role) }, "sidak"),
+  );
 }
 
 export async function getAccessibleSidakFilters(
   userId: string,
   role: string,
 ): Promise<SidakFilterScope | null> {
-  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
+  const scope = await resolveDataScope(
+    { id: userId, role: normalizeRole(role) },
+    "sidak",
+  );
+  if (scope.kind === "all") return null;
 
-  if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const snapshot = await getLeaderScopeSnapshot(userId, "sidak");
-
-    if (snapshot.pesertaIds.length === 0) {
-      return {
-        agentIds: [],
-        allowedFolders: [],
-        allowedServices: snapshot.serviceTypes,
-        serviceTypeLocked: snapshot.serviceTypes.length > 0,
-      };
-    }
-
+  if (scope.kind === "team") {
     const batchRows = await fetchAllPages<{ batch_name: string | null }>({
       build: ({ from, to }) =>
         supabaseAdmin
           .from("profiler_peserta")
           .select("batch_name")
-          .in("id", snapshot.pesertaIds)
+          .in("id", scope.pesertaIds)
           .order("batch_name", { ascending: true })
           .order("id", { ascending: true })
           .range(from, to),
@@ -202,24 +188,22 @@ export async function getAccessibleSidakFilters(
     const allowedFolders = await expandFoldersWithParents(batchFolders);
 
     return {
-      agentIds: snapshot.pesertaIds,
+      agentIds: scope.pesertaIds,
       allowedFolders,
-      allowedServices: snapshot.serviceTypes,
-      serviceTypeLocked: snapshot.serviceTypes.length > 0,
+      allowedServices: scope.services,
+      serviceTypeLocked: scope.services.length > 0,
     };
   }
 
   return {
     agentIds: [],
     allowedFolders: [],
-    allowedServices: [],
-    serviceTypeLocked: false,
+    allowedServices: scope.kind === "none" ? (scope.services ?? []) : [],
+    serviceTypeLocked: scope.kind === "none" && !!scope.services?.length,
   };
 }
 
-export async function resolveFolderFiltersByIds(
-  folderIds: string[],
-): Promise<{
+export async function resolveFolderFiltersByIds(folderIds: string[]): Promise<{
   selectedFolders: SidakFolderRow[];
   filterNames: string[];
 }> {
@@ -270,15 +254,15 @@ export async function getAgentsByFolder(
       ? await resolveFolderNamesFromFolderRows(scopedFolderRows)
       : [folder];
 
-  const { data } = await supabaseAdmin
+  const query = supabaseAdmin
     .from("profiler_peserta")
     .select("id, nama")
     .in("batch_name", folderNames)
     .order("nama");
-  let result = data ?? [];
-  if (filterScope && filterScope.agentIds.length > 0) {
-    const idSet = new Set(filterScope.agentIds);
-    result = result.filter((agent: any) => idSet.has(agent.id));
-  }
-  return result;
+  const { data } = await applyPesertaScope(
+    query,
+    pesertaScopeFromIds(filterScope?.agentIds),
+    "id",
+  );
+  return data ?? [];
 }

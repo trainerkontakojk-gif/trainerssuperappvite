@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
@@ -62,8 +63,11 @@ export async function getTemuan(params: {
   if (params.period_id) query = query.eq("period_id", params.period_id);
   if (params.service_type)
     query = query.eq("service_type", params.service_type);
-  if (params.agent_ids && params.agent_ids.length > 0)
-    query = query.in("peserta_id", params.agent_ids);
+  query = applyPesertaScope(
+    query,
+    pesertaScopeFromIds(params.agent_ids),
+    "peserta_id",
+  );
 
   query = query.order("created_at", { ascending: false });
 

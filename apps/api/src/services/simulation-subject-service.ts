@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import {
   normalizeSimulationSubjectSelection,
   type SimulationSubjectSnapshot,
@@ -38,7 +39,7 @@ function normalizedRole(role?: string | null): string {
 }
 
 function isManagerRole(role?: string | null): boolean {
-  return normalizedRole(role) === "admin" || normalizedRole(role) === "trainer";
+  return can(normalizeRole(role), "simulation.subject.select");
 }
 
 function safeSelfName(name?: string | null): string {

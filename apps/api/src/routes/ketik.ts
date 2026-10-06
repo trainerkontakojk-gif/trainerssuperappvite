@@ -1,3 +1,5 @@
+import { getActor } from "../middleware/role";
+import { resolveAccountScope } from "../services/access/scope";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
@@ -11,7 +13,7 @@ import {
 import * as ketikService from "../services/ketik-service";
 import { SimulationSubjectError } from "../services/simulation-subject-service";
 import { resolveRequestSimulationSubject } from "./pdkt/route-utils";
-import { requireRole } from "../middleware/role";
+import { requireCapability } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import { createAdminClient } from "../lib/supabase";
 import { isSettingsConflictError } from "../lib/guarded-user-settings";
@@ -21,17 +23,17 @@ type Variables = { user: User; profile: any };
 
 const ketik = new Hono<{ Variables: Variables }>();
 
-ketik.get("/scenarios", (c) => {
+ketik.get("/scenarios", requireCapability("ketik.use"), (c) => {
   return c.json({ success: true, data: ketikService.getScenarios() });
 });
 
-ketik.get("/consumer-types", (c) => {
+ketik.get("/consumer-types", requireCapability("ketik.use"), (c) => {
   return c.json({ success: true, data: ketikService.getConsumerTypes() });
 });
 
 ketik.post(
   "/generate",
-  requireRole("admin", "trainer", "leader", "qa", "tl", "spv", "om", "agent"),
+  requireCapability("ketik.use"),
   aiRateLimitMiddleware,
   zValidator("json", generateMessageSchema),
   async (c) => {
@@ -101,10 +103,11 @@ ketik.post(
   },
 );
 
-ketik.get("/settings", async (c) => {
-  const user = c.get("user");
+ketik.get("/settings", requireCapability("ketik.settings.read"), async (c) => {
   try {
-    const snapshot = await ketikService.getSettingsSnapshot(user.id);
+    const snapshot = await ketikService.getSettingsSnapshot(
+      resolveAccountScope(getActor(c)).userId,
+    );
     c.header("x-settings-version", snapshot.version);
     c.header("x-ketik-templates-version", snapshot.globalTemplatesVersion);
     return c.json({ success: true, data: snapshot.settings });
@@ -121,7 +124,7 @@ ketik.get("/settings", async (c) => {
 
 ketik.put(
   "/templates",
-  requireRole("admin"),
+  requireCapability("ketik.templates.shared.write"),
   zValidator(
     "json",
     z.object({ templates: z.array(ketikQuickTemplateSchema) }),
@@ -163,14 +166,14 @@ ketik.put(
 
 ketik.put(
   "/settings",
+  requireCapability("ketik.settings.write"),
   zValidator("json", ketikAppSettingsSchema),
   async (c) => {
-    const user = c.get("user");
     const body = c.req.valid("json");
     try {
       const version = c.req.header("x-settings-version");
       const newVersion = await ketikService.saveSettings(
-        user.id,
+        resolveAccountScope(getActor(c)).userId,
         body,
         version,
       );
@@ -201,10 +204,11 @@ ketik.put(
   },
 );
 
-ketik.get("/history", async (c) => {
-  const user = c.get("user");
+ketik.get("/history", requireCapability("ketik.history.read"), async (c) => {
   try {
-    const history = await ketikService.getHistory(user.id);
+    const history = await ketikService.getHistory(
+      resolveAccountScope(getActor(c)).userId,
+    );
     return c.json({ success: true, data: history });
   } catch (err: any) {
     return c.json(
@@ -219,6 +223,7 @@ ketik.get("/history", async (c) => {
 
 ketik.post(
   "/history",
+  requireCapability("ketik.history.write"),
   zValidator(
     "json",
     z.object({
@@ -232,17 +237,19 @@ ketik.post(
     }),
   ),
   async (c) => {
-    const user = c.get("user");
     const body = c.req.valid("json");
     try {
       const snapshot = await resolveRequestSimulationSubject(
         c,
         body.simulationSubject,
       );
-      const session = await ketikService.persistSession(user.id, {
-        ...body,
-        simulationSubjectSnapshot: snapshot,
-      });
+      const session = await ketikService.persistSession(
+        resolveAccountScope(getActor(c)).userId,
+        {
+          ...body,
+          simulationSubjectSnapshot: snapshot,
+        },
+      );
       return c.json({ success: true, data: session });
     } catch (err: any) {
       if (err instanceof SimulationSubjectError) {
@@ -262,71 +269,86 @@ ketik.post(
   },
 );
 
-ketik.delete("/history", async (c) => {
-  const user = c.get("user");
-  try {
-    await ketikService.clearHistory(user.id);
-    return c.json({ success: true, message: "Riwayat berhasil dihapus." });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
-      },
-      500,
-    );
-  }
-});
-
-ketik.delete("/history/:id", async (c) => {
-  const user = c.get("user");
-  const sessionId = c.req.param("id");
-  try {
-    await ketikService.deleteSession(sessionId, user.id);
-    return c.json({ success: true, message: "Sesi berhasil dihapus." });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
-      },
-      500,
-    );
-  }
-});
-
-ketik.get("/review/:sessionId", async (c) => {
-  const user = c.get("user");
-  const sessionId = c.req.param("sessionId");
-  try {
-    const detail = await ketikService.getReviewDetail(sessionId, user.id);
-    if (!detail) {
+ketik.delete(
+  "/history",
+  requireCapability("ketik.history.delete"),
+  async (c) => {
+    try {
+      await ketikService.clearHistory(resolveAccountScope(getActor(c)).userId);
+      return c.json({ success: true, message: "Riwayat berhasil dihapus." });
+    } catch (err: any) {
       return c.json(
         {
           success: false,
-          error: {
-            code: "NOT_FOUND",
-            message: "Review tidak ditemukan atau belum selesai.",
-          },
+          error: { code: "INTERNAL_ERROR", message: err.message },
         },
-        404,
+        500,
       );
     }
-    return c.json({ success: true, data: detail });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
-      },
-      500,
-    );
-  }
-});
+  },
+);
+
+ketik.delete(
+  "/history/:id",
+  requireCapability("ketik.history.delete"),
+  async (c) => {
+    const sessionId = c.req.param("id");
+    try {
+      await ketikService.deleteSession(
+        sessionId,
+        resolveAccountScope(getActor(c)).userId,
+      );
+      return c.json({ success: true, message: "Sesi berhasil dihapus." });
+    } catch (err: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: err.message },
+        },
+        500,
+      );
+    }
+  },
+);
+
+ketik.get(
+  "/review/:sessionId",
+  requireCapability("ketik.review.read"),
+  async (c) => {
+    const sessionId = c.req.param("sessionId");
+    try {
+      const detail = await ketikService.getReviewDetail(
+        sessionId,
+        resolveAccountScope(getActor(c)).userId,
+      );
+      if (!detail) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Review tidak ditemukan atau belum selesai.",
+            },
+          },
+          404,
+        );
+      }
+      return c.json({ success: true, data: detail });
+    } catch (err: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: err.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 ketik.post(
   "/review",
-  requireRole("admin", "trainer", "qa"),
+  requireCapability("ketik.review"),
   aiRateLimitMiddleware,
   zValidator(
     "json",
@@ -334,7 +356,7 @@ ketik.post(
   ),
   async (c) => {
     const body = c.req.valid("json");
-    const user = c.get("user");
+
     const adminClient = createAdminClient();
     const nowIso = new Date().toISOString();
 
@@ -344,7 +366,7 @@ ketik.post(
         .from("ketik_history")
         .select("user_id, review_status")
         .eq("id", body.sessionId)
-        .eq("user_id", user.id)
+        .eq("user_id", resolveAccountScope(getActor(c)).userId)
         .single();
 
       if (sessionError || !session) {
@@ -437,7 +459,7 @@ ketik.post(
       // 3. Trigger review (handles missing job + enqueue)
       const triggerResult = await ketikService.triggerKetikAIReview(
         body.sessionId,
-        user.id,
+        resolveAccountScope(getActor(c)).userId,
       );
 
       if (triggerResult?.status === "skipped") {
@@ -487,34 +509,40 @@ ketik.post(
   },
 );
 
-ketik.get("/review/status/:sessionId", async (c) => {
-  const sessionId = c.req.param("sessionId");
-  const user = c.get("user");
+ketik.get(
+  "/review/status/:sessionId",
+  requireCapability("ketik.review.read"),
+  async (c) => {
+    const sessionId = c.req.param("sessionId");
 
-  try {
-    const result = await ketikService.getKetikReviewStatus(sessionId, user.id);
-    if (!result) {
+    try {
+      const result = await ketikService.getKetikReviewStatus(
+        sessionId,
+        resolveAccountScope(getActor(c)).userId,
+      );
+      if (!result) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Session not found." },
+          },
+          404,
+        );
+      }
+      return c.json({ success: true, data: result });
+    } catch (err: any) {
       return c.json(
         {
           success: false,
-          error: { code: "NOT_FOUND", message: "Session not found." },
+          error: { code: "INTERNAL_ERROR", message: err.message },
         },
-        404,
+        500,
       );
     }
-    return c.json({ success: true, data: result });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
-      },
-      500,
-    );
-  }
-});
+  },
+);
 
-ketik.get("/worker", requireRole("admin", "trainer", "qa"), async (c) => {
+ketik.get("/worker", requireCapability("ketik.worker.process"), async (c) => {
   const workerId = c.req.query("workerId") || "web-daemon";
   try {
     const result = await ketikService.processOldestQueuedJob(workerId);

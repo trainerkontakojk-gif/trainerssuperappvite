@@ -8,7 +8,7 @@ import {
   pdktMailboxBulkDeleteSchema,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import { SimulationSubjectError } from "../../services/simulation-subject-service";
 import {
   PDKT_MAILBOX_RETRY_TOKEN_MAX_LENGTH,
@@ -37,58 +37,50 @@ const pdktMailboxBatchRequestSchema = z.union([
 
 const mailbox = new Hono<{ Variables: Variables }>();
 
-mailbox.get(
-  "/",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const userClient = getUserClient(c);
+mailbox.get("/", requireCapability("pdkt.mailbox.read"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const userClient = getUserClient(c);
 
-    try {
-      const data = await pdktService.fetchMailboxItems(userClient, {
-        id: user.id,
-        role: profile.role,
-      });
-      return c.json({ success: true, data });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
+  try {
+    const data = await pdktService.fetchMailboxItems(userClient, {
+      id: user.id,
+      role: profile.role,
+    });
+    return c.json({ success: true, data });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
+
+mailbox.get("/:id", requireCapability("pdkt.mailbox.read"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const userClient = getUserClient(c);
+
+  try {
+    // Detail rows keep inline attachments; the list stays text-only so
+    // opening the session does not download every attachment up front.
+    const data = await pdktService.fetchMailboxItemById(
+      userClient,
+      { id: user.id, role: profile.role },
+      id,
+    );
+
+    if (!data) {
+      return jsonNotFound(c, "Email mailbox tidak ditemukan.");
     }
-  },
-);
 
-mailbox.get(
-  "/:id",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const id = c.req.param("id");
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const userClient = getUserClient(c);
-
-    try {
-      // Detail rows keep inline attachments; the list stays text-only so
-      // opening the session does not download every attachment up front.
-      const data = await pdktService.fetchMailboxItemById(
-        userClient,
-        { id: user.id, role: profile.role },
-        id,
-      );
-
-      if (!data) {
-        return jsonNotFound(c, "Email mailbox tidak ditemukan.");
-      }
-
-      return c.json({ success: true, data });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
-    }
-  },
-);
+    return c.json({ success: true, data });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
 mailbox.post(
   "/batch",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.mailbox.create"),
   zValidator("json", pdktMailboxBatchRequestSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -159,30 +151,26 @@ mailbox.post(
   },
 );
 
-mailbox.delete(
-  "/:id",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const id = c.req.param("id");
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const userClient = getUserClient(c);
+mailbox.delete("/:id", requireCapability("pdkt.mailbox.delete"), async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const userClient = getUserClient(c);
 
-    try {
-      await pdktService.softDeleteMailboxItem(userClient, id, {
-        id: user.id,
-        role: profile.role,
-      });
-      return c.json({ success: true, message: "Mailbox item deleted." });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
-    }
-  },
-);
+  try {
+    await pdktService.softDeleteMailboxItem(userClient, id, {
+      id: user.id,
+      role: profile.role,
+    });
+    return c.json({ success: true, message: "Mailbox item deleted." });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
 mailbox.post(
   "/batch-delete",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.mailbox.delete"),
   zValidator("json", pdktMailboxBulkDeleteSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -208,7 +196,7 @@ mailbox.post(
 
 mailbox.post(
   "/reply",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.mailbox.reply"),
   zValidator("json", pdktMailboxReplyPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -270,7 +258,7 @@ mailbox.post(
 // This endpoint was in pdkt.ts as /evaluate, but it's related to mailbox/agent responses
 mailbox.post(
   "/evaluate",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("pdkt.evaluate"),
   aiRateLimitMiddleware,
   zValidator("json", evaluatePromptSchema),
   async (c) => {

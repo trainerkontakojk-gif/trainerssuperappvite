@@ -1,7 +1,8 @@
+import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
 import { serviceTypeSchema } from "@trainers/types";
@@ -19,16 +20,12 @@ async function resolveSidakFilterScope(
 }
 
 // ── Periods ────────────────────────────────────────────
-sidakCore.get(
-  "/periods",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const periods = await sidakService.getPeriods();
-    return c.json({ success: true, data: periods });
-  },
-);
+sidakCore.get("/periods", requireCapability("sidak.config.read"), async (c) => {
+  const periods = await sidakService.getPeriods();
+  return c.json({ success: true, data: periods });
+});
 
-sidakCore.post("/periods", requireRole("admin", "trainer"), async (c) => {
+sidakCore.post("/periods", requireCapability("sidak.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({
@@ -63,33 +60,38 @@ sidakCore.post("/periods", requireRole("admin", "trainer"), async (c) => {
   return c.json({ success: true, data: period }, 201);
 });
 
-sidakCore.delete("/periods/:id", requireRole("admin", "trainer"), async (c) => {
-  const id = c.req.param("id");
-  try {
-    const period = await sidakService.deletePeriod(id);
-    await logActivity({
-      user_id: c.get("user").id,
-      user_name: c.get("user").email ?? "",
-      action: `Menghapus Periode ID: ${id}`,
-      module: "SIDAK",
-      type: "delete",
-    });
-    return c.json({ success: true, data: period });
-  } catch (e: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "DELETE_ERROR", message: e.message },
-      },
-      400,
-    );
-  }
-});
+sidakCore.delete(
+  "/periods/:id",
+  requireCapability("sidak.write"),
+  async (c) => {
+    const id = c.req.param("id");
+    try {
+      const period = await sidakService.deletePeriod(id);
+      await logActivity({
+        user_id: c.get("user").id,
+        user_name: c.get("user").email ?? "",
+        action: `Menghapus Periode ID: ${id}`,
+        module: "SIDAK",
+        type: "delete",
+      });
+      return c.json({ success: true, data: period });
+    } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
+      return c.json(
+        {
+          success: false,
+          error: { code: "DELETE_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
 // ── Resolved Input Config ──────────────────────────────
 sidakCore.get(
   "/resolved-input-config",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const serviceType = c.req.query("service_type");
     const periodId = c.req.query("period_id");
@@ -128,6 +130,7 @@ sidakCore.get(
       );
       return c.json({ success: true, data: config });
     } catch (e: any) {
+      if (e instanceof ScopeUnavailableError) throw e;
       return c.json(
         {
           success: false,
@@ -145,7 +148,7 @@ sidakCore.get(
 // ── Indicators ─────────────────────────────────────────
 sidakCore.get(
   "/indicators",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const serviceType = c.req.query("service_type");
     const indicators = await sidakService.getIndicators(serviceType);
@@ -153,7 +156,7 @@ sidakCore.get(
   },
 );
 
-sidakCore.post("/indicators", requireRole("admin", "trainer"), async (c) => {
+sidakCore.post("/indicators", requireCapability("sidak.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z
     .object({
@@ -192,23 +195,19 @@ sidakCore.post("/indicators", requireRole("admin", "trainer"), async (c) => {
 });
 
 // ── Folders ────────────────────────────────────────────
-sidakCore.get(
-  "/folders",
-  requireRole("admin", "trainer", "leader"),
-  async (c) => {
-    const filterScope = await resolveSidakFilterScope(c);
-    if (filterScope) {
-      return c.json({ success: true, data: filterScope.allowedFolders });
-    }
-    const folders = await sidakService.getAllFolders();
-    return c.json({ success: true, data: folders });
-  },
-);
+sidakCore.get("/folders", requireCapability("sidak.read"), async (c) => {
+  const filterScope = await resolveSidakFilterScope(c);
+  if (filterScope) {
+    return c.json({ success: true, data: filterScope.allowedFolders });
+  }
+  const folders = await sidakService.getAllFolders();
+  return c.json({ success: true, data: folders });
+});
 
 // ── Agents by Folder ────────────────────────────────────
 sidakCore.get(
   "/folders/:folder/agents",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.read"),
   async (c) => {
     const folder = c.req.param("folder");
     const filterScope = await resolveSidakFilterScope(c);

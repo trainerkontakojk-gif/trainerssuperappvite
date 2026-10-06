@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 /**
  * Agregasi heatmap ketidaksesuaian SIDAK.
  *
@@ -30,7 +31,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SidakHeatmapMode, ServiceType } from "@trainers/types";
 
 /** Kolom yang benar-benar dibutuhkan agregasi — jangan `select("*")`. */
-const SELECT_COLUMNS = "id, service_type, nilai, ketidaksesuaian, sebaiknya, no_tiket";
+const SELECT_COLUMNS =
+  "id, service_type, nilai, ketidaksesuaian, sebaiknya, no_tiket";
 
 /**
  * Batas akses app-side untuk leader. `null` berarti tanpa batas (admin/trainer).
@@ -88,16 +90,15 @@ function hasTicketNumber(value: string | null | undefined): value is string {
 }
 
 /** Terapkan batas agent + layanan secara konsisten ke setiap query. */
-function applyScope<T extends { eq: Function; in: Function }>(
-  query: T,
-  agentId: string | undefined,
-  scope: HeatmapScope | undefined,
-): T {
+function applyScope<
+  T extends {
+    eq: (column: string, value: string) => T;
+    in: (column: string, ids: readonly string[]) => T;
+  },
+>(query: T, agentId: string | undefined, scope: HeatmapScope | undefined): T {
   let q = query;
   if (agentId) q = q.eq("peserta_id", agentId) as T;
-  if (scope?.agentIds && scope.agentIds.length > 0) {
-    q = q.in("peserta_id", scope.agentIds) as T;
-  }
+  q = applyPesertaScope(q, pesertaScopeFromIds(scope?.agentIds));
   if (scope?.serviceTypes && scope.serviceTypes.length > 0) {
     q = q.in("service_type", scope.serviceTypes) as T;
   }

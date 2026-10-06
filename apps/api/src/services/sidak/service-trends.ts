@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { isCountableFinding } from "./shared-constants";
@@ -43,9 +44,11 @@ export async function fetchPaginatedTrendData(
     if (year) {
       query = query.eq("tahun", year);
     }
-    if (agent_ids && agent_ids.length > 0) {
-      query = query.in("peserta_id", agent_ids);
-    }
+    query = applyPesertaScope(
+      query,
+      pesertaScopeFromIds(agent_ids),
+      "peserta_id",
+    );
 
     const { data, error } = await query;
     if (error) throw error;
@@ -372,9 +375,11 @@ export async function getAvailableYears(
         .order("id", { ascending: false })
         .range(from, to);
 
-      if (agent_ids && agent_ids.length > 0) {
-        query = query.in("peserta_id", agent_ids);
-      }
+      query = applyPesertaScope(
+        query,
+        pesertaScopeFromIds(agent_ids),
+        "peserta_id",
+      );
 
       return query;
     },

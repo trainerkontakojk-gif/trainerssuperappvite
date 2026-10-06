@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import {
   POC_TRANSPORT,
   isHistoricalTelefunOpenAiWebRtcModelId,
@@ -100,8 +101,8 @@ export async function authorizeWebRtcCall(
   if (normalizeWebRtcProfileStatus(profile.status) !== "active") {
     return { ok: false, reason: "forbidden" };
   }
-  const normalizedRole = normalizeWebRtcProfileRole(profile.role);
-  if (normalizedRole !== "admin" && normalizedRole !== "trainer") {
+  const normalizedRole = normalizeRole(profile.role);
+  if (!can(normalizedRole, "telefun.cleanup")) {
     return { ok: false, reason: "forbidden" };
   }
 
@@ -139,11 +140,6 @@ function isHistoricalCleanupStatus(status: string): boolean {
 function normalizeWebRtcProfileStatus(status?: string | null): string {
   const normalized = status?.trim().toLowerCase() ?? "";
   return normalized === "approved" ? "active" : normalized;
-}
-
-function normalizeWebRtcProfileRole(role?: string | null): string {
-  const normalized = role?.trim().toLowerCase() ?? "";
-  return normalized === "trainers" ? "trainer" : normalized;
 }
 
 async function raceWithAbort<T>(

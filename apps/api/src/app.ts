@@ -1,3 +1,5 @@
+import { requireCapability } from "./middleware/role";
+import { ScopeUnavailableError } from "./services/access/scope";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
@@ -74,6 +76,12 @@ app.onError((err, c) => {
     c.res.headers.delete("Access-Control-Allow-Credentials");
   }
 
+  if (err instanceof ScopeUnavailableError)
+    return c.json(
+      { success: false, error: { code: err.code, message: err.message } },
+      503,
+    );
+
   if (err instanceof HTTPException) {
     return c.json<ApiResponse<never>>(
       {
@@ -130,70 +138,78 @@ const healthCheck = new Hono()
 
 // ── V1 routes (behind auth middleware) ──
 const v1Api = new Hono<{ Variables: AuthVariables }>()
-  .get("/me/access-status", async (c) => {
-    const user = c.get("user");
-    try {
-      const status = await getLeaderAccessStatus(user.id);
-      return c.json({ success: true, data: status });
-    } catch (e: any) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "SERVER_ERROR",
-            message: e.message || "Gagal memuat status akses",
+  .get(
+    "/me/access-status",
+    requireCapability("account.accessStatus.read"),
+    async (c) => {
+      const user = c.get("user");
+      try {
+        const status = await getLeaderAccessStatus(user.id);
+        return c.json({ success: true, data: status });
+      } catch (e: any) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SERVER_ERROR",
+              message: e.message || "Gagal memuat status akses",
+            },
           },
-        },
-        500,
-      );
-    }
-  })
-  .get("/me", (c) => {
+          500,
+        );
+      }
+    },
+  )
+  .get("/me", requireCapability("account.read"), (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
     return c.json({ success: true, data: { user, profile } });
   })
-  .post("/me/revoke-sessions", async (c) => {
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const authHeader = c.req.header("Authorization") ?? "";
-    const accessToken = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : null;
+  .post(
+    "/me/revoke-sessions",
+    requireCapability("account.sessions.revoke"),
+    async (c) => {
+      const user = c.get("user");
+      const profile = c.get("profile");
+      const authHeader = c.req.header("Authorization") ?? "";
+      const accessToken = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
 
-    if (!accessToken) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Unauthorized",
+      if (!accessToken) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Unauthorized",
+            },
           },
-        },
-        401,
-      );
-    }
+          401,
+        );
+      }
 
-    try {
-      const data = await revokeOwnSessions({
-        accessToken,
-        userId: user.id,
-        actorName: profile.full_name || user.email || "System",
-      });
-      return c.json({ success: true, data });
-    } catch (error) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "SESSION_REVOKE_FAILED",
-            message: "Gagal logout dari semua perangkat. Silakan coba lagi.",
+      try {
+        const data = await revokeOwnSessions({
+          accessToken,
+          userId: user.id,
+          actorName: profile.full_name || user.email || "System",
+        });
+        return c.json({ success: true, data });
+      } catch (error) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SESSION_REVOKE_FAILED",
+              message: "Gagal logout dari semua perangkat. Silakan coba lagi.",
+            },
           },
-        },
-        500,
-      );
-    }
-  })
+          500,
+        );
+      }
+    },
+  )
   .route("/sidak", sidak)
   .route("/ketik", ketik)
   .route("/pdkt", pdkt)

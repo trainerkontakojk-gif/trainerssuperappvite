@@ -1,3 +1,4 @@
+import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
 import type {
   DashboardAgentWithMetrics,
@@ -30,7 +31,10 @@ import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
-import { getSidakExcludedPesertaIds, getSoftDeletedPesertaIds } from "./agent-directory";
+import {
+  getSidakExcludedPesertaIds,
+  getSoftDeletedPesertaIds,
+} from "./agent-directory";
 import {
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
@@ -80,9 +84,11 @@ async function fetchAllTemuan(opts: {
     if (opts.peserta_id) {
       query = query.eq("peserta_id", opts.peserta_id);
     }
-    if (opts.agent_ids && opts.agent_ids.length > 0) {
-      query = query.in("peserta_id", opts.agent_ids);
-    }
+    query = applyPesertaScope(
+      query,
+      pesertaScopeFromIds(opts.agent_ids),
+      "peserta_id",
+    );
     if (opts.folderNames && opts.folderNames.length > 0) {
       query = query.in("profiler_peserta.batch_name", opts.folderNames);
     }

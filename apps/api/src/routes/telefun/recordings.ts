@@ -1,3 +1,9 @@
+import {
+  resolveAccountScope,
+  isAccountInScope,
+} from "../../services/access/scope";
+import { getActor } from "../../middleware/role";
+import { can } from "@trainers/types";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
@@ -33,9 +39,7 @@ import {
   buildTelefunHistoryScoringView,
 } from "../../lib/telefun-feedback";
 import type { TelefunHistoryScoringView } from "@trainers/types";
-import {
-  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
-} from "../../lib/telefun-openai-assessment";
+import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../../lib/telefun-openai-assessment";
 
 export { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 
@@ -73,7 +77,9 @@ function normalizeRecordingRpcRow(
   };
 }
 
-function recordingRpcFailureStatus(reason: string): 400 | 403 | 404 | 409 | 503 {
+function recordingRpcFailureStatus(
+  reason: string,
+): 400 | 403 | 404 | 409 | 503 {
   if (reason === "session_not_found") return 404;
   if (reason === "not_owner") return 403;
   if (
@@ -81,8 +87,10 @@ function recordingRpcFailureStatus(reason: string): 400 | 403 | 404 | 409 | 503 
     reason === "session_not_terminal" ||
     reason === "capture_failed" ||
     reason === "recording_failed"
-  ) return 409;
-  if (reason.startsWith("invalid_") || reason === "recording_required") return 400;
+  )
+    return 409;
+  if (reason.startsWith("invalid_") || reason === "recording_required")
+    return 400;
   return 503;
 }
 
@@ -251,7 +259,10 @@ telefunRecordings.post(
         return c.json(
           {
             success: false,
-            error: { code: "DATABASE_ERROR", message: "Sesi belum dapat diperiksa." },
+            error: {
+              code: "DATABASE_ERROR",
+              message: "Sesi belum dapat diperiksa.",
+            },
           },
           503,
         );
@@ -269,7 +280,10 @@ telefunRecordings.post(
         return c.json(
           {
             success: false,
-            error: { code: "UNAUTHORIZED", message: "Anda tidak memiliki akses." },
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Anda tidak memiliki akses.",
+            },
           },
           403,
         );
@@ -290,13 +304,16 @@ telefunRecordings.post(
         );
       }
 
-      const rpcResult = await adminClient.rpc("mark_telefun_recording_uploaded", {
-        p_session_id: sessionId,
-        p_user_id: user.id,
-        p_recording_path: recordingPath ?? null,
-        p_agent_recording_path: agentRecordingPath ?? null,
-        p_capture_status: captureStatus,
-      });
+      const rpcResult = await adminClient.rpc(
+        "mark_telefun_recording_uploaded",
+        {
+          p_session_id: sessionId,
+          p_user_id: user.id,
+          p_recording_path: recordingPath ?? null,
+          p_agent_recording_path: agentRecordingPath ?? null,
+          p_capture_status: captureStatus,
+        },
+      );
       if (rpcResult.error) {
         return c.json(
           {
@@ -311,7 +328,12 @@ telefunRecordings.post(
       }
 
       const row = normalizeRecordingRpcRow(
-        firstRpcRow(rpcResult.data as TelefunRecordingRpcRow | TelefunRecordingRpcRow[] | null),
+        firstRpcRow(
+          rpcResult.data as
+            | TelefunRecordingRpcRow
+            | TelefunRecordingRpcRow[]
+            | null,
+        ),
       );
       if (!row) {
         return c.json(
@@ -403,8 +425,9 @@ telefunRecordings.get("/recording/:id", async (c) => {
         404,
       );
 
-    const canAccessCrossUserRecording = ["admin", "trainer"].includes(
+    const canAccessCrossUserRecording = can(
       profile?.role,
+      "telefun.recording.read",
     );
     if (!canAccessCrossUserRecording && session.user_id !== user.id) {
       return c.json(
@@ -491,14 +514,23 @@ telefunRecordings.post("/score/:id", async (c) => {
     }
     if (!sessionOwner) {
       return c.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Session tidak ditemukan." } },
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Session tidak ditemukan." },
+        },
         404,
       );
     }
 
     if (sessionOwner.user_id !== user.id) {
       return c.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "Anda tidak memiliki akses ke session ini." } },
+        {
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Anda tidak memiliki akses ke session ini.",
+          },
+        },
         403,
       );
     }
@@ -607,9 +639,7 @@ telefunRecordings.post("/score/:id", async (c) => {
       },
     );
 
-    const normalizedClaimed = Array.isArray(claimed)
-      ? claimed[0]
-      : claimed;
+    const normalizedClaimed = Array.isArray(claimed) ? claimed[0] : claimed;
     if (claimError) {
       console.error("[Telefun] Claim scoring RPC error");
       return c.json(
@@ -705,10 +735,7 @@ telefunRecordings.post("/score/:id", async (c) => {
     if (!result.success || !result.assessment) {
       // A failed WebRTC capture owns the terminal scoring latch. Re-read it
       // before writing a generic analysis failure so it cannot be overwritten.
-      const {
-        data: failedState,
-        error: failedStateError,
-      } = await adminClient
+      const { data: failedState, error: failedStateError } = await adminClient
         .from("telefun_history")
         .select(SCORING_STATE_SELECT)
         .eq("id", id)
@@ -963,8 +990,7 @@ telefunRecordings.post("/score/:id", async (c) => {
 
 telefunRecordings.get("/coaching-summary/:id", async (c) => {
   const sessionId = c.req.param("id");
-  const user = c.get("user");
-  const profile = c.get("profile");
+
   const adminClient = createAdminClient();
 
   try {
@@ -985,8 +1011,12 @@ telefunRecordings.get("/coaching-summary/:id", async (c) => {
       );
     }
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && session.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        session.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,

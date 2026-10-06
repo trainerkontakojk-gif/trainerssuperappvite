@@ -1,3 +1,4 @@
+import { can } from "@trainers/types";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -13,12 +14,10 @@ import {
 import type { AiModelModule } from "@trainers/types";
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenAIContent } from "../lib/openai";
-import { requireRole } from "../middleware/role";
+import { requireCapability } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
-import {
-  getMonitoringHistory,
-} from "../services/monitoring-history-service";
+import { getMonitoringHistory } from "../services/monitoring-history-service";
 import {
   getMonitoringReviewDetail,
   MonitoringReviewDataError,
@@ -46,10 +45,10 @@ const monitoringHistoryModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
 const monitoringHistoryIdSchema = z.string().uuid();
 
 function canSignCrossUserRecording(profile: any): boolean {
-  return ["admin", "trainer"].includes(profile?.role);
+  return can(profile?.role, "monitoring.recording.sign");
 }
 
-ai.get("/models", (c) => {
+ai.get("/models", requireCapability("ai.models.read"), (c) => {
   const module = c.req.query("module") as AiModelModule | undefined;
   const models = module ? getModelsForModule(module) : AI_MODELS;
   return c.json({ success: true, data: models });
@@ -65,7 +64,7 @@ const generateSchema = z.object({
 
 ai.post(
   "/generate",
-  requireRole("admin", "trainer", "qa"),
+  requireCapability("ai.generate"),
   zValidator("json", generateSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -109,7 +108,7 @@ ai.post(
 );
 
 // ── My Usage (own logs) ─────────────────────────────────
-ai.get("/usage", async (c) => {
+ai.get("/usage", requireCapability("usage.read"), async (c) => {
   const user = c.get("user");
   const userId = user?.id;
 
@@ -135,7 +134,7 @@ ai.get("/usage", async (c) => {
   return c.json({ success: true, data });
 });
 
-ai.get("/usage/summary", async (c) => {
+ai.get("/usage/summary", requireCapability("usage.read"), async (c) => {
   const user = c.get("user");
   const userId = user?.id;
   const moduleParam = c.req.query("module") || "pdkt";
@@ -201,7 +200,7 @@ ai.get("/usage/summary", async (c) => {
 // ── Monitoring History ──────────────────────────────
 ai.get(
   "/monitoring/history",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("monitoring.read"),
   async (c) => {
     try {
       const data = await getMonitoringHistory();
@@ -224,9 +223,11 @@ ai.get(
 // ── Monitoring Review Detail (admin-only, cross-user) ──
 ai.get(
   "/monitoring/history/:module/:id/review",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("monitoring.read"),
   async (c) => {
-    const parsedModule = monitoringHistoryModuleSchema.safeParse(c.req.param("module"));
+    const parsedModule = monitoringHistoryModuleSchema.safeParse(
+      c.req.param("module"),
+    );
     const parsedId = monitoringHistoryIdSchema.safeParse(c.req.param("id"));
 
     if (!parsedModule.success || !parsedId.success) {
@@ -287,7 +288,7 @@ ai.get(
 // ── Monitoring Delete History ──────────────────────────
 ai.delete(
   "/monitoring/history/:module/:id",
-  requireRole("admin", "trainer"),
+  requireCapability("monitoring.history.delete"),
   async (c) => {
     const { module, id } = c.req.param();
 
@@ -356,7 +357,7 @@ ai.delete(
 // ── Usage Aggregation ──────────────────────────────────
 ai.get(
   "/monitoring/aggregation",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("monitoring.read"),
   async (c) => {
     const admin = createAdminClient();
     const year = parseInt(
@@ -494,126 +495,136 @@ type PricingDatabaseRow = {
   output_price_usd_per_million: number | null;
 } & Partial<Record<(typeof REALTIME_PRICING_COLUMNS)[number], number | null>>;
 
-ai.get("/monitoring/pricing", requireRole("admin", "trainer"), async (c) => {
-  const admin = createAdminClient();
-  let pricingResult = (await admin
-    .from("ai_pricing_settings")
-    .select(EXPANDED_PRICING_SELECT)
-    .order("model_id", { ascending: true })) as unknown as {
-    data: PricingDatabaseRow[] | null;
-    error: { code?: string; message?: string } | null;
-  };
-
-  if (
-    pricingResult.error &&
-    isMissingRealtimePricingColumn(pricingResult.error)
-  ) {
-    pricingResult = (await admin
+ai.get(
+  "/monitoring/pricing",
+  requireCapability("monitoring.pricing.read"),
+  async (c) => {
+    const admin = createAdminClient();
+    let pricingResult = (await admin
       .from("ai_pricing_settings")
-      .select(LEGACY_PRICING_SELECT)
-      .order("model_id", {
-        ascending: true,
-      })) as unknown as typeof pricingResult;
-  }
+      .select(EXPANDED_PRICING_SELECT)
+      .order("model_id", { ascending: true })) as unknown as {
+      data: PricingDatabaseRow[] | null;
+      error: { code?: string; message?: string } | null;
+    };
 
-  const { data, error } = pricingResult;
-
-  if (error)
-    return c.json(
-      { success: false, error: { code: "DB_ERROR", message: error.message } },
-      500,
-    );
-
-  const dbPricing: Array<
-    PricingDatabaseRow & {
-      input_price_usd_per_million: number;
-      output_price_usd_per_million: number;
+    if (
+      pricingResult.error &&
+      isMissingRealtimePricingColumn(pricingResult.error)
+    ) {
+      pricingResult = (await admin
+        .from("ai_pricing_settings")
+        .select(LEGACY_PRICING_SELECT)
+        .order("model_id", {
+          ascending: true,
+        })) as unknown as typeof pricingResult;
     }
-  > = (data || []).map(
-    (r) =>
-      ({
-        model_id: r.model_id,
-        input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
-        output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
-        ...Object.fromEntries(
-          REALTIME_PRICING_COLUMNS.map((column) => [column, r[column] ?? null]),
-        ),
-      }) as PricingDatabaseRow & {
+
+    const { data, error } = pricingResult;
+
+    if (error)
+      return c.json(
+        { success: false, error: { code: "DB_ERROR", message: error.message } },
+        500,
+      );
+
+    const dbPricing: Array<
+      PricingDatabaseRow & {
         input_price_usd_per_million: number;
         output_price_usd_per_million: number;
-      },
-  );
+      }
+    > = (data || []).map(
+      (r) =>
+        ({
+          model_id: r.model_id,
+          input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
+          output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
+          ...Object.fromEntries(
+            REALTIME_PRICING_COLUMNS.map((column) => [
+              column,
+              r[column] ?? null,
+            ]),
+          ),
+        }) as PricingDatabaseRow & {
+          input_price_usd_per_million: number;
+          output_price_usd_per_million: number;
+        },
+    );
 
-  const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
-  const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
-    (model, index, models) =>
-      models.findIndex((candidate) => candidate.id === model.id) === index,
-  );
-  const result: Array<{
-    model_id: string;
-    model_name: string;
-    provider: string;
-    pricing_mode: "simple" | "realtime";
-    input_price_usd_per_million: number;
-    output_price_usd_per_million: number;
-    [key: string]: unknown;
-  }> = pricingModels.map((m) => ({
-    model_id: m.id,
-    model_name: m.name,
-    provider: m.provider,
-    pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
-    input_price_usd_per_million:
-      pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
-    output_price_usd_per_million:
-      pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
-    ...Object.fromEntries(
-      REALTIME_PRICING_COLUMNS.map((column) => [
-        column,
-        pricingMap.get(m.id)?.[column] ?? null,
-      ]),
-    ),
-  }));
+    const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
+    const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
+      (model, index, models) =>
+        models.findIndex((candidate) => candidate.id === model.id) === index,
+    );
+    const result: Array<{
+      model_id: string;
+      model_name: string;
+      provider: string;
+      pricing_mode: "simple" | "realtime";
+      input_price_usd_per_million: number;
+      output_price_usd_per_million: number;
+      [key: string]: unknown;
+    }> = pricingModels.map((m) => ({
+      model_id: m.id,
+      model_name: m.name,
+      provider: m.provider,
+      pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
+      input_price_usd_per_million:
+        pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
+      output_price_usd_per_million:
+        pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
+      ...Object.fromEntries(
+        REALTIME_PRICING_COLUMNS.map((column) => [
+          column,
+          pricingMap.get(m.id)?.[column] ?? null,
+        ]),
+      ),
+    }));
 
-  for (const p of dbPricing) {
-    if (result.some((r) => r.model_id === p.model_id)) continue;
+    for (const p of dbPricing) {
+      if (result.some((r) => r.model_id === p.model_id)) continue;
 
-    const historicalModel = getHistoricalTelefunRealtimeModel(p.model_id);
-    if (historicalModel) {
+      const historicalModel = getHistoricalTelefunRealtimeModel(p.model_id);
+      if (historicalModel) {
+        result.push({
+          model_id: historicalModel.id,
+          model_name: historicalModel.name,
+          provider: historicalModel.provider,
+          pricing_mode: "realtime" as const,
+          historical: true,
+          editable: false,
+          input_price_usd_per_million: p.input_price_usd_per_million,
+          output_price_usd_per_million: p.output_price_usd_per_million,
+          ...Object.fromEntries(
+            REALTIME_PRICING_COLUMNS.map((column) => [
+              column,
+              p[column] ?? null,
+            ]),
+          ),
+        });
+        continue;
+      }
+
       result.push({
-        model_id: historicalModel.id,
-        model_name: historicalModel.name,
-        provider: historicalModel.provider,
-        pricing_mode: "realtime" as const,
-        historical: true,
-        editable: false,
+        model_id: p.model_id,
+        model_name: p.model_id,
+        provider: "unknown" as const,
+        pricing_mode: "simple" as const,
         input_price_usd_per_million: p.input_price_usd_per_million,
         output_price_usd_per_million: p.output_price_usd_per_million,
         ...Object.fromEntries(
           REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
         ),
       });
-      continue;
     }
 
-    result.push({
-      model_id: p.model_id,
-      model_name: p.model_id,
-      provider: "unknown" as const,
-      pricing_mode: "simple" as const,
-      input_price_usd_per_million: p.input_price_usd_per_million,
-      output_price_usd_per_million: p.output_price_usd_per_million,
-      ...Object.fromEntries(
-        REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
-      ),
-    });
-  }
-
-  return c.json({ success: true, data: result });
-});
+    return c.json({ success: true, data: result });
+  },
+);
 
 ai.put(
   "/monitoring/pricing",
-  requireRole("admin", "trainer"),
+  requireCapability("monitoring.pricing.write"),
   zValidator("json", pricingUpsertSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -648,24 +659,28 @@ ai.put(
 );
 
 // ── Billing ───────────────────────────────────────────
-ai.get("/monitoring/billing", requireRole("admin", "trainer"), async (c) => {
-  const admin = createAdminClient();
-  try {
-    const usdToIdrRate = await getBillingRate(admin);
-    return c.json({
-      success: true,
-      data: { usd_to_idr_rate: usdToIdrRate },
-    });
-  } catch (error: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "DB_ERROR", message: error?.message || "DB error." },
-      },
-      500,
-    );
-  }
-});
+ai.get(
+  "/monitoring/billing",
+  requireCapability("monitoring.billing.read"),
+  async (c) => {
+    const admin = createAdminClient();
+    try {
+      const usdToIdrRate = await getBillingRate(admin);
+      return c.json({
+        success: true,
+        data: { usd_to_idr_rate: usdToIdrRate },
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "DB_ERROR", message: error?.message || "DB error." },
+        },
+        500,
+      );
+    }
+  },
+);
 
 const billingUpdateSchema = z.object({
   usd_to_idr_rate: z.number().min(1).max(100000),
@@ -673,7 +688,7 @@ const billingUpdateSchema = z.object({
 
 ai.post(
   "/monitoring/billing",
-  requireRole("admin", "trainer"),
+  requireCapability("monitoring.billing.write"),
   zValidator("json", billingUpdateSchema),
   async (c) => {
     const body = c.req.valid("json");

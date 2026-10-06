@@ -1,112 +1,106 @@
+import { resolveAccountScope } from "../../services/access/scope";
+import { getActor } from "../../middleware/role";
 import { Hono } from "hono";
 import {
   PdktSessionHistory,
   mapSimulationSubjectRowToSnapshot,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import { createAdminClient } from "../../lib/supabase";
 import { Variables, getUserClient, jsonServerError } from "./route-utils";
 import { toPdktSimulationConfig } from "../../services/pdkt/scenario-projections";
 
 const history = new Hono<{ Variables: Variables }>();
 
-history.get(
-  "/",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const user = c.get("user");
-    const profile = c.get("profile");
-    const userClient = getUserClient(c);
+history.get("/", requireCapability("pdkt.history.read"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const userClient = getUserClient(c);
 
-    try {
-      const { data, error } = await userClient
-        .from("pdkt_history")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("timestamp", { ascending: false });
+  try {
+    const { data, error } = await userClient
+      .from("pdkt_history")
+      .select("*")
+      .eq("user_id", resolveAccountScope(getActor(c)).userId)
+      .order("timestamp", { ascending: false });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      return c.json({
-        success: true,
-        data: (data || []).map((row: any) => ({
-          ...row,
-          config: toPdktSimulationConfig(row.config),
-          user_id: row.user_id ?? user.id,
-          user_email: user.email ?? null,
-          user_role: profile?.role ?? null,
-          simulationSubject: mapSimulationSubjectRowToSnapshot(row),
-        })) as PdktSessionHistory[],
-      });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
-    }
-  },
-);
+    return c.json({
+      success: true,
+      data: (data || []).map((row: any) => ({
+        ...row,
+        config: toPdktSimulationConfig(row.config),
+        user_id: row.user_id ?? user.id,
+        user_email: user.email ?? null,
+        user_role: profile?.role ?? null,
+        simulationSubject: mapSimulationSubjectRowToSnapshot(row),
+      })) as PdktSessionHistory[],
+    });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
-history.get(
-  "/eval/:id",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const id = c.req.param("id");
-    const userClient = getUserClient(c);
+history.get("/eval/:id", requireCapability("pdkt.history.read"), async (c) => {
+  const id = c.req.param("id");
+  const userClient = getUserClient(c);
 
-    try {
-      // First, try querying via userClient (respects RLS, works if they own the row)
-      let { data, error } = await userClient
-        .from("pdkt_history")
-        .select("evaluation_status, evaluation, evaluation_error")
-        .eq("id", id)
-        .single();
+  try {
+    // First, try querying via userClient (respects RLS, works if they own the row)
+    let { data, error } = await userClient
+      .from("pdkt_history")
+      .select("evaluation_status, evaluation, evaluation_error")
+      .eq("id", id)
+      .single();
 
-      // Fallback: check if the history item is associated with a mailbox item
-      // that the user has access to (pdkt_mailbox_items select policy is select_all)
-      if (error || !data) {
-        const { data: mailboxItem } = await userClient
-          .from("pdkt_mailbox_items")
-          .select("id")
-          .eq("history_id", id)
-          .maybeSingle();
+    // Fallback: check if the history item is associated with a mailbox item
+    // that the user has access to (pdkt_mailbox_items select policy is select_all)
+    if (error || !data) {
+      const { data: mailboxItem } = await userClient
+        .from("pdkt_mailbox_items")
+        .select("id")
+        .eq("history_id", id)
+        .maybeSingle();
 
-        if (mailboxItem) {
-          const adminClient = createAdminClient();
-          const { data: adminData, error: adminError } = await adminClient
-            .from("pdkt_history")
-            .select("evaluation_status, evaluation, evaluation_error")
-            .eq("id", id)
-            .single();
+      if (mailboxItem) {
+        const adminClient = createAdminClient();
+        const { data: adminData, error: adminError } = await adminClient
+          .from("pdkt_history")
+          .select("evaluation_status, evaluation, evaluation_error")
+          .eq("id", id)
+          .single();
 
-          if (!adminError && adminData) {
-            data = adminData;
-            error = null;
-          }
+        if (!adminError && adminData) {
+          data = adminData;
+          error = null;
         }
       }
-
-      if (error || !data) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "History not found or access denied.",
-            },
-          },
-          404,
-        );
-      }
-
-      return c.json({ success: true, data });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
     }
-  },
-);
+
+    if (error || !data) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "History not found or access denied.",
+          },
+        },
+        404,
+      );
+    }
+
+    return c.json({ success: true, data });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
 history.post(
   "/retry-eval",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.history.retry"),
   async (c) => {
     try {
       const body = await c.req.json();
@@ -197,50 +191,41 @@ history.post(
   },
 );
 
-history.delete(
-  "/",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const user = c.get("user");
-    const adminClient = createAdminClient();
+history.delete("/", requireCapability("pdkt.history.delete"), async (c) => {
+  const adminClient = createAdminClient();
 
-    try {
-      const { error } = await adminClient
-        .from("pdkt_history")
-        .delete()
-        .eq("user_id", user.id);
+  try {
+    const { error } = await adminClient
+      .from("pdkt_history")
+      .delete()
+      .eq("user_id", resolveAccountScope(getActor(c)).userId);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      return c.json({ success: true, message: "All PDKT history deleted." });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
-    }
-  },
-);
+    return c.json({ success: true, message: "All PDKT history deleted." });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
-history.delete(
-  "/:id",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  async (c) => {
-    const id = c.req.param("id");
-    const user = c.get("user");
-    const adminClient = createAdminClient();
+history.delete("/:id", requireCapability("pdkt.history.delete"), async (c) => {
+  const id = c.req.param("id");
 
-    try {
-      const { error } = await adminClient
-        .from("pdkt_history")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
+  const adminClient = createAdminClient();
 
-      if (error) throw error;
+  try {
+    const { error } = await adminClient
+      .from("pdkt_history")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", resolveAccountScope(getActor(c)).userId);
 
-      return c.json({ success: true, message: "PDKT history item deleted." });
-    } catch (error: unknown) {
-      return jsonServerError(c, error);
-    }
-  },
-);
+    if (error) throw error;
+
+    return c.json({ success: true, message: "PDKT history item deleted." });
+  } catch (error: unknown) {
+    return jsonServerError(c, error);
+  }
+});
 
 export { history };

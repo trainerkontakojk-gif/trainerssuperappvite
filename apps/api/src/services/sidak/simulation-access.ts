@@ -1,9 +1,7 @@
-import type {
-  ServiceType,
-  SidakSimulationModule,
-} from "@trainers/types";
+import { isPesertaInScope, pesertaScopeFromIds } from "../access/scope";
+import type { ServiceType, SidakSimulationModule } from "@trainers/types";
 import { getAccessibleSidakFilters } from "./access-scope";
-import { TRAINER_ROLES } from "./shared-constants";
+import { can, normalizeRole } from "@trainers/types";
 
 const SERVICE_TO_SIMULATION_MODULE: Partial<
   Record<ServiceType, SidakSimulationModule>
@@ -60,7 +58,7 @@ export function canReadSidakSimulationModule(
   module: SidakSimulationModule,
 ): boolean {
   return (
-    (TRAINER_ROLES as readonly string[]).includes(access.role) ||
+    can(normalizeRole(access.role), "profiler.write") ||
     access.modules.includes(module)
   );
 }
@@ -69,7 +67,7 @@ export function canPlaySidakTelefunRecording(
   access: SidakSimulationAccessLike,
 ): boolean {
   return (
-    (TRAINER_ROLES as readonly string[]).includes(access.role) ||
+    can(normalizeRole(access.role), "profiler.write") ||
     access.modules.includes("telefun")
   );
 }
@@ -88,7 +86,7 @@ export async function resolveSidakSimulationAccess(params: {
 }): Promise<SidakSimulationAccess> {
   const role = params.role.toLowerCase();
 
-  if ((TRAINER_ROLES as readonly string[]).includes(role)) {
+  if (can(normalizeRole(role), "profiler.write")) {
     return {
       agentId: params.agentId,
       role,
@@ -111,14 +109,18 @@ export async function resolveSidakSimulationAccess(params: {
     throw failClosedScopeError();
   }
 
-  if (!scope || scope.agentIds.length === 0 || scope.allowedServices.length === 0) {
+  if (
+    !scope ||
+    scope.agentIds.length === 0 ||
+    scope.allowedServices.length === 0
+  ) {
     throw new SidakSimulationAccessError(
       "Scope SIDAK Anda kosong atau belum disetujui.",
       { status: 403, code: "FORBIDDEN" },
     );
   }
 
-  if (!scope.agentIds.includes(params.agentId)) {
+  if (!isPesertaInScope(pesertaScopeFromIds(scope.agentIds), params.agentId)) {
     throw new SidakSimulationAccessError(
       "Anda tidak memiliki akses ke data agent ini.",
       { status: 403, code: "FORBIDDEN" },

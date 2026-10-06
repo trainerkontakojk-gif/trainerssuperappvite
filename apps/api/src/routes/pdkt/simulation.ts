@@ -11,7 +11,7 @@ import {
   type EmailMessage,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import { SimulationSubjectError } from "../../services/simulation-subject-service";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import { createMailboxSession } from "../../services/pdkt/mailbox-session";
@@ -32,37 +32,25 @@ import {
 
 const simulation = new Hono<{ Variables: Variables }>();
 
-simulation.get(
-  "/scenarios",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  (c) => {
-    const scenarios = pdktService.getScenarios().map(toPdktSimulationScenario);
-    return c.json({ success: true, data: scenarios });
-  },
-);
+simulation.get("/scenarios", requireCapability("pdkt.use"), (c) => {
+  const scenarios = pdktService.getScenarios().map(toPdktSimulationScenario);
+  return c.json({ success: true, data: scenarios });
+});
 
-simulation.get(
-  "/consumer-types",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  (c) => {
-    return c.json({ success: true, data: pdktService.getConsumerTypes() });
-  },
-);
+simulation.get("/consumer-types", requireCapability("pdkt.use"), (c) => {
+  return c.json({ success: true, data: pdktService.getConsumerTypes() });
+});
 
-simulation.post(
-  "/generate-identity",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  (c) => {
-    return c.json({
-      success: true,
-      data: pdktService.generateRandomIdentity(),
-    });
-  },
-);
+simulation.post("/generate-identity", requireCapability("pdkt.use"), (c) => {
+  return c.json({
+    success: true,
+    data: pdktService.generateRandomIdentity(),
+  });
+});
 
 simulation.post(
   "/generate-template",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("pdkt.templates.generate"),
   aiRateLimitMiddleware,
   zValidator("json", generateEmailPromptSchema),
   async (c) => {
@@ -105,7 +93,7 @@ simulation.post(
 
 simulation.post(
   "/session/init",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.use"),
   aiRateLimitMiddleware,
   zValidator(
     "json",
@@ -201,7 +189,7 @@ simulation.post(
 
 simulation.post(
   "/session/create",
-  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  requireCapability("pdkt.use"),
   aiRateLimitMiddleware,
   zValidator(
     "json",
@@ -249,25 +237,26 @@ simulation.post(
       }
       const status = pdktErrorStatus(result, 503);
       const retryBatch = result.retryDraft?.batch;
-      const details = result.retryDraft && retryBatch
-        ? {
-            retryable: true,
-            retryDraft: {
-              token: result.retryDraft.token,
-              batch: {
-                ...retryBatch,
-                scenario_snapshot: toPdktSimulationScenario(
-                  retryBatch.scenario_snapshot,
-                ),
-                config_snapshot: toPdktSimulationConfig(
-                  retryBatch.config_snapshot,
-                ),
+      const details =
+        result.retryDraft && retryBatch
+          ? {
+              retryable: true,
+              retryDraft: {
+                token: result.retryDraft.token,
+                batch: {
+                  ...retryBatch,
+                  scenario_snapshot: toPdktSimulationScenario(
+                    retryBatch.scenario_snapshot,
+                  ),
+                  config_snapshot: toPdktSimulationConfig(
+                    retryBatch.config_snapshot,
+                  ),
+                },
+                inbound_email: retryBatch.inbound_email,
+                simulationSubject: result.retryDraft.simulationSubjectSnapshot,
               },
-              inbound_email: retryBatch.inbound_email,
-              simulationSubject: result.retryDraft.simulationSubjectSnapshot,
-            },
-          }
-        : undefined;
+            }
+          : undefined;
       return c.json(
         {
           success: false,

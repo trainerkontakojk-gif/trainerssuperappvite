@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireRole } from "../../middleware/role";
+import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
 
@@ -12,7 +12,7 @@ const sidakRuleVersions = new Hono<{ Variables: Variables }>();
 // ── QA Rule Versions ────────────────────────────────────
 sidakRuleVersions.get(
   "/rule-versions",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const serviceType = c.req.query("service_type");
     try {
@@ -34,7 +34,7 @@ sidakRuleVersions.get(
 
 sidakRuleVersions.get(
   "/rule-versions/meta",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const serviceType = c.req.query("service_type");
     if (
@@ -61,7 +61,7 @@ sidakRuleVersions.get(
 
 sidakRuleVersions.post(
   "/rule-versions",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const user = c.get("user");
     const body = await c.req.json();
@@ -117,7 +117,7 @@ sidakRuleVersions.post(
 
 sidakRuleVersions.put(
   "/rule-versions/:id",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
@@ -164,7 +164,7 @@ sidakRuleVersions.put(
 
 sidakRuleVersions.delete(
   "/rule-versions/:id",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
@@ -196,7 +196,7 @@ sidakRuleVersions.delete(
 
 sidakRuleVersions.post(
   "/rule-versions/:id/publish",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
@@ -249,7 +249,7 @@ sidakRuleVersions.post(
 
 sidakRuleVersions.post(
   "/rule-versions/:id/supersede",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
@@ -300,7 +300,7 @@ sidakRuleVersions.post(
 
 sidakRuleVersions.get(
   "/rule-versions/:id/indicators",
-  requireRole("admin", "trainer", "leader"),
+  requireCapability("sidak.config.read"),
   async (c) => {
     const id = c.req.param("id");
     try {
@@ -320,7 +320,7 @@ sidakRuleVersions.get(
 
 sidakRuleVersions.post(
   "/rule-versions/:id/indicators",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const user = c.get("user");
     const id = c.req.param("id");
@@ -379,7 +379,7 @@ sidakRuleVersions.post(
 
 sidakRuleVersions.delete(
   "/rule-versions/:versionId/indicators/:indicatorId",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const indicatorId = c.req.param("indicatorId");
     const user = c.get("user");
@@ -407,7 +407,7 @@ sidakRuleVersions.delete(
 
 sidakRuleVersions.put(
   "/rule-versions/:versionId/indicators/:indicatorId",
-  requireRole("admin", "trainer"),
+  requireCapability("sidak.write"),
   async (c) => {
     const indicatorId = c.req.param("indicatorId");
     const body = await c.req.json();

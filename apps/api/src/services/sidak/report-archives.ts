@@ -1,7 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
-import { REPORT_ADMIN_ROLES } from "./shared-constants";
-
-const adminRoles: readonly string[] = REPORT_ADMIN_ROLES;
+import { can, normalizeRole } from "@trainers/types";
 
 type ReportArchiveInput = {
   userId: string;
@@ -38,7 +36,7 @@ export async function getReportArchives(userId: string, role: string) {
     .select("id, title, report_type, filter_params, created_at")
     .order("created_at", { ascending: false });
 
-  if (!adminRoles.includes(role)) {
+  if (!can(normalizeRole(role), "sidak.archives.manageAll")) {
     query = query.eq("user_id", userId);
   }
 
@@ -60,7 +58,11 @@ export async function getReportArchiveById(
 
   if (error) return null;
 
-  if (!adminRoles.includes(role) && data.user_id !== userId) return null;
+  if (
+    !can(normalizeRole(role), "sidak.archives.manageAll") &&
+    data.user_id !== userId
+  )
+    return null;
 
   return data;
 }
@@ -75,7 +77,7 @@ export async function deleteReportArchive(
     .delete()
     .eq("id", archiveId);
 
-  if (!adminRoles.includes(role)) {
+  if (!can(normalizeRole(role), "sidak.archives.manageAll")) {
     query = query.eq("user_id", userId);
   }
 

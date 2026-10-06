@@ -1,3 +1,9 @@
+import {
+  resolveAccountScope,
+  isAccountInScope,
+} from "../../services/access/scope";
+import { getActor } from "../../middleware/role";
+import { can } from "@trainers/types";
 import { Hono } from "hono";
 import {
   mapSimulationSubjectRowToSnapshot,
@@ -288,7 +294,7 @@ telefunSessions.get("/sessions", async (c) => {
   const adminClient = createAdminClient();
 
   try {
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
+    const isManager = can(profile?.role, "telefun.manage");
     let query = adminClient
       .from("telefun_history")
       .select("*")
@@ -695,8 +701,7 @@ telefunSessions.patch(
 
 telefunSessions.get("/history/:id", async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
-  const profile = c.get("profile");
+
   const adminClient = createAdminClient();
 
   try {
@@ -717,8 +722,12 @@ telefunSessions.get("/history/:id", async (c) => {
       );
     }
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && data.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        data.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,
@@ -751,8 +760,7 @@ telefunSessions.get("/history/:id", async (c) => {
 
 telefunSessions.delete("/history/:id", async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
-  const profile = c.get("profile");
+
   const adminClient = createAdminClient();
 
   try {
@@ -774,8 +782,12 @@ telefunSessions.delete("/history/:id", async (c) => {
         404,
       );
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && session.user_id !== user.id) {
+    if (
+      !isAccountInScope(
+        resolveAccountScope(getActor(c), "telefun.manage"),
+        session.user_id,
+      )
+    ) {
       return c.json(
         {
           success: false,
