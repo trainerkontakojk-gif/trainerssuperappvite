@@ -142,3 +142,15 @@ for (const role of ["qa", "tl", "spv", "om"]) {
     }
   });
 }
+
+// Activity logs are an append-only audit trail (plans/markdown/management-pages-redesign.md):
+// no role may delete them, so the route must not exist at all.
+for (const role of ["admin", "trainer", "leader", "agent"]) {
+  test(`${role}: activity logs cannot be deleted`, async () => {
+    const response = await mount(role).request(
+      `http://local.test/v1/admin/activity-logs/${actorId}`,
+      { method: "DELETE" },
+    );
+    expect(response.status).toBe(404);
+  });
+}

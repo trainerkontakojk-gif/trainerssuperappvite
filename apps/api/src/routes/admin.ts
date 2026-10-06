@@ -465,24 +465,4 @@ admin.get(
   },
 );
 
-admin.delete(
-  "/activity-logs/:id",
-  requireCapability("admin.activityLogs.delete"),
-  async (c) => {
-    const id = c.req.param("id");
-    try {
-      await adminService.deleteActivity(id);
-      return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
-    }
-  },
-);
-
 export { admin as adminRouter };

@@ -74,6 +74,21 @@ test.describe("Log Aktivitas (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("log bersifat append-only: tidak ada kontrol hapus", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard/activities",
+      apiMocks: ACTIVITIES_MOCKS,
+    });
+
+    await expect(page.getByText("Fajar Nugroho")).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole("button", { name: /hapus/i })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
   test("pencarian menyaring baris, dan yang tidak cocok menampilkan empty state", async ({
     page,
   }) => {
@@ -96,6 +111,64 @@ test.describe("Log Aktivitas (hermetic)", () => {
       page.getByText("Belum ada rekaman mutasi yang terekam."),
     ).toBeVisible();
 
+    expectHermetic(audit);
+  });
+});
+
+test.describe("Log Aktivitas — ekspor CSV (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("CSV berisi baris yang tersaring dan meng-escape tanda kutip", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard/activities",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/admin/activity-logs",
+          body: {
+            success: true,
+            data: [
+              ...LOGS,
+              {
+                id: "log-3",
+                created_at: "2026-09-12T05:00:00.000Z",
+                user_name: 'Andi "QA" Pratama',
+                action: "update_role",
+                type: "UPDATE",
+                module: "admin",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    await page.getByRole("textbox", { name: SEARCH }).fill("Andi");
+    await expect(page.getByText('Andi "QA" Pratama')).toBeVisible({
+      timeout: 20000,
+    });
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Ekspor CSV" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^log_aktivitas_\d{4}-\d{2}-\d{2}\.csv$/,
+    );
+
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    const lines = Buffer.concat(chunks).toString("utf8").trim().split("\n");
+
+    expect(lines[0]).toBe('"Waktu","Aktor","Aksi","Tipe","Modul"');
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain(
+      '"Andi ""QA"" Pratama","update_role","UPDATE","admin"',
+    );
     expectHermetic(audit);
   });
 });

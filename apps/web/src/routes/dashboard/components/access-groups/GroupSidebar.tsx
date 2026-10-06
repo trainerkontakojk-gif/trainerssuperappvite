@@ -1,5 +1,9 @@
-import { Search, Layers } from "lucide-react";
 import type { AccessGroupRow } from "@trainers/types";
+import { Skeleton } from "../../../../components/ui/skeleton";
+import { SearchField } from "../management/SearchField";
+import { StatusDot } from "../management/StatusDot";
+import { EmptyState } from "../management/EmptyState";
+import { SplitViewItem } from "../management/SplitView";
 
 interface GroupSidebarProps {
   groups: AccessGroupRow[];
@@ -19,73 +23,58 @@ export function GroupSidebar({
   onSelectGroup,
 }: GroupSidebarProps) {
   return (
-    <div className="space-y-4">
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-        <input
-          type="text"
-          placeholder="Cari nama grup..."
+    <>
+      <div className="border-b border-border p-3">
+        <SearchField
+          label="Cari nama grup"
           value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full rounded-xl border border-border bg-card pl-11 pr-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+          onChange={onSearchChange}
         />
       </div>
-
-      {/* Groups List */}
-      <div className="rounded-2xl border border-border bg-card p-1.5 shadow-sm space-y-1 max-h-[600px] overflow-y-auto custom-scrollbar">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <span className="mt-3 text-[10px] font-bold uppercase tracking-widest opacity-60">
-              Memuat grup...
-            </span>
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground/40">
-            <Layers className="mx-auto h-8 w-8 opacity-20 mb-3" />
-            <p className="text-[10px] font-bold uppercase tracking-widest">
-              Grup tidak ditemukan
-            </p>
-          </div>
-        ) : (
-          groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => onSelectGroup(g.id)}
-              className={`w-full text-left rounded-xl p-3.5 transition-all group ${
-                selectedGroupId === g.id
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                  : "text-foreground hover:bg-muted/50"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`text-sm tracking-tight ${selectedGroupId === g.id ? "font-bold" : "font-semibold"}`}>
-                  {g.name}
+      {loading && groups.length === 0 ? (
+        <div role="status" aria-live="polite" className="grid gap-2 p-3">
+          <span className="sr-only">Memuat grup akses…</span>
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-14 w-full" />
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          title="Grup tidak ditemukan"
+          description={
+            searchTerm
+              ? "Tidak ada grup yang cocok dengan pencarian ini."
+              : "Buat grup pertama untuk mulai membatasi data leader."
+          }
+        />
+      ) : (
+        <ul className="flex-1 divide-y divide-border overflow-y-auto lg:max-h-[640px]">
+          {groups.map((group) => {
+            const selected = selectedGroupId === group.id;
+            const active = group.is_active !== false;
+            return (
+              <SplitViewItem
+                key={group.id}
+                selected={selected}
+                onSelect={() => onSelectGroup(group.id)}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {group.name}
+                  </span>
+                  <StatusDot
+                    tone={active ? "success" : "muted"}
+                    label={active ? "Aktif" : "Nonaktif"}
+                  />
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                    selectedGroupId === g.id
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : g.is_active !== false
-                        ? "bg-emerald-500/10 text-emerald-500"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {g.is_active !== false ? "Aktif" : "Nonaktif"}
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {group.item_count} aturan
                 </span>
-              </div>
-              {g.description && (
-                <p className={`mt-1 text-[11px] line-clamp-1 leading-normal ${
-                  selectedGroupId === g.id ? "text-primary-foreground/70" : "text-muted-foreground"
-                }`}>
-                  {g.description}
-                </p>
-              )}
-            </button>
-          ))
-        )}
-      </div>
-    </div>
+              </SplitViewItem>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }
