@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { profilerApi } from "../../lib/profilerService";
 import type {
   ProfilerYear,
@@ -7,14 +7,15 @@ import type {
   ProfilerPeserta,
 } from "@trainers/types";
 
-import WorkspaceHeader from "./components/workspace/WorkspaceHeader";
-import WorkspaceNavigator from "./components/workspace/WorkspaceNavigator";
-import WorkspaceActiveBatch from "./components/workspace/WorkspaceActiveBatch";
-import HierarchyPanel from "./components/workspace/HierarchyPanel";
+import ProfilerLibraryNav from "./components/workspace/ProfilerLibraryNav";
+import ProfilerYearOverview from "./components/workspace/ProfilerYearOverview";
+import ProfilerBatchWorkspace from "./components/workspace/ProfilerBatchWorkspace";
+import { cleanYearLabel } from "./components/workspace/workspace-utils";
 import DuplicateFolderModal from "./components/DuplicateFolderModal";
 import AddMemberPicker from "./components/AddMemberPicker";
-import { Cake, Loader2, Trash2 } from "lucide-react";
+import { Cake, Loader2, PanelLeft, Trash2 } from "lucide-react";
 import { useProfilerAccess } from "../../hooks/useProfilerAccess";
+import { useQueryParams } from "../../hooks/useQueryParams";
 import LeaderAccessGate from "../../components/LeaderAccessGate";
 import { formatDate, getUpcomingBirthdays } from "./utils/birthday";
 import { Badge } from "@/components/ui/badge";
@@ -38,22 +39,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function ProfilerLanding() {
-  const { isReadOnly, role } = useProfilerAccess();
+  const { isReadOnly } = useProfilerAccess();
+  const navigate = useNavigate();
+  // Batch aktif hidup di URL (`?batch=`) supaya tahan refresh, back, dan bisa dibagikan.
+  const selectedBatch = useQueryParams().batch ?? "";
 
   const [years, setYears] = useState<ProfilerYear[]>([]);
   const [folders, setFolders] = useState<ProfilerFolder[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loaded, setLoaded] = useState(false);
   const [pesertaMap, setPesertaMap] = useState<
     Record<string, ProfilerPeserta[]>
   >({});
+  const [pesertaError, setPesertaError] = useState<string | null>(null);
+  const [pesertaReloadKey, setPesertaReloadKey] = useState(0);
 
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedBatch, setSelectedBatch] = useState<string>("");
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [loadingPeserta, setLoadingPeserta] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false);
 
   // Modals
   const [showAddYear, setShowAddYear] = useState(false);
@@ -76,77 +78,81 @@ export default function ProfilerLanding() {
   const [showPicker, setShowPicker] = useState(false);
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
 
+  const selectBatch = useCallback(
+    (name: string, options: { replace?: boolean } = {}) => {
+      setIsNavOpen(false);
+      navigate({
+        to: "/profiler",
+        search: name ? { batch: name } : {},
+        replace: options.replace,
+      });
+    },
+    [navigate],
+  );
+
   useEffect(() => {
     Promise.all([
       profilerApi.getYears(),
       profilerApi.getFolders(),
       profilerApi.getFolderCounts(),
-    ]).then(([y, f, c]) => {
-      setYears(y);
-      setFolders(f);
-      setCounts(c);
-      if (y.length > 0) {
-        const currentYear = new Date().getFullYear();
-        const sameYear = y.find((yy) => yy.year === currentYear);
-        if (sameYear) setSelectedYearId(sameYear.id);
-        else
+    ])
+      .then(([y, f, c]) => {
+        setYears(y);
+        setFolders(f);
+        setCounts(c);
+        if (y.length > 0) {
+          const currentYear = new Date().getFullYear();
+          const sameYear = y.find((yy) => yy.year === currentYear);
           setSelectedYearId(
-            [...y].sort((a, b) => b.year - a.year)[0]?.id || y[0]?.id || null,
+            sameYear?.id ??
+              [...y].sort((a, b) => b.year - a.year)[0]?.id ??
+              null,
           );
-      }
-    });
+        }
+      })
+      .catch((err) => console.error("Failed to load profiler data:", err))
+      .finally(() => setLoaded(true));
   }, []);
 
+  const activeFolder = useMemo(
+    () =>
+      selectedBatch
+        ? (folders.find((f) => f.name === selectedBatch) ?? null)
+        : null,
+    [folders, selectedBatch],
+  );
+
+  // Batch dari URL yang tidak dikenal kembali ke ringkasan; yang dikenal
+  // menyelaraskan pemilih tahun dengan tahun batch tersebut.
   useEffect(() => {
-    if (!selectedYearId) {
-      setSelectedTeamId(null);
-      setSelectedBatch("");
-      setSelectedFolderId(null);
+    if (!loaded || !selectedBatch) return;
+    if (!activeFolder) {
+      selectBatch("", { replace: true });
       return;
     }
-    const teamStillValid = selectedTeamId
-      ? folders.some(
-          (f) =>
-            f.id === selectedTeamId &&
-            f.year_id === selectedYearId &&
-            !f.parent_id,
-        )
-      : false;
-
-    if (!teamStillValid) {
-      setSelectedTeamId(null);
-      setSelectedBatch("");
-      setSelectedFolderId(null);
-    }
-  }, [selectedYearId, selectedTeamId, folders]);
-
-  // Normalize selectedBatch if no longer in folder list (scoped metadata shrink)
-  useEffect(() => {
-    if (!selectedBatch || folders.length === 0) return;
-    const exists = folders.some((f) => f.name === selectedBatch);
-    if (!exists) {
-      setSelectedBatch("");
-      setSelectedFolderId(null);
-    }
-  }, [folders, selectedBatch]);
+    if (activeFolder.year_id) setSelectedYearId(activeFolder.year_id);
+  }, [loaded, selectedBatch, activeFolder, selectBatch]);
 
   useEffect(() => {
-    if (!selectedBatch) return;
-    if (!pesertaMap[selectedBatch]) {
-      const fetchPeserta = async () => {
-        setLoadingPeserta(true);
-        try {
-          const data = await profilerApi.getPesertaByBatch(selectedBatch);
-          setPesertaMap((prev) => ({ ...prev, [selectedBatch]: data }));
-        } catch (err) {
-          console.error("Failed to fetch peserta:", err);
-        } finally {
-          setLoadingPeserta(false);
-        }
-      };
-      fetchPeserta();
-    }
-  }, [selectedBatch, pesertaMap]);
+    if (!activeFolder || pesertaMap[activeFolder.name]) return;
+    const batchName = activeFolder.name;
+    let cancelled = false;
+    setPesertaError(null);
+    profilerApi
+      .getPesertaByBatch(batchName)
+      .then((data) => {
+        if (!cancelled)
+          setPesertaMap((prev) => ({ ...prev, [batchName]: data }));
+      })
+      .catch((err) => {
+        console.error("Failed to fetch peserta:", err);
+        if (!cancelled)
+          setPesertaError("Gagal memuat peserta batch ini. Coba lagi.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFolder, pesertaMap, pesertaReloadKey]);
 
   const handleAddYear = async () => {
     try {
@@ -154,6 +160,7 @@ export default function ProfilerLanding() {
       setYears((prev) => [newYear, ...prev]);
       setSelectedYearId(newYear.id);
       setShowAddYear(false);
+      selectBatch("");
     } catch (err: any) {
       alert("Gagal tambah tahun: " + err.message);
     }
@@ -168,13 +175,11 @@ export default function ProfilerLanding() {
         parent_id: showAddFolder.parentId,
       });
       setFolders((prev) => [...prev, folder]);
-      setSelectedFolderId(folder.id);
-      setSelectedBatch(folder.name);
-      setSelectedTeamId(showAddFolder.parentId || folder.id);
       setCounts((prev) => ({ ...prev, [folder.name]: 0 }));
       setPesertaMap((prev) => ({ ...prev, [folder.name]: [] }));
       setNewFolderName("");
       setShowAddFolder(null);
+      selectBatch(folder.name);
     } catch (err: any) {
       alert("Gagal tambah folder: " + err.message);
     }
@@ -210,7 +215,7 @@ export default function ProfilerLanding() {
         delete next[oldName];
         return next;
       });
-      if (selectedBatch === oldName) setSelectedBatch(newName);
+      if (selectedBatch === oldName) selectBatch(newName, { replace: true });
       setRenamingFolder(null);
     } catch (err: any) {
       alert("Gagal rename: " + err.message);
@@ -222,21 +227,28 @@ export default function ProfilerLanding() {
     setDeleting(true);
     try {
       await profilerApi.deleteFolder(confirmDeleteFolder.id);
-      setFolders((prev) => prev.filter((f) => f.id !== confirmDeleteFolder.id));
+      const removedIds = new Set([
+        confirmDeleteFolder.id,
+        ...folders
+          .filter((f) => f.parent_id === confirmDeleteFolder.id)
+          .map((f) => f.id),
+      ]);
+      const removedNames = folders
+        .filter((f) => removedIds.has(f.id))
+        .map((f) => f.name);
+      setFolders((prev) => prev.filter((f) => !removedIds.has(f.id)));
       setCounts((prev) => {
         const next = { ...prev };
-        delete next[confirmDeleteFolder.name];
+        for (const name of removedNames) delete next[name];
         return next;
       });
       setPesertaMap((prev) => {
         const next = { ...prev };
-        delete next[confirmDeleteFolder.name];
+        for (const name of removedNames) delete next[name];
         return next;
       });
-      if (selectedFolderId === confirmDeleteFolder.id) {
-        setSelectedFolderId(null);
-        setSelectedBatch("");
-      }
+      if (removedNames.includes(selectedBatch))
+        selectBatch("", { replace: true });
     } catch (err: any) {
       alert("Gagal hapus: " + err.message);
     } finally {
@@ -245,165 +257,134 @@ export default function ProfilerLanding() {
     }
   };
 
-  const selectFolder = (id: string) => {
-    const folder = folders.find((f) => f.id === id);
-    if (folder) {
-      setSelectedFolderId(id);
-      if (!folder.parent_id) {
-        setSelectedTeamId(folder.id);
-        const children = folders.filter((f) => f.parent_id === folder.id);
-        if (children.length === 0) {
-          setSelectedBatch(folder.name);
-        } else {
-          setSelectedBatch("");
-        }
-      } else {
-        setSelectedTeamId(folder.parent_id);
-        setSelectedBatch(folder.name);
-      }
-    }
-  };
-
-  const count = counts[selectedBatch] || 0;
+  const batchPeserta = activeFolder ? pesertaMap[activeFolder.name] : undefined;
   const upcomingBirthdays = useMemo(
-    () => getUpcomingBirthdays(pesertaMap[selectedBatch] || []),
-    [pesertaMap, selectedBatch],
+    () => getUpcomingBirthdays(batchPeserta ?? []),
+    [batchPeserta],
   );
-  const activeTeamName = useMemo(
-    () => folders.find((f) => f.id === selectedTeamId)?.name,
-    [folders, selectedTeamId],
-  );
-  const activeYearLabel = useMemo(
-    () => years.find((y) => y.id === selectedYearId)?.label,
-    [years, selectedYearId],
-  );
+  const activeTeamName = useMemo(() => {
+    if (!activeFolder?.parent_id) return null;
+    return folders.find((f) => f.id === activeFolder.parent_id)?.name ?? null;
+  }, [folders, activeFolder]);
+  const activeYearLabel = useMemo(() => {
+    const label = years.find((y) => y.id === selectedYearId)?.label;
+    return label ? cleanYearLabel(label) : null;
+  }, [years, selectedYearId]);
+
+  const libraryNavProps = {
+    years,
+    folders,
+    counts,
+    selectedYearId,
+    activeBatch: selectedBatch,
+    isReadOnly,
+    onSelectYear: (id: string) => {
+      setSelectedYearId(id);
+      if (activeFolder && activeFolder.year_id !== id) selectBatch("");
+    },
+    onSelectBatch: (name: string) => selectBatch(name),
+    onAddYear: () => setShowAddYear(true),
+    onAddFolder: (yearId: string, parentId?: string) => {
+      setIsNavOpen(false);
+      setShowAddFolder({ yearId, parentId });
+    },
+    onRenameFolder: (folder: ProfilerFolder) => {
+      setIsNavOpen(false);
+      setRenamingFolder(folder);
+      setRenameValue(folder.name);
+    },
+    onDeleteFolder: (folder: ProfilerFolder) => {
+      setIsNavOpen(false);
+      setConfirmDeleteFolder(folder);
+    },
+    onDuplicateFolder: (folder: ProfilerFolder) => {
+      setIsNavOpen(false);
+      setDuplicateFolder(folder);
+    },
+  };
 
   return (
     <LeaderAccessGate module="ktp" moduleLabel="KTP">
-      <div className="flex-1 bg-background flex flex-col transition-colors duration-500 overflow-hidden w-full relative">
-        <WorkspaceHeader
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          activeBatch={selectedBatch}
-          activeTeam={activeTeamName}
-          activeYearLabel={activeYearLabel}
-        />
+      <div className="relative flex w-full flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 md:hidden">
+          <p className="min-w-0 truncate text-sm text-muted-foreground">
+            {activeYearLabel ? `Profiler · ${activeYearLabel}` : "Profiler"}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={() => setIsNavOpen(true)}
+            className="min-h-11 shrink-0"
+          >
+            <PanelLeft data-icon="inline-start" aria-hidden="true" />
+            Pilih batch
+          </Button>
+        </div>
 
-        <div className="flex flex-1 overflow-hidden relative">
-          <main className="flex-1 overflow-hidden relative group">
-            <AnimatePresence mode="wait">
-              {!selectedBatch ? (
-                <motion.div
-                  key="navigator"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.4, ease: "circOut" }}
-                  className="h-full"
-                >
-                  <WorkspaceNavigator
-                    years={years}
-                    folders={folders}
-                    selectedYearId={selectedYearId}
-                    onSelectYear={setSelectedYearId}
-                    selectedTeamId={selectedTeamId}
-                    onSelectTeam={setSelectedTeamId}
-                    onSelectBatch={(id, name) => {
-                      setSelectedFolderId(id);
-                      setSelectedBatch(name);
-                    }}
-                    isReadOnly={isReadOnly}
-                    onAddFolder={(yearId, parentId) =>
-                      setShowAddFolder({ yearId, parentId })
-                    }
-                    counts={counts}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="active-batch"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.4, ease: "circOut" }}
-                  className="h-full"
-                >
-                  <WorkspaceActiveBatch
-                    batchName={selectedBatch}
-                    count={count}
-                    loadingPeserta={loadingPeserta}
-                    isReadOnly={isReadOnly}
-                    onPickPeserta={() => setShowPicker(true)}
-                    upcomingBirthdays={upcomingBirthdays}
-                    onShowBirthdays={() => setShowBirthdayModal(true)}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-
-          <aside className="hidden md:block">
-            <HierarchyPanel
-              years={years}
-              folders={folders}
-              selectedYearId={selectedYearId}
-              selectedFolderId={selectedFolderId}
-              onSelectYear={setSelectedYearId}
-              onSelectFolder={selectFolder}
-              onAddYear={() => setShowAddYear(true)}
-              onAddFolder={(yearId, parentId) =>
-                setShowAddFolder({ yearId, parentId })
-              }
-              onRenameFolder={(f) => {
-                setRenamingFolder(f);
-                setRenameValue(f.name);
-              }}
-              onDeleteFolder={setConfirmDeleteFolder}
-              onDuplicateFolder={setDuplicateFolder}
-              counts={counts}
-              role={role}
-            />
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <aside className="hidden w-72 shrink-0 border-r border-border bg-card md:block">
+            <ProfilerLibraryNav {...libraryNavProps} />
           </aside>
 
-          {/* Mobile Hierarchy Sidebar */}
-          <Dialog open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-            <DialogContent
-              showCloseButton={false}
-              aria-labelledby="profiler-mobile-hierarchy-title"
-              className="inset-y-0 right-0 left-auto top-0 h-full max-w-sm translate-x-0 translate-y-0 rounded-none bg-card p-0 sm:max-w-sm md:hidden"
-            >
-              <DialogHeader className="sr-only">
-                <DialogTitle id="profiler-mobile-hierarchy-title">
-                  Navigasi hierarki
-                </DialogTitle>
-                <DialogDescription>
-                  Pilih tahun, tim, dan batch dari hierarki Profiler.
-                </DialogDescription>
-              </DialogHeader>
-              <HierarchyPanel
-                years={years}
-                folders={folders}
-                selectedYearId={selectedYearId}
-                selectedFolderId={selectedFolderId}
-                onSelectYear={setSelectedYearId}
-                onSelectFolder={selectFolder}
-                onAddYear={() => setShowAddYear(true)}
-                onAddFolder={(yearId, parentId) =>
-                  setShowAddFolder({ yearId, parentId })
-                }
-                onRenameFolder={(f) => {
-                  setRenamingFolder(f);
-                  setRenameValue(f.name);
+          <main className="min-w-0 flex-1 overflow-y-auto custom-scrollbar">
+            {!loaded ? (
+              <div
+                role="status"
+                className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2
+                  aria-hidden="true"
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                />
+                Memuat Profiler…
+              </div>
+            ) : activeFolder ? (
+              <ProfilerBatchWorkspace
+                key={activeFolder.name}
+                batchName={activeFolder.name}
+                teamName={activeTeamName}
+                peserta={batchPeserta ?? []}
+                loading={!batchPeserta && !pesertaError}
+                error={pesertaError}
+                onRetry={() => {
+                  setPesertaError(null);
+                  setPesertaReloadKey((key) => key + 1);
                 }}
-                onDeleteFolder={setConfirmDeleteFolder}
-                onDuplicateFolder={setDuplicateFolder}
-                counts={counts}
-                role={role}
-                isMobile
-                onClose={() => setIsSidebarOpen(false)}
+                isReadOnly={isReadOnly}
+                upcomingBirthdays={upcomingBirthdays}
+                onShowBirthdays={() => setShowBirthdayModal(true)}
+                onPickPeserta={() => setShowPicker(true)}
               />
-            </DialogContent>
-          </Dialog>
+            ) : (
+              <ProfilerYearOverview
+                yearLabel={activeYearLabel}
+                yearId={selectedYearId}
+                folders={folders}
+                counts={counts}
+                isReadOnly={isReadOnly}
+                onSelectBatch={(name) => selectBatch(name)}
+                onAddYear={() => setShowAddYear(true)}
+                onAddFolder={(yearId) => setShowAddFolder({ yearId })}
+              />
+            )}
+          </main>
         </div>
+
+        <Dialog open={isNavOpen} onOpenChange={setIsNavOpen}>
+          <DialogContent
+            showCloseButton={false}
+            className="inset-y-0 left-0 top-0 h-full w-[min(20rem,calc(100vw-2rem))] max-w-none translate-x-0 translate-y-0 rounded-none bg-card p-0 sm:max-w-none md:hidden"
+          >
+            <DialogHeader className="sr-only">
+              <DialogTitle>Pilih batch</DialogTitle>
+              <DialogDescription>
+                Pilih tahun, tim, dan batch Profiler.
+              </DialogDescription>
+            </DialogHeader>
+            <ProfilerLibraryNav {...libraryNavProps} />
+          </DialogContent>
+        </Dialog>
 
         {/* Modals */}
         <Dialog open={showAddYear} onOpenChange={setShowAddYear}>
@@ -609,9 +590,6 @@ export default function ProfilerLanding() {
             years={years}
             onSuccess={(newFolder, newPeserta) => {
               setFolders((prev) => [...prev, newFolder]);
-              setSelectedFolderId(newFolder.id);
-              setSelectedBatch(newFolder.name);
-              setSelectedTeamId(newFolder.parent_id || newFolder.id);
               setCounts((prev) => ({
                 ...prev,
                 [newFolder.name]: newPeserta.length,
@@ -620,6 +598,9 @@ export default function ProfilerLanding() {
                 ...prev,
                 [newFolder.name]: newPeserta as any,
               }));
+              // Duplikat bisa bernama sama di tahun lain; tampilkan ringkasan tahun tujuan.
+              if (newFolder.year_id) setSelectedYearId(newFolder.year_id);
+              selectBatch("");
             }}
           />
         )}

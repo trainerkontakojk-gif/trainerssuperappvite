@@ -31,9 +31,9 @@ test.describe("Profiler (hermetic)", () => {
     });
     console.log("[audit]", formatAudit(audit));
 
-    await expect(page.getByText(/Kotak Tool Profil/i).first()).toBeVisible({
-      timeout: 20000,
-    });
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Batch tahun 2026/ }),
+    ).toBeVisible({ timeout: 20000 });
 
     // Buktikan fetch awal benar-benar terjadi DAN semuanya dilayani mock.
     await waitForMockedApi(audit, [
@@ -52,14 +52,13 @@ test.describe("Profiler (hermetic)", () => {
       apiMocks: PROFILER_MOCKS,
     });
 
-    // Tim muncul di navigator; batch baru muncul setelah tim dibuka.
-    await page
-      .getByRole("button", { name: /Tim Call/i })
-      .first()
-      .click();
-    await expect(page.getByText("Batch Pagi").first()).toBeVisible({
-      timeout: 20000,
-    });
+    // Tim dan batch langsung tampil di satu navigasi; batch membuka workspace.
+    const nav = page.getByRole("navigation", { name: "Daftar tim dan batch" });
+    await expect(nav.getByText("Tim Call")).toBeVisible({ timeout: 20000 });
+    await nav.getByRole("button", { name: /^Batch Pagi/ }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Batch Pagi" }),
+    ).toBeVisible();
 
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);

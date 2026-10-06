@@ -173,6 +173,7 @@ Sistem manajemen database terstruktur untuk peserta training dan agen aktif.
 - **Fungsi**: Penyimpanan terpusat data diri, riwayat training, dan penugasan tim.
 - **Routes**: `/profiler`, `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams`
 - **Fitur Utama**:
+  - **Workspace (`/profiler`)**: Panel kiri adalah satu-satunya navigasi (pemilih tahun, pencarian, tim → batch dengan jumlah peserta, menu baris untuk tambah batch/duplikat/ubah nama/hapus; di layar sempit dibuka lewat tombol "Pilih batch"). Batch aktif disimpan di URL `?batch=` (tahan refresh/back; nama tak dikenal kembali ke ringkasan). Tanpa batch: daftar batch tahun aktif + widget ulang tahun global. Dengan batch: daftar peserta + pencarian, baris ulang tahun ≤7 hari, tautan Statistik/Slide/Ekspor/Tabel lengkap, dan satu tombol "Tambah peserta" (pilih dari daftar, input manual, impor Excel). Mode hanya-baca (leader/qa) menyembunyikan semua aksi tulis.
   - **Table View**: Search, filter, dan edit data peserta dengan responsive grid layout (1-4 kolom) dan glassmorphism cards.
   - **Analytics**: Recharts analytics dengan 4 chart.
   - **Export**: Excel/CSV export.
