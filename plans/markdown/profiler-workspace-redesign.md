@@ -46,7 +46,7 @@ Kriteria penerimaan:
 - Prettier (file yang diubah) dan `git diff --check` — bersih.
 - `impeccable detect --json` pada 4 file UI — `[]`. Review manual: target sentuh menu baris dinaikkan ke 44px.
 - Tambahan di luar rencana awal: `useProfilerAccess` kini membaca role dari auth store (sumber yang sama dengan guard), menggantikan query `profiles` terpisah; error muat peserta kini tampil dengan "Coba lagi" alih-alih tampak sebagai batch kosong.
-- Tidak dijalankan: unit test (butuh persetujuan), `graphify update .`, review `thermo-nuclear`/`ui-ux-pro-max` (tidak tersedia di host ini).
+- Tidak dijalankan: unit test (butuh persetujuan).
 - Diketahui: lookup batch tetap berbasis nama (kontrak lama `counts`/`peserta/batch/:name`); nama sama di dua tahun akan memilih yang pertama.
 
 ## Tahap 2 — Statistik, Slide, Ekspor di dalam workspace
@@ -81,10 +81,17 @@ Kriteria penerimaan:
 - Prettier (file yang diubah) dan `git diff --check` — bersih. `impeccable detect --json` pada 4 file UI — `[]`.
 - Review visual 1440 px dan 375 px per tab: slide landscape di layar sempit kini bisa digulir (sebelumnya terpotong kiri-kanan); tombol "Unduh" punya nama aksesibel per format.
 - Catatan: `useProfilerAccess`/akses leader ke tab kini lewat `LeaderAccessGate` di `/profiler` (route lama memakai `requireLeaderModuleApproval`); otorisasi data tetap di backend.
-- Tidak dijalankan: unit test, `graphify update .`, review `thermo-nuclear`/`ui-ux-pro-max` (tidak tersedia di host ini).
+- Tidak dijalankan: unit test.
 
 ### Tambahan — widget ulang tahun global
 
 - Teks kosong "No data available" diganti "Belum ada ulang tahun terdekat".
 - Unit test `global-birthdays-widget.test.tsx` diganti E2E `apps/web/e2e/profiler-global-birthdays.spec.ts` (kartu terdekat vs daftar lengkap di popup + `limit=5`, state kosong, error server lalu "Coba lagi" memanggil ulang API). RED: tes state kosong gagal pada teks lama; GREEN 3/3. Unit test dihapus setelah E2E hijau (tidak terdaftar di manifest suite).
 - Gate gabungan: `npx playwright test profiler-workspace.spec.ts profiler-global-birthdays.spec.ts profiler.spec.ts sidebar-nav-state.spec.ts` — 24/24 lulus; typecheck exit 0; `git diff --check` bersih.
+
+## Gate lanjutan (host Pi)
+
+- `graphify update .` — exit 0, 14057 node / 25207 edge / 978 community; `graphify-out/` tetap cache lokal (gitignored). `graph.html` dilewati karena melebihi batas 5000 node (bukan kegagalan).
+- `thermo-nuclear` — scoped change PASS; satu perbaikan diterapkan: item menu baris `ProfilerLibraryNav` dinaikkan dari `min-h-10` ke `min-h-11` supaya klaim target sentuh ≥44px benar. Tersisa temuan P3 saja. Gate repo `pnpm lint` gagal karena 2 error pra-eksisting di `apps/api/src/services/sidak/heatmap-service.ts:91` (file tidak tersentuh diff ini) — di luar scope.
+- `ui-ux-pro-max` — dijalankan sebagai audit konformitas constraint (skill ini normalnya pra-implementasi): satu navigasi, hierarki tipografi/spasi, empty/loading/error state, target sentuh, dan 320–768px tanpa overflow terverifikasi lewat E2E; tidak ada tema/macrostructure baru.
+- Verifikasi ulang setelah perbaikan target sentuh: `npx playwright test` (4 spec Profiler/sidebar) 24/24 lulus; `pnpm typecheck` exit 0; `pnpm --filter @trainers/web lint` 0 error; `pnpm build` exit 0; `git diff --check` bersih.

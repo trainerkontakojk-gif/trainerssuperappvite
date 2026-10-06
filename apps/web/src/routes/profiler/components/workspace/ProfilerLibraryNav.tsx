@@ -357,18 +357,18 @@ function RowMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         {onAddBatch && (
-          <DropdownMenuItem onClick={onAddBatch} className="min-h-10">
+          <DropdownMenuItem onClick={onAddBatch} className="min-h-11">
             <Plus aria-hidden="true" />
             Tambah batch
           </DropdownMenuItem>
         )}
         {onDuplicate && (
-          <DropdownMenuItem onClick={onDuplicate} className="min-h-10">
+          <DropdownMenuItem onClick={onDuplicate} className="min-h-11">
             <Copy aria-hidden="true" />
             Duplikat ke tahun lain
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={onRename} className="min-h-10">
+        <DropdownMenuItem onClick={onRename} className="min-h-11">
           <Pencil aria-hidden="true" />
           Ubah nama
         </DropdownMenuItem>
@@ -376,7 +376,7 @@ function RowMenu({
         <DropdownMenuItem
           onClick={onDelete}
           variant="destructive"
-          className="min-h-10"
+          className="min-h-11"
         >
           <Trash2 aria-hidden="true" />
           Hapus
