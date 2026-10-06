@@ -278,8 +278,8 @@ sidakReports.post(
       .object({
         title: z.string().min(1),
         reportType: z.enum(["data", "ai"]).default("ai"),
-        filterParams: z.record(z.unknown()).default({}),
-        reportData: z.record(z.unknown()),
+        filterParams: z.record(z.string(), z.unknown()).default({}),
+        reportData: z.record(z.string(), z.unknown()),
         reportHtml: z.string().optional(),
       })
       .safeParse(body);
