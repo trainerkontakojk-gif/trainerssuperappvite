@@ -28,7 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "exceljs": "^4.4.0",
-    "framer-motion": "^12.39.0",
+    "framer-motion": "^14.0.0",
     "hono": "^4.13.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
