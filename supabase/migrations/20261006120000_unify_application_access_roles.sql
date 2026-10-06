@@ -24,17 +24,8 @@ BEGIN
 END;
 $$;
 
-ALTER POLICY "Users read own telefun recordings" ON storage.objects
-  USING (bucket_id = 'telefun-recordings' AND (
-    (storage.foldername(name))[1] = auth.uid()::text OR EXISTS (
-      SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','trainer')
-    )
-  ));
-ALTER POLICY "Users can view their own coaching summaries" ON public.telefun_coaching_summary
-  USING (auth.uid() = user_id OR EXISTS (
-    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','trainer')
-  ));
-ALTER POLICY "Users can view their own replay annotations" ON public.telefun_replay_annotations
-  USING (auth.uid() = user_id OR EXISTS (
-    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','trainer')
-  ));
+-- Telefun policies that still list 'qa' are intentionally left untouched: the
+-- CHECK above makes role 'qa' impossible, so role IN ('admin','trainer','qa')
+-- already equals role IN ('admin','trainer'). Remote preflight (2026-10-06)
+-- found two of those policies missing and storage.objects owned by
+-- supabase_storage_admin, so ALTER POLICY would only block the apply.

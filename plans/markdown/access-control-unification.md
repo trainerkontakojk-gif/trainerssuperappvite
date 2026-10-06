@@ -509,3 +509,17 @@ Lane keseluruhan D; batch ini hanya dokumen/inventaris, tanpa perubahan runtime.
 Manifest Graphify AST dibandingkan dengan MD5 seluruh owned TS/TSX: daftar stale kosong. Cache lokal tidak distage; cluster/HTML report lama tidak diklaim terbaru. Audit read-only DB lokal setelah cleanup kembali leader 5/trainer 5; fixture akun/participant/indikator milik E2E sudah dibersihkan. CHECK/default/policy metadata sesuai migrasi.
 
 Tidak ada kegagalan gate akhir tersisa. Unit suites tidak dijalankan; dua file legacy hanya mendapat penyesuaian compatibility fixture/import. Tidak commit/push/deploy/migrasi remote. Perubahan meliputi shared catalog/types, gate API+broker, resolver/services scope, guard/nav/control web, Playwright/config, migrasi baru dan canonical docs. Tree awal berisi plan untracked milik Fajar; plan itu dipertahankan dan diisi log pelaksanaan.
+
+### 2026-10-06 — Preflight remote setelah instruksi HOLD
+
+- Fajar melarang apply remote dan meminta definisi asli signup, nama tiga policy Telefun, serta privilege ALTER POLICY storage. Semua pemeriksaan melalui Supabase execute_sql berhasil (`isError: false`), read-only; tidak ada apply/DDL/perubahan privilege.
+- `pg_get_functiondef('public.handle_new_user'::regproc)` membuktikan fungsi remote masih insert role literal user dan status pending, tanpa logika tambahan dalam fungsi tersebut. Audit 22 profil canonical tidak membuktikan fungsi berbeda.
+- Policy storage `Users read own telefun recordings` ada. Dua tabel public ada dan RLS aktif, tetapi policy `Users can view their own coaching summaries` dan `Users can view their own replay annotations` tidak ada; pg_policies tidak memuat policy apa pun untuk kedua tabel tersebut.
+- Koneksi postgres bukan superuser dan bukan member/owner-role storage.objects (owner supabase_storage_admin; pg_has_role USAGE/MEMBER false). BYPASSRLS tidak memberi izin ALTER POLICY. Owner tabel public ialah postgres. Privilege runner apply lain belum dibuktikan.
+- **Migrasi remote HOLD dan belum siap apply.** Perlu adaptasi terhadap policy remote yang hilang, parity pada DB disposable, verifikasi privilege runner, dan otorisasi apply terpisah. Definisi fungsi, snapshot policy/privilege, dan query reproduksi dicatat pada [preflight canonical](../../docs/auth-rbac.md#preflight-migrasi-remote--hold-2026-10-06). Tidak mengubah body migrasi atau menjalankan ulang gate produk untuk batch dokumentasi ini.
+
+### 2026-10-06 — Penyesuaian migrasi setelah preflight (Claude Code)
+
+- `apps/api/src/services/sidak-ranking-service.ts`: filter `accessibleIds.length > 0` diganti `applyPesertaScope(..., pesertaScopeFromIds(accessibleIds))` (sisa pola F10). `tsc` API exit 0, eslint file exit 0, access API E2E 74 passed.
+- Fajar menyetujui penghapusan tiga `ALTER POLICY` Telefun dari `20261006120000_unify_application_access_roles.sql`; alasan dan urutan apply dicatat di `docs/auth-rbac.md` (Resolusi preflight). Migrasi diterapkan ulang ke DB lokal loopback via `psql -1 -v ON_ERROR_STOP=1` (exit 0; CHECK empat role dan default `agent` terverifikasi), lalu `playwright test --config playwright.access-api.config.ts` exit 0, 74 passed.
+- Apply remote tetap menunggu otorisasi terpisah. Tidak ada DDL remote.

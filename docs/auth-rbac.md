@@ -483,6 +483,82 @@ Catatan:
 
 Katalog juga dipakai guard router, sidebar, mobile navigation dan kontrol UI. Approval leader hanya diwajibkan pada view SIDAK/KTP melalui metadata; backend membatasi data peserta tanpa gate approval menyeluruh pada metadata modul.
 
+### Preflight migrasi remote — HOLD (2026-10-06)
+
+Fajar melarang apply `20261006120000_unify_application_access_roles.sql` ke remote sampai preflight selesai dan ada otorisasi apply terpisah. Pemeriksaan berikut memakai Supabase `execute_sql` read-only pada project `ruosnjmtywcrghjgqugz`, cocok dengan `supabase/.temp/project-ref`. Tidak menjalankan DDL atau mengubah privilege remote.
+
+`SELECT pg_get_functiondef('public.handle_new_user'::regproc);` mengembalikan:
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, role, status)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data ->> 'full_name',
+    'user',
+    'pending'
+  );
+  RETURN NEW;
+END;
+$function$;
+```
+
+Snapshot fungsi remote masih menulis literal `user`, sama dengan fungsi dasar repo; tidak ditemukan logika signup tambahan dalam fungsi ini. Distribusi 22 profil canonical sebelumnya tidak membuktikan definisi trigger sudah berubah. Versi migrasi lokal mempertahankan id/email/full_name/status pending dan memakai default role agent; pemeriksaan ini belum mengizinkan penggantian fungsi remote.
+
+| Target                              | Policy yang diminta migrasi                   | Hasil remote                                                                                                           |
+| ----------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `storage.objects`                   | `Users read own telefun recordings`           | Ada, SELECT untuk authenticated; hanya bucket telefun-recordings + folder milik auth.uid(), belum ada manager override |
+| `public.telefun_coaching_summary`   | `Users can view their own coaching summaries` | Tidak ada; tabel ada dan RLS aktif, tidak ada policy pada tabel ini di pg_policies                                     |
+| `public.telefun_replay_annotations` | `Users can view their own replay annotations` | Tidak ada; tabel ada dan RLS aktif, tidak ada policy pada tabel ini di pg_policies                                     |
+
+Policy storage lain yang ditemukan ialah `Users update own telefun recordings` dan `Users upload own telefun recordings`; keduanya bukan pengganti policy SELECT public yang hilang.
+
+Koneksi audit memakai `current_user = session_user = postgres`, `rolsuper = false`, `rolinherit = true`, `rolbypassrls = true`. Owner kedua tabel public adalah postgres. Owner `storage.objects` adalah `supabase_storage_admin`; `pg_has_role(current_user, relowner, 'USAGE')` dan `'MEMBER'` keduanya false untuk storage.objects. Koneksi ini tidak memiliki hak owner yang diperlukan untuk ALTER POLICY pada storage.objects; BYPASSRLS tidak memberi hak DDL tersebut. Privilege runner apply yang berbeda belum diperiksa. Tidak mencoba ALTER POLICY, SET ROLE, atau pemberian membership.
+
+Query katalog yang dapat diulang:
+
+```sql
+SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check
+FROM pg_policies
+WHERE (schemaname = 'public' AND tablename IN (
+  'telefun_coaching_summary', 'telefun_replay_annotations'
+)) OR (schemaname = 'storage' AND tablename = 'objects'
+  AND policyname ILIKE '%telefun%');
+
+SELECT current_user, session_user, r.rolsuper, r.rolinherit, r.rolbypassrls,
+       n.nspname, c.relname, pg_get_userbyid(c.relowner) AS table_owner,
+       pg_has_role(current_user, c.relowner, 'USAGE') AS owner_privileges_available,
+       pg_has_role(current_user, c.relowner, 'MEMBER') AS owner_role_member
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_roles r ON r.rolname = current_user
+WHERE (n.nspname = 'storage' AND c.relname = 'objects')
+   OR (n.nspname = 'public' AND c.relname IN (
+     'telefun_coaching_summary', 'telefun_replay_annotations'
+   ));
+```
+
+**Apply remote tetap HOLD:** dua ALTER POLICY public menargetkan policy yang tidak ada, dan koneksi audit tidak dapat ALTER POLICY storage. Sebelum meminta otorisasi apply, siapkan adaptasi migrasi terhadap schema remote, buktikan parity signup/policy pada target disposable, dan verifikasi privilege runner sebenarnya. Migrasi lokal yang lulus E2E belum merupakan bukti kesiapan apply remote.
+
+#### Resolusi preflight (2026-10-06)
+
+Ketiga `ALTER POLICY` Telefun dihapus dari migrasi. Setelah CHECK empat role berlaku, role `qa` tidak mungkin ada, sehingga `role IN ('admin','trainer','qa')` pada policy lama setara dengan `role IN ('admin','trainer')`; mengubah teks policy tidak menambah keamanan dan hanya menghalangi apply remote (dua policy tidak ada, `storage.objects` milik `supabase_storage_admin`). Isi migrasi sekarang: guard role, default `agent`, CHECK empat role, dan penggantian `handle_new_user` (remote identik dengan versi dasar repo, jadi tidak ada logika yang hilang). Migrasi versi ini diterapkan ulang ke DB lokal loopback dalam satu transaksi (exit 0) dan E2E akses API lulus 74/74.
+
+Urutan apply remote (tetap butuh otorisasi terpisah):
+
+1. Tepat sebelum apply, jalankan `SELECT count(*) FROM public.profiles WHERE role NOT IN ('admin','trainer','leader','agent');`. Trigger lama memberi signup baru role `user`; hasil bukan 0 harus diputuskan dulu, karena guard migrasi akan membatalkan apply.
+2. Apply migrasi **sebelum** deploy kode baru, karena `authMiddleware` baru menolak role di luar empat nilai.
+3. Deploy API/web/Telefun.
+
+Temuan terpisah, di luar plan ini: remote tidak punya policy SELECT untuk `telefun_coaching_summary` dan `telefun_replay_annotations` padahal RLS aktif (drift dari migrasi lokal). Perlu audit apakah ada pembacaan lewat user JWT.
+
 ### Rencana lanjutan RLS peserta
 
 Usulkan pekerjaan terpisah `can_access_peserta(auth.uid(), peserta_id, module)` sebagai policy SELECT bagi leader: memakai approval approved + access group peserta, fail closed pada scope kosong, indeks join terkait dan parity E2E untuk all/self/team/none. Audit dahulu policy service-role dan relasi `trainer_id`; migrasi bertahap per resource setelah parity terbukti. Rencana ini tidak menambahkan policy peserta baru atau mengubah shared mailbox.
