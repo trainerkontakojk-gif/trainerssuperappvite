@@ -24,7 +24,7 @@ interface ProfilerYearOverviewProps {
   onAddFolder: (yearId: string) => void;
 }
 
-type BatchRow = { id: string; name: string; team: string | null };
+type BatchRow = { id: string; name: string; team: string };
 
 /** Isi kanan saat belum ada batch terpilih: semua batch di tahun aktif. */
 export default function ProfilerYearOverview({
@@ -45,7 +45,8 @@ export default function ProfilerYearOverview({
     return teams.flatMap((team): BatchRow[] => {
       const batches = folders.filter((folder) => folder.parent_id === team.id);
       if (batches.length === 0) {
-        return [{ id: team.id, name: team.name, team: null }];
+        // Tim tanpa batch dipakai langsung sebagai batch.
+        return [{ id: team.id, name: team.name, team: team.name }];
       }
       return batches.map((batch) => ({
         id: batch.id,
@@ -149,7 +150,7 @@ export default function ProfilerYearOverview({
                         {row.name}
                       </span>
                       <span className="col-start-1 row-start-2 min-w-0 truncate text-xs text-muted-foreground sm:col-start-auto sm:row-start-auto sm:text-sm">
-                        {row.team ?? "Tanpa batch"}
+                        {row.team}
                       </span>
                       <span className="row-span-2 text-right font-mono text-sm tabular-nums text-foreground sm:row-span-1">
                         {count}

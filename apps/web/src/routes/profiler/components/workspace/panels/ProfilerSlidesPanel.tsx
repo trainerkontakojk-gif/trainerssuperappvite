@@ -42,7 +42,8 @@ interface ProfilerSlidesPanelProps {
   peserta: ProfilerPeserta[];
   /** Peserta yang ditampilkan (dari `?participant=`); kosong = peserta pertama. */
   participantId: string | null;
-  onParticipantChange: (id: string) => void;
+  /** `null` menghapus `?participant=` (mis. id basi yang tidak ada di batch). */
+  onParticipantChange: (id: string | null) => void;
 }
 
 /** Slide profil satu peserta per halaman, dengan simpan PNG/PDF. */
@@ -62,6 +63,13 @@ export default function ProfilerSlidesPanel({
     ? peserta.findIndex((p) => p.id === participantId)
     : -1;
   const index = foundIndex === -1 ? 0 : foundIndex;
+
+  // Id peserta yang tidak ada di batch ini dibersihkan dari URL agar tautan
+  // yang dibagikan tidak membawa id basi; tampilan jatuh ke peserta pertama.
+  const hasStaleParticipant = Boolean(participantId) && foundIndex === -1;
+  useEffect(() => {
+    if (hasStaleParticipant) onParticipantChange(null);
+  }, [hasStaleParticipant, onParticipantChange]);
   const current = peserta[index];
 
   const goTo = useCallback(

@@ -71,6 +71,11 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await expect(
       overview.getByRole("button", { name: /Batch Pagi.*2 peserta/ }),
     ).toBeVisible();
+    // Tim tanpa batch dipakai langsung sebagai batch: kolom Tim tetap nama tim,
+    // bukan label "Tanpa batch" yang menyesatkan.
+    const soloRow = overview.getByRole("button", { name: /^Tim Email/ });
+    await expect(soloRow).toHaveAccessibleName(/^Tim Email Tim Email\b/);
+    await expect(overview.getByText("Tanpa batch")).toHaveCount(0);
 
     // Navigator tengah dan panel hierarki lama tidak lagi tampil berdampingan.
     await expect(page.getByText("Hierarki data")).toHaveCount(0);
@@ -297,6 +302,26 @@ test.describe("Workspace Profiler (hermetic)", () => {
 
     // Ketiga tab memakai data peserta yang sudah dimuat workspace.
     expect(pesertaFetchCount()).toBe(fetchesBeforeTabs);
+
+    console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test("slide: participant tak dikenal dibersihkan dari URL dan menampilkan peserta pertama", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler?batch=Batch%20Pagi&view=slide&participant=tidak-ada",
+      waitForUrl: /\/profiler/,
+      apiMocks: PROFILER_MOCKS,
+    });
+    const workspace = page.getByRole("region", { name: "Batch Pagi" });
+    await expect(
+      workspace.getByRole("button", { name: "Peserta sebelumnya" }),
+    ).toBeDisabled({ timeout: 20000 });
+    await expect(workspace.getByText("Rina Kartika").first()).toBeVisible();
+    await expect(page).toHaveURL(/[?&]view=slide/);
+    await expect(page).not.toHaveURL(/participant=/);
 
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);

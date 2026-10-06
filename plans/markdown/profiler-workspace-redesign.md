@@ -95,3 +95,10 @@ Kriteria penerimaan:
 - `thermo-nuclear` — scoped change PASS; satu perbaikan diterapkan: item menu baris `ProfilerLibraryNav` dinaikkan dari `min-h-10` ke `min-h-11` supaya klaim target sentuh ≥44px benar. Tersisa temuan P3 saja. Gate repo `pnpm lint` gagal karena 2 error pra-eksisting di `apps/api/src/services/sidak/heatmap-service.ts:91` (file tidak tersentuh diff ini) — di luar scope.
 - `ui-ux-pro-max` — dijalankan sebagai audit konformitas constraint (skill ini normalnya pra-implementasi): satu navigasi, hierarki tipografi/spasi, empty/loading/error state, target sentuh, dan 320–768px tanpa overflow terverifikasi lewat E2E; tidak ada tema/macrostructure baru.
 - Verifikasi ulang setelah perbaikan target sentuh: `npx playwright test` (4 spec Profiler/sidebar) 24/24 lulus; `pnpm typecheck` exit 0; `pnpm --filter @trainers/web lint` 0 error; `pnpm build` exit 0; `git diff --check` bersih.
+
+### Tindak lanjut P3 (thermo-nuclear)
+
+- Ringkasan tahun: tim tanpa batch kini menampilkan nama tim di kolom Tim (bukan "Tanpa batch").
+- Slide: `?participant=` yang tidak ada di batch dibersihkan dari URL (`replace`), tampilan jatuh ke peserta pertama — memulihkan perilaku halaman Slide lama.
+- RED: 2 assertion/tes baru di `profiler-workspace.spec.ts` gagal (nama aksesibel "Tim Email Tanpa batch 0 peserta"; URL masih membawa `participant=tidak-ada`). GREEN: 4 spec Profiler 25/25; typecheck, ESLint workspace, build exit 0; Prettier dan `git diff --check` bersih.
+- Dibiarkan sebagai catatan: `ChartTooltip: any` dan `role` yang tidak dipakai di `useProfilerAccess`.

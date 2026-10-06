@@ -243,7 +243,9 @@ export default function ProfilerBatchWorkspace({
               onParticipantChange={(id) =>
                 navigate({
                   to: "/profiler",
-                  search: { ...search, view: "slide", participant: id },
+                  search: id
+                    ? { ...search, view: "slide", participant: id }
+                    : { ...search, view: "slide" },
                   replace: true,
                 })
               }
