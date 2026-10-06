@@ -1,10 +1,11 @@
+import { ROLES, type Role } from "./access";
 import { z } from "zod";
 
 export interface ManagedUser {
   id: string;
   email: string;
   full_name: string | null;
-  role: "admin" | "trainer" | "leader" | "agent" | "qa";
+  role: Role;
   status: "active" | "pending" | "inactive";
   is_deleted: boolean;
   created_at?: string;
@@ -78,7 +79,7 @@ export const updateUserStatusSchema = z.object({
 });
 
 export const updateUserRoleSchema = z.object({
-  role: z.enum(["admin", "trainer", "leader", "agent"]),
+  role: z.enum(ROLES),
 });
 
 export const createAccessGroupSchema = z.object({

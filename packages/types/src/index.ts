@@ -14,3 +14,5 @@ export * from "./monitoring";
 export * from "./simulation-subject";
 export * from "./sidak-simulations";
 export * from "./ai-pricing";
+
+export * from "./access";

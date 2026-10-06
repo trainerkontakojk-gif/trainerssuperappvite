@@ -1,3 +1,4 @@
+import type { Role } from "./access";
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue =
   | JsonPrimitive
@@ -9,11 +10,14 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "admin" | "trainer" | "leader" | "agent" | "qa";
+  role: Role;
   status?: "pending" | "active" | "inactive";
   is_deleted?: boolean;
 }
 
 export type ApiResponse<T> =
   | { success: true; data: T }
-  | { success: false; error: { code: string; message: string; details?: JsonValue } };
+  | {
+      success: false;
+      error: { code: string; message: string; details?: JsonValue };
+    };
