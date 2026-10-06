@@ -32,11 +32,11 @@ Halaman `/dashboard/access-groups` memakai guided scope builder agar Admin/Train
 
 Builder menyediakan 3 jalur:
 
-| Mode       | UI Flow                                                   | Stored Item                                                    |
-| ---------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+| Mode       | UI Flow                                                                                  | Stored Item                                                      |
+| ---------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | By Team    | Pilih parent team untuk semua subfolder, atau pilih subfolder/batch di bawah parent team | Parent: `field_name = tim`; subfolder: `field_name = batch_name` |
-| By Service | Pilih service dari daftar SIDAK valid                     | `field_name = service_type`, `field_value = selected service`  |
-| By Name    | Pilih Team dulu, lalu pilih Name/agent dari team tersebut | `field_name = peserta_id`, `field_value = selected peserta id` |
+| By Service | Pilih service dari daftar SIDAK valid                                                    | `field_name = service_type`, `field_value = selected service`    |
+| By Name    | Pilih Team dulu, lalu pilih Name/agent dari team tersebut                                | `field_name = peserta_id`, `field_value = selected peserta id`   |
 
 ### Modules
 
@@ -81,12 +81,12 @@ Leader opens KTP/SIDAK page
 
 ### Backend Scope Enforcers
 
-| Function | File | Module | Used In |
-|----------|------|--------|---------|
-| `getAccessibleAgentIds(userId, role)` | `apps/api/src/services/sidak-service.ts:27` | SIDAK | All SIDAK read routes |
-| `getAccessiblePesertaIds(userId, role)` | `apps/api/src/services/profiler-service.ts:12` | KTP | All Profiler read routes |
-| `getAccessibleSidakFilters(userId, role)` | `apps/api/src/services/sidak-service.ts:60` | SIDAK | SIDAK metadata + service enforcement |
-| `getLeaderScopeSnapshot(userId, module)` | `apps/api/src/services/leader-access-service.ts:100` | Shared | Centralized scope resolution (shared by KTP+SIDAK) |
+| Function                                  | File                                                 | Module | Used In                                            |
+| ----------------------------------------- | ---------------------------------------------------- | ------ | -------------------------------------------------- |
+| `getAccessibleAgentIds(userId, role)`     | `apps/api/src/services/sidak-service.ts:27`          | SIDAK  | All SIDAK read routes                              |
+| `getAccessiblePesertaIds(userId, role)`   | `apps/api/src/services/profiler-service.ts:12`       | KTP    | All Profiler read routes                           |
+| `getAccessibleSidakFilters(userId, role)` | `apps/api/src/services/sidak-service.ts:60`          | SIDAK  | SIDAK metadata + service enforcement               |
+| `getLeaderScopeSnapshot(userId, module)`  | `apps/api/src/services/leader-access-service.ts:100` | Shared | Centralized scope resolution (shared by KTP+SIDAK) |
 
 Both `getAccessibleAgentIds` and `getAccessiblePesertaIds` now delegate to the **shared** `getLeaderScopeSnapshot()` helper which extracts `pesertaIds`, `batchNames`, `tims`, and `serviceTypes` from approved access group items in a single normalized snapshot. This eliminates duplicate parsing logic that was previously in both services.
 
@@ -96,14 +96,14 @@ Both `getAccessibleAgentIds` and `getAccessiblePesertaIds` now delegate to the *
 
 Starting from this hardening, **metadata endpoints are scoped** for leaders:
 
-| Endpoint | Leader Behavior | Admin/Trainer |
-|----------|----------------|---------------|
-| `GET /profiler/years` | Only years containing folders with scoped participants; subfolder scope also resolves parent year | All years |
-| `GET /profiler/folders` | Only folders containing scoped participants plus their parent folder so the KTP workspace tree can render | All folders |
-| `GET /profiler/teams` | Only teams appearing in scoped participants | All teams |
-| `GET /profiler/counts` | Already scoped (was scoped before) | All counts |
-| `GET /sidak/folders` | Only folders containing scoped agents | All folders |
-| `GET /sidak/folders/:folder/agents` | Only scoped agents in that folder; empty if folder not in scope | All agents |
+| Endpoint                            | Leader Behavior                                                                                           | Admin/Trainer |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------- |
+| `GET /profiler/years`               | Only years containing folders with scoped participants; subfolder scope also resolves parent year         | All years     |
+| `GET /profiler/folders`             | Only folders containing scoped participants plus their parent folder so the KTP workspace tree can render | All folders   |
+| `GET /profiler/teams`               | Only teams appearing in scoped participants                                                               | All teams     |
+| `GET /profiler/counts`              | Already scoped (was scoped before)                                                                        | All counts    |
+| `GET /sidak/folders`                | Only folders containing scoped agents                                                                     | All folders   |
+| `GET /sidak/folders/:folder/agents` | Only scoped agents in that folder; empty if folder not in scope                                           | All agents    |
 
 ### SIDAK Service Type Enforcement
 
@@ -145,14 +145,15 @@ To prevent stale/confusing state when a leader's scope changes:
 
 Centralized logic for resolving effective approval status and approved request IDs:
 
-| Function | Purpose |
-|----------|---------|
-| `fetchLeaderModuleRequests(userId, module)` | Queries rows for target module + `"all"`, ordered by `updated_at DESC, created_at DESC` |
-| `resolveEffectiveModuleStatus(rows, module)` | Pure function: returns effective status given all rows |
-| `resolveEffectiveModuleCreatedAt(rows, module, status)` | Returns `created_at` of the effective status row |
-| `getApprovedRequestIds(userId, module)` | Returns all approved request IDs for scope resolution (module + `"all"`) |
+| Function                                                | Purpose                                                                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `fetchLeaderModuleRequests(userId, module)`             | Queries rows for target module + `"all"`, ordered by `updated_at DESC, created_at DESC` |
+| `resolveEffectiveModuleStatus(rows, module)`            | Pure function: returns effective status given all rows                                  |
+| `resolveEffectiveModuleCreatedAt(rows, module, status)` | Returns `created_at` of the effective status row                                        |
+| `getApprovedRequestIds(userId, module)`                 | Returns all approved request IDs for scope resolution (module + `"all"`)                |
 
 **Precedence rules** (highest to lowest):
+
 1. `approved` (any row for target module or `"all"`)
 2. `pending` (any row for target module or `"all"`)
 3. Most recent terminal status (`revoked` / `rejected`) for target module or `"all"`
@@ -170,7 +171,11 @@ This ensures historical override works correctly: `revoked → approved` returns
 {
   "success": true,
   "data": {
-    "ktp": { "status": "approved", "module": "ktp", "created_at": "2025-01-01" },
+    "ktp": {
+      "status": "approved",
+      "module": "ktp",
+      "created_at": "2025-01-01"
+    },
     "sidak": { "status": "none", "module": "sidak", "created_at": null }
   }
 }
@@ -193,7 +198,7 @@ Used in `apps/web/src/routes/profiler/index.tsx` and `apps/web/src/routes/sidak/
 
 ### Frontend: Route Guard (Subroute Protection)
 
-The `requireLeaderModuleApproval` guard in `apps/web/src/router.tsx:441` protects SIDAK and KTP subroutes from deep-link bypass. It wraps `requireRole` logic with an additional access-status check for leaders:
+The `requireCapability` guard in `apps/web/src/router.tsx:441` protects SIDAK and KTP subroutes from deep-link bypass. It checks the shared capability catalog and applies `LEADER_APPROVAL_MODULE` metadata for leaders. Caught redirects are rethrown with TanStack `isRedirect()`:
 
 - Admin/Trainer → passes immediately (no approval check)
 - Leader with `approved` access status for the target module → passes
@@ -201,16 +206,17 @@ The `requireLeaderModuleApproval` guard in `apps/web/src/router.tsx:441` protect
 
 **Protected subroutes:**
 
-| Module | Routes |
-|--------|--------|
-| SIDAK | `/sidak/dashboard`, `/sidak/ranking`, `/sidak/agents`, `/sidak/agents/$id` |
-| KTP | `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams` |
+| Module | Routes                                                                                                                                   |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| SIDAK  | `/sidak/dashboard`, `/sidak/ranking`, `/sidak/agents`, `/sidak/agents/$id`                                                               |
+| KTP    | `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams` |
 
 **Landing pages** (`/sidak`, `/profiler`) are intentionally NOT guarded — they serve as the UX surface where leaders see their access status and CTA buttons.
 
 ### Frontend: Access Status Refetch
 
 `useAccessStatus()` in `apps/web/src/hooks/useAccessStatus.ts` refetches on:
+
 1. Mount (initial load)
 2. After submitting a request
 3. `window.focus` event
@@ -260,3 +266,7 @@ pnpm test
 pnpm --filter @trainers/api test
 git diff --check
 ```
+
+## Integrasi katalog capability
+
+Guard view menggunakan `requireCapability("sidak.view")` / `requireCapability("profiler.view")`; metadata `LEADER_APPROVAL_MODULE` mengarahkan leader tanpa approval ke landing modul. Resolver backend `resolveDataScope` memakai snapshot approval sebagai batas peserta. Scope kosong selalu menghasilkan nol baris; kegagalan snapshot menghasilkan 503 `SCOPE_UNAVAILABLE`. Ownership history/settings akun dan shared mailbox PDKT tetap terpisah dari scope peserta.
