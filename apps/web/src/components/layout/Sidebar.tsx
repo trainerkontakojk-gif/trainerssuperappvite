@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import {
   APP_MODULES,
-  isRoleAllowed,
+  isCapabilityAllowed,
   normalizeRoleLabel,
 } from "../../lib/app-config";
 import { SIDAK_CHILDREN, MANAGEMENT_LINKS } from "./nav-config";
@@ -108,15 +108,15 @@ export function Sidebar({
     (module) =>
       ["dashboard", "ketik", "pdkt", "telefun", "profiler"].includes(
         module.id,
-      ) && isRoleAllowed(profile?.role, module.allowedRoles),
+      ) && isCapabilityAllowed(profile?.role, module.capability),
   );
 
   const qaModule = APP_MODULES.find((module) => module.id === "qa-analyzer");
   const isQaAllowed =
-    qaModule && isRoleAllowed(profile?.role, qaModule.allowedRoles);
+    qaModule && isCapabilityAllowed(profile?.role, qaModule.capability);
 
   const visibleManagementLinks = MANAGEMENT_LINKS.filter((item) =>
-    isRoleAllowed(profile?.role, item.allowedRoles),
+    isCapabilityAllowed(profile?.role, item.capability),
   );
 
   const showManagementButton = visibleManagementLinks.length > 0;
@@ -137,7 +137,9 @@ export function Sidebar({
           onClick={handleLinkClick}
           className="sidebar-rail-item group mb-4 h-9 w-9 rounded-xl border border-border bg-surface flex items-center justify-center text-foreground hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
         >
-          <span className="font-display font-bold text-sm tracking-tight">S</span>
+          <span className="font-display font-bold text-sm tracking-tight">
+            S
+          </span>
           <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
             Dashboard
           </div>
@@ -173,60 +175,68 @@ export function Sidebar({
           })}
 
           {/* SIDAK Module (qa-analyzer) */}
-          {isQaAllowed && qaModule && (() => {
-            const isSidakActive = pathname.startsWith("/sidak");
-            const isSidakOpen = flyoutModule === "sidak" && flyoutOpen;
-            return (
-              <button
-                className="sidebar-rail-item group"
-                data-active={isSidakActive}
-                data-open={isSidakOpen}
-                onClick={() => {
-                  if (flyoutModule === "sidak" && flyoutOpen) {
-                    setFlyoutOpen(false);
-                    setFlyoutModule(null);
-                  } else {
-                    setFlyoutModule("sidak");
-                    setFlyoutOpen(true);
-                  }
-                }}
-              >
-                <qaModule.icon className="h-[18px] w-[18px]" />
-                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
-                  {qaModule.shortTitle}
-                </div>
-              </button>
-            );
-          })()}
+          {isQaAllowed &&
+            qaModule &&
+            (() => {
+              const isSidakActive = pathname.startsWith("/sidak");
+              const isSidakOpen = flyoutModule === "sidak" && flyoutOpen;
+              return (
+                <button
+                  className="sidebar-rail-item group"
+                  data-active={isSidakActive}
+                  data-open={isSidakOpen}
+                  onClick={() => {
+                    if (flyoutModule === "sidak" && flyoutOpen) {
+                      setFlyoutOpen(false);
+                      setFlyoutModule(null);
+                    } else {
+                      setFlyoutModule("sidak");
+                      setFlyoutOpen(true);
+                    }
+                  }}
+                >
+                  <qaModule.icon className="h-[18px] w-[18px]" />
+                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                    {qaModule.shortTitle}
+                  </div>
+                </button>
+              );
+            })()}
         </div>
 
         {/* Footer actions inside rail */}
         <div className="mt-auto flex flex-col gap-2 w-full items-center border-t border-border pt-4">
-          {showManagementButton && (() => {
-            const isManagementActive = pathname.startsWith("/dashboard/users") || pathname.startsWith("/dashboard/access-") || pathname === "/monitoring" || pathname === "/dashboard/activities";
-            const isManagementOpen = flyoutModule === "management" && flyoutOpen;
-            return (
-              <button
-                className="sidebar-rail-item group"
-                data-active={isManagementActive}
-                data-open={isManagementOpen}
-                onClick={() => {
-                  if (flyoutModule === "management" && flyoutOpen) {
-                    setFlyoutOpen(false);
-                    setFlyoutModule(null);
-                  } else {
-                    setFlyoutModule("management");
-                    setFlyoutOpen(true);
-                  }
-                }}
-              >
-                <Settings className="h-[18px] w-[18px]" />
-                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
-                  Management
-                </div>
-              </button>
-            );
-          })()}
+          {showManagementButton &&
+            (() => {
+              const isManagementActive =
+                pathname.startsWith("/dashboard/users") ||
+                pathname.startsWith("/dashboard/access-") ||
+                pathname === "/monitoring" ||
+                pathname === "/dashboard/activities";
+              const isManagementOpen =
+                flyoutModule === "management" && flyoutOpen;
+              return (
+                <button
+                  className="sidebar-rail-item group"
+                  data-active={isManagementActive}
+                  data-open={isManagementOpen}
+                  onClick={() => {
+                    if (flyoutModule === "management" && flyoutOpen) {
+                      setFlyoutOpen(false);
+                      setFlyoutModule(null);
+                    } else {
+                      setFlyoutModule("management");
+                      setFlyoutOpen(true);
+                    }
+                  }}
+                >
+                  <Settings className="h-[18px] w-[18px]" />
+                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                    Management
+                  </div>
+                </button>
+              );
+            })()}
 
           <Link
             to="/account"
@@ -291,7 +301,7 @@ export function Sidebar({
               </div>
               <nav className="space-y-1.5">
                 {SIDAK_CHILDREN.filter((item) =>
-                  isRoleAllowed(profile?.role, item.allowedRoles),
+                  isCapabilityAllowed(profile?.role, item.capability),
                 ).map((item) => {
                   const active = item.exactMatch
                     ? pathname === item.to
@@ -428,7 +438,7 @@ export function Sidebar({
                       SIDAK
                     </p>
                     {SIDAK_CHILDREN.filter((item) =>
-                      isRoleAllowed(profile?.role, item.allowedRoles),
+                      isCapabilityAllowed(profile?.role, item.capability),
                     ).map((item) => {
                       const active = item.exactMatch
                         ? pathname === item.to
@@ -482,11 +492,18 @@ export function Sidebar({
 
               <div className="border-t border-border pt-4 mt-auto flex flex-col gap-1">
                 <div className="px-3 py-2 rounded-xl bg-surface mb-2 border border-border/50">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Signed in as</p>
-                  <p className="text-xs font-semibold truncate text-foreground" title={profile?.email || session?.user?.email}>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Signed in as
+                  </p>
+                  <p
+                    className="text-xs font-semibold truncate text-foreground"
+                    title={profile?.email || session?.user?.email}
+                  >
                     {profile?.email || session?.user?.email}
                   </p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">Role: {normalizeRoleLabel(profile?.role)}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5">
+                    Role: {normalizeRoleLabel(profile?.role)}
+                  </p>
                 </div>
 
                 <Link

@@ -1,4 +1,12 @@
-import { Shield, Clock, XCircle, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { can, normalizeRole } from "@trainers/types";
+import {
+  Shield,
+  Clock,
+  XCircle,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useAccessStatus } from "../hooks/useAccessStatus";
 
@@ -92,7 +100,7 @@ export default function LeaderAccessGate({
   const role = profile?.role ?? "";
   const { status, loading, error, submitRequest } = useAccessStatus(module);
 
-  const isAdminOrTrainer = role === "admin" || role === "trainer";
+  const isAdminOrTrainer = can(normalizeRole(role), "profiler.write");
   const isApproved = status === "approved";
 
   if (isAdminOrTrainer) return <>{children}</>;
@@ -127,9 +135,7 @@ export default function LeaderAccessGate({
     <div className="flex flex-1 items-center justify-center min-h-[60vh] p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-foreground">
-            {moduleLabel}
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">{moduleLabel}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Akses berbasis izin
           </p>
@@ -145,7 +151,9 @@ export default function LeaderAccessGate({
           <div
             className={`mx-auto mb-4 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold ${cfg.badgeBg} ${cfg.badgeText}`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${cfg.badgeText} opacity-60`} />
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${cfg.badgeText} opacity-60`}
+            />
             {cfg.label}
           </div>
 

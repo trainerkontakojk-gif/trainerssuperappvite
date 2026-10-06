@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
@@ -20,7 +21,7 @@ import { ReviewDetailModal } from "./components/ReviewDetailModal";
 export default function MonitoringPage() {
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role?.toLowerCase() || "";
-  const canEditPricing = role === "trainer" || role === "admin";
+  const canEditPricing = can(normalizeRole(role), "monitoring.pricing.write");
 
   const [tab, setTab] = useState<"history" | "usage" | "pricing">("history");
   const [year, setYear] = useState(new Date().getFullYear());

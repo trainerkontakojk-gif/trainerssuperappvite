@@ -6,7 +6,7 @@ import {
   BarChart3,
   Menu,
 } from "lucide-react";
-import { isRoleAllowed } from "../../lib/app-config";
+import { isCapabilityAllowed } from "../../lib/app-config";
 
 const PRIMARY_TABS = [
   { id: "dashboard", href: "/dashboard", icon: LayoutDashboard, label: "Home" },
@@ -17,7 +17,7 @@ const PRIMARY_TABS = [
     href: "/sidak",
     icon: BarChart3,
     label: "SIDAK",
-    allowedRoles: ["trainer", "leader", "admin"],
+    capability: "sidak.landing" as const,
   },
 ];
 
@@ -37,7 +37,7 @@ export function MobileTabBar({
   const { pathname } = useLocation();
 
   const tabs = PRIMARY_TABS.filter((t) =>
-    isRoleAllowed(profile?.role, t.allowedRoles),
+    isCapabilityAllowed(profile?.role, t.capability),
   );
 
   return (

@@ -1,3 +1,4 @@
+import { can } from "@trainers/types";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
@@ -93,9 +94,7 @@ export default function PdktLanding() {
   const profile = useAuthStore((st) => st.profile);
   const session = useAuthStore((st) => st.session);
   const accountKey = session?.user?.id ?? null;
-  const canPickParticipant = ["admin", "trainer"].includes(
-    (profile?.role || "").toLowerCase(),
-  );
+  const canPickParticipant = can(profile?.role, "simulation.subject.select");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);

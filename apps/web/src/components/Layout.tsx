@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
@@ -31,7 +32,7 @@ function DashboardLayoutContent() {
   useEffect(() => {
     if (profile) {
       const normalizedRole = profile.role?.toLowerCase().trim();
-      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
       if (isAllowedRole && !hasTelefunAccess) {
         grantTelefunAccess();
       }
@@ -41,7 +42,7 @@ function DashboardLayoutContent() {
   useEffect(() => {
     if (pathname.startsWith("/telefun") && !hasTelefunAccess && profile) {
       const normalizedRole = profile.role?.toLowerCase().trim();
-      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
       if (isAllowedRole) {
         grantTelefunAccess();
         navigate({ to: "/telefun" });
@@ -55,7 +56,7 @@ function DashboardLayoutContent() {
       !pathname.startsWith("/telefun")
     ) {
       const normalizedRole = profile?.role?.toLowerCase().trim();
-      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
       if (!isAllowedRole) {
         revokeTelefunAccess();
       }

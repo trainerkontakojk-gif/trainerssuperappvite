@@ -77,7 +77,11 @@ describe("Auth Login Flow Hardening", () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 401,
         headers: new Headers({ "content-type": "application/json" }),
-        json: () => Promise.resolve({ success: false, error: { message: "Unauthorized" } }),
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: { message: "Unauthorized" },
+          }),
       });
       vi.stubGlobal("fetch", mockFetch);
 
@@ -99,7 +103,11 @@ describe("Auth Login Flow Hardening", () => {
       const mockFetch = vi.fn().mockResolvedValue({
         status: 401,
         headers: new Headers({ "content-type": "application/json" }),
-        json: () => Promise.resolve({ success: false, error: { message: "Unauthorized" } }),
+        json: () =>
+          Promise.resolve({
+            success: false,
+            error: { message: "Unauthorized" },
+          }),
       });
       vi.stubGlobal("fetch", mockFetch);
 
@@ -145,30 +153,30 @@ describe("Auth Login Flow Hardening", () => {
     });
   });
 
-  describe("UserProfile type accepts qa role", () => {
-    it("allows qa role assignment at type level", () => {
+  describe("UserProfile type accepts leader role", () => {
+    it("allows leader role assignment at type level", () => {
       const profile: import("@trainers/types").UserProfile = {
         id: "qa-1",
         email: "qa@test.com",
         full_name: "QA Tester",
-        role: "qa",
+        role: "leader",
         status: "active",
       };
-      expect(profile.role).toBe("qa");
+      expect(profile.role).toBe("leader");
     });
   });
 
-  describe("ManagedUser type accepts qa role", () => {
-    it("allows qa role assignment at type level", () => {
+  describe("ManagedUser type accepts leader role", () => {
+    it("allows leader role assignment at type level", () => {
       const user: import("@trainers/types").ManagedUser = {
         id: "qa-1",
         email: "qa@test.com",
         full_name: "QA Tester",
-        role: "qa",
+        role: "leader",
         status: "active",
         is_deleted: false,
       };
-      expect(user.role).toBe("qa");
+      expect(user.role).toBe("leader");
     });
   });
 });

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockGetSession, mockFetchAuthProfile, mockFetchApi } = vi.hoisted(() => ({
-  mockGetSession: vi.fn(),
-  mockFetchAuthProfile: vi.fn(),
-  mockFetchApi: vi.fn(),
-}));
+const { mockGetSession, mockFetchAuthProfile, mockFetchApi } = vi.hoisted(
+  () => ({
+    mockGetSession: vi.fn(),
+    mockFetchAuthProfile: vi.fn(),
+    mockFetchApi: vi.fn(),
+  }),
+);
 
 vi.mock("../lib/supabase", () => ({
   supabase: {
@@ -24,30 +26,19 @@ vi.mock("../lib/fetchAuthProfile", () => ({
 }));
 
 vi.mock("../hooks/useApi", () => ({
-  fetchApi: <T,>(path: string) => mockFetchApi(path) as Promise<T>,
+  fetchApi: <T>(path: string) => mockFetchApi(path) as Promise<T>,
 }));
 
-vi.mock("@tanstack/react-router", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
-  const OriginalRedirect = actual.redirect;
-  return {
-    ...actual,
-    redirect: (opts: { to: string }) => {
-      const err = new Error("redirect") as any;
-      err.redirectTo = opts.to;
-      err.isRedirect = true;
-      throw err;
-    },
-  };
-});
-
-async function runGuard(guardFactory: () => () => Promise<void>): Promise<string | null> {
+async function runGuard(
+  guardFactory: () => () => Promise<void>,
+): Promise<string | null> {
   const guard = guardFactory();
   try {
     await guard();
     return null;
   } catch (e: any) {
-    if (e.isRedirect) return e.redirectTo;
+    const { isRedirect } = await import("@tanstack/react-router");
+    if (isRedirect(e)) return e.options.to ?? null;
     throw e;
   }
 }
@@ -214,11 +205,13 @@ describe("Route Guards", { timeout: 60_000 }, () => {
       });
       mockFetchAuthProfile.mockRejectedValue(new Error("Profile fetch error"));
       const { guardWaitingApproval } = await import("../router");
-      await expect(runGuard(guardWaitingApproval)).rejects.toThrow("Profile fetch error");
+      await expect(runGuard(guardWaitingApproval)).rejects.toThrow(
+        "Profile fetch error",
+      );
     });
   });
 
-  describe("requireLeaderModuleApproval", () => {
+  describe("requireCapability", () => {
     it("allows trainer to pass without approval check", async () => {
       mockGetSession.mockResolvedValue({
         data: { session: { user: { id: "u1" } } },
@@ -229,12 +222,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         status: "active",
         is_deleted: false,
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBeNull();
     });
@@ -249,12 +238,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         status: "active",
         is_deleted: false,
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBeNull();
     });
@@ -273,12 +258,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         sidak: { status: "none", module: "sidak", created_at: null },
         ktp: { status: "pending", module: "ktp", created_at: "2025-01-01" },
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBe("/sidak");
     });
@@ -294,15 +275,15 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         is_deleted: false,
       });
       mockFetchApi.mockResolvedValue({
-        sidak: { status: "approved", module: "sidak", created_at: "2025-01-01" },
+        sidak: {
+          status: "approved",
+          module: "sidak",
+          created_at: "2025-01-01",
+        },
         ktp: { status: "approved", module: "ktp", created_at: "2025-01-01" },
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBeNull();
     });
@@ -321,12 +302,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         ktp: { status: "none", module: "ktp", created_at: null },
         sidak: { status: "revoked", module: "sidak", created_at: "2025-01-01" },
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBe("/sidak");
     });
@@ -345,12 +322,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         ktp: { status: "pending", module: "ktp", created_at: "2025-01-01" },
         sidak: { status: "none", module: "sidak", created_at: null },
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "ktp",
-        "/profiler",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("profiler.view");
       const location = await runGuard(() => guard);
       expect(location).toBe("/profiler");
     });
@@ -365,12 +338,8 @@ describe("Route Guards", { timeout: 60_000 }, () => {
         status: "active",
         is_deleted: false,
       });
-      const { requireLeaderModuleApproval } = await import("../router");
-      const guard = requireLeaderModuleApproval(
-        ["trainer", "leader", "admin"],
-        "sidak",
-        "/sidak",
-      );
+      const { requireCapability } = await import("../router");
+      const guard = requireCapability("sidak.view");
       const location = await runGuard(() => guard);
       expect(location).toBe("/unauthorized");
     });

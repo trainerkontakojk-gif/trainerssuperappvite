@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -17,7 +18,7 @@ import { useAuthStore } from "../store/authStore";
 import { useTelefunWarning } from "../context/TelefunWarningContext";
 import {
   APP_MODULES,
-  isRoleAllowed,
+  isCapabilityAllowed,
   normalizeRoleLabel,
 } from "../lib/app-config";
 import { notify } from "../lib/toast";
@@ -127,7 +128,7 @@ export default function DashboardPage() {
   const displayName = profile?.full_name || "User";
   const userRole = profile?.role?.toLowerCase() || "";
 
-  const isManager = userRole === "admin" || userRole === "trainer";
+  const isManager = can(normalizeRole(userRole), "admin.users");
   const isLeader = userRole === "leader";
   const isAgent = userRole === "agent";
   const showAnalytics = isManager || isLeader;
@@ -136,7 +137,7 @@ export default function DashboardPage() {
   const visibleModules = APP_MODULES.filter(
     (m) =>
       ["ketik", "pdkt", "telefun", "profiler", "qa-analyzer"].includes(m.id) &&
-      isRoleAllowed(userRole, m.allowedRoles),
+      isCapabilityAllowed(userRole, m.capability),
   );
 
   // States

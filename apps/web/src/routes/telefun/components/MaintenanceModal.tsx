@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Home, ArrowRight } from "lucide-react";
@@ -25,7 +26,7 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
   };
 
   const normalizedRole = role?.toLowerCase().trim();
-  const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+  const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
 
   if (isAllowedRole) {
     return null;
@@ -42,7 +43,7 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
             className="absolute inset-0 bg-background/80 backdrop-blur-md"
             onClick={handleRedirect}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -51,15 +52,15 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
           >
             {/* Background Decorative Element */}
             <div className="absolute top-0 left-0 w-full h-1 bg-destructive/20" />
-            
+
             <div className="w-20 h-20 bg-destructive/10 rounded-3xl mx-auto mb-6 flex items-center justify-center">
               <Lock className="w-10 h-10 text-destructive" />
             </div>
-            
+
             <h3 className="text-xl font-black text-foreground mb-4 tracking-tight">
               Akses Terbatas
             </h3>
-            
+
             <div className="text-sm text-muted-foreground leading-relaxed mb-6 font-medium px-4">
               Modul Telefun hanya dapat diakses oleh Trainer.
             </div>

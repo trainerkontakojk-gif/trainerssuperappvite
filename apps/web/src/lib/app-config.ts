@@ -1,3 +1,4 @@
+import { can, normalizeRole, type Capability } from "@trainers/types";
 import {
   BarChart3,
   LayoutDashboard,
@@ -18,7 +19,7 @@ export interface AppModuleConfig {
   icon: LucideIcon;
   accentClassName: string;
   accentSoftClassName: string;
-  allowedRoles?: string[];
+  capability?: Capability;
 }
 
 export const APP_MODULES: AppModuleConfig[] = [
@@ -57,7 +58,7 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: Mail,
     accentClassName: "text-sky-600",
     accentSoftClassName: "bg-sky-100",
-    allowedRoles: ["trainer", "leader", "admin", "agent"],
+    capability: "pdkt.use",
   },
   {
     id: "telefun",
@@ -70,7 +71,7 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: Phone,
     accentClassName: "text-violet-600",
     accentSoftClassName: "bg-violet-100",
-    allowedRoles: ["admin", "trainer"],
+    capability: "telefun.use",
   },
   {
     id: "profiler",
@@ -83,7 +84,7 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: Users,
     accentClassName: "text-amber-600",
     accentSoftClassName: "bg-amber-100",
-    allowedRoles: ["trainer", "leader", "admin"],
+    capability: "profiler.landing",
   },
   {
     id: "qa-analyzer",
@@ -96,42 +97,18 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: BarChart3,
     accentClassName: "text-rose-600",
     accentSoftClassName: "bg-rose-100",
-    allowedRoles: ["trainer", "leader", "admin"],
+    capability: "sidak.landing",
   },
 ];
 
-export function normalizeRoleLabel(role?: string | null) {
-  const value = role?.toLowerCase().trim();
-  switch (value) {
-    case "agent":
-    case "agents":
-      return "Agent";
-    case "leader":
-      return "Leader";
-    case "trainer":
-    case "trainers":
-      return "Trainer";
-    case "admin":
-      return "Admin";
-    default:
-      return "User";
-  }
+export function normalizeRoleLabel(raw?: string | null) {
+  const role = normalizeRole(raw);
+  return role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
 }
 
-export function isRoleAllowed(
+export function isCapabilityAllowed(
   role: string | undefined | null,
-  allowedRoles?: string[],
+  capability: Capability = "dashboard.view",
 ) {
-  if (!allowedRoles || allowedRoles.length === 0) return true;
-  const normalizedRole = role?.toLowerCase().trim();
-
-  // Normalize role to singular form
-  const finalRole =
-    normalizedRole === "trainers"
-      ? "trainer"
-      : normalizedRole === "agents"
-        ? "agent"
-        : normalizedRole;
-
-  return allowedRoles.includes(finalRole || "");
+  return can(normalizeRole(role), capability);
 }

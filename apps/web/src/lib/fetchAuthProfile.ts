@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { useAuthStore } from "../store/authStore";
 import { normalizeProfileStatus } from "./profile";
-import type { UserProfile } from "@trainers/types";
+import { normalizeRole, type UserProfile } from "@trainers/types";
 
 function isMissingIsDeletedColumn(
   error: { code?: string; message?: string } | null | undefined,
@@ -33,7 +33,10 @@ export async function fetchAuthProfile(
     }
   }
 
-  if (profile) {
+  const role = normalizeRole(profile?.role);
+  if (profile && !role) profile = null;
+  if (profile && role) {
+    profile.role = role;
     profile.status = normalizeProfileStatus(
       profile.status,
     ) as UserProfile["status"];

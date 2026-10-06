@@ -1,10 +1,4 @@
-import {
-  Shield,
-  UserCheck,
-  Layers,
-  Activity,
-  History,
-} from "lucide-react";
+import { Shield, UserCheck, Layers, Activity, History } from "lucide-react";
 import { APP_MODULES } from "../../lib/app-config";
 
 export const SIDAK_CHILDREN = [
@@ -16,7 +10,7 @@ export const SIDAK_CHILDREN = [
   {
     to: "/sidak/reports",
     label: "Laporan",
-    allowedRoles: ["trainer", "admin"],
+    capability: "sidak.reports.view" as const,
   },
   {
     // Volume temuan ketidaksesuaian per hari. Admin/trainer melihat semua;
@@ -24,30 +18,30 @@ export const SIDAK_CHILDREN = [
     // berarti role `qa` punya akses.
     to: "/sidak/heatmap",
     label: "Heatmap",
-    allowedRoles: ["trainer", "admin", "leader"],
+    capability: "sidak.view" as const,
   },
   {
     to: "/sidak/input",
     label: "Input Temuan",
-    allowedRoles: ["trainer", "admin"],
+    capability: "sidak.config.manage" as const,
   },
   {
     to: "/sidak/periods",
     label: "Periode QA",
-    allowedRoles: ["trainer", "admin"],
+    capability: "sidak.config.manage" as const,
   },
   {
     // Read-only jadwal WFM. Role dibatasi admin+trainer di tiga lapis: nav ini,
-    // route guard, dan `requireRole` di backend. Leader/agent tidak termasuk —
+    // route guard, dan `requireCapability` di backend. Leader/agent tidak termasuk —
     // jangan menambah role lain tanpa persetujuan Fajar.
     to: "/sidak/jadwal-shifting",
     label: "Jadwal Shifting",
-    allowedRoles: ["trainer", "admin"],
+    capability: "sidak.schedule.read" as const,
   },
   {
     to: "/sidak/settings",
     label: "Parameter QA",
-    allowedRoles: ["trainer", "admin"],
+    capability: "sidak.config.manage" as const,
   },
 ];
 
@@ -56,31 +50,31 @@ export const MANAGEMENT_LINKS = [
     to: "/dashboard/users",
     label: "User Management",
     icon: Shield,
-    allowedRoles: ["trainer", "admin"],
+    capability: "admin.users" as const,
   },
   {
     to: "/dashboard/access-approval",
     label: "Access Approval",
     icon: UserCheck,
-    allowedRoles: ["trainer", "admin"],
+    capability: "admin.leaderAccess" as const,
   },
   {
     to: "/dashboard/access-groups",
     label: "Access Groups",
     icon: Layers,
-    allowedRoles: ["trainer", "admin"],
+    capability: "admin.accessGroups" as const,
   },
   {
     to: "/monitoring",
     label: "Monitoring",
     icon: Activity,
-    allowedRoles: ["trainer", "leader", "admin"],
+    capability: "monitoring.read" as const,
   },
   {
     to: "/dashboard/activities",
     label: "Activity Logs",
     icon: History,
-    allowedRoles: ["trainer", "admin"],
+    capability: "admin.activityLogs.read" as const,
   },
 ];
 
@@ -99,7 +93,7 @@ export const MOBILE_TABS = APP_MODULES.filter((module) =>
 
 export interface BreadcrumbSegment {
   label: string;
-  href?: string;  // undefined = current page (no link)
+  href?: string; // undefined = current page (no link)
 }
 
 export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
@@ -113,48 +107,132 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   // Module root detection
   if (pathname.startsWith("/sidak")) {
     crumbs.push({ label: "SIDAK", href: "/sidak" });
-    if (pathname === "/sidak") return crumbs.map((c, i) => i === crumbs.length-1 ? {...c, href: undefined} : c);
-    if (pathname === "/sidak/dashboard") { crumbs.push({ label: "Dashboard SIDAK" }); return crumbs; }
-    if (pathname === "/sidak/forecast") { crumbs.push({ label: "Forecast" }); return crumbs; }
-    if (pathname === "/sidak/input") { crumbs.push({ label: "Input Temuan" }); return crumbs; }
-    if (pathname === "/sidak/ranking") { crumbs.push({ label: "Ranking" }); return crumbs; }
-    if (pathname === "/sidak/settings") { crumbs.push({ label: "Parameter" }); return crumbs; }
-    if (pathname === "/sidak/periods") { crumbs.push({ label: "Periode" }); return crumbs; }
-    if (pathname === "/sidak/jadwal-shifting") { crumbs.push({ label: "Jadwal Shifting" }); return crumbs; }
-    if (pathname.startsWith("/sidak/agents/")) { crumbs.push({ label: "Agen", href: "/sidak/agents" }); crumbs.push({ label: "Detail" }); return crumbs; }
-    if (pathname === "/sidak/agents") { crumbs.push({ label: "Analisis Individu" }); return crumbs; }
-    if (pathname.startsWith("/sidak/reports")) { crumbs.push({ label: "Laporan" }); return crumbs; }
+    if (pathname === "/sidak")
+      return crumbs.map((c, i) =>
+        i === crumbs.length - 1 ? { ...c, href: undefined } : c,
+      );
+    if (pathname === "/sidak/dashboard") {
+      crumbs.push({ label: "Dashboard SIDAK" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/forecast") {
+      crumbs.push({ label: "Forecast" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/input") {
+      crumbs.push({ label: "Input Temuan" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/ranking") {
+      crumbs.push({ label: "Ranking" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/settings") {
+      crumbs.push({ label: "Parameter" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/periods") {
+      crumbs.push({ label: "Periode" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/jadwal-shifting") {
+      crumbs.push({ label: "Jadwal Shifting" });
+      return crumbs;
+    }
+    if (pathname.startsWith("/sidak/agents/")) {
+      crumbs.push({ label: "Agen", href: "/sidak/agents" });
+      crumbs.push({ label: "Detail" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/agents") {
+      crumbs.push({ label: "Analisis Individu" });
+      return crumbs;
+    }
+    if (pathname.startsWith("/sidak/reports")) {
+      crumbs.push({ label: "Laporan" });
+      return crumbs;
+    }
     crumbs.push({ label: pathname.split("/").pop() || "" });
     return crumbs;
   }
 
-  if (pathname.startsWith("/ketik")) { return [{ label: "KETIK" }]; }
+  if (pathname.startsWith("/ketik")) {
+    return [{ label: "KETIK" }];
+  }
   if (pathname.startsWith("/pdkt")) {
     crumbs.push({ label: "PDKT", href: "/pdkt" });
-    if (pathname === "/pdkt/simulation") { crumbs.push({ label: "Simulasi" }); return crumbs; }
-    return crumbs.map((c, i) => i === crumbs.length-1 ? {...c, href: undefined} : c);
+    if (pathname === "/pdkt/simulation") {
+      crumbs.push({ label: "Simulasi" });
+      return crumbs;
+    }
+    return crumbs.map((c, i) =>
+      i === crumbs.length - 1 ? { ...c, href: undefined } : c,
+    );
   }
   if (pathname.startsWith("/telefun")) {
     crumbs.push({ label: "Telefun", href: "/telefun" });
-    if (pathname.startsWith("/telefun/replay")) { crumbs.push({ label: "Replay" }); return crumbs; }
-    return crumbs.map((c, i) => i === crumbs.length-1 ? {...c, href: undefined} : c);
+    if (pathname.startsWith("/telefun/replay")) {
+      crumbs.push({ label: "Replay" });
+      return crumbs;
+    }
+    return crumbs.map((c, i) =>
+      i === crumbs.length - 1 ? { ...c, href: undefined } : c,
+    );
   }
   if (pathname.startsWith("/profiler")) {
     crumbs.push({ label: "KTP", href: "/profiler" });
-    if (pathname === "/profiler/table") { crumbs.push({ label: "Tabel" }); return crumbs; }
-    if (pathname === "/profiler/add") { crumbs.push({ label: "Tambah" }); return crumbs; }
-    if (pathname === "/profiler/import") { crumbs.push({ label: "Import" }); return crumbs; }
-    if (pathname === "/profiler/teams") { crumbs.push({ label: "Tim" }); return crumbs; }
-    return crumbs.map((c, i) => i === crumbs.length-1 ? {...c, href: undefined} : c);
+    if (pathname === "/profiler/table") {
+      crumbs.push({ label: "Tabel" });
+      return crumbs;
+    }
+    if (pathname === "/profiler/add") {
+      crumbs.push({ label: "Tambah" });
+      return crumbs;
+    }
+    if (pathname === "/profiler/import") {
+      crumbs.push({ label: "Import" });
+      return crumbs;
+    }
+    if (pathname === "/profiler/teams") {
+      crumbs.push({ label: "Tim" });
+      return crumbs;
+    }
+    return crumbs.map((c, i) =>
+      i === crumbs.length - 1 ? { ...c, href: undefined } : c,
+    );
   }
-  if (pathname === "/monitoring") { return [{ label: "Monitoring" }]; }
-  if (pathname === "/account") { return [{ label: "Akun" }]; }
+  if (pathname === "/monitoring") {
+    return [{ label: "Monitoring" }];
+  }
+  if (pathname === "/account") {
+    return [{ label: "Akun" }];
+  }
 
   // Dashboard management
-  if (pathname === "/dashboard/users") { return [{ label: "Dashboard", href: "/dashboard" }, { label: "Kelola Pengguna" }]; }
-  if (pathname === "/dashboard/access-approval") { return [{ label: "Dashboard", href: "/dashboard" }, { label: "Persetujuan Akses" }]; }
-  if (pathname === "/dashboard/access-groups") { return [{ label: "Dashboard", href: "/dashboard" }, { label: "Grup Akses" }]; }
-  if (pathname === "/dashboard/activities") { return [{ label: "Dashboard", href: "/dashboard" }, { label: "Log Aktivitas" }]; }
+  if (pathname === "/dashboard/users") {
+    return [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Kelola Pengguna" },
+    ];
+  }
+  if (pathname === "/dashboard/access-approval") {
+    return [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Persetujuan Akses" },
+    ];
+  }
+  if (pathname === "/dashboard/access-groups") {
+    return [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Grup Akses" },
+    ];
+  }
+  if (pathname === "/dashboard/activities") {
+    return [
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Log Aktivitas" },
+    ];
+  }
 
   return [{ label: "Trainers SuperApp" }];
 }

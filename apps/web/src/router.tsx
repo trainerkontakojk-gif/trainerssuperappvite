@@ -3,10 +3,11 @@ import {
   createRoute,
   createRootRoute,
   redirect,
+  isRedirect,
 } from "@tanstack/react-router";
 import { lazy } from "react";
 import { DashboardLayout } from "./components/Layout";
-import { isRoleAllowed } from "./lib/app-config";
+import { can, LEADER_APPROVAL_MODULE, type Capability } from "@trainers/types";
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
 import { fetchApi } from "./hooks/useApi";
@@ -77,28 +78,28 @@ const dashboardUsersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard/users",
   component: DashboardUsers,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("admin.users"),
 });
 
 const dashboardAccessGroupsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard/access-groups",
   component: DashboardAccessGroups,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("admin.accessGroups"),
 });
 
 const dashboardAccessApprovalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard/access-approval",
   component: DashboardAccessApproval,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("admin.leaderAccess"),
 });
 
 const dashboardActivitiesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard/activities",
   component: DashboardActivities,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("admin.activityLogs.read"),
 });
 
 /**
@@ -126,18 +127,14 @@ const profilerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler",
   component: ProfilerLanding,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireCapability("profiler.landing"),
 });
 
 const profilerTableRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/table",
   component: ProfilerTable,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: requireCapability("profiler.view"),
 });
 
 const profilerSlidesRoute = createRoute({
@@ -162,94 +159,70 @@ const profilerAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/add",
   component: ProfilerAdd,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: requireCapability("profiler.view"),
 });
 
 const profilerImportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/import",
   component: ProfilerImport,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: requireCapability("profiler.view"),
 });
 
 const profilerTeamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/teams",
   component: ProfilerTeams,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: requireCapability("profiler.view"),
 });
 
 const sidakRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak",
   component: SidakLanding,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireCapability("sidak.landing"),
 });
 
 const sidakDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/dashboard",
   component: SidakDashboard,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakForecastRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/forecast",
   component: SidakForecast,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakInputRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/input",
   component: SidakInput,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.config.manage"),
 });
 
 const sidakRankingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/ranking",
   component: SidakRanking,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/settings",
   component: SidakSettings,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.config.manage"),
 });
 
 const sidakPeriodsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/periods",
   component: SidakPeriods,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.config.manage"),
 });
 
 const sidakHeatmapRoute = createRoute({
@@ -258,11 +231,7 @@ const sidakHeatmapRoute = createRoute({
   component: SidakHeatmap,
   // Admin/trainer (semua data) + leader (hanya scope tim-nya). Leader tetap
   // harus punya modul SIDAK disetujui — tiga lapis: nav, beforeLoad, backend.
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "admin", "leader"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakJadwalShiftingRoute = createRoute({
@@ -322,51 +291,43 @@ const sidakJadwalShiftingRoute = createRoute({
     return validated;
   },
   // Hanya `admin` + `trainer`. Guard ini untuk navigasi/UX; penegakan yang
-  // sebenarnya ada di backend `requireRole("admin", "trainer")`.
-  beforeLoad: requireRole(["trainer", "admin"]),
+  // sebenarnya ada di backend `requireCapability("telefun.use")`.
+  beforeLoad: requireCapability("sidak.schedule.read"),
 });
 
 const sidakAgentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents",
   component: SidakAgents,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakAgentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents/$id",
   component: SidakAgentDetail,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "sidak",
-    "/sidak",
-  ),
+  beforeLoad: requireCapability("sidak.view"),
 });
 
 const sidakReportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports",
   component: SidakReportsLanding,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.reports.view"),
 });
 
 const sidakReportsDataRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports-data",
   component: SidakReportsData,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.reports.view"),
 });
 
 const sidakReportsAiRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports-ai",
   component: SidakReportsAi,
-  beforeLoad: requireRole(["trainer", "admin"]),
+  beforeLoad: requireCapability("sidak.reports.view"),
 });
 
 const ketikRoute = createRoute({
@@ -396,27 +357,27 @@ const pdktRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt",
   component: PdktLanding,
-  beforeLoad: requireRole(["trainer", "leader", "admin", "agent"]),
+  beforeLoad: requireCapability("pdkt.use"),
 });
 
 const pdktSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/simulation",
   component: PdktSimulation,
-  beforeLoad: requireRole(["trainer", "leader", "admin", "agent"]),
+  beforeLoad: requireCapability("pdkt.use"),
 });
 
 const pdktHistoryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/history",
   component: PdktHistory,
-  beforeLoad: requireRole(["trainer", "leader", "admin", "agent"]),
+  beforeLoad: requireCapability("pdkt.use"),
 });
 
 const monitoringRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/monitoring",
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireCapability("monitoring.read"),
   component: MonitoringPage,
 });
 
@@ -506,78 +467,30 @@ function requireAuth() {
   };
 }
 
-function requireRole(allowedRoles: string[]) {
+export function requireCapability(capability: Capability) {
   return async () => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/" });
-    }
-
-    try {
-      // Revalidate profile from server to prevent spoofing
-      const profile = await fetchAuthProfile(session.user.id);
-
-      if (!profile) {
-        throw redirect({ to: "/" });
-      }
-
-      if (profile.is_deleted || profile.status === "inactive") {
-        throw redirect({ to: "/waiting-approval" });
-      }
-
-      if (!isRoleAllowed(profile.role, allowedRoles)) {
-        throw redirect({ to: "/unauthorized" });
-      }
-    } catch (error) {
-      console.error("Auth revalidation error:", error);
-      // On network error or other failure, default deny
-      throw redirect({ to: "/unauthorized" });
-    }
-  };
-}
-
-export function requireLeaderModuleApproval(
-  allowedRoles: string[],
-  module: "ktp" | "sidak",
-  landingPath: string,
-) {
-  return async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/" });
-    }
-
+    if (!session) throw redirect({ to: "/" });
     try {
       const profile = await fetchAuthProfile(session.user.id);
-
-      if (!profile) {
-        throw redirect({ to: "/" });
-      }
-
-      if (profile.is_deleted || profile.status === "inactive") {
+      if (!profile) throw redirect({ to: "/" });
+      if (profile.is_deleted || profile.status === "inactive")
         throw redirect({ to: "/waiting-approval" });
-      }
-
-      if (!isRoleAllowed(profile.role, allowedRoles)) {
+      if (!can(profile.role, capability))
         throw redirect({ to: "/unauthorized" });
-      }
-
-      if (profile.role === "leader") {
-        const accessData =
+      const module = LEADER_APPROVAL_MODULE[capability];
+      if (module && profile.role === "leader") {
+        const access =
           await fetchApi<Record<string, { status: string }>>(
             "/me/access-status",
           );
-        const moduleStatus = accessData[module]?.status;
-        if (moduleStatus !== "approved") {
-          throw redirect({ to: landingPath });
-        }
+        if (access[module]?.status !== "approved")
+          throw redirect({ to: module === "ktp" ? "/profiler" : "/sidak" });
       }
-    } catch (error: any) {
-      if (error.isRedirect) throw error;
+    } catch (error: unknown) {
+      if (isRedirect(error)) throw error;
       console.error("Auth revalidation error:", error);
       throw redirect({ to: "/unauthorized" });
     }

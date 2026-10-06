@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
 import {
   BarChart3,
@@ -70,7 +71,7 @@ const CARDS = [
 export default function SidakLanding() {
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role ?? "";
-  const isManager = ["trainer", "admin"].includes(role?.toLowerCase());
+  const isManager = can(normalizeRole(role), "sidak.config.manage");
 
   const visibleCards = CARDS.filter((c) => !c.managerOnly || isManager);
 

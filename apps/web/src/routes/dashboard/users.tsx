@@ -1,3 +1,4 @@
+import { ROLES, can, normalizeRole } from "@trainers/types";
 import { useState, useEffect } from "react";
 import { Search, Users, Trash2 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
@@ -20,20 +21,18 @@ import {
 } from "../../components/ui/select";
 import { Skeleton } from "../../components/ui/skeleton";
 
-type ManagerRole = "trainer" | "admin";
 type UserStatus = "approved" | "pending" | "rejected";
 
-const ROLE_OPTIONS: Record<ManagerRole, string[]> = {
-  trainer: ["agent", "leader", "trainer"],
-  admin: ["agent", "leader", "trainer", "admin"],
-};
+function roleOptions(role: string | null) {
+  const actorRole = normalizeRole(role);
+  if (!can(actorRole, "admin.users")) return [];
+  return ROLES.filter(
+    (target) => target !== "admin" || can(actorRole, "admin.users.manageAdmin"),
+  );
+}
 
 function normalizeRoleValue(role?: string | null) {
-  const value = role?.toLowerCase().trim() ?? "";
-  if (value === "trainers") return "trainer";
-  if (value === "agents") return "agent";
-  if (["agent", "leader", "trainer", "admin"].includes(value)) return value;
-  return "agent";
+  return normalizeRole(role) ?? "";
 }
 
 function normalizeRoleLabel(role?: string | null) {
@@ -63,9 +62,7 @@ function normalizeStatusLabel(status?: string | null) {
 
 export default function UsersPage() {
   const currentProfile = useAuthStore((s) => s.profile);
-  const managerRole = (
-    currentProfile?.role?.toLowerCase() === "admin" ? "admin" : "trainer"
-  ) as ManagerRole;
+  const managerRole = normalizeRole(currentProfile?.role);
 
   const {
     data: initialUsers,
@@ -413,7 +410,7 @@ export default function UsersPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {ROLE_OPTIONS[managerRole].map((option) => (
+                            {roleOptions(managerRole).map((option) => (
                               <SelectItem key={option} value={option}>
                                 {normalizeRoleLabel(option)}
                               </SelectItem>

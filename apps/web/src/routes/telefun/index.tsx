@@ -1,3 +1,4 @@
+import { can } from "@trainers/types";
 import {
   useState,
   useEffect,
@@ -131,8 +132,9 @@ export default function TelefunLanding() {
   const authSession = useAuthStore((st) => st.session);
   const authProfile = useAuthStore((st) => st.profile);
   const accountKey = authSession?.user?.id ?? null;
-  const canPickParticipant = ["admin", "trainer"].includes(
-    authProfile?.role?.trim().toLowerCase() || "",
+  const canPickParticipant = can(
+    authProfile?.role,
+    "simulation.subject.select",
   );
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);

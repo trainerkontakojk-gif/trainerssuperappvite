@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserCog, Sun, Moon, LogOut, BarChart3 } from "lucide-react";
-import { APP_MODULES, isRoleAllowed } from "../../lib/app-config";
+import { APP_MODULES, isCapabilityAllowed } from "../../lib/app-config";
 import { SIDAK_CHILDREN, MANAGEMENT_LINKS } from "./nav-config";
 import { ThemeMode } from "../../hooks/useThemeMode";
 
@@ -31,10 +31,10 @@ export function MobileDrawer({
   const { pathname } = useLocation();
 
   const modules = APP_MODULES.filter((m) =>
-    isRoleAllowed(profile?.role, m.allowedRoles),
+    isCapabilityAllowed(profile?.role, m.capability),
   );
   const managementLinks = MANAGEMENT_LINKS.filter((l) =>
-    isRoleAllowed(profile?.role, l.allowedRoles),
+    isCapabilityAllowed(profile?.role, l.capability),
   );
 
   const isModuleActive = (moduleHref: string) => {
@@ -72,9 +72,7 @@ export function MobileDrawer({
           >
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-2">
-              <div
-                className="h-1.5 w-12 rounded-full bg-neutral-300 dark:bg-neutral-700"
-              />
+              <div className="h-1.5 w-12 rounded-full bg-neutral-300 dark:bg-neutral-700" />
             </div>
 
             {/* User info */}
@@ -129,7 +127,7 @@ export function MobileDrawer({
                 </p>
                 <div className="space-y-1">
                   {SIDAK_CHILDREN.filter((item) =>
-                    isRoleAllowed(profile?.role, item.allowedRoles),
+                    isCapabilityAllowed(profile?.role, item.capability),
                   ).map((item) => {
                     const active = item.exactMatch
                       ? pathname === item.to
@@ -204,7 +202,11 @@ export function MobileDrawer({
                 }}
                 className="flex items-center justify-center gap-2 rounded-xl py-2.5 px-4 text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
               </button>
               <button
                 onClick={() => {

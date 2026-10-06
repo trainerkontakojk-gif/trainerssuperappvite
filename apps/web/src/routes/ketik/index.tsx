@@ -1,3 +1,4 @@
+import { can, normalizeRole } from "@trainers/types";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, History, Play, BarChart3 } from "lucide-react";
@@ -41,9 +42,12 @@ export default function KetikLanding() {
   const profile = useAuthStore((s) => s.profile);
   const normalizedRole = profile?.role?.trim().toLowerCase() || "";
   const canManageTemplates = normalizedRole === "admin";
-  const canStartReview = ["admin", "trainer", "qa"].includes(normalizedRole);
+  const canStartReview = can(normalizeRole(normalizedRole), "ketik.review");
   const accountKey = userId ?? null;
-  const canPickParticipant = ["admin", "trainer"].includes(normalizedRole);
+  const canPickParticipant = can(
+    normalizeRole(normalizedRole),
+    "simulation.subject.select",
+  );
   const [view, setView] = useState<"home" | "chat">("home");
   const [settings, setSettings] = useState<KetikAppSettings>(
     DEFAULT_KETIK_SETTINGS,
