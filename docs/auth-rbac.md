@@ -557,7 +557,7 @@ Urutan apply remote (tetap butuh otorisasi terpisah):
 2. Apply migrasi **sebelum** deploy kode baru, karena `authMiddleware` baru menolak role di luar empat nilai.
 3. Deploy API/web/Telefun.
 
-Temuan terpisah, di luar plan ini: remote tidak punya policy SELECT untuk `telefun_coaching_summary` dan `telefun_replay_annotations` padahal RLS aktif (drift dari migrasi lokal). Perlu audit apakah ada pembacaan lewat user JWT.
+Temuan terpisah, di luar plan ini: remote tidak punya policy untuk `telefun_coaching_summary` dan `telefun_replay_annotations` padahal RLS aktif (drift dari migrasi lokal). Audit 2026-10-06: semua akses lewat service-role di backend, tidak ada pembacaan via user JWT; drift diterima dan aturannya dicatat di `docs/database.md` (Catatan drift Telefun).
 
 ### Rencana lanjutan RLS peserta
 
