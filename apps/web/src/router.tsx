@@ -51,9 +51,6 @@ const WaitingApprovalPage = lazy(() => import("./routes/waiting-approval"));
 const ResetPasswordPage = lazy(() => import("./routes/reset-password"));
 const ProfilerLanding = lazy(() => import("./routes/profiler/index"));
 const ProfilerTable = lazy(() => import("./routes/profiler/table"));
-const ProfilerSlides = lazy(() => import("./routes/profiler/slides"));
-const ProfilerAnalytics = lazy(() => import("./routes/profiler/analytics"));
-const ProfilerExport = lazy(() => import("./routes/profiler/export"));
 const ProfilerAdd = lazy(() => import("./routes/profiler/add"));
 const ProfilerImport = lazy(() => import("./routes/profiler/import"));
 const ProfilerTeams = lazy(() => import("./routes/profiler/teams"));
@@ -104,6 +101,27 @@ const dashboardActivitiesRoute = createRoute({
   beforeLoad: requireRole(["trainer", "admin"]),
 });
 
+/**
+ * Statistik, Slide, dan Ekspor kini tab di workspace `/profiler`
+ * (`?view=`). Route lama tetap ada sebagai deep link dan diteruskan ke tab
+ * yang sesuai. `searchStr` dibaca mentah supaya nama batch tidak di-parse
+ * ulang menjadi angka/JSON.
+ */
+const redirectToProfilerView =
+  (view: "statistik" | "slide" | "ekspor") =>
+  ({ location }: { location: { searchStr: string } }) => {
+    const params = new URLSearchParams(location.searchStr);
+    const batch = params.get("batch");
+    const participant = params.get("participant");
+    const search: Record<string, string> = {};
+    if (batch) {
+      search.batch = batch;
+      search.view = view;
+      if (view === "slide" && participant) search.participant = participant;
+    }
+    throw redirect({ to: "/profiler", search, replace: true });
+  };
+
 const profilerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler",
@@ -125,34 +143,19 @@ const profilerTableRoute = createRoute({
 const profilerSlidesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/slides",
-  component: ProfilerSlides,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: redirectToProfilerView("slide"),
 });
 
 const profilerAnalyticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/analytics",
-  component: ProfilerAnalytics,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: redirectToProfilerView("statistik"),
 });
 
 const profilerExportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/export",
-  component: ProfilerExport,
-  beforeLoad: requireLeaderModuleApproval(
-    ["trainer", "leader", "admin"],
-    "ktp",
-    "/profiler",
-  ),
+  beforeLoad: redirectToProfilerView("ekspor"),
 });
 
 const profilerAddRoute = createRoute({
@@ -609,9 +612,7 @@ const dashboardMonitoringRedirectRoute = createRoute({
 const profilerDownloadRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/download",
-  beforeLoad: () => {
-    throw redirect({ to: "/profiler/export" });
-  },
+  beforeLoad: redirectToProfilerView("ekspor"),
 });
 
 const pendingRedirectRoute = createRoute({
@@ -625,9 +626,7 @@ const pendingRedirectRoute = createRoute({
 const previewProfilerSlidesRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/preview/profiler-slides",
-  beforeLoad: () => {
-    throw redirect({ to: "/profiler/slides" });
-  },
+  beforeLoad: redirectToProfilerView("slide"),
 });
 
 const routeTree = rootRoute.addChildren([

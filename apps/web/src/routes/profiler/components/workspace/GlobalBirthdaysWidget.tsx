@@ -104,7 +104,7 @@ export default function GlobalBirthdaysWidget({
               </span>
             ) : (
               <span className="mt-1 text-xs text-muted-foreground">
-                No data available
+                Belum ada ulang tahun terdekat
               </span>
             ))}
         </span>

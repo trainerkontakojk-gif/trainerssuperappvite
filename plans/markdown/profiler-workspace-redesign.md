@@ -48,3 +48,43 @@ Kriteria penerimaan:
 - Tambahan di luar rencana awal: `useProfilerAccess` kini membaca role dari auth store (sumber yang sama dengan guard), menggantikan query `profiles` terpisah; error muat peserta kini tampil dengan "Coba lagi" alih-alih tampak sebagai batch kosong.
 - Tidak dijalankan: unit test (butuh persetujuan), `graphify update .`, review `thermo-nuclear`/`ui-ux-pro-max` (tidak tersedia di host ini).
 - Diketahui: lookup batch tetap berbasis nama (kontrak lama `counts`/`peserta/batch/:name`); nama sama di dua tahun akan memilih yang pertama.
+
+## Tahap 2 — Statistik, Slide, Ekspor di dalam workspace
+
+### Requirement
+
+- Tab **Statistik**, **Slide**, dan **Ekspor** dirender di dalam workspace batch, memakai data peserta yang sudah dimuat workspace (tanpa fetch ulang). Tab aktif disimpan di URL `?view=statistik|slide|ekspor`; peserta yang sedang ditampilkan di Slide disimpan di `?participant=`.
+- **Tabel lengkap** tetap tautan ke `/profiler/table` (penyuntingan, urutan, pindah folder).
+- Deep link lama `/profiler/analytics`, `/profiler/slides`, `/profiler/export` (dan alias `/profiler/download`, `/preview/profiler-slides`) diarahkan ke workspace dengan `batch`/`view`/`participant` yang sesuai.
+- Konten tidak berubah: grafik + daftar peserta per segmen, slide + mode + simpan PNG/PDF + navigasi, ekspor Excel/CSV/PPTX/PDF dengan orientasi. Kartu ringkasan dekoratif ("Batch aktif", "Mode akses", ikon-tile) diganti satu baris ringkasan.
+- Tab tetap tersedia untuk peran hanya-baca (semuanya operasi baca/unduh).
+
+### Design
+
+- Panel baru di `components/workspace/panels/`: `ProfilerStatsPanel`, `ProfilerSlidesPanel`, `ProfilerExportPanel`, diambil dari isi `analytics.tsx`, `slides.tsx`, `export.tsx`; dimuat lazy agar recharts/pptx/pdf tidak masuk chunk awal `/profiler`.
+- Route `analytics`/`slides`/`export` menjadi redirect di `router.tsx` (membaca `searchStr` mentah); file route dan `ProfilerExportToolbar` dihapus. Breadcrumb di `nav-config.ts` dan `ProfilerRouteNav` diarahkan ke view workspace.
+- E2E: perluas `profiler-workspace.spec.ts` (tab di URL, isi tiap panel, unduhan Excel nyata dari data mock, redirect deep link, overflow 375px per tab).
+
+### Tasklist
+
+- [x] E2E RED untuk tab, redirect, dan unduhan.
+- [x] Ekstrak panel + wiring tab/URL; redirect route lama; hapus file tergantikan.
+- [x] Typecheck, lint, build, diff check, detector Impeccable, screenshot review.
+- [x] Perbarui `docs/modules.md`.
+
+### Verification
+
+- RED: `npx playwright test profiler-workspace.spec.ts` (apps/web) — 9 tes baru/diubah gagal (tab belum ada, redirect belum ada), 7 tes Tahap 1 tetap lulus.
+- GREEN: `npx playwright test profiler-workspace.spec.ts profiler.spec.ts sidebar-nav-state.spec.ts` — 21/21 lulus, Chromium lokal hermetic. Termasuk: unduhan Excel nyata (`Batch Pagi_peserta.xlsx`), tidak ada fetch peserta tambahan saat pindah tab, redirect 3 deep link lama, `?participant=` tahan reload, 375 px tanpa overflow per tab.
+- `pnpm --filter @trainers/web typecheck` — exit 0. `pnpm --filter @trainers/web build` — exit 0; panel terpisah menjadi chunk lazy (Stats 6.8 kB, Slides 19.6 kB, Export 29.8 kB sebelum gzip).
+- ESLint file yang diubah — 0 error; `router.tsx` 37 warning react-refresh (40 di HEAD, pola `lazy()` lama).
+- Prettier (file yang diubah) dan `git diff --check` — bersih. `impeccable detect --json` pada 4 file UI — `[]`.
+- Review visual 1440 px dan 375 px per tab: slide landscape di layar sempit kini bisa digulir (sebelumnya terpotong kiri-kanan); tombol "Unduh" punya nama aksesibel per format.
+- Catatan: `useProfilerAccess`/akses leader ke tab kini lewat `LeaderAccessGate` di `/profiler` (route lama memakai `requireLeaderModuleApproval`); otorisasi data tetap di backend.
+- Tidak dijalankan: unit test, `graphify update .`, review `thermo-nuclear`/`ui-ux-pro-max` (tidak tersedia di host ini).
+
+### Tambahan — widget ulang tahun global
+
+- Teks kosong "No data available" diganti "Belum ada ulang tahun terdekat".
+- Unit test `global-birthdays-widget.test.tsx` diganti E2E `apps/web/e2e/profiler-global-birthdays.spec.ts` (kartu terdekat vs daftar lengkap di popup + `limit=5`, state kosong, error server lalu "Coba lagi" memanggil ulang API). RED: tes state kosong gagal pada teks lama; GREEN 3/3. Unit test dihapus setelah E2E hijau (tidak terdaftar di manifest suite).
+- Gate gabungan: `npx playwright test profiler-workspace.spec.ts profiler-global-birthdays.spec.ts profiler.spec.ts sidebar-nav-state.spec.ts` — 24/24 lulus; typecheck exit 0; `git diff --check` bersih.

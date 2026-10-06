@@ -10,6 +10,10 @@ import type {
 import ProfilerLibraryNav from "./components/workspace/ProfilerLibraryNav";
 import ProfilerYearOverview from "./components/workspace/ProfilerYearOverview";
 import ProfilerBatchWorkspace from "./components/workspace/ProfilerBatchWorkspace";
+import {
+  parseProfilerBatchView,
+  type ProfilerBatchView,
+} from "./components/workspace/batch-views";
 import { cleanYearLabel } from "./components/workspace/workspace-utils";
 import DuplicateFolderModal from "./components/DuplicateFolderModal";
 import AddMemberPicker from "./components/AddMemberPicker";
@@ -42,7 +46,9 @@ export default function ProfilerLanding() {
   const { isReadOnly } = useProfilerAccess();
   const navigate = useNavigate();
   // Batch aktif hidup di URL (`?batch=`) supaya tahan refresh, back, dan bisa dibagikan.
-  const selectedBatch = useQueryParams().batch ?? "";
+  const queryParams = useQueryParams();
+  const selectedBatch = queryParams.batch ?? "";
+  const activeView = parseProfilerBatchView(queryParams.view);
 
   const [years, setYears] = useState<ProfilerYear[]>([]);
   const [folders, setFolders] = useState<ProfilerFolder[]>([]);
@@ -79,11 +85,18 @@ export default function ProfilerLanding() {
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
 
   const selectBatch = useCallback(
-    (name: string, options: { replace?: boolean } = {}) => {
+    (
+      name: string,
+      options: { replace?: boolean; view?: ProfilerBatchView | null } = {},
+    ) => {
       setIsNavOpen(false);
       navigate({
         to: "/profiler",
-        search: name ? { batch: name } : {},
+        search: !name
+          ? {}
+          : options.view
+            ? { batch: name, view: options.view }
+            : { batch: name },
         replace: options.replace,
       });
     },
@@ -215,7 +228,8 @@ export default function ProfilerLanding() {
         delete next[oldName];
         return next;
       });
-      if (selectedBatch === oldName) selectBatch(newName, { replace: true });
+      if (selectedBatch === oldName)
+        selectBatch(newName, { replace: true, view: activeView });
       setRenamingFolder(null);
     } catch (err: any) {
       alert("Gagal rename: " + err.message);
@@ -282,7 +296,8 @@ export default function ProfilerLanding() {
       setSelectedYearId(id);
       if (activeFolder && activeFolder.year_id !== id) selectBatch("");
     },
-    onSelectBatch: (name: string) => selectBatch(name),
+    // Tab aktif ikut terbawa saat berpindah batch (mis. membandingkan statistik).
+    onSelectBatch: (name: string) => selectBatch(name, { view: activeView }),
     onAddYear: () => setShowAddYear(true),
     onAddFolder: (yearId: string, parentId?: string) => {
       setIsNavOpen(false);
@@ -344,6 +359,8 @@ export default function ProfilerLanding() {
                 key={activeFolder.name}
                 batchName={activeFolder.name}
                 teamName={activeTeamName}
+                view={activeView}
+                participantId={queryParams.participant ?? null}
                 peserta={batchPeserta ?? []}
                 loading={!batchPeserta && !pesertaError}
                 error={pesertaError}

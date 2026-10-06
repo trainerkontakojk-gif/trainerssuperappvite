@@ -142,9 +142,6 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   if (pathname.startsWith("/profiler")) {
     crumbs.push({ label: "KTP", href: "/profiler" });
     if (pathname === "/profiler/table") { crumbs.push({ label: "Tabel" }); return crumbs; }
-    if (pathname === "/profiler/analytics") { crumbs.push({ label: "Analitik" }); return crumbs; }
-    if (pathname === "/profiler/slides") { crumbs.push({ label: "Slides" }); return crumbs; }
-    if (pathname === "/profiler/export") { crumbs.push({ label: "Export" }); return crumbs; }
     if (pathname === "/profiler/add") { crumbs.push({ label: "Tambah" }); return crumbs; }
     if (pathname === "/profiler/import") { crumbs.push({ label: "Import" }); return crumbs; }
     if (pathname === "/profiler/teams") { crumbs.push({ label: "Tim" }); return crumbs; }

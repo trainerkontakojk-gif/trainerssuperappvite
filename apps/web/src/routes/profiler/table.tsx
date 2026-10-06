@@ -410,8 +410,8 @@ export default function ProfilerTable() {
                     aria-label="Ekspor peserta"
                     onClick={() =>
                       router.navigate({
-                        to: "/profiler/export",
-                        search: { batch: batchName },
+                        to: "/profiler",
+                        search: { batch: batchName, view: "ekspor" },
                       })
                     }
                   >

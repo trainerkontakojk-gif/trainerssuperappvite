@@ -1,7 +1,6 @@
-import { BarChart3, GalleryHorizontal, Table2 } from "lucide-react";
+import { GalleryHorizontal, Table2 } from "lucide-react";
 import { useRouter } from "@tanstack/react-router";
 import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
-import { Button } from "../../../components/ui/button";
 
 export type ProfilerRouteTab = "table" | "slides";
 
@@ -18,7 +17,10 @@ export function ProfilerRouteNav({ active, batchName }: ProfilerRouteNavProps) {
       router.navigate({ to: "/profiler/table", search: { batch: batchName } });
     }
     if (value === "slides") {
-      router.navigate({ to: "/profiler/slides", search: { batch: batchName } });
+      router.navigate({
+        to: "/profiler",
+        search: { batch: batchName, view: "slide" },
+      });
     }
   };
 
@@ -39,26 +41,5 @@ export function ProfilerRouteNav({ active, batchName }: ProfilerRouteNavProps) {
         </TabsTrigger>
       </TabsList>
     </Tabs>
-  );
-}
-
-export function ProfilerAnalyticsLink({ batchName }: { batchName: string }) {
-  const router = useRouter();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="lg"
-      onClick={() =>
-        router.navigate({
-          to: "/profiler/analytics",
-          search: { batch: batchName },
-        })
-      }
-      className="min-h-11 text-muted-foreground"
-    >
-      <BarChart3 aria-hidden="true" className="size-4" />
-      Analytics
-    </Button>
   );
 }

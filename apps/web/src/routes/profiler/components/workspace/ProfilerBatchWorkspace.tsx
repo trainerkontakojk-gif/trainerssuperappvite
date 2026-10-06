@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ProfilerPeserta } from "@trainers/types";
 import {
+  ArrowUpRight,
   Cake,
   ChevronDown,
   FileSpreadsheet,
@@ -26,21 +27,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "cn";
 
 import type { BirthdayEntry } from "../../utils/birthday";
+import type { ProfilerBatchView } from "./batch-views";
 import { ProfilerParticipantGrid } from "../table/ProfilerParticipantGrid";
 
 /** Baris ulang tahun hanya muncul untuk yang jatuh dalam rentang ini. */
 const BIRTHDAY_WINDOW_DAYS = 7;
 
-const VIEW_LINKS = [
-  { label: "Statistik", to: "/profiler/analytics" },
-  { label: "Slide", to: "/profiler/slides" },
-  { label: "Ekspor", to: "/profiler/export" },
-  { label: "Tabel lengkap", to: "/profiler/table" },
-] as const;
+const VIEW_TABS: { label: string; view: ProfilerBatchView | null }[] = [
+  { label: "Peserta", view: null },
+  { label: "Statistik", view: "statistik" },
+  { label: "Slide", view: "slide" },
+  { label: "Ekspor", view: "ekspor" },
+];
+
+// Panel berat (recharts, ekspor PPTX/PDF, canvas slide) dimuat saat tabnya dibuka.
+const ProfilerStatsPanel = lazy(() => import("./panels/ProfilerStatsPanel"));
+const ProfilerSlidesPanel = lazy(() => import("./panels/ProfilerSlidesPanel"));
+const ProfilerExportPanel = lazy(() => import("./panels/ProfilerExportPanel"));
+
+const EMPTY_SELECTION = new Set<string>();
 
 interface ProfilerBatchWorkspaceProps {
   batchName: string;
   teamName: string | null;
+  /** Tab aktif dari `?view=`; `null` = daftar peserta. */
+  view: ProfilerBatchView | null;
+  participantId: string | null;
   peserta: ProfilerPeserta[];
   loading: boolean;
   error: string | null;
@@ -56,6 +68,8 @@ const noop = () => {};
 export default function ProfilerBatchWorkspace({
   batchName,
   teamName,
+  view,
+  participantId,
   peserta,
   loading,
   error,
@@ -156,136 +170,186 @@ export default function ProfilerBatchWorkspace({
         className="-mx-4 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
       >
         <ul className="flex min-w-max gap-1">
+          {VIEW_TABS.map((tab) => {
+            const isActive = tab.view === view;
+            return (
+              <li key={tab.label}>
+                <Link
+                  to="/profiler"
+                  search={tab.view ? { ...search, view: tab.view } : search}
+                  // TanStack memberi aria-current ke link aktif; "Peserta" harus
+                  // cocok persis agar tidak ikut aktif di tab lain, sedangkan
+                  // tab lain cocok parsial (Slide membawa `participant`).
+                  activeOptions={{ exact: tab.view === null }}
+                  className={cn(
+                    "inline-flex min-h-11 items-center border-b-2 px-3 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isActive
+                      ? "border-foreground font-semibold text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              </li>
+            );
+          })}
           <li>
-            <span
-              aria-current="page"
-              className="inline-flex min-h-11 items-center border-b-2 border-foreground px-3 text-sm font-semibold text-foreground"
+            <Link
+              to="/profiler/table"
+              search={search}
+              className="inline-flex min-h-11 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Peserta
-            </span>
+              Tabel lengkap
+              <ArrowUpRight aria-hidden="true" className="size-3.5" />
+            </Link>
           </li>
-          {VIEW_LINKS.map((view) => (
-            <li key={view.to}>
-              <Link
-                to={view.to}
-                search={search}
-                className="inline-flex min-h-11 items-center border-b-2 border-transparent px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {view.label}
-              </Link>
-            </li>
-          ))}
         </ul>
       </nav>
 
-      {soonBirthdays.length > 0 && (
-        <button
-          type="button"
-          onClick={onShowBirthdays}
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 text-left text-sm transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={onRetry}
+              className="min-h-11"
+            >
+              Coba lagi
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : loading ? (
+        <div
+          role="status"
+          aria-label="Memuat peserta"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
-          <Cake
-            aria-hidden="true"
-            className="size-4 shrink-0 text-muted-foreground"
-          />
-          <span className="min-w-0 flex-1 truncate">
-            <span className="font-medium text-foreground">Ulang tahun: </span>
-            {soonBirthdays.slice(0, 2).map((birthday, index) => (
-              <span key={`${birthday.nama}-${birthday.tglLahir}`}>
-                {index > 0 && " · "}
-                <span className="text-foreground">{birthday.nama}</span>{" "}
-                <span
-                  className={cn(
-                    birthday.days === 0
-                      ? "font-semibold text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {birthday.days === 0
-                    ? "hari ini"
-                    : `${birthday.days} hari lagi`}
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-32 rounded-xl" />
+          ))}
+        </div>
+      ) : view ? (
+        <Suspense fallback={<PanelFallback />}>
+          {view === "statistik" ? (
+            <ProfilerStatsPanel peserta={peserta} />
+          ) : view === "slide" ? (
+            <ProfilerSlidesPanel
+              batchName={batchName}
+              peserta={peserta}
+              participantId={participantId}
+              onParticipantChange={(id) =>
+                navigate({
+                  to: "/profiler",
+                  search: { ...search, view: "slide", participant: id },
+                  replace: true,
+                })
+              }
+            />
+          ) : (
+            <ProfilerExportPanel batchName={batchName} peserta={peserta} />
+          )}
+        </Suspense>
+      ) : (
+        <>
+          {soonBirthdays.length > 0 && (
+            <button
+              type="button"
+              onClick={onShowBirthdays}
+              className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 text-left text-sm transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Cake
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground"
+              />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium text-foreground">
+                  Ulang tahun:{" "}
                 </span>
+                {soonBirthdays.slice(0, 2).map((birthday, index) => (
+                  <span key={`${birthday.nama}-${birthday.tglLahir}`}>
+                    {index > 0 && " · "}
+                    <span className="text-foreground">
+                      {birthday.nama}
+                    </span>{" "}
+                    <span
+                      className={cn(
+                        birthday.days === 0
+                          ? "font-semibold text-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {birthday.days === 0
+                        ? "hari ini"
+                        : `${birthday.days} hari lagi`}
+                    </span>
+                  </span>
+                ))}
+                {soonBirthdays.length > 2 && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    +{soonBirthdays.length - 2} lainnya
+                  </span>
+                )}
               </span>
-            ))}
-            {soonBirthdays.length > 2 && (
-              <span className="text-muted-foreground">
-                {" "}
-                +{soonBirthdays.length - 2} lainnya
+              <span className="shrink-0 text-xs text-muted-foreground">
+                Lihat
               </span>
+            </button>
+          )}
+
+          <div className="flex flex-col gap-4">
+            {peserta.length > 0 && (
+              <div className="relative sm:max-w-xs">
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Cari nama peserta"
+                  aria-label="Cari peserta"
+                  className="h-11 pl-9"
+                />
+              </div>
             )}
-          </span>
-          <span className="shrink-0 text-xs text-muted-foreground">Lihat</span>
-        </button>
+            <ProfilerParticipantGrid
+              displayList={visiblePeserta}
+              sortMode={false}
+              selectMode={false}
+              selectedIds={EMPTY_SELECTION}
+              toggleSelect={noop}
+              density="compact"
+              isReadOnly={isReadOnly}
+              hasActiveFilters={query.trim().length > 0}
+              resetFilters={() => setQuery("")}
+              setSelectedPeserta={openTable}
+              onViewAnalysis={(id) =>
+                navigate({ to: "/sidak/agents/$id", params: { id } })
+              }
+              onAddPeserta={onPickPeserta}
+              dragIndex={null}
+              dragOverIndex={null}
+              handleDragStart={noop}
+              handleDragOver={noop}
+              handleDragLeave={noop}
+              handleDragEnd={noop}
+            />
+          </div>
+        </>
       )}
-
-      <div className="flex flex-col gap-4">
-        {peserta.length > 0 && (
-          <div className="relative sm:max-w-xs">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari nama peserta"
-              aria-label="Cari peserta"
-              className="h-11 pl-9"
-            />
-          </div>
-        )}
-
-        {error ? (
-          <Alert variant="destructive">
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-              <span>{error}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={onRetry}
-                className="min-h-11"
-              >
-                Coba lagi
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : loading ? (
-          <div
-            role="status"
-            aria-label="Memuat peserta"
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          >
-            {Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} className="h-32 rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <ProfilerParticipantGrid
-            displayList={visiblePeserta}
-            sortMode={false}
-            selectMode={false}
-            selectedIds={new Set()}
-            toggleSelect={noop}
-            density="compact"
-            isReadOnly={isReadOnly}
-            hasActiveFilters={query.trim().length > 0}
-            resetFilters={() => setQuery("")}
-            setSelectedPeserta={openTable}
-            onViewAnalysis={(id) =>
-              navigate({ to: "/sidak/agents/$id", params: { id } })
-            }
-            onAddPeserta={onPickPeserta}
-            dragIndex={null}
-            dragOverIndex={null}
-            handleDragStart={noop}
-            handleDragOver={noop}
-            handleDragLeave={noop}
-            handleDragEnd={noop}
-          />
-        )}
-      </div>
     </section>
+  );
+}
+
+function PanelFallback() {
+  return (
+    <div role="status" aria-label="Memuat tampilan">
+      <Skeleton className="h-80 rounded-xl" />
+    </div>
   );
 }

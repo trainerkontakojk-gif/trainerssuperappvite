@@ -56,6 +56,7 @@ export function ProfilerExportCard({
           className="min-h-11 w-full"
           onClick={option.action}
           disabled={disabled}
+          aria-label={`Unduh ${option.title}`}
         >
           {isGenerating ? "Menyiapkan..." : "Unduh"}
         </Button>

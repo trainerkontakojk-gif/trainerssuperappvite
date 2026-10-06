@@ -171,12 +171,10 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
 Sistem manajemen database terstruktur untuk peserta training dan agen aktif.
 
 - **Fungsi**: Penyimpanan terpusat data diri, riwayat training, dan penugasan tim.
-- **Routes**: `/profiler`, `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams`
+- **Routes**: `/profiler` (workspace, `?batch=&view=statistik|slide|ekspor&participant=`), `/profiler/table`, `/profiler/add`, `/profiler/import`, `/profiler/teams`. `/profiler/analytics`, `/profiler/slides`, `/profiler/export`, `/profiler/download`, dan `/preview/profiler-slides` hanya redirect ke tab workspace yang sesuai.
 - **Fitur Utama**:
-  - **Workspace (`/profiler`)**: Panel kiri adalah satu-satunya navigasi (pemilih tahun, pencarian, tim → batch dengan jumlah peserta, menu baris untuk tambah batch/duplikat/ubah nama/hapus; di layar sempit dibuka lewat tombol "Pilih batch"). Batch aktif disimpan di URL `?batch=` (tahan refresh/back; nama tak dikenal kembali ke ringkasan). Tanpa batch: daftar batch tahun aktif + widget ulang tahun global. Dengan batch: daftar peserta + pencarian, baris ulang tahun ≤7 hari, tautan Statistik/Slide/Ekspor/Tabel lengkap, dan satu tombol "Tambah peserta" (pilih dari daftar, input manual, impor Excel). Mode hanya-baca (leader/qa) menyembunyikan semua aksi tulis.
+  - **Workspace (`/profiler`)**: Panel kiri adalah satu-satunya navigasi (pemilih tahun, pencarian, tim → batch dengan jumlah peserta, menu baris untuk tambah batch/duplikat/ubah nama/hapus; di layar sempit dibuka lewat tombol "Pilih batch"). Batch aktif disimpan di URL `?batch=` (tahan refresh/back; nama tak dikenal kembali ke ringkasan). Tanpa batch: daftar batch tahun aktif + widget ulang tahun global. Dengan batch: tab **Peserta** (daftar + pencarian, baris ulang tahun ≤7 hari), **Statistik** (distribusi jabatan/tim/gender/pendidikan, klik untuk daftar peserta), **Slide** (satu peserta per slide, simpan PNG/PDF, peserta aktif di `?participant=`), dan **Ekspor** (Excel/CSV/PPTX/PDF + orientasi). Ketiga tab memakai data peserta yang sudah dimuat workspace dan dimuat lazy; tab aktif ikut terbawa saat berpindah batch. **Tabel lengkap** tetap ke `/profiler/table`. Satu tombol "Tambah peserta" (pilih dari daftar, input manual, impor Excel). Mode hanya-baca (leader/qa) menyembunyikan semua aksi tulis.
   - **Table View**: Search, filter, dan edit data peserta dengan responsive grid layout (1-4 kolom) dan glassmorphism cards.
-  - **Analytics**: Recharts analytics dengan 4 chart.
-  - **Export**: Excel/CSV export.
   - **Import**: Excel template generation dan upload.
   - **Teams**: Custom team management.
   - **Upcoming Birthdays**: Endpoint untuk menampilkan peserta yang berulang tahun dalam rentang waktu tertentu.
