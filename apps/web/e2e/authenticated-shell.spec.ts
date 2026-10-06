@@ -104,3 +104,63 @@ test.describe("Shell terautentikasi (hermetic)", () => {
     expectHermetic(audit);
   });
 });
+
+for (const role of ["admin", "trainer", "leader", "agent"]) {
+  test(`${role}: shell shows modules according to the approved access matrix`, async ({
+    page,
+  }) => {
+    await assertLocalDevOnlyTarget();
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      auth: { role },
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    await expect(
+      page.getByRole("link", { name: "Ketik", exact: true }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.getByRole("link", { name: "PDKT", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Telefun", exact: true }),
+    ).toHaveCount(role === "admin" || role === "trainer" ? 1 : 0);
+    await expect(
+      page.getByRole("link", { name: "KTP", exact: true }),
+    ).toHaveCount(role === "agent" ? 0 : 1);
+    expectHermetic(audit);
+  });
+}
+
+test("agent: protected management route redirects to unauthorized", async ({
+  page,
+}) => {
+  await assertLocalDevOnlyTarget();
+  const audit = await openHermeticShell(page, {
+    path: "/dashboard/users",
+    auth: { role: "agent" },
+  });
+  await expect(page).toHaveURL(/\/unauthorized$/);
+  expectHermetic(audit);
+});
+
+for (const [module, path, landing] of [
+  ["ktp", "/profiler/table", "/profiler"],
+  ["sidak", "/sidak/dashboard", "/sidak"],
+] as const) {
+  test(`leader: ${module} view requires approval`, async ({ page }) => {
+    await assertLocalDevOnlyTarget();
+    const audit = await openHermeticShell(page, {
+      path,
+      auth: { role: "leader" },
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/me/access-status",
+          body: { success: true, data: { [module!]: { status: "pending" } } },
+        },
+      ],
+    });
+    await expect(page).toHaveURL(new RegExp(`${landing}$`));
+    expectHermetic(audit);
+  });
+}
