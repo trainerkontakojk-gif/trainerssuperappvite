@@ -580,6 +580,28 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ).toBeVisible();
     await expect(page.getByText(SCOPE_LINE, { exact: true })).toBeVisible();
 
+    // Default filters: Call, current year, January through the current month.
+    const currentMonth = new Date().toLocaleString("id-ID", { month: "long" });
+    await expect(page.getByRole("combobox", { name: "Layanan" })).toContainText(
+      "Call",
+    );
+    await expect(page.getByRole("combobox", { name: "Tahun" })).toContainText(
+      String(YEAR),
+    );
+    await expect(
+      page.getByRole("combobox", { name: "Bulan awal" }),
+    ).toContainText("Januari");
+    await expect(
+      page.getByRole("combobox", { name: "Bulan akhir" }),
+    ).toContainText(currentMonth);
+    const dashboardRequest = audit.mockedApi.find((entry) =>
+      entry.includes("/sidak/dashboard?"),
+    );
+    expect(dashboardRequest).toContain(`year=${YEAR}`);
+    expect(dashboardRequest).toContain("service_type=call");
+    expect(dashboardRequest).toContain("startMonth=1");
+    expect(dashboardRequest).toContain(`endMonth=${new Date().getMonth() + 1}`);
+
     // KPI strip: one region, four indicators, values preserved.
     const kpis = page.getByRole("region", { name: "Indikator utama" });
     await expect(kpis.locator("article")).toHaveCount(4);
@@ -665,9 +687,10 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     await expect(priorityAgent).toContainText("Skor 84.5%");
     await expect(priorityAgent).toContainText("12");
     await expect(priorityAgent).toContainText("Ada temuan kritikal");
+    // Ranking page reads `service_type`, so the link must carry it verbatim.
     await expect(
       agents.getByRole("link", { name: "Lihat semua ranking" }),
-    ).toHaveAttribute("href", /\/sidak\/ranking/);
+    ).toHaveAttribute("href", `/sidak/ranking?service_type=call&year=${YEAR}`);
 
     // Parameter ranking replaces the dual-axis Pareto chart.
     const parameters = page.getByRole("region", { name: "Parameter teratas" });
@@ -919,6 +942,38 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
       forecast.getByText("Belum ada forecast untuk filter ini."),
     ).toBeVisible();
     await expect(summary.getByText(/Turun|Naik \d+\.\d+%/)).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("menampilkan skeleton, bukan teks loading, saat dashboard pertama dimuat", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?"]);
+
+    // Hold the dashboard GET on reload so the initial-load state stays visible.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/api\/v1\/sidak\/dashboard\?/, async (route) => {
+      if (route.request().method() === "GET") await held;
+      await route.fallback();
+    });
+    await page.reload();
+
+    const skeleton = page.getByTestId("sidak-dashboard-skeleton");
+    await expect(skeleton).toBeVisible();
+    await expect(page.getByText("Memuat data dashboard...")).toHaveCount(0);
+
+    release();
+    await expect(
+      page.getByRole("region", { name: "Indikator utama" }),
+    ).toBeVisible();
+    await expect(skeleton).toHaveCount(0);
     expectHermetic(audit);
   });
 

@@ -549,7 +549,7 @@ Closed as **PARTIAL — deliberately stopped** on 2026-10-02. The tasklist above
 
 | Open item                                                                                                                                                                                    | Disposition                                                                                                                                              |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sidak-agent-detail-temuan-parity` (exact score digits)                                                                                                                                      | **Keep.** Bare-digit assertions are not meaningful end-to-end; its other 3 contracts are E2E-proven.                                                     |
+| `sidak-agent-detail-temuan-parity` (exact score digits)                                                                                                                                      | **Retired 2026-10-07** — see §Post-closure follow-up. (Was: keep, on the bare-digit argument.)                                                           |
 | "Narrow 11 mixed files"                                                                                                                                                                      | **Not started.** Dedup work, not new coverage; deliberately left out of scope.                                                                           |
 | `LandingAuthClient` (3 remaining contracts)                                                                                                                                                  | **Keep.** Transient checking state, hidden-while-checking, stale-user-after-logout.                                                                      |
 | Tier C appearance files                                                                                                                                                                      | **Keep by decision.** No action was ever required.                                                                                                       |
@@ -560,6 +560,16 @@ Closed as **PARTIAL — deliberately stopped** on 2026-10-02. The tasklist above
 **Why the original target was unreachable**: see §Revised tactic. The unit suite is saturated with CSS-class and focus/attribute assertions woven into behaviour tests, and the plan's ~80-file figure assumed those could be replaced by E2E. They cannot be, honestly.
 
 Follow-up plans: `plans/026-monitoring-e2e-spec.md` and `plans/027-access-approval-e2e-spec.md` — one finish line each.
+
+### Post-closure follow-up (2026-10-07)
+
+After the SIDAK redesign, `test:full` went red on six jsdom specs. Two were retired here; the rest are tracked outside this plan.
+
+- `sidak-agent-detail-temuan-parity.test.tsx` **deleted**. The digit objection above did not hold: `e2e/sidak-agent-detail.spec.ts` now scopes the score to the score column of each finding `article` and anchors the match (`/^\s*1\s*dari 3\s*$/`). Mutation-checked: rendering `nilai + 1` and restoring the old `Poin` label both turn the test red. Non-kritis (Chat) is covered by the same test.
+- `sidak-dashboard.test.tsx` **deleted**. `e2e/sidak-dashboard-insights.spec.ts` now asserts the default filters and the dashboard query, plus the exact ranking href `/sidak/ranking?service_type=call&year=<YEAR>` (the old `/\/sidak\/ranking/` regex did not catch a `service=` regression; mutation-checked). A new test holds the dashboard GET to prove the initial-load skeleton. Its Pareto case was obsolete because the dashboard now uses `SidakParameterRanking`.
+- `ParetoChart.tsx` and `ParetoChart.test.tsx` **deleted** (no importers left).
+- `sidak-ranking-fatal-badge.test.tsx` **deleted**. New `e2e/sidak-ranking.spec.ts` (4 tests) covers position movement without a `Fatal` label, the mobile movement label, labelled filters plus keyboard navigation to agent detail, and shared rank for tied defects that survives a score sort. Mutation-checked: dense ranking, rank taken from display order, and a hidden mobile label each turn a test red. Its `TopAgentsTable` href case moved to `sidak-dashboard-insights.spec.ts` earlier.
+- **Open finding:** `/sidak/ranking` never reads `service_type` (or `year`) from the URL, so the dashboard link keeps the param but the page always opens on Call. Not fixed here; a behavior change needs its own decision.
 
 ## Commands you will need
 
