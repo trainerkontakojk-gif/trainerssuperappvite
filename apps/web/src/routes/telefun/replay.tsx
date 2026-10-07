@@ -276,12 +276,12 @@ export default function TelefunReplay() {
                     key={i}
                     className="flex gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100"
                   >
-                    <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center text-[10px] font-bold text-amber-700 shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center text-xs font-bold text-amber-700 shrink-0">
                       {i + 1}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-amber-800">{rec.text}</p>
-                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-600">
                         Prioritas {rec.priority}
                       </p>
                     </div>
@@ -304,7 +304,7 @@ export default function TelefunReplay() {
                 <MessageSquare size={16} className="text-indigo-600" />
                 Annotations
               </h2>
-              <span className="text-[10px] font-bold text-fg3 bg-surface px-2 py-1 rounded-lg">
+              <span className="text-xs font-bold text-fg3 bg-surface px-2 py-1 rounded-lg">
                 {annotations?.length || 0}
               </span>
             </div>
@@ -318,7 +318,7 @@ export default function TelefunReplay() {
                   <div className="flex items-center justify-between mb-2">
                     <button
                       onClick={() => handleSeek(anno.timestamp_ms / 1000)}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline"
+                      className="text-xs font-bold text-indigo-600 hover:underline"
                     >
                       {formatTime(anno.timestamp_ms / 1000)}
                     </button>
@@ -338,7 +338,7 @@ export default function TelefunReplay() {
                       {anno.category === "critical_moment" && (
                         <Zap size={12} className="text-red-500 fill-red-500" />
                       )}
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-fg3">
+                      <span className="text-xs font-bold uppercase tracking-wide text-fg3">
                         {anno.category.replace("_", " ")}
                       </span>
                     </div>
@@ -378,7 +378,7 @@ export default function TelefunReplay() {
                     onClick={() =>
                       setNewAnnotation((prev) => ({ ...prev, category: cat }))
                     }
-                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
                       newAnnotation.category === cat
                         ? "bg-indigo-600 text-white shadow-sm"
                         : "bg-surface text-fg2 hover:bg-surface-sunken"

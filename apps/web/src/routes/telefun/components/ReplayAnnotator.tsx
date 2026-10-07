@@ -142,14 +142,14 @@ function RecommendationList({
             key={`${rec.priority}-${idx}`}
             className="flex items-start gap-2 rounded-lg bg-slate-950/[0.02] p-2.5 dark:bg-white/5"
           >
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-400">
               {idx + 1}
             </span>
             <div className="min-w-0">
               <p className="text-sm text-slate-700 dark:text-white/70">
                 {rec.text}
               </p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
                 Prioritas {rec.priority}
               </p>
             </div>
@@ -183,21 +183,21 @@ function AnnotationCard({
           {formatTimestamp(annotation.timestampMs)}
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${categoryColor.bg} ${categoryColor.text}`}
+          className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${categoryColor.bg} ${categoryColor.text}`}
         >
           {CATEGORY_LABELS[annotation.category]}
         </span>
-        <span className="text-[10px] text-slate-400 dark:text-white/35">
+        <span className="text-xs text-slate-400 dark:text-white/35">
           {annotation.moment}
         </span>
         <span className="ml-auto flex items-center gap-1">
           {annotation.isManual ? (
-            <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-white/50">
+            <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-white/50">
               <User className="h-3 w-3" aria-hidden="true" />
               Manual
             </span>
           ) : (
-            <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+            <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
               <Bot className="h-3 w-3" aria-hidden="true" />
               AI
             </span>
@@ -320,7 +320,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 type="button"
                 onClick={onGenerateAi}
                 disabled={isGenerating}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isGenerating ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -414,7 +414,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
-                className={`rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition ${
+                className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   category === item
                     ? "bg-emerald-600 text-white shadow-sm"
                     : "bg-slate-950/5 text-slate-500 hover:bg-slate-950/10 dark:bg-white/5 dark:text-white/55 dark:hover:bg-white/10"
@@ -451,7 +451,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               placeholder="Tulis catatan singkat untuk momen ini..."
               className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
             />
-            <div className="mt-1 flex items-center justify-between text-[10px]">
+            <div className="mt-1 flex items-center justify-between text-xs">
               <span
                 className={
                   charCount > MAX_CHAR_COUNT * 0.9

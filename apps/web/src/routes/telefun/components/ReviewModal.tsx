@@ -513,7 +513,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Konsumen
                           </span>
                         </div>
@@ -525,7 +525,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Target simulasi
                           </span>
                         </div>
@@ -551,7 +551,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Pelaksana
                           </span>
                         </div>
@@ -563,7 +563,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Calendar className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Tanggal
                           </span>
                         </div>
@@ -575,7 +575,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Clock className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Durasi
                           </span>
                         </div>
@@ -594,7 +594,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <Star className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Skor
                           </span>
                         </div>
@@ -612,7 +612,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <MessageSquare className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Feedback
                           </span>
                         </div>
@@ -627,7 +627,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Mic2 className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Rekaman Sesi
                           </span>
                         </div>

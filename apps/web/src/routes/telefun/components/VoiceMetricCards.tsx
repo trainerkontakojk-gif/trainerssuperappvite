@@ -11,10 +11,10 @@ interface VoiceMetricCardsProps {
 }
 
 const STATUS_CLASSES: Record<string, string> = {
-  good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full border",
+  good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-xs font-bold px-2 py-0.5 rounded-full border",
   needs_improvement:
-    "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full border",
-  poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full border",
+    "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-xs font-bold px-2 py-0.5 rounded-full border",
+  poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 text-xs font-bold px-2 py-0.5 rounded-full border",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -101,7 +101,7 @@ export const VoiceMetricCards: React.FC<VoiceMetricCardsProps> = ({
               metric.examples &&
               metric.examples.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+                  <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
                     Contoh terdeteksi
                   </p>
                   <div className="flex flex-wrap gap-1.5">

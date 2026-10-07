@@ -243,7 +243,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
           >
             <VoiceRadarChart profile={communicationProfile} compact />
             <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm dark:bg-white/20">
+              <div className="flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-xs font-bold text-white backdrop-blur-sm dark:bg-white/20">
                 <Maximize2 className="h-3 w-3" />
                 Klik untuk memperbesar
               </div>
@@ -261,7 +261,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-4 text-[10px] font-bold mt-3 text-slate-500 dark:text-white/45">
+        <div className="flex flex-wrap justify-center gap-4 text-xs font-bold mt-3 text-slate-500 dark:text-white/45">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-0 border border-dashed border-emerald-500" />
             Target QA
@@ -290,7 +290,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
             {communicationProfile.metrics.map((m) => (
               <span
                 key={m.key}
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${STATUS_COLORS[m.status] || ""}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${STATUS_COLORS[m.status] || ""}`}
               >
                 {m.label}: {STATUS_LABELS[m.status]}
               </span>

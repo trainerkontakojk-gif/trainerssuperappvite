@@ -46,3 +46,20 @@ Constraint record (`ui-ux-pro-max`):
   - `telefun-history.spec.ts` "landing Telefun dirender tanpa menyentuh backend" juga gagal tanpa baris `--text-xs`. Locator `getByText(/Telefun/).first()` mengenai tooltip sidebar yang tersembunyi. Kegagalan ini sudah ada sebelumnya.
 - `impeccable detect` pada 22 file yang berubah: tidak ada temuan.
 - Root `pnpm typecheck` exit 0, e2e typecheck exit 0, `pnpm lint` exit 0 (warning lama saja), `pnpm build` exit 0, `git diff --check` bersih.
+
+## Lanjutan: modul Telefun
+
+Requirement: tidak ada teks terlihat < 11px di landing, riwayat, dan modal review Telefun (tab Detail dan Penilaian).
+
+Design:
+
+- 40 `text-[6–10px]` di `routes/telefun` diganti `text-xs` (11px).
+- `TelefunMotionFrame` sengaja tidak diubah (7 tempat). Komponen ini mockup ponsel dekoratif (`aria-hidden`) yang meniru layar telepon pada skala kecil, termasuk huruf keypad 6px. Spec landing mengecualikannya secara eksplisit lewat opsi `exclude` di `findTextBelowFloor`.
+- Tes lama "landing Telefun dirender tanpa menyentuh backend" sudah gagal sebelum perubahan ini: locator `getByText(/Telefun/).first()` mengenai tooltip sidebar yang tersembunyi, dan landing ternyata memanggil `/telefun/settings` serta `/sessions`. Tes itu digabung dengan scan landing yang baru, memakai locator caption yang terlihat dan mock kedua endpoint.
+
+Hasil:
+
+- RED: scan review menemukan label 10px (Konsumen, Target simulasi, Pelaksana, Tanggal, Durasi, Skor, Rekaman Sesi).
+- GREEN: `telefun-history.spec.ts` 13/13 lulus. Spec lain yang menyentuh Telefun (`edukatif-visual`, `authenticated-shell`, `usage`, `access-matrix-api`): 23 lulus, 2 dilewati.
+- Belum tercakup E2E: route `/telefun/replay`, tab Replay (`ReplayAnnotator`), dan `CommunicationProfileZoomModal`. Semuanya butuh rekaman audio atau fixture tambahan.
+- `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
