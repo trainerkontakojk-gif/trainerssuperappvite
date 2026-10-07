@@ -1,5 +1,8 @@
+import { useId } from "react";
 import { Plus } from "lucide-react";
 import type { AccessScopeOptions } from "@trainers/types";
+import { Button } from "../../../../components/ui/button";
+import { Label } from "../../../../components/ui/label";
 
 type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
@@ -27,6 +30,17 @@ interface RuleBuilderFormProps {
   ruleValueOptions: string[];
 }
 
+// `<select>` native dipertahankan karena butuh `<optgroup>` untuk tim → batch.
+const SELECT_CLASS =
+  "h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 dark:bg-input/30";
+
+const HINTS: Record<RuleType, string> = {
+  tim: "Pilih tim untuk semua subfolder-nya, atau satu subfolder (batch) di bawahnya.",
+  service_type: "Leader melihat semua peserta pada layanan ini.",
+  peserta_id: "Pilih tim dulu untuk menampilkan daftar agen.",
+  batch_name: "",
+};
+
 export function RuleBuilderForm({
   scopeOptions,
   ruleType,
@@ -41,66 +55,75 @@ export function RuleBuilderForm({
   getRuleValueLabel,
   ruleValueOptions,
 }: RuleBuilderFormProps) {
+  const typeId = useId();
+  const valueId = useId();
+  const teamId = useId();
+  const hintId = useId();
+
   if (!scopeOptions) return null;
 
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-2xl border border-primary/20 bg-primary/5 p-6 space-y-5"
+      className="grid gap-3 border-t border-border pt-5"
+      aria-label="Tambah aturan"
     >
-      <div>
-        <h5 className="text-[11px] font-bold text-primary uppercase tracking-[0.2em]">
-          Tambah Aturan Baru
-        </h5>
-        <p className="text-xs text-muted-foreground mt-1">
-          Kombinasikan kriteria untuk mempersempit skup data yang dapat diakses.
-        </p>
-      </div>
+      <h3 className="text-sm font-semibold text-foreground">Tambah aturan</h3>
 
-      <div className="grid gap-5 sm:grid-cols-[200px_1fr_auto]">
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">
-            Tipe Aturan
-          </label>
+      <div className="grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
+        <div className="grid gap-1.5">
+          <Label htmlFor={typeId} className="text-xs text-muted-foreground">
+            Jenis
+          </Label>
           <select
+            id={typeId}
             value={ruleType}
             onChange={(e) => onRuleTypeChange(e.target.value as RuleType)}
-            className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+            className={SELECT_CLASS}
           >
-            <option value="tim">Team</option>
-            <option value="service_type">Service</option>
-            <option value="peserta_id">Specific Agent</option>
+            <option value="tim">Tim</option>
+            <option value="service_type">Layanan</option>
+            <option value="peserta_id">Agen tertentu</option>
           </select>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">
-            {ruleType === "tim"
-              ? "Pilih Team"
-              : ruleType === "service_type"
-                ? "Pilih Service"
-                : "Pilih Name"}
-          </label>
-          {ruleType === "peserta_id" ? (
-            <div className="grid gap-2 sm:grid-cols-2">
+        {ruleType === "peserta_id" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor={teamId} className="text-xs text-muted-foreground">
+                Tim
+              </Label>
               <select
+                id={teamId}
                 value={filterTeam}
                 onChange={(e) => onFilterTeamChange(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+                className={SELECT_CLASS}
               >
-                <option value="">Pilih Team terlebih dahulu</option>
-                {(scopeOptions?.teams || []).map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                <option value="">Pilih tim</option>
+                {scopeOptions.teams.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
                 ))}
               </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label
+                htmlFor={valueId}
+                className="text-xs text-muted-foreground"
+              >
+                Agen
+              </Label>
               <select
+                id={valueId}
                 value={ruleValue}
                 onChange={(e) => onRuleValueChange(e.target.value)}
                 disabled={!filterTeam}
-                className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-describedby={hintId}
+                className={SELECT_CLASS}
               >
                 <option value="">
-                  {filterTeam ? "Pilih Name" : "Pilih Team terlebih dahulu"}
+                  {filterTeam ? "Pilih agen" : "Pilih tim dulu"}
                 </option>
                 {ruleValueOptions.map((id) => (
                   <option key={id} value={id}>
@@ -109,56 +132,52 @@ export function RuleBuilderForm({
                 ))}
               </select>
             </div>
-          ) : (
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            <Label htmlFor={valueId} className="text-xs text-muted-foreground">
+              {ruleType === "tim" ? "Tim atau batch" : "Layanan"}
+            </Label>
             <select
+              id={valueId}
               value={ruleValue}
               onChange={(e) => onRuleValueChange(e.target.value)}
-              className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
+              aria-describedby={hintId}
+              className={SELECT_CLASS}
             >
-              <option value="">Pilih nilai...</option>
+              <option value="">Pilih nilai</option>
               {ruleType === "tim"
                 ? teamRuleOptionGroups.map((group) => (
                     <optgroup key={group.team} label={group.team}>
                       {group.options.map((option) => (
                         <option key={option.value} value={option.value}>
-                          {option.kind === "batch"
-                            ? `  ${option.label}`
-                            : option.label}
+                          {option.label}
                         </option>
                       ))}
                     </optgroup>
                   ))
-                : (scopeOptions?.services || []).map((s) => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                : scopeOptions.services.map((service) => (
+                    <option key={service.value} value={service.value}>
+                      {service.label}
+                    </option>
                   ))}
             </select>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={addingRule || !ruleValue}
-            className="w-full sm:w-auto h-[42px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-          >
-            {addingRule ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            Tambah Aturan
-          </button>
-        </div>
+        <Button
+          type="submit"
+          className="h-11 sm:h-9"
+          disabled={addingRule || !ruleValue}
+        >
+          <Plus aria-hidden="true" />
+          Tambah
+        </Button>
       </div>
-      
-      <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 font-medium ml-1 italic">
-        <div className="h-1 w-1 rounded-full bg-primary/40" />
-        {ruleType === "tim"
-          ? "Pilih parent team untuk semua subfolder, atau pilih subfolder di bawah parent untuk scope satu batch leader."
-          : ruleType === "peserta_id"
-            ? "Aturan 'Specific Agent' memerlukan pemilihan Team untuk menampilkan daftar nama yang ditampilkan."
-          : "Pilih salah satu kriteria di atas untuk membatasi akses data Leader."}
-      </div>
+
+      <p id={hintId} className="text-xs text-muted-foreground">
+        {HINTS[ruleType]}
+      </p>
     </form>
   );
 }

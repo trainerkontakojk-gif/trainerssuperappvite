@@ -672,15 +672,6 @@ export async function getActivityLogs(): Promise<ActivityLog[]> {
   return data ?? [];
 }
 
-export async function deleteActivity(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("activity_logs")
-    .delete()
-    .eq("id", id);
-
-  if (error) throw new Error(error.message);
-}
-
 export interface LeaderAccessStatusItem {
   status: "none" | "pending" | "approved" | "rejected" | "revoked";
   module: string;

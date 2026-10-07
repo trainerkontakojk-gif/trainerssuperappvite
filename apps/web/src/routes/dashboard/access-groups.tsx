@@ -1,10 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import {
-  Layers,
-  Plus,
-  Settings,
-  Check,
-} from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { useApi } from "../../hooks/useApi";
 import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
@@ -13,11 +8,27 @@ import type {
   AccessGroupRow,
   AccessScopeOptions,
 } from "@trainers/types";
-
-// Extracted Components
+import { Button } from "../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
 import { GroupSidebar } from "./components/access-groups/GroupSidebar";
 import { RuleList } from "./components/access-groups/RuleList";
+import { RULE_TYPE_LABELS } from "./components/access-groups/ruleLabels";
 import { RuleBuilderForm } from "./components/access-groups/RuleBuilderForm";
+import { ManagementShell } from "./components/management/ManagementShell";
+import { StatusDot } from "./components/management/StatusDot";
+import { ConfirmDialog } from "./components/management/ConfirmDialog";
+import { EmptyState } from "./components/management/EmptyState";
+import { SplitView } from "./components/management/SplitView";
 
 type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
@@ -99,12 +110,23 @@ export default function AccessGroupsPage() {
   const [filterTeam, setFilterTeam] = useState("");
   const [addingRule, setAddingRule] = useState(false);
 
-  // Select first group automatically when groups load
+  const [pendingDeleteRule, setPendingDeleteRule] =
+    useState<AccessGroupItemRow | null>(null);
+  const [deletingRule, setDeletingRule] = useState(false);
+  const nameId = useId();
+  const descriptionId = useId();
+  const activeId = useId();
+
+  // Di layar lebar, buka grup pertama sekali saat data datang. Di ponsel daftar
+  // dan detail tampil bergantian, jadi pilihan otomatis akan menyembunyikan daftar.
+  const autoSelected = useRef(false);
   useEffect(() => {
-    if (groups && groups.length > 0 && !selectedGroupId) {
-      setSelectedGroupId(groups[0].id);
+    if (autoSelected.current || !groups?.length) return;
+    autoSelected.current = true;
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      setSelectedGroupId((current) => current ?? groups[0].id);
     }
-  }, [groups, selectedGroupId]);
+  }, [groups]);
 
   const handleOpenCreateModal = () => {
     setEditingGroup(null);
@@ -176,7 +198,7 @@ export default function AccessGroupsPage() {
         }),
       );
       setRuleValue("");
-      await refetchItems();
+      await Promise.all([refetchItems(), refetchGroups()]);
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, "Gagal menambahkan aturan akses."));
     } finally {
@@ -184,18 +206,21 @@ export default function AccessGroupsPage() {
     }
   };
 
-  const handleDeleteRule = async (itemId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus aturan akses ini?")) return;
-
+  const handleDeleteRule = async () => {
+    if (!pendingDeleteRule) return;
+    setDeletingRule(true);
     try {
       await unwrapResponse(
         await adminClient["access-groups"].items[":itemId"].$delete({
-          param: { itemId },
+          param: { itemId: pendingDeleteRule.id },
         }),
       );
-      await refetchItems();
+      setPendingDeleteRule(null);
+      await Promise.all([refetchItems(), refetchGroups()]);
     } catch (err: unknown) {
       notify.error(getErrorMessage(err, "Gagal menghapus aturan akses."));
+    } finally {
+      setDeletingRule(false);
     }
   };
 
@@ -268,7 +293,8 @@ export default function AccessGroupsPage() {
 
   const getRuleValueLabel = (type: string, val: string): string => {
     if (type === "tim") {
-      return teamRuleValueLabels.get(val) || val;
+      // Item tersimpan memakai nama tim mentah; opsi builder memakai nilai ter-encode.
+      return teamRuleValueLabels.get(encodeTeamRuleOption("tim", val)) || val;
     }
     if (type === "peserta_id") {
       for (const agents of Object.values(scopeOptions?.agentsByTeam || {})) {
@@ -285,78 +311,68 @@ export default function AccessGroupsPage() {
     return val;
   };
 
+  const selectedActive = selectedGroup?.is_active !== false;
+
   return (
-    <div className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
-            <Layers className="h-3.5 w-3.5" />
-            Access Scopes Builder
-          </div>
-          <h1 className="mt-3 text-page-title font-display text-foreground">
-            Grup Akses
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-            Definisikan batasan wilayah kerja (skup data) untuk Leader
-            berdasarkan kriteria dinamis untuk memastikan keamanan dan privasi data.
-          </p>
-        </div>
-        <button
-          onClick={handleOpenCreateModal}
-          className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Buat Grup Baru
-        </button>
-      </div>
-
-      {/* Main Layout: Master-Detail Split */}
-      <div className="grid gap-10 lg:grid-cols-[340px_1fr]">
-        {/* Left Side: Groups List */}
-        <GroupSidebar
-          groups={filteredGroups}
-          loading={loadingGroups}
-          selectedGroupId={selectedGroupId}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          onSelectGroup={setSelectedGroupId}
-        />
-
-        {/* Right Side: Group Rules Builder */}
-        <div className="space-y-8">
-          {selectedGroup ? (
-            <div className="rounded-3xl border border-border bg-card p-8 shadow-sm space-y-10 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-primary/40" />
-              
-              {/* Header Group Details */}
-              <div className="flex flex-wrap items-start justify-between gap-6">
-                <div>
-                  <h3 className="text-2xl font-bold font-display text-foreground tracking-tight">
-                    {selectedGroup.name}
-                  </h3>
-                  <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed max-w-xl">
-                    {selectedGroup.description || "Grup ini belum memiliki deskripsi detail."}
-                  </p>
+    <ManagementShell
+      title="Grup Akses"
+      description="Tentukan data peserta yang boleh dilihat leader. Grup dipilih saat menyetujui permintaan akses."
+      actions={
+        <Button className="h-11 sm:h-9" onClick={handleOpenCreateModal}>
+          <Plus aria-hidden="true" />
+          Buat grup
+        </Button>
+      }
+    >
+      <SplitView
+        onBack={() => setSelectedGroupId(null)}
+        list={
+          <GroupSidebar
+            groups={filteredGroups}
+            loading={loadingGroups}
+            selectedGroupId={selectedGroupId}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            onSelectGroup={setSelectedGroupId}
+          />
+        }
+        detail={
+          selectedGroup ? (
+            <div className="flex flex-col gap-6 p-5 lg:p-6">
+              <div>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="font-display text-xl font-semibold tracking-tight text-foreground">
+                      {selectedGroup.name}
+                    </h2>
+                    <p className="mt-1 max-w-prose text-sm text-pretty text-muted-foreground">
+                      {selectedGroup.description || "Belum ada deskripsi."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusDot
+                      tone={selectedActive ? "success" : "muted"}
+                      label={selectedActive ? "Aktif" : "Nonaktif"}
+                    />
+                    <Button
+                      variant="outline"
+                      className="h-11 sm:h-8"
+                      onClick={() => handleOpenEditModal(selectedGroup)}
+                    >
+                      Edit grup
+                    </Button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleOpenEditModal(selectedGroup)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm"
-                >
-                  <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-                  Pengaturan Grup
-                </button>
               </div>
 
-              {/* Rules List Section */}
               <RuleList
+                groupName={selectedGroup.name}
                 items={selectedGroupItems || []}
                 loading={loadingItems}
-                onDelete={handleDeleteRule}
+                onDelete={setPendingDeleteRule}
                 getRuleValueLabel={getRuleValueLabel}
               />
 
-              {/* Add Rule Form Section */}
               <RuleBuilderForm
                 scopeOptions={scopeOptions}
                 ruleType={ruleType}
@@ -379,103 +395,97 @@ export default function AccessGroupsPage() {
                 ruleValueOptions={ruleValueOptions}
               />
             </div>
-          ) : (
-            <div className="rounded-3xl border border-dashed border-border py-32 text-center bg-card shadow-sm flex flex-col items-center justify-center animate-pulse-slow">
-              <Layers className="h-16 w-16 text-muted-foreground/20 mb-6" />
-              <h3 className="text-lg font-bold font-display text-foreground/80">Pilih Grup Akses</h3>
-              <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
-                Pilih salah satu grup akses di sebelah kiri untuk mengelola batasan data yang dapat diakses oleh Leader.
-              </p>
+          ) : null
+        }
+        empty={
+          <EmptyState
+            title="Pilih grup akses"
+            description="Pilih grup di daftar untuk melihat dan mengatur data yang boleh diakses leader."
+          />
+        }
+      />
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="gap-5 p-5 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-lg font-semibold tracking-tight">
+              {editingGroup ? "Edit grup akses" : "Grup akses baru"}
+            </DialogTitle>
+            <DialogDescription>
+              Nama grup tampil saat menyetujui permintaan akses leader.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveGroup} className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor={nameId}>Nama grup</Label>
+              <Input
+                id={nameId}
+                required
+                placeholder="Contoh: Tim Java"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                className="h-11 sm:h-9"
+              />
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Group Create/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-xl font-bold font-display text-foreground mb-2">
-              {editingGroup ? "Edit Grup Akses" : "Grup Akses Baru"}
-            </h3>
-            <p className="text-xs text-muted-foreground mb-8">
-              Nama grup membantu identifikasi cepat saat proses persetujuan akses Leader.
-            </p>
-
-            <form onSubmit={handleSaveGroup} className="space-y-6">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">
-                  Nama Grup
-                </label>
+            <div className="grid gap-1.5">
+              <Label htmlFor={descriptionId}>Deskripsi</Label>
+              <Textarea
+                id={descriptionId}
+                placeholder="Untuk siapa grup ini dipakai?"
+                value={groupDescription}
+                onChange={(e) => setGroupDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            {editingGroup ? (
+              <div className="flex items-center gap-2">
                 <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Tim Java, Area Jabodetabek"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
+                  id={activeId}
+                  type="checkbox"
+                  checked={groupIsActive}
+                  onChange={(e) => setGroupIsActive(e.target.checked)}
+                  className="size-4 accent-foreground"
                 />
+                <Label htmlFor={activeId}>Grup aktif</Label>
               </div>
+            ) : null}
+            <DialogFooter className="-mx-5 -mb-5 px-5">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 sm:h-9"
+                onClick={() => setIsModalOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                className="h-11 sm:h-9"
+                disabled={savingGroup || !groupName.trim()}
+              >
+                {editingGroup ? "Simpan perubahan" : "Buat grup"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">
-                  Deskripsi Singkat
-                </label>
-                <textarea
-                  placeholder="Jelaskan peruntukan grup akses ini..."
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all resize-none"
-                />
-              </div>
-
-              {editingGroup && (
-                <div className="flex items-center gap-3 px-1">
-                  <div className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={groupIsActive}
-                      onChange={(e) => setGroupIsActive(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-10 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
-                  </div>
-                  <label
-                    htmlFor="is_active"
-                    className="text-sm font-bold text-foreground/80 cursor-pointer select-none"
-                  >
-                    Grup Aktif
-                  </label>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-6 border-t border-border">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="h-11 rounded-xl border border-border px-5 text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingGroup || !groupName.trim()}
-                  className="h-11 inline-flex items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {savingGroup ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  ) : (
-                    <Check className="h-4 w-4" />
-                  )}
-                  Simpan Perubahan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      <ConfirmDialog
+        open={pendingDeleteRule !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteRule(null);
+        }}
+        title="Hapus aturan?"
+        description={
+          pendingDeleteRule
+            ? `Leader di grup ini tidak lagi melihat data dengan ${RULE_TYPE_LABELS[pendingDeleteRule.field_name] ?? pendingDeleteRule.field_name} ${getRuleValueLabel(pendingDeleteRule.field_name, pendingDeleteRule.field_value)}.`
+            : ""
+        }
+        confirmLabel="Hapus aturan"
+        tone="destructive"
+        pending={deletingRule}
+        onConfirm={handleDeleteRule}
+      />
+    </ManagementShell>
   );
 }

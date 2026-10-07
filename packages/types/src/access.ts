@@ -14,7 +14,6 @@ export const CAPABILITIES = {
   "account.read": ["admin", "trainer", "leader", "agent"],
   "account.sessions.revoke": ["admin", "trainer", "leader", "agent"],
   "admin.accessGroups": ["admin", "trainer"],
-  "admin.activityLogs.delete": ["admin", "trainer"],
   "admin.activityLogs.read": ["admin", "trainer"],
   "admin.leaderAccess": ["admin", "trainer"],
   "admin.users": ["admin", "trainer"],

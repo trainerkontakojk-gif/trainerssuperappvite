@@ -48,19 +48,19 @@ export const SIDAK_CHILDREN = [
 export const MANAGEMENT_LINKS = [
   {
     to: "/dashboard/users",
-    label: "User Management",
+    label: "Pengguna",
     icon: Shield,
     capability: "admin.users" as const,
   },
   {
     to: "/dashboard/access-approval",
-    label: "Access Approval",
+    label: "Persetujuan Akses",
     icon: UserCheck,
     capability: "admin.leaderAccess" as const,
   },
   {
     to: "/dashboard/access-groups",
-    label: "Access Groups",
+    label: "Grup Akses",
     icon: Layers,
     capability: "admin.accessGroups" as const,
   },
@@ -72,7 +72,7 @@ export const MANAGEMENT_LINKS = [
   },
   {
     to: "/dashboard/activities",
-    label: "Activity Logs",
+    label: "Log Aktivitas",
     icon: History,
     capability: "admin.activityLogs.read" as const,
   },
@@ -212,7 +212,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   if (pathname === "/dashboard/users") {
     return [
       { label: "Dashboard", href: "/dashboard" },
-      { label: "Kelola Pengguna" },
+      { label: "Pengguna" },
     ];
   }
   if (pathname === "/dashboard/access-approval") {

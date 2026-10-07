@@ -307,6 +307,13 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 - **SELECT membutuhkan RLS policies** — table grant `SELECT` saja tidak cukup. Policies wajib: own-profile, admin-all, trainer-all, leader-all.
 - Migration `008_profile_admin_policies.sql` menambahkan `profiles_select_admin` dan `profiles_update_admin` untuk defense-in-depth via user JWT (sebelumnya hanya via service_role).
 
+**Catatan drift Telefun (diterima, 2026-10-06):**
+
+- Repo mendefinisikan policy owner-only untuk `telefun_coaching_summary` (SELECT) dan `telefun_replay_annotations` (SELECT/INSERT/DELETE) di `20260523000000_telefun_parity_extensions.sql`. Baris tabel di atas mencerminkan kontrak repo itu.
+- Preflight read-only remote (2026-10-06, lihat `docs/auth-rbac.md` § Preflight migrasi remote) menemukan **tidak ada policy apa pun** untuk kedua tabel, sementara RLS aktif. Efeknya deny-all untuk akses via user JWT. Tidak ada migrasi di repo yang menghapusnya.
+- Drift ini **diterima** karena seluruh akses kedua tabel lewat service-role di backend: `apps/api/src/routes/telefun/annotations.ts`, `routes/telefun/recordings.ts`, `lib/telefun-analysis.ts` (RPC `upsert_telefun_coaching_summary`), `services/monitoring-review-service.ts`, dan `services/monitoring-history-service.ts`. Frontend dan `apps/telefun` tidak menyentuh kedua tabel. Otorisasi ditegakkan di aplikasi (`requireCapability` + `can()`), bukan RLS.
+- **Aturan:** jangan membaca/menulis kedua tabel dengan user client (`createUserClient`) sebelum policy owner-only dipulihkan lewat migrasi dan dibuktikan dengan E2E pada DB disposable. Tanpa itu, hasilnya diam-diam kosong di remote meski lulus di lokal.
+
 **Catatan Monitoring AI Usage:**
 
 - `leader` hanya mendapatkan visibilitas usage monitoring dari backend API yang sudah di-gate role.
