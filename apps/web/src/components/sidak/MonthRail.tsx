@@ -125,7 +125,7 @@ export default function MonthRail({
                 }`}
               >
                 <span
-                  className={`flex h-5 items-end text-[10px] font-semibold tabular-nums sm:text-xs ${
+                  className={`flex h-5 items-end text-xs font-semibold tabular-nums ${
                     isActive ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >

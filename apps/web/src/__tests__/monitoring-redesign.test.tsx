@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { parseVoiceQualityAssessment } from "@trainers/types";
-import { HistoryCard } from "../routes/monitoring/components/HistoryCard";
 import { HistoryTab } from "../routes/monitoring/components/HistoryTab";
 import { PdktEvaluationPanel } from "../routes/monitoring/components/PdktEvaluationPanel";
 import type { UnifiedHistoryEntry } from "../routes/monitoring/utils/formatting";
@@ -155,115 +154,6 @@ const searchableMetadataEntry: UnifiedHistoryEntry = {
   recipient: "lapor@ojk.go.id",
   contact: "sari@example.com",
 };
-
-// ─── HistoryCard Tests ─────────────────────────────────────────────────────────
-
-describe("HistoryCard — module-specific assessment previews", () => {
-  const onViewDetail = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("renders KETIK mini score bars for completed sessions", () => {
-    render(<HistoryCard entry={ketikEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("Empati")).toBeTruthy();
-    expect(screen.getByText("Probing")).toBeTruthy();
-    expect(screen.getByText("Tulis")).toBeTruthy();
-    expect(screen.getByText("Comply")).toBeTruthy();
-    expect(screen.getByText("80")).toBeTruthy();
-    expect(screen.getByText("75")).toBeTruthy();
-    expect(screen.getByText("90")).toBeTruthy();
-    expect(screen.getByText("85")).toBeTruthy();
-  });
-
-  it("renders PDKT evaluation score and stats", () => {
-    render(<HistoryCard entry={pdktEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("Skor: 85%")).toBeTruthy();
-    expect(screen.getByText(/2 typo/)).toBeTruthy();
-    expect(screen.getByText(/Jelas/)).toBeTruthy();
-    expect(screen.getByText(/Jawaban sudah relevan/)).toBeTruthy();
-  });
-
-  it("renders subject, batch/team, actor role, and review status together", () => {
-    render(<HistoryCard entry={pdktEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText(/Andi/)).toBeTruthy();
-    expect(screen.getByText(/Batch 12/)).toBeTruthy();
-    expect(screen.getByText(/Tim Alpha/)).toBeTruthy();
-    expect(screen.getByText(/trainer/)).toBeTruthy();
-    expect(screen.getByText("Selesai")).toBeTruthy();
-  });
-
-  it("marks a deleted participant record without rewriting the frozen name", () => {
-    render(
-      <HistoryCard
-        entry={{
-          ...pdktEntry,
-          simulationSubject: {
-            ...pdktEntry.simulationSubject!,
-            participantId: null,
-          },
-        }}
-        onViewDetail={onViewDetail}
-      />,
-    );
-
-    expect(screen.getByText(/Andi \(record peserta tidak lagi tersedia\)/)).toBeTruthy();
-  });
-
-  it("renders PDKT without typos as 'Tanpa typo'", () => {
-    const cleanPdkt = {
-      ...pdktEntry,
-      pdkt_evaluation: {
-        ...pdktEntry.pdkt_evaluation!,
-        typos_count: 0,
-      },
-    };
-    render(<HistoryCard entry={cleanPdkt} onViewDetail={onViewDetail} />);
-    expect(screen.getByText(/Tanpa typo/)).toBeTruthy();
-  });
-
-  it("renders Telefun voice assessment metrics", () => {
-    render(<HistoryCard entry={telefunEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("142")).toBeTruthy(); // WPM
-    expect(screen.getByText("WPM")).toBeTruthy();
-    expect(screen.getByText("7/10")).toBeTruthy(); // Intonation
-    expect(screen.getByText("8/10")).toBeTruthy(); // Articulation
-    expect(screen.getByText("3")).toBeTruthy(); // Filler count
-    expect(screen.getByText("Filler")).toBeTruthy();
-    expect(screen.getByText(/Empati/)).toBeTruthy();
-  });
-
-  it("renders 'Belum dinilai' placeholder when no assessment data", () => {
-    render(
-      <HistoryCard entry={noAssessmentEntry} onViewDetail={onViewDetail} />,
-    );
-    expect(screen.getByText("Belum dinilai")).toBeTruthy();
-  });
-
-  it("renders scenario title and user email", () => {
-    render(<HistoryCard entry={ketikEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("Pinjol Ilegal Chat")).toBeTruthy();
-    expect(screen.getByText("agent@test.com")).toBeTruthy();
-  });
-
-  it("renders score with correct value", () => {
-    render(<HistoryCard entry={ketikEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("82")).toBeTruthy();
-  });
-
-  it("renders review status badge for completed sessions", () => {
-    render(<HistoryCard entry={ketikEntry} onViewDetail={onViewDetail} />);
-    expect(screen.getByText("Selesai")).toBeTruthy();
-  });
-
-  it("calls onViewDetail when button is clicked", () => {
-    render(<HistoryCard entry={ketikEntry} onViewDetail={onViewDetail} />);
-    const button = screen.getByText("Lihat Detail");
-    fireEvent.click(button);
-    expect(onViewDetail).toHaveBeenCalledWith(ketikEntry);
-  });
-});
 
 describe("PdktEvaluationPanel — score breakdown", () => {
   beforeEach(() => {

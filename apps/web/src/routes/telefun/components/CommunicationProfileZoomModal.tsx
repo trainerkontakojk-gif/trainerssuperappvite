@@ -172,7 +172,7 @@ export const CommunicationProfileZoomModal: React.FC<
                 >
                   <div className="flex items-center justify-center gap-1 mb-2">
                     {MODE_ICONS[metric.evaluationMode] ?? null}
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       {metric.label}
                     </span>
                   </div>
@@ -183,7 +183,7 @@ export const CommunicationProfileZoomModal: React.FC<
                     </span>
                   </div>
                   <span
-                    className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_COLORS[metric.status] || ""}`}
+                    className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full border ${STATUS_COLORS[metric.status] || ""}`}
                   >
                     {STATUS_LABELS[metric.status] || metric.status}
                   </span>
@@ -193,7 +193,7 @@ export const CommunicationProfileZoomModal: React.FC<
                     </p>
                   )}
                   {metric.improvementTip && (
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 italic">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 italic">
                       {metric.improvementTip}
                     </p>
                   )}

@@ -524,7 +524,7 @@ export default function DashboardTrendPanel({
                   axisLine={false}
                   tickLine={false}
                   tick={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fill: "currentColor",
                     opacity: 0.4,
                     fontWeight: 700,
@@ -535,7 +535,7 @@ export default function DashboardTrendPanel({
                   axisLine={false}
                   tickLine={false}
                   tick={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fill: "currentColor",
                     opacity: 0.4,
                     fontWeight: 700,
@@ -572,7 +572,7 @@ export default function DashboardTrendPanel({
                       <span key="val" className="flex items-center gap-1.5">
                         {value}{" "}
                         {isForecast && (
-                          <span className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary rounded">
+                          <span className="text-xs px-1 py-0.5 bg-primary/20 text-primary rounded">
                             Prediksi
                           </span>
                         )}
@@ -592,7 +592,7 @@ export default function DashboardTrendPanel({
                       value: "PREDIKSI",
                       position: "top",
                       fill: "var(--primary)",
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: "bold",
                     }}
                   />
@@ -756,7 +756,7 @@ export default function DashboardTrendPanel({
           {trendDelta !== null && (
             <Badge
               variant="outline"
-              className={`h-7 gap-0.5 px-1.5 text-[10px] font-bold ${trendDelta <= 0 ? "border-chart-green/30 bg-chart-green/10 text-chart-green" : "border-destructive/30 bg-destructive/10 text-destructive"}`}
+              className={`h-7 gap-0.5 px-1.5 text-xs font-bold ${trendDelta <= 0 ? "border-chart-green/30 bg-chart-green/10 text-chart-green" : "border-destructive/30 bg-destructive/10 text-destructive"}`}
             >
               {trendDelta <= 0 ? (
                 <TrendingDown aria-hidden="true" />

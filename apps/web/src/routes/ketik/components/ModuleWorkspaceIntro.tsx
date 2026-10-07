@@ -33,7 +33,7 @@ export default function ModuleWorkspaceIntro({
         <Card className="border-border bg-card py-0">
           <CardHeader className="gap-4 p-6 lg:p-8">
             <div
-              className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${accentClassName} border-current/15 bg-current/10`}
+              className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] ${accentClassName} border-current/15 bg-current/10`}
             >
               {eyebrow}
             </div>
@@ -56,7 +56,7 @@ export default function ModuleWorkspaceIntro({
 
         <Card className="border-border bg-card py-0">
           <CardContent className="p-6 lg:p-7">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
               Workspace actions
             </p>
             <div className="mt-5 space-y-3">{actions}</div>

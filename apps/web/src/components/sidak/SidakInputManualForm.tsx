@@ -226,7 +226,7 @@ export default function SidakInputManualForm({
                         }`}
                       >
                         <p className="text-lg font-bold">{opt.v}</p>
-                        <p className="text-[9px] font-semibold uppercase opacity-65">
+                        <p className="text-xs font-semibold uppercase opacity-65">
                           {opt.label}
                         </p>
                       </button>

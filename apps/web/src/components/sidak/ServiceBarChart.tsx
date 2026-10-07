@@ -73,7 +73,7 @@ export default function ServiceBarChart({ data }: Props) {
         {severityLevels.map((sev) => (
           <div key={sev} className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[sev] }} />
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{sev}</span>
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">{sev}</span>
           </div>
         ))}
       </div>

@@ -147,7 +147,7 @@ export function TelefunReviewPanel({
         <button
           type="button"
           onClick={onRetry ?? fetchReview}
-          className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-[10px] font-bold hover:bg-module-telefun/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
+          className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-xs font-bold hover:bg-module-telefun/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
         >
           <RefreshCw size={10} aria-hidden="true" />
           Coba Lagi
@@ -233,14 +233,14 @@ export function TelefunReviewPanel({
                   Browser tidak mendukung pemutar audio.
                 </audio>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {data.scenario_title}
                   </span>
                   <a
                     href={recordingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-module-telefun hover:underline cursor-pointer"
+                    className="text-xs font-bold text-module-telefun hover:underline cursor-pointer"
                   >
                     Buka di tab baru
                   </a>
@@ -253,7 +253,7 @@ export function TelefunReviewPanel({
                   <p className="text-sm font-bold text-muted-foreground">
                     Rekaman tidak dapat diputar
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     File rekaman sudah dihapus atau tidak tersedia.
                   </p>
                 </div>
@@ -275,7 +275,7 @@ export function TelefunReviewPanel({
               <p className="text-sm font-bold text-muted-foreground">
                 Rekaman tidak dapat diputar
               </p>
-              <p className="text-[10px] text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Rekaman hanya dapat diputar oleh admin dan trainer.
               </p>
             </div>
@@ -295,7 +295,7 @@ export function TelefunReviewPanel({
               <p className="text-sm font-bold text-muted-foreground">
                 Tidak ada rekaman
               </p>
-              <p className="text-[10px] text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Sesi ini tidak memiliki file rekaman audio.
               </p>
             </div>
@@ -313,7 +313,7 @@ export function TelefunReviewPanel({
                 <Phone className="w-7 h-7 text-white" />
               </div>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-module-telefun">
+                <div className="text-xs font-black uppercase tracking-[0.3em] text-module-telefun">
                   Skor Sesi
                 </div>
                 <div className="text-3xl font-black text-module-telefun">
@@ -328,7 +328,7 @@ export function TelefunReviewPanel({
             </div>
             {data.duration_seconds != null && (
               <div className="text-right">
-                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                   Durasi
                 </div>
                 <div className="text-lg font-black">
@@ -398,7 +398,7 @@ export function TelefunReviewPanel({
               >
                 <VoiceRadarChart profile={communicationProfile} compact />
                 <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold text-foreground shadow-sm">
+                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-xs font-bold text-foreground shadow-sm">
                     <Maximize2 className="h-3 w-3" />
                     Klik untuk memperbesar
                   </div>
@@ -434,7 +434,7 @@ export function TelefunReviewPanel({
             ) : null}
 
             {/* Legend */}
-            <div className="flex flex-wrap justify-center gap-4 text-[10px] font-bold mt-3 text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-4 text-xs font-bold mt-3 text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-0 border border-dashed border-emerald-500" />
                 Target QA
@@ -463,7 +463,7 @@ export function TelefunReviewPanel({
                 {communicationProfile.metrics.map((m) => (
                   <span
                     key={m.key}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${STATUS_COLORS[m.status] || ""}`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${STATUS_COLORS[m.status] || ""}`}
                   >
                     {m.label}: {STATUS_LABELS[m.status]}
                   </span>
@@ -480,7 +480,7 @@ export function TelefunReviewPanel({
             (m) => m.drill || m.improvementTip,
           ) && (
             <div className="rounded-xl border border-border bg-muted/20 p-4">
-              <h4 className="text-[10px] font-black uppercase tracking-wide text-muted-foreground mb-2">
+              <h4 className="text-xs font-black uppercase tracking-wide text-muted-foreground mb-2">
                 Latihan Per Metrik
               </h4>
               <ul className="space-y-1.5">
@@ -627,7 +627,7 @@ export function TelefunReviewPanel({
           <p className="text-sm font-bold text-muted-foreground">
             Penilaian suara AI belum tersedia
           </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Metrik suara (kecepatan, intonasi, artikulasi, dll.) akan muncul
             setelah AI selesai menganalisis rekaman.
           </p>
@@ -736,7 +736,7 @@ export function TelefunReviewPanel({
             <ul className="space-y-3">
               {data.coaching_focus.map((focus, i) => (
                 <li key={i} className="flex gap-4 items-start">
-                  <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
+                  <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">
                     {i + 1}
                   </div>
                   <p className="text-sm font-bold text-primary/80 leading-snug">

@@ -81,7 +81,7 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
 
   const height = compact ? 240 : 380;
   const outerRadius = compact ? "70%" : "75%";
-  const tickFontSize = compact ? 10 : 12;
+  const tickFontSize = compact ? 11 : 12;
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -121,7 +121,7 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
               <PolarRadiusAxis
                 angle={30}
                 domain={[0, 100]}
-                tick={{ fill: "#94a3b8", fontSize: 9 }}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
                 axisLine={false}
                 tickCount={5}
               />

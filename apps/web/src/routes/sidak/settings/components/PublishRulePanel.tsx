@@ -64,7 +64,7 @@ export function PublishRulePanel({
           </p>
           <div className="flex items-center gap-2 mt-2">
             <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+            <span className="text-xs font-semibold uppercase tracking-wide text-amber-700">
               Target: {getPeriodLabel(selectedVersion.effective_period_id)}
             </span>
           </div>
@@ -72,7 +72,7 @@ export function PublishRulePanel({
       </div>
       <button
         onClick={() => setShowAddForm(true)}
-        className="px-4 py-2 bg-foreground hover:opacity-90 text-background rounded-lg text-[10px] font-semibold uppercase tracking-wide shrink-0 transition"
+        className="px-4 py-2 bg-foreground hover:opacity-90 text-background rounded-lg text-xs font-semibold uppercase tracking-wide shrink-0 transition"
       >
         Tambah Parameter
       </button>

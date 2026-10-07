@@ -30,7 +30,7 @@ function CopyButton({ text }: { text: string }) {
       variant="outline"
       onClick={handleCopy}
       aria-label={copied ? "Tersalin" : "Salin contoh"}
-      className="min-h-11 gap-1.5 rounded-lg px-2.5 text-[10px] font-bold uppercase tracking-wider"
+      className="min-h-11 gap-1.5 rounded-lg px-2.5 text-xs font-bold uppercase tracking-wider"
     >
       {copied ? (
         <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -73,7 +73,7 @@ function GuidanceCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-bold text-foreground">{label}</span>
-            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
               {verdict}
             </span>
           </div>
@@ -91,7 +91,7 @@ function GuidanceCard({
         className="px-4 pb-4 space-y-3 border-t border-border/40 pt-3"
       >
         <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
             Diagnosis
           </div>
           <p className="text-sm text-foreground/75 leading-relaxed">
@@ -99,7 +99,7 @@ function GuidanceCard({
           </p>
         </div>
         <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
             Cara Memperbaiki
           </div>
           <p className="text-sm text-foreground/75 leading-relaxed">
@@ -108,7 +108,7 @@ function GuidanceCard({
         </div>
         {exampleRewrite && (
           <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">
               Contoh Perbaikan
             </div>
             <blockquote className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm italic leading-relaxed text-foreground/80">

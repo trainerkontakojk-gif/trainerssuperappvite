@@ -187,7 +187,7 @@ export default function SidakHeatmapCalendar({
                   <span
                     key={w}
                     aria-hidden="true"
-                    className="pb-1 text-center text-[10px] text-muted-foreground"
+                    className="pb-1 text-center text-xs text-muted-foreground"
                   >
                     {w}
                   </span>

@@ -20,6 +20,7 @@ import {
   type ApiMock,
   type ShellAudit,
 } from "./helpers/hermeticShell";
+import { findTextBelowFloor } from "./helpers/typographyFloor";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 const YEAR = new Date().getFullYear();
@@ -268,6 +269,34 @@ test.describe("Prediksi tren dashboard (hermetic)", () => {
       page.getByRole("button", { name: "Update Prediksi" }),
     ).toBeDisabled();
     expect(bodies).toHaveLength(0);
+    expectHermetic(audit);
+  });
+  test("Teks dashboard minimal 11px", async ({ page }) => {
+    const { audit } = await openDashboard(page, TWO_MONTHS, {
+      lookup: {
+        status: 200,
+        data: { status: "fresh", snapshot: FORECAST_SNAPSHOT },
+      },
+    });
+
+    // Forecast visible: "PREDIKSI" reference label and the delta badge render.
+    await expect(xAxisLabels(page)).toHaveText(["Jan 26", "Feb 26", "Mar 26"]);
+    await expect(page.getByText("PREDIKSI", { exact: true })).toBeVisible();
+
+    const main = page.getByRole("region", { name: "Konten halaman" });
+    expect(await findTextBelowFloor(main)).toEqual([]);
+
+    // Hover the last (forecast) point so the tooltip "Prediksi" badge renders.
+    const chart = page.locator(".recharts-wrapper").first();
+    await chart.scrollIntoViewIfNeeded();
+    const box = await chart.boundingBox();
+    if (!box) throw new Error("Trend chart has no bounding box");
+    await page.mouse.move(box.x + box.width - 60, box.y + box.height / 2);
+    const tooltip = page.locator(".recharts-tooltip-wrapper");
+    await expect(
+      tooltip.getByText("Prediksi", { exact: true }).first(),
+    ).toBeVisible();
+    expect(await findTextBelowFloor(main)).toEqual([]);
     expectHermetic(audit);
   });
 });

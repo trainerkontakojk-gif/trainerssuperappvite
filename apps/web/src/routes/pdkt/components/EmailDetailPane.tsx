@@ -509,7 +509,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                         key={item.label}
                         className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2"
                       >
-                        <div className="text-[9px] font-bold uppercase text-[var(--fg3)]">
+                        <div className="text-xs font-bold uppercase text-[var(--fg3)]">
                           {item.label}
                         </div>
                         <div className="mt-1 text-sm font-black text-[var(--fg)]">

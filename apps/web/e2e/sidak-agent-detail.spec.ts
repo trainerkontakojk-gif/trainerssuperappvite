@@ -26,6 +26,7 @@ import {
   openAgentDetail,
   startAudit,
 } from "./helpers/sidakAgentReportFixture";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
  * Pindah ke tab tertentu dan kembalikan panel-nya.
@@ -70,6 +71,23 @@ test.describe("Detail agent SIDAK: tab", () => {
     for (const audit of drainAudits()) {
       console.log(formatAudit(audit));
     }
+  });
+
+  test(`teks Ringkasan dan Temuan minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+    const audit = startAudit();
+    await openAgentDetail(page, audit);
+    const main = page.locator("main").first();
+
+    await expect(
+      page.getByRole("tabpanel", { name: "Ringkasan" }),
+    ).toBeVisible();
+    const summary = await findTextBelowFloor(main);
+
+    await openTemuanTab(page);
+    const findings = await findTextBelowFloor(main);
+
+    const offenders = [...new Set([...summary, ...findings])];
+    expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
   test("Ringkasan aktif lebih dulu dan panel hanya di-mount setelah dibuka", async ({

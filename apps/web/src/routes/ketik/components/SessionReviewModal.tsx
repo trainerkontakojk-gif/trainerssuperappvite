@@ -286,22 +286,22 @@ export function SessionReviewModal({
                       >
                         <card.icon className="w-5 h-5" />
                       </div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
                         {card.label}
                       </div>
                       <div className={`text-2xl font-black ${grade.color}`}>
                         {card.score}
                       </div>
                       <div
-                        className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}
+                        className={`text-xs font-bold ${grade.color} uppercase tracking-wider`}
                       >
                         {grade.label}
                       </div>
                       <ScoreBar score={card.score} />
-                      <div className="text-[10px] text-foreground/75 leading-snug mt-1 max-w-[130px]">
+                      <div className="text-xs text-foreground/75 leading-snug mt-1 max-w-[130px]">
                         {card.description}
                       </div>
-                      <div className="text-[8px] text-muted-foreground/70 uppercase tracking-wider">
+                      <div className="text-xs text-muted-foreground/70 uppercase tracking-wider">
                         {card.instruction}
                       </div>
                     </div>
@@ -315,7 +315,7 @@ export function SessionReviewModal({
                     <TrendingUp className="w-7 h-7 text-white" />
                   </div>
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/60">
+                    <div className="text-xs font-black uppercase tracking-[0.3em] text-primary/60">
                       Skor Akhir
                     </div>
                     <div
@@ -448,7 +448,7 @@ export function SessionReviewModal({
                               </span>
                             </div>
                             <span
-                              className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${
                                 typo.severity === "critical"
                                   ? "bg-rose-500 text-white"
                                   : typo.severity === "medium"
@@ -478,7 +478,7 @@ export function SessionReviewModal({
                     <ul className="space-y-3">
                       {review.coachingFocus.map((focus, i) => (
                         <li key={i} className="flex gap-4 items-start">
-                          <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
+                          <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">
                             {i + 1}
                           </div>
                           <p className="text-sm font-bold text-primary/80 leading-snug">
@@ -542,12 +542,12 @@ export function SessionReviewModal({
                     className="h-2.5"
                   />
                   {progress.etaSeconds > 0 && (
-                    <p className="text-[10px] text-muted-foreground text-center tabular-nums">
+                    <p className="text-xs text-muted-foreground text-center tabular-nums">
                       Estimasi: ~{progress.etaSeconds} detik lagi
                     </p>
                   )}
                   {progress.status === "delayed" && (
-                    <p className="text-[10px] text-muted-foreground animate-pulse text-center">
+                    <p className="text-xs text-muted-foreground animate-pulse text-center">
                       Proses ini memakan waktu lebih lama dari biasanya. Harap
                       tunggu...
                     </p>

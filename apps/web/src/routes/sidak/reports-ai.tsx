@@ -126,7 +126,7 @@ export default function SidakReportsAi() {
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-            <Link to="/sidak/reports" className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary">
+            <Link to="/sidak/reports" className="mb-2 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-primary">
               <ArrowLeft className="h-3 w-3" /> Kembali ke Laporan
             </Link>
             <div className="flex items-center gap-3 mt-1">
@@ -147,7 +147,7 @@ export default function SidakReportsAi() {
             {/* Mode + Model Selectors */}
             <div className="flex items-center flex-wrap gap-6">
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mode:</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Mode:</span>
                 {(["layanan", "individu"] as const).map((m) => (
                   <button key={m} onClick={() => { setMode(m); setPesertaId(""); }}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
@@ -159,7 +159,7 @@ export default function SidakReportsAi() {
                 ))}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model:</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Model:</span>
                 <select value={modelId} onChange={(e) => setModelId(e.target.value)}
                   className="rounded-xl border border-border px-3 py-2 text-sm bg-card outline-none focus:border-primary"
                 >
@@ -169,10 +169,10 @@ export default function SidakReportsAi() {
                 </select>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Format:</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Format:</span>
                 {(["docx", "html", "pdf"] as ExportFormat[]).map((f) => (
                   <button key={f} onClick={() => setExportFormat(f)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
                       exportFormat === f ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:border-primary/40"
                     }`}
                   >
@@ -185,7 +185,7 @@ export default function SidakReportsAi() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {mode === "layanan" ? (
                 <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Layanan</span>
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground">Layanan</span>
                   <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}
                     className="w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-card outline-none focus:border-primary"
                   >
@@ -195,7 +195,7 @@ export default function SidakReportsAi() {
                 </label>
               ) : (
                 <label className="block">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1">
                     <Users className="w-3 h-3" /> Agen
                   </span>
                   <select value={pesertaId} onChange={(e) => setPesertaId(e.target.value)}
@@ -209,7 +209,7 @@ export default function SidakReportsAi() {
                 </label>
               )}
               <label className="block">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tahun</span>
+                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground">Tahun</span>
                 <select value={year} onChange={(e) => setYear(Number(e.target.value))}
                   className="w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-card outline-none focus:border-primary"
                 >
@@ -217,7 +217,7 @@ export default function SidakReportsAi() {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dari Bulan</span>
+                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground">Dari Bulan</span>
                 <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))}
                   className="w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-card outline-none focus:border-primary"
                 >
@@ -225,7 +225,7 @@ export default function SidakReportsAi() {
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ke Bulan</span>
+                <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-muted-foreground">Ke Bulan</span>
                 <select value={endMonth} onChange={(e) => setEndMonth(Number(e.target.value))}
                   className="w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-card outline-none focus:border-primary"
                 >

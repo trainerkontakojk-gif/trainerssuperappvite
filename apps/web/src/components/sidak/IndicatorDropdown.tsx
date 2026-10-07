@@ -47,7 +47,7 @@ function IndicatorOption({
     >
       <span className="min-w-0">{indicator.name}</span>
       <span
-        className={`ml-2 flex-shrink-0 text-[10px] font-bold tabular-nums ${
+        className={`ml-2 flex-shrink-0 text-xs font-bold tabular-nums ${
           selected ? "text-primary-foreground/70" : "text-muted-foreground"
         }`}
       >
@@ -83,7 +83,7 @@ function GroupedOptions({
             <p className="text-[11px] font-semibold leading-snug text-foreground">
               {group}
             </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Pilih sub-parameter
             </p>
           </div>
@@ -209,7 +209,7 @@ export default function IndicatorDropdown({
             ) : (
               <>
                 <div className="sticky top-0 z-10 border-b border-border bg-blue-500/10 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
                     Non-Critical Error
                   </p>
                 </div>
@@ -219,7 +219,7 @@ export default function IndicatorDropdown({
                   onSelect={handleSelect}
                 />
                 <div className="sticky top-0 z-10 border-y border-border bg-red-500/10 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-red-600">
+                  <p className="text-xs font-bold uppercase tracking-wider text-red-600">
                     Critical Error
                   </p>
                 </div>

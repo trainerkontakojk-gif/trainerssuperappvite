@@ -9,6 +9,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 const YEAR = new Date().getFullYear();
 const PREVIOUS_LABEL = `Apr ${String(YEAR).slice(-2)}`;
@@ -1098,6 +1099,21 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
       page.getByRole("region", { name: "Indikator utama" }),
     ).toBeVisible();
     await expect(skeleton).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test(`teks dashboard minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: DASHBOARD_READY_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?", "/dashboard/forecast"]);
+    await expect(
+      page.getByRole("heading", { name: "Parameter teratas" }),
+    ).toBeVisible();
+
+    const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 

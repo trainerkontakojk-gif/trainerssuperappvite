@@ -746,7 +746,7 @@ export default function KetikLanding() {
 
                   <div className="mt-8 border-t border-border/40 pt-6">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                         Mulai latihan
                       </p>
                       <span className="text-[13px] font-medium text-muted-foreground">

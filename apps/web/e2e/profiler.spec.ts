@@ -5,8 +5,9 @@ import {
   openHermeticShell,
   waitForMockedApi,
 } from "./helpers/hermeticShell";
-import { PROFILER_MOCKS } from "./helpers/profilerMocks";
+import { PROFILER_MOCKS, TEAM_ID } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
  * Profiler — flow browser-level HERMETIC (plan 025 spec #5).
@@ -61,6 +62,36 @@ test.describe("Profiler (hermetic)", () => {
     ).toBeVisible();
 
     console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test(`teks halaman impor Profiler minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler/import?batch=Batch%20Pagi",
+      apiMocks: [
+        ...PROFILER_MOCKS,
+        {
+          method: "GET",
+          path: "/api/v1/profiler/teams",
+          body: {
+            success: true,
+            data: [{ id: TEAM_ID, nama: "Tim Call" }],
+          },
+        },
+      ],
+    });
+    // Label grup kolom template (mis. "Identitas Utama") adalah teks kecil
+    // yang dulu text-[10px]; pastikan sudah tampil sebelum dipindai.
+    await expect(page.getByText("Identitas Utama")).toBeVisible({
+      timeout: 20000,
+    });
+
+    // Slide peserta (ParticipantSlide) tidak ada di halaman ini, jadi tidak
+    // perlu pengecualian; seluruh <main> dipindai.
+    const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 });

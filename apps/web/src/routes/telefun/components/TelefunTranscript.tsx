@@ -33,7 +33,7 @@ export const TelefunTranscript: React.FC<TelefunTranscriptProps> = ({
             <span className="min-w-0 flex-1 basis-[12rem] break-words">
               {entry.text}
             </span>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-white/40">
+            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-white/40">
               ({getTranscriptSpeakerLabel(entry.speaker)})
             </span>
           </li>

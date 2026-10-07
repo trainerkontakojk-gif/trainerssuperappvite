@@ -26,7 +26,7 @@ function CopyInlineButton({ text }: { text: string }) {
           // clipboard unavailable
         }
       }}
-      className="min-h-11 gap-1 rounded-md px-2.5 text-[10px] font-bold uppercase tracking-wider"
+      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-bold uppercase tracking-wider"
     >
       {copied ? (
         <Check className="w-3 h-3 text-emerald-500" />
@@ -60,7 +60,7 @@ export function PdktActionItemsCard({
             key={`${item.priorityRank}-${item.dimension}`}
             className="flex gap-2.5 items-start"
           >
-            <span className="mt-0.5 w-5 h-5 shrink-0 rounded-md bg-amber-500 text-white flex items-center justify-center text-[10px] font-black">
+            <span className="mt-0.5 w-5 h-5 shrink-0 rounded-md bg-amber-500 text-white flex items-center justify-center text-xs font-black">
               {item.priorityRank}
             </span>
             <div className="min-w-0 flex-1">
@@ -171,7 +171,7 @@ export function PdktDimensionTip({
   const tip = edu?.dimensionTips?.[dimension];
   if (value >= 75 || !tip) return null;
   return (
-    <p className="mt-1.5 text-[10px] leading-snug text-amber-600 dark:text-amber-500 font-medium border-t border-amber-500/20 pt-1.5 text-left">
+    <p className="mt-1.5 text-xs leading-snug text-amber-600 dark:text-amber-500 font-medium border-t border-amber-500/20 pt-1.5 text-left">
       💡 {tip}
     </p>
   );

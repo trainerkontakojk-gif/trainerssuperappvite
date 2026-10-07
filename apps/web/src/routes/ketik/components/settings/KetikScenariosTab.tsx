@@ -444,7 +444,7 @@ export function KetikScenariosTab({
                           >
                             <X data-icon="inline" />
                           </Button>
-                          <Badge className="absolute bottom-1 left-1 bg-foreground/75 text-[10px] text-background hover:bg-foreground/75">
+                          <Badge className="absolute bottom-1 left-1 bg-foreground/75 text-xs text-background hover:bg-foreground/75">
                             #{idx}
                           </Badge>
                         </div>

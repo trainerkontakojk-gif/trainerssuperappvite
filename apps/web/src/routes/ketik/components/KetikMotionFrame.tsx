@@ -26,6 +26,7 @@ export function KetikMotionFrame() {
   return (
     <div
       aria-hidden="true"
+      data-testid="ketik-motion-frame"
       className="relative flex h-full min-h-[380px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-module-ketik/5 p-6 lg:min-h-[520px] lg:p-8 dark:bg-module-ketik/10"
     >
       <motion.div

@@ -67,7 +67,7 @@ export function MobileTabBar({
               style={{ color: active ? "var(--fg)" : "var(--fg3)" }}
             >
               <tab.icon className="h-[18px] w-[18px]" />
-              <span className="text-[10px] font-semibold tracking-wider">
+              <span className="text-xs font-semibold tracking-wider">
                 {tab.label}
               </span>
             </Link>
@@ -81,7 +81,7 @@ export function MobileTabBar({
           style={{ color: "var(--fg3)" }}
         >
           <Menu className="h-[18px] w-[18px]" />
-          <span className="text-[10px] font-semibold tracking-wider">
+          <span className="text-xs font-semibold tracking-wider">
             Lainnya
           </span>
         </button>

@@ -31,11 +31,11 @@ export default function SidakReportsLanding() {
         <div>
           <Link
             to="/sidak/dashboard"
-            className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            className="mb-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-3 w-3" /> Dashboard SIDAK
           </Link>
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <FileText className="h-3 w-3" /> SIDAK
           </div>
           <h1 className="font-outfit text-3xl font-black tracking-tight text-foreground">
@@ -83,7 +83,7 @@ export default function SidakReportsLanding() {
           >
             <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted border border-border text-muted-foreground group-hover:bg-foreground group-hover:text-background transition-colors relative">
               <Sparkles className="h-8 w-8" />
-              <span className="absolute -top-1 -right-1 bg-foreground text-background text-[8px] font-semibold px-1.5 py-0.5 rounded-full border border-border">
+              <span className="absolute -top-1 -right-1 bg-foreground text-background text-xs font-semibold px-1.5 py-0.5 rounded-full border border-border">
                 AI
               </span>
             </div>

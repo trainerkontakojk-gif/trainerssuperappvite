@@ -7,12 +7,14 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
  * Telefun — riwayat (hermetic).
  *
- * Modul terakhir tanpa E2E (plan 025 Wave 3, spec #13). Landing Telefun tidak
- * memanggil `/api` saat load; daftar riwayat baru diambil saat modal dibuka.
+ * Modul terakhir tanpa E2E (plan 025 Wave 3, spec #13). Landing Telefun
+ * mengambil `/api/v1/telefun/settings` dan `/sessions` saat load, jadi
+ * keduanya selalu di-mock.
  *
  * PENTING: `/api/v1/telefun/sessions` mengembalikan BARIS DB (snake_case) yang
  * baru dipetakan ke `CallRecord` oleh `mapTelefunSessionRow`. Memakai nama
@@ -30,6 +32,8 @@ type TelefunRow = {
   scoring_status?: "pending" | "processing" | "completed" | "failed";
   scoring_retryable?: boolean;
   simulationSubject?: unknown;
+  voice_assessment?: unknown;
+  messages?: unknown;
 };
 
 const BASE_ROW: TelefunRow = {
@@ -52,6 +56,44 @@ const UNAVAILABLE_PARTICIPANT_ROW: TelefunRow = {
   },
 };
 
+/** Sesi selesai dengan penilaian suara lengkap, untuk membuka modal review. */
+const aspect = (score: number, verdict: string) => ({
+  score,
+  verdict,
+  feedback: `Umpan balik ${verdict.toLowerCase()} untuk aspek ini.`,
+});
+const REVIEWED_ROW: TelefunRow = {
+  ...BASE_ROW,
+  id: "telefun-reviewed-1",
+  score: 8,
+  scoring_status: "completed",
+  voice_assessment: {
+    overallScore: 8,
+    speakingRate: { ...aspect(8, "Baik"), wordsPerMinute: 135 },
+    intonation: aspect(7, "Cukup"),
+    articulation: aspect(8, "Baik"),
+    fillerWords: { ...aspect(6, "Cukup"), count: 4, examples: ["eee", "anu"] },
+    emotionalTone: { ...aspect(8, "Baik"), dominant: "tenang" },
+    transcript: "",
+    highlights: ["Menyapa pelanggan dengan nama"],
+    strengths: ["Intonasi stabil"],
+    holdManagement: {
+      status: "within_limit",
+      score: 9,
+      verdict: "Baik",
+      feedback: "Hold dipakai sekali dan sesuai batas.",
+      holdCount: 1,
+      totalDurationMs: 20000,
+      longestDurationMs: 20000,
+      exceededCount: 0,
+    },
+  },
+  messages: [
+    { speaker: "agent", text: "Selamat pagi, dengan Andi?", startMs: 0 },
+    { speaker: "consumer", text: "Iya, saya mau tanya tagihan.", startMs: 2400 },
+  ],
+};
+
 function telefunMocks(history: readonly TelefunRow[]): readonly ApiMock[] {
   return [
     {
@@ -68,10 +110,14 @@ function telefunMocks(history: readonly TelefunRow[]): readonly ApiMock[] {
   ];
 }
 
-async function openHistory(page: Page, history: readonly TelefunRow[]) {
+async function openHistory(
+  page: Page,
+  history: readonly TelefunRow[],
+  extraMocks: readonly ApiMock[] = [],
+) {
   const audit = await openHermeticShell(page, {
     path: "/telefun",
-    apiMocks: telefunMocks(history),
+    apiMocks: [...telefunMocks(history), ...extraMocks],
   });
   await page
     .getByRole("button", { name: /^Riwayat/ })
@@ -87,12 +133,58 @@ test.describe("Telefun (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("landing Telefun dirender tanpa menyentuh backend", async ({ page }) => {
-    const audit = await openHermeticShell(page, { path: "/telefun" });
-    console.log("[audit]", formatAudit(audit));
-    await expect(page.getByText(/Telefun/).first()).toBeVisible({
-      timeout: 20000,
+  test(`landing Telefun dirender tanpa menyentuh backend, teks minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: telefunMocks([]),
     });
+    await expect(
+      page.getByText("Lihat alur panggilan sebelum memilih skenario latihan."),
+    ).toBeVisible({ timeout: 20000 });
+
+    // Mockup telepon (aria-hidden) meniru layar ponsel pada skala kecil,
+    // termasuk huruf keypad; ia ilustrasi, bukan teks UI yang dibaca.
+    const offenders = await findTextBelowFloor(page.locator("main").first(), {
+      exclude: '[data-testid="telefun-motion-frame"]',
+    });
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test(`teks riwayat dan review Telefun minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    // Tanpa rekaman: modal menampilkan status "belum tersedia", tidak memuat audio.
+    const { audit, dialog } = await openHistory(page, [REVIEWED_ROW], [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/recording/${REVIEWED_ROW.id}`,
+        body: { success: true, data: { url: null } },
+      },
+    ]);
+    await expect(dialog.getByText("Skenario Telefun")).toBeVisible();
+    const history = await findTextBelowFloor(dialog);
+
+    await dialog
+      .getByRole("button", { name: "Lihat detail Skenario Telefun" })
+      .click();
+    const review = page.getByRole("dialog").last();
+    const tabs = review.getByRole("tablist", { name: "Bagian detail sesi" });
+    await expect(tabs).toBeVisible({ timeout: 20000 });
+    const details = await findTextBelowFloor(review);
+
+    await tabs.getByRole("tab").nth(1).click();
+    await expect(tabs.getByRole("tab").nth(1)).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const assessment = await findTextBelowFloor(review);
+
+    const offenders = [...new Set([...history, ...details, ...assessment])];
+    expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 

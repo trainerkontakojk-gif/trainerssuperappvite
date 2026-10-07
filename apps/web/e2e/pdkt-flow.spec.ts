@@ -7,6 +7,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import type { SessionHistory } from "../src/routes/pdkt/components/HistoryModal";
 
 /**
@@ -40,8 +41,144 @@ const HISTORY_UNAVAILABLE_PARTICIPANT: readonly SessionHistory[] = [
   },
 ];
 
-function pdktMocks(history: readonly SessionHistory[]): readonly ApiMock[] {
+/** Mailbox berisi: satu email terbuka berlampiran, satu sudah dibalas dan dievaluasi. */
+const MAIL_AT = "2026-09-15T08:00:00.000Z";
+const PIXEL_PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const SCENARIO = {
+  id: "s1",
+  category: "Transaksi",
+  title: "Keluhan transaksi gagal",
+  description: "Konsumen melaporkan transaksi yang gagal.",
+  isActive: true,
+};
+const SESSION_CONFIG = {
+  scenarios: [SCENARIO],
+  consumerType: { id: "marah", name: "Marah", description: "Marah." },
+  identity: {
+    name: "Rina",
+    email: "rina@local.test",
+    city: "Bandung",
+    bodyName: "Rina",
+  },
+  enableImageGeneration: false,
+  selectedModel: "gemini-3.8-flash",
+  resolvedConsumerNameMentionPattern: "none",
+  writingStyleMode: "training",
+};
+function mailboxItem(
+  id: string,
+  status: "open" | "replied",
+  extra: Record<string, unknown> = {},
+) {
+  const inbound = {
+    id: `msg-${id}`,
+    from: "rina@local.test",
+    to: "ojk@kontak157.go.id",
+    subject: `Transaksi gagal ${id}`,
+    body: "Saldo terpotong tetapi transaksi gagal.",
+    timestamp: MAIL_AT,
+    isAgent: false,
+    ...(status === "open" ? { attachments: [PIXEL_PNG] } : {}),
+  };
+  return {
+    list: {
+      id,
+      user_id: "user-1",
+      status,
+      created_at: MAIL_AT,
+      last_activity_at: MAIL_AT,
+      sender_name: "Rina",
+      sender_email: "rina@local.test",
+      subject: inbound.subject,
+      snippet: inbound.body,
+      permissions: { can_delete: true },
+      ...extra,
+    },
+    detail: {
+      id,
+      user_id: "user-1",
+      status,
+      created_at: MAIL_AT,
+      last_activity_at: MAIL_AT,
+      sender_name: "Rina",
+      sender_email: "rina@local.test",
+      subject: inbound.subject,
+      snippet: inbound.body,
+      scenario_snapshot: SCENARIO,
+      config_snapshot: SESSION_CONFIG,
+      inbound_email: inbound,
+      emails_thread:
+        status === "replied"
+          ? [
+              {
+                id: `reply-${id}`,
+                from: "agent@local.test",
+                to: "rina@local.test",
+                subject: `Re: ${inbound.subject}`,
+                body: "Terima kasih, kami cek transaksinya.",
+                timestamp: MAIL_AT,
+                isAgent: true,
+              },
+            ]
+          : [],
+      permissions: { can_delete: true },
+      ...extra,
+    },
+  };
+}
+const OPEN_MAIL = mailboxItem("mail-open", "open");
+const REPLIED_MAIL = mailboxItem("mail-replied", "replied", {
+  history_id: "pdkt-evaluated-1",
+  replied_at: MAIL_AT,
+  time_taken: 225,
+});
+const EVALUATED_HISTORY: readonly SessionHistory[] = [
+  {
+    id: "pdkt-evaluated-1",
+    timestamp: MAIL_AT,
+    config: SESSION_CONFIG as SessionHistory["config"],
+    emails: [],
+    evaluationStatus: "completed",
+    evaluation: {
+      score: 85,
+      feedback: "Jawaban relevan dan jelas.",
+      typos: ["transkasi"],
+      clarityIssues: ["Kalimat pembuka terlalu panjang"],
+      contentGaps: ["Belum menyebut kanal pengaduan resmi"],
+      scoreBreakdown: {
+        recipientDirectionScore: 90,
+        normativeResponseScore: 80,
+        clarityScore: 85,
+        typoScore: 88,
+        templateComplianceScore: 82,
+      },
+      edu: {
+        dimensionTips: { clarity: "Pecah kalimat panjang menjadi dua." },
+        actionItems: [
+          {
+            dimension: "normative",
+            text: "Sebut kanal pengaduan resmi.",
+            example: "Silakan hubungi 157.",
+            priorityRank: 1,
+          },
+        ],
+        suggestedRewrite: { body: "Terima kasih, kami cek transaksi Ibu." },
+      },
+    },
+  },
+];
+
+function pdktMocks(
+  history: readonly SessionHistory[],
+  mailbox: readonly ReturnType<typeof mailboxItem>[] = [],
+): readonly ApiMock[] {
   return [
+    ...mailbox.map(({ detail }) => ({
+      method: "GET" as const,
+      path: `/api/v1/pdkt/mailbox/${detail.id}`,
+      body: { success: true, data: detail },
+    })),
     {
       method: "GET",
       path: "/api/v1/pdkt/settings",
@@ -65,7 +202,7 @@ function pdktMocks(history: readonly SessionHistory[]): readonly ApiMock[] {
     {
       method: "GET",
       path: "/api/v1/pdkt/mailbox",
-      body: { success: true, data: [] },
+      body: { success: true, data: mailbox.map(({ list }) => list) },
     },
     {
       method: "GET",
@@ -296,6 +433,72 @@ test.describe("PDKT (hermetic)", () => {
       dialog.getByText(/record peserta tidak lagi tersedia/),
     ).toBeVisible();
 
+    expectHermetic(audit);
+  });
+
+  test(`teks landing PDKT minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks([]),
+    });
+    await expect(
+      page.getByRole("button", { name: /^Mulai simulasi/ }).first(),
+    ).toBeVisible({ timeout: 20000 });
+
+    // Mockup email (aria-hidden) meniru layar kotak masuk pada skala kecil;
+    // ia ilustrasi, bukan teks UI yang dibaca.
+    const offenders = await findTextBelowFloor(page.locator("main").first(), {
+      exclude: '[data-testid="pdkt-motion-frame"]',
+    });
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test(`teks mailbox, evaluasi, dan lampiran PDKT minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks(EVALUATED_HISTORY, [OPEN_MAIL, REPLIED_MAIL]),
+    });
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    const picker = page
+      .getByRole("dialog")
+      .filter({ hasText: "Pilih peserta latihan" });
+    const openSubject = page.getByText(OPEN_MAIL.list.subject).first();
+    await expect
+      .poll(async () => (await picker.isVisible()) || (await openSubject.isVisible()), {
+        timeout: 20000,
+      })
+      .toBe(true);
+    if (await picker.isVisible()) {
+      await picker.getByRole("button", { name: "Mulai" }).click();
+    }
+    await expect(openSubject).toBeVisible({ timeout: 20000 });
+
+    // Filter default "Belum Dibalas" memilih email terbuka (berlampiran) otomatis.
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    await expect(
+      page.getByRole("button", { name: "Attachment 1" }),
+    ).toBeVisible({ timeout: 20000 });
+    const offenders = (await findTextBelowFloor(page.locator("main").first())).map(
+      (o) => `[mailbox + lampiran] ${o}`,
+    );
+
+    await page.getByRole("button", { name: "Terbalas" }).click();
+    await page.getByText(REPLIED_MAIL.list.subject).first().click();
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
+    await expect(page.getByText("Sebut kanal pengaduan resmi.").first()).toBeVisible({
+      timeout: 20000,
+    });
+    offenders.push(
+      ...(await findTextBelowFloor(page.locator("main").first())).map(
+        (o) => `[terbalas + evaluasi] ${o}`,
+      ),
+    );
+
+    const unique = [...new Set(offenders)];
+    expect(unique, unique.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 });

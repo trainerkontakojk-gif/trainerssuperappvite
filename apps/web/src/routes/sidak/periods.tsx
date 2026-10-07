@@ -128,7 +128,7 @@ export default function SidakPeriodsPage() {
                         <button
                           key={i}
                           onClick={() => setSelectedMonth(i + 1)}
-                          className={`py-2 rounded-xl text-[10px] font-semibold uppercase transition-all border ${
+                          className={`py-2 rounded-xl text-xs font-semibold uppercase transition-all border ${
                             selectedMonth === i + 1
                               ? "bg-foreground text-background border-foreground"
                               : "bg-transparent text-muted-foreground border-border hover:border-foreground/20"

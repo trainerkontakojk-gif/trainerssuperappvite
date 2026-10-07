@@ -450,7 +450,7 @@ export default function SidakInputPage() {
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
           {/* COMPACT BREADCRUMB */}
-          <div className="flex items-center gap-1 text-[10px] md:text-xs font-semibold uppercase tracking-wide whitespace-nowrap overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide whitespace-nowrap overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => resetToStep("folder")}
@@ -545,7 +545,7 @@ export default function SidakInputPage() {
                     setTemuan([]);
                     setStep("folder");
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide transition-all border border-border ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all border border-border ${
                     showAllData
                       ? "bg-foreground text-background border-foreground"
                       : "bg-background text-muted-foreground hover:bg-muted"

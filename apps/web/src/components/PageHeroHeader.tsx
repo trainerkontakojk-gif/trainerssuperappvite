@@ -42,7 +42,7 @@ export default function PageHeroHeader({
         <CardContent className="p-6 md:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-3 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
+              <div className="inline-flex items-center gap-3 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.24em] text-primary">
                 {icon}
                 <span className="truncate">{eyebrow}</span>
               </div>

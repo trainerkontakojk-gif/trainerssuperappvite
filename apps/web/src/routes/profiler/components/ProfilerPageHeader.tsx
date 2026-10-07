@@ -73,7 +73,7 @@ export function ProfilerPageHeader({
             <div className="min-w-0 max-w-4xl">
               <Badge
                 variant="outline"
-                className="gap-2 text-[0.68rem] uppercase tracking-[0.16em]"
+                className="gap-2 text-xs uppercase tracking-[0.16em]"
               >
                 {icon}
                 <span className="truncate">{eyebrow}</span>

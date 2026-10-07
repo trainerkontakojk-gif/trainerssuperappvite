@@ -43,7 +43,7 @@ export function RuleVersionPicker({
             <button
               key={team}
               onClick={() => setActiveTeam(team)}
-              className={`flex-1 min-w-[60px] py-1.5 rounded text-[10px] font-semibold uppercase transition-all ${
+              className={`flex-1 min-w-[60px] py-1.5 rounded text-xs font-semibold uppercase transition-all ${
                 activeTeam === team ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted"
               }`}
             >
@@ -62,7 +62,7 @@ export function RuleVersionPicker({
             </div>
           ) : !versions || versions.length === 0 ? (
             <div className="p-4 text-center border border-dashed border-border rounded-xl bg-background/20">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
                 Belum ada versi untuk {SERVICE_LABELS[activeTeam]}
               </p>
               {meta?.indicator_count ? (
@@ -74,7 +74,7 @@ export function RuleVersionPicker({
                   Belum ada parameter baseline untuk service ini.
                 </p>
               )}
-              <button onClick={() => handleCreateDraft()} className="mt-2 text-[10px] font-semibold text-foreground hover:underline uppercase">
+              <button onClick={() => handleCreateDraft()} className="mt-2 text-xs font-semibold text-foreground hover:underline uppercase">
                 Buat Baseline
               </button>
             </div>
@@ -92,7 +92,7 @@ export function RuleVersionPicker({
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span
-                      className={`text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                      className={`text-xs font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${
                         v.status === "draft"
                           ? "bg-amber-500/15 text-amber-600 border border-amber-500/20"
                           : v.status === "superseded"
@@ -102,7 +102,7 @@ export function RuleVersionPicker({
                     >
                       {v.status}
                     </span>
-                    <span className="text-[9px] font-semibold text-muted-foreground">
+                    <span className="text-xs font-semibold text-muted-foreground">
                       {new Date(v.created_at).toLocaleDateString("id-ID")}
                     </span>
                   </div>
@@ -110,11 +110,11 @@ export function RuleVersionPicker({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-foreground">v{v.version_number}</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">
                       Efektif: {getPeriodLabel(v.effective_period_id)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-2 opacity-65 text-[10px] font-semibold text-muted-foreground uppercase">
+                  <div className="flex items-center gap-2 mt-2 opacity-65 text-xs font-semibold text-muted-foreground uppercase">
                     <Clock className="w-3 h-3" />
                     <span>{v.scoring_mode} Mode</span>
                   </div>

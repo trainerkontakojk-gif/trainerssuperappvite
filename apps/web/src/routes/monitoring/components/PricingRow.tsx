@@ -58,17 +58,17 @@ export function PricingRow({
           <span className="font-semibold text-foreground text-sm">
             {entry.model_name}
           </span>
-          <span className="text-muted-foreground/60 ml-2 text-[10px] font-mono">
+          <span className="text-muted-foreground/60 ml-2 text-xs font-mono">
             {entry.model_id}
           </span>
           {isRealtime ? (
-            <span className="ml-2 rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+            <span className="ml-2 rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary">
               {isHistorical ? "Riwayat (read-only)" : "6 rate"}
             </span>
           ) : null}
         </td>
         <td className="px-6 py-3.5">
-          <span className="inline-flex rounded border border-border/60 bg-muted/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-foreground">
+          <span className="inline-flex rounded border border-border/60 bg-muted/40 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-foreground">
             {entry.provider}
           </span>
         </td>

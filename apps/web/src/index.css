@@ -66,6 +66,9 @@
   --shadow-lg: var(--shadow-lg);
 
   --spacing-76: 19rem;
+
+  /* Root 14px membuat text-xs bawaan (0.75rem) jatuh ke 10.5px; batas baca 11px. */
+  --text-xs: 11px;
 }
 
 @layer base {
