@@ -156,3 +156,19 @@ Hasil:
 - Tidak dapat dicakup E2E: `UserMenu`, `components/ModuleWorkspaceIntro.tsx`, dan `components/PageHeroHeader.tsx` tidak dirender di mana pun (hanya diekspor atau dimock di tes unit lama); panel mobile di dalam `Sidebar.tsx` (`mobileMenuOpen`) tidak terjangkau karena pembungkusnya `hidden lg:flex` sedangkan panelnya `lg:hidden`. Ukurannya tetap dinaikkan agar konsisten bila dipakai kembali. Kandidat kode mati untuk dibersihkan terpisah.
 - Suite penuh (`pnpm exec playwright test`, 24,2 menit): 410 lulus, 15 gagal, 3 dilewati. 14 gagal bersifat lingkungan (spec backend/DB: `access-scope-api` 401 pada JWT nyata, `sidak-temuan-dates-api` 13 tes dengan egress ke `supabase.co` diblokir guard loopback atau 400/500/503 tanpa DB lokal). 1 gagal (`sidak-jadwal-shifting` "loading calendar states", status loading 400ms) tidak tereproduksi: lulus tanpa perubahan shell dan 3/3 dengan perubahan shell saat diulang.
 - Cek akhir: `impeccable detect`, web dan e2e typecheck, `pnpm typecheck`, `pnpm lint` (0 error; 102 web, 8 api warning), `pnpm build`, `git diff --check` semua exit 0.
+
+## Lanjutan: Dashboard
+
+Requirement: tidak ada teks terlihat < 11px di panel tren dashboard (`/dashboard`, `DashboardTrendPanel.tsx`), termasuk teks SVG grafik dan tooltip hover.
+
+Design:
+
+- Lima ukuran diganti: tick sumbu X dan Y `fontSize: 10` menjadi `11`, label ReferenceLine "PREDIKSI" `fontSize: 10` menjadi `11`, badge "Prediksi" di tooltip `text-[9px]` menjadi `text-xs`, badge delta tren `text-[10px]` menjadi `text-xs` (tinggi `h-7` tetap muat).
+- Satu tes baru di `dashboard-trend-forecast.spec.ts` ("Teks dashboard minimal 11px"): forecast ditampilkan (cache `fresh`), memindai region "Konten halaman", lalu menyorot titik forecast terakhir (setelah `scrollIntoViewIfNeeded`) agar tooltip tampil dan memindai ulang. Semua `/api` dimock, ditutup `expectHermetic`.
+- Tidak diubah (di luar cakupan): opasitas 0.4 pada tick sumbu adalah masalah kontras terpisah.
+
+Hasil:
+
+- RED: 10 teks < 11px: tick X "Jan 26", "Feb 26", "Mar 26", tick Y "0", "5", "10", "15", "20", label "PREDIKSI" (semua 10px, SVG tspan) dan badge delta "50" (10px). Dengan sisanya diperbaiki dan hanya badge tooltip dikembalikan ke `text-[9px]`, tes gagal dengan `9px <span> "Prediksi"`, membuktikan hover tooltip terpindai.
+- GREEN: `dashboard-trend-forecast` 5 lulus, 0 gagal.
+- Cek akhir: `impeccable detect`, web dan e2e typecheck, `pnpm build`, `git diff --check` exit 0; `pnpm lint` exit 0 (102 web, 8 api warning, tidak bertambah).
