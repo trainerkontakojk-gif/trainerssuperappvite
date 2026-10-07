@@ -569,7 +569,7 @@ After the SIDAK redesign, `test:full` went red on six jsdom specs. Two were reti
 - `sidak-dashboard.test.tsx` **deleted**. `e2e/sidak-dashboard-insights.spec.ts` now asserts the default filters and the dashboard query, plus the exact ranking href `/sidak/ranking?service_type=call&year=<YEAR>` (the old `/\/sidak\/ranking/` regex did not catch a `service=` regression; mutation-checked). A new test holds the dashboard GET to prove the initial-load skeleton. Its Pareto case was obsolete because the dashboard now uses `SidakParameterRanking`.
 - `ParetoChart.tsx` and `ParetoChart.test.tsx` **deleted** (no importers left).
 - `sidak-ranking-fatal-badge.test.tsx` **deleted**. New `e2e/sidak-ranking.spec.ts` (4 tests) covers position movement without a `Fatal` label, the mobile movement label, labelled filters plus keyboard navigation to agent detail, and shared rank for tied defects that survives a score sort. Mutation-checked: dense ranking, rank taken from display order, and a hidden mobile label each turn a test red. Its `TopAgentsTable` href case moved to `sidak-dashboard-insights.spec.ts` earlier.
-- **Open finding:** `/sidak/ranking` never reads `service_type` (or `year`) from the URL, so the dashboard link keeps the param but the page always opens on Call. Not fixed here; a behavior change needs its own decision.
+- **Finding, fixed:** `/sidak/ranking` never read `service_type` (or `year`) from the URL, so the dashboard link kept the param but the page always opened on Call. Fixed under `plans/markdown/sidak-ranking-deep-link.md`.
 
 ## Commands you will need
 

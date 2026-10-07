@@ -77,7 +77,10 @@ const TIE_ROWS: RankingRow[] = [
   },
 ];
 
-const rankingMocks = (rankings: RankingRow[]): ApiMock[] => [
+const rankingMocks = (
+  rankings: RankingRow[],
+  availableServices?: string[],
+): ApiMock[] => [
   {
     method: "GET",
     path: "/api/v1/me/access-status",
@@ -95,6 +98,7 @@ const rankingMocks = (rankings: RankingRow[]): ApiMock[] => [
         ],
         folders: [],
         availableYears: [YEAR - 1, YEAR],
+        ...(availableServices ? { availableServices } : {}),
       },
     },
   },
@@ -103,10 +107,14 @@ const rankingMocks = (rankings: RankingRow[]): ApiMock[] => [
 async function openRanking(
   page: Page,
   rankings: RankingRow[],
+  path = "/sidak/ranking",
+  availableServices?: string[],
 ): Promise<ShellAudit> {
   const audit = await openHermeticShell(page, {
-    path: "/sidak/ranking",
-    apiMocks: rankingMocks(rankings),
+    path,
+    apiMocks: rankingMocks(rankings, availableServices),
+    // The router may drop invalid search params, so match the pathname only.
+    waitForUrl: /\/sidak\/ranking(\?|$)/,
   });
   await waitForMockedApi(audit, ["/sidak/ranking?"]);
   await expect(
@@ -256,6 +264,86 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
       "Agent Tie A",
     ]);
     await expectRanks();
+    expectHermetic(audit);
+  });
+
+  test("link dari dashboard membuka ranking dengan layanan dan tahun yang sama", async ({
+    page,
+  }) => {
+    const previousYear = YEAR - 1;
+    const audit = await openRanking(
+      page,
+      MOVEMENT_ROWS,
+      `/sidak/ranking?service_type=chat&year=${previousYear}`,
+    );
+
+    const filters = page.getByRole("region", { name: "Filter ranking" });
+    await expect(filters.getByLabel("Layanan", { exact: true })).toHaveValue(
+      "chat",
+    );
+    await expect(filters.getByLabel("Tahun", { exact: true })).toHaveValue(
+      String(previousYear),
+    );
+
+    // Every ranking request uses the linked filters; no Call fetch first.
+    const requests = audit.mockedApi.filter((entry) =>
+      entry.includes("/sidak/ranking?"),
+    );
+    expect(requests.length).toBeGreaterThan(0);
+    for (const request of requests) {
+      expect(request).toContain("service_type=chat");
+      expect(request).toContain(`year=${previousYear}`);
+    }
+    expectHermetic(audit);
+  });
+
+  test("leader yang terkunci ke satu layanan tidak bisa dibuka ke layanan lain lewat URL", async ({
+    page,
+  }) => {
+    const audit = await openRanking(
+      page,
+      MOVEMENT_ROWS,
+      "/sidak/ranking?service_type=chat",
+      ["call"],
+    );
+
+    const service = page
+      .getByRole("region", { name: "Filter ranking" })
+      .getByLabel("Layanan", { exact: true });
+    await expect(service).toHaveValue("call");
+    await expect(service).toBeDisabled();
+    // The page normalises back to the only allowed service and refetches it.
+    await waitForMockedApi(audit, ["service_type=call"]);
+    const requests = audit.mockedApi.filter((entry) =>
+      entry.includes("/sidak/ranking?"),
+    );
+    expect(requests.at(-1)).toContain("service_type=call");
+    expectHermetic(audit);
+  });
+
+  test("query layanan atau tahun yang tidak valid diabaikan", async ({
+    page,
+  }) => {
+    const audit = await openRanking(
+      page,
+      MOVEMENT_ROWS,
+      "/sidak/ranking?service_type=bogus&year=20x6",
+    );
+
+    const filters = page.getByRole("region", { name: "Filter ranking" });
+    await expect(filters.getByLabel("Layanan", { exact: true })).toHaveValue(
+      "call",
+    );
+    await expect(filters.getByLabel("Tahun", { exact: true })).toHaveValue(
+      String(YEAR),
+    );
+    const requests = audit.mockedApi.filter((entry) =>
+      entry.includes("/sidak/ranking?"),
+    );
+    for (const request of requests) {
+      expect(request).toContain("service_type=call");
+      expect(request).toContain(`year=${YEAR}`);
+    }
     expectHermetic(audit);
   });
 });

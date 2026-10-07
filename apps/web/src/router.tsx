@@ -7,7 +7,13 @@ import {
 } from "@tanstack/react-router";
 import { lazy } from "react";
 import { DashboardLayout } from "./components/Layout";
-import { can, LEADER_APPROVAL_MODULE, type Capability } from "@trainers/types";
+import {
+  can,
+  LEADER_APPROVAL_MODULE,
+  VALID_SERVICE_TYPES,
+  type Capability,
+  type ServiceType,
+} from "@trainers/types";
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
 import { fetchApi } from "./hooks/useApi";
@@ -208,6 +214,21 @@ const sidakRankingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/ranking",
   component: SidakRanking,
+  // Link "Lihat semua ranking" di dashboard membawa layanan dan tahun yang
+  // aktif. Hanya nilai yang dikenal yang diteruskan sebagai filter awal; nilai
+  // lain dibuang. Scope leader tetap dinormalisasi halaman dan ditegakkan API.
+  //
+  // Kedua kunci selalu dikembalikan: router menggabungkan hasil ini di atas
+  // query mentah, jadi kunci yang tidak ditulis akan tetap membawa nilai mentah.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { service_type: ServiceType | undefined; year: number | undefined } => ({
+    service_type: VALID_SERVICE_TYPES.find(
+      (value) => value === search.service_type,
+    ),
+    // Router mem-parse `year=2026` sebagai angka; `year=20x6` tetap string.
+    year: /^\d{4}$/.test(String(search.year)) ? Number(search.year) : undefined,
+  }),
   beforeLoad: requireCapability("sidak.view"),
 });
 

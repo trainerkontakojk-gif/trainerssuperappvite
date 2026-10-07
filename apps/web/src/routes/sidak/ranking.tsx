@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { useApi } from "../../hooks/useApi";
 import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import type { TopAgentData, QAPeriod } from "@trainers/types";
@@ -45,9 +45,16 @@ type SortKey = "defects" | "nama" | "score";
 type SortDirection = "asc" | "desc";
 
 export default function SidakRankingPage() {
-  const [selectedService, setSelectedService] = useState("call");
+  // `from` (bukan `strict: false`) supaya yang terbaca adalah hasil
+  // `validateSearch` di `sidakRankingRoute`, bukan query mentah dari URL.
+  const search = useSearch({ from: "/sidak/ranking" });
+  const [selectedService, setSelectedService] = useState<string>(
+    search.service_type ?? "call",
+  );
   const [selectedPeriod, setSelectedPeriod] = useState("ytd");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState(
+    search.year ?? new Date().getFullYear(),
+  );
   const [selectedFolder, setSelectedFolder] = useState("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("defects");
   const initialFolderSetRef = useRef(false);
