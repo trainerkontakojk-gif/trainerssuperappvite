@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+/** Records the query-builder calls the services push down to the fake DB. */
+let recordedQueryCalls: Array<[string, unknown[]]> = [];
+
 function buildQuery(onAwait: () => any) {
   const q = new Proxy(
     {},
@@ -8,7 +11,10 @@ function buildQuery(onAwait: () => any) {
         if (prop === "then") {
           return (resolve: any) => resolve(onAwait());
         }
-        return () => q;
+        return (...args: unknown[]) => {
+          recordedQueryCalls.push([String(prop), args]);
+          return q;
+        };
       },
     },
   );
@@ -760,7 +766,7 @@ describe("sidak-service", () => {
       expect(result).toEqual(fake);
     });
 
-    it("filters agents by allowed agentIds in filterScope", async () => {
+    it("pushes the allowed agentIds into the peserta query", async () => {
       const fake = [{ id: "a1", nama: "Agent A" }, { id: "a2", nama: "Agent B" }];
       pendingResolve = () => ({ data: fake, error: null });
 
@@ -770,7 +776,11 @@ describe("sidak-service", () => {
         allowedServices: [],
         serviceTypeLocked: false,
       });
-      expect(result).toEqual([{ id: "a1", nama: "Agent A" }]);
+
+      // Scope is resolved in the database now: assert the filter the service
+      // sends (the fake query builder returns every row it holds).
+      expect(recordedQueryCalls).toContainEqual(["in", ["id", ["a1"]]]);
+      expect(result).toEqual(fake);
     });
   });
 
