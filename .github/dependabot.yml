@@ -14,6 +14,17 @@ updates:
         dependency-type: production
         update-types: [minor, patch]
     # Majors stay ungrouped: they need their own branch and verification run.
+    ignore:
+      # vitest 5.0.3 breaks `.rejects.toThrow(<string|RegExp>)`, used by 68
+      # assertions here (docs/dependency-audit-2026-10-06.md). Allow 5.0.4+.
+      - dependency-name: "vitest"
+        versions: [">=5.0.0 <5.0.4"]
+      - dependency-name: "@vitest/*"
+        versions: [">=5.0.0 <5.0.4"]
+      # Production runs Node 22 (.node-version); newer types would allow
+      # APIs the runtime does not have.
+      - dependency-name: "@types/node"
+        versions: [">=23.0.0"]
 
   - package-ecosystem: github-actions
     directory: /
