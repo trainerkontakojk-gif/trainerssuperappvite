@@ -44,6 +44,7 @@ import * as sidakService from "../services/sidak-service";
 describe("sidak-service", () => {
   beforeEach(() => {
     pendingResolve = () => ({ data: [], error: null });
+    recordedQueryCalls = [];
   });
 
   describe("getPeriods", () => {

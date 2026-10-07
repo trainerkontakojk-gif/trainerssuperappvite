@@ -13,6 +13,7 @@ overrides:
   protobufjs: ^7.6.5
   # Security: transitive-only advisories (no upstream patched parent release)
   hono: ^4.13.13
+  "@modelcontextprotocol/sdk": ^1.31.0 # advisory >=1.31.0; found by pnpm 12 audit, missed by pnpm 11
   seroval: ^1.6.7
   image-size: ^2.0.3
   compression: ^1.8.2
