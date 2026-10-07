@@ -134,10 +134,10 @@
     --module-ketik-bg: #3b82f610; /* blue-500/10 */
     --module-pdkt: #a855f7; /* purple-500  */
     --module-pdkt-bg: #a855f710;
-    --module-telefun: #10b981; /* emerald-500 */
-    --module-telefun-bg: #10b98110;
-    --module-profiler: #8b5cf6; /* violet-500  */
-    --module-profiler-bg: #8b5cf610;
+    --module-telefun: #047857; /* emerald-700 — 5:1 sebagai teks di tema terang */
+    --module-telefun-bg: #04785710;
+    --module-profiler: #0e7490; /* cyan-700    — terpisah dari ungu PDKT */
+    --module-profiler-bg: #0e749010;
     --module-sidak: #f43f5e; /* rose-500    */
     --module-sidak-bg: #f43f5e10;
 
@@ -159,7 +159,7 @@
     --border: #262626;
     --fg: #fafafa;
     --fg2: #a3a3a3;
-    --fg3: #525252;
+    --fg3: #8a8a8a;
     --inv-bg: #fafafa;
     --inv-fg: #0a0a0a;
 
@@ -207,8 +207,8 @@
     --module-pdkt-bg: #a855f715;
     --module-telefun: #10b981;
     --module-telefun-bg: #10b98115;
-    --module-profiler: #8b5cf6;
-    --module-profiler-bg: #8b5cf615;
+    --module-profiler: #06b6d4;
+    --module-profiler-bg: #06b6d415;
     --module-sidak: #f43f5e;
     --module-sidak-bg: #f43f5e15;
 
