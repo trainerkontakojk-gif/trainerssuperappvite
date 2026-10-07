@@ -332,7 +332,7 @@ export function HistoryModal({
                       <Separator />
                       <CardContent className="grid grid-cols-2 gap-4 pt-4 sm:grid-cols-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                          <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                             Konsumen
                           </span>
                           <span className="break-words text-xs font-medium text-foreground">
@@ -340,7 +340,7 @@ export function HistoryModal({
                           </span>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                          <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                             Intensitas
                           </span>
                           <span className="text-xs font-medium text-foreground">
@@ -349,7 +349,7 @@ export function HistoryModal({
                         </div>
                         {session.simulationDuration && (
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                            <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                               Durasi
                             </span>
                             <span className="text-xs font-medium text-foreground">
@@ -359,7 +359,7 @@ export function HistoryModal({
                         )}
                         {session.reviewStatus && (
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                            <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                               Review AI
                             </span>
                             <Badge
@@ -386,7 +386,7 @@ export function HistoryModal({
 
           <Separator />
           <DialogFooter className="!mx-0 !mb-0 shrink-0 justify-center rounded-none border-0 bg-card px-5 py-4 sm:px-6">
-            <p className="inline-flex items-center gap-2 text-center text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="inline-flex items-center gap-2 text-center text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               <Database className="size-3" />
               Data lokal terenkripsi di browser Anda
             </p>

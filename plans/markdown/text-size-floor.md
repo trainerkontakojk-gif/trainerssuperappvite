@@ -81,3 +81,19 @@ Hasil:
 - GREEN: `monitoring.spec.ts` 7/7 dan `telefun-history.spec.ts` 13/13 lulus. `usage`, `authenticated-shell`, `edukatif-visual`, dan `typography-floor`: 12 lulus, 2 dilewati.
 - `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
 - Sisa di luar Monitoring: `DashboardTrendPanel` memakai `fontSize: 10` pada grafik (modul Dashboard).
+
+## Lanjutan: modul KETIK
+
+Requirement: tidak ada teks terlihat < 11px di landing, riwayat, replay sesi, dan review sesi KETIK, termasuk `KetikEducationSections` (juga dipakai panel review Monitoring).
+
+Design:
+
+- 31 `text-[6–10px]` di `routes/ketik` dan `components/KetikEducationSections.tsx` diganti `text-xs`.
+- `KetikMotionFrame` (mockup chat ponsel, `aria-hidden`) tidak diubah. Ia mendapat `data-testid="ketik-motion-frame"` agar spec landing bisa mengecualikannya secara eksplisit, sama seperti Telefun.
+
+Hasil:
+
+- RED: "Mulai latihan" 10px di landing; 34 teks < 11px di riwayat, replay, dan review.
+- GREEN: `ketik-flow.spec.ts` 4/4 lulus. `monitoring`, `usage`, `authenticated-shell`, `edukatif-visual`, `typography-floor`: 19 lulus, 2 dilewati.
+- `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
+- Temuan di luar scope: `SessionReplayModal` tidak punya `role="dialog"`/`aria-modal`, tidak bisa ditutup dengan Escape, dan tombol tutupnya ikon tanpa label aksesibel.

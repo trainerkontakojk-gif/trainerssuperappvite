@@ -58,7 +58,7 @@ export function SessionReplayModal({
                   <span className="underline decoration-red-400 decoration-wavy underline-offset-4 bg-red-400/5 px-0.5 rounded transition-colors group-hover/typo:bg-red-400/10">
                     {split[i]}
                   </span>
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover/typo:opacity-100 transition-opacity whitespace-nowrap z-[210] shadow-xl pointer-events-none border border-white/10">
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover/typo:opacity-100 transition-opacity whitespace-nowrap z-[210] shadow-xl pointer-events-none border border-white/10">
                     <span className="text-white/50 mr-1 italic">Saran:</span>
                     <span className="text-green-400">{typo.correctedWord}</span>
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-slate-900" />
@@ -128,11 +128,11 @@ export function SessionReplayModal({
                 {scenarioTitle}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                <span className="text-xs font-black uppercase tracking-widest text-primary">
                   Replay
                 </span>
                 <span className="w-1 h-1 bg-foreground/20 rounded-full" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                   {consumerName}
                 </span>
               </div>
@@ -153,7 +153,7 @@ export function SessionReplayModal({
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
               <MessageSquare className="w-12 h-12 mb-4" />
-              <p className="font-black uppercase tracking-widest text-[10px]">
+              <p className="font-black uppercase tracking-widest text-xs">
                 Tidak ada pesan
               </p>
             </div>
@@ -168,7 +168,7 @@ export function SessionReplayModal({
                       animate={{ opacity: 1, y: 0 }}
                       className="flex justify-center py-2"
                     >
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 bg-foreground/5 px-3 py-1 rounded-full">
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 bg-foreground/5 px-3 py-1 rounded-full">
                         {msg.text}
                       </span>
                     </motion.div>
@@ -189,7 +189,7 @@ export function SessionReplayModal({
                         {renderTextWithHighlights(msg.text, msg.id)}
                       </div>
                       <div
-                        className={`text-[8px] font-black uppercase tracking-widest mt-2 flex items-center gap-1.5 opacity-60 ${isAgent ? "justify-end" : "justify-start"}`}
+                        className={`text-xs font-black uppercase tracking-widest mt-2 flex items-center gap-1.5 opacity-60 ${isAgent ? "justify-end" : "justify-start"}`}
                       >
                         <Clock className="w-2.5 h-2.5" />
                         {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -217,7 +217,7 @@ export function SessionReplayModal({
                   }}
                 />
               </div>
-              <span className="text-[10px] font-black tabular-nums text-muted-foreground min-w-[40px]">
+              <span className="text-xs font-black tabular-nums text-muted-foreground min-w-[40px]">
                 {currentIndex + 1} / {messages.length}
               </span>
             </div>
@@ -265,7 +265,7 @@ export function SessionReplayModal({
               </button>
               <div className="w-12" />
             </div>
-            <p className="text-center mt-6 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+            <p className="text-center mt-6 text-xs font-black uppercase tracking-[0.2em] text-muted-foreground/40">
               Stepping through session replay
             </p>
           </div>
