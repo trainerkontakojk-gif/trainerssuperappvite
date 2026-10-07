@@ -21,7 +21,7 @@ export default function AiInsightCard({ insight }: Props) {
           </div>
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Coaching Insight</p>
-            <p className="text-[10px] font-medium text-muted-foreground">Tidak ada temuan signifikan</p>
+            <p className="text-xs font-medium text-muted-foreground">Tidak ada temuan signifikan</p>
           </div>
         </div>
       </div>
@@ -40,7 +40,7 @@ export default function AiInsightCard({ insight }: Props) {
             {insight.parameter}
           </h4>
           <div className="flex items-center gap-3">
-            <div className={`rounded-full px-3 py-1 text-[10px] font-semibold text-white ${insight.isCritical ? "bg-rose-500" : "bg-blue-500"}`}>
+            <div className={`rounded-full px-3 py-1 text-xs font-semibold text-white ${insight.isCritical ? "bg-rose-500" : "bg-blue-500"}`}>
               {insight.isCritical ? "CRITICAL" : "OPPORTUNITY"}
             </div>
             <div className="text-sm font-medium text-muted-foreground">{insight.count} Sesi</div>

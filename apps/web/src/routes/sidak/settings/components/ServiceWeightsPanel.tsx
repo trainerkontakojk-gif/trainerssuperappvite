@@ -20,7 +20,7 @@ export function ServiceWeightsPanel({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
           <Settings className="w-4 h-4" /> Konfigurasi Bobot & Mode
         </h3>
-        <span className="px-2 py-0.5 bg-background border border-border rounded text-[10px] font-semibold uppercase">
+        <span className="px-2 py-0.5 bg-background border border-border rounded text-xs font-semibold uppercase">
           {selectedVersion.scoring_mode} Mode
         </span>
       </div>

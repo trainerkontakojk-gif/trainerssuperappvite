@@ -56,7 +56,7 @@ export default function FatalDonutChart({ critical, nonCritical, total }: Props)
       </ResponsiveContainer>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: "-10%" }}>
         <span className="text-3xl font-bold text-foreground">{total}</span>
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</span>
       </div>
     </div>
   );

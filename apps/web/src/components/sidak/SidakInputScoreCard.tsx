@@ -13,9 +13,9 @@ interface Props {
 function ModeIndicator({ mode }: { mode: ScoringMode }) {
   switch (mode) {
     case "flat":
-      return <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">(flat)</span>;
+      return <span className="text-xs text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">(flat)</span>;
     case "no_category":
-      return <span className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">(no_category)</span>;
+      return <span className="text-xs text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">(no_category)</span>;
     default:
       return null;
   }
@@ -57,7 +57,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
-          <span className="text-[9px] font-semibold uppercase tracking-widest text-green-600">Kalkulasi Live</span>
+          <span className="text-xs font-semibold uppercase tracking-widest text-green-600">Kalkulasi Live</span>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
               <span className={`text-2xl font-black tracking-tight leading-none ${colors.text}`}>
                 {score}
               </span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-1">
+              <span className="text-xs font-black uppercase tracking-widest text-muted-foreground mt-1">
                 {scoreLabel(score)}
               </span>
             </div>
@@ -116,7 +116,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-rose-500/[0.04] border border-rose-500/10">
                 <ShieldAlert className="h-5 w-5 text-rose-500 shrink-0" />
                 <div>
-                  <div className="text-[9px] font-black uppercase tracking-wider text-rose-600">
+                  <div className="text-xs font-black uppercase tracking-wider text-rose-600">
                     NC Score ({Math.round(activeWeight.non_critical_weight * 100)}%)
                   </div>
                   <div className="text-base font-black text-rose-600 leading-none mt-1">
@@ -127,7 +127,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
               <div className="flex items-center gap-3 p-3 rounded-2xl bg-blue-500/[0.04] border border-blue-500/10">
                 <ShieldCheck className="h-5 w-5 text-blue-500 shrink-0" />
                 <div>
-                  <div className="text-[9px] font-black uppercase tracking-wider text-blue-600">
+                  <div className="text-xs font-black uppercase tracking-wider text-blue-600">
                     CR Score ({Math.round(activeWeight.critical_weight * 100)}%)
                   </div>
                   <div className="text-base font-black text-blue-600 leading-none mt-1">
@@ -138,7 +138,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
             </div>
           ) : liveScore.mode === "flat" ? (
             <div className="rounded-2xl p-4 border border-border bg-foreground/[0.02] min-w-[260px]">
-              <div className="flex justify-between items-center mb-1 text-[9px] font-black uppercase text-muted-foreground tracking-wider">
+              <div className="flex justify-between items-center mb-1 text-xs font-black uppercase text-muted-foreground tracking-wider">
                 <span>Skema Penilaian Flat</span>
                 <span>{Math.round(activeWeight.non_critical_weight * 100)}% NC &middot; {Math.round(activeWeight.critical_weight * 100)}% CR</span>
               </div>
@@ -148,7 +148,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
             </div>
           ) : (
             <div className="rounded-2xl p-4 border border-border bg-foreground/[0.02] min-w-[260px]">
-              <p className="text-[9px] font-black uppercase text-muted-foreground text-center mb-1.5 tracking-wider">
+              <p className="text-xs font-black uppercase text-muted-foreground text-center mb-1.5 tracking-wider">
                 Mode No Category (BKO)
               </p>
               <p className="text-[11px] font-bold text-muted-foreground/80 text-center leading-normal">
@@ -162,7 +162,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
       {/* Info Footnote */}
       <div className="flex items-start gap-2 border-t border-border/50 pt-3.5 mt-5">
         <Info className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0 mt-0.5" />
-        <div className="text-[10px] text-muted-foreground leading-relaxed">
+        <div className="text-xs text-muted-foreground leading-relaxed">
           Telah diinput <strong>{liveScore.sessionCount} sesi</strong> (Sampling maks. 5 sesi terendah). Perubahan data di bawah ter-kalkulasi langsung secara live. Hasil akhir akan sinkron setelah Anda menyimpan audit ini.
         </div>
       </div>

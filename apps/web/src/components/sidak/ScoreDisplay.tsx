@@ -34,7 +34,7 @@ export default function ScoreDisplay({ score, showLabel, showProgress, size = "m
         {score.toFixed(1)}
       </span>
       {showLabel && (
-        <span className={`text-[10px] font-bold uppercase tracking-widest ${colorClass}`}>
+        <span className={`text-xs font-bold uppercase tracking-widest ${colorClass}`}>
           {scoreLabel(score)}
         </span>
       )}

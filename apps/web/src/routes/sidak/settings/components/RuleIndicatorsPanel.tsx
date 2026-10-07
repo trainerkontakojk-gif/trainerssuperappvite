@@ -41,7 +41,7 @@ function IndicatorRow({
       <div className="flex min-w-0 flex-1 items-center gap-4">
         <div className="w-14 flex-shrink-0 text-center">
           <span
-            className={`inline-flex min-w-12 justify-center rounded-lg border px-2 py-1 text-[10px] font-semibold tabular-nums ${CAT_COLOR[indicator.category] || CAT_COLOR.none}`}
+            className={`inline-flex min-w-12 justify-center rounded-lg border px-2 py-1 text-xs font-semibold tabular-nums ${CAT_COLOR[indicator.category] || CAT_COLOR.none}`}
             title={
               showEffectiveWeight
                 ? `${Math.round(indicator.bobot * 100)}% dari kategori`
@@ -57,34 +57,34 @@ function IndicatorRow({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${CAT_COLOR[indicator.category] || CAT_COLOR.none}`}
+              className={`rounded-md border px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${CAT_COLOR[indicator.category] || CAT_COLOR.none}`}
             >
               {CAT_LABEL[indicator.category]
                 ? CAT_LABEL[indicator.category].replace(" Error", "")
                 : indicator.category}
             </span>
             {showEffectiveWeight && (
-              <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[9px] font-semibold text-foreground">
+              <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-semibold text-foreground">
                 Bobot akhir {Math.round(effectiveWeight * 100)}%
               </span>
             )}
             {indicator.has_na && (
-              <span className="rounded-md border border-border bg-foreground/5 px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">
+              <span className="rounded-md border border-border bg-foreground/5 px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                 N/A
               </span>
             )}
             {indicator.sort_order != null && indicator.sort_order > 0 && (
-              <span className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-purple-600">
+              <span className="rounded-md border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-xs font-semibold text-purple-600">
                 #{indicator.sort_order}
               </span>
             )}
             {indicator.threshold != null && (
-              <span className="rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600">
+              <span className="rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-xs font-semibold text-amber-600">
                 Th: {indicator.threshold}
               </span>
             )}
             {indicator.legacy_indicator_id && (
-              <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+              <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-600">
                 Linked
               </span>
             )}
@@ -197,7 +197,7 @@ export function RuleIndicatorsPanel({
               <button
                 type="button"
                 onClick={() => handleCreateDraft(publishedWhenDraftEmpty.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-background transition hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-xs font-semibold uppercase tracking-wide text-background transition hover:opacity-90"
               >
                 <GitBranch className="h-3.5 w-3.5" />
                 Create Revision dari Published

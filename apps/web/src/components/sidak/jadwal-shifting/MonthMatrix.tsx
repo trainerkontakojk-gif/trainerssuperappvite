@@ -141,7 +141,7 @@ export function MonthMatrix({ month, rows }: Props) {
                 data-testid={`jadwal-shifting-matrix-col-${date}`}
                 className="sticky top-0 z-20 min-w-[2.75rem] border-b border-border bg-muted px-1 py-1.5 text-center align-bottom"
               >
-                <span className="block text-[10px] font-medium uppercase text-muted-foreground">
+                <span className="block text-xs font-medium uppercase text-muted-foreground">
                   {weekdayShort(date)}
                 </span>
                 <span className="block text-xs font-semibold tabular-nums text-foreground">
@@ -158,7 +158,7 @@ export function MonthMatrix({ month, rows }: Props) {
                 {SUMMARY_FIELDS.map((field) => (
                   <span
                     key={field.key}
-                    className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                    className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                   >
                     {field.label}
                   </span>

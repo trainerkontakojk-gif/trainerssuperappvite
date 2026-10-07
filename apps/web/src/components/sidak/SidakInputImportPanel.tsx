@@ -203,7 +203,7 @@ export default function SidakInputImportPanel({
                     <p className="text-xl font-bold text-emerald-600">
                       {validRows.length}
                     </p>
-                    <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">
+                    <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wide">
                       Siap import
                     </p>
                   </div>
@@ -212,7 +212,7 @@ export default function SidakInputImportPanel({
                       <p className="text-xl font-bold text-red-600">
                         {invalidRows.length}
                       </p>
-                      <p className="text-[10px] text-red-600 font-semibold uppercase tracking-wide">
+                      <p className="text-xs text-red-600 font-semibold uppercase tracking-wide">
                         Error
                       </p>
                     </div>
@@ -228,13 +228,13 @@ export default function SidakInputImportPanel({
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-[10px] font-mono text-muted-foreground mt-0.5 w-6">
+                        <span className="text-xs font-mono text-muted-foreground mt-0.5 min-w-6 shrink-0">
                           R{row.rowNum}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             {row.no_tiket && (
-                              <span className="text-[10px] font-mono font-semibold text-foreground bg-muted px-1.5 py-0.5 rounded">
+                              <span className="text-xs font-mono font-semibold text-foreground bg-muted px-1.5 py-0.5 rounded">
                                 {row.no_tiket}
                               </span>
                             )}
@@ -243,7 +243,7 @@ export default function SidakInputImportPanel({
                             </span>
                             {row.nilai !== null && (
                               <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-white ${NILAI_BADGE_COLORS[row.nilai]}`}
+                                className={`text-xs font-bold px-1.5 py-0.5 rounded text-white ${NILAI_BADGE_COLORS[row.nilai]}`}
                               >
                                 {row.nilai}
                               </span>
@@ -252,19 +252,19 @@ export default function SidakInputImportPanel({
                           {/* Tanggal ikut ditampilkan di preview supaya user
                               bisa 확인 sebelum mengimpor, bukan baru tahu
                               setelah disimpan. Kosong tampil sebagai "Belum diisi". */}
-                          <p className="text-[10px] text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Tanggal layanan:{" "}
                             {row.tanggal_layanan || "Belum diisi"} · Tanggal
                             sampel: {row.tanggal_sampel || "Belum diisi"}
                           </p>
                           {row.error && (
-                            <p className="text-[10px] text-red-500 mt-1">
+                            <p className="text-xs text-red-500 mt-1">
                               {row.error}
                             </p>
                           )}
                         </div>
                         <span
-                          className={`text-[10px] font-bold ${row.error ? "text-red-500" : "text-green-500"}`}
+                          className={`text-xs font-bold ${row.error ? "text-red-500" : "text-green-500"}`}
                         >
                           {row.error ? "✗" : "✓"}
                         </span>

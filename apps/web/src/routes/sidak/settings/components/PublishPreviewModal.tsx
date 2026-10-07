@@ -150,7 +150,7 @@ export function PublishPreviewModal({
               >
                 <span className="min-w-0 font-medium text-foreground/85">
                   {ind.parameter_group && (
-                    <span className="block text-[10px] text-muted-foreground">
+                    <span className="block text-xs text-muted-foreground">
                       {ind.parameter_group}
                     </span>
                   )}
@@ -159,7 +159,7 @@ export function PublishPreviewModal({
                 <span className="shrink-0 text-right font-semibold text-muted-foreground">
                   {Math.round(ind.bobot * 100)}%
                   {isSlik && ind.category !== "none" && (
-                    <span className="block text-[10px] font-medium">
+                    <span className="block text-xs font-medium">
                       akhir{" "}
                       {Math.round(
                         ind.bobot *

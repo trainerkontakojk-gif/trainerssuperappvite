@@ -73,7 +73,7 @@ export default function TemuanGroupCard({
     <article className="min-w-0 border border-border rounded-xl overflow-hidden bg-surface">
       {/* Session header */}
       <div className="flex items-center gap-3 px-5 py-2.5 bg-muted/20 border-b border-border">
-        <div className="w-6 h-6 rounded bg-foreground text-background flex items-center justify-center flex-shrink-0 font-semibold text-[10px]">
+        <div className="w-6 h-6 rounded bg-foreground text-background flex items-center justify-center flex-shrink-0 font-semibold text-xs">
           {gIdx + 1}
         </div>
         {group.label ? (
@@ -81,7 +81,7 @@ export default function TemuanGroupCard({
         ) : (
           <span className="text-xs text-muted-foreground italic">Tanpa no. tiket</span>
         )}
-        <span className="text-[10px] text-muted-foreground ml-auto font-semibold tracking-wide">
+        <span className="text-xs text-muted-foreground ml-auto font-semibold tracking-wide">
           {group.items.length} temuan
         </span>
       </div>
@@ -188,7 +188,7 @@ export default function TemuanGroupCard({
                         {indicatorLabelMap.get(item.indicator_id) ?? item.indicator_id.slice(0, 8)}
                       </span>
                       {cat && (
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${isCritical ? "bg-red-500/5 text-red-600 border-red-500/20" : "bg-blue-500/5 text-blue-600 border-blue-500/20"}`}>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${isCritical ? "bg-red-500/5 text-red-600 border-red-500/20" : "bg-blue-500/5 text-blue-600 border-blue-500/20"}`}>
                           {isCritical ? "Critical" : "Non-Critical"}
                         </span>
                       )}
@@ -226,7 +226,7 @@ export default function TemuanGroupCard({
                       <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-semibold ${NILAI_BADGE_STYLE[item.nilai]}`}>
                         {item.nilai}
                       </div>
-                      <p className={`text-[9px] font-semibold mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
+                      <p className={`text-xs font-semibold mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
                         {NILAI_LABELS[item.nilai]}
                       </p>
                     </div>
