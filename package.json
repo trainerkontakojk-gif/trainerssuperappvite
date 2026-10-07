@@ -1,6 +1,9 @@
 {
   "name": "trainers-superapp",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
