@@ -189,7 +189,7 @@ export function PdktEvaluationPanel({
       >
         <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Target
             </div>
             <div className="mt-1 font-semibold text-foreground">
@@ -197,7 +197,7 @@ export function PdktEvaluationPanel({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Batch
             </div>
             <div className="mt-1 font-semibold text-foreground">
@@ -205,7 +205,7 @@ export function PdktEvaluationPanel({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Tim
             </div>
             <div className="mt-1 font-semibold text-foreground">
@@ -213,7 +213,7 @@ export function PdktEvaluationPanel({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Pelaksana
             </div>
             <div className="mt-1 font-semibold text-foreground">
@@ -222,7 +222,7 @@ export function PdktEvaluationPanel({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Status
             </div>
             <div className="mt-1 font-semibold text-foreground">
@@ -273,7 +273,7 @@ export function PdktEvaluationPanel({
                         />
                       )}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
                           isResponse
                             ? "bg-primary/10 text-primary"
                             : "bg-module-pdkt/10 text-module-pdkt"
@@ -312,7 +312,7 @@ export function PdktEvaluationPanel({
                 Hasil Evaluasi
               </h3>
               {data?.time_taken != null && (
-                <p className="text-[10px] text-muted-foreground font-bold mt-1">
+                <p className="text-xs text-muted-foreground font-bold mt-1">
                   Selesai dikerjakan dalam{" "}
                   <span className="text-foreground">
                     {formatTime(data.time_taken)}
@@ -321,7 +321,7 @@ export function PdktEvaluationPanel({
               )}
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-module-pdkt/10 border border-module-pdkt/20">
-              <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-black uppercase tracking-wide text-muted-foreground">
                 Skor
               </span>
               <span className="text-2xl font-black text-module-pdkt">
@@ -343,7 +343,7 @@ export function PdktEvaluationPanel({
                   key={item.label}
                   className="rounded-lg border border-border bg-muted/30 px-3 py-2"
                 >
-                  <div className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">
+                  <div className="text-xs font-black uppercase tracking-wide text-muted-foreground">
                     {item.label}
                   </div>
                   <div className="mt-1 text-sm font-black text-foreground">
@@ -362,7 +362,7 @@ export function PdktEvaluationPanel({
           {/* 4-Card Evaluation Grid */}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="p-4 rounded-xl border border-border bg-muted/20">
-              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-chart-red">
+              <h4 className="mb-3 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-chart-red">
                 <AlertCircle size={12} aria-hidden="true" />
                 Typo / Salah Ketik
               </h4>
@@ -390,7 +390,7 @@ export function PdktEvaluationPanel({
             </div>
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
-              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+              <h4 className="mb-3 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-muted-foreground">
                 <MessageSquare size={12} aria-hidden="true" />
                 Kejelasan Kalimat
               </h4>
@@ -419,7 +419,7 @@ export function PdktEvaluationPanel({
             </div>
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
-              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-module-pdkt">
+              <h4 className="mb-3 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-module-pdkt">
                 <BookOpen size={12} aria-hidden="true" />
                 Relevansi Solusi
               </h4>
@@ -447,7 +447,7 @@ export function PdktEvaluationPanel({
             </div>
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
-              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+              <h4 className="mb-3 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-muted-foreground">
                 <MessageSquare size={12} aria-hidden="true" />
                 Masukan
               </h4>

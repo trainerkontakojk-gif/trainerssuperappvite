@@ -63,3 +63,21 @@ Hasil:
 - GREEN: `telefun-history.spec.ts` 13/13 lulus. Spec lain yang menyentuh Telefun (`edukatif-visual`, `authenticated-shell`, `usage`, `access-matrix-api`): 23 lulus, 2 dilewati.
 - Belum tercakup E2E: route `/telefun/replay`, tab Replay (`ReplayAnnotator`), dan `CommunicationProfileZoomModal`. Semuanya butuh rekaman audio atau fixture tambahan.
 - `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
+
+## Lanjutan: modul Monitoring
+
+Requirement: tidak ada teks terlihat < 11px di riwayat Monitoring, detail review tiap modul (KETIK, PDKT, Telefun), dan tab Penggunaan Token.
+
+Design:
+
+- 74 `text-[6–10px]` di `routes/monitoring` diganti `text-xs`.
+- `HistoryCard.tsx` tidak diubah, lalu dihapus. Komponen ini tidak dipakai aplikasi; hanya blok `describe("HistoryCard …")` di `__tests__/monitoring-redesign.test.tsx` yang mengimpornya, dan blok itu ikut dihapus. Tes HistoryTab dan PdktEvaluationPanel di file yang sama tetap ada, jadi entri `scripts/test-core.json` tidak berubah.
+- Grafik radar Telefun (`VoiceRadarChartInner`, dipakai di detail Monitoring) mengatur ukuran lewat props Recharts, bukan class. Label sudut mode compact 10 → 11, tick radius 9 → 11.
+- `monitoring.spec.ts` kini punya fixture berisi data (satu sesi per modul, review per modul, agregasi token). Fixture kosong lama tetap dipakai tes lain.
+
+Hasil:
+
+- RED: 59 teks di bawah 11px di riwayat, ketiga panel review, dan penggunaan token (termasuk tick radar 9–10px).
+- GREEN: `monitoring.spec.ts` 7/7 dan `telefun-history.spec.ts` 13/13 lulus. `usage`, `authenticated-shell`, `edukatif-visual`, dan `typography-floor`: 12 lulus, 2 dilewati.
+- `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
+- Sisa di luar Monitoring: `DashboardTrendPanel` memakai `fontSize: 10` pada grafik (modul Dashboard).

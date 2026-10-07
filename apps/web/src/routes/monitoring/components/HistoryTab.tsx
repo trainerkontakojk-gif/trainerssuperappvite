@@ -224,7 +224,7 @@ export function HistoryTab({
         return (
           <Badge
             variant="outline"
-            className="h-7 border-transparent px-2.5 text-[10px] font-bold tracking-wider"
+            className="h-7 border-transparent px-2.5 text-xs font-bold tracking-wider"
             style={{
               backgroundColor: "var(--module-ketik-bg)",
               color: "var(--module-ketik)",
@@ -239,7 +239,7 @@ export function HistoryTab({
         return (
           <Badge
             variant="outline"
-            className="h-7 border-transparent px-2.5 text-[10px] font-bold tracking-wider"
+            className="h-7 border-transparent px-2.5 text-xs font-bold tracking-wider"
             style={{
               backgroundColor: "var(--module-pdkt-bg)",
               color: "var(--module-pdkt)",
@@ -254,7 +254,7 @@ export function HistoryTab({
         return (
           <Badge
             variant="outline"
-            className="h-7 border-transparent px-2.5 text-[10px] font-bold tracking-wider"
+            className="h-7 border-transparent px-2.5 text-xs font-bold tracking-wider"
             style={{
               backgroundColor: "var(--module-telefun-bg)",
               color: "var(--module-telefun)",
@@ -274,7 +274,7 @@ export function HistoryTab({
     switch (status) {
       case "completed":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold w-fit bg-muted text-muted-foreground border border-border">
             <CheckCircle2
               size={12}
               aria-hidden="true"
@@ -286,7 +286,7 @@ export function HistoryTab({
       case "processing":
       case "pending":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse motion-reduce:animate-none">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse motion-reduce:animate-none">
             <Loader2
               size={12}
               aria-hidden="true"
@@ -298,7 +298,7 @@ export function HistoryTab({
         );
       case "failed":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold w-fit bg-muted text-muted-foreground border border-border">
             <AlertCircle
               size={12}
               aria-hidden="true"
@@ -309,7 +309,7 @@ export function HistoryTab({
         );
       default:
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold w-fit bg-muted text-muted-foreground border border-border">
             <AlertCircle
               size={12}
               aria-hidden="true"
@@ -402,7 +402,7 @@ export function HistoryTab({
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground ml-0.5">
+            <span className="text-xs text-muted-foreground ml-0.5">
               /100
             </span>
           </div>
@@ -413,7 +413,7 @@ export function HistoryTab({
           >
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {label}
                 </span>
                 <span className="text-xs font-semibold text-foreground mt-0.5">
@@ -456,7 +456,7 @@ export function HistoryTab({
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground ml-0.5">
+            <span className="text-xs text-muted-foreground ml-0.5">
               /100
             </span>
           </div>
@@ -465,7 +465,7 @@ export function HistoryTab({
           <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {label}
                 </span>
                 <span className="text-xs font-semibold text-foreground mt-0.5">
@@ -507,13 +507,13 @@ export function HistoryTab({
             }}
           >
             <span>{finalVal ?? "-"}</span>
-            <span className="text-[9px] text-muted-foreground ml-0.5">/10</span>
+            <span className="text-xs text-muted-foreground ml-0.5">/10</span>
           </div>
           {assessment ? (
             <div className="grid grid-cols-5 gap-x-4 min-w-[360px]">
               {submetrics.map(({ label, val }) => (
                 <div key={label} className="flex flex-col">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     {label}
                   </span>
                   <span className="text-xs font-semibold text-foreground mt-0.5">
@@ -561,7 +561,7 @@ export function HistoryTab({
             <MessageSquare size={20} aria-hidden="true" />
           </div>
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block">
               Total Sesi
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -582,7 +582,7 @@ export function HistoryTab({
             <PenTool size={20} aria-hidden="true" />
           </div>
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block uppercase">
               ketik
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -603,7 +603,7 @@ export function HistoryTab({
             <Mail size={20} aria-hidden="true" />
           </div>
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block uppercase">
               pdkt
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -624,7 +624,7 @@ export function HistoryTab({
             <Phone size={20} aria-hidden="true" />
           </div>
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block capitalize">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block capitalize">
               telefun
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -719,7 +719,7 @@ export function HistoryTab({
                 <div className="space-y-1">
                   <label
                     htmlFor="monitoring-date-start"
-                    className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+                    className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
                   >
                     Mulai
                   </label>
@@ -738,7 +738,7 @@ export function HistoryTab({
                 <div className="space-y-1">
                   <label
                     htmlFor="monitoring-date-end"
-                    className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+                    className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
                   >
                     Selesai
                   </label>

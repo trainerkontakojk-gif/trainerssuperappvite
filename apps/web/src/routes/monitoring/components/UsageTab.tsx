@@ -125,7 +125,7 @@ export function UsageTab({
         {/* Card 1: Aktivitas AI */}
         <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
               Aktivitas AI
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground">
@@ -148,7 +148,7 @@ export function UsageTab({
         {/* Card 2: Konsumsi Token */}
         <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
               Konsumsi Token
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground">
@@ -163,7 +163,7 @@ export function UsageTab({
         {/* Card 3: Biaya Simulasi */}
         <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Simulasi
             </span>
             <p
@@ -173,7 +173,7 @@ export function UsageTab({
               Rp {Math.round(totalSummary.simulationCost).toLocaleString()}
             </p>
           </div>
-          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
+          <p className="text-xs text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Chat, email, & suara
           </p>
         </Card>
@@ -181,7 +181,7 @@ export function UsageTab({
         {/* Card 4: Biaya Penilaian AI */}
         <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Penilaian AI
             </span>
             <p
@@ -191,7 +191,7 @@ export function UsageTab({
               Rp {Math.round(totalSummary.reviewCost).toLocaleString()}
             </p>
           </div>
-          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
+          <p className="text-xs text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Evaluasi & analisis AI
           </p>
         </Card>
@@ -361,7 +361,7 @@ export function UsageTab({
                     >
                       {a.user_name || "Unknown"}
                     </span>
-                    <span className="text-muted-foreground/70 ml-2 font-mono text-[10px]">
+                    <span className="text-muted-foreground/70 ml-2 font-mono text-xs">
                       {a.user_email}
                     </span>
                   </td>
@@ -476,18 +476,18 @@ export function UsageTab({
                       key={i}
                       className="hover:bg-foreground/[0.015] transition-colors"
                     >
-                      <td className="px-6 py-3.5 font-mono text-[10px] font-semibold text-foreground">
+                      <td className="px-6 py-3.5 font-mono text-xs font-semibold text-foreground">
                         {m.model_id}
                       </td>
                       <td className="px-6 py-3.5">
-                        <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
+                        <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-xs font-bold uppercase tracking-wider">
                           {m.module}
                         </span>
                       </td>
                       <td className="px-6 py-3.5">
                         {m.action_category === "simulation" ? (
                           <span
-                            className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                            className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider"
                             style={{
                               backgroundColor: "var(--chart-green)",
                               color: "white",
@@ -497,7 +497,7 @@ export function UsageTab({
                           </span>
                         ) : m.action_category === "review" ? (
                           <span
-                            className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                            className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider"
                             style={{
                               backgroundColor: "var(--chart-amber)",
                               color: "white",
@@ -506,7 +506,7 @@ export function UsageTab({
                             Penilaian
                           </span>
                         ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
                             Lainnya
                           </span>
                         )}
@@ -569,18 +569,18 @@ export function UsageTab({
                     key={i}
                     className="hover:bg-foreground/[0.015] transition-colors"
                   >
-                    <td className="px-6 py-3.5 font-mono text-[10px] font-semibold text-foreground">
+                    <td className="px-6 py-3.5 font-mono text-xs font-semibold text-foreground">
                       {m.model_id}
                     </td>
                     <td className="px-6 py-3.5">
-                      <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
+                      <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-xs font-bold uppercase tracking-wider">
                         {m.module}
                       </span>
                     </td>
                     <td className="px-6 py-3.5">
                       {m.action_category === "simulation" ? (
                         <span
-                          className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider"
                           style={{
                             backgroundColor: "var(--chart-green)",
                             color: "white",
@@ -590,7 +590,7 @@ export function UsageTab({
                         </span>
                       ) : m.action_category === "review" ? (
                         <span
-                          className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider"
                           style={{
                             backgroundColor: "var(--chart-amber)",
                             color: "white",
@@ -599,7 +599,7 @@ export function UsageTab({
                           Penilaian
                         </span>
                       ) : (
-                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
                           Lainnya
                         </span>
                       )}

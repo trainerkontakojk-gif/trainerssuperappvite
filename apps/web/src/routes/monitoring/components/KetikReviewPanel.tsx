@@ -159,7 +159,7 @@ export function KetikReviewPanel({
                         />
                       )}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
                           isUser
                             ? "bg-primary/10 text-primary"
                             : "bg-module-ketik/10 text-module-ketik"
@@ -209,7 +209,7 @@ export function KetikReviewPanel({
           <button
             type="button"
             onClick={onRetry ?? fetchReview}
-            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <RefreshCw size={10} aria-hidden="true" />
             Coba Lagi
@@ -309,19 +309,19 @@ export function KetikReviewPanel({
                       >
                         <card.icon className="w-5 h-5" aria-hidden="true" />
                       </div>
-                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                      <div className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
                         {card.label}
                       </div>
                       <div className={`text-2xl font-black ${grade.color}`}>
                         {card.score}
                       </div>
                       <div
-                        className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}
+                        className={`text-xs font-bold ${grade.color} uppercase tracking-wider`}
                       >
                         {grade.label}
                       </div>
                       <ScoreBar score={card.score} />
-                      <div className="text-[10px] text-foreground leading-snug mt-1">
+                      <div className="text-xs text-foreground leading-snug mt-1">
                         {card.description}
                       </div>
                     </div>
@@ -340,7 +340,7 @@ export function KetikReviewPanel({
                   />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+                  <div className="text-xs font-black uppercase tracking-[0.3em] text-primary">
                     Skor Akhir
                   </div>
                   <div
@@ -499,7 +499,7 @@ export function KetikReviewPanel({
                           </span>
                         </div>
                         <span
-                          className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${typo.severity === "critical" ? "bg-rose-500 text-white" : typo.severity === "medium" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"}`}
+                          className={`text-xs font-black uppercase px-1.5 py-0.5 rounded ${typo.severity === "critical" ? "bg-rose-500 text-white" : typo.severity === "medium" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"}`}
                         >
                           {typo.severity}
                         </span>
@@ -529,7 +529,7 @@ export function KetikReviewPanel({
                     <ul className="space-y-3">
                       {data.review.coachingFocus.map((focus, i) => (
                         <li key={i} className="flex gap-4 items-start">
-                          <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
+                          <div className="mt-1 w-5 h-5 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">
                             {i + 1}
                           </div>
                           <p className="text-sm font-bold text-primary/80 leading-snug">
