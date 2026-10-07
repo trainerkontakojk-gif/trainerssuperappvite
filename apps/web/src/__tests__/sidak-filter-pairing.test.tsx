@@ -14,6 +14,8 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  // Ranking reads validated search params; no query means default filters.
+  useSearch: () => ({}),
 }));
 
 vi.mock("../components/sidak/KpiCard", () => ({
