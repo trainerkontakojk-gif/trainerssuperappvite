@@ -251,6 +251,68 @@ const DASHBOARD_READY_MOCKS = DASHBOARD_MOCKS.map((mock) =>
     : mock,
 );
 
+const FUTURE_MONTHS = ["Jun", "Jul", "Agu"] as const;
+const parameterForecast = (label: string, values: number[]) => ({
+  scope: { type: "parameter" as const, parameterId: label, label },
+  historical: [],
+  forecast: FUTURE_MONTHS.map((month, index) => ({
+    label: month,
+    date: `${YEAR}-0${6 + index}-28`,
+    value: values[index],
+  })),
+  summary: FORECAST_SNAPSHOT.series.total.summary,
+  status: "ready" as const,
+});
+
+const TWO_PARAMETER_MOCKS = DASHBOARD_READY_MOCKS.map((mock) => {
+  if (mock.method === "GET" && mock.path === "/api/v1/sidak/dashboard") {
+    return {
+      ...mock,
+      body: {
+        success: true,
+        data: {
+          ...DASHBOARD_DATA,
+          paramTrend: {
+            ...DASHBOARD_DATA.paramTrend,
+            datasets: [
+              ...DASHBOARD_DATA.paramTrend.datasets,
+              { label: "Salam Pembuka", data: [10, 8], isTotal: false },
+            ],
+          },
+        },
+      },
+    };
+  }
+  if (
+    mock.method === "POST" &&
+    mock.path === "/api/v1/sidak/dashboard/forecast"
+  ) {
+    return {
+      ...mock,
+      body: {
+        success: true,
+        data: {
+          status: "fresh",
+          snapshot: {
+            ...FORECAST_SNAPSHOT,
+            series: {
+              ...FORECAST_SNAPSHOT.series,
+              parameters: {
+                "Akurasi Informasi": parameterForecast(
+                  "Akurasi Informasi",
+                  [20, 18, 16],
+                ),
+                "Salam Pembuka": parameterForecast("Salam Pembuka", [6, 5, 4]),
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+  return mock;
+});
+
 const PANEL_TITLES = [
   "Ringkasan temuan",
   "Tren temuan",
@@ -580,6 +642,28 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ).toBeVisible();
     await expect(page.getByText(SCOPE_LINE, { exact: true })).toBeVisible();
 
+    // Default filters: Call, current year, January through the current month.
+    const currentMonth = new Date().toLocaleString("id-ID", { month: "long" });
+    await expect(page.getByRole("combobox", { name: "Layanan" })).toContainText(
+      "Call",
+    );
+    await expect(page.getByRole("combobox", { name: "Tahun" })).toContainText(
+      String(YEAR),
+    );
+    await expect(
+      page.getByRole("combobox", { name: "Bulan awal" }),
+    ).toContainText("Januari");
+    await expect(
+      page.getByRole("combobox", { name: "Bulan akhir" }),
+    ).toContainText(currentMonth);
+    const dashboardRequest = audit.mockedApi.find((entry) =>
+      entry.includes("/sidak/dashboard?"),
+    );
+    expect(dashboardRequest).toContain(`year=${YEAR}`);
+    expect(dashboardRequest).toContain("service_type=call");
+    expect(dashboardRequest).toContain("startMonth=1");
+    expect(dashboardRequest).toContain(`endMonth=${new Date().getMonth() + 1}`);
+
     // KPI strip: one region, four indicators, values preserved.
     const kpis = page.getByRole("region", { name: "Indikator utama" });
     await expect(kpis.locator("article")).toHaveCount(4);
@@ -665,9 +749,10 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     await expect(priorityAgent).toContainText("Skor 84.5%");
     await expect(priorityAgent).toContainText("12");
     await expect(priorityAgent).toContainText("Ada temuan kritikal");
+    // Ranking page reads `service_type`, so the link must carry it verbatim.
     await expect(
       agents.getByRole("link", { name: "Lihat semua ranking" }),
-    ).toHaveAttribute("href", /\/sidak\/ranking/);
+    ).toHaveAttribute("href", `/sidak/ranking?service_type=call&year=${YEAR}`);
 
     // Parameter ranking replaces the dual-axis Pareto chart.
     const parameters = page.getByRole("region", { name: "Parameter teratas" });
@@ -858,6 +943,68 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("proyeksi parameter ditempatkan di bulan mendatang yang sama", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: TWO_PARAMETER_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?", "/dashboard/forecast"]);
+
+    // Two parameters, no total: the chart allows at most two series.
+    const trend = page.getByRole("region", { name: "Tren temuan" });
+    await trend.getByRole("button", { name: "Akurasi Informasi" }).click();
+    await trend
+      .getByRole("button", { name: "Total Temuan", exact: true })
+      .click();
+    await trend.getByRole("button", { name: "Salam Pembuka" }).click();
+    for (const name of ["Akurasi Informasi", "Salam Pembuka"]) {
+      await expect(trend.getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    }
+
+    // Forecast months follow the history once, shared by both parameters.
+    const ticks = trend.locator(
+      ".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
+    );
+    await expect(ticks).toHaveText([
+      PREVIOUS_LABEL,
+      LATEST_LABEL,
+      ...FUTURE_MONTHS,
+    ]);
+
+    const tooltipAt = async (label: string) => {
+      const tick = ticks.filter({ hasText: label });
+      // Mouse coordinates are viewport-relative; bring the chart on screen.
+      await trend.locator(".recharts-wrapper").scrollIntoViewIfNeeded();
+      const tickBox = await tick.boundingBox();
+      // `.recharts-surface` also matches legend icons; the wrapper is the plot.
+      const plot = await trend.locator(".recharts-wrapper").boundingBox();
+      if (!tickBox || !plot) throw new Error(`No geometry for tick ${label}`);
+      await page.mouse.move(
+        tickBox.x + tickBox.width / 2,
+        plot.y + plot.height / 2,
+      );
+      const tooltip = trend.locator(".recharts-tooltip-wrapper");
+      await expect(tooltip).toContainText(label);
+      return tooltip;
+    };
+
+    const june = await tooltipAt("Jun");
+    await expect(june).toContainText(/Prediksi Akurasi Informasi\s*:\s*20/);
+    await expect(june).toContainText(/Prediksi Salam Pembuka\s*:\s*6/);
+
+    // The last actual month keeps its real values, not forecast values.
+    const latest = await tooltipAt(LATEST_LABEL);
+    await expect(latest).toContainText(/Akurasi Informasi\s*:\s*24/);
+    await expect(latest).toContainText(/Salam Pembuka\s*:\s*8/);
+
+    expectHermetic(audit);
+  });
+
   test("tidak menyarankan agen prioritas saat daftar agen kosong", async ({
     page,
   }) => {
@@ -919,6 +1066,38 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
       forecast.getByText("Belum ada forecast untuk filter ini."),
     ).toBeVisible();
     await expect(summary.getByText(/Turun|Naik \d+\.\d+%/)).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("menampilkan skeleton, bukan teks loading, saat dashboard pertama dimuat", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?"]);
+
+    // Hold the dashboard GET on reload so the initial-load state stays visible.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(/\/api\/v1\/sidak\/dashboard\?/, async (route) => {
+      if (route.request().method() === "GET") await held;
+      await route.fallback();
+    });
+    await page.reload();
+
+    const skeleton = page.getByTestId("sidak-dashboard-skeleton");
+    await expect(skeleton).toBeVisible();
+    await expect(page.getByText("Memuat data dashboard...")).toHaveCount(0);
+
+    release();
+    await expect(
+      page.getByRole("region", { name: "Indikator utama" }),
+    ).toBeVisible();
+    await expect(skeleton).toHaveCount(0);
     expectHermetic(audit);
   });
 

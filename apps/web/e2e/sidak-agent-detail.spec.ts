@@ -15,6 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   AGENT_ID,
   AGENT_NAME,
+  CHAT_INDICATOR_NAME,
   EMPTY_AGENT_ID,
   EMPTY_AGENT_NAME,
   INDICATOR_NAME,
@@ -201,6 +202,49 @@ test.describe("Detail agent SIDAK: tab", () => {
 
     await expect(february).toContainText("2 temuan");
     await expect(february).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("tiap temuan menampilkan nilai 'dari 3' dan kategori parameternya", async ({
+    page,
+  }) => {
+    const audit = startAudit();
+    await openAgentDetail(page, audit);
+    const panel = await openTemuanTab(page);
+
+    // Layanan default Call: satu temuan nilai 1 pada parameter kritis.
+    const critical = panel
+      .locator("article")
+      .filter({ hasText: INDICATOR_NAME })
+      .first();
+    await expect(critical.locator("> div").first()).toHaveText(
+      /^\s*1\s*dari 3\s*$/,
+    );
+    await expect(critical.getByText("Kritis", { exact: true })).toBeVisible();
+
+    // Layanan Chat: dua temuan (nilai 2 dan 1) pada parameter non-kritis.
+    await page.getByRole("combobox", { name: "Pilihan layanan audit" }).click();
+    await page.getByRole("option", { name: "Chat", exact: true }).click();
+    await panel
+      .getByRole("button")
+      .filter({ hasText: "Februari 2026" })
+      .first()
+      .click();
+
+    const nonCritical = panel
+      .locator("article")
+      .filter({ hasText: CHAT_INDICATOR_NAME });
+    await expect(nonCritical).toHaveCount(2);
+    const scores = await nonCritical
+      .locator("> div:first-child")
+      .allTextContents();
+    expect(scores.map((score) => score.replace(/\s+/g, "")).sort()).toEqual([
+      "1dari3",
+      "2dari3",
+    ]);
+    await expect(
+      nonCritical.first().getByText("Non-kritis", { exact: true }),
+    ).toBeVisible();
+    await expect(panel.getByText("Poin", { exact: true })).toHaveCount(0);
   });
 
   test("tabel benchmark menampilkan baris total dan parameter", async ({ page }) => {
