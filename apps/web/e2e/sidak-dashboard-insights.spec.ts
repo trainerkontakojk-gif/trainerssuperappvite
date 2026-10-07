@@ -251,6 +251,68 @@ const DASHBOARD_READY_MOCKS = DASHBOARD_MOCKS.map((mock) =>
     : mock,
 );
 
+const FUTURE_MONTHS = ["Jun", "Jul", "Agu"] as const;
+const parameterForecast = (label: string, values: number[]) => ({
+  scope: { type: "parameter" as const, parameterId: label, label },
+  historical: [],
+  forecast: FUTURE_MONTHS.map((month, index) => ({
+    label: month,
+    date: `${YEAR}-0${6 + index}-28`,
+    value: values[index],
+  })),
+  summary: FORECAST_SNAPSHOT.series.total.summary,
+  status: "ready" as const,
+});
+
+const TWO_PARAMETER_MOCKS = DASHBOARD_READY_MOCKS.map((mock) => {
+  if (mock.method === "GET" && mock.path === "/api/v1/sidak/dashboard") {
+    return {
+      ...mock,
+      body: {
+        success: true,
+        data: {
+          ...DASHBOARD_DATA,
+          paramTrend: {
+            ...DASHBOARD_DATA.paramTrend,
+            datasets: [
+              ...DASHBOARD_DATA.paramTrend.datasets,
+              { label: "Salam Pembuka", data: [10, 8], isTotal: false },
+            ],
+          },
+        },
+      },
+    };
+  }
+  if (
+    mock.method === "POST" &&
+    mock.path === "/api/v1/sidak/dashboard/forecast"
+  ) {
+    return {
+      ...mock,
+      body: {
+        success: true,
+        data: {
+          status: "fresh",
+          snapshot: {
+            ...FORECAST_SNAPSHOT,
+            series: {
+              ...FORECAST_SNAPSHOT.series,
+              parameters: {
+                "Akurasi Informasi": parameterForecast(
+                  "Akurasi Informasi",
+                  [20, 18, 16],
+                ),
+                "Salam Pembuka": parameterForecast("Salam Pembuka", [6, 5, 4]),
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+  return mock;
+});
+
 const PANEL_TITLES = [
   "Ringkasan temuan",
   "Tren temuan",
@@ -878,6 +940,68 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ).toBeEnabled();
 
     console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test("proyeksi parameter ditempatkan di bulan mendatang yang sama", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: TWO_PARAMETER_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?", "/dashboard/forecast"]);
+
+    // Two parameters, no total: the chart allows at most two series.
+    const trend = page.getByRole("region", { name: "Tren temuan" });
+    await trend.getByRole("button", { name: "Akurasi Informasi" }).click();
+    await trend
+      .getByRole("button", { name: "Total Temuan", exact: true })
+      .click();
+    await trend.getByRole("button", { name: "Salam Pembuka" }).click();
+    for (const name of ["Akurasi Informasi", "Salam Pembuka"]) {
+      await expect(trend.getByRole("button", { name })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    }
+
+    // Forecast months follow the history once, shared by both parameters.
+    const ticks = trend.locator(
+      ".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
+    );
+    await expect(ticks).toHaveText([
+      PREVIOUS_LABEL,
+      LATEST_LABEL,
+      ...FUTURE_MONTHS,
+    ]);
+
+    const tooltipAt = async (label: string) => {
+      const tick = ticks.filter({ hasText: label });
+      // Mouse coordinates are viewport-relative; bring the chart on screen.
+      await trend.locator(".recharts-wrapper").scrollIntoViewIfNeeded();
+      const tickBox = await tick.boundingBox();
+      // `.recharts-surface` also matches legend icons; the wrapper is the plot.
+      const plot = await trend.locator(".recharts-wrapper").boundingBox();
+      if (!tickBox || !plot) throw new Error(`No geometry for tick ${label}`);
+      await page.mouse.move(
+        tickBox.x + tickBox.width / 2,
+        plot.y + plot.height / 2,
+      );
+      const tooltip = trend.locator(".recharts-tooltip-wrapper");
+      await expect(tooltip).toContainText(label);
+      return tooltip;
+    };
+
+    const june = await tooltipAt("Jun");
+    await expect(june).toContainText(/Prediksi Akurasi Informasi\s*:\s*20/);
+    await expect(june).toContainText(/Prediksi Salam Pembuka\s*:\s*6/);
+
+    // The last actual month keeps its real values, not forecast values.
+    const latest = await tooltipAt(LATEST_LABEL);
+    await expect(latest).toContainText(/Akurasi Informasi\s*:\s*24/);
+    await expect(latest).toContainText(/Salam Pembuka\s*:\s*8/);
+
     expectHermetic(audit);
   });
 
