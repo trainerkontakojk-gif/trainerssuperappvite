@@ -1,24 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { useRef, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
-  BarChart3,
   ChevronRight,
   LogOut,
   UserCog,
   Sun,
   Moon,
   Settings,
-  LayoutDashboard,
-  MessageSquare,
-  Mail,
-  Phone,
-  Users,
 } from "lucide-react";
 import {
   APP_MODULES,
   isCapabilityAllowed,
-  normalizeRoleLabel,
 } from "../../lib/app-config";
 import { SIDAK_CHILDREN, MANAGEMENT_LINKS } from "./nav-config";
 import { ThemeMode } from "../../hooks/useThemeMode";
@@ -27,8 +19,6 @@ interface SidebarProps {
   pathname: string;
   profile: any;
   session: any;
-  mobileMenuOpen: boolean;
-  setMobileMenuOpen: (open: boolean) => void;
   hasTelefunAccess: boolean;
   openMaintenance: () => void;
   theme: ThemeMode;
@@ -44,8 +34,6 @@ export function Sidebar({
   pathname,
   profile,
   session,
-  mobileMenuOpen,
-  setMobileMenuOpen,
   hasTelefunAccess,
   openMaintenance,
   theme,
@@ -76,18 +64,6 @@ export function Sidebar({
     };
   }, [flyoutOpen, setFlyoutOpen, setFlyoutModule]);
 
-  // Prevent background scroll when mobile sidebar is open
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [mobileMenuOpen]);
-
   const userInitial = (profile?.full_name || session?.user?.email || "U")
     .charAt(0)
     .toUpperCase();
@@ -95,12 +71,6 @@ export function Sidebar({
   const handleLinkClick = () => {
     setFlyoutOpen(false);
     setFlyoutModule(null);
-    setMobileMenuOpen(false);
-  };
-
-  const getModuleId = (id: string) => {
-    if (id === "qa-analyzer") return "sidak";
-    return id;
   };
 
   // Determine which modules to render in rail
@@ -364,187 +334,6 @@ export function Sidebar({
           )}
         </div>
       </div>
-
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm lg:hidden"
-              onClick={handleLinkClick}
-            />
-            <motion.div
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "tween", ease: "easeOut", duration: 0.25 }}
-              className="fixed inset-y-0 left-0 z-[70] w-76 bg-card border-r border-border p-6 lg:hidden flex flex-col h-full"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                    <span className="font-display font-bold text-sm">S</span>
-                  </div>
-                  <span className="font-display font-bold text-sm tracking-tight">
-                    Trainers SuperApp
-                  </span>
-                </div>
-                <button
-                  onClick={handleLinkClick}
-                  className="p-1 rounded-lg hover:bg-foreground/5 text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
-                <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
-                  Platform
-                </p>
-
-                {desktopRailModules.map((module) => {
-                  const active = isModuleActive(module.href);
-                  return (
-                    <Link
-                      key={module.id}
-                      to={module.href as any}
-                      onClick={(e) => {
-                        if (module.id === "telefun" && !hasTelefunAccess) {
-                          e.preventDefault();
-                          openMaintenance();
-                          return;
-                        }
-                        handleLinkClick();
-                      }}
-                      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                        active
-                          ? "bg-primary text-primary-foreground font-semibold"
-                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                      }`}
-                    >
-                      <module.icon className="h-4 w-4 shrink-0" />
-                      <span>{module.shortTitle}</span>
-                    </Link>
-                  );
-                })}
-
-                {isQaAllowed && qaModule && (
-                  <div className="pt-2 border-t border-border/50 mt-2">
-                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
-                      SIDAK
-                    </p>
-                    {SIDAK_CHILDREN.filter((item) =>
-                      isCapabilityAllowed(profile?.role, item.capability),
-                    ).map((item) => {
-                      const active = item.exactMatch
-                        ? pathname === item.to
-                        : pathname.startsWith(item.to);
-
-                      return (
-                        <Link
-                          key={item.to}
-                          to={item.to as any}
-                          onClick={handleLinkClick}
-                          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? "bg-primary text-primary-foreground font-semibold"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }`}
-                        >
-                          <BarChart3 className="h-4 w-4 shrink-0" />
-                          <span>{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {showManagementButton && (
-                  <div className="pt-2 border-t border-border/50 mt-2">
-                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
-                      Management
-                    </p>
-                    {visibleManagementLinks.map((item) => {
-                      const active = pathname === item.to;
-                      return (
-                        <Link
-                          key={item.to}
-                          to={item.to as any}
-                          onClick={handleLinkClick}
-                          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                            active
-                              ? "bg-primary text-primary-foreground font-semibold"
-                              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-                          }`}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          <span>{item.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </nav>
-
-              <div className="border-t border-border pt-4 mt-auto flex flex-col gap-1">
-                <div className="px-3 py-2 rounded-xl bg-surface mb-2 border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Signed in as
-                  </p>
-                  <p
-                    className="text-xs font-semibold truncate text-foreground"
-                    title={profile?.email || session?.user?.email}
-                  >
-                    {profile?.email || session?.user?.email}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Role: {normalizeRoleLabel(profile?.role)}
-                  </p>
-                </div>
-
-                <Link
-                  to="/account"
-                  className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition cursor-pointer"
-                  onClick={handleLinkClick}
-                >
-                  <UserCog className="h-4 w-4 shrink-0" />
-                  <span>Akun</span>
-                </Link>
-
-                <button
-                  onClick={() => {
-                    setTheme(theme === "dark" ? "light" : "dark");
-                    handleLinkClick();
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition cursor-pointer text-left"
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <Moon className="h-4 w-4 shrink-0" />
-                  )}
-                  <span>Tema {theme === "dark" ? "Terang" : "Gelap"}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    handleLinkClick();
-                    handleLogout();
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 transition cursor-pointer text-left font-medium"
-                >
-                  <LogOut className="h-4 w-4 shrink-0" />
-                  <span>Keluar</span>
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

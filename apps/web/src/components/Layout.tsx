@@ -131,8 +131,6 @@ function DashboardLayoutContent() {
         pathname={pathname}
         profile={profile}
         session={session}
-        mobileMenuOpen={mobileDrawerOpen}
-        setMobileMenuOpen={setMobileDrawerOpen}
         hasTelefunAccess={hasTelefunAccess}
         openMaintenance={openMaintenance}
         theme={theme}

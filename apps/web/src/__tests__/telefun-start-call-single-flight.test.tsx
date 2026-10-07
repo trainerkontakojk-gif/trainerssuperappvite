@@ -56,9 +56,6 @@ vi.mock("../routes/telefun/components/HistoryModal", () => ({
 vi.mock("../components/UsageModal", () => ({
   UsageModal: () => null,
 }));
-vi.mock("../components/ModuleWorkspaceIntro", () => ({
-  default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
-}));
 vi.mock("../routes/telefun/services/telefun-recording-reconciliation", () => ({
   installTelefunRecordingReconciliation: vi.fn(),
   reconcileTelefunRecordingQueue: vi.fn().mockResolvedValue(undefined),

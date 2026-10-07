@@ -30,7 +30,6 @@ function renderSidebar({ pathname, flyoutOpen, flyoutModule }: RenderProps) {
   const mockProfile = { role: "admin", full_name: "Test Admin" };
   const mockSession = { user: { email: "admin@test.com" } };
 
-  const setMobileMenuOpen = vi.fn();
   const openMaintenance = vi.fn();
   const setTheme = vi.fn();
   const handleLogout = vi.fn();
@@ -42,8 +41,6 @@ function renderSidebar({ pathname, flyoutOpen, flyoutModule }: RenderProps) {
       pathname={pathname}
       profile={mockProfile}
       session={mockSession}
-      mobileMenuOpen={false}
-      setMobileMenuOpen={setMobileMenuOpen}
       hasTelefunAccess={true}
       openMaintenance={openMaintenance}
       theme="light"
