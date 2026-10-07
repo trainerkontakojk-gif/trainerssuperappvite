@@ -97,3 +97,20 @@ Hasil:
 - GREEN: `ketik-flow.spec.ts` 4/4 lulus. `monitoring`, `usage`, `authenticated-shell`, `edukatif-visual`, `typography-floor`: 19 lulus, 2 dilewati.
 - `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
 - Temuan di luar scope: `SessionReplayModal` tidak punya `role="dialog"`/`aria-modal`, tidak bisa ditutup dengan Escape, dan tombol tutupnya ikon tanpa label aksesibel.
+
+## Lanjutan: modul PDKT
+
+Requirement: tidak ada teks terlihat < 11px di landing, sidebar mailbox, detail email berlampiran, dan email terbalas yang sudah dievaluasi, termasuk `PdktEducationSections` (juga dipakai panel evaluasi PDKT di Monitoring).
+
+Design:
+
+- 9 `text-[6–10px]` di `routes/pdkt` dan `components/PdktEducationSections.tsx` diganti `text-xs`.
+- `PdktMotionFrame` (mockup kotak masuk, `aria-hidden`, 12 tempat) tidak diubah. Ia mendapat `data-testid="pdkt-motion-frame"` untuk pengecualian eksplisit di spec landing.
+- `pdkt-flow.spec.ts` kini punya fixture mailbox berisi data: satu email terbuka berlampiran, satu email terbalas yang tertaut ke riwayat dengan evaluasi, `scoreBreakdown`, dan `edu`. Tes mengikuti alur nyata: filter default "Belum Dibalas" memilih email terbuka, lalu filter "Terbalas".
+
+Hasil:
+
+- RED: 13 teks < 11px (tanggal dan status di sidebar, "Dibuat oleh user lama", label skor breakdown 9px, tombol "Salin" edukasi). Landing tidak punya teks kecil di luar mockup.
+- GREEN: `pdkt-flow.spec.ts` 8/8 lulus. `monitoring`, `usage`, `authenticated-shell`, `edukatif-visual`, `typography-floor`: 19 lulus, 2 dilewati.
+- `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
+- Catatan verifikasi: run pertama tidak valid karena port 3005 dipakai dev server sesi lain (worktree `.claude/worktrees/dreamy-kare-63d5f1`). Run di atas diulang setelah port kosong, dan cwd listener sudah dipastikan checkout ini.

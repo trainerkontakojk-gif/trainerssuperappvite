@@ -39,6 +39,7 @@ export function PdktMotionFrame() {
   return (
     <div
       aria-hidden="true"
+      data-testid="pdkt-motion-frame"
       className="relative flex h-full min-h-[380px] items-center justify-center overflow-hidden rounded-[2rem] border border-border/50 bg-muted/20 p-6 lg:min-h-[520px] lg:p-8"
     >
       <motion.div

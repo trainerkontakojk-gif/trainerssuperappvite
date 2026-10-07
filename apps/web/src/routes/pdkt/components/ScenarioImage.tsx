@@ -66,7 +66,7 @@ export default function ScenarioImage({
         {...interactiveProps}
       >
         <FileText className="w-5 h-5 text-[var(--fg2)]" />
-        <span className="text-[10px] font-semibold leading-none text-[var(--fg2)]">
+        <span className="text-xs font-semibold leading-none text-[var(--fg2)]">
           PDF
         </span>
       </div>

@@ -348,7 +348,7 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                       >
                         {item.sender_name}
                       </span>
-                      <span className="text-[10px] text-[var(--fg3)] whitespace-nowrap">
+                      <span className="text-xs text-[var(--fg3)] whitespace-nowrap">
                         {formatTime(item.last_activity_at)}
                       </span>
                     </div>
@@ -363,13 +363,13 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                       {item.snippet}
                     </div>
 
-                    <div className="text-[10px] text-[var(--fg3)] mt-1 leading-normal">
+                    <div className="text-xs text-[var(--fg3)] mt-1 leading-normal">
                       {formatCreatorLabel(item)}
                     </div>
 
                     <div className="mt-2 flex items-center gap-2">
                       {item.status === "open" ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--fg2)]">
+                        <span className="inline-flex items-center gap-1 font-medium text-xs text-[var(--fg2)]">
                           <span
                             aria-hidden="true"
                             className="w-1.5 h-1.5 rounded-full bg-[var(--module-pdkt)]"
@@ -377,7 +377,7 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                           Menunggu Balasan
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--chart-green)]">
+                        <span className="inline-flex items-center gap-1 font-medium text-xs text-[var(--chart-green)]">
                           <span
                             aria-hidden="true"
                             className="w-1.5 h-1.5 rounded-full bg-[var(--chart-green)]"
