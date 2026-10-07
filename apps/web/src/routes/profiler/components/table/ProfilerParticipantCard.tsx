@@ -197,7 +197,7 @@ export const ProfilerParticipantCard: React.FC<
             {p.jabatan ? (
               <Badge
                 variant="secondary"
-                className="mt-1 max-w-full truncate text-[0.65rem]"
+                className="mt-1 max-w-full truncate text-xs"
               >
                 {labelJabatan[p.jabatan] || p.jabatan}
               </Badge>
@@ -208,7 +208,7 @@ export const ProfilerParticipantCard: React.FC<
       <CardFooter className="justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
         <span className="min-w-0 truncate">{p.tim || "Tanpa tim"}</span>
         {p.nik_ojk ? (
-          <span className="shrink-0 font-mono text-[0.68rem]">
+          <span className="shrink-0 font-mono text-xs">
             #{p.nik_ojk}
           </span>
         ) : null}

@@ -131,3 +131,10 @@ Hasil:
 - GREEN: tes baru lulus 1/1. `profiler`, `profiler-workspace`, `profiler-global-birthdays`, `typography-floor`: 24 lulus, 0 gagal, 0 dilewati.
 - `impeccable detect`, web dan e2e typecheck, `pnpm build`, `git diff --check` exit 0; `pnpm lint` 0 error, 102 warning (sama seperti sebelumnya).
 - Di luar cakupan E2E: `text-[0.68rem]` di `ProfilerFolderSelect.tsx` dan `text-[0.65rem]`/`text-[0.68rem]` di `table/ProfilerParticipantCard.tsx` (di bawah 11px, belum dipindai karena bukan di halaman impor).
+
+Lanjutan Profiler, sisa ukuran rem (disetujui Fajar):
+
+- `text-[0.68rem]` di `ProfilerFolderSelect.tsx` (label "Batch") serta `text-[0.65rem]` (badge jabatan) dan `text-[0.68rem]` (kode `#NIK`) di `table/ProfilerParticipantCard.tsx` menjadi `text-xs`. Badge `h-5` sudah memakai `text-xs` secara default, jadi tidak ada risiko terpotong.
+- Dua tes baru di `profiler-workspace.spec.ts`, memakai peserta ber-`nik_ojk` dan jabatan, serta mock `/profiler/teams` (halaman tabel memuatnya bersama peserta): kartu peserta di workspace (`/profiler?batch=`) dan halaman `/profiler/table`. Keduanya menegaskan elemen terlihat dulu, memindai `<main>`, dan ditutup `expectHermetic`. Slide tidak tampil di layar ini, jadi tanpa pengecualian.
+- RED: workspace 4 teks (badge "agent" 9.1px x2, "#" 9.52px x2); halaman tabel 5 teks (label "Batch" 9.52px plus 4 yang sama).
+- GREEN: `profiler`, `profiler-workspace`, `profiler-global-birthdays`, `typography-floor`: 26 lulus, 0 gagal, 0 dilewati.

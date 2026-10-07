@@ -34,7 +34,7 @@ export function ProfilerFolderSelect({
   return (
     <div className={className}>
       {hideLabel ? null : (
-        <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {label}
         </p>
       )}

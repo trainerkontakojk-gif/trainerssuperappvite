@@ -6,8 +6,9 @@ import {
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
-import { PROFILER_MOCKS } from "./helpers/profilerMocks";
+import { BATCH_PAGI_PESERTA, PROFILER_MOCKS, TEAM_ID } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
  * Workspace Profiler (plan `profiler-workspace-redesign.md`, tahap 1).
@@ -45,6 +46,31 @@ async function expectNoHorizontalOverflow(page: Page) {
   );
   expect(overflow).toBeLessThanOrEqual(0);
 }
+
+/** Peserta dengan jabatan dan NIK OJK agar badge jabatan dan kode NIK di kartu tampil. */
+const PESERTA_LENGKAP: readonly ApiMock[] = [
+  ...PROFILER_MOCKS.filter(
+    (mock) =>
+      !(mock.path instanceof RegExp && String(mock.path).includes("Pagi")),
+  ),
+  // Halaman /profiler/table memuat daftar tim bersama peserta dan folder.
+  {
+    method: "GET",
+    path: "/api/v1/profiler/teams",
+    body: { success: true, data: [{ id: TEAM_ID, nama: "Tim Call" }] },
+  },
+  {
+    method: "GET",
+    path: /^\/api\/v1\/profiler\/peserta\/batch\/Batch(%20|\+)Pagi$/,
+    body: {
+      success: true,
+      data: BATCH_PAGI_PESERTA.map((peserta, index) => ({
+        ...peserta,
+        nik_ojk: `OJK-00${index + 1}`,
+      })),
+    },
+  },
+];
 
 test.describe("Workspace Profiler (hermetic)", () => {
   test.beforeAll(async () => {
@@ -436,4 +462,40 @@ test.describe("Workspace Profiler (hermetic)", () => {
       expectHermetic(audit);
     });
   }
+
+  test(`teks kartu peserta di workspace Profiler minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler?batch=Batch%20Pagi",
+      apiMocks: PESERTA_LENGKAP,
+    });
+    const workspace = page.getByRole("region", { name: "Batch Pagi" });
+    await expect(workspace.getByText("Rina Kartika").first()).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(workspace.getByText("#OJK-001")).toBeVisible();
+
+    const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test(`teks halaman tabel Profiler (pilih batch + kartu) minimal ${MIN_TEXT_PX}px`, async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler/table?batch=Batch%20Pagi",
+      apiMocks: PESERTA_LENGKAP,
+    });
+    await expect(page.getByText("Rina Kartika").first()).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByText("Batch", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("#OJK-001")).toBeVisible();
+
+    const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
 });
