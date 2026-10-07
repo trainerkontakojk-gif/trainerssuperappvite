@@ -114,3 +114,20 @@ Hasil:
 - GREEN: `pdkt-flow.spec.ts` 8/8 lulus. `monitoring`, `usage`, `authenticated-shell`, `edukatif-visual`, `typography-floor`: 19 lulus, 2 dilewati.
 - `impeccable detect` bersih; web dan e2e typecheck, `pnpm lint`, `pnpm build`, `git diff --check` semua exit 0.
 - Catatan verifikasi: run pertama tidak valid karena port 3005 dipakai dev server sesi lain (worktree `.claude/worktrees/dreamy-kare-63d5f1`). Run di atas diulang setelah port kosong, dan cwd listener sudah dipastikan checkout ini.
+
+## Lanjutan: modul Profiler
+
+Requirement: tidak ada teks terlihat < 11px di halaman impor Profiler (`/profiler/import`).
+
+Design:
+
+- `text-[10px]` pada label grup kolom template di `routes/profiler/import.tsx` menjadi `text-xs`. Eyebrow "Profiler import" di `ProfilerPageHeader` (`text-[0.68rem]` = 9,52px) juga menjadi `text-xs`.
+- `ParticipantSlide.tsx` (12x `text-[10px]`, 7x `text-[9px]`) sengaja TIDAK diubah, atas keputusan Fajar. Ia adalah kanvas ekspor: dirender di dalam `SlideCanvas` dengan rasio tetap (A4 210/297 atau 16:9) dan diekspor ke PNG/PDF lewat `html2canvas` yang menangkap kotak rasio tetap itu. Teks lebih besar akan menambah tinggi konten sehingga terpotong di ekspor A4/16:9. `SlideCanvas.tsx` juga tidak diubah. Tidak ada pengecualian di spec karena slide tidak ada di halaman impor.
+- Tes baru di `profiler.spec.ts` memindai seluruh `<main>` halaman impor dengan semua `/api` dimock (termasuk `/profiler/teams`), memastikan label "Identitas Utama" tampil dulu, dan ditutup `expectHermetic`.
+
+Hasil:
+
+- RED: 5 teks < 11px: "Profiler import" 9.52px, serta "Identitas Utama", "Data Kerja", "Data Pribadi", "Data Sensitif" masing-masing 10px.
+- GREEN: tes baru lulus 1/1. `profiler`, `profiler-workspace`, `profiler-global-birthdays`, `typography-floor`: 24 lulus, 0 gagal, 0 dilewati.
+- `impeccable detect`, web dan e2e typecheck, `pnpm build`, `git diff --check` exit 0; `pnpm lint` 0 error, 102 warning (sama seperti sebelumnya).
+- Di luar cakupan E2E: `text-[0.68rem]` di `ProfilerFolderSelect.tsx` dan `text-[0.65rem]`/`text-[0.68rem]` di `table/ProfilerParticipantCard.tsx` (di bawah 11px, belum dipindai karena bukan di halaman impor).
