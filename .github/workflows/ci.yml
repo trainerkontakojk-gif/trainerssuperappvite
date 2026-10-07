@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from package.json "packageManager" (pnpm 12).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      # NOTE: `pnpm test:fast` is deliberately NOT run here.
+      # 1. AGENTS.md requires asking Fajar before adding/running any non-E2E
+      #    test, and the unit-suite manifests are legacy inventory, not
+      #    permission to run them.
+      # 2. The api suite imports apps/api/src/lib/env.ts, which calls
+      #    process.exit(1) when .env.local is absent, so it cannot pass on a
+      #    clean runner without an env-injection step.
+      # Re-enable only with explicit approval + env injection.
+
+      # Fails the job on any prod advisory. pnpm 12's audit reports
+      # transitive advisories that pnpm 11 missed, so keep it blocking.
+      - name: Dependency audit (prod)
+        run: pnpm audit --prod

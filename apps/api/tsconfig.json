@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "outDir": "dist",
-    "baseUrl": ".",
+    "rootDir": "../..",
     "paths": {
       "@/*": ["./src/*"]
     }

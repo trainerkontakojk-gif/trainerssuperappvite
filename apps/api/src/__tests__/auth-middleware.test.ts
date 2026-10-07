@@ -353,15 +353,16 @@ describe("authMiddleware", () => {
       expect(next).toHaveBeenCalled();
     });
 
-    it("passes for qa role", async () => {
+    it("rejects the retired qa role with 403", async () => {
       pendingProfileResult = () => ({
         data: { status: "active", role: "qa", full_name: "QA User", is_deleted: false },
         error: null,
       });
       const { c } = mockContext({ Authorization: "Bearer valid-token" });
       const next = vi.fn();
-      expect(await authMiddleware(c, next)).toBeUndefined();
-      expect(next).toHaveBeenCalled();
+      const response = (await authMiddleware(c, next)) as unknown as Response;
+      expect(response.status).toBe(403);
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("passes for agent role", async () => {

@@ -286,7 +286,10 @@ export const pdktInitialEmailAiOutputSchema = pdktGeneratedEmailAiOutputSchema;
 export const pdktEducationAiOutputSchema = z
   .object({
     dimensionTips: z
-      .record(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))
+      .record(
+        z.string(),
+        z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+      )
       .optional(),
     improvementTips: z
       .array(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))

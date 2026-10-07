@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LiveSession } from "../routes/telefun/services/liveSession";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
+import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 
 type MessageHandler = ((event: { data: string }) => void) | null;
 
@@ -280,7 +281,7 @@ describe("LiveSession first-message authentication", () => {
 
     expect(JSON.parse(socket.sent[1])).toMatchObject({
       type: "telefun_session_configure",
-      modelId: "gemini-3.1-flash-live-preview",
+      modelId: DEFAULT_TELEFUN_LIVE_MODEL_ID,
       transport: "gemini-live",
     });
   });

@@ -89,11 +89,11 @@ describe("getAccessiblePesertaIds", () => {
     let scopeSnapshotSpy: any;
 
     beforeEach(async () => {
-      const leaderAccessService = await import(
-        "../services/leader-access-service"
-      );
+      // getLeaderScopeSnapshot moved to services/access/leader-scope; spying on
+      // the leader-access-service re-export no longer intercepts the caller.
+      const leaderScope = await import("../services/access/leader-scope");
       scopeSnapshotSpy = vi
-        .spyOn(leaderAccessService, "getLeaderScopeSnapshot")
+        .spyOn(leaderScope, "getLeaderScopeSnapshot")
         .mockResolvedValue({
           requestIds: [],
           pesertaIds: [],
