@@ -138,3 +138,21 @@ Lanjutan Profiler, sisa ukuran rem (disetujui Fajar):
 - Dua tes baru di `profiler-workspace.spec.ts`, memakai peserta ber-`nik_ojk` dan jabatan, serta mock `/profiler/teams` (halaman tabel memuatnya bersama peserta): kartu peserta di workspace (`/profiler?batch=`) dan halaman `/profiler/table`. Keduanya menegaskan elemen terlihat dulu, memindai `<main>`, dan ditutup `expectHermetic`. Slide tidak tampil di layar ini, jadi tanpa pengecualian.
 - RED: workspace 4 teks (badge "agent" 9.1px x2, "#" 9.52px x2); halaman tabel 5 teks (label "Batch" 9.52px plus 4 yang sama).
 - GREEN: `profiler`, `profiler-workspace`, `profiler-global-birthdays`, `typography-floor`: 26 lulus, 0 gagal, 0 dilewati.
+
+## Lanjutan: layout dan sidebar
+
+Requirement: tidak ada teks terlihat < 11px di shell yang tampil di setiap halaman: rail sidebar (termasuk tooltip hover), flyout SIDAK/Management, tab bar dan drawer ponsel. Karena menyentuh semua halaman, ini diperlakukan sebagai Lane D (UI lintas modul): seluruh suite Playwright default dijalankan, bukan hanya spec shell.
+
+Design:
+
+- 23 `text-[9px]`/`text-[10px]` diganti `text-xs`: `Sidebar.tsx` 14 (7 tooltip rail `group-hover`, subjudul flyout SIDAK/Management, label bagian panel, "Signed in as"/Role), `MobileDrawer.tsx` 3, `MobileTabBar.tsx` 2, `UserMenu.tsx` 1, `ModuleWorkspaceIntro.tsx` 2, `PageHeroHeader.tsx` 1. Tooltip rail memakai `whitespace-nowrap` dan posisi absolut, tab bar memakai `min-h-[44px]`, sehingga tidak ada risiko terpotong.
+- Sisa `components/` sudah >= 11px: `text-[0.8rem]` (11,2px) di `ui/button.tsx`, `fontSize` grafik SIDAK 11-12. Tidak ada rem/em lain di bawah batas.
+- Tiga tes baru di `authenticated-shell.spec.ts` (grup "Teks shell minimal 11px"): rail desktop 1280x800 plus hover tiap item rail (tooltip berukuran nol sampai di-hover, jadi dipindai setelah `toBeVisible`); flyout SIDAK lalu Management; tab bar dan drawer "Lainnya" di 390x844. Semua `/api` dimock dan ditutup `expectHermetic`.
+
+Hasil:
+
+- RED: tooltip rail "Dashboard" 10px; subjudul flyout SIDAK 10px; tab bar 5 label 10px (Home, Ketik, Telefun, SIDAK, Lainnya). Tiap tes berhenti pada assertion pertama yang gagal, sehingga RED untuk flyout Management dan drawer ponsel tidak terlihat terpisah; keduanya dibuktikan GREEN.
+- GREEN: `authenticated-shell` dan `sidebar-nav-state` 14 lulus.
+- Tidak dapat dicakup E2E: `UserMenu`, `components/ModuleWorkspaceIntro.tsx`, dan `components/PageHeroHeader.tsx` tidak dirender di mana pun (hanya diekspor atau dimock di tes unit lama); panel mobile di dalam `Sidebar.tsx` (`mobileMenuOpen`) tidak terjangkau karena pembungkusnya `hidden lg:flex` sedangkan panelnya `lg:hidden`. Ukurannya tetap dinaikkan agar konsisten bila dipakai kembali. Kandidat kode mati untuk dibersihkan terpisah.
+- Suite penuh (`pnpm exec playwright test`, 24,2 menit): 410 lulus, 15 gagal, 3 dilewati. 14 gagal bersifat lingkungan (spec backend/DB: `access-scope-api` 401 pada JWT nyata, `sidak-temuan-dates-api` 13 tes dengan egress ke `supabase.co` diblokir guard loopback atau 400/500/503 tanpa DB lokal). 1 gagal (`sidak-jadwal-shifting` "loading calendar states", status loading 400ms) tidak tereproduksi: lulus tanpa perubahan shell dan 3/3 dengan perubahan shell saat diulang.
+- Cek akhir: `impeccable detect`, web dan e2e typecheck, `pnpm typecheck`, `pnpm lint` (0 error; 102 web, 8 api warning), `pnpm build`, `git diff --check` semua exit 0.

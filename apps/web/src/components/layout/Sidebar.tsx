@@ -140,7 +140,7 @@ export function Sidebar({
           <span className="font-display font-bold text-sm tracking-tight">
             S
           </span>
-          <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+          <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
             Dashboard
           </div>
         </Link>
@@ -167,7 +167,7 @@ export function Sidebar({
                 }}
               >
                 <module.icon className="h-[18px] w-[18px]" />
-                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
                   {module.shortTitle}
                 </div>
               </Link>
@@ -196,7 +196,7 @@ export function Sidebar({
                   }}
                 >
                   <qaModule.icon className="h-[18px] w-[18px]" />
-                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
                     {qaModule.shortTitle}
                   </div>
                 </button>
@@ -231,7 +231,7 @@ export function Sidebar({
                   }}
                 >
                   <Settings className="h-[18px] w-[18px]" />
-                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                  <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
                     Management
                   </div>
                 </button>
@@ -245,7 +245,7 @@ export function Sidebar({
             onClick={handleLinkClick}
           >
             <UserCog className="h-[18px] w-[18px]" />
-            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
               Akun
             </div>
           </Link>
@@ -259,7 +259,7 @@ export function Sidebar({
             ) : (
               <Moon className="h-[18px] w-[18px]" />
             )}
-            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
               Tema {theme === "dark" ? "Terang" : "Gelap"}
             </div>
           </button>
@@ -269,7 +269,7 @@ export function Sidebar({
             className="sidebar-rail-item group text-red-600 hover:bg-red-500/10"
           >
             <LogOut className="h-[18px] w-[18px]" />
-            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+            <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
               Keluar
             </div>
           </button>
@@ -295,7 +295,7 @@ export function Sidebar({
                 <h2 className="font-display font-semibold text-sm tracking-tight text-foreground">
                   SIDAK
                 </h2>
-                <p className="text-[10px] font-semibold text-muted-foreground mt-1">
+                <p className="text-xs font-semibold text-muted-foreground mt-1">
                   Sistem Informasi Data Analisis Kualitas
                 </p>
               </div>
@@ -333,7 +333,7 @@ export function Sidebar({
                 <h2 className="font-display font-semibold text-sm tracking-tight text-foreground">
                   Management
                 </h2>
-                <p className="text-[10px] font-semibold text-muted-foreground mt-1">
+                <p className="text-xs font-semibold text-muted-foreground mt-1">
                   Administrasi & Monitoring
                 </p>
               </div>
@@ -402,7 +402,7 @@ export function Sidebar({
               </div>
 
               <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
+                <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
                   Platform
                 </p>
 
@@ -434,7 +434,7 @@ export function Sidebar({
 
                 {isQaAllowed && qaModule && (
                   <div className="pt-2 border-t border-border/50 mt-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
                       SIDAK
                     </p>
                     {SIDAK_CHILDREN.filter((item) =>
@@ -465,7 +465,7 @@ export function Sidebar({
 
                 {showManagementButton && (
                   <div className="pt-2 border-t border-border/50 mt-2">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground mb-3 px-3">
                       Management
                     </p>
                     {visibleManagementLinks.map((item) => {
@@ -492,7 +492,7 @@ export function Sidebar({
 
               <div className="border-t border-border pt-4 mt-auto flex flex-col gap-1">
                 <div className="px-3 py-2 rounded-xl bg-surface mb-2 border border-border/50">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Signed in as
                   </p>
                   <p
@@ -501,7 +501,7 @@ export function Sidebar({
                   >
                     {profile?.email || session?.user?.email}
                   </p>
-                  <p className="text-[9px] text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Role: {normalizeRoleLabel(profile?.role)}
                   </p>
                 </div>

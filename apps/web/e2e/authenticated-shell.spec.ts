@@ -7,6 +7,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
  * Bentuk respons dashboard diambil dari handler aslinya
@@ -164,3 +165,86 @@ for (const [module, path, landing] of [
     expectHermetic(audit);
   });
 }
+
+/**
+ * Batas teks 11px untuk shell yang tampil di setiap halaman: rail sidebar
+ * (termasuk tooltip yang hanya muncul saat hover), flyout SIDAK/Management, serta
+ * tab bar dan drawer ponsel. Semua `/api` dimock; admin dipakai agar semua
+ * modul dan menu Management tampil.
+ */
+test.describe(`Teks shell minimal ${MIN_TEXT_PX}px (hermetic)`, () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("rail sidebar desktop beserta tooltip hover", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    const rail = page.locator(".sidebar-rail");
+    await expect(rail.getByRole("link", { name: "KTP", exact: true })).toBeVisible({
+      timeout: 20000,
+    });
+
+    const offenders = await findTextBelowFloor(rail);
+    expect(offenders, `rail: ${offenders.join("\n")}`).toEqual([]);
+
+    // Tooltip rail berukuran nol (scale-0) sampai di-hover, sehingga pemindaian
+    // biasa melewatinya. Hover tiap item, tunggu tooltip terlihat, lalu pindai.
+    const items = rail.locator(".sidebar-rail-item");
+    const count = await items.count();
+    expect(count).toBeGreaterThan(5);
+    for (let i = 0; i < count; i++) {
+      const item = items.nth(i);
+      await item.hover();
+      const tooltip = item.locator("div.absolute");
+      await expect(tooltip).toBeVisible();
+      const tipOffenders = await findTextBelowFloor(item);
+      expect(tipOffenders, `tooltip rail #${i}: ${tipOffenders.join("\n")}`).toEqual([]);
+    }
+    expectHermetic(audit);
+  });
+
+  test("flyout SIDAK dan Management terbuka", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    const flyout = page.locator(".sidebar-flyout");
+
+    await page.getByRole("button", { name: "SIDAK" }).click({ timeout: 20000 });
+    await expect(flyout.getByRole("heading", { name: "SIDAK" })).toBeVisible();
+    let offenders = await findTextBelowFloor(flyout);
+    expect(offenders, `flyout SIDAK: ${offenders.join("\n")}`).toEqual([]);
+
+    await page.getByRole("button", { name: "Management" }).click();
+    await expect(flyout.getByRole("heading", { name: "Management" })).toBeVisible();
+    offenders = await findTextBelowFloor(flyout);
+    expect(offenders, `flyout Management: ${offenders.join("\n")}`).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("tab bar dan drawer ponsel (390x844)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: DASHBOARD_MOCKS,
+    });
+    const tabBar = page.getByRole("navigation", { name: "Navigasi utama" });
+    await expect(tabBar.getByRole("button", { name: "Lainnya" })).toBeVisible({
+      timeout: 20000,
+    });
+    let offenders = await findTextBelowFloor(tabBar);
+    expect(offenders, `tab bar: ${offenders.join("\n")}`).toEqual([]);
+
+    await tabBar.getByRole("button", { name: "Lainnya" }).click();
+    const drawer = page.locator("div.fixed.inset-0.z-\\[80\\]");
+    await expect(drawer.getByRole("link", { name: "Akun" })).toBeVisible();
+    offenders = await findTextBelowFloor(drawer);
+    expect(offenders, `drawer: ${offenders.join("\n")}`).toEqual([]);
+    expectHermetic(audit);
+  });
+});

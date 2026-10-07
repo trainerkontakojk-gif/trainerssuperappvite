@@ -45,7 +45,7 @@ export function UserMenu({
             <p className="text-sm font-semibold truncate text-foreground" title={profile?.email || session?.user?.email}>
               {profile?.email || session?.user?.email}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Role: {normalizeRoleLabel(profile?.role)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Role: {normalizeRoleLabel(profile?.role)}</p>
           </div>
           
           <Link

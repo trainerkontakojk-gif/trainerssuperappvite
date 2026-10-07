@@ -87,7 +87,7 @@ export function MobileDrawer({
 
             {/* All modules */}
             <div className="px-4 py-3">
-              <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="px-2 mb-2 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Platform
               </p>
               <div className="space-y-1">
@@ -122,7 +122,7 @@ export function MobileDrawer({
             {/* SIDAK Sub-navigation for mobile */}
             {pathname.startsWith("/sidak") && (
               <div className="px-4 py-3 border-t border-border">
-                <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="px-2 mb-2 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
                   SIDAK Menu
                 </p>
                 <div className="space-y-1">
@@ -156,7 +156,7 @@ export function MobileDrawer({
             {/* Management */}
             {managementLinks.length > 0 && (
               <div className="px-4 py-3 border-t border-border">
-                <p className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="px-2 mb-2 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
                   Management
                 </p>
                 <div className="space-y-1">
