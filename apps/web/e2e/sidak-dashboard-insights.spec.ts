@@ -9,6 +9,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 const YEAR = new Date().getFullYear();
@@ -1113,6 +1114,34 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ).toBeVisible();
 
     const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("teks sumbu grafik tren parameter memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: DASHBOARD_READY_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?", "/dashboard/forecast"]);
+
+    const trend = page.getByRole("region", { name: "Tren temuan" });
+    const ticks = trend.locator(
+      ".recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value",
+    );
+    await expect(ticks.first()).toBeVisible();
+    const chart = trend.locator(".recharts-wrapper");
+    await chart.scrollIntoViewIfNeeded();
+
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      offenders.push(
+        ...(await findLowContrastText(chart)).map((o) => `[${theme}] ${o}`),
+      );
+    }
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });

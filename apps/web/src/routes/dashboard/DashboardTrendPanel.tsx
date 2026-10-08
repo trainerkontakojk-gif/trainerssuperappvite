@@ -525,8 +525,7 @@ export default function DashboardTrendPanel({
                   tickLine={false}
                   tick={{
                     fontSize: 11,
-                    fill: "currentColor",
-                    opacity: 0.4,
+                    fill: "var(--muted-foreground)",
                     fontWeight: 700,
                   }}
                   dy={10}
@@ -536,8 +535,7 @@ export default function DashboardTrendPanel({
                   tickLine={false}
                   tick={{
                     fontSize: 11,
-                    fill: "currentColor",
-                    opacity: 0.4,
+                    fill: "var(--muted-foreground)",
                     fontWeight: 700,
                   }}
                   dx={-10}

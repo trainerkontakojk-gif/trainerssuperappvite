@@ -20,6 +20,7 @@ import {
   type ApiMock,
   type ShellAudit,
 } from "./helpers/hermeticShell";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { findTextBelowFloor } from "./helpers/typographyFloor";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
@@ -271,6 +272,30 @@ test.describe("Prediksi tren dashboard (hermetic)", () => {
     expect(bodies).toHaveLength(0);
     expectHermetic(audit);
   });
+  test("Teks sumbu grafik tren memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const { audit } = await openDashboard(page, TWO_MONTHS, {
+      lookup: {
+        status: 200,
+        data: { status: "fresh", snapshot: FORECAST_SNAPSHOT },
+      },
+    });
+    await expect(xAxisLabels(page)).toHaveText(["Jan 26", "Feb 26", "Mar 26"]);
+    await expect(page.getByText("PREDIKSI", { exact: true })).toBeVisible();
+
+    const chart = page.locator(".recharts-wrapper").first();
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      offenders.push(
+        ...(await findLowContrastText(chart)).map((o) => `[${theme}] ${o}`),
+      );
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
   test("Teks dashboard minimal 11px", async ({ page }) => {
     const { audit } = await openDashboard(page, TWO_MONTHS, {
       lookup: {
