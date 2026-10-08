@@ -384,7 +384,7 @@ export default function PdktLanding() {
                           type="button"
                           size="lg"
                           onClick={handleStartSimulation}
-                          className="min-h-12 w-full justify-start gap-2.5 bg-module-pdkt px-3 text-sm font-semibold text-white hover:bg-module-pdkt/90"
+                          className="min-h-12 w-full justify-start gap-2.5 bg-module-pdkt px-3 text-sm font-semibold text-module-pdkt-foreground hover:bg-module-pdkt/90"
                         >
                           <Play data-icon="inline-start" fill="currentColor" />
                           Mulai simulasi

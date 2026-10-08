@@ -201,14 +201,14 @@ export default function KetikSimulation() {
             <div
               className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[74%] ${
                 m.sender === "agent"
-                  ? "rounded-tr-md bg-module-ketik text-white"
+                  ? "rounded-tr-md bg-module-ketik text-module-ketik-foreground"
                   : "module-clean-panel rounded-tl-md text-foreground"
               }`}
             >
               <div
                 className={`mb-1 flex items-center gap-2 text-xs font-semibold ${
                   m.sender === "agent"
-                    ? "text-white/85"
+                    ? "text-module-ketik-foreground/85"
                     : "text-muted-foreground"
                 }`}
               >

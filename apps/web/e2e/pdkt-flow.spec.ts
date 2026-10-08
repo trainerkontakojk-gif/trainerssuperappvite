@@ -7,6 +7,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import type { SessionHistory } from "../src/routes/pdkt/components/HistoryModal";
 
@@ -433,6 +434,28 @@ test.describe("PDKT (hermetic)", () => {
       dialog.getByText(/record peserta tidak lagi tersedia/),
     ).toBeVisible();
 
+    expectHermetic(audit);
+  });
+
+  test("tombol Mulai simulasi PDKT memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks([]),
+    });
+    const start = page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first();
+    await expect(start).toBeVisible({ timeout: 20000 });
+
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      const buttons = await findLowContrastText(start.locator(".."), {
+        selector: "button",
+      });
+      expect(buttons, `${theme}: ${buttons.join("\n")}`).toEqual([]);
+    }
     expectHermetic(audit);
   });
 
