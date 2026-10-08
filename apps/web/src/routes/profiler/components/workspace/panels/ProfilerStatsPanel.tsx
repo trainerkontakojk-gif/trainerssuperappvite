@@ -48,6 +48,11 @@ const UNKNOWN = "Tidak Diketahui";
 const jabatanOf = (p: ProfilerPeserta) =>
   labelJabatan[p.jabatan || ""] || p.jabatan || UNKNOWN;
 
+/** Teks legenda memakai token netral; ikon tetap berwarna irisan. */
+const legendText = (value: string) => (
+  <span style={{ color: "var(--muted-foreground)" }}>{value}</span>
+);
+
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const item = payload[0];
@@ -257,7 +262,12 @@ export default function ProfilerStatsPanel({
                 ))}
               </Pie>
               <Tooltip content={<ChartTooltip />} />
-              <Legend verticalAlign="bottom" height={32} iconType="circle" />
+              <Legend
+                verticalAlign="bottom"
+                height={32}
+                iconType="circle"
+                formatter={legendText}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartSection>
@@ -299,7 +309,12 @@ export default function ProfilerStatsPanel({
                 ))}
               </Pie>
               <Tooltip content={<ChartTooltip />} />
-              <Legend verticalAlign="bottom" height={32} iconType="circle" />
+              <Legend
+                verticalAlign="bottom"
+                height={32}
+                iconType="circle"
+                formatter={legendText}
+              />
             </PieChart>
           </ResponsiveContainer>
         </ChartSection>

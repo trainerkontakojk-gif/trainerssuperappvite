@@ -540,12 +540,21 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await expect(workspace.locator(".recharts-cartesian-axis-tick-value").first()).toBeVisible();
     await workspace.getByRole("heading", { name: "Tingkat pendidikan" }).scrollIntoViewIfNeeded();
 
+    // Teks legenda pie harus sudah tergambar, supaya scan legenda tidak kosong.
+    await expect(
+      workspace.locator(".recharts-legend-wrapper span").first(),
+    ).toBeVisible();
     const offenders: string[] = [];
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      offenders.push(
-        ...(await findLowContrastText(workspace)).map((o) => `[${theme}] ${o}`),
-      );
+      const found = [
+        ...(await findLowContrastText(workspace)),
+        ...(await findLowContrastText(workspace, {
+          selector: ".recharts-legend-wrapper span",
+          leafOnly: true,
+        })),
+      ];
+      offenders.push(...new Set(found.map((o) => `[${theme}] ${o}`)));
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);

@@ -214,12 +214,20 @@ test.describe("Telefun (hermetic)", () => {
     });
     await expect(radar.getByText("Speaking Rate")).toBeVisible();
 
+    await expect(
+      review.locator(".recharts-legend-wrapper span").first(),
+    ).toBeVisible();
     const offenders: string[] = [];
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      offenders.push(
-        ...(await findLowContrastText(radar)).map((o) => `[${theme}] ${o}`),
-      );
+      const found = [
+        ...(await findLowContrastText(radar)),
+        ...(await findLowContrastText(review, {
+          selector: ".recharts-legend-wrapper span",
+          leafOnly: true,
+        })),
+      ];
+      offenders.push(...new Set(found.map((o) => `[${theme}] ${o}`)));
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);

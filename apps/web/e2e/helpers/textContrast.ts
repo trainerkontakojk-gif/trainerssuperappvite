@@ -13,6 +13,8 @@
  *     opak (fallback `body`, lalu putih), dikomposit dari bawah ke atas;
  *   - teks dicampur (alpha blend) di atas latar itu, lalu dihitung rasio WCAG.
  *
+ * `leafOnly` melewati elemen yang masih punya elemen anak (untuk legenda HTML).
+ *
  * Batasan: `background-image`/gradien diabaikan, dan latar dibaca per lapisan
  * `background-color`. Warna dinormalisasi lewat canvas supaya format modern
  * (oklch, color-mix) ikut terbaca. Pemanggil mengganti tema dengan
@@ -42,10 +44,11 @@ export async function findLowContrastText(
   {
     minRatio = MIN_TEXT_CONTRAST,
     selector = "svg text",
-  }: { minRatio?: number; selector?: string } = {},
+    leafOnly = false,
+  }: { minRatio?: number; selector?: string; leafOnly?: boolean } = {},
 ): Promise<string[]> {
   return root.evaluate(
-    (element, { min, sel }) => {
+    (element, { min, sel, leaf }) => {
       type Rgba = [number, number, number, number];
       const ctx = document.createElement("canvas").getContext("2d", {
         willReadFrequently: true,
@@ -78,6 +81,9 @@ export async function findLowContrastText(
       for (const node of element.querySelectorAll(sel)) {
         const text = node.textContent?.trim();
         if (!text) continue;
+        // Legenda HTML: pembungkus ber-warna seri bisa memuat span anak yang
+        // sudah diberi warna token; hanya elemen daun yang menentukan.
+        if (leaf && node.childElementCount > 0) continue;
         const rect = node.getBoundingClientRect();
         const style = getComputedStyle(node);
         if (
@@ -114,6 +120,6 @@ export async function findLowContrastText(
       }
       return offenders;
     },
-    { min: minRatio, sel: selector },
+    { min: minRatio, sel: selector, leaf: leafOnly },
   );
 }
