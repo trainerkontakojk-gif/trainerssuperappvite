@@ -416,7 +416,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 onClick={() => setCategory(item)}
                 className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   category === item
-                    ? "bg-module-telefun text-white shadow-sm"
+                    ? "bg-module-telefun text-module-telefun-foreground shadow-sm"
                     : "bg-slate-950/5 text-slate-500 hover:bg-slate-950/10 dark:bg-white/5 dark:text-white/55 dark:hover:bg-white/10"
                 }`}
               >
@@ -473,7 +473,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !text.trim() || charLimitReached}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-module-telefun px-4 py-2.5 text-sm font-bold text-white transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-module-telefun px-4 py-2.5 text-sm font-bold text-module-telefun-foreground transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

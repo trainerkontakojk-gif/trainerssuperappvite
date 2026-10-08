@@ -43,6 +43,7 @@
   --color-module-ketik: var(--module-ketik);
   --color-module-pdkt: var(--module-pdkt);
   --color-module-telefun: var(--module-telefun);
+  --color-module-telefun-foreground: var(--module-telefun-foreground);
   --color-module-profiler: var(--module-profiler);
   --color-module-sidak: var(--module-sidak);
 
@@ -139,6 +140,8 @@
     --module-pdkt-bg: #a855f710;
     --module-telefun: #047857; /* emerald-700 — 5:1 sebagai teks di tema terang */
     --module-telefun-bg: #04785710;
+    /* Warna teks/ikon di atas bg-module-telefun (putih ≥5:1 di tema terang) */
+    --module-telefun-foreground: #ffffff;
     --module-profiler: #0e7490; /* cyan-700    — terpisah dari ungu PDKT */
     --module-profiler-bg: #0e749010;
     --module-sidak: #f43f5e; /* rose-500    */
@@ -210,6 +213,8 @@
     --module-pdkt-bg: #a855f715;
     --module-telefun: #10b981;
     --module-telefun-bg: #10b98115;
+    /* Warna teks/ikon di atas bg-module-telefun (gelap ≈8:1 di emerald-500) */
+    --module-telefun-foreground: #0a0a0a;
     --module-profiler: #06b6d4;
     --module-profiler-bg: #06b6d415;
     --module-sidak: #f43f5e;
