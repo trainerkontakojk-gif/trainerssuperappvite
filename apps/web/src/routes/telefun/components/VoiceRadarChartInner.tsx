@@ -108,7 +108,7 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
                       x={x}
                       y={y}
                       textAnchor={x > cx ? "start" : x < cx ? "end" : "middle"}
-                      fill="#64748b"
+                      fill="var(--muted-foreground)"
                       fontSize={tickFontSize}
                       fontWeight={700}
                       dy={y > cy ? 10 : -4}
@@ -121,7 +121,7 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
               <PolarRadiusAxis
                 angle={30}
                 domain={[0, 100]}
-                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
                 axisLine={false}
                 tickCount={5}
               />

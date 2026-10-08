@@ -200,12 +200,16 @@ export default function ProfilerStatsPanel({
                 horizontal={false}
                 stroke="var(--border)"
               />
-              <XAxis type="number" allowDecimals={false} />
+              <XAxis
+                type="number"
+                allowDecimals={false}
+                tick={{ fill: "var(--muted-foreground)" }}
+              />
               <YAxis
                 dataKey="name"
                 type="category"
                 width={100}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
               />
               <Tooltip content={<ChartTooltip />} />
               <Bar
@@ -270,9 +274,17 @@ export default function ProfilerStatsPanel({
                 cy="45%"
                 outerRadius={90}
                 dataKey="value"
-                label={({ name, percent }) =>
-                  `${name} ${((percent || 0) * 100).toFixed(0)}%`
-                }
+                label={({ name, percent, x, y, textAnchor }) => (
+                  <text
+                    x={x}
+                    y={y}
+                    textAnchor={textAnchor}
+                    dominantBaseline="central"
+                    fill="var(--muted-foreground)"
+                  >
+                    {`${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                  </text>
+                )}
                 cursor="pointer"
                 onClick={(data) =>
                   showParticipants(
@@ -306,8 +318,11 @@ export default function ProfilerStatsPanel({
                 vertical={false}
                 stroke="var(--border)"
               />
-              <XAxis dataKey="name" />
-              <YAxis allowDecimals={false} />
+              <XAxis dataKey="name" tick={{ fill: "var(--muted-foreground)" }} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fill: "var(--muted-foreground)" }}
+              />
               <Tooltip content={<ChartTooltip />} />
               <Bar
                 dataKey="value"

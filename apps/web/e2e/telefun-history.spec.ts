@@ -7,6 +7,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
@@ -184,6 +185,42 @@ test.describe("Telefun (hermetic)", () => {
     const assessment = await findTextBelowFloor(review);
 
     const offenders = [...new Set([...history, ...details, ...assessment])];
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("teks sumbu radar komunikasi memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openHistory(page, [REVIEWED_ROW], [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/recording/${REVIEWED_ROW.id}`,
+        body: { success: true, data: { url: null } },
+      },
+    ]);
+    await dialog
+      .getByRole("button", { name: "Lihat detail Skenario Telefun" })
+      .click();
+    const review = page.getByRole("dialog").last();
+    const tabs = review.getByRole("tablist", { name: "Bagian detail sesi" });
+    await expect(tabs).toBeVisible({ timeout: 20000 });
+    await tabs.getByRole("tab").nth(1).click();
+
+    // Radar dimuat lazy; tunggu label sumbu sudutnya benar-benar tergambar.
+    const radar = review.locator(".recharts-wrapper").first();
+    await expect(radar.locator("svg text").first()).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(radar.getByText("Speaking Rate")).toBeVisible();
+
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      offenders.push(
+        ...(await findLowContrastText(radar)).map((o) => `[${theme}] ${o}`),
+      );
+    }
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });

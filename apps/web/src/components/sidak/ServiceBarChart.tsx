@@ -45,8 +45,7 @@ export default function ServiceBarChart({ data }: Props) {
               type="category"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: "currentColor", fontSize: 11 }}
-              opacity={0.6}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
               width={85}
             />
             <Tooltip

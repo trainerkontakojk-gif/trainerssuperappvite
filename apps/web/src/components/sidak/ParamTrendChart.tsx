@@ -183,13 +183,13 @@ export default function ParamTrendChart({
             dataKey="name"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.75 }}
+            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
             dy={10}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 12, fill: "currentColor", opacity: 0.75 }}
+            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
           />
           <Tooltip
             contentStyle={{

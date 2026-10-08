@@ -8,6 +8,7 @@ import {
 } from "./helpers/hermeticShell";
 import { BATCH_PAGI_PESERTA, PROFILER_MOCKS, TEAM_ID } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
@@ -68,6 +69,30 @@ const PESERTA_LENGKAP: readonly ApiMock[] = [
         ...peserta,
         nik_ojk: `OJK-00${index + 1}`,
       })),
+    },
+  },
+];
+
+/** PESERTA_LENGKAP plus gender, pendidikan, dan dua jabatan agar semua grafik statistik berisi. */
+const PESERTA_STATISTIK: readonly ApiMock[] = [
+  ...PESERTA_LENGKAP.filter(
+    (mock) =>
+      !(mock.path instanceof RegExp && String(mock.path).includes("Pagi")),
+  ),
+  {
+    method: "GET",
+    path: /^\/api\/v1\/profiler\/peserta\/batch\/Batch(%20|\+)Pagi$/,
+    body: {
+      success: true,
+      data: [
+        { ...BATCH_PAGI_PESERTA[0], jenis_kelamin: "Perempuan", pendidikan: "S1" },
+        {
+          ...BATCH_PAGI_PESERTA[1],
+          jabatan: "leader",
+          jenis_kelamin: "Laki-laki",
+          pendidikan: "D3",
+        },
+      ],
     },
   },
 ];
@@ -495,6 +520,33 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await expect(page.getByText("#OJK-001")).toBeVisible();
 
     const offenders = await findTextBelowFloor(page.locator("main").first());
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("teks grafik statistik Profiler memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler?batch=Batch%20Pagi&view=statistik",
+      apiMocks: PESERTA_STATISTIK,
+    });
+    const workspace = page.getByRole("region", { name: "Batch Pagi" });
+    await expect(
+      workspace.getByRole("heading", { name: "Tingkat pendidikan" }),
+    ).toBeVisible({ timeout: 20000 });
+    // Label irisan pie gender dan tick sumbu harus sudah tergambar.
+    await expect(workspace.getByText(/^Perempuan \d+%$/)).toBeVisible();
+    await expect(workspace.locator(".recharts-cartesian-axis-tick-value").first()).toBeVisible();
+    await workspace.getByRole("heading", { name: "Tingkat pendidikan" }).scrollIntoViewIfNeeded();
+
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      offenders.push(
+        ...(await findLowContrastText(workspace)).map((o) => `[${theme}] ${o}`),
+      );
+    }
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
