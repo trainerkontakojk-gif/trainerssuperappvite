@@ -359,7 +359,7 @@ Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama unt
 - Snapshot rule version harus dipakai untuk periode yang sudah dipublish agar skor historis tidak berubah.
 - Jika data temuan real dan phantom bercampur dalam sesi yang sama, hitungan skor dan defect harus mengikuti row real saja.
 - Gunakan `docs/SIDAK_SCORING_GUARDRAILS.md` untuk perubahan yang menyentuh scoring atau agregasi SIDAK.
-- **Tampilan UI**: Halaman input (`/sidak/input`) memakai grid responsif untuk pilihan folder, agen, periode, dan daftar temuan. Di mobile grid kembali menjadi satu kolom agar tetap mudah dibaca; di layar lebih lebar trainer bisa melihat lebih banyak pilihan atau sesi dalam satu viewport.
+- **Tampilan UI**: Halaman input (`/sidak/input`) adalah satu layar kerja: bar konteks (Folder, Agen yang bisa dicari, Periode, Layanan) di atas ringkasan sesi dan daftar temuan. Mengganti konteks tidak membutuhkan langkah mundur; di mobile bar konteks menjadi satu kolom (Periode + Layanan dua kolom).
 - **Tim Mix**: Karena satu tim Mix dapat menangani beberapa layanan, layanan audit wajib dipilih eksplisit setelah agent dipilih. Sistem tidak lagi otomatis menyimpan sesi Mix sebagai CSO.
 
 ## Agent Detail Ranking and Forecast Quickview

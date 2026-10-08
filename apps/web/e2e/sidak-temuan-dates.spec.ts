@@ -17,6 +17,7 @@ import {
   lastBatchItems,
   openInputAudit,
   resetStore,
+  selectPeriod,
   startAudit,
 } from "./helpers/sidakTemuanDatesHarness";
 import {
@@ -53,12 +54,9 @@ async function openForm(
   const audit = startAudit();
   await openInputAudit(page, audit, opts);
 
-  // Halaman berhenti di "Pilih Periode" sampai periode dipilih; tombol tambah
-  // temuan baru muncul setelah agent + periode + layanan siap.
-  const periodButton = page
-    .getByRole("button", { name: /Januari 2026/ })
-    .first();
-  await periodButton.click();
+  // Daftar temuan dan tombol tambah baru muncul setelah periode dipilih lewat
+  // kontrol `Periode` (agent + layanan sudah ter-resolve dari deep link).
+  await selectPeriod(page);
 
   await page.getByRole("button", { name: OPEN_FORM }).first().click();
   await expect(page.getByLabel(LAYAN)).toBeVisible();
@@ -204,10 +202,13 @@ test.describe("Input manual: dua tanggal opsional", () => {
     await page.getByLabel(LAYAN).fill("2026-01-05");
     await page.getByLabel(SAMPEL).fill("2026-01-09");
 
-    // Latar belakang perlakukan perubahan konteks sebagai form yang perlu
-    // dibersihkan; driver di bawah mengikuti kontrol nyata di halaman.
+    // Ganti layanan lewat bar konteks: form ditutup, dan saat dibuka kembali
+    // tanggal dari konteks sebelumnya tidak boleh terbawa.
     await changeContext(page);
+    await expect(page.getByLabel(LAYAN)).toHaveCount(0);
+    await page.getByRole("button", { name: OPEN_FORM }).first().click();
     await expect(page.getByLabel(LAYAN)).toHaveValue("");
+    await expect(page.getByLabel(SAMPEL)).toHaveValue("");
 
     expectIsolation(audit);
   });
@@ -227,17 +228,17 @@ async function pickParameter(
   index: number,
   name: string,
 ) {
-  await page.locator('button[aria-haspopup="listbox"]').nth(index).click();
+  await page
+    // Dropdown parameter milik form; pemilih di bar konteks (fieldset) dikecualikan.
+    .locator('button[aria-haspopup="listbox"]:not(fieldset *)')
+    .nth(index).click();
   await page.getByRole("option", { name }).first().click();
 }
 
-/** Pemicu perubahan konteks di halaman Input Audit. */
+/** Pemicu perubahan konteks: ganti Layanan lewat bar konteks Input Temuan. */
 async function changeContext(page: import("@playwright/test").Page) {
-  const serviceSelect = page.locator("#sidak-mix-service, select").first();
-  if (await serviceSelect.count()) {
-    await serviceSelect.selectOption({ index: 1 }).catch(() => {});
-  }
-  await page.waitForTimeout(300);
+  await page.getByRole("combobox", { name: "Layanan", exact: true }).click();
+  await page.getByRole("option", { name: "Chat", exact: true }).click();
 }
 test.describe("Edit inline di Input Audit", () => {
   /** Simpan satu temuan lebih dulu supaya ada baris yang bisa diedit. */

@@ -20,6 +20,7 @@ import {
   lastBatchItems,
   openInputAudit,
   resetStore,
+  selectPeriod,
   startAudit,
   type Audit,
 } from "./helpers/sidakTemuanDatesHarness";
@@ -83,9 +84,8 @@ async function uploadXlsx(page: import("@playwright/test").Page, buffer: Buffer)
 async function openPage(page: import("@playwright/test").Page): Promise<Audit> {
   const audit = startAudit();
   await openInputAudit(page, audit, {});
-  // Panel import baru muncul setelah agent + periode + layanan siap, sama
-  // seperti form manual.
-  await page.getByRole("button", { name: /Januari 2026/ }).first().click();
+  // Panel import baru muncul setelah periode dipilih lewat kontrol `Periode`.
+  await selectPeriod(page);
   return audit;
 }
 
