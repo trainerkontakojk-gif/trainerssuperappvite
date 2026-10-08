@@ -15,6 +15,7 @@ import {
   expectIsolation,
   formatAudit,
   normalizedRows,
+  createResponseGate,
   openJadwalShifting,
   resetCapturedJadwalRequests,
 } from "./helpers/sidakJadwalShiftingHarness";
@@ -2389,17 +2390,27 @@ test.describe("Format kalender (matriks agen × hari)", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 400 });
+    // Respons bulan ditahan sampai dilepas, jadi state loading stabil
+    // berapa pun lambatnya runner.
+    const gate = createResponseGate();
     const audit = await openJadwalShifting(page, {
       view: "calendar",
       month: FIXTURE_MONTH,
-      behavior: { kind: "data", delayMs: 400, monthRows: MATRIX_ROWS },
+      behavior: {
+        kind: "data",
+        holdUntil: gate.promise,
+        monthRows: MATRIX_ROWS,
+      },
     });
     const slot = page.getByTestId("jadwal-shifting-view-calendar");
-    await expect(
-      page.getByTestId("jadwal-shifting-month-state-loading"),
-    ).toBeVisible();
+    const loading = page.getByTestId("jadwal-shifting-month-state-loading");
+    await expect(loading).toBeVisible();
     await expect(slot).toBeVisible();
+    // Kalender baru dirender setelah data tiba, bukan saat loading.
+    await expect(page.getByTestId("jadwal-shifting-calendar")).toHaveCount(0);
+    gate.release();
     await expect(page.getByTestId("jadwal-shifting-calendar")).toBeVisible();
+    await expect(loading).toHaveCount(0);
     expectIsolation(audit);
   });
 
