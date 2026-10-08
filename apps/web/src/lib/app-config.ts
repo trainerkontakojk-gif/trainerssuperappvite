@@ -1,6 +1,7 @@
 import { can, normalizeRole, type Capability } from "@trainers/types";
 import {
   BarChart3,
+  ClipboardList,
   LayoutDashboard,
   Mail,
   MessageSquare,
@@ -98,6 +99,18 @@ export const APP_MODULES: AppModuleConfig[] = [
     accentClassName: "text-rose-600",
     accentSoftClassName: "bg-rose-100",
     capability: "sidak.landing",
+  },
+  {
+    id: "tna",
+    title: "TNA",
+    shortTitle: "TNA",
+    expandedTitle: "Training Needs Analysis",
+    description: "Deteksi, validasi kebutuhan, dan rencana pelatihan.",
+    href: "/tna",
+    icon: ClipboardList,
+    capability: "tna.read",
+    accentClassName: "text-module-tna",
+    accentSoftClassName: "bg-[var(--module-tna-bg)]",
   },
 ];
 

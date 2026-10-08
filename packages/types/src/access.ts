@@ -75,6 +75,8 @@ export const CAPABILITIES = {
   "telefun.manage": ["admin", "trainer"],
   "telefun.recording.read": ["admin", "trainer"],
   "telefun.use": ["admin", "trainer"],
+  "tna.read": ["admin", "trainer"],
+  "tna.write": ["admin", "trainer"],
   "usage.read": ["admin", "trainer", "leader", "agent"],
 } as const satisfies Record<string, readonly Role[]>;
 

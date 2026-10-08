@@ -271,7 +271,7 @@ Berdasarkan mitigasi keamanan terbaru, seluruh hak akses bawaan yang luas (`GRAN
 
 - **Peran `anon` dan `public`:** Tidak memiliki akses `SELECT`, `INSERT`, `UPDATE`, atau `DELETE` pada tabel aplikasi apa pun, termasuk materialized views (`mv_qa_period_summary`).
 - **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings`, serta materialized view `mv_qa_period_summary` (setelah terminal re-hardening migration `20260526090000`) sepenuhnya **tertutup** dari akses client (_zero client-side grants_) dan hanya dapat dimanipulasi/dibaca melalui klien admin di sisi backend (Hono API menggunakan `service_role`).
-- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`. Fungsi refresh materialized view `refresh_mv_qa_period_summary()` dibatasi khusus untuk `service_role` (dipertegas setelah contract restore oleh migration `20260526090000`). Seluruh Phase 4 lifecycle/recording/scoring RPC di migration `20260801120000` secara eksplisit revoke dari `public`, `anon`, dan `authenticated`, lalu grant hanya ke `service_role`.
+- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) umumnya dibatasi ke peran `authenticated` atau `service_role`. Pengecualian eksplisit lima RPC TNA memakai guard service-role di dalam fungsi, bukan penolakan ACL; lihat bagian TNA di bawah. Fungsi refresh materialized view `refresh_mv_qa_period_summary()` dibatasi khusus untuk `service_role` (dipertegas setelah contract restore oleh migration `20260526090000`). Seluruh Phase 4 lifecycle/recording/scoring RPC di migration `20260801120000` secara eksplisit revoke dari `public`, `anon`, dan `authenticated`, lalu grant hanya ke `service_role`.
 
 ### 🛡️ Lapisan 2: Row Level Security (RLS)
 
@@ -285,6 +285,7 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 | `profiler_folders`                     | No Access                                                 | Read (Scoped via `batch_name`)                     | Full CRUD Access                       |
 | `profiler_tim_list`                    | No Access                                                 | Read (Scoped via `tim`)                            | Full CRUD Access                       |
 | `profiler_peserta`                     | No Access                                                 | Read (Scoped via `leader_can_access_peserta`)      | Full CRUD Access                       |
+| `tna_*` | SELECT 0 baris; DML ditolak | SELECT 0 baris; DML ditolak | SELECT; tulis via RPC service-role |
 | `qa_periods`                           | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
 | `qa_indicators`                        | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
 | `qa_temuan`                            | Read (Own via email_ojk match)                            | Read (Scoped via `leader_can_access_sidak_temuan`) | Full CRUD Access                       |
@@ -320,6 +321,48 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 - Editor pricing dan kurs hanya tersedia untuk `trainer` dan `admin`.
 - **Category Breakdown**: API `/ai/usage/summary` sekarang menyediakan rincian penggunaan per kategori (`simulation`, `review`, `uncategorized`), memungkinkan frontend menampilkan rincian biaya simulasi vs penilaian AI secara akurat.
 - Akses aplikasi untuk permukaan monitoring dijelaskan lebih detail di `docs/auth-rbac.md` dan `docs/MONITORING_TOKEN_USAGE_BILLING.md`.
+
+## TNA — Training Needs Analysis (Fase 1)
+
+Sumber schema: `supabase/migrations/20261008120000_tna_phase1.sql`. Artefak ini telah diuji pada Supabase lokal; **bukan bukti penerapan hosted**, dan T6 tidak menjalankan migrasi apa pun.
+
+| Tabel public            | Data dan batas penting                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tna_programs`          | Katalog seed tujuh program: code unik, nama/deskripsi, gap, klaster pemicu, layanan, modul simulasi, flag aktif. Tidak ada UI mutasi katalog.                                                                                                                                                               |
+| `tna_needs`             | Layanan, FK parameter master `qa_indicators`, FK periode `qa_periods` (keduanya RESTRICT), pembanding 1–6, snapshot metrik saat validasi, klaster dugaan/tervalidasi, catatan 10–2000 karakter, gap/outcome, actor dan waktu. UPDATE ditolak trigger (append-only pada jalur aplikasi).                     |
+| `tna_plans`             | FK kebutuhan/program RESTRICT, judul, intervensi, jadwal (`end >= start`, evaluasi sesudah end), target 0–100, status, snapshot baseline, waktu aktivasi/pembatalan, actor, `updated_at`. Partial unique `uq_tna_plans_open_need` pada need dengan status selain dibatalkan: maksimal satu rencana terbuka. |
+| `tna_plan_participants` | FK plan CASCADE, FK peserta SET NULL, snapshot nama/tim, `baseline_findings` nonnegatif dan `was_affected`. Unik plan/peserta. Penghapusan profil boleh men-null-kan FK tanpa mengubah snapshot/baseline.                                                                                                   |
+
+Indeks pencarian: kebutuhan layanan/periode, status rencana, dan peserta per plan. Status yang dicadangkan `evaluasi`/`selesai` belum memiliki transisi Fase 1; hanya draft → aktif/dibatalkan dan aktif → dibatalkan.
+
+### RLS dan batas tulis
+
+Keempat tabel mengaktifkan RLS. `PUBLIC`/`anon` tidak mendapat hak tabel; `authenticated` hanya SELECT dengan policy `public.is_admin_or_trainer()`. JWT admin/trainer membaca seluruh TNA; leader/agent mendapat nol baris. Tidak ada policy/grant INSERT/UPDATE/DELETE bagi pengguna, termasuk admin/trainer. Backend membaca menggunakan JWT pengguna; `service_role` mendapat hak tabel untuk mutasi RPC setelah otorisasi API, bukan sebagai jalur baca TNA atau QA.
+
+Kelima entry point public adalah `SECURITY DEFINER`, memakai `search_path = public, tna_internal`, memanggil `tna_internal.assert_service_role()` sebelum validasi bisnis dan `require_actor()` yang memeriksa profil admin/trainer aktif, bukan deleted:
+
+- `tna_create_need(uuid,jsonb)` — menyimpan snapshot validasi hasil hitungan backend dan memeriksa parameter master layanan.
+- `tna_create_plan(uuid,jsonb,jsonb)` — kebutuhan training, program aktif, INSERT plan + roster atomik.
+- `tna_update_draft_plan(uuid,uuid,timestamptz,jsonb,jsonb)` — row lock, status draft, revision `expected_updated_at`, edit dan penggantian penuh roster atomik.
+- `tna_activate_plan(uuid,uuid,timestamptz,jsonb,jsonb)` — row lock/revision, baseline audited dengan temuan > 0, salah satu target membaik, roster baseline cocok; membekukan populasi dan temuan peserta dalam transaksi sama.
+- `tna_cancel_plan(uuid,uuid,timestamptz)` — conditional update status/revision; konflik tidak mengubah data.
+
+Snapshot tidak dihitung oleh SQL: TypeScript menghitung semua QA terpaginasikan dengan tiga bucket SIDAK, lalu hanya backend boleh mengirimnya. Payload metrik/actor klien tidak dipercaya. Snapshot validasi disimpan saat validasi; baseline populasi + peserta dibekukan saat aktivasi, bukan saat create draft. Pratinjau draft tetap live. `validation_drift` mencatat selisih findings/auditedAgents dari snapshot validasi.
+
+### Schema privat dan trigger
+
+`tna_internal` tidak diekspos PostgREST; USAGE schema dicabut dari PUBLIC/anon/authenticated, dan akses langsung fungsi helper dicabut juga dari service-role. Fungsi public yang berjalan sebagai owner memanggil helper internal. Fungsi `assert_service_role()` memeriksa role dari claims JWT PostgREST terverifikasi, bukan `current_user`/`session_user` milik SECURITY DEFINER. Claims kosong, hilang, malformed, atau bukan service-role gagal dengan SQLSTATE `42501`, pesan `TNA_FORBIDDEN`.
+
+- `tna_need_immutable` → `guard_need`: menolak UPDATE kebutuhan.
+- `tna_plan_guard` → `guard_plan`: state awal draft tanpa baseline/timestamp transisi; identitas immutable; edit field hanya draft; transisi Fase 1 saja; baseline/activated_at tidak boleh diubah sesudah aktivasi. Revision bergerak monoton dengan clock timestamp, minimal +1 mikrodetik.
+- `tna_participant_guard` → `guard_participant`: identitas baris immutable; roster boleh berubah hanya draft tanpa baseline. Pada aktivasi, hanya pengisian baseline NULL → nilai final dibolehkan dengan marker transaction-local `tna.activating_plan` yang cocok dengan parent aktif; field lain tidak berubah. Marker tidak bisa membuka INSERT/DELETE atau menimpa baseline yang sudah terisi, dan RPC membersihkannya pada sukses/kegagalan. Pengecualian hanya cleanup FK peserta dan cascade setelah parent dihapus, bukan endpoint delete aplikasi.
+- `replace_participants`: validasi array 1–200 peserta unik yang ada; DELETE/INSERT roster dalam transaksi pemanggil sehingga kegagalan rollback seluruh plan/roster.
+
+### Mengapa guard, bukan REVOKE EXECUTE?
+
+Image Supabase Postgres lokal 17.6.1.x pernah crash (`signal 11`) ketika PostgREST memanggil fungsi public yang EXECUTE-nya dicabut. Lima entry point TNA sengaja tetap EXECUTE untuk anon/authenticated/service_role; **grant ini bukan izin bisnis**. Guard pertama menolak caller biasa secara normal, tanpa menyentuh data. Jangan mengganti guard dengan pencabutan EXECUTE pada entry point public tanpa investigasi dan persetujuan terpisah. Bukti/alasan: [investigasi crash](../plans/markdown/tna-postgres-crash-investigation.md), [rencana rev. 7 K6](../plans/markdown/tna-phase-1.md), upstream supabase/postgres #2377/#2495 dan supabase/supabase #50900. Jika guard test memicu signal 11/PGRST001, berhenti; jangan mengulang untuk memaksa hijau.
+
+Bukti API lokal RLS/guard/atomisitas/baseline dan batas verifikasi UI: [laporan T6](../plans/markdown/tna-phase-1-t6-report.md). Akses leader membutuhkan rancangan scope dan RLS baru; tidak boleh hanya menambah role ke capability.
 
 ## Storage
 

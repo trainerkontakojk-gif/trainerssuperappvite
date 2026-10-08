@@ -15,7 +15,12 @@ import {
 type Rgb = [number, number, number];
 
 const GROUNDS = ["--bg", "--surface", "--surface-elevated"] as const;
-const TEXT_TOKENS = ["--fg3", "--module-telefun", "--module-profiler"] as const;
+const TEXT_TOKENS = [
+  "--fg3",
+  "--module-telefun",
+  "--module-profiler",
+  "--module-tna",
+] as const;
 const MIN_TEXT_CONTRAST = 4.5;
 const MIN_MODULE_HUE_DISTANCE = 60;
 

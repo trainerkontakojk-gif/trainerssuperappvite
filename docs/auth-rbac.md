@@ -461,6 +461,29 @@ Catatan:
 - Izin modul tidak memberi izin atribusi. Participant reply PDKT hanya admin/trainer; visibilitas snapshot nama/batch/tim di shared mailbox hanya untuk pembaca berizin (tanpa akses picker/Profiler penuh).
 - Resolver memakai actor middleware + lookup minimal; user-JWT untuk lookup/RPC sesuai RLS; tidak menambah admin client untuk bypass lookup gagal. Existing admin writes tetap butuh validasi actor + snapshot eksplisit.
 
+## TNA — kapabilitas dan jalur tulis (Fase 1)
+
+`packages/types/src/access.ts` menetapkan `tna.read` dan `tna.write` hanya untuk **admin/trainer**. Role leader/agent tidak mendapat akses TNA, termasuk leader dengan approval SIDAK/KTP. Ini modul terpisah, bukan turunan izin SIDAK.
+
+| Permukaan                                                                                                       | Guard/hasil                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rail desktop dan drawer mobile                                                                                  | Entri `APP_MODULES` ber-capability `tna.read`; tidak ada tab mobile baru.                                                                                       |
+| `/tna`, `/tna/parameter`, `/tna/kebutuhan/$id`, `/tna/rencana/$id`                                              | `requireCapability("tna.read")` router web; role tidak berizin ke `/unauthorized`.                                                                              |
+| GET `/api/v1/tna/programs`, `/parameters`, `/parameters/detail`, `/needs`, `/needs/:id`, `/plans`, `/plans/:id` | Middleware auth v1 + `requireCapability("tna.read")`; tanpa token 401, role tidak berizin 403.                                                                  |
+| POST `/needs`, `/plans`, PATCH `/plans/:id`, POST `/plans/:id/activate` dan `/plans/:id/cancel`                 | Auth v1 + `requireCapability("tna.write")`; actor dari middleware, bukan body.                                                                                  |
+| Direct PostgREST tabel `tna_*`                                                                                  | JWT pengguna hanya SELECT; policy `is_admin_or_trainer()` (leader/agent nol baris). Semua DML pengguna ditolak, termasuk admin/trainer.                         |
+| Lima RPC mutasi public TNA                                                                                      | EXECUTE tersedia tetapi guard service-role pertama menolak anon/JWT pengguna dengan `42501 TNA_FORBIDDEN`; helper di `tna_internal` tidak terjangkau PostgREST. |
+
+### Batas service-role yang disetujui
+
+Jalur tunggal: route berizin → `services/tna/write-service.ts` → `supabaseAdmin.rpc()` untuk `tna_create_need`, `tna_create_plan`, `tna_update_draft_plan`, `tna_activate_plan`, atau `tna_cancel_plan`. Guard SQL memeriksa claims role service-role dan profil actor admin/trainer aktif, tidak deleted. Backend menghitung snapshot/baseline; payload klien tidak boleh memalsukan angka. Izin ini disetujui Fajar untuk K6; **bukan** izin bypass pembacaan, memperluas tabel mutasi, atau mempercayai actor klien. Activity log memakai service audit yang sudah ada setelah mutasi.
+
+Pembacaan kebutuhan/rencana/roster/program, QA/periode/metadata parameter dan validasi peserta tetap memakai `createUserClient(token)` agar RLS berlaku. Peserta harus terlihat, unik, 1–200, dan bukan agent non-service. Snapshot baseline dan roster dikunci trigger sesudah aktivasi bahkan untuk service-role; revision/lock menjamin satu pemenang pada transisi bersamaan. Detail implementasi dan alasan guard (mitigasi crash saat EXECUTE revoked) ada di [database TNA](database.md#tna--training-needs-analysis-fase-1).
+
+`DataScope` mesin metrik Fase 1 selalu `{ kind: "all" }`, sesuai admin/trainer. Sebelum leader dibuka harus diputuskan sumber scope, akses metrik populasi, RLS snapshot/kepemilikan kebutuhan/rencana, serta wewenang aktivasi/pembatalan. Menambah role ke `tna.*` saja dapat membocorkan data lintas tim dan tidak diizinkan.
+
+Bukti lokal: [laporan T6](../plans/markdown/tna-phase-1-t6-report.md); tidak menyatakan schema/guard TNA sudah diterapkan hosted. Inventaris Fase 0 di awal dokumen tetap catatan historis; katalog capability dan kode live adalah acuan akses sekarang.
+
 ## Katalog dan scope terpadu (2026-10-06)
 
 `packages/types/src/access.ts` adalah katalog tunggal `ROLES`, `Role`, `CAPABILITIES`, `can()` dan metadata approval leader. Boundary menerima empat role canonical (trim/lowercase); alias `trainers`/`agents` dihapus setelah audit lokal dan remote bersih. Nilai tak dikenal mengembalikan `null` dan tidak mendapat capability. `qa` sebagai mode heatmap, jabatan peserta dan speaker transkrip tetap domain terpisah.

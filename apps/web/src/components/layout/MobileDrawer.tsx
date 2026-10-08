@@ -39,7 +39,7 @@ export function MobileDrawer({
 
   const isModuleActive = (moduleHref: string) => {
     if (moduleHref === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(moduleHref);
+    return pathname === moduleHref || pathname.startsWith(`${moduleHref}/`);
   };
 
   return (
@@ -96,6 +96,7 @@ export function MobileDrawer({
                   return (
                     <Link
                       key={m.id}
+                      aria-current={active ? "page" : undefined}
                       to={m.href as any}
                       onClick={(e) => {
                         if (m.id === "telefun" && !hasTelefunAccess) {

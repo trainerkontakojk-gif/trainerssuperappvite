@@ -76,7 +76,7 @@ export function Sidebar({
   // Determine which modules to render in rail
   const desktopRailModules = APP_MODULES.filter(
     (module) =>
-      ["dashboard", "ketik", "pdkt", "telefun", "profiler"].includes(
+      ["dashboard", "ketik", "pdkt", "telefun", "profiler", "tna"].includes(
         module.id,
       ) && isCapabilityAllowed(profile?.role, module.capability),
   );

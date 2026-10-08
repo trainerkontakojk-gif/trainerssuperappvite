@@ -173,6 +173,28 @@ export function calculateSessionScoreFromTemuan(
   return scoreSession(indicators, temuan, serviceWeight);
 }
 
+/**
+ * Jumlah sesi terburuk yang dipakai untuk skor agent. Kalau sesi kurang dari
+ * angka ini, sisa slot diisi 100 (padding).
+ */
+export const MAX_SAMPLING = 5;
+
+/**
+ * Kunci sesi SIDAK. `no_tiket` yang sudah di-trim adalah kunci utama; baris
+ * tanpa nomor tiket memakai fallback yang sama seperti scoring. `index` adalah
+ * posisi baris di dalam himpunan yang diskor (biasanya baris satu agent pada
+ * satu periode), bukan indeks global.
+ */
+export function getTemuanSessionKey(
+  row: { no_tiket?: string | null; created_at?: string; period_id?: string },
+  index: number,
+): string {
+  return (
+    row.no_tiket?.trim() ||
+    `__no_ticket_${row.created_at ?? row.period_id ?? index}`
+  );
+}
+
 export function calculateQAScoreFromTemuan(
   indicators: QAIndicator[],
   temuan: {
@@ -189,13 +211,11 @@ export function calculateQAScoreFromTemuan(
     {};
 
   temuan.forEach((t, i) => {
-    const key =
-      t.no_tiket?.trim() || `__no_ticket_${t.created_at ?? t.period_id ?? i}`;
+    const key = getTemuanSessionKey(t, i);
     if (!sessions[key]) sessions[key] = [];
     sessions[key].push(t);
   });
 
-  const MAX_SAMPLING = 5;
   const sessionScoresArr = Object.values(sessions).map((s) =>
     scoreSession(indicators, s, weight),
   );
