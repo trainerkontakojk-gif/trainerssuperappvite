@@ -362,7 +362,7 @@ export default function ProfilerTable() {
         icon={<FolderInput className="size-3.5" aria-hidden="true" />}
         actions={headerActions}
       />
-      <main className="flex-1">
+      <div className="flex-1">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           <ProfilerRouteNav active="table" batchName={batchName} />
 
@@ -576,7 +576,7 @@ export default function ProfilerTable() {
             </Button>
           ) : null}
         </div>
-      </main>
+      </div>
 
       {selectMode && selectedIds.size > 0 ? (
         <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">

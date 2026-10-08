@@ -31,7 +31,7 @@ export function ManagementShell({
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    <div className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <nav
         aria-label="Navigasi manajemen"
         className="-mx-4 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
@@ -76,6 +76,6 @@ export function ManagementShell({
       </header>
 
       {children}
-    </main>
+    </div>
   );
 }

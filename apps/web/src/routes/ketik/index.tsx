@@ -716,7 +716,7 @@ export default function KetikLanding() {
             exit={{ opacity: 0, y: -12 }}
             className="relative z-10"
           >
-            <main className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
+            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
               <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
                 <div className="flex min-w-0 flex-col">
                   <div className="flex flex-1 flex-col">
@@ -825,7 +825,7 @@ export default function KetikLanding() {
                   </div>
                 </Card>
               </div>
-            </main>
+            </div>
           </motion.div>
         ) : (
           <motion.div

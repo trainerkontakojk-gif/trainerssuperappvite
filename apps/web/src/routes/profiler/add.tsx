@@ -249,7 +249,7 @@ export default function ProfilerAdd() {
         icon={<UserPlus className="size-3.5" aria-hidden="true" />}
         actions={heroAction}
       />
-      <main className="flex-1">
+      <div className="flex-1">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <Card size="sm" className="shadow-none">
             <CardContent className="flex flex-wrap items-center gap-2 p-4">
@@ -674,7 +674,7 @@ export default function ProfilerAdd() {
             {loading ? "Menyimpan..." : "Simpan data peserta"}
           </Button>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -92,7 +92,7 @@ export default function SidakHeatmap() {
       : "tanggal sampel (kapan QA memeriksa sampel)";
 
   return (
-    <main className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6">
+    <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
           Heatmap Ketidaksesuaian
@@ -297,6 +297,6 @@ export default function SidakHeatmap() {
           />
         </section>
       )}
-    </main>
+    </div>
   );
 }

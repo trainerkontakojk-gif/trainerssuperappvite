@@ -26,7 +26,7 @@ export default function SidakReportsLanding() {
   };
 
   return (
-    <main className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <header className="relative z-20 flex shrink-0 flex-col items-start justify-between gap-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur-sm sm:h-28 sm:flex-row sm:items-center sm:px-6 sm:py-0 lg:px-10">
         <div>
           <Link
@@ -146,6 +146,6 @@ export default function SidakReportsLanding() {
           </div>
         )}
       </AnimatePresence>
-    </main>
+    </div>
   );
 }

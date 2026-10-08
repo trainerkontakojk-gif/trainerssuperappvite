@@ -342,7 +342,7 @@ export default function ProfilerLanding() {
             <ProfilerLibraryNav {...libraryNavProps} />
           </aside>
 
-          <main className="min-w-0 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="min-w-0 flex-1 overflow-y-auto custom-scrollbar">
             {!loaded ? (
               <div
                 role="status"
@@ -385,7 +385,7 @@ export default function ProfilerLanding() {
                 onAddFolder={(yearId) => setShowAddFolder({ yearId })}
               />
             )}
-          </main>
+          </div>
         </div>
 
         <Dialog open={isNavOpen} onOpenChange={setIsNavOpen}>

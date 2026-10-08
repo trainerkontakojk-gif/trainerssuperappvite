@@ -778,7 +778,7 @@ export default function SidakForecastPage() {
   const isRefreshing = serviceForecastLoading || agentForecastLoading;
 
   return (
-    <main className="min-h-dvh bg-background">
+    <div className="min-h-dvh bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
@@ -1313,6 +1313,6 @@ export default function SidakForecastPage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
