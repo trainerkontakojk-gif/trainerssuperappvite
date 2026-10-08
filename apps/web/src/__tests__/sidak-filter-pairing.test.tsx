@@ -26,10 +26,6 @@ vi.mock("../components/sidak/ParamTrendChart", () => ({
   default: () => <div />,
 }));
 
-vi.mock("../components/sidak/ParetoChart", () => ({
-  default: () => <div />,
-}));
-
 import SidakDashboardPage from "../routes/sidak/dashboard";
 import SidakRankingPage from "../routes/sidak/ranking";
 
