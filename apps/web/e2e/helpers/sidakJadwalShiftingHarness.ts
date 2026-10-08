@@ -508,6 +508,18 @@ export const expectNoApplicationTraffic = expectIsolation;
 
 // ── Mock endpoint jadwal di browser ─────────────────────────────────────────
 
+/** Gerbang per-test untuk menahan respons mock sampai `release()` dipanggil. */
+export function createResponseGate(): {
+  promise: Promise<void>;
+  release: () => void;
+} {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
 /**
  * Perilaku yang bisa dipilih per test. Semua state UI yang disepakati harus punya
  * cara untuk dibuktikan tanpa upstream nyata.
@@ -526,8 +538,12 @@ export type JadwalApiBehavior =
       monthRows?: readonly unknown[];
       truncated?: boolean;
       asOf?: string;
-      /** Delay a success response so loading states are observable in E2E. */
-      delayMs?: number;
+      /**
+       * Tahan respons bulan sampai promise ini selesai, supaya state loading
+       * terlihat secara deterministik (bukan bergantung jendela waktu). Buat
+       * dengan `createResponseGate()` dan panggil `release()` dari test.
+       */
+      holdUntil?: Promise<void>;
     }
   | { kind: "empty" }
   | { kind: "error"; code: string; message: string; status: number }
@@ -798,8 +814,8 @@ export async function mockJadwalApi(
       await route.abort("failed");
       return;
     }
-    if (behavior.kind === "data" && behavior.delayMs) {
-      await new Promise((resolve) => setTimeout(resolve, behavior.delayMs));
+    if (behavior.kind === "data" && behavior.holdUntil && isMonth) {
+      await behavior.holdUntil;
     }
     if (behavior.kind === "error") {
       await route.fulfill(
