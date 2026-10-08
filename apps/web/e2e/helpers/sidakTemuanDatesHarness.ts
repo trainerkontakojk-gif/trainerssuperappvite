@@ -138,6 +138,32 @@ export function resetStore(): void {
   seq = 0;
 }
 
+/** Tanam baris temuan sintetis langsung ke store (tanpa lewat UI). */
+export function seedTemuan(
+  rows: Array<Partial<StoredTemuan> & { indicator_id: string }>,
+  fixture: Pick<HarnessFixture, "agent" | "period"> = FIXTURE,
+): StoredTemuan[] {
+  return rows.map((row) => {
+    const id = nextId();
+    const stored: StoredTemuan = {
+      id,
+      peserta_id: fixture.agent.id,
+      period_id: fixture.period.id,
+      service_type: "call",
+      no_tiket: null,
+      nilai: 0,
+      ketidaksesuaian: null,
+      sebaiknya: null,
+      tanggal_layanan: null,
+      tanggal_sampel: null,
+      is_phantom_padding: false,
+      ...row,
+    };
+    store.set(id, stored);
+    return stored;
+  });
+}
+
 export function allRows(): StoredTemuan[] {
   return [...store.values()];
 }
@@ -200,7 +226,20 @@ export type RealApiForwarder = {
   ) => Promise<{ status: number; bodyText: string }>;
 };
 
+export type HarnessFolder = { id: string; name: string };
+export type HarnessPeriod = { id: string; month: number; year: number };
+export type HarnessAgent = HarnessFixture["agent"];
+
 export type HarnessOptions = {
+  /** Daftar folder/periode/agen penuh; default hanya satu dari `fixture`. */
+  folders?: HarnessFolder[];
+  periods?: HarnessPeriod[];
+  agents?: HarnessAgent[];
+  /**
+   * URL awal setelah harness terpasang. Default: deep link ke folder + agen
+   * fixture. Beri `"/sidak/input"` untuk membuka halaman tanpa konteks.
+   */
+  initialUrl?: string;
   role?: string;
   batch?: BatchBehavior;
   fixture?: HarnessFixture;
@@ -232,12 +271,12 @@ export async function openInputAudit(
 
   await page.route(`${APP_ORIGIN}/api/v1/sidak/folders*`, async (route) => {
     audit.mockedApi.push(new URL(route.request().url()).pathname);
-    await route.fulfill(toJson({ success: true, data: [fixture.folder] }));
+    await route.fulfill(toJson({ success: true, data: opts.folders ?? [fixture.folder] }));
   });
 
   await page.route(`${APP_ORIGIN}/api/v1/sidak/periods*`, async (route) => {
     audit.mockedApi.push(new URL(route.request().url()).pathname);
-    await route.fulfill(toJson({ success: true, data: [fixture.period] }));
+    await route.fulfill(toJson({ success: true, data: opts.periods ?? [fixture.period] }));
   });
 
   await page.route(
@@ -264,7 +303,7 @@ export async function openInputAudit(
 
   await page.route(`${APP_ORIGIN}/api/v1/sidak/agents*`, async (route) => {
     audit.mockedApi.push(new URL(route.request().url()).pathname);
-    await route.fulfill(toJson({ success: true, data: [fixture.agent] }));
+    await route.fulfill(toJson({ success: true, data: opts.agents ?? [fixture.agent] }));
   });
 
   if (!opts.realApi) {
@@ -430,8 +469,15 @@ export async function openInputAudit(
     `${APP_ORIGIN}/api/v1/sidak/temuan?*`,
     async (route) => {
       audit.mockedApi.push("temuan:GET");
+      const query = new URL(route.request().url()).searchParams;
+      const pesertaId = query.get("peserta_id");
+      const periodId = query.get("period_id");
+      const serviceType = query.get("service_type");
       const rows = [...store.values()].filter(
-        (r) => r.peserta_id === fixture.agent.id,
+        (r) =>
+          r.peserta_id === (pesertaId ?? fixture.agent.id) &&
+          (!periodId || r.period_id === periodId) &&
+          (!serviceType || r.service_type === serviceType),
       );
       await route.fulfill(
         toJson({ success: true, data: { items: rows, total: rows.length } }),
@@ -449,9 +495,38 @@ export async function openInputAudit(
   // `domcontentloaded`, bukan default `load`: koneksi HMR membuat event
   // `load` tidak pernah sampai sehingga aksi Playwright menggantung.
   await page.goto(
-    `/sidak/input?folder=${encodeURIComponent(fixture.folder.name)}&agent_id=${fixture.agent.id}`,
+    opts.initialUrl ??
+      `/sidak/input?folder=${encodeURIComponent(fixture.folder.name)}&agent_id=${fixture.agent.id}`,
     { waitUntil: "domcontentloaded" },
   );
+}
+
+const MONTH_NAMES = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+/**
+ * Pilih periode lewat kontrol `Periode` di bar konteks Input Temuan.
+ * Satu helper bersama untuk semua spec Input Temuan.
+ */
+export async function selectPeriod(
+  page: Page,
+  period: { month: number; year: number } = FIXTURE.period,
+): Promise<void> {
+  const label = `${MONTH_NAMES[period.month - 1]} ${period.year}`;
+  await page.getByRole("combobox", { name: "Periode" }).click();
+  await page.getByRole("option", { name: label }).click();
 }
 
 function isApiPath(pathname: string): boolean {

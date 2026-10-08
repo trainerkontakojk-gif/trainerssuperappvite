@@ -19,6 +19,7 @@ import { expect, test } from "@playwright/test";
 import ExcelJS from "exceljs";
 import {
   openInputAudit,
+  selectPeriod,
   startAudit,
   type HarnessFixture,
 } from "./helpers/sidakTemuanDatesHarness";
@@ -133,7 +134,10 @@ async function pickParameter(
   index: number,
   name: string,
 ) {
-  await page.locator('button[aria-haspopup="listbox"]').nth(index).click();
+  await page
+    // Dropdown parameter milik form; pemilih di bar konteks (fieldset) dikecualikan.
+    .locator('button[aria-haspopup="listbox"]:not(fieldset *)')
+    .nth(index).click();
   await page.getByRole("option", { name }).first().click();
 }
 
@@ -197,8 +201,8 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     const audit = startAudit();
     await openInputAudit(page, audit, { realApi: app, fixture: fx.fixture });
 
-    // Pilih periode (halaman menahan form sampai periode dipilih).
-    await page.getByRole("button", { name: /Januari 2026/ }).first().click();
+    // Pilih periode (lewat kontrol `Periode`).
+    await selectPeriod(page, fx.fixture.period);
     await page.getByRole("button", { name: /^(Tambah Temuan|Tambah)$/ }).first().click();
     await expect(page.getByLabel(/^Tanggal layanan/)).toBeVisible();
 
@@ -271,7 +275,7 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
   test("import batch → route nyata → DB → heatmap", async ({ page }) => {
     const audit = startAudit();
     await openInputAudit(page, audit, { realApi: app, fixture: fx.fixture });
-    await page.getByRole("button", { name: /Januari 2026/ }).first().click();
+    await selectPeriod(page, fx.fixture.period);
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Input Temuan");

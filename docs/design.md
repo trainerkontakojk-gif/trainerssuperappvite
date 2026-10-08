@@ -180,6 +180,15 @@ Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang 
 - Susun Ringkasan dengan hierarki eksplisit: judul dan deskripsi, Quickview performa, lalu nilai skor per bulan. Gunakan divider dan jarak section untuk mengelompokkan konten; hindari badge dekoratif atau kartu tambahan yang tidak menambah makna.
 - Jelaskan fungsi pemilih bulan, lalu tampilkan detail skor, tiket pengurang, dan akar masalah untuk bulan yang dipilih.
 
+### Input Temuan (SIDAK)
+
+Halaman kerja harian `/sidak/input` memakai satu layar, bukan wizard kartu:
+
+- **Bar konteks** satu `fieldset` (legend `sr-only` "Konteks audit") berisi Folder, Agen, Periode, Layanan. Label terlihat di atas kontrol, tinggi kontrol minimal 44px, memakai `ui/select` dan `ui/combobox` (Agen bisa dicari nama/tim/batch). Desktop satu baris; mobile Folder dan Agen penuh, Periode + Layanan dua kolom. Kontrol berikutnya disabled sampai kontrol sebelumnya terisi.
+- **Ringkasan sesi** satu baris tanpa kartu: skor live (`tabular-nums`) dengan status dari `utils/sidakScoreStatus.ts` (target 95), jumlah temuan, jumlah tiket; aksi `Sesi Tanpa Temuan`, `Import`, `Tambah` di sisi kanan (wrap di layar sempit). Rincian kategori hanya baris teks sekunder.
+- **Pesan** (error, sukses, konfigurasi parameter) memakai `QaStatePanel`/`Alert`; satu blok peringatan konfigurasi. Sukses `role="status"`, error `role="alert"` dengan aksi `Coba lagi` bila bisa diulang.
+- **Motion** hanya untuk expand form/import dan dimatikan saat `prefers-reduced-motion`.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeAgentsResponse } from "../routes/sidak/input";
+import { normalizeAgentsResponse } from "../lib/sidak-input-agents";
 import { resolveInitialInputService } from "../lib/sidak-input-service";
 
 describe("normalizeAgentsResponse", () => {

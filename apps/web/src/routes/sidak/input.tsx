@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useAuthStore } from "../../store/authStore";
@@ -8,112 +8,72 @@ import {
   type QAPeriod,
   type QATemuan,
   type ServiceWeight,
-  type RuleVersion,
-  type AgentDirectoryResponse,
   type ResolvedSidakInputConfig,
 } from "@trainers/types";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  FolderOpen,
-  User as UserIcon,
-  CalendarDays,
-  Plus,
-  Upload,
-  Check,
-  ChevronRight,
-  AlertCircle,
-  AlertTriangle,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Check, Plus, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import TemuanGroupGrid from "../../components/sidak/TemuanGroupGrid";
-import SidakInputScoreCard from "../../components/sidak/SidakInputScoreCard";
-import SidakSelectionCard from "../../components/sidak/SidakSelectionCard";
-import SidakSelectionGrid from "../../components/sidak/SidakSelectionGrid";
+import SidakInputContextBar from "../../components/sidak/SidakInputContextBar";
+import SidakInputSessionSummary from "../../components/sidak/SidakInputSessionSummary";
 import SidakInputManualForm from "../../components/sidak/SidakInputManualForm";
 import SidakInputImportPanel from "../../components/sidak/SidakInputImportPanel";
-import { calculateQAScoreFromTemuan } from "../../lib/scoring";
+import {
+  periodLabel,
+  SERVICE_TYPES,
+} from "../../components/sidak/sidak-input.constants";
+import { calculateQAScoreFromTemuan, SERVICE_LABELS } from "../../lib/scoring";
 import { resolveInitialInputService } from "../../lib/sidak-input-service";
+import {
+  normalizeAgentsResponse,
+  type SidakInputAgent,
+} from "../../lib/sidak-input-agents";
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
 
-const MONTHS = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-];
+type ServiceType = QAIndicator["service_type"];
 
-type Step = "folder" | "agent" | "period" | "list";
-
-const SERVICE_TYPES = [
-  "call",
-  "chat",
-  "email",
-  "cso",
-  "pencatatan",
-  "bko",
-  "slik",
-];
-const SERVICE_LABELS: Record<string, string> = {
-  call: "Call",
-  chat: "Chat",
-  email: "Email",
-  cso: "CSO",
-  pencatatan: "Pencatatan",
-  bko: "BKO",
-  slik: "SLIK",
-};
-
-interface AgentEntry {
-  id: string;
-  nama: string;
-  batch_name?: string | null;
-  tim?: string | null;
-  jabatan?: string | null;
-}
-
-export function normalizeAgentsResponse(raw: unknown): AgentEntry[] {
-  if (!raw || typeof raw !== "object") return [];
-  const obj = raw as Record<string, unknown>;
-  if (Array.isArray(obj.agents)) return obj.agents as AgentEntry[];
-  if (Array.isArray(raw)) return raw as AgentEntry[];
-  return [];
+function isServiceType(value: string | null): value is ServiceType {
+  return value !== null && (SERVICE_TYPES as string[]).includes(value);
 }
 
 export default function SidakInputPage() {
-  const [step, setStep] = useState<Step>("folder");
-  const [showAllData, setShowAllData] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<SidakInputAgent | null>(
+    null,
+  );
   const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
-  const [selectedService, setSelectedService] = useState<
-    QAIndicator["service_type"] | ""
-  >("call");
+  const [selectedService, setSelectedService] = useState<ServiceType | "">("");
   const [activeWeight, setActiveWeight] = useState<ServiceWeight | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role ?? "trainer";
+  const reduceMotion = useReducedMotion();
 
-  const { data: folders } =
+  const { data: folders, error: foldersError } =
     useApi<{ id: string; name: string }[]>("/sidak/folders");
-  const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
-  const [agents, setAgents] = useState<AgentEntry[]>([]);
+  const { data: periods, error: periodsError } =
+    useApi<QAPeriod[]>("/sidak/periods");
+  const [agents, setAgents] = useState<SidakInputAgent[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
   const [temuan, setTemuan] = useState<QATemuan[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [retryTarget, setRetryTarget] = useState<
+    | {
+        kind: "workspace";
+        agent: SidakInputAgent;
+        period: QAPeriod | null;
+        service: ServiceType;
+      }
+    | { kind: "agents"; folder: string }
+    | null
+  >(null);
 
   // Resolved Config State
   const [resolvedIndicators, setResolvedIndicators] = useState<QAIndicator[]>(
@@ -122,6 +82,10 @@ export default function SidakInputPage() {
   const [ruleVersionId, setRuleVersionId] = useState<string | null>(null);
   const [hasDraftVersion, setHasDraftVersion] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
+
+  // Token permintaan: respons lama tidak boleh menimpa konteks yang lebih baru.
+  const contextSeq = useRef(0);
+  const agentsSeq = useRef(0);
 
   const activeIndicators = resolvedIndicators;
 
@@ -135,13 +99,21 @@ export default function SidakInputPage() {
     return set;
   }, [resolvedIndicators]);
 
+  const clearResolvedConfig = useCallback(() => {
+    setResolvedIndicators([]);
+    setActiveWeight(null);
+    setRuleVersionId(null);
+    setHasDraftVersion(false);
+  }, []);
+
   const loadResolvedConfig = useCallback(
-    async (service: QAIndicator["service_type"], periodId?: string) => {
+    async (
+      service: ServiceType,
+      periodId: string | undefined,
+      isCurrent: () => boolean,
+    ) => {
       setLoadingConfig(true);
-      setResolvedIndicators([]);
-      setActiveWeight(null);
-      setRuleVersionId(null);
-      setHasDraftVersion(false);
+      clearResolvedConfig();
       try {
         const response = await sidakClient["resolved-input-config"].$get({
           query: {
@@ -152,6 +124,7 @@ export default function SidakInputPage() {
         const res = (await unwrapResponse(
           response,
         )) as ResolvedSidakInputConfig;
+        if (!isCurrent()) return;
         if (res) {
           setResolvedIndicators(res.indicators || []);
           setActiveWeight(res.weight || null);
@@ -160,12 +133,65 @@ export default function SidakInputPage() {
         }
       } catch (err) {
         console.error("Gagal memuat konfigurasi input SIDAK:", err);
-        setErrorMsg("Gagal memuat parameter");
+        if (isCurrent()) setErrorMsg("Gagal memuat parameter");
       } finally {
-        setLoadingConfig(false);
+        if (isCurrent()) setLoadingConfig(false);
       }
     },
-    [],
+    [clearResolvedConfig],
+  );
+
+  /**
+   * Muat parameter (+ temuan bila periode sudah dipilih) untuk satu konteks.
+   * Tanpa layanan (tim Mix) tidak ada yang dimuat.
+   */
+  const loadWorkspace = useCallback(
+    async (
+      agent: SidakInputAgent | null,
+      period: QAPeriod | null,
+      service: ServiceType | "",
+    ) => {
+      const seq = ++contextSeq.current;
+      const isCurrent = () => seq === contextSeq.current;
+      setTemuan([]);
+      setErrorMsg(null);
+      setRetryTarget(null);
+
+      if (!agent || !service) {
+        clearResolvedConfig();
+        setLoadingConfig(false);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const [, result] = await Promise.all([
+          loadResolvedConfig(service, period?.id, isCurrent),
+          period
+            ? unwrapResponse(
+                await sidakClient.temuan.$get({
+                  query: {
+                    peserta_id: agent.id,
+                    period_id: period.id,
+                    service_type: service,
+                    limit: "200",
+                  },
+                }),
+              )
+            : Promise.resolve(null),
+        ]);
+        if (!isCurrent()) return;
+        if (result) setTemuan((result as { items: QATemuan[] }).items ?? []);
+      } catch {
+        if (!isCurrent()) return;
+        setErrorMsg("Gagal memuat temuan");
+        setRetryTarget({ kind: "workspace", agent, period, service });
+      } finally {
+        if (isCurrent()) setLoading(false);
+      }
+    },
+    [loadResolvedConfig, clearResolvedConfig],
   );
 
   // Initialize Hooks
@@ -200,190 +226,200 @@ export default function SidakInputPage() {
     setSuccessMsg,
   });
 
-  const { setEntries } = formHook;
-
-  const indicatorLookup = useMemo(() => {
-    const map = new Map<string, QAIndicator>();
-    activeIndicators.forEach((i) => map.set(i.id, i));
-    return map;
-  }, [activeIndicators]);
-
   const indicatorLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     activeIndicators.forEach((i) => map.set(i.id, formatQAIndicatorName(i)));
     return map;
   }, [activeIndicators]);
 
-  const displayFolders = folders ?? [];
-
-  const handleAgentClick = async (agent: AgentEntry) => {
-    setSelectedAgent(agent);
-    setSelectedPeriod(null);
-    setTemuan([]);
-    setLoading(true);
-    setErrorMsg(null);
-
-    try {
-      const agentService = resolveInitialInputService(agent.tim);
-      setSelectedService(agentService);
-      if (agentService) {
-        await loadResolvedConfig(agentService);
-      } else {
-        setResolvedIndicators([]);
-        setActiveWeight(null);
-        setRuleVersionId(null);
-        setHasDraftVersion(false);
-      }
-      setStep("period");
-    } catch {
-      setErrorMsg("Gagal memuat data");
-    } finally {
-      setLoading(false);
+  const folderOptions = useMemo(() => {
+    const list = folders ?? [];
+    if (selectedFolder && !list.some((f) => f.name === selectedFolder)) {
+      return [...list, { id: `url:${selectedFolder}`, name: selectedFolder }];
     }
-  };
+    return list;
+  }, [folders, selectedFolder]);
 
-  const handlePeriodClick = async (period: QAPeriod) => {
-    if (!selectedAgent) return;
-    if (!selectedService) {
-      setErrorMsg("Pilih layanan audit terlebih dahulu.");
-      return;
-    }
-    setSelectedPeriod(period);
-    setLoading(true);
-    setErrorMsg(null);
-
-    try {
-      const svc = selectedService;
-      const [_, result] = await Promise.all([
-        loadResolvedConfig(svc, period.id),
-        unwrapResponse(
-          await sidakClient.temuan.$get({
-            query: {
-              peserta_id: selectedAgent.id,
-              period_id: period.id,
-              service_type: svc,
-              limit: "200",
-            },
-          }),
-        ),
-      ]);
-      setTemuan((result as { items: QATemuan[] }).items ?? []);
-      setStep("list");
-    } catch {
-      setErrorMsg("Gagal memuat temuan");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleServiceChange = useCallback(
-    async (newService: QAIndicator["service_type"]) => {
-      setSelectedService(newService);
-      setLoading(true);
-      setErrorMsg(null);
-      setTemuan([]);
-      setEntries([newEntry()]);
-      importHook.setImportRows([]);
-      importHook.setImportFile(null);
-      try {
-        await loadResolvedConfig(newService, selectedPeriod?.id);
-        if (selectedAgent && selectedPeriod) {
-          const result = await unwrapResponse(
-            await sidakClient.temuan.$get({
-              query: {
-                peserta_id: selectedAgent.id,
-                period_id: selectedPeriod.id,
-                service_type: newService,
-                limit: "200",
-              },
-            }),
-          );
-          setTemuan((result as { items: QATemuan[] }).items ?? []);
-        }
-      } catch {
-        setErrorMsg("Gagal memuat data untuk layanan baru");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [selectedAgent, selectedPeriod, loadResolvedConfig, setEntries, importHook],
+  const periodOptions = useMemo(
+    () =>
+      [...(periods ?? [])].sort(
+        (a, b) => b.year - a.year || b.month - a.month,
+      ),
+    [periods],
   );
 
-  const handleFolderClick = async (folder: string) => {
-    setSelectedFolder(folder);
-    setSelectedAgent(null);
-    setSelectedPeriod(null);
-    setTemuan([]);
-    setLoading(true);
+  /** Tutup form/import dan batalkan edit/hapus saat konteks berganti. */
+  const closeWorkspaceUi = () => {
+    setSuccessMsg(null);
+    formHook.resetForm();
+    editHook.setDeletingId(null);
+    editHook.setEditingId(null);
+    importHook.handleImportClose();
+  };
 
-    try {
+  const fetchFolderAgents = useCallback(
+    async (folder: string): Promise<SidakInputAgent[]> => {
       const year = new Date().getFullYear();
       const result = await unwrapResponse(
         await sidakClient.agents.$get({ query: { year: String(year) } }),
       );
-      const allAgents = normalizeAgentsResponse(result);
-      const folderAgents = allAgents.filter(
+      return normalizeAgentsResponse(result).filter(
         (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
       );
-      setAgents(folderAgents);
-      setStep("agent");
-    } catch {
-      setErrorMsg("Gagal memuat agen");
-    } finally {
-      setLoading(false);
+    },
+    [],
+  );
+
+  const loadAgentsForFolder = useCallback(
+    async (folder: string) => {
+      const seq = ++agentsSeq.current;
+      setLoadingAgents(true);
+      try {
+        const list = await fetchFolderAgents(folder);
+        if (seq === agentsSeq.current) setAgents(list);
+      } catch {
+        if (seq !== agentsSeq.current) return;
+        setAgents([]);
+        setErrorMsg("Gagal memuat agen");
+        setRetryTarget({ kind: "agents", folder });
+      } finally {
+        if (seq === agentsSeq.current) setLoadingAgents(false);
+      }
+    },
+    [fetchFolderAgents],
+  );
+
+  const handleRetry = () => {
+    if (!retryTarget) return;
+    setErrorMsg(null);
+    setRetryTarget(null);
+    if (retryTarget.kind === "agents") {
+      void loadAgentsForFolder(retryTarget.folder);
+    } else {
+      void loadWorkspace(
+        retryTarget.agent,
+        retryTarget.period,
+        retryTarget.service,
+      );
     }
   };
 
-  const loadFolderAndPreSelectAgent = useCallback(
-    async (folder: string, agentId: string) => {
-      setErrorMsg(null);
-      try {
-        const year = new Date().getFullYear();
-        const result = await unwrapResponse(
-          await sidakClient.agents.$get({ query: { year: String(year) } }),
-        );
-        const allAgents = normalizeAgentsResponse(result);
-        const folderAgents = allAgents.filter(
-          (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
-        );
-        const found = folderAgents.find((a) => a.id === agentId);
-        if (!found) {
-          setErrorMsg("Agen tidak ditemukan. Silakan pilih manual.");
-          setAgents(folderAgents);
-          setSelectedFolder(folder);
-          setStep("agent");
-          return;
-        }
-        setAgents(folderAgents);
-        setSelectedFolder(folder);
-        setSelectedAgent(found);
-        const agentService = resolveInitialInputService(found.tim);
-        setSelectedService(agentService);
-        if (agentService) {
-          await loadResolvedConfig(agentService);
-        } else {
-          setResolvedIndicators([]);
-          setActiveWeight(null);
-          setRuleVersionId(null);
-          setHasDraftVersion(false);
-        }
-        setStep("period");
-        window.history.replaceState({}, "", window.location.pathname);
-      } catch {
-        setErrorMsg("Gagal memuat data. Silakan pilih manual.");
-      }
-    },
-    [loadResolvedConfig],
-  );
+  const handleFolderChange = (folder: string) => {
+    if (folder === selectedFolder) return;
+    closeWorkspaceUi();
+    contextSeq.current += 1;
+    setErrorMsg(null);
+    setRetryTarget(null);
+    setSelectedFolder(folder);
+    setSelectedAgent(null);
+    setSelectedPeriod(null);
+    setSelectedService("");
+    setTemuan([]);
+    clearResolvedConfig();
+    setLoading(false);
+    setAgents([]);
+    void loadAgentsForFolder(folder);
+  };
 
+  const handleAgentChange = (agent: SidakInputAgent) => {
+    if (agent.id === selectedAgent?.id) return;
+    closeWorkspaceUi();
+    const service = resolveInitialInputService(agent.tim);
+    setSelectedAgent(agent);
+    setSelectedService(service);
+    void loadWorkspace(agent, selectedPeriod, service);
+  };
+
+  const handlePeriodChange = (periodId: string) => {
+    const period = periodOptions.find((p) => p.id === periodId);
+    if (!period || period.id === selectedPeriod?.id) return;
+    closeWorkspaceUi();
+    setSelectedPeriod(period);
+    void loadWorkspace(selectedAgent, period, selectedService);
+  };
+
+  const handleServiceChange = (service: ServiceType) => {
+    if (service === selectedService) return;
+    closeWorkspaceUi();
+    setSelectedService(service);
+    void loadWorkspace(selectedAgent, selectedPeriod, service);
+  };
+
+  // Konteks awal dari URL: ?folder=&agent_id=&period_id=&service=
+  const initStarted = useRef(false);
   useEffect(() => {
+    if (initStarted.current) return;
     const params = new URLSearchParams(window.location.search);
     const folder = params.get("folder");
     const agentId = params.get("agent_id");
-    if (folder && agentId) {
-      loadFolderAndPreSelectAgent(folder, agentId);
+    const periodId = params.get("period_id");
+    const serviceParam = params.get("service");
+
+    if (!folder) {
+      initStarted.current = true;
+      setInitialized(true);
+      return;
     }
-  }, [loadFolderAndPreSelectAgent]);
+    // Periode di URL hanya bisa dicocokkan setelah daftar periode dimuat.
+    if (periodId && periods === null && !periodsError) return;
+    initStarted.current = true;
+
+    void (async () => {
+      setSelectedFolder(folder);
+      const seq = ++agentsSeq.current;
+      setLoadingAgents(true);
+      try {
+        const folderAgents = await fetchFolderAgents(folder);
+        if (seq !== agentsSeq.current) return;
+        setAgents(folderAgents);
+        const found = agentId
+          ? folderAgents.find((a) => a.id === agentId)
+          : undefined;
+        if (agentId && !found) {
+          setErrorMsg("Agen tidak ditemukan. Silakan pilih manual.");
+        }
+        if (found) {
+          const period =
+            (periodId ? periods?.find((p) => p.id === periodId) : null) ?? null;
+          const service = isServiceType(serviceParam)
+            ? serviceParam
+            : resolveInitialInputService(found.tim);
+          setSelectedAgent(found);
+          setSelectedPeriod(period);
+          setSelectedService(service);
+          void loadWorkspace(found, period, service);
+        }
+      } catch {
+        if (seq === agentsSeq.current) {
+          setErrorMsg("Gagal memuat data. Silakan pilih manual.");
+        }
+      } finally {
+        if (seq === agentsSeq.current) setLoadingAgents(false);
+        setInitialized(true);
+      }
+    })();
+  }, [periods, periodsError, fetchFolderAgents, loadWorkspace]);
+
+  // Sinkronkan konteks ke URL (replaceState) agar reload mempertahankannya.
+  useEffect(() => {
+    if (!initialized) return;
+    const params = new URLSearchParams();
+    if (selectedFolder) params.set("folder", selectedFolder);
+    if (selectedAgent) params.set("agent_id", selectedAgent.id);
+    if (selectedPeriod) params.set("period_id", selectedPeriod.id);
+    if (selectedService) params.set("service", selectedService);
+    const query = params.toString();
+    const next = `${window.location.pathname}${query ? `?${query}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(window.history.state, "", next);
+    }
+  }, [
+    initialized,
+    selectedFolder,
+    selectedAgent,
+    selectedPeriod,
+    selectedService,
+  ]);
 
   const groupedTemuan = useMemo(() => {
     const groups: { key: string; label: string | null; items: QATemuan[] }[] =
@@ -423,494 +459,198 @@ export default function SidakInputPage() {
 
   const scoringMode = activeWeight?.scoring_mode ?? "weighted";
 
-  const resetToStep = (target: Step) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    formHook.resetForm();
-    editHook.setDeletingId(null);
-    editHook.setEditingId(null);
-    if (target === "folder") {
-      setSelectedFolder(null);
-      setSelectedAgent(null);
-      setSelectedPeriod(null);
-      setTemuan([]);
-    } else if (target === "agent") {
-      setSelectedAgent(null);
-      setSelectedPeriod(null);
-      setTemuan([]);
-    } else if (target === "period") {
-      setSelectedPeriod(null);
-      setTemuan([]);
+  const serviceRequired =
+    selectedAgent !== null && resolveInitialInputService(selectedAgent.tim) === "";
+  const ready =
+    selectedAgent !== null && selectedPeriod !== null && selectedService !== "";
+  const showConfigWarning =
+    ready &&
+    !loadingConfig &&
+    (hasDraftVersion || !ruleVersionId);
+
+  const expandMotion = reduceMotion
+    ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : {
+        initial: { opacity: 0, height: 0 },
+        animate: { opacity: 1, height: "auto" },
+        exit: { opacity: 0, height: 0 },
+      };
+
+  const renderEmptyContext = () => {
+    if (folders && folders.length === 0) {
+      return (
+        <QaStatePanel
+          type="empty"
+          title="Belum ada folder"
+          description="Tidak ada folder yang tersedia untuk input temuan."
+        />
+      );
     }
-    setStep(target);
+    if (periods && periods.length === 0 && selectedAgent) {
+      return (
+        <QaStatePanel
+          type="empty"
+          title="Belum ada periode"
+          description="Tidak ada periode audit yang tersedia."
+        />
+      );
+    }
+    if (selectedFolder && !loadingAgents && agents.length === 0 && !errorMsg) {
+      return (
+        <QaStatePanel
+          type="empty"
+          title="Tidak ada agen"
+          description={`Tidak ditemukan agen untuk folder "${selectedFolder}".`}
+        />
+      );
+    }
+    const next = !selectedFolder
+      ? "Pilih folder untuk memulai."
+      : !selectedAgent
+        ? "Pilih agen untuk melanjutkan."
+        : !selectedPeriod
+          ? "Pilih periode untuk melihat temuan."
+          : "Pilih layanan audit untuk memuat temuan.";
+    return (
+      <p className="py-6 text-sm text-muted-foreground">{next}</p>
+    );
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="mx-auto max-w-6xl space-y-6">
-          {/* COMPACT BREADCRUMB */}
-          <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide whitespace-nowrap overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => resetToStep("folder")}
-              className={`transition-colors shrink-0 ${step === "folder" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Folder
-            </button>
-            <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-            <button
-              type="button"
-              onClick={() => selectedFolder && resetToStep("agent")}
-              disabled={!selectedFolder}
-              className={`transition-colors truncate max-w-[120px] ${step === "agent" ? "text-foreground" : selectedFolder ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/30"}`}
-            >
-              {selectedFolder || "Agen"}
-            </button>
-            {selectedFolder && (
-              <>
-                <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-                <button
-                  type="button"
-                  onClick={() => selectedAgent && resetToStep("period")}
-                  disabled={!selectedAgent}
-                  className={`transition-colors truncate max-w-[120px] ${step === "period" ? "text-foreground" : selectedAgent ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/30"}`}
-                >
-                  {selectedAgent?.nama || "Agen"}
-                </button>
-              </>
-            )}
-            {selectedAgent && (
-              <>
-                <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-                <span
-                  className={`truncate max-w-[120px] ${step === "list" ? "text-foreground" : "text-muted-foreground/60"}`}
-                >
-                  {selectedPeriod
-                    ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`
-                    : "Periode"}
-                </span>
-              </>
-            )}
-          </div>
+      <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-5">
+          <header className="space-y-1">
+            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
+              Input Temuan
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Pilih agen dan periode, lalu catat temuan audit per tiket.
+            </p>
+          </header>
 
-          {/* MESSAGES */}
-          <AnimatePresence>
-            {errorMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="p-3.5 rounded-lg bg-red-500/5 border border-red-500/25 text-red-600 text-sm flex items-center gap-2"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {errorMsg}
-              </motion.div>
-            )}
-            {successMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="p-3.5 rounded-lg bg-green-500/5 border border-green-500/25 text-emerald-600 text-sm flex items-center gap-2"
-              >
-                <Check className="w-4 h-4 shrink-0" />
-                {successMsg}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <SidakInputContextBar
+            folders={folderOptions}
+            folder={selectedFolder}
+            onFolderChange={handleFolderChange}
+            agents={agents}
+            agent={selectedAgent}
+            loadingAgents={loadingAgents}
+            onAgentChange={handleAgentChange}
+            periods={periodOptions}
+            periodId={selectedPeriod?.id ?? null}
+            onPeriodChange={handlePeriodChange}
+            service={selectedService}
+            onServiceChange={handleServiceChange}
+            serviceRequired={serviceRequired}
+          />
 
-          {/* STEP 1: FOLDER SELECTION */}
-          {step === "folder" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FolderOpen className="w-5 h-5 text-muted-foreground" />
-                  <h2 className="font-outfit text-lg font-bold text-foreground">
-                    Pilih Folder
-                  </h2>
-                </div>
-                <button
-                  data-testid="show-all-toggle"
-                  type="button"
-                  onClick={() => {
-                    setShowAllData(!showAllData);
-                    setSelectedFolder(null);
-                    setSelectedAgent(null);
-                    setSelectedPeriod(null);
-                    setTemuan([]);
-                    setStep("folder");
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all border border-border ${
-                    showAllData
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-background text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {showAllData ? (
-                    <EyeOff className="w-3.5 h-3.5" />
-                  ) : (
-                    <Eye className="w-3.5 h-3.5" />
-                  )}
-                  {showAllData ? "Data Terfilter" : "Tampilkan Semua"}
-                </button>
-              </div>
-
-              {displayFolders.length === 0 ? (
-                <QaStatePanel
-                  type="empty"
-                  title="Belum ada folder"
-                  description="Tidak ada folder yang tersedia untuk input temuan."
-                />
-              ) : (
-                <SidakSelectionGrid testId="folder-selection-grid">
-                  {displayFolders.map((f, i) => (
-                    <SidakSelectionCard
-                      key={f.id}
-                      delay={i * 0.02}
-                      icon={<FolderOpen className="h-5 w-5" />}
-                      title={f.name}
-                      onClick={() => handleFolderClick(f.name)}
-                      testId="folder-selection-card"
-                    />
-                  ))}
-                </SidakSelectionGrid>
-              )}
-            </motion.div>
-          )}
-
-          {/* STEP 2: AGENT SELECTION */}
-          {step === "agent" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserIcon className="w-5 h-5 text-muted-foreground" />
-                  <h2 className="font-outfit text-lg font-bold text-foreground">
-                    Pilih Agen
-                  </h2>
-                </div>
-              </div>
-
-              {loading ? (
-                <SidakSelectionGrid testId="agent-selection-skeleton">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse"
-                    >
-                      <div className="h-11 w-11 rounded bg-foreground/10" />
-                      <div className="mt-5 h-3 w-28 rounded bg-foreground/10" />
-                      <div className="mt-2 h-2.5 w-20 rounded bg-foreground/10" />
-                    </div>
-                  ))}
-                </SidakSelectionGrid>
-              ) : agents.length === 0 ? (
-                <QaStatePanel
-                  type="empty"
-                  title="Tidak ada agen"
-                  description={`Tidak ditemukan agen untuk folder "${selectedFolder}".`}
-                />
-              ) : (
-                <SidakSelectionGrid testId="agent-selection-grid">
-                  {agents.map((agent, i) => (
-                    <SidakSelectionCard
-                      key={agent.id}
-                      delay={i * 0.02}
-                      icon={
-                        <span className="text-sm font-black">
-                          {agent.nama.charAt(0).toUpperCase()}
-                        </span>
-                      }
-                      title={agent.nama}
-                      subtitle={agent.batch_name || agent.tim || "-"}
-                      onClick={() => handleAgentClick(agent)}
-                      testId="agent-selection-card"
-                    />
-                  ))}
-                </SidakSelectionGrid>
-              )}
-            </motion.div>
-          )}
-
-          {/* STEP 3: PERIOD SELECTION */}
-          {step === "period" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-muted-foreground" />
-                  <h2 className="font-outfit text-lg font-bold text-foreground">
-                    Pilih Periode
-                  </h2>
-                </div>
-              </div>
-
-              {resolveInitialInputService(selectedAgent?.tim) === "" && (
-                <div
-                  data-testid="explicit-service-selection"
-                  className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4"
-                >
-                  <label
-                    htmlFor="sidak-mix-service"
-                    className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+          {/* PESAN STATUS */}
+          {errorMsg ? (
+            <QaStatePanel
+              type="error"
+              compact
+              title={errorMsg}
+              action={
+                retryTarget ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-[44px]"
+                    onClick={handleRetry}
                   >
-                    Layanan Audit
-                  </label>
-                  <select
-                    id="sidak-mix-service"
-                    aria-label="Layanan audit"
-                    value={selectedService}
-                    onChange={(event) => {
-                      const service = event.target.value as QAIndicator["service_type"];
-                      if (service) void handleServiceChange(service);
-                    }}
-                    className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-foreground sm:max-w-sm"
-                  >
-                    <option value="">Pilih layanan audit</option>
-                    {SERVICE_TYPES.map((service) => (
-                      <option key={service} value={service}>
-                        {SERVICE_LABELS[service]}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    Tim Mix menangani lebih dari satu layanan. Pilih layanan
-                    audit sebelum memilih periode agar sesi tersimpan pada
-                    service yang benar.
-                  </p>
-                </div>
-              )}
+                    Coba lagi
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : null}
+          {foldersError && !folders ? (
+            <QaStatePanel
+              type="error"
+              compact
+              title="Daftar folder belum dapat dimuat. Muat ulang halaman."
+            />
+          ) : null}
+          {successMsg ? (
+            <QaStatePanel type="success" compact title={successMsg} />
+          ) : null}
+          {showConfigWarning ? (
+            <QaStatePanel
+              type="warning"
+              compact
+              title="Konfigurasi parameter perlu dicek"
+              description={
+                !ruleVersionId
+                  ? `Belum ada parameter yang berlaku untuk ${selectedService ? SERVICE_LABELS[selectedService] : "layanan ini"} pada periode ini. Cek Settings QA untuk mempublish parameter yang sesuai.${hasDraftVersion ? " Ada juga draft parameter yang belum dipublikasikan." : ""}`
+                  : "Ada draft parameter yang belum dipublikasikan. Input temuan saat ini menggunakan parameter versi terakhir yang published."
+              }
+            />
+          ) : null}
 
-              {loading ? (
-                <SidakSelectionGrid testId="period-selection-skeleton">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse"
-                    >
-                      <div className="h-11 w-11 rounded bg-foreground/10" />
-                      <div className="mt-5 h-3 w-24 rounded bg-foreground/10" />
-                      <div className="mt-2 h-2.5 w-16 rounded bg-foreground/10" />
-                    </div>
-                  ))}
-                </SidakSelectionGrid>
-              ) : !periods || periods.length === 0 ? (
-                <QaStatePanel
-                  type="empty"
-                  title="Belum ada periode"
-                  description="Tidak ada periode audit yang tersedia."
-                />
-              ) : (
-                <SidakSelectionGrid testId="period-selection-grid">
-                  {periods.map((p, i) => (
-                    <SidakSelectionCard
-                      key={p.id}
-                      delay={i * 0.02}
-                      icon={
-                        <span className="text-sm font-black text-indigo-500">
-                          {String(p.month).padStart(2, "0")}
-                        </span>
-                      }
-                      title={MONTHS[p.month - 1]}
-                      subtitle={String(p.year)}
-                      onClick={() => handlePeriodClick(p)}
-                      disabled={!selectedService}
-                      testId="period-selection-card"
-                    />
-                  ))}
-                </SidakSelectionGrid>
-              )}
-            </motion.div>
-          )}
-
-          {/* STEP 4: TEMUAN LIST */}
-          {step === "list" && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => resetToStep("period")}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
-                      Daftar Temuan
-                    </h1>
-                  </div>
-                  <p className="text-muted-foreground text-sm mt-1 ml-9">
-                    {selectedAgent?.nama}
-                    {" · "}
-                    {selectedPeriod &&
-                      `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
-                    {" · "}
-                    {SERVICE_LABELS[selectedService]}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {role !== "leader" && (
+          {!ready ? (
+            renderEmptyContext()
+          ) : (
+            <div className="space-y-5">
+              <SidakInputSessionSummary
+                liveScore={liveScore}
+                activeWeight={activeWeight}
+                temuanCount={temuan.length}
+                ticketCount={groupedTemuan.length}
+                actions={
+                  role !== "leader" ? (
                     <>
-                      <button
+                      {!formHook.showForm && !importHook.showImport && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-[44px] px-4"
+                          onClick={formHook.handlePerfectScore}
+                          disabled={formHook.saving || formHook.hasBadFindings}
+                          title={
+                            formHook.hasBadFindings
+                              ? "Sesi tanpa temuan hanya bisa dibuat jika belum ada laporan temuan buruk."
+                              : undefined
+                          }
+                        >
+                          <Check aria-hidden="true" />
+                          {formHook.hasBadFindings
+                            ? "Sudah Ada Temuan"
+                            : "Sesi Tanpa Temuan"}
+                        </Button>
+                      )}
+                      <Button
                         type="button"
+                        variant="outline"
+                        className="h-[44px] px-4"
                         onClick={() => {
                           importHook.setShowImport(!importHook.showImport);
                           importHook.setImportTab("download");
                           importHook.setImportRows([]);
                           importHook.setImportFile(null);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border border-border text-foreground hover:bg-muted text-xs font-semibold uppercase tracking-wide transition-colors"
                       >
-                        <Upload className="w-3.5 h-3.5" /> Import
-                      </button>
-                      {!formHook.showForm && !importHook.showImport && (
-                        <button
-                          type="button"
-                          onClick={formHook.handlePerfectScore}
-                          disabled={formHook.saving || formHook.hasBadFindings}
-                          className={
-                            formHook.hasBadFindings
-                              ? "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold uppercase tracking-wide cursor-not-allowed opacity-50"
-                              : "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border border-border hover:bg-muted text-emerald-600 text-xs font-semibold uppercase tracking-wide transition-colors"
-                          }
-                          title={
-                            formHook.hasBadFindings
-                              ? "Sesi tanpa temuan hanya bisa dibuat jika belum ada laporan temuan buruk."
-                              : ""
-                          }
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          {formHook.hasBadFindings
-                            ? "Sudah Ada Temuan"
-                            : "Sesi Tanpa Temuan"}
-                        </button>
-                      )}
-                      <button
+                        <Upload aria-hidden="true" />
+                        Import
+                      </Button>
+                      <Button
                         type="button"
+                        className="h-[44px] px-4"
                         onClick={() => formHook.setShowForm(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold uppercase tracking-wide hover:opacity-90 transition-all"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Tambah
-                      </button>
+                        <Plus aria-hidden="true" />
+                        Tambah
+                      </Button>
                     </>
-                  )}
-                </div>
-              </div>
-
-              {/* Konfigurasi Audit card */}
-              <div className="bg-surface rounded-xl border border-border p-5">
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                  Konfigurasi Audit
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground block mb-1.5">
-                      Layanan Audit
-                    </label>
-                    <select
-                      value={selectedService}
-                      onChange={(e) =>
-                        handleServiceChange(
-                          e.target.value as QAIndicator["service_type"],
-                        )
-                      }
-                      className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground cursor-pointer"
-                    >
-                      {SERVICE_TYPES.map((st) => (
-                        <option key={st} value={st}>
-                          {SERVICE_LABELS[st]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground block mb-1.5">
-                      Tim Agent
-                    </label>
-                    <div className="flex items-center h-10 px-3 rounded-lg border border-border bg-background text-sm text-muted-foreground">
-                      {selectedAgent?.tim || selectedAgent?.batch_name || "-"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Estimasi Skor card */}
-              <SidakInputScoreCard
-                liveScore={liveScore}
-                activeWeight={activeWeight}
-                agentName={selectedAgent?.nama ?? ""}
-                periodLabel={
-                  selectedPeriod
-                    ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`
-                    : ""
+                  ) : null
                 }
               />
-
-              {/* Draft warning banner */}
-              {hasDraftVersion && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
-                >
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Ada draft parameter yang belum dipublikasikan. Input temuan
-                  saat ini menggunakan parameter versi terakhir yang published.
-                </motion.div>
-              )}
-
-              {selectedPeriod && !loadingConfig && !ruleVersionId && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
-                >
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Belum ada parameter yang berlaku untuk{" "}
-                  {SERVICE_LABELS[selectedService]} pada periode ini. Cek
-                  Settings QA untuk mempublish parameter yang sesuai.
-                </motion.div>
-              )}
-
-              {/* Info bar */}
-              <div className="p-3 rounded-lg bg-surface border border-border text-sm text-muted-foreground flex items-center gap-3">
-                <span>
-                  Total temuan:{" "}
-                  <strong className="text-foreground">{temuan.length}</strong>
-                </span>
-                <span className="text-muted-foreground/30">|</span>
-                <span>
-                  Group:{" "}
-                  <strong className="text-foreground">
-                    {groupedTemuan.length}
-                  </strong>
-                </span>
-              </div>
 
               {/* ADD FORM */}
               <AnimatePresence>
                 {formHook.showForm && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    {...expandMotion}
                     className="overflow-hidden"
                   >
                     <SidakInputManualForm
@@ -934,9 +674,7 @@ export default function SidakInputPage() {
                       onCancel={formHook.resetForm}
                       activeIndicators={activeIndicators}
                       scoringMode={scoringMode}
-                      serviceType={
-                        selectedService as QAIndicator["service_type"]
-                      }
+                      serviceType={selectedService as ServiceType}
                       saving={formHook.saving}
                       previewing={formHook.previewing}
                     />
@@ -948,9 +686,7 @@ export default function SidakInputPage() {
               <AnimatePresence>
                 {importHook.showImport && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    {...expandMotion}
                     className="overflow-hidden"
                   >
                     <SidakInputImportPanel
@@ -967,9 +703,7 @@ export default function SidakInputPage() {
                       onFileUpload={importHook.handleFileUpload}
                       onImportSave={importHook.handleImportSave}
                       disabled={activeIndicators.length === 0}
-                      serviceType={
-                        selectedService as QAIndicator["service_type"]
-                      }
+                      serviceType={selectedService as ServiceType}
                     />
                   </motion.div>
                 )}
@@ -979,28 +713,29 @@ export default function SidakInputPage() {
               {loading ? (
                 <div
                   data-testid="temuan-grid-skeleton"
-                  className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3"
+                  aria-hidden="true"
+                  className="space-y-2"
                 >
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="min-h-40 rounded-2xl bg-card/50 border border-border animate-pulse"
-                    />
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
                   ))}
                 </div>
-              ) : groupedTemuan.length === 0 ? (
+              ) : groupedTemuan.length === 0 && !errorMsg ? (
                 <QaStatePanel
                   type="empty"
                   title="Belum ada temuan"
-                  description="Belum ada data temuan untuk agen ini pada periode dan layanan yang dipilih."
+                  description={`Belum ada data temuan untuk ${selectedAgent?.nama ?? "agen ini"} pada ${selectedPeriod ? periodLabel(selectedPeriod) : "periode"} dan layanan ${selectedService ? SERVICE_LABELS[selectedService] : ""}.`}
                   action={
-                    <button
-                      type="button"
-                      onClick={() => formHook.setShowForm(true)}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground text-background text-xs font-semibold uppercase tracking-wide"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Tambah Temuan
-                    </button>
+                    role !== "leader" ? (
+                      <Button
+                        type="button"
+                        className="h-[44px] px-4"
+                        onClick={() => formHook.setShowForm(true)}
+                      >
+                        <Plus aria-hidden="true" />
+                        Tambah Temuan
+                      </Button>
+                    ) : undefined
                   }
                 />
               ) : (
@@ -1027,7 +762,7 @@ export default function SidakInputPage() {
                   setEditTanggalSampel={editHook.setEditTanggalSampel}
                 />
               )}
-            </motion.div>
+            </div>
           )}
         </div>
       </div>
