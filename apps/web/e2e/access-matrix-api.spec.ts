@@ -37,15 +37,17 @@ test.beforeAll(async () => {
     WFM_SCHEDULE_SUPABASE_KEY: "",
     WFM_SCHEDULE_API_ALLOWED_ORIGINS: "",
   });
-  const [admin, ai, ketik, pdkt, profiler, sidak, telefun] = await Promise.all([
-    import("../../api/src/routes/admin"),
-    import("../../api/src/routes/ai"),
-    import("../../api/src/routes/ketik"),
-    import("../../api/src/routes/pdkt"),
-    import("../../api/src/routes/profiler"),
-    import("../../api/src/routes/sidak"),
-    import("../../api/src/routes/telefun"),
-  ]);
+  const [admin, ai, ketik, pdkt, profiler, sidak, telefun, tna] =
+    await Promise.all([
+      import("../../api/src/routes/admin"),
+      import("../../api/src/routes/ai"),
+      import("../../api/src/routes/ketik"),
+      import("../../api/src/routes/pdkt"),
+      import("../../api/src/routes/profiler"),
+      import("../../api/src/routes/sidak"),
+      import("../../api/src/routes/telefun"),
+      import("../../api/src/routes/tna"),
+    ]);
   routers = {
     admin: admin.adminRouter as unknown as Hono,
     ai: ai.ai as unknown as Hono,
@@ -54,6 +56,7 @@ test.beforeAll(async () => {
     profiler: profiler.profiler as unknown as Hono,
     sidak: sidak.sidak as unknown as Hono,
     telefun: telefun.telefun as unknown as Hono,
+    tna: tna.tna as unknown as Hono,
   };
 });
 

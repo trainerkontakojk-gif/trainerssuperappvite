@@ -563,7 +563,52 @@ const previewProfilerSlidesRedirectRoute = createRoute({
   beforeLoad: redirectToProfilerView("slide"),
 });
 
+const tnaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna",
+  component: lazy(() => import("./routes/tna/index")),
+  validateSearch: (search: Record<string, unknown>) => ({
+    service: VALID_SERVICE_TYPES.includes(search.service as ServiceType)
+      ? (search.service as ServiceType)
+      : ("call" as ServiceType),
+    period: typeof search.period === "string" ? search.period : "",
+    compare: Math.min(6, Math.max(1, Number(search.compare) || 2)),
+    all: search.all === true || search.all === "true",
+  }),
+  beforeLoad: requireCapability("tna.read"),
+});
+const tnaParameterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/parameter",
+  component: lazy(() => import("./routes/tna/parameter")),
+  validateSearch: (search: Record<string, unknown>) => ({
+    service: VALID_SERVICE_TYPES.includes(search.service as ServiceType)
+      ? (search.service as ServiceType)
+      : ("call" as ServiceType),
+    period: typeof search.period === "string" ? search.period : "",
+    indicator: typeof search.indicator === "string" ? search.indicator : "",
+    compare: Math.min(6, Math.max(1, Number(search.compare) || 2)),
+  }),
+  beforeLoad: requireCapability("tna.read"),
+});
+const tnaNeedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/kebutuhan/$id",
+  component: lazy(() => import("./routes/tna/need")),
+  beforeLoad: requireCapability("tna.read"),
+});
+const tnaPlanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/rencana/$id",
+  component: lazy(() => import("./routes/tna/plan")),
+  beforeLoad: requireCapability("tna.read"),
+});
+
 const routeTree = rootRoute.addChildren([
+  tnaRoute,
+  tnaParameterRoute,
+  tnaNeedRoute,
+  tnaPlanRoute,
   indexRoute,
   dashboardRoute,
   dashboardUsersRoute,

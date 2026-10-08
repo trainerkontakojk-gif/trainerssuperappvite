@@ -48,6 +48,7 @@
   --color-module-telefun-foreground: var(--module-telefun-foreground);
   --color-module-profiler: var(--module-profiler);
   --color-module-sidak: var(--module-sidak);
+  --color-module-tna: var(--module-tna);
 
   /* Chart colors */
   --color-chart-blue: var(--chart-blue);
@@ -150,6 +151,8 @@
     --module-profiler-bg: #0e749010;
     --module-sidak: #f43f5e; /* rose-500    */
     --module-sidak-bg: #f43f5e10;
+    --module-tna: #92400e;
+    --module-tna-bg: #92400e10;
 
     /* ── Semantic Chart/Status Colors ───────────────────── */
     /* Dipakai di SIDAK charts, section bars, status badges  */
@@ -225,6 +228,8 @@
     --module-profiler-bg: #06b6d415;
     --module-sidak: #f43f5e;
     --module-sidak-bg: #f43f5e15;
+    --module-tna: #fbbf24;
+    --module-tna-bg: #fbbf2415;
 
     /* ── Semantic Chart/Status Colors ────────────────── */
     --chart-blue: #3b82f6;

@@ -1,6 +1,11 @@
-import type { DashboardAgentGroup, DashboardTemuanRow } from "./dashboard-types";
+import type {
+  DashboardAgentGroup,
+  DashboardTemuanRow,
+} from "./dashboard-types";
 
-export function groupTemuanByAgent(rows: DashboardTemuanRow[]): DashboardAgentGroup[] {
+export function groupTemuanByAgent(
+  rows: DashboardTemuanRow[],
+): DashboardAgentGroup[] {
   const agentMap = new Map<string, DashboardAgentGroup>();
 
   for (const row of rows) {
@@ -22,7 +27,9 @@ export function groupTemuanByAgent(rows: DashboardTemuanRow[]): DashboardAgentGr
   return Array.from(agentMap.values());
 }
 
-export function getScoreRows(rows: DashboardTemuanRow[]): DashboardTemuanRow[] {
+export function getScoreRows<T extends { is_phantom_padding?: boolean | null }>(
+  rows: T[],
+): T[] {
   const realRows = rows.filter((row) => row.is_phantom_padding !== true);
   return realRows.length > 0 ? realRows : rows;
 }

@@ -104,6 +104,17 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     return [{ label: "Dashboard" }];
   }
 
+  if (pathname === "/tna") return [{ label: "TNA" }];
+  if (pathname.startsWith("/tna/")) {
+    const label =
+      pathname === "/tna/parameter"
+        ? "Detail parameter"
+        : pathname.startsWith("/tna/kebutuhan/")
+          ? "Kebutuhan"
+          : "Rencana";
+    return [{ label: "TNA", href: "/tna" }, { label }];
+  }
+
   // Module root detection
   if (pathname.startsWith("/sidak")) {
     crumbs.push({ label: "SIDAK", href: "/sidak" });

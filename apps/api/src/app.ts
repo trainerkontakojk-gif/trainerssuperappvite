@@ -13,6 +13,7 @@ import {
   securityHeadersMiddleware,
 } from "./middleware/securityHeaders";
 import { sidak } from "./routes/sidak";
+import { tna } from "./routes/tna";
 import { ketik } from "./routes/ketik";
 import { pdkt } from "./routes/pdkt";
 import { ai } from "./routes/ai";
@@ -211,6 +212,7 @@ const v1Api = new Hono<{ Variables: AuthVariables }>()
     },
   )
   .route("/sidak", sidak)
+  .route("/tna", tna)
   .route("/ketik", ketik)
   .route("/pdkt", pdkt)
   .route("/ai", ai)
