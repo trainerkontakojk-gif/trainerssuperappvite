@@ -40,10 +40,10 @@ erDiagram
 
 ### `qa_temuan` — tanggal bisnis (opsional)
 
-| Kolom | Tipe | Arti |
-| --- | --- | --- |
+| Kolom             | Tipe        | Arti                                                                                          |
+| ----------------- | ----------- | --------------------------------------------------------------------------------------------- |
 | `tanggal_layanan` | `date NULL` | Kapan layanan/interaksi yang ditinjau benar-benar terjadi. Dasar mode **Agent** pada heatmap. |
-| `tanggal_sampel` | `date NULL` | Kapan QA memeriksa sampel dan menetapkan temuan. Dasar mode **QA** pada heatmap. |
+| `tanggal_sampel`  | `date NULL` | Kapan QA memeriksa sampel dan menetapkan temuan. Dasar mode **QA** pada heatmap.              |
 
 Aturan yang berlaku:
 
@@ -285,7 +285,7 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 | `profiler_folders`                     | No Access                                                 | Read (Scoped via `batch_name`)                     | Full CRUD Access                       |
 | `profiler_tim_list`                    | No Access                                                 | Read (Scoped via `tim`)                            | Full CRUD Access                       |
 | `profiler_peserta`                     | No Access                                                 | Read (Scoped via `leader_can_access_peserta`)      | Full CRUD Access                       |
-| `tna_*` | SELECT 0 baris; DML ditolak | SELECT 0 baris; DML ditolak | SELECT; tulis via RPC service-role |
+| `tna_*`                                | SELECT 0 baris; DML ditolak                               | SELECT 0 baris; DML ditolak                        | SELECT; tulis via RPC service-role     |
 | `qa_periods`                           | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
 | `qa_indicators`                        | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
 | `qa_temuan`                            | Read (Own via email_ojk match)                            | Read (Scoped via `leader_can_access_sidak_temuan`) | Full CRUD Access                       |
@@ -324,7 +324,7 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 
 ## TNA — Training Needs Analysis (Fase 1)
 
-Sumber schema: `supabase/migrations/20261008120000_tna_phase1.sql`. Artefak ini telah diuji pada Supabase lokal; **bukan bukti penerapan hosted**, dan T6 tidak menjalankan migrasi apa pun.
+Sumber schema: `supabase/migrations/20261008120000_tna_phase1.sql`. Artefak ini telah diuji pada Supabase lokal. **Diterapkan ke produksi `ruosnjmtywcrghjgqugz` pada 2026-10-08** dengan izin Fajar: hanya file ini lewat `supabase db query --linked -f`, lalu `supabase migration repair --status applied 20261008120000` (bukan `db push`, karena riwayat remote memuat versi lain yang belum sinkron). Verifikasi hanya-baca pasca-apply: 4 tabel, 7 program, 5 fungsi `public.tna_*`, 6 fungsi `tna_internal`, RLS aktif, `authenticated` punya EXECUTE tetapi tanpa INSERT dan tanpa USAGE `tna_internal`, versi tercatat. Guard RPC tidak diuji dengan pemanggilan di produksi. Komentar baris pertama file migrasi ("Apply locally only…") historis dan sengaja tidak diubah setelah apply.
 
 | Tabel public            | Data dan batas penting                                                                                                                                                                                                                                                                                      |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
