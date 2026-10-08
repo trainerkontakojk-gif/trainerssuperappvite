@@ -54,8 +54,7 @@ const SHELL_ROUTES: readonly ShellRoute[] = [
   "/sidak/input",
   "/sidak/periods",
   "/sidak/ranking",
-  "/sidak/reports",
-  "/sidak/reports-ai",
+  "/sidak/reports-data",
   "/sidak/settings",
   "/telefun",
 ];

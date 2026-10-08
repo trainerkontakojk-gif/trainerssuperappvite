@@ -1173,7 +1173,6 @@ const RESULTS_SURFACE = "results-surface";
 const RESULTS_COUNT = "results-count";
 const RESULTS_TABLE = "results-table";
 const RESULTS_LIST = "results-list";
-const BACK_LINK = "Kembali ke Laporan";
 
 /** Label unik untuk setiap sel Temuan/Rekomendasi, dipakai desktop & mobile. */
 const CELL_LABELS = ["Temuan", "Rekomendasi"];
@@ -1372,7 +1371,6 @@ async function captureViewportPair(
 /** Kontrol milik halaman ini saja; navigasi shared di luar scope. */
 function inScopeControls(page: Page) {
   return [
-    page.getByRole("link", { name: BACK_LINK }),
     page.getByRole("button", { name: "Per Layanan" }),
     page.getByRole("button", { name: "Per Individu" }),
     page.getByRole("combobox", { name: "Layanan" }),

@@ -143,6 +143,70 @@ for (const role of ["qa", "tl", "spv", "om"]) {
   });
 }
 
+for (const role of ["admin", "trainer", "leader", "agent"]) {
+  test(`${role}: SIDAK data reports retain their generation gate`, async () => {
+    const response = await mount(role).request(
+      "http://local.test/v1/sidak/reports/data",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        // Invalid filter stops before persistence while proving the route still exists.
+        body: JSON.stringify({ startMonth: 0 }),
+      },
+    );
+    expect(response.status).toBe(role === "agent" ? 403 : 400);
+    expect((await response.json()).error?.code).toBe(
+      role === "agent" ? "FORBIDDEN" : "VALIDATION_ERROR",
+    );
+  });
+}
+
+for (const role of [
+  "admin",
+  "trainer",
+  "leader",
+  "agent",
+  "qa",
+  "tl",
+  "spv",
+  "om",
+]) {
+  test(`${role}: removed SIDAK AI and archive endpoints return 404`, async () => {
+    const app = mount(role);
+    const endpoints = [
+      ...[
+        "generate",
+        "export-docx",
+        "export-html",
+        "export-pdf",
+        "chart-data",
+        "save",
+      ].map((action) => ({
+        method: "POST",
+        path: `/v1/sidak/reports/ai/${action}`,
+      })),
+      { method: "GET", path: "/v1/sidak/reports/archives" },
+      { method: "GET", path: `/v1/sidak/reports/archives/${actorId}` },
+      { method: "DELETE", path: `/v1/sidak/reports/archives/${actorId}` },
+    ];
+    for (const endpoint of endpoints) {
+      const response = await app.request(`http://local.test${endpoint.path}`, {
+        method: endpoint.method,
+        ...(endpoint.method === "POST"
+          ? {
+              headers: { "content-type": "application/json" },
+              body: "{}",
+            }
+          : {}),
+      });
+      expect(
+        response.status,
+        `${role} ${endpoint.method} ${endpoint.path}`,
+      ).toBe(404);
+    }
+  });
+}
+
 // Activity logs are an append-only audit trail (plans/markdown/management-pages-redesign.md):
 // no role may delete them, so the route must not exist at all.
 for (const role of ["admin", "trainer", "leader", "agent"]) {

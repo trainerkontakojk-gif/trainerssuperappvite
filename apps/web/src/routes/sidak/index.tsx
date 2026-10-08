@@ -45,7 +45,7 @@ const CARDS = [
     title: "Laporan",
     desc: "Ekstraksi data historis dan generasi laporan audit dalam berbagai format standar institusi.",
     icon: FileText,
-    href: "/sidak/reports",
+    href: "/sidak/reports-data",
     managerOnly: true,
   },
   {

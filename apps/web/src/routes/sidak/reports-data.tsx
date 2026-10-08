@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Search, Download, Loader2, RefreshCw } from "lucide-react";
+import { Search, Download, Loader2, RefreshCw } from "lucide-react";
 import { formatQAIndicatorName, type QAIndicator } from "@trainers/types";
 import { useApi, fetchApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
@@ -353,13 +352,6 @@ export default function SidakReportsData() {
         <div className="mx-auto max-w-7xl space-y-6">
           {/* Header: tipografi + spasi, tanpa ikon dekoratif dan tanpa motion. */}
           <header className="space-y-3">
-            <Link
-              to="/sidak/reports"
-              className="-ml-1 inline-flex min-h-[44px] items-center gap-1.5 rounded px-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Kembali ke Laporan
-            </Link>
             <div>
               <h1 className="font-heading text-2xl font-semibold tracking-tight text-balance text-foreground">
                 Laporan Data

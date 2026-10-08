@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["authenticated-shell.spec.ts", "sidebar-nav-state.spec.ts"],
+  testMatch: [
+    "authenticated-shell.spec.ts",
+    "sidebar-nav-state.spec.ts",
+    "sidak-reports-removed.spec.ts",
+  ],
   outputDir: "test-results/access-web",
   workers: 1,
   timeout: 60000,
