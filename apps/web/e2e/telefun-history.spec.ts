@@ -155,6 +155,30 @@ test.describe("Telefun (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("teks tombol Mulai simulasi di landing memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: telefunMocks([]),
+    });
+    const start = page.getByRole("button", { name: "Mulai simulasi" });
+    await expect(start).toBeVisible({ timeout: 20000 });
+
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      // Teks di atas bg-module-telefun; root = pembungkus supaya hanya tombol ini dipindai.
+      // Tombol punya ikon anak, jadi tidak memakai leafOnly.
+      const found = await findLowContrastText(start.locator(".."), {
+        selector: "button",
+      });
+      offenders.push(...found.map((o) => `[${theme}] ${o}`));
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
   test(`teks riwayat dan review Telefun minimal ${MIN_TEXT_PX}px`, async ({
     page,
   }) => {

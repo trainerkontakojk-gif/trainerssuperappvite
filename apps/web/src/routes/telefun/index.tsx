@@ -870,7 +870,7 @@ export default function TelefunLanding() {
                         size="lg"
                         onClick={requestStartCall}
                         disabled={settingsLoading}
-                        className="h-12 w-full justify-start gap-2 bg-module-telefun px-3 text-base font-semibold text-white hover:bg-module-telefun/90"
+                        className="h-12 w-full justify-start gap-2 bg-module-telefun px-3 text-base font-semibold text-module-telefun-foreground hover:bg-module-telefun/90"
                       >
                         {settingsLoading ? (
                           <LoaderCircle

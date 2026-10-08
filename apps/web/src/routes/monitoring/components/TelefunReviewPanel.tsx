@@ -310,7 +310,7 @@ export function TelefunReviewPanel({
           <div className="bg-module-telefun/5 rounded-[1.5rem] p-6 border border-module-telefun/10 flex flex-col md:flex-row items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-module-telefun rounded-2xl flex items-center justify-center shadow-lg shadow-module-telefun/20 shrink-0">
-                <Phone className="w-7 h-7 text-white" />
+                <Phone className="w-7 h-7 text-module-telefun-foreground" />
               </div>
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.3em] text-module-telefun">

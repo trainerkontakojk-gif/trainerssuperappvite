@@ -344,7 +344,7 @@ function DialerScreen({
                 <div
                   className={`flex h-[46px] w-[46px] flex-col items-center justify-center rounded-full backdrop-blur transition-colors ${
                     isPressed
-                      ? "bg-module-telefun text-white"
+                      ? "bg-module-telefun text-module-telefun-foreground"
                       : isEntered
                         ? "bg-white/20 text-white ring-1 ring-module-telefun/70"
                         : "bg-white/12 text-white"
@@ -379,7 +379,7 @@ function DialerScreen({
         >
           <div
             className={`flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg shadow-black/25 transition-colors ${
-              isDialing ? "bg-module-telefun/80" : "bg-module-telefun"
+              isDialing ? "bg-module-telefun/80 text-module-telefun-foreground" : "bg-module-telefun text-module-telefun-foreground"
             }`}
           >
             <svg
@@ -391,7 +391,7 @@ function DialerScreen({
             >
               <path
                 d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12 1.33.43 2.62.92 3.84a2 2 0 01-.58 2.11l-1.27 1.27a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.58c1.22.49 2.5.8 3.85.92A2 2 0 0122 16.92z"
-                fill="white"
+                fill="currentColor"
               />
             </svg>
           </div>
@@ -475,7 +475,7 @@ function ConversationScreen({ shouldReduceMotion }: ConversationScreenProps) {
               157
             </span>
           </div>
-          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-module-telefun text-[8px] font-bold text-white shadow-md ring-2 ring-[#0a0a14]">
+          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-module-telefun text-[8px] font-bold text-module-telefun-foreground shadow-md ring-2 ring-[#0a0a14]">
             HD
           </span>
         </motion.div>

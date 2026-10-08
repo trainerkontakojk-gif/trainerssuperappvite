@@ -131,7 +131,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         <button
           disabled={!hasAgentRecording}
           onClick={handleAnalyze}
-          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-module-telefun-foreground shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Wand2 className="h-4 w-4" />
           <span>Mulai Analisis</span>
@@ -159,7 +159,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         </p>
         <button
           onClick={handleAnalyze}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-module-telefun-foreground shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90"
         >
           <RefreshCw className="h-4 w-4" />
           <span>Cek Status</span>
@@ -193,7 +193,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         <button
           onClick={handleAnalyze}
           disabled={!hasAgentRecording}
-          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-module-telefun-foreground shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" />
           <span>Coba Lagi</span>
