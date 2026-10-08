@@ -446,7 +446,7 @@ export default function ProfilerImport() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <main className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <ProfilerPageHeader
             backHref={`/profiler/table?batch=${encodeURIComponent(batchName)}`}
@@ -703,7 +703,7 @@ export default function ProfilerImport() {
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

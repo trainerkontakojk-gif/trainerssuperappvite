@@ -826,7 +826,7 @@ export default function TelefunLanding() {
             exit={{ opacity: 0, y: -12 }}
             className="relative"
           >
-            <main className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2 lg:items-stretch lg:px-8 lg:py-10">
+            <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2 lg:items-stretch lg:px-8 lg:py-10">
               <div className="flex min-w-0 flex-col">
                 <div className="flex flex-1 flex-col">
                   <TelefunMotionFrame />
@@ -932,7 +932,7 @@ export default function TelefunLanding() {
                   </div>
                 </CardContent>
               </Card>
-            </main>
+            </div>
           </motion.div>
         )}
 

@@ -302,7 +302,7 @@ export default function SidakSettingsPage() {
       : null;
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden bg-background">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Header Sticky */}
       <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border sticky top-0 z-30">
         <div className="flex items-center gap-4">
@@ -476,6 +476,6 @@ export default function SidakSettingsPage() {
           />
         )}
       </AnimatePresence>
-    </main>
+    </div>
   );
 }

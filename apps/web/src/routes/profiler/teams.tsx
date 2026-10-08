@@ -96,7 +96,7 @@ export default function ProfilerTeams() {
         description="Tim default selalu tersedia, sedangkan tim kustom dapat ditambah dan dibersihkan dari satu panel."
         icon={<Users className="size-3.5" aria-hidden="true" />}
       />
-      <main className="flex-1">
+      <div className="flex-1">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <Alert>
             <Info aria-hidden="true" />
@@ -240,7 +240,7 @@ export default function ProfilerTeams() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

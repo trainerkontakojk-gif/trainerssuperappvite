@@ -105,7 +105,7 @@ export function ScenarioForm({
         </Button>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[env(safe-area-inset-bottom)] sm:px-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[env(safe-area-inset-bottom)] sm:px-6">
         {creationMode === null ? (
           <ScenarioCreationModePicker
             onSelect={onModeSelect}
@@ -206,7 +206,7 @@ export function ScenarioForm({
             </section>
           </>
         )}
-      </main>
+      </div>
 
       {creationMode !== null && (
         <ScenarioStickyFooter>

@@ -101,7 +101,7 @@ export default function MonitoringPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-[var(--content-max-width)] space-y-8 p-4 lg:p-8">
+    <div className="mx-auto w-full max-w-[var(--content-max-width)] space-y-8 p-4 lg:p-8">
       {/* Test & Accessibility Compatibility Elements */}
       <div className="sr-only">
         <span>SIMULATION MONITORING</span>
@@ -243,6 +243,6 @@ export default function MonitoringPage() {
           }}
         />
       )}
-    </main>
+    </div>
   );
 }

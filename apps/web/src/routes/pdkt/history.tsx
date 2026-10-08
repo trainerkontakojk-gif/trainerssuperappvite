@@ -176,7 +176,7 @@ export default function PdktHistory() {
   }, [loadHistory]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <Link
@@ -362,6 +362,6 @@ export default function PdktHistory() {
           </div>
         )}
       </Card>
-    </main>
+    </div>
   );
 }

@@ -251,7 +251,7 @@ export default function SidakRankingPage() {
   ) ?? [];
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 pb-14 md:p-8 md:pb-10 lg:pb-8">
         <div className="max-w-7xl mx-auto space-y-6">
           <header className="flex flex-col gap-1">
@@ -558,6 +558,6 @@ export default function SidakRankingPage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

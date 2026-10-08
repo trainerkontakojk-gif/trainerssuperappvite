@@ -111,7 +111,7 @@ export default function SidakReportsAi() {
   const exportLabel = exportFormat === "docx" ? "DOCX" : exportFormat === "html" ? "HTML" : "PDF";
 
   return (
-    <main className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <style>{`
         @media print {
           body { background: white !important; }
@@ -340,6 +340,6 @@ export default function SidakReportsAi() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }
