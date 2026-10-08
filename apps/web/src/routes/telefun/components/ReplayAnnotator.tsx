@@ -278,7 +278,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
   if (isLoading) {
     return (
       <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-slate-950/5 bg-white p-6 dark:border-white/10 dark:bg-slate-900">
-        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-module-telefun" />
       </div>
     );
   }
@@ -375,7 +375,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
 
       <div className="rounded-2xl border border-slate-950/10 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
         <div className="mb-3 flex items-center gap-2">
-          <Plus className="h-4 w-4 text-emerald-500" />
+          <Plus className="h-4 w-4 text-module-telefun" />
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
             Tambah Anotasi Manual
           </h3>
@@ -393,7 +393,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               step={1000}
               value={timestampMs}
               onChange={(e) => setTimestampMs(Number(e.target.value))}
-              className="w-full accent-emerald-600"
+              className="w-full accent-module-telefun"
             />
             <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 dark:text-white/35">
               <span>00:00</span>
@@ -416,7 +416,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 onClick={() => setCategory(item)}
                 className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   category === item
-                    ? "bg-emerald-600 text-white shadow-sm"
+                    ? "bg-module-telefun text-white shadow-sm"
                     : "bg-slate-950/5 text-slate-500 hover:bg-slate-950/10 dark:bg-white/5 dark:text-white/55 dark:hover:bg-white/10"
                 }`}
               >
@@ -432,7 +432,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
             <select
               value={moment}
               onChange={(e) => setMoment(e.target.value as AnnotationMoment)}
-              className="w-full rounded-xl border border-slate-950/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
+              className="w-full rounded-xl border border-slate-950/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-module-telefun dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
             >
               {(
                 Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
@@ -449,7 +449,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               value={text.slice(0, MAX_CHAR_COUNT)}
               onChange={(e) => setText(e.target.value)}
               placeholder="Tulis catatan singkat untuk momen ini..."
-              className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
+              className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-module-telefun dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
             />
             <div className="mt-1 flex items-center justify-between text-xs">
               <span
@@ -473,7 +473,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting || !text.trim() || charLimitReached}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-module-telefun px-4 py-2.5 text-sm font-bold text-white transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />

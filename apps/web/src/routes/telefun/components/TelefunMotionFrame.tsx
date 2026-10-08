@@ -344,9 +344,9 @@ function DialerScreen({
                 <div
                   className={`flex h-[46px] w-[46px] flex-col items-center justify-center rounded-full backdrop-blur transition-colors ${
                     isPressed
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-module-telefun text-white"
                       : isEntered
-                        ? "bg-white/20 text-white ring-1 ring-emerald-400/70"
+                        ? "bg-white/20 text-white ring-1 ring-module-telefun/70"
                         : "bg-white/12 text-white"
                   }`}
                 >
@@ -379,7 +379,7 @@ function DialerScreen({
         >
           <div
             className={`flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-lg shadow-black/25 transition-colors ${
-              isDialing ? "bg-emerald-400" : "bg-emerald-500"
+              isDialing ? "bg-module-telefun/80" : "bg-module-telefun"
             }`}
           >
             <svg
@@ -475,7 +475,7 @@ function ConversationScreen({ shouldReduceMotion }: ConversationScreenProps) {
               157
             </span>
           </div>
-          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white shadow-md ring-2 ring-[#0a0a14]">
+          <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-module-telefun text-[8px] font-bold text-white shadow-md ring-2 ring-[#0a0a14]">
             HD
           </span>
         </motion.div>

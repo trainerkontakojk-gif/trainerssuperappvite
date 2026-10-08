@@ -122,7 +122,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   if (!assessment && !isAnalyzing && scoringStatus !== "processing" && scoringStatus !== "pending" && scoringStatus !== "failed") {
     return (
       <div className="rounded-2xl border border-dashed border-slate-950/10 bg-slate-950/5 p-8 text-center dark:border-white/10 dark:bg-white/5">
-        <Sparkles className="mx-auto mb-3 h-8 w-8 text-emerald-500" />
+        <Sparkles className="mx-auto mb-3 h-8 w-8 text-module-telefun" />
         <h3 className="mb-2 text-lg font-bold">Analisis Kualitas Suara Agen</h3>
         <p className="mb-6 text-sm text-slate-500 dark:text-white/55">
           Gunakan AI untuk menilai kecepatan bicara, intonasi, dan artikulasi
@@ -131,7 +131,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         <button
           disabled={!hasAgentRecording}
           onClick={handleAnalyze}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Wand2 className="h-4 w-4" />
           <span>Mulai Analisis</span>
@@ -159,7 +159,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         </p>
         <button
           onClick={handleAnalyze}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-700"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90"
         >
           <RefreshCw className="h-4 w-4" />
           <span>Cek Status</span>
@@ -171,7 +171,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   if (isAnalyzing || scoringStatus === "processing") {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
-        <Loader2 className="mb-4 h-12 w-12 animate-spin text-emerald-500" />
+        <Loader2 className="mb-4 h-12 w-12 animate-spin text-module-telefun" />
         <h3 className="mb-1 text-xl font-bold">Menganalisis Suara...</h3>
         <p className="max-w-xs text-sm text-slate-500 dark:text-white/55">
           {scoringStatus === "processing" && !isAnalyzing
@@ -193,7 +193,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         <button
           onClick={handleAnalyze}
           disabled={!hasAgentRecording}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-module-telefun px-6 py-3 font-bold text-white shadow-lg shadow-module-telefun/20 transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" />
           <span>Coba Lagi</span>
@@ -221,7 +221,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
               Semakin sesuai dengan area target, semakin baik
             </p>
           </div>
-          <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-500">
+          <div className="flex items-center gap-1 rounded-full bg-module-telefun/10 px-3 py-1 text-xs font-bold text-module-telefun">
             <Sparkles className="h-3 w-3" />
             <span>{assessment.overallScore}/10</span>
           </div>
@@ -314,7 +314,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
 
           <div className="rounded-2xl border border-slate-950/10 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
             <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-              <ListChecks className="h-4 w-4 text-emerald-500" />
+              <ListChecks className="h-4 w-4 text-module-telefun" />
               Prioritas Perbaikan
             </h3>
             {communicationProfile.improvementPriorities.length > 0 ? (
