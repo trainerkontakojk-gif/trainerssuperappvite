@@ -41,9 +41,7 @@ const SidakJadwalShifting = lazy(
 );
 const SidakAgents = lazy(() => import("./routes/sidak/agents"));
 const SidakAgentDetail = lazy(() => import("./routes/sidak/agents.$id"));
-const SidakReportsLanding = lazy(() => import("./routes/sidak/reports/index"));
 const SidakReportsData = lazy(() => import("./routes/sidak/reports-data"));
-const SidakReportsAi = lazy(() => import("./routes/sidak/reports-ai"));
 const KetikLanding = lazy(() => import("./routes/ketik/index"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktSimulation = lazy(() => import("./routes/pdkt/simulation"));
@@ -333,8 +331,9 @@ const sidakAgentDetailRoute = createRoute({
 const sidakReportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports",
-  component: SidakReportsLanding,
-  beforeLoad: requireCapability("sidak.reports.view"),
+  beforeLoad: () => {
+    throw redirect({ to: "/sidak/reports-data", replace: true });
+  },
 });
 
 const sidakReportsDataRoute = createRoute({
@@ -347,8 +346,9 @@ const sidakReportsDataRoute = createRoute({
 const sidakReportsAiRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports-ai",
-  component: SidakReportsAi,
-  beforeLoad: requireCapability("sidak.reports.view"),
+  beforeLoad: () => {
+    throw redirect({ to: "/sidak/reports-data", replace: true });
+  },
 });
 
 const ketikRoute = createRoute({

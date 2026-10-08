@@ -8,7 +8,7 @@ export const SIDAK_CHILDREN = [
   { to: "/sidak/agents", label: "Analisis Individu", startsWith: true },
   { to: "/sidak/ranking", label: "Ranking Agen" },
   {
-    to: "/sidak/reports",
+    to: "/sidak/reports-data",
     label: "Laporan",
     capability: "sidak.reports.view" as const,
   },

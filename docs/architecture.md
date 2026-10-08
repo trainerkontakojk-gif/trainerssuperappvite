@@ -203,7 +203,7 @@ Struktur folder monorepo:
 │   │   │   │   ├── monitoring-history-service.ts
 │   │   │   │   └── activity-log-service.ts
 │   │   │   ├── lib/            # AI models, scoring, usage logging, Supabase clients,
-│   │   │   │                   #   math-utils, telefun-communication-profile, report builders
+│   │   │   │                   #   math-utils, telefun-communication-profile
 │   │   │   ├── middleware/      # auth, role, rate-limit middleware
 │   │   │   └── index.ts        # Hono app entry point + AppType export
 │   │   └── vitest.config.ts    # API test config

@@ -1,6 +1,8 @@
 # QA Analyzer Reporting Guidelines — Path to Zero
 
-Dokumen ini adalah rujukan standar untuk AI dalam menghasilkan laporan kualitas di modul SIDAK (QA Analyzer). AI harus menginterpretasikan data secara dinamis mengikuti prinsip-prinsip di bawah ini.
+> **Arsip historis — Reports AI sudah dihapus.** Dokumen ini merekam pedoman fitur lama, bukan kontrak runtime aktif. Laporan aktif ada di `/sidak/reports-data` (data QA dan ekspor Excel); `/sidak/reports` dan `/sidak/reports-ai` redirect ke sana. Semua endpoint AI/arsip lama mengembalikan 404. Tabel `report_archives`, RLS, dan nilai `UsageContext` historis tetap dipertahankan.
+
+Materi berikut adalah pedoman analisis AI historis di modul SIDAK (QA Analyzer).
 
 ---
 
@@ -116,9 +118,8 @@ _Catatan: Spasi otomatis diganti dengan underscore (\_) dan karakter khusus dibe
 
 ---
 
-## Implementasi di Monorepo
+## Implementasi Lama (tidak aktif)
 
-- **Backend API**: `/api/v1/ai/` endpoints menangani report generation.
-- **Frontend**: `/sidak/reports-ai` untuk AI report generation form.
-- **Storage**: Bucket `reports` di Supabase Storage menyimpan file `.docx` dan `.html`.
-- **AI Models**: Model selection via `apps/api/src/lib/ai-models.ts`, logged ke `ai_usage_logs`.
+- Generator, ekspor DOCX/HTML/PDF, chart-data, save, dan akses arsip Reports AI tidak lagi tersedia.
+- `POST /api/v1/sidak/reports/data` tetap memakai gate `sidak.reports.generate`; halaman tujuan memakai `sidak.reports.view`.
+- Riwayat penggunaan AI tidak dihapus atau ditulis ulang. Tidak ada migrasi maupun perubahan remote untuk retirement ini.
