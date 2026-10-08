@@ -123,10 +123,10 @@ export function KetikMotionFrame() {
                           className="flex justify-end"
                         >
                           <div className="max-w-[86%] rounded-2xl rounded-br-md bg-module-ketik px-3.5 py-2.5 shadow-sm">
-                            <p className="text-[11px] leading-relaxed text-white">
+                            <p className="text-[11px] leading-relaxed text-module-ketik-foreground">
                               Anda telah terhubung dengan Layanan Kontak OJK
                               157. Selamat pagi. Saya
-                              <span className="font-semibold text-white">
+                              <span className="font-semibold text-module-ketik-foreground">
                                 {" "}
                                 Rojak
                               </span>{" "}
@@ -134,7 +134,7 @@ export function KetikMotionFrame() {
                               Bapak/Ibu butuhkan seputar Sektor Jasa Keuangan.
                               Perihal apa yang dapat kami bantu?
                             </p>
-                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-white/75">
+                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-module-ketik-foreground/75">
                               09:41 <span className="text-[10px]">✓✓</span>
                             </p>
                           </div>
@@ -235,11 +235,11 @@ export function KetikMotionFrame() {
                           className="flex justify-end"
                         >
                           <div className="max-w-[86%] rounded-2xl rounded-br-md bg-module-ketik px-3.5 py-2.5 shadow-sm">
-                            <p className="text-[11px] leading-relaxed text-white">
+                            <p className="text-[11px] leading-relaxed text-module-ketik-foreground">
                               Baik, saya bantu cek dulu status pelunasannya.
                               Mohon kirim nama pinjaman online yang dimaksud.
                             </p>
-                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-white/75">
+                            <p className="mt-1 flex items-center justify-end gap-1 text-right text-[9px] text-module-ketik-foreground/75">
                               09:43 <span className="text-[10px]">✓✓</span>
                             </p>
                           </div>
@@ -270,7 +270,7 @@ export function KetikMotionFrame() {
                     |
                   </motion.span>
                 </div>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-module-ketik text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-module-ketik text-module-ketik-foreground">
                   <svg
                     className="size-4"
                     viewBox="0 0 24 24"

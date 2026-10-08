@@ -11,6 +11,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
@@ -210,6 +211,38 @@ test.describe("KETIK (hermetic)", () => {
       page.getByText(/record peserta tidak lagi tersedia/),
     ).toBeVisible();
 
+    expectHermetic(audit);
+  });
+
+  test("tombol Mulai simulasi dan label aksen KETIK memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/ketik",
+      apiMocks: ketikMocks([]),
+      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
+    });
+    const start = page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first();
+    await expect(start).toBeVisible({ timeout: 20000 });
+    await waitForMockedApi(audit, ["/ketik/settings", "/ketik/history"]);
+
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      const buttons = await findLowContrastText(start.locator(".."), {
+        selector: "button",
+      });
+      expect(buttons, `${theme}: ${buttons.join("\n")}`).toEqual([]);
+    }
+
+    // Teks beraksen modul (token text-module-ketik) di atas latar terang.
+    await setDocumentTheme(page, "light");
+    const accent = await findLowContrastText(
+      page.locator('[data-testid="ketik-motion-frame"]'),
+      { selector: "p.text-module-ketik" },
+    );
+    expect(accent, accent.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 

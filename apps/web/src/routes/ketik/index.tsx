@@ -765,11 +765,11 @@ export default function KetikLanding() {
                         size="lg"
                         onClick={requestStartSimulation}
                         disabled={isLoading}
-                        className="min-h-12 w-full justify-start bg-module-ketik px-3 text-[15px] text-white hover:bg-module-ketik/90"
+                        className="min-h-12 w-full justify-start bg-module-ketik px-3 text-[15px] text-module-ketik-foreground hover:bg-module-ketik/90"
                       >
                         {isLoading ? (
                           <span
-                            className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                            className="size-4 animate-spin rounded-full border-2 border-module-ketik-foreground/30 border-t-module-ketik-foreground"
                             aria-hidden="true"
                           />
                         ) : (

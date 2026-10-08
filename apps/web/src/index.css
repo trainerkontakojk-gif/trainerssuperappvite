@@ -41,7 +41,9 @@
 
   /* Module colors */
   --color-module-ketik: var(--module-ketik);
+  --color-module-ketik-foreground: var(--module-ketik-foreground);
   --color-module-pdkt: var(--module-pdkt);
+  --color-module-pdkt-foreground: var(--module-pdkt-foreground);
   --color-module-telefun: var(--module-telefun);
   --color-module-telefun-foreground: var(--module-telefun-foreground);
   --color-module-profiler: var(--module-profiler);
@@ -134,10 +136,12 @@
 
     /* ── Module Identity Colors ──────────────────────── */
     /* Dipakai di dashboard card dan header modul          */
-    --module-ketik: #3b82f6; /* blue-500    */
-    --module-ketik-bg: #3b82f610; /* blue-500/10 */
-    --module-pdkt: #a855f7; /* purple-500  */
-    --module-pdkt-bg: #a855f710;
+    --module-ketik: #2563eb; /* blue-600 — ≥4.5:1 sebagai teks dan dengan teks putih di tema terang */
+    --module-ketik-foreground: #ffffff; /* teks di atas bg-module-ketik */
+    --module-ketik-bg: #2563eb10; /* blue-600/10 */
+    --module-pdkt: #9333ea; /* purple-600 — ≥4.5:1 sebagai teks dan dengan teks putih di tema terang */
+    --module-pdkt-foreground: #ffffff; /* teks di atas bg-module-pdkt */
+    --module-pdkt-bg: #9333ea10;
     --module-telefun: #047857; /* emerald-700 — 5:1 sebagai teks di tema terang */
     --module-telefun-bg: #04785710;
     /* Warna teks/ikon di atas bg-module-telefun (putih ≥5:1 di tema terang) */
@@ -208,8 +212,10 @@
 
     /* ── Module Identity Colors (dark) ────────────────── */
     --module-ketik: #3b82f6;
+    --module-ketik-foreground: #0a0a0a; /* teks gelap ≥4.5:1 di atas biru terang */
     --module-ketik-bg: #3b82f615;
     --module-pdkt: #a855f7;
+    --module-pdkt-foreground: #0a0a0a; /* teks gelap ≥4.5:1 di atas ungu terang */
     --module-pdkt-bg: #a855f715;
     --module-telefun: #10b981;
     --module-telefun-bg: #10b98115;

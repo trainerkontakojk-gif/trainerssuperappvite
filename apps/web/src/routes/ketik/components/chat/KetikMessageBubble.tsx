@@ -89,7 +89,7 @@ export function KetikMessageBubble({
         className={`relative max-w-[88%] px-4 py-3 text-lg leading-7 sm:max-w-[76%] sm:px-5
           ${
             isAgent
-              ? "rounded-2xl rounded-tr-md bg-module-ketik text-white"
+              ? "rounded-2xl rounded-tr-md bg-module-ketik text-module-ketik-foreground"
               : "module-clean-panel rounded-2xl rounded-tl-md text-foreground"
           }`}
       >
@@ -102,7 +102,7 @@ export function KetikMessageBubble({
           )}
         </div>
         <div
-          className={`mt-2 flex items-center justify-end gap-2 text-[13px] font-medium tabular-nums ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
+          className={`mt-2 flex items-center justify-end gap-2 text-[13px] font-medium tabular-nums ${isAgent ? "text-module-ketik-foreground/80" : "text-muted-foreground"}`}
         >
           <span>
             {message.timestamp

@@ -28,14 +28,20 @@ export const MIN_TEXT_CONTRAST = 4.5;
 /**
  * Tema gelap = class `dark` di <html> (sama dengan useThemeMode).
  *
- * Menunggu transisi CSS selesai: tanpa itu warna dibaca di tengah transisi dan
- * rasio kontras yang dilaporkan palsu.
+ * Menunggu transisi CSS selesai (animasi tak berhingga dilewati): tanpa itu
+ * warna dibaca di tengah transisi dan rasio kontras yang dilaporkan palsu.
  */
 export async function setDocumentTheme(page: Page, theme: "light" | "dark") {
   await page.evaluate(async (next) => {
     document.documentElement.classList.toggle("dark", next === "dark");
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)));
+    // Animasi tak berhingga (spinner, ilustrasi bergerak) tidak pernah selesai.
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    );
   }, theme);
 }
 
