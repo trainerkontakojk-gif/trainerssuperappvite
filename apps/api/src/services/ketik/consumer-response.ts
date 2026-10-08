@@ -231,7 +231,7 @@ ATURAN BALASAN:
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
   const usesConservativeTemperature = provider === "openai";
 
-  // Gemini uses a conversational temperature; direct OpenAI uses conservative sampling.
+  // Temperature applies only to direct OpenAI; Gemini uses model defaults.
 
   const providerSystemInstruction =
     usesConservativeTemperature && hasScript

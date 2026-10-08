@@ -53,6 +53,7 @@ export async function generateGeminiContent(options: {
   responseMimeType?: string;
   responseSchema?: any;
   responseModalities?: Modality[];
+  /** Ignored for Gemini; kept for caller compatibility with the OpenAI path. */
   temperature?: number;
   usageContext?: UsageContext;
   userId?: string;
@@ -102,7 +103,6 @@ export async function generateGeminiContent(options: {
             responseMimeType: options.responseMimeType,
             responseSchema: options.responseSchema,
             responseModalities: options.responseModalities,
-            temperature: options.temperature ?? 0.7,
           } as any,
         }),
         timeoutPromise,
@@ -143,7 +143,6 @@ export async function generateGeminiContent(options: {
               responseMimeType: options.responseMimeType,
               responseSchema: options.responseSchema,
               responseModalities: options.responseModalities,
-              temperature: options.temperature ?? 0.7,
             } as any,
           }),
           retryTimeout,
