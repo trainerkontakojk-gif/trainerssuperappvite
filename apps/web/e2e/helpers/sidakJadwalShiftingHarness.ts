@@ -508,18 +508,6 @@ export const expectNoApplicationTraffic = expectIsolation;
 
 // ── Mock endpoint jadwal di browser ─────────────────────────────────────────
 
-/** Gerbang per-test untuk menahan respons mock sampai `release()` dipanggil. */
-export function createResponseGate(): {
-  promise: Promise<void>;
-  release: () => void;
-} {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  return { promise, release };
-}
-
 /**
  * Perilaku yang bisa dipilih per test. Semua state UI yang disepakati harus punya
  * cara untuk dibuktikan tanpa upstream nyata.

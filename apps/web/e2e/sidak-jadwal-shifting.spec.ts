@@ -15,10 +15,10 @@ import {
   expectIsolation,
   formatAudit,
   normalizedRows,
-  createResponseGate,
   openJadwalShifting,
   resetCapturedJadwalRequests,
 } from "./helpers/sidakJadwalShiftingHarness";
+import { createResponseGate } from "./helpers/responseGate";
 
 /**
  * E2E untuk workspace `/sidak/jadwal-shifting`.

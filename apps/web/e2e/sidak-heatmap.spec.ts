@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from "@playwright/test";
 import { mockSupabaseAuth } from "./helpers/mockAuth";
+import { createResponseGate } from "./helpers/responseGate";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
@@ -24,8 +25,10 @@ type Behavior =
   | { kind: "data"; counts?: Record<string, number>; missing?: number }
   | { kind: "empty" }
   | { kind: "error"; status: number }
-  | { kind: "slow"; delayMs: number }
-  | { kind: "stale" };
+  /** Respons ditahan sampai `until` resolve, supaya state loading bisa diamati. */
+  | { kind: "held"; until: Promise<void> }
+  /** Respons `agent` ditahan sampai `agentUntil` resolve; `qa` langsung dijawab. */
+  | { kind: "stale"; agentUntil: Promise<void> };
 
 type Captured = {
   mode: string;
@@ -124,7 +127,7 @@ async function installMocks(page: Page, role: string) {
       // membiarkan respons `agent` yang basi menimpa filter `qa` yang aktif.
       const mode = (url.searchParams.get("mode") ?? "agent") as "agent" | "qa";
       const year = Number(url.searchParams.get("year") ?? "2026");
-      if (mode === "agent") await new Promise((r) => setTimeout(r, 1500));
+      if (mode === "agent") await behaviour.agentUntil;
       const counts: Record<string, number> =
         mode === "agent" ? { "2026-03-03": 5 } : { "2026-04-04": 9 };
       const days = buildYear(year, counts);
@@ -144,10 +147,7 @@ async function installMocks(page: Page, role: string) {
       );
       return;
     }
-    if (behaviour.kind === "slow") {
-      const { delayMs } = behaviour;
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
+    if (behaviour.kind === "held") await behaviour.until;
     await route.fulfill(toJson({ success: true, data: payload() }));
   });
 
@@ -254,11 +254,17 @@ test.describe("Halaman Heatmap", () => {
   });
 
   test("loading terlihat sebelum data arrives", async ({ page }) => {
-    behaviour = { kind: "slow", delayMs: 1200 };
+    const gate = createResponseGate();
+    behaviour = { kind: "held", until: gate.promise };
     await open(page, "trainer");
 
+    // Respons ditahan, jadi loading pasti terlihat dan kalender belum ada.
     await expect(page.getByTestId("heatmap-loading")).toBeVisible();
+    await expect(page.getByLabel(/Kalender Januari 2026/)).toHaveCount(0);
+
+    gate.release();
     await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(page.getByTestId("heatmap-loading")).toHaveCount(0);
   });
 
   test("tanggal bisa dipilih lewat keyboard dan menampilkan jumlahnya", async ({ page }) => {
@@ -464,17 +470,46 @@ test.describe("Halaman Heatmap", () => {
   });
 
   test("respons basi tidak menimpa filter yang aktif", async ({ page }) => {
-    behaviour = { kind: "stale" };
+    const agentGate = createResponseGate();
+    behaviour = { kind: "stale", agentUntil: agentGate.promise };
     await open(page, "trainer");
 
-    // Filter `qa` selesai lebih dulu; respons `agent` yang lambat tiba setelahnya.
+    // Pastikan request `agent` benar-benar sudah dikirim dan sedang ditahan,
+    // supaya test tidak lolos tanpa menguji jalur respons basi.
+    // (Halaman bisa mengirim lebih dari satu request awal; semuanya ditahan.)
+    await expect.poll(() => captured.length).toBeGreaterThan(0);
+    expect(captured.every((c) => c.mode === "agent")).toBe(true);
+
+    // Filter `qa` selesai lebih dulu; respons `agent` yang ditahan dilepas setelahnya.
     await page.getByRole("button", { name: "QA — Tanggal sampel" }).click();
     await expect(
       page.getByRole("button", { name: "04/04/2026: 9 temuan" }),
     ).toBeVisible();
 
-    // Tunggu lebih lama dari delay respons basi, lalu pastikan ia tidak menimpa.
-    await page.waitForTimeout(2000);
+    // Hitung respons `agent` yang benar-benar sampai ke halaman setelah dilepas.
+    const heldAgentRequests = captured.filter((c) => c.mode === "agent").length;
+    let deliveredAgentResponses = 0;
+    page.on("response", (res) => {
+      const url = new URL(res.url());
+      if (
+        url.pathname === "/api/v1/sidak/heatmap" &&
+        url.searchParams.get("mode") === "agent"
+      ) {
+        deliveredAgentResponses += 1;
+      }
+    });
+    agentGate.release();
+    await expect
+      .poll(() => deliveredAgentResponses)
+      .toBe(heldAgentRequests);
+    // Beri halaman satu siklus render penuh untuk memproses respons basi.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+
     await expect(
       page.getByRole("button", { name: "03/03/2026: 5 temuan" }),
     ).toHaveCount(0);
