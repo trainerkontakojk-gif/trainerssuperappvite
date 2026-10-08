@@ -324,4 +324,14 @@ test.describe("Prediksi tren dashboard (hermetic)", () => {
     expect(await findTextBelowFloor(main)).toEqual([]);
     expectHermetic(audit);
   });
+
+  test("Dashboard hanya punya satu landmark main", async ({ page }) => {
+    const { audit } = await openDashboard(page, TWO_MONTHS, {
+      lookup: { status: 200, data: { status: "missing", snapshot: null } },
+    });
+
+    await expect(page.locator("main")).toHaveCount(1);
+    await expect(page.locator("main main")).toHaveCount(0);
+    expectHermetic(audit);
+  });
 });

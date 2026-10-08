@@ -367,7 +367,7 @@ export default function DashboardPage() {
     trendSummary?.activeServiceCount;
 
   return (
-    <main className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-6 py-8 lg:px-10 lg:py-12">
+    <div className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-6 py-8 lg:px-10 lg:py-12">
       {error && (
         <Alert variant="destructive" className="items-center">
           <AlertCircle aria-hidden="true" />
@@ -679,6 +679,6 @@ export default function DashboardPage() {
           </StaggerItem>
         </div>
       </StaggerList>
-    </main>
+    </div>
   );
 }
