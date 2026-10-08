@@ -139,7 +139,7 @@ function LoadingSkeleton() {
     <div className="space-y-4" role="status" aria-label="Memuat metrik suara">
       <div className="flex items-center gap-3 p-4">
         <Loader2
-          className="h-5 w-5 animate-spin text-emerald-500"
+          className="h-5 w-5 animate-spin text-module-telefun"
           aria-hidden="true"
         />
         <span className="text-sm font-medium text-slate-600 dark:text-white/60">

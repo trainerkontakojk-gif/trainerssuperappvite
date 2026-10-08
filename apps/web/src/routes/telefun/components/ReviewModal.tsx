@@ -398,9 +398,9 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
           >
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b border-border shrink-0 bg-foreground/[0.02]">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                <div className="w-12 h-12 bg-module-telefun/10 rounded-2xl flex items-center justify-center border border-module-telefun/20">
                   <Phone
-                    className="w-6 h-6 text-emerald-600 dark:text-emerald-400"
+                    className="w-6 h-6 text-module-telefun"
                     aria-hidden="true"
                   />
                 </div>
@@ -442,13 +442,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 aria-selected={activeTab === "details"}
                 aria-controls="telefun-review-panel-details"
                 onClick={() => setActiveTab("details")}
-                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "details" ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}
+                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "details" ? "text-module-telefun" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Detail Sesi
                 {activeTab === "details" && (
                   <motion.div
                     layoutId={shouldReduceMotion ? undefined : "tab-underline"}
-                    className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full"
+                    className="absolute bottom-0 left-0 right-0 h-1 bg-module-telefun rounded-t-full"
                   />
                 )}
               </button>
@@ -458,13 +458,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 aria-selected={activeTab === "assessment"}
                 aria-controls="telefun-review-panel-assessment"
                 onClick={() => setActiveTab("assessment")}
-                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "assessment" ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}
+                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "assessment" ? "text-module-telefun" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Kualitas Suara Agen
                 {activeTab === "assessment" && (
                   <motion.div
                     layoutId={shouldReduceMotion ? undefined : "tab-underline"}
-                    className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full"
+                    className="absolute bottom-0 left-0 right-0 h-1 bg-module-telefun rounded-t-full"
                   />
                 )}
               </button>
@@ -474,13 +474,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 aria-selected={activeTab === "replay"}
                 aria-controls="telefun-review-panel-replay"
                 onClick={() => setActiveTab("replay")}
-                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "replay" ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}
+                className={`min-h-11 pb-3 px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === "replay" ? "text-module-telefun" : "text-muted-foreground hover:text-foreground"}`}
               >
                 Anotasi Replay
                 {activeTab === "replay" && (
                   <motion.div
                     layoutId={shouldReduceMotion ? undefined : "tab-underline"}
-                    className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full"
+                    className="absolute bottom-0 left-0 right-0 h-1 bg-module-telefun rounded-t-full"
                   />
                 )}
               </button>
@@ -512,7 +512,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <User className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Konsumen
                           </span>
@@ -524,7 +524,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <User className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Target simulasi
                           </span>
@@ -550,7 +550,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <User className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Pelaksana
                           </span>
@@ -562,7 +562,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <Calendar className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <Calendar className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Tanggal
                           </span>
@@ -574,7 +574,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <Clock className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <Clock className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Durasi
                           </span>
@@ -593,7 +593,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <Star className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <Star className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Skor
                           </span>
@@ -611,7 +611,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     {record.feedback && (
                       <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <MessageSquare className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Feedback
                           </span>
@@ -626,13 +626,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Mic2 className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <Mic2 className="w-4 h-4 text-module-telefun/60" />
                           <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                             Rekaman Sesi
                           </span>
                         </div>
                         {recordingLoading && (
-                          <div className="w-3 h-3 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin motion-reduce:animate-none" />
+                          <div className="w-3 h-3 border-2 border-module-telefun/30 border-t-module-telefun rounded-full animate-spin motion-reduce:animate-none" />
                         )}
                       </div>
 
@@ -655,7 +655,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                             <button
                               type="button"
                               onClick={downloadRecording}
-                              className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-xl border border-emerald-500/10 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                              className="inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider text-module-telefun bg-module-telefun/5 hover:bg-module-telefun/10 rounded-xl border border-module-telefun/10 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
                               <Download
                                 className="w-3.5 h-3.5"
@@ -678,7 +678,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                                 setRecordingError(null);
                                 setRetryTrigger((prev) => prev + 1);
                               }}
-                              className="mt-2 min-h-11 px-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                              className="mt-2 min-h-11 px-2 text-xs font-bold text-module-telefun hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             >
                               Coba Lagi
                             </button>

@@ -54,13 +54,21 @@ export async function findLowContrastText(
         willReadFrequently: true,
       });
       if (!ctx) throw new Error("canvas 2d tidak tersedia");
-      const parse = (css: string): Rgba => {
+      const draw = (css: string) => {
         ctx.clearRect(0, 0, 1, 1);
         ctx.fillStyle = "#000";
         ctx.fillStyle = css;
         ctx.fillRect(0, 0, 1, 1);
-        const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-        return a === 0 ? [0, 0, 0, 0] : [(r * 255) / a, (g * 255) / a, (b * 255) / a, a / 255];
+        return ctx.getImageData(0, 0, 1, 1).data;
+      };
+      // getImageData sudah non-premultiplied; warna translusen (mis. lapisan
+      // `bg-foreground/[0.02]`) kehilangan presisi RGB bila dibaca langsung,
+      // jadi alfa dan RGB opak dibaca terpisah lewat relative color syntax.
+      const parse = (css: string): Rgba => {
+        const a = draw(`rgb(from ${css} 255 255 255 / alpha)`)[3];
+        if (a === 0) return [0, 0, 0, 0];
+        const [r, g, b] = draw(`rgb(from ${css} r g b / 1)`);
+        return [r, g, b, a / 255];
       };
       const over = (top: Rgba, bottom: Rgba): Rgba => {
         const a = top[3] + bottom[3] * (1 - top[3]);

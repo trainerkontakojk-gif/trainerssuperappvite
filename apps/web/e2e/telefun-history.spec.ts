@@ -233,6 +233,50 @@ test.describe("Telefun (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("teks aksen modul di modal review memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+    page,
+  }) => {
+    // url null -> modal menampilkan galat rekaman beserta aksi aksen "Coba Lagi".
+    const { audit, dialog } = await openHistory(page, [REVIEWED_ROW], [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/recording/${REVIEWED_ROW.id}`,
+        body: { success: true, data: { url: null } },
+      },
+    ]);
+    await dialog
+      .getByRole("button", { name: "Lihat detail Skenario Telefun" })
+      .click();
+    const review = page.getByRole("dialog").last();
+    const tabs = review.getByRole("tablist", { name: "Bagian detail sesi" });
+    await expect(tabs).toBeVisible({ timeout: 20000 });
+    await expect(tabs.getByRole("tab", { name: "Detail Sesi" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const retry = review.getByRole("button", { name: "Coba Lagi" });
+    await expect(retry).toBeVisible({ timeout: 20000 });
+
+    const offenders: string[] = [];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      const found = [
+        // Label tab aktif (aksen modul).
+        ...(await findLowContrastText(tabs, {
+          selector: '[role="tab"][aria-selected="true"]',
+        })),
+        // Aksi teks aksen; root = pembungkusnya supaya hanya tombol ini dipindai.
+        ...(await findLowContrastText(retry.locator(".."), {
+          selector: "button",
+          leafOnly: true,
+        })),
+      ];
+      offenders.push(...found.map((o) => `[${theme}] ${o}`));
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
   test("baris riwayat menampilkan data sesi yang sebenarnya", async ({
     page,
   }) => {
