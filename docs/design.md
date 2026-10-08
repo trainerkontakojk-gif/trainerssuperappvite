@@ -189,6 +189,18 @@ Halaman kerja harian `/sidak/input` memakai satu layar, bukan wizard kartu:
 - **Pesan** (error, sukses, konfigurasi parameter) memakai `QaStatePanel`/`Alert`; satu blok peringatan konfigurasi. Sukses `role="status"`, error `role="alert"` dengan aksi `Coba lagi` bila bisa diulang.
 - **Motion** hanya untuk expand form/import dan dimatikan saat `prefers-reduced-motion`.
 
+### Parameter QA (SIDAK)
+
+Halaman `/sidak/settings` mengelola versi aturan penilaian per layanan. Setiap publish mengubah skor semua agen, jadi status dan konfirmasi harus eksplisit:
+
+- **Struktur:** `h1 "Parameter QA"`, pemilih layanan memakai `ui/tabs` (strip digulir horizontal di layar sempit), lalu dua kolom di ≥lg: riwayat versi (satu-satunya surface bertepi) di kiri, detail versi terpilih di kanan. Di mobile riwayat menjadi `Select` "Versi" di atas detail. Section dipisah divider dan `space-y-8`, bukan kartu bertumpuk.
+- **Status versi:** satu peta di `settings/constants.ts` — `draft` → "Draft", `published` → "Berlaku", `superseded` → "Digantikan". Warna hanya titik dekoratif; teks tetap netral. Jangan menampilkan status mentah berbahasa Inggris.
+- **Seleksi versi** diturunkan dari daftar terbaru berdasarkan `id`, bukan menyimpan objek versi, sehingga setelah publish/hapus/buat draft header langsung mengikuti status server (tombol Publish/Hapus draft hilang setelah publish).
+- **Konfirmasi:** semua modal (tambah/edit parameter, hapus parameter, hapus draft, Publish) memakai `ui/dialog` — judul terhubung, Escape/klik backdrop menutup (kecuali saat menyimpan), fokus kembali ke pemicu, footer aksi tetap terlihat. Tidak ada `window.confirm`. Dialog Publish menampilkan diff terhadap versi `published` yang berlaku (parameter ditambah/dihapus/diubah dan perubahan bobot kategori; "Versi pertama untuk layanan ini" bila belum ada), periode efektif wajib, alasan opsional, dan checkbox konfirmasi sebelum tombol Publish aktif.
+- **Simpan bobot kategori:** slider dan input angka mengubah state lokal; `PUT` dikirim sekali per commit (pointer up, blur, Enter, atau jeda 500 ms), hasil request lama diabaikan, status "Menyimpan…/Tersimpan" atau error inline ditampilkan, dan nilai kembali ke nilai server bila gagal.
+- **Metadata parameter** (`N/A diizinkan`, `Urutan #n`, `Ambang x`, `Tertaut ke parameter lama`) berupa teks kecil netral dipisah `·`, bukan badge berwarna. Teks porsi kategori SLIK dihitung dari bobot versi, bukan angka tetap.
+- Kontrol minimal 44px (`h-[44px]`; root 14px membuat `h-11` hanya 38,5px), teks sekunder minimal 12px.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`

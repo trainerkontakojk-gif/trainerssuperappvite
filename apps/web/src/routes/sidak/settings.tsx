@@ -1,32 +1,33 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
+import type { QARuleIndicator, RuleVersion, ServiceType } from "@trainers/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
-import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Settings,
-  Plus,
-  Trash2,
-  History,
-  Rocket,
-  GitBranch,
-} from "lucide-react";
 import { notify } from "../../lib/toast";
-import type {
-  ServiceType,
-  RuleVersion,
-  QARuleIndicator,
-} from "@trainers/types";
-import { formatPeriodLabel, SERVICE_LABELS } from "./settings/constants";
-import { RuleVersionPicker } from "./settings/components/RuleVersionPicker";
-import { ServiceWeightsPanel } from "./settings/components/ServiceWeightsPanel";
-import { RuleIndicatorsPanel } from "./settings/components/RuleIndicatorsPanel";
-import { PublishRulePanel } from "./settings/components/PublishRulePanel";
-
+import { periodLabel } from "../../components/sidak/sidak-input.constants";
+import { SERVICE_LABELS } from "./settings/constants";
+import { CategoryWeightsSection } from "./settings/components/CategoryWeightsSection";
+import { ConfirmDialog } from "./settings/components/ConfirmDialog";
+import { IndicatorFormDialog } from "./settings/components/IndicatorFormDialog";
+import { PublishRuleDialog } from "./settings/components/PublishRuleDialog";
+import { RuleIndicatorsSection } from "./settings/components/RuleIndicatorsSection";
+import { RuleVersionHeader } from "./settings/components/RuleVersionHeader";
+import {
+  RuleVersionList,
+  RuleVersionSelect,
+} from "./settings/components/RuleVersionList";
+import { ServiceTabs } from "./settings/components/ServiceTabs";
 import type { IndicatorFormState } from "./settings/types";
-import { indicatorFormToPayload, indicatorToFormState } from "./settings/utils";
-import { AddIndicatorModal } from "./settings/components/AddIndicatorModal";
-import { EditIndicatorModal } from "./settings/components/EditIndicatorModal";
-import { PublishPreviewModal } from "./settings/components/PublishPreviewModal";
+import {
+  createEmptyIndicatorForm,
+  findEffectiveBaseline,
+  indicatorFormToPayload,
+  indicatorToFormState,
+  pickDefaultVersion,
+} from "./settings/utils";
 
 interface RuleVersionMeta {
   service_type: string;
@@ -36,446 +37,517 @@ interface RuleVersionMeta {
   published_count: number;
 }
 
+interface Period {
+  id: string;
+  month: number;
+  year: number;
+}
+
+type FormTarget =
+  | { mode: "add" }
+  | { mode: "edit"; indicator: QARuleIndicator };
+
 export default function SidakSettingsPage() {
   const [activeTeam, setActiveTeam] = useState<ServiceType>("call");
-  const [selectedVersion, setSelectedVersion] = useState<RuleVersion | null>(
-    null,
-  );
-  const [draftIndicators, setDraftIndicators] = useState<QARuleIndicator[]>([]);
-  const [loadingIndicators, setLoadingIndicators] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [meta, setMeta] = useState<RuleVersionMeta | null>(null);
 
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [changeReason, setChangeReason] = useState("");
-  const [publishPeriodId, setPublishPeriodId] = useState<string>("");
-  const [previewVersion, setPreviewVersion] = useState<RuleVersion | null>(
-    null,
-  );
-  const [publishConfirmed, setPublishConfirmed] = useState(false);
-
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [savingNew, setSavingNew] = useState(false);
-
-  const [editIndId, setEditIndId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<IndicatorFormState | null>(null);
-  const [savingEdit, setSavingEdit] = useState(false);
-
   const {
-    data: versions,
+    data: versionRows,
     loading: versionsLoading,
+    error: versionsError,
     refetch: refetchVersions,
   } = useApi<RuleVersion[]>(`/sidak/rule-versions?service_type=${activeTeam}`);
-  const { data: periods } =
-    useApi<{ id: string; month: number; year: number }[]>("/sidak/periods");
+  const { data: periodRows } = useApi<Period[]>("/sidak/periods");
+  const periods = useMemo(() => periodRows ?? [], [periodRows]);
 
-  // Selection logic: Draft first, then published, then latest version
+  // `useApi` mempertahankan data lama saat path berganti; saring per layanan aktif.
+  const versions = useMemo(
+    () => (versionRows ?? []).filter((v) => v.service_type === activeTeam),
+    [versionRows, activeTeam],
+  );
+  const initialLoading = versionsLoading && versions.length === 0;
+
+  // Seleksi diturunkan dari daftar terbaru berdasarkan id, bukan disimpan sebagai objek.
+  const selectedVersion = useMemo(
+    () =>
+      versions.find((v) => v.id === selectedId) ?? pickDefaultVersion(versions),
+    [versions, selectedId],
+  );
+  const isDraft = selectedVersion?.status === "draft";
+
+  const getPeriodLabel = useCallback(
+    (periodId: string) => {
+      const period = periods.find((p) => p.id === periodId);
+      return period ? periodLabel(period) : "-";
+    },
+    [periods],
+  );
+
+  // Meta (jumlah parameter baseline) hanya relevan saat layanan belum punya versi.
   useEffect(() => {
-    if (versions && (versions as RuleVersion[]).length > 0) {
-      setMeta(null);
-      const stillExists = selectedVersion
-        ? versions.find((v) => v.id === selectedVersion.id)
-        : null;
-      if (stillExists) {
-        setSelectedVersion(stillExists);
-      } else {
-        const draft = versions.find((v) => v.status === "draft");
-        const published = versions.find((v) => v.status === "published");
-        const latest = [...versions].sort(
-          (a, b) => b.version_number - a.version_number,
-        )[0];
-        setSelectedVersion(draft || published || latest || versions[0]);
-      }
-    } else {
-      setSelectedVersion(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions?.length, activeTeam]);
+    setMeta(null);
+    if (versionsLoading || versionsError || versions.length > 0) return;
+    let cancelled = false;
+    sidakClient["rule-versions"].meta
+      .$get({ query: { service_type: activeTeam } })
+      .then((res: Response) => unwrapResponse(res))
+      .then((result: unknown) => {
+        if (!cancelled) setMeta(result as RuleVersionMeta);
+      })
+      .catch(() => {
+        if (!cancelled) setMeta(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeam, versionsLoading, versionsError, versions.length]);
 
-  useEffect(() => {
-    if (!versionsLoading && (!versions || versions.length === 0)) {
-      let cancelled = false;
-      sidakClient["rule-versions"].meta
-        .$get({ query: { service_type: activeTeam } })
-        .then((res: Response) => unwrapResponse(res))
-        .then((result: any) => {
-          if (!cancelled) setMeta(result as RuleVersionMeta);
-        })
-        .catch(() => {
-          if (!cancelled) setMeta(null);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTeam, versionsLoading, versions?.length]);
+  // ── Parameter versi terpilih ──
+  const [indicators, setIndicators] = useState<QARuleIndicator[]>([]);
+  const [loadingIndicators, setLoadingIndicators] = useState(false);
+  const indicatorsRequest = useRef(0);
+  const indicatorsVersionId = useRef<string | null>(null);
 
-  const fetchVersionIndicators = useCallback(async (versionId: string) => {
-    setLoadingIndicators(true);
+  const loadIndicators = useCallback(async (versionId: string) => {
+    const request = ++indicatorsRequest.current;
+    if (indicatorsVersionId.current !== versionId) {
+      indicatorsVersionId.current = versionId;
+      setIndicators([]);
+      setLoadingIndicators(true);
+    }
     try {
-      const res = await unwrapResponse(
+      const rows = await unwrapResponse(
         await sidakClient["rule-versions"][":id"].indicators.$get({
           param: { id: versionId },
         }),
       );
-      setDraftIndicators((res as QARuleIndicator[]) ?? []);
+      if (request === indicatorsRequest.current)
+        setIndicators((rows as QARuleIndicator[]) ?? []);
     } catch {
-      setDraftIndicators([]);
+      if (request === indicatorsRequest.current) setIndicators([]);
     } finally {
-      setLoadingIndicators(false);
+      if (request === indicatorsRequest.current) setLoadingIndicators(false);
     }
   }, []);
 
+  const selectedVersionId = selectedVersion?.id ?? null;
   useEffect(() => {
-    if (selectedVersion) {
-      fetchVersionIndicators(selectedVersion.id);
-    } else {
-      setDraftIndicators([]);
+    if (selectedVersionId) void loadIndicators(selectedVersionId);
+    else {
+      indicatorsVersionId.current = null;
+      setIndicators([]);
     }
-  }, [selectedVersion, fetchVersionIndicators]);
+  }, [selectedVersionId, loadIndicators]);
 
-  const getPeriodLabel = (periodId: string) => {
-    const period = periods?.find((p) => p.id === periodId);
-    if (!period) return "-";
-    return formatPeriodLabel(period.month, period.year);
+  const changeTeam = (team: ServiceType) => {
+    setActiveTeam(team);
+    setSelectedId(null);
   };
 
-  const getPreviewVersionNumber = () => {
-    if (!selectedVersion || !publishPeriodId) return 0;
-    if (selectedVersion.effective_period_id === publishPeriodId) {
-      return selectedVersion.version_number;
-    }
-    const versionsInTarget =
-      versions?.filter((v) => v.effective_period_id === publishPeriodId) || [];
-    if (versionsInTarget.length === 0) return 1;
-    return Math.max(...versionsInTarget.map((v) => v.version_number)) + 1;
-  };
+  // ── Draft / revisi ──
+  const [busy, setBusy] = useState(false);
 
   const handleCreateDraft = async (sourceId?: string) => {
+    setBusy(true);
     try {
-      const draft = await unwrapResponse(
+      const draft = (await unwrapResponse(
         await sidakClient["rule-versions"].$post({
+          json: { service_type: activeTeam, source_version_id: sourceId },
+        }),
+      )) as RuleVersion;
+      notify.success(
+        sourceId ? "Draft revisi berhasil dibuat." : "Draft baru berhasil dibuat.",
+      );
+      await refetchVersions();
+      setSelectedId(draft.id);
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Gagal membuat draft");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const [confirmDraftDelete, setConfirmDraftDelete] = useState(false);
+  const handleDeleteDraft = async () => {
+    if (!selectedVersion) return;
+    setBusy(true);
+    try {
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].$delete({
+          param: { id: selectedVersion.id },
+        }),
+      );
+      notify.success("Draft berhasil dihapus.");
+      setConfirmDraftDelete(false);
+      setSelectedId(null);
+      await refetchVersions();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Gagal menghapus draft");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Bobot kategori (dipanggil sekali per commit oleh useCategoryWeightDraft) ──
+  const saveWeight = useCallback(
+    async (versionId: string, nonCriticalPercent: number) => {
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].$put({
+          param: { id: versionId },
           json: {
-            service_type: activeTeam,
-            source_version_id: sourceId,
+            non_critical_weight: nonCriticalPercent / 100,
+            critical_weight: (100 - nonCriticalPercent) / 100,
           },
         }),
       );
-      notify.success(
-        sourceId
-          ? "Draft revisi berhasil dibuat!"
-          : "Draft baru berhasil dibuat!",
-      );
-      refetchVersions();
-      setSelectedVersion(draft as RuleVersion);
-    } catch (e: any) {
-      notify.error(e.message || "Gagal membuat draft");
-    }
+      await refetchVersions();
+    },
+    [refetchVersions],
+  );
+
+  // ── Publish ──
+  const [publishOpen, setPublishOpen] = useState(false);
+  // Snapshot draft saat dialog dibuka: dialog tetap terpasang selama animasi
+  // tutup walau daftar versi sudah diperbarui (draft menjadi Berlaku).
+  const [publishVersion, setPublishVersion] = useState<RuleVersion | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishPeriodId, setPublishPeriodId] = useState("");
+  const [changeReason, setChangeReason] = useState("");
+  const [publishConfirmed, setPublishConfirmed] = useState(false);
+  // Selama dialog terbuka, pakai baris terbaru (mis. bobot yang baru tersimpan
+  // saat blur sebelum Publish diklik); snapshot hanya cadangan saat animasi tutup.
+  const dialogVersion = publishVersion
+    ? (versions.find((v) => v.id === publishVersion.id && v.status === "draft") ??
+      publishVersion)
+    : null;
+
+  const openPublish = () => {
+    if (!selectedVersion) return;
+    setPublishVersion(selectedVersion);
+    setPublishPeriodId(selectedVersion.effective_period_id || "");
+    setChangeReason("");
+    setPublishConfirmed(false);
+    setPublishOpen(true);
   };
 
-  const handleDeleteDraft = async (id: string) => {
-    const v = versions?.find((x) => x.id === id);
-    const periodLabel = v ? getPeriodLabel(v.effective_period_id) : "";
-    const svcLabel = SERVICE_LABELS[activeTeam] || activeTeam;
-    const msg = v
-      ? `Hapus draft v${v.version_number} untuk ${svcLabel} efektif ${periodLabel}? Versi published tidak akan berubah.`
-      : "Hapus draft ini?";
-    if (!confirm(msg)) return;
-    try {
-      await unwrapResponse(
-        await sidakClient["rule-versions"][":id"].$delete({ param: { id } }),
-      );
-      notify.success("Draft berhasil dihapus");
-      refetchVersions();
-      if (selectedVersion?.id === id) {
-        setSelectedVersion(null);
-      }
-    } catch (e: any) {
-      notify.error(e.message || "Gagal menghapus draft");
+  const getPreviewVersionNumber = () => {
+    if (!dialogVersion || !publishPeriodId) return 0;
+    if (dialogVersion.effective_period_id === publishPeriodId) {
+      return dialogVersion.version_number;
     }
+    const inTarget = versions.filter(
+      (v) => v.effective_period_id === publishPeriodId,
+    );
+    if (inTarget.length === 0) return 1;
+    return Math.max(...inTarget.map((v) => v.version_number)) + 1;
   };
+
+  const baseline = useMemo(
+    () =>
+      publishOpen && publishPeriodId
+        ? findEffectiveBaseline(versions, periods, publishPeriodId)
+        : null,
+    [publishOpen, publishPeriodId, versions, periods],
+  );
 
   const handlePublish = async () => {
-    if (!selectedVersion || !publishPeriodId) return;
-    setIsPublishing(true);
+    if (!publishVersion || !publishPeriodId) return;
+    setPublishing(true);
     try {
       await unwrapResponse(
         await sidakClient["rule-versions"][":id"].publish.$post({
-          param: { id: selectedVersion.id },
+          param: { id: publishVersion.id },
           json: {
-            change_reason: changeReason || undefined,
+            change_reason: changeReason.trim() || undefined,
             effective_period_id: publishPeriodId,
           },
         }),
       );
-      notify.success("Rule version berhasil dipublish!");
-      setPreviewVersion(null);
-      setChangeReason("");
-      setPublishConfirmed(false);
-      refetchVersions();
-    } catch (e: any) {
-      notify.error(e.message || "Gagal mempublish rules");
+      notify.success("Versi aturan berhasil dipublish.");
+      setPublishOpen(false);
+      await refetchVersions();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Gagal mempublish versi");
     } finally {
-      setIsPublishing(false);
+      setPublishing(false);
     }
   };
 
-  const handleAddIndicator = async (form: IndicatorFormState) => {
+  // ── Parameter: tambah / edit / hapus ──
+  const [formTarget, setFormTarget] = useState<FormTarget>({ mode: "add" });
+  const [formOpen, setFormOpen] = useState(false);
+  const [savingForm, setSavingForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<QARuleIndicator | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleSubmitIndicator = async (form: IndicatorFormState) => {
     if (!selectedVersion) return;
-    setSavingNew(true);
+    setSavingForm(true);
     try {
-      const payload = indicatorFormToPayload(
-        form,
-        selectedVersion.scoring_mode,
+      const payload = indicatorFormToPayload(form, selectedVersion.scoring_mode);
+      if (formTarget.mode === "add") {
+        await unwrapResponse(
+          await sidakClient["rule-versions"][":id"].indicators.$post({
+            param: { id: selectedVersion.id },
+            json: { service_type: activeTeam, ...payload },
+          }),
+        );
+        notify.success("Parameter berhasil ditambahkan ke draft.");
+      } else {
+        await unwrapResponse(
+          await sidakClient["rule-versions"][":versionId"].indicators[
+            ":indicatorId"
+          ].$put({
+            param: {
+              versionId: selectedVersion.id,
+              indicatorId: formTarget.indicator.id,
+            },
+            json: payload,
+          }),
+        );
+        notify.success("Parameter berhasil diperbarui.");
+      }
+      setFormOpen(false);
+      void loadIndicators(selectedVersion.id);
+      void refetchVersions();
+    } catch (e) {
+      notify.error(
+        e instanceof Error
+          ? e.message
+          : formTarget.mode === "add"
+            ? "Gagal menambahkan parameter"
+            : "Gagal memperbarui parameter",
       );
-      await unwrapResponse(
-        await sidakClient["rule-versions"][":id"].indicators.$post({
-          param: { id: selectedVersion.id },
-          json: {
-            service_type: activeTeam,
-            ...payload,
-          },
-        }),
-      );
-      notify.success("Parameter berhasil ditambahkan ke draft.");
-      setShowAddForm(false);
-      fetchVersionIndicators(selectedVersion.id);
-      refetchVersions();
-    } catch (e: any) {
-      notify.error(e.message || "Gagal menambahkan parameter");
     } finally {
-      setSavingNew(false);
+      setSavingForm(false);
     }
   };
 
-  const handleSaveEditIndicator = async (form: IndicatorFormState) => {
-    if (!selectedVersion || !editIndId) return;
-    setSavingEdit(true);
-    try {
-      const payload = indicatorFormToPayload(
-        form,
-        selectedVersion.scoring_mode,
-      );
-      await unwrapResponse(
-        await sidakClient["rule-versions"][":versionId"].indicators[
-          ":indicatorId"
-        ].$put({
-          param: { versionId: selectedVersion.id, indicatorId: editIndId },
-          json: payload,
-        }),
-      );
-      notify.success("Parameter berhasil diperbarui.");
-      setEditIndId(null);
-      setEditForm(null);
-      fetchVersionIndicators(selectedVersion.id);
-      refetchVersions();
-    } catch (e: any) {
-      notify.error(e.message || "Gagal memperbarui parameter");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const handleDeleteIndicator = async (id: string) => {
-    if (!selectedVersion) return;
+  const handleDeleteIndicator = async () => {
+    if (!selectedVersion || !deleteTarget) return;
+    setDeleting(true);
     try {
       await unwrapResponse(
         await sidakClient["rule-versions"][":versionId"].indicators[
           ":indicatorId"
         ].$delete({
-          param: { versionId: selectedVersion.id, indicatorId: id },
+          param: {
+            versionId: selectedVersion.id,
+            indicatorId: deleteTarget.id,
+          },
         }),
       );
       notify.success("Parameter dihapus dari draft.");
-      fetchVersionIndicators(selectedVersion.id);
-      refetchVersions();
-    } catch (e: any) {
-      notify.error(e.message || "Gagal menghapus parameter");
+      setDeleteTarget(null);
+      void loadIndicators(selectedVersion.id);
+      void refetchVersions();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Gagal menghapus parameter");
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const isDraft = selectedVersion?.status === "draft";
-
-  const publishedWhenDraftEmpty =
-    isDraft && draftIndicators.length === 0
-      ? versions?.find((v) => v.status === "published")
+  const publishedForRevision =
+    isDraft && indicators.length === 0
+      ? (versions.find((v) => v.status === "published") ?? null)
       : null;
 
+  const hasList = versions.length > 0 || initialLoading;
+
+  const renderDetail = () => {
+    if (versionsError && versions.length === 0) {
+      return (
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>Gagal memuat versi aturan: {versionsError}</span>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-[44px] px-4"
+              onClick={() => void refetchVersions()}
+            >
+              Coba lagi
+            </Button>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    if (initialLoading) {
+      return (
+        <div className="space-y-4" aria-busy="true">
+          <Skeleton className="h-[56px] w-2/3" />
+          <Skeleton className="h-[88px] w-full" />
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-[48px] w-full" />
+          ))}
+        </div>
+      );
+    }
+    if (!selectedVersion) {
+      const hasBaseline = (meta?.indicator_count ?? 0) > 0;
+      return (
+        <div className="space-y-3 rounded-lg border border-dashed border-border p-6">
+          <h2 className="text-base font-semibold text-foreground">
+            Belum ada versi untuk {SERVICE_LABELS[activeTeam]}
+          </h2>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {hasBaseline
+              ? `Baseline tersedia: ${meta?.indicator_count} parameter. Buat baseline untuk menampilkan detail versi.`
+              : "Belum ada parameter baseline untuk layanan ini. Buat draft baru untuk mulai menyusun parameter."}
+          </p>
+          <Button
+            type="button"
+            className="h-[44px] px-4"
+            disabled={busy}
+            onClick={() => void handleCreateDraft()}
+          >
+            <Plus aria-hidden="true" />
+            {hasBaseline ? "Buat baseline" : "Buat draft baru"}
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-8">
+        <RuleVersionHeader
+          version={selectedVersion}
+          periodLabel={getPeriodLabel(selectedVersion.effective_period_id)}
+          busy={busy}
+          onPublish={openPublish}
+          onDeleteDraft={() => setConfirmDraftDelete(true)}
+          onCreateRevision={() => void handleCreateDraft(selectedVersion.id)}
+        />
+        <CategoryWeightsSection
+          version={selectedVersion}
+          isDraft={isDraft}
+          save={saveWeight}
+        />
+        <RuleIndicatorsSection
+          version={selectedVersion}
+          indicators={indicators}
+          loading={loadingIndicators}
+          isDraft={isDraft}
+          publishedForRevision={publishedForRevision}
+          onAdd={() => {
+            setFormTarget({ mode: "add" });
+            setFormOpen(true);
+          }}
+          onEdit={(indicator) => {
+            setFormTarget({ mode: "edit", indicator });
+            setFormOpen(true);
+          }}
+          onDelete={setDeleteTarget}
+          onCreateRevision={(sourceId) => void handleCreateDraft(sourceId)}
+        />
+      </div>
+    );
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      {/* Header Sticky */}
-      <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
-              <History className="w-4 h-4" />
-            </div>
-            <h1 className="font-outfit text-lg font-bold text-foreground">
-              Versioning Parameter QA
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-5">
+          <header className="space-y-1">
+            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
+              Parameter QA
             </h1>
+            <p className="text-sm text-muted-foreground">
+              Kelola versi aturan penilaian per layanan: bobot, parameter, dan
+              periode berlakunya.
+            </p>
+          </header>
+
+          <ServiceTabs value={activeTeam} onChange={changeTeam} />
+
+          <div className="grid min-w-0 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+            {hasList ? (
+              <>
+                <RuleVersionList
+                  versions={versions}
+                  loading={initialLoading}
+                  selectedId={selectedVersion?.id ?? null}
+                  onSelect={setSelectedId}
+                  getPeriodLabel={getPeriodLabel}
+                />
+                {versions.length > 0 && (
+                  <RuleVersionSelect
+                    versions={versions}
+                    selectedId={selectedVersion?.id ?? null}
+                    onSelect={setSelectedId}
+                    getPeriodLabel={getPeriodLabel}
+                  />
+                )}
+              </>
+            ) : null}
+            <div
+              className={`min-w-0 ${hasList ? "lg:col-start-2 lg:row-start-1" : "lg:col-span-2"}`}
+            >
+              {renderDetail()}
+            </div>
           </div>
         </div>
-
-        <div className="flex gap-2">
-          {selectedVersion?.status === "draft" && (
-            <>
-              <button
-                onClick={() => {
-                  setPreviewVersion(selectedVersion);
-                  setPublishConfirmed(false);
-                  setPublishPeriodId(selectedVersion.effective_period_id || "");
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
-              >
-                <Rocket className="w-3.5 h-3.5" />
-                Publish
-              </button>
-              <button
-                onClick={() => handleDeleteDraft(selectedVersion.id)}
-                className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Hapus Draft
-              </button>
-            </>
-          )}
-          {selectedVersion?.status === "published" && (
-            <button
-              onClick={() => handleCreateDraft(selectedVersion.id)}
-              className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
-            >
-              <GitBranch className="w-3.5 h-3.5" />
-              Create Revision
-            </button>
-          )}
-          {!selectedVersion &&
-            !versionsLoading &&
-            (!versions || !versions.some((v) => v.status === "draft")) && (
-              <button
-                onClick={() => handleCreateDraft()}
-                className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Buat Draft Baru
-              </button>
-            )}
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-        {/* Sidebar: Version History */}
-        <RuleVersionPicker
-          activeTeam={activeTeam}
-          setActiveTeam={setActiveTeam}
-          versions={versions}
-          versionsLoading={versionsLoading}
-          selectedVersion={selectedVersion}
-          setSelectedVersion={setSelectedVersion}
-          meta={meta}
-          getPeriodLabel={getPeriodLabel}
-          handleCreateDraft={handleCreateDraft}
-          handleDeleteDraft={handleDeleteDraft}
-        />
-
-        {/* Main Content: Version Detail & Editor */}
-        <section className="flex-1 overflow-y-auto p-4 lg:p-8">
-          <AnimatePresence mode="wait">
-            {selectedVersion ? (
-              <motion.div
-                key={selectedVersion.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="max-w-4xl mx-auto space-y-6"
-              >
-                {/* Status Banner */}
-                <PublishRulePanel
-                  selectedVersion={selectedVersion}
-                  getPeriodLabel={getPeriodLabel}
-                  setShowAddForm={setShowAddForm}
-                />
-
-                {/* Weights & Mode Panel */}
-                <ServiceWeightsPanel
-                  selectedVersion={selectedVersion}
-                  isDraft={isDraft}
-                  setSelectedVersion={setSelectedVersion}
-                />
-
-                {/* Parameters List */}
-                <RuleIndicatorsPanel
-                  loadingIndicators={loadingIndicators}
-                  draftIndicators={draftIndicators}
-                  publishedWhenDraftEmpty={publishedWhenDraftEmpty}
-                  selectedVersion={selectedVersion}
-                  isDraft={isDraft}
-                  handleCreateDraft={handleCreateDraft}
-                  handleDeleteIndicator={handleDeleteIndicator}
-                  onEditIndicator={(indicator) => {
-                    setEditIndId(indicator.id);
-                    setEditForm(indicatorToFormState(indicator));
-                  }}
-                />
-              </motion.div>
-            ) : (
-              <div className="h-full flex items-center justify-center py-20">
-                <div className="text-center p-8 border border-border bg-surface rounded-2xl max-w-sm mx-auto">
-                  <Settings className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="font-outfit text-sm font-bold text-foreground">
-                    Pilih atau buat versi rules untuk melihat detail
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Gunakan panel di sebelah kiri untuk melihat riwayat versi
-                    parameter QA.
-                  </p>
-                </div>
-              </div>
-            )}
-          </AnimatePresence>
-        </section>
       </div>
 
-      <AnimatePresence>
-        {showAddForm && selectedVersion && (
-          <AddIndicatorModal
-            scoringMode={selectedVersion.scoring_mode}
-            serviceType={activeTeam}
-            saving={savingNew}
-            onClose={() => setShowAddForm(false)}
-            onSubmit={handleAddIndicator}
-          />
-        )}
-        {editIndId && editForm && selectedVersion && (
-          <EditIndicatorModal
-            initialForm={editForm}
-            scoringMode={selectedVersion.scoring_mode}
-            serviceType={activeTeam}
-            saving={savingEdit}
-            onClose={() => {
-              setEditIndId(null);
-              setEditForm(null);
-            }}
-            onSubmit={handleSaveEditIndicator}
-          />
-        )}
-        {previewVersion && (
-          <PublishPreviewModal
-            previewVersion={previewVersion}
-            periods={periods ?? undefined}
-            draftIndicators={draftIndicators}
-            publishPeriodId={publishPeriodId}
-            setPublishPeriodId={setPublishPeriodId}
-            changeReason={changeReason}
-            setChangeReason={setChangeReason}
-            publishConfirmed={publishConfirmed}
-            setPublishConfirmed={setPublishConfirmed}
-            isPublishing={isPublishing}
-            getPreviewVersionNumber={getPreviewVersionNumber}
-            onPublish={handlePublish}
-            onClose={() => setPreviewVersion(null)}
-          />
-        )}
-      </AnimatePresence>
+      <IndicatorFormDialog
+        open={formOpen && Boolean(selectedVersion)}
+        mode={formTarget.mode}
+        initialForm={
+          formTarget.mode === "edit"
+            ? indicatorToFormState(formTarget.indicator)
+            : createEmptyIndicatorForm()
+        }
+        scoringMode={selectedVersion?.scoring_mode ?? "weighted"}
+        serviceType={activeTeam}
+        saving={savingForm}
+        onClose={() => setFormOpen(false)}
+        onSubmit={handleSubmitIndicator}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Hapus parameter?"
+        description={`Parameter "${deleteTarget?.name ?? ""}" akan dihapus dari draft ini. Versi yang sudah berlaku tidak berubah.`}
+        confirmLabel="Hapus"
+        busy={deleting}
+        onConfirm={() => void handleDeleteIndicator()}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDraftDelete && isDraft}
+        title="Hapus draft?"
+        description={
+          selectedVersion
+            ? `Draft v${selectedVersion.version_number} untuk ${SERVICE_LABELS[activeTeam]} (efektif ${getPeriodLabel(selectedVersion.effective_period_id)}) akan dihapus. Versi yang sudah berlaku tidak berubah.`
+            : ""
+        }
+        confirmLabel="Hapus draft"
+        busy={busy}
+        onConfirm={() => void handleDeleteDraft()}
+        onCancel={() => setConfirmDraftDelete(false)}
+      />
+
+      {dialogVersion && (
+        <PublishRuleDialog
+          open={publishOpen}
+          version={dialogVersion}
+          baseline={baseline}
+          periods={periods}
+          draftIndicators={indicators}
+          periodId={publishPeriodId}
+          onPeriodChange={setPublishPeriodId}
+          reason={changeReason}
+          onReasonChange={setChangeReason}
+          confirmed={publishConfirmed}
+          onConfirmedChange={setPublishConfirmed}
+          publishing={publishing}
+          previewVersionNumber={getPreviewVersionNumber()}
+          onPublish={() => void handlePublish()}
+          onClose={() => setPublishOpen(false)}
+        />
+      )}
     </div>
   );
 }
