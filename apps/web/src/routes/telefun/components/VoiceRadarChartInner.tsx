@@ -70,7 +70,7 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="font-bold text-slate-600 dark:text-white/70">
+            <span className="font-bold text-muted-foreground">
               {entry.value}
             </span>
           </div>
