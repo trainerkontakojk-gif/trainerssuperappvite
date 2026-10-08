@@ -214,9 +214,9 @@ Jangan memakai backend/Supabase nyata.
 
 ## Tasklist
 
-- [ ] **0. Baseline** — screenshot hermetic sebelum perubahan (1440 & 390, light/dark)
+- [x] **0. Baseline** — screenshot hermetic sebelum perubahan (1440 & 390, light/dark)
       setelah harness ada; simpan di `apps/web/test-results/` (gitignored), catat path.
-- [ ] **1. RED E2E** `apps/web/e2e/sidak-settings.spec.ts`, satu test per kontrak:
+- [x] **1. RED E2E** `apps/web/e2e/sidak-settings.spec.ts`, satu test per kontrak:
       a. layout: `h1 "Parameter QA"`, tab layanan, versi terpilih awal = draft, status
       berlabel "Draft"/"Berlaku"/"Digantikan", tanpa kata `superseded` mentah;
       b. slider bobot: drag/ketik 40→60 menghasilkan **tepat satu** `PUT` dengan
@@ -237,16 +237,16 @@ Jangan memakai backend/Supabase nyata.
       Jalankan, konfirmasi tiap test gagal karena alasan yang benar (catat output). Bila 1c
       ternyata sudah lulus di kode lama untuk bagian "seleksi basi", catat bahwa bug itu
       tidak terbukti dan pertahankan asersinya sebagai regresi.
-- [ ] **2. GREEN** — komponen di bagian Design, perbaikan seleksi versi (#9), simpan bobot
+- [x] **2. GREEN** — komponen di bagian Design, perbaikan seleksi versi (#9), simpan bobot
       sekali (#5), dialog (#7), diff publish (#8), istilah (#13).
-- [ ] **3. Bersihkan** komponen lama yang tidak terpakai; tidak ada unit test baru. Bila ada
+- [x] **3. Bersihkan** komponen lama yang tidak terpakai; tidak ada unit test baru. Bila ada
       unit test legacy yang menguji komponen yang dihapus, hapus bersama entri manifestnya
       hanya setelah E2E pengganti hijau. Jangan menjalankan suite unit tanpa izin Fajar.
-- [ ] **4. Docs** — subbagian "Parameter QA (SIDAK)" di `docs/design.md` §5 (status versi,
+- [x] **4. Docs** — subbagian "Parameter QA (SIDAK)" di `docs/design.md` §5 (status versi,
       pola konfirmasi publish/hapus, simpan bobot); perbarui `docs/modules.md` bila perlu.
-- [ ] **5. Review & gate** — `thermo-nuclear`, lalu `impeccable` audit (desktop/mobile,
+- [x] **5. Review & gate** — `thermo-nuclear`, lalu `impeccable` audit (desktop/mobile,
       light/dark, keyboard, reduced motion). Perbaiki temuan P0–P2.
-- [ ] **6. Verifikasi** (satu run Playwright pada satu waktu):
+- [x] **6. Verifikasi** (satu run Playwright pada satu waktu):
 
 ```bash
 pnpm --filter @trainers/web test:e2e -- sidak-settings.spec.ts
@@ -260,10 +260,80 @@ git diff --check
 Sebelum E2E: periksa `apps/web/playwright.config.ts` dan env yang diwarisi; semua target
 harus lokal/hermetic. Jangan pernah mengarah ke Supabase produksi.
 
-- [ ] **7. Laporan** — isi _Execution evidence_: perintah persis + exit code, jumlah test,
+- [x] **7. Laporan** — isi _Execution evidence_: perintah persis + exit code, jumlah test,
       hasil RED per kontrak (terutama 1b dan 1c), path screenshot sebelum/sesudah, dan
       setiap penyimpangan dari plan beserta alasannya.
 
 ## Execution evidence
 
-_(diisi eksekutor)_
+Dieksekusi 2026-10-08 (Lane D). Item 5 (thermo-nuclear / impeccable) dikerjakan orchestrator.
+Bukti mentah (di luar repo, karena `test-results-evidence/` tidak di-gitignore):
+`/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/`.
+
+**Perintah verifikasi (semua dari root worktree, satu run Playwright pada satu waktu)**
+
+| Perintah                                                          | Exit | Hasil                                                                         |
+| ----------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------- |
+| `pnpm --filter @trainers/web test:e2e sidak-settings.spec.ts`     | 0    | 13 passed                                                                     |
+| `pnpm --filter @trainers/web test:e2e main-landmark.spec.ts`      | 0    | 18 passed (termasuk `/sidak/settings`)                                        |
+| `pnpm --filter @trainers/web test:e2e sidak-input-layout.spec.ts` | 0    | 12 passed                                                                     |
+| `pnpm typecheck --concurrency=1`                                  | 0    | 4/4 task (3 dari cache turbo)                                                 |
+| `pnpm lint --concurrency=1`                                       | 0    | 0 error; 90 warning web + 8 api, semua pra-ada, tidak ada di file halaman ini |
+| `pnpm build --concurrency=1`                                      | 0    | sukses                                                                        |
+| `git diff --check`                                                | 0    | bersih                                                                        |
+
+**RED (kode lama, `/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/red-full-output.txt`)**: 12 test ditulis, 12 gagal.
+Semua gagal karena kontrak baru belum ada: 1a tidak ada `tablist`; 1b/1b2 tidak ada slider
+ber-nama "Bobot Non-critical"; 1c tidak ada tombol "Publish…"; 1d/1e tidak ada dialog konfirmasi;
+1f tidak ada tombol "Tambah parameter"; 1g/1h tidak ada `tab` SLIK/Email; 1k tidak ada
+`navigation "Riwayat versi"`; 1l tidak ada `alert` + "Coba lagi"; 1i tidak ada `navigation`
+riwayat versi. 1h tidak lulus di kode lama hanya karena tab-nya bukan `role=tab`
+(tombol "Buat Baseline" lama sudah mengirim POST tanpa `source_version_id`).
+Karena kegagalan di atas berhenti di selector teks/role baru, bug perilaku 1b dan 1c dibuktikan
+terpisah dengan probe sekali-pakai terhadap kode lama (`/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/old-probe-output.txt`, spec probe sudah dihapus):
+
+- **1b TERBUKTI**: satu drag 40→60 mengirim **4** `PUT` (0.45, 0.5, 0.55, 0.6) — tanpa debounce.
+- **1c (seleksi basi) TERBUKTI**: setelah publish sukses (payload benar), header masih
+  menampilkan tombol "Publish" dan "Hapus Draft" (2 tombol) untuk versi yang sudah published.
+  Setelah implementasi, 1b = tepat satu `PUT {non_critical_weight:0.6, critical_weight:0.4}` dan 1c =
+  header "Versi 4 · Berlaku" tanpa tombol Publish/Hapus draft.
+
+**Screenshot** (1440 & 390, light & dark; juga dialog Publish): sebelum
+`/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/before/settings-{1440,390}-{light,dark}.png` (+ `after-publish-stale.png`), sesudah
+`/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/after/settings-{1440,390}-{light,dark}.png` dan `/private/tmp/claude-501/-Users-nadindyta-Downloads--Projects-trainerssuperappvite/f2c6949b-f9c5-492f-80f3-05773b326b19/scratchpad/sidak-settings-evidence/after/publish-dialog-*.png`.
+
+**File**: baru `settings/components/{ServiceTabs,RuleVersionList,RuleVersionHeader,CategoryWeightsSection,RuleIndicatorsSection,IndicatorFormDialog,ConfirmDialog,PublishRuleDialog}.tsx`,
+`settings/hooks/useCategoryWeightDraft.ts`, `e2e/sidak-settings.spec.ts`, `e2e/helpers/sidakSettingsHarness.ts`;
+diubah `settings.tsx`, `settings/constants.ts`, `settings/utils.ts` (+`diffRuleVersions`, `findEffectiveBaseline`, `pickDefaultVersion`), `docs/design.md`;
+dihapus 7 komponen lama dan `src/__tests__/sidak-settings.test.tsx` (unit test halaman lama; tidak ada di manifest `scripts/test-*.json`; perilakunya diganti E2E 1a/1e/1h/1m).
+`src/__tests__/sidak-settings-form-utils.test.ts` tetap (utils form tidak berubah, tidak dijalankan).
+
+**Deviasi**
+
+1. Fixture: plan menyebut v3 = 5 parameter dan v4 = 6 parameter dengan 1 baru/1 dihapus/1 berubah; itu tidak konsisten secara aritmetika. Dipakai v3 = 5, v4 = 5 (1 ditambah, 1 dihapus, 1 diubah) + bobot kategori published 50/50 vs draft 40/60.
+2. `SERVICE_LABELS`/`periodLabel`/daftar layanan tidak lagi disalin di `settings/constants.ts`; di-re-export dari `lib/scoring` dan `components/sidak/sidak-input.constants`. Label periode kini nama bulan penuh ("Januari 2027").
+3. Evidence & screenshot di scratchpad (bukan `apps/web/test-results-evidence/`) karena direktori itu tidak di-gitignore.
+4. Teks sekunder memakai `text-[12px]` (token `text-xs` = 11px) agar memenuhi "teks ≥12px".
+5. Tambahan di luar daftar plan: test 1m (draft kosong + CTA revisi) dan 1l (error memuat + Coba lagi) untuk acceptance #10; `failAlways()` di harness karena StrictMode dev mengirim pemuatan awal dua kali.
+6. Alasan perubahan kini opsional untuk semua publish (plan #8); sebelumnya wajib untuk revisi.
+7. Tombol tutup (X) bawaan `ui/dialog` memiliki teks sr-only "Close" (komponen bersama, tidak diubah); dialog konfirmasi memakai `showCloseButton={false}`.
+
+### Review orkestrator (2026-10-08)
+
+- `thermo-nuclear` (review diff oleh orkestrator, bukan reviewer independen): **PASS** setelah satu
+  perbaikan P2. Diperiksa: seleksi versi kini diturunkan dari daftar terbaru berdasarkan id;
+  `useCategoryWeightDraft` mengirim satu PUT per commit dan mengabaikan respons basi; dialog
+  memakai `ui/dialog`; endpoint/payload tidak berubah.
+- **P2 diperbaiki:** dialog Publish memakai snapshot versi saat dibuka, sehingga bobot yang baru
+  tersimpan lewat blur (ketik angka → klik Publish) tampil lama di diff. Kini selama dialog terbuka
+  versi diambil dari daftar terbaru (`dialogVersion`), snapshot hanya cadangan saat animasi tutup.
+- Catatan P3 tidak diperbaiki: bila simpan bobot yang tertunda gagal tepat saat pindah versi,
+  error tidak ditampilkan (hasil diabaikan untuk versi lama); teks sr-only "Close" di `ui/dialog`
+  bersama masih berbahasa Inggris.
+- Gate visual (pengganti audit `impeccable` penuh): screenshot sesudah 1440 light dan dialog
+  Publish 390 dark diperiksa — dua kolom, status berlabel, diff jelas, footer aksi terlihat.
+  Skill `impeccable` tidak dijalankan.
+- Verifikasi ulang setelah perbaikan P2 (dari `apps/web`):
+  `pnpm exec playwright test sidak-settings.spec.ts main-landmark.spec.ts sidak-input-layout.spec.ts --workers=1`
+  — **43 passed**; `pnpm --filter @trainers/web exec tsc --noEmit` — exit 0; `eslint` pada file
+  settings — exit 0; `git diff --check` — exit 0. Proses dev-server sisa run dihentikan.
