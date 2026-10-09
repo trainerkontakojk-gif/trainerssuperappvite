@@ -15,6 +15,7 @@ import {
   selectTrigger,
   selectValue,
 } from "./helpers/pickSelect";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 
 /**
  * E2E untuk workspace `/sidak/reports-data`.
@@ -51,7 +52,7 @@ const APP_URL = new URL(APP_ORIGIN);
  * Origin Supabase dev yang diizuinkan. Kalau env berubah, guard tetap
  * fail-closed: request di-`abort` dan test gagal terbuka, bukan diam-diam.
  */
-const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
+const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 
 /**
  * Satu-satunya endpoint yang boleh menerima mock. Method + path di sini adalah

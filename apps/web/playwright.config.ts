@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "url";
+import { E2E_WEB_SERVER_ENV } from "./e2e/helpers/e2eTargets";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,10 +28,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
+  // Web dev server only, with E2E env: never the root `pnpm dev`, whose API
+  // and Telefun run against the production project from the root `.env`.
+  // Never reuse a server on :3005 either; its env cannot be verified.
   webServer: {
-    command: "pnpm dev",
+    command: "pnpm --filter @trainers/web dev --host 127.0.0.1 --strictPort",
     url: "http://localhost:3005",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
+    env: E2E_WEB_SERVER_ENV,
     cwd: path.resolve(__dirname, "../../"),
     timeout: 60000,
   },

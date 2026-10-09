@@ -11,6 +11,21 @@ harnesses in `apps/web/e2e/` and the traps already paid for.
 | **Hermetic** — mock every `/api` the page uses | `helpers/hermeticShell.ts`, or a feature harness such as `helpers/sidakTemuanDatesHarness.ts` / `helpers/sidakAgentReportFixture.ts` | nothing                                    |
 | **Real backend** — real JWT, real Hono routers | `helpers/sidakRealBackend.ts`                                                                                                        | `apps/api/.env.integration`, loopback only |
 
+## Dev server and service targets
+
+`playwright.config.ts` and `playwright.access-web.config.ts` start **only** the web Vite dev
+server (`pnpm --filter @trainers/web dev`), never the root `pnpm dev`: that one also boots the API
+and Telefun with the root `.env`, which points at production, and the API's startup schedulers then
+write to production. No browser spec needs those processes. Hermetic specs mock `/api`, and
+real-backend specs forward `/api` to the in-process Hono app.
+
+- The server gets `E2E_WEB_SERVER_ENV` from `helpers/e2eTargets.ts`. It points Supabase and Telefun
+  at `127.0.0.1:9`, where nothing listens, so a request a spec forgot to mock fails on this machine.
+  Mock Supabase paths against `E2E_SUPABASE_URL` / `E2E_SUPABASE_STORAGE_KEY`, never a project URL.
+- `reuseExistingServer` is `false`. If `:3005` is busy (for example your own `pnpm dev`), the run
+  fails instead of testing against a server whose env cannot be verified. Stop that server first.
+- `e2e-target-isolation.spec.ts` guards both properties.
+
 ## `mockSupabaseAuth` is UI-only
 
 `helpers/mockAuth.ts` makes the app _believe_ it is logged in; its `access_token` is not a

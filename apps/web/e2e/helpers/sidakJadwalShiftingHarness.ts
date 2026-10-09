@@ -28,6 +28,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mockSupabaseAuth } from "./mockAuth";
+import { E2E_SUPABASE_URL } from "./e2eTargets";
 
 /**
  * Akar repo. Helper ini berada di `apps/web/e2e/helpers/`, jadi satu level lebih
@@ -40,7 +41,7 @@ const REPO_ROOT = path.resolve(
 
 export const APP_ORIGIN = "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
-const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
+const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 
 /** Label UI yang jadi tempat kueri diuji lewat teks, bukan lewat selector rapuh. */
 export const PAGE_TITLE = "Jadwal Shifting";
