@@ -11,7 +11,6 @@ import {
   FileText,
   ArrowRight,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
 import LeaderAccessGate from "../../components/LeaderAccessGate";
 import { Card, CardContent } from "../../components/ui/card";
@@ -84,7 +83,7 @@ export default function SidakLanding() {
             <Card className="border-border bg-card py-0">
               <CardContent className="p-8 sm:p-10 lg:p-12">
                 <div className="max-w-3xl">
-                  <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] font-semibold text-muted-foreground">
                     <BarChart3 aria-hidden="true" className="h-3.5 w-3.5" />
                     Modul Utama
                   </div>
@@ -120,9 +119,9 @@ export default function SidakLanding() {
                     <Link
                       key={card.href}
                       to={card.href}
-                      className="block h-full"
+                      className="group/card block h-full"
                     >
-                      <motion.div whileHover={{ y: -2 }} className="h-full">
+                      <div className="h-full transition-transform motion-safe:group-hover/card:-translate-y-0.5">
                         <Card className="group flex h-full flex-col border-border bg-card py-0 transition-colors hover:border-foreground/20">
                           <CardContent className="flex h-full flex-col p-6">
                             <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-foreground group-hover:text-background">
@@ -134,15 +133,15 @@ export default function SidakLanding() {
                             <h4 className="text-base font-semibold tracking-tight text-foreground">
                               {card.title}
                             </h4>
-                            <p className="mt-2 flex-1 text-xs leading-relaxed text-muted-foreground">
+                            <p className="mt-2 flex-1 text-[12px] leading-relaxed text-muted-foreground">
                               {card.desc}
                             </p>
-                            <div className="mt-6 flex items-center text-[11px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
+                            <div className="mt-6 flex items-center text-[12px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
                               Buka Modul <ArrowRight className="ml-1 h-3 w-3" />
                             </div>
                           </CardContent>
                         </Card>
-                      </motion.div>
+                      </div>
                     </Link>
                   );
                 })}

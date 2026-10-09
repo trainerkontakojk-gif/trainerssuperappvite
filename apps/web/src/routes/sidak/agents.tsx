@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useApi } from "../../hooks/useApi";
-import { ChevronDown, Eye, EyeOff, RotateCcw, Search } from "lucide-react";
+import { Eye, EyeOff, RotateCcw, Search } from "lucide-react";
 import type { AgentDirectoryResponse } from "@trainers/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import AgentCard from "../../components/sidak/AgentCard";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { titleize } from "../../lib/humanize";
+import { FilterSelect } from "../../components/sidak/FilterSelect";
 
 const INITIAL_VISIBLE = 24;
 const AGENT_GRID_CLASS =
@@ -44,6 +45,8 @@ function AgentCardSkeleton() {
     </div>
   );
 }
+
+const ALL_BATCHES = "__all__";
 
 export default function SidakAgentsPage() {
   const [search, setSearch] = useState("");
@@ -225,37 +228,23 @@ export default function SidakAgentsPage() {
               </div>
 
               {batches.length > 0 ? (
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-                  <label
-                    htmlFor="sidak-batch-filter"
-                    className="shrink-0 text-xs font-semibold text-foreground"
-                  >
-                    Batch
-                  </label>
-                  <div className="relative w-full min-w-0 sm:max-w-[320px]">
-                    <select
-                      id="sidak-batch-filter"
-                      aria-label="Filter batch"
-                      value={selectedBatch ?? ""}
-                      onChange={(event) => {
-                        setSelectedBatch(event.target.value || null);
-                        setVisibleCount(INITIAL_VISIBLE);
-                      }}
-                      className="h-11 w-full appearance-none rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-9"
-                    >
-                      <option value="">Semua batch</option>
-                      {batches.map((batch) => (
-                        <option key={batch} value={batch}>
-                          {titleize(batch)}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      aria-hidden="true"
-                      className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
-                  </div>
-                </div>
+                <FilterSelect
+                  id="sidak-batch-filter"
+                  label="Batch"
+                  className="flex min-w-0 flex-col gap-1.5 sm:max-w-[320px]"
+                  value={selectedBatch ?? ALL_BATCHES}
+                  onValueChange={(value) => {
+                    setSelectedBatch(value === ALL_BATCHES ? null : value);
+                    setVisibleCount(INITIAL_VISIBLE);
+                  }}
+                  items={[
+                    { value: ALL_BATCHES, label: "Semua batch" },
+                    ...batches.map((batch) => ({
+                      value: batch,
+                      label: titleize(batch),
+                    })),
+                  ]}
+                />
               ) : null}
             </section>
 

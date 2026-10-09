@@ -686,7 +686,7 @@ export default function SidakJadwalShiftingPage() {
                                     {spansMidnight ? (
                                       <span
                                         title="Shift melintasi tengah malam"
-                                        className="text-[11px] font-semibold text-amber-700 dark:text-amber-400"
+                                        className="text-[12px] font-semibold text-foreground"
                                       >
                                         <span className="sr-only">
                                           Shift melintasi tengah malam
