@@ -373,6 +373,21 @@ Keamanan aplikasi dijaga di beberapa sisi:
 3. **Database RLS**: Filter data di tingkat PostgreSQL sehingga user hanya bisa melihat/mengubah data sesuai hak akses mereka. Semua 32 tabel RLS-enabled. Policy gaps closed: write_trainer for dashboard summary tables, admin profiles policies (migration 008).
 4. **Admin Server Boundary**: Service role hanya dipakai di backend (Hono) untuk operasi yang membutuhkan akses lintas akun.
 5. **Hono RPC Type Safety**: `hc<AppType>` memastikan frontend tidak bisa mengirim payload yang tidak sesuai dengan validasi Zod di backend.
+6. **Fungsi di schema yang diekspos**: kontrol akses fungsi Postgres ada di dalam body fungsi, bukan di GRANT/REVOKE (lihat di bawah).
+
+### Kontrak: fungsi di schema yang diekspos (`public`, `graphql_public`)
+
+Di Supabase Postgres 17.6.1.x, memanggil fungsi yang EXECUTE-nya di-revoke dari role pemanggil bisa membuat backend Postgres crash (signal 11), bukan mengembalikan error izin (upstream supabase/postgres#2377, #2495, supabase/supabase#50900). Production (17.6.1.121) dianggap mungkin terdampak. Latar belakang dan bukti: `plans/markdown/postgres-revoked-execute-crash-mitigation.md` beserta laporan T0–T4.
+
+- **Jangan pernah** `REVOKE EXECUTE` dari `anon` atau `authenticated` pada fungsi non-trigger di `public`/`graphql_public`. Default privileges Supabase sudah memberi EXECUTE ke keduanya; biarkan.
+- **Fungsi khusus service-role**: `SECURITY DEFINER`, owner `postgres`, `SET search_path = ''`, dan statement pertama setelah `BEGIN` adalah `PERFORM app_internal.assert_service_role();`. Guard membaca `request.jwt.claims ->> 'role'` dan menolak selain `service_role` dengan `42501 SERVICE_ROLE_REQUIRED` (HTTP 401 anon / 403 authenticated). `DECLARE` hanya boleh berisi inisialisasi konstan, karena inisialisasi dijalankan sebelum guard. Fungsi `LANGUAGE sql` atau `SECURITY INVOKER` harus dikonversi dulu ke plpgsql `SECURITY DEFINER`.
+- **Fungsi untuk user login**: tolak `anon` di awal body (mis. `auth.uid() IS NULL` atau `auth.role() = 'anon'`) sebelum membaca atau menulis data; EXECUTE untuk `anon` tetap diberikan.
+- **Fungsi tanpa pemanggil PostgREST**: pindahkan ke schema non-exposed `app_internal`. Schema ini tidak memberi `USAGE` ke `PUBLIC`/`anon`/`authenticated` dan **tidak boleh** ditambahkan ke `PGRST_DB_SCHEMAS`. Fungsi yang dipanggil backend lewat `supabase.rpc()` tetap harus di `public`, karena service-role juga lewat PostgREST.
+- Guard tidak berlaku untuk sesi SQL langsung tanpa JWT claims (SQL editor, migration). Tidak ada cron atau koneksi `pg` langsung di runtime saat ini; kalau nanti ditambahkan, pemanggil itu harus membawa claims `service_role` atau memakai fungsi terpisah di `app_internal`.
+- **pg_graphql**: setelah EXECUTE diberikan, fungsi yang di-guard bisa muncul sebagai field GraphQL di project yang mengaktifkan pg_graphql. Ini diterima karena guard ada di dalam body, sehingga jalur GraphQL mendapat `42501` yang sama.
+- TNA memakai guard sendiri `tna_internal.assert_service_role()` dengan semantik yang sama.
+- **Penegakan**: migration `20261008150001_restore_anon_execute_client_rpcs.sql` diakhiri self-check global yang gagal jika ada fungsi non-trigger di `public`/`graphql_public` tanpa EXECUTE untuk `anon`/`authenticated`. E2E `apps/web/e2e/exposed-function-guard-api.spec.ts` (project `db-guard-real-backend` di `playwright.api.config.ts`, hanya target loopback) memeriksa invariant yang sama, posisi guard, dan matriks penolakan.
+- Rollback `supabase/rollbacks/rollback_20261008150000_*.sql` dan `rollback_20261008150001_*.sql` mengembalikan eksposur crash; hanya dipakai dengan persetujuan Fajar.
 
 ## Performance Guardrails (FCP/LCP)
 

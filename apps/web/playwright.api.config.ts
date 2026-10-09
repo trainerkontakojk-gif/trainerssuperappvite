@@ -18,5 +18,9 @@ export default defineConfig({
   projects: [
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     { name: "tna-real-backend", testMatch: "tna-*-api.spec.ts" },
+    {
+      name: "db-guard-real-backend",
+      testMatch: "exposed-function-guard-api.spec.ts",
+    },
   ],
 });
