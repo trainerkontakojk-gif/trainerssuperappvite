@@ -10,7 +10,7 @@ import { notify } from "../../lib/toast";
 import { periodLabel } from "../../components/sidak/sidak-input.constants";
 import { SERVICE_LABELS } from "./settings/constants";
 import { CategoryWeightsSection } from "./settings/components/CategoryWeightsSection";
-import { ConfirmDialog } from "./settings/components/ConfirmDialog";
+import { ConfirmDialog } from "../../components/sidak/ConfirmDialog";
 import { IndicatorFormDialog } from "./settings/components/IndicatorFormDialog";
 import { PublishRuleDialog } from "./settings/components/PublishRuleDialog";
 import { RuleIndicatorsSection } from "./settings/components/RuleIndicatorsSection";
