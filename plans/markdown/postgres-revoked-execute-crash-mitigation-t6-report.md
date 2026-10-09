@@ -1,6 +1,6 @@
 # T6 report: handoff (2026-10-10)
 
-- **Status: handoff complete. The production migration is NOT applied — it waits on Fajar's rollout window.** No production write occurred in this task; every production statement was a read-only catalog query plus a TEMP-only atomicity probe that created no persistent object.
+- **Status: handoff complete; the production rollout was EXECUTED and verified (2026-10-09 22:51 UTC, Fajar's go-ahead).** §1–§2 evidence is the pre-rollout read-only catalog check; §3b records the executed rollout and its verification.
 - **Lane:** D, approved plan `postgres-revoked-execute-crash-mitigation.md`.
 - **Shipped:** commit `78277ed` on `fix/postgres-revoked-execute-guard`, PR #38 (14 files, +6679/−0). No `.env`, `scratch/`, `supabase/.temp/`, or `.claude/launch.json` is included.
 - **Scope:** handoff only — evidence, rollout commands, rollback path. No product/spec/migration edit, no E2E rerun.
@@ -90,6 +90,51 @@ Both rollback files carry the crash-exposure warning: restoring revoked EXECUTE 
 
 Fallback if `db query --linked` ever refuses a wrapper: paste the same wrapper file into the Supabase Dashboard SQL editor for `ruosnjmtywcrghjgqugz`, which runs multi-statement batches in one session. Never split a wrapper into separate runs — that loses the atomic file+history guarantee.
 
+## 3b. Rollout EXECUTED (2026-10-09 22:51 UTC)
+
+Fajar authorized the rollout. Both migrations were applied as two separate transactions, in order, exactly as §3 prescribes — never `supabase db push`.
+
+| Step | Command | Exit | UTC window |
+| --- | --- | --- | --- |
+| 1 | `supabase db query --linked -f scratch/prod-preflight/apply-20261008150000.sql` | **0** | 22:51:01.758572–22:51:03.724663 |
+| 2 | `supabase db query --linked -f scratch/prod-preflight/apply-20261008150001.sql` | **0** | 22:51:40.439740–22:51:41.460712 |
+
+Immediately before step 1: the preflight still read 44 `ok` + 1 `info`, and each wrapper was re-verified to contain `BEGIN;` … `COMMIT;` with its body byte-identical to the migration file and the correct `VALUES ('<version>', …)` history insert.
+
+Post-rollout state (production):
+
+| Check | Result |
+| --- | --- |
+| history rows `20261008150000`, `20261008150001` | **2** — both recorded |
+| `app_internal` schema | present, 2 functions (`assert_service_role`, `get_leader_approved_scope_items`) |
+| Group A: guard is the first statement after `BEGIN` | **34/34** |
+| Group A: `anon` / `authenticated` EXECUTE restored (the guard rejects in-body) | 34/34 `anon=true auth=true` |
+| `app_internal` for client roles | `anon` USAGE/EXECUTE `false`, `authenticated` USAGE/EXECUTE `false` |
+| Group B: `anon` EXECUTE restored | 7/7 `anon=true auth=true` |
+| exposed functions still lacking anon/authenticated EXECUTE | **0** |
+| `public.get_leader_approved_scope_items` | gone from `public`, present as `app_internal.get_leader_approved_scope_items(uuid,text)` (Q3 move) |
+| owner of every touched function | `postgres` |
+
+Expected post-rollout preflight readings, **not** failures: 34 `BODY_DIFFERS_FROM_REPO` (the guard was added to the bodies), `history` = `ALREADY_APPLIED`, `schema app_internal` = `EXISTS_ALREADY`, and the single `MISSING` row for the moved `get_leader_approved_scope_items`. Everything else stays `ok`.
+
+**Crash sentinel:** `pg_postmaster_start_time()` was `2026-05-19 06:05:47.828884+00` before step 1 and was **unchanged** after both migrations; `pg_is_in_recovery()` = `false`. No server restart and no crash occurred during the rollout.
+
+Service smoke check immediately after the rollout (production):
+
+| Check | Result |
+| --- | --- |
+| `WEB_URL=https://trainers-superapp.vercel.app API_URL=https://trainerssuperappapi.up.railway.app/api/v1 TELEFUN_WS_URL=wss://trainerssuperapptelefun.up.railway.app node scripts/deployment/telefun-railway-smoke.mjs` | exit **0** — web 200, api 200, telefun 200 |
+| `GET /api/health` | `{"status":"ok"}` |
+| `GET /health` (telefun) | `{"status":"ok","readiness":{"acceptingSessions":true,"providers":{"gemini":{"ready":true},"openai":{"enabled":false}}}}` |
+| Railway logs for `@trainers/api`, `@trainers/web`, `@trainers/telefun` since 22:45Z | **0** error/failure/`SERVICE_ROLE_REQUIRED` lines (api shows only the two smoke `GET /api/health 200`) |
+
+Honest limitations:
+
+- The Postgres log window itself was **not** read: the Supabase CLI has no log command and no access token is stored on this machine. Crash evidence here is the unchanged postmaster start time plus zero app-level errors. For the literal log-window check, open Dashboard → Logs → Postgres for `ruosnjmtywcrghjgqugz` around 22:51 UTC.
+- A live `anon` PostgREST call against a guarded production function (to watch the 401/42501 rejection) was deliberately **not** sent. Local E2E already proves the rejection (T4 D5.3–8) and guard-first placement is verified 34/34 in production; sending an anon call into production is Fajar's call, not this report's.
+
+Evidence (gitignored, `scratch/prod-preflight/`): `apply-150000.out` SHA-256 `0c4e5e870ab15cc43a5347fb4f950b080a9f871aa61f594af910e5db2d9fe09e`, `apply-150001.out` `d70c74fe2b120eca2271b4ae72f0a3e53e7c91754e6af49c986832e4de50eefd`, `preflight.after-150000.out`, `preflight.after-rollout.out` `0470377272e863505d5fc30a390b2e0104c7801133e832928f7418270f703a81`, `preflight.before-rollout.out` (identical to the §1 file, `f7369208…`).
+
 ## 4. Wrapper verification performed locally
 
 | Rehearsal | Result |
@@ -110,7 +155,10 @@ Wrapper mechanics and the history-row write are therefore proven; migration 1's 
 
 ## 6. What still needs Fajar
 
-1. Rollout window for production — the migration itself is not applied.
-2. A Telefun staging/production verification slot right after the rollout.
-3. Merge of PR #38 (does not touch production; safe any time).
-4. Optional: confirm patch level `17.6.1.121` out of band.
+PR #38 was merged 2026-10-09 22:48 UTC (`97fd7e3`).
+
+1. Optional: the literal Postgres log-window check for `ruosnjmtywcrghjgqugz` around 2026-10-09 22:51 UTC in the Dashboard (§3b limitation).
+2. Optional: one live `anon` rejection probe against a guarded production RPC, if you want production-side proof of the 401/42501 behaviour on top of the local E2E.
+3. Optional: confirm patch level `17.6.1.121` out of band.
+
+Still open by decision: the durable-Telefun original-caller gap accepted in T4 remains a staging/at-deploy verification, not something this rollout proved.
