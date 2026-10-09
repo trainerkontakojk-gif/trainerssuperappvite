@@ -15,6 +15,7 @@ import {
   type ApiMock,
   type ShellAudit,
 } from "./helpers/hermeticShell";
+import { selectTrigger, selectValue } from "./helpers/pickSelect";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 const YEAR = new Date().getFullYear();
@@ -204,10 +205,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
 
     const filters = page.getByRole("region", { name: "Filter ranking" });
     for (const label of ["Layanan", "Periode", "Tahun", "Folder/tim"]) {
-      await expect(filters.getByLabel(label, { exact: true })).toBeVisible();
+      await expect(selectTrigger(filters, label)).toBeVisible();
     }
-    await expect(filters.getByLabel("Layanan", { exact: true })).toHaveValue(
-      "call",
+    await expect(selectValue(selectTrigger(filters, "Layanan"))).toHaveText(
+      "Call",
     );
 
     const agentLink = rankingTable(page).getByRole("link", {
@@ -278,10 +279,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     );
 
     const filters = page.getByRole("region", { name: "Filter ranking" });
-    await expect(filters.getByLabel("Layanan", { exact: true })).toHaveValue(
-      "chat",
+    await expect(selectValue(selectTrigger(filters, "Layanan"))).toHaveText(
+      "Chat",
     );
-    await expect(filters.getByLabel("Tahun", { exact: true })).toHaveValue(
+    await expect(selectValue(selectTrigger(filters, "Tahun"))).toHaveText(
       String(previousYear),
     );
 
@@ -307,10 +308,11 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
       ["call"],
     );
 
-    const service = page
-      .getByRole("region", { name: "Filter ranking" })
-      .getByLabel("Layanan", { exact: true });
-    await expect(service).toHaveValue("call");
+    const service = selectTrigger(
+      page.getByRole("region", { name: "Filter ranking" }),
+      "Layanan",
+    );
+    await expect(selectValue(service)).toHaveText("Call");
     await expect(service).toBeDisabled();
     // The page normalises back to the only allowed service and refetches it.
     await waitForMockedApi(audit, ["service_type=call"]);
@@ -331,10 +333,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     );
 
     const filters = page.getByRole("region", { name: "Filter ranking" });
-    await expect(filters.getByLabel("Layanan", { exact: true })).toHaveValue(
-      "call",
+    await expect(selectValue(selectTrigger(filters, "Layanan"))).toHaveText(
+      "Call",
     );
-    await expect(filters.getByLabel("Tahun", { exact: true })).toHaveValue(
+    await expect(selectValue(selectTrigger(filters, "Tahun"))).toHaveText(
       String(YEAR),
     );
     const requests = audit.mockedApi.filter((entry) =>

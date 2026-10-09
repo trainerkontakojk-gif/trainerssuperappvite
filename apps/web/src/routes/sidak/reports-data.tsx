@@ -7,6 +7,7 @@ import { writeFlatExcel } from "../../lib/excel-utils";
 import { Pagination } from "../../components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import { FilterSelect } from "../../components/sidak/FilterSelect";
 import type { AgentDirectoryResponse } from "@trainers/types";
 import {
   getReportFindingText,
@@ -40,12 +41,23 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ] as const;
 
+/**
+ * Base UI Select memegang nilai string. Opsi "kosong" (Semua Layanan, Semuanya,
+ * Pilih Agen) dipetakan ke sentinel di batas komponen; state dan body request
+ * tetap memakai "".
+ */
+const NONE = "__none__";
+const toSelect = (value: string) => (value === "" ? NONE : value);
+const fromSelect = (value: string) => (value === NONE ? "" : value);
+
+const SERVICE_ITEMS = [
+  { value: NONE, label: "Semua Layanan" },
+  ...SERVICE_TYPES.map((st) => ({ value: st, label: SERVICE_LABELS[st] })),
+];
+const MONTH_ITEMS = MONTH_NAMES.map((name, i) => ({ value: String(i + 1), label: name }));
+
 /** Kelas sel tabel: padat, rata atas, wrap aman untuk teks panjang. */
 const CELL = "px-3 py-2.5 align-top";
-/** Kontrol form: target sentuh nyata, fokus terlihat, token repo saja. */
-const CONTROL =
-  "w-full min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
-
 /**
  * Satu bentuk fakta per baris, dipakai oleh KEDUA representasi hasil (tabel
  * desktop dan daftar ringkas mobile). Jadi isi kolom, urutan, dan nilai selalu
@@ -370,7 +382,7 @@ export default function SidakReportsData() {
               <fieldset className="flex flex-col gap-2">
                 <legend className="sr-only">Cakupan data</legend>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-fg2">Cakupan</span>
+                  <span className="text-[12px] font-medium text-fg2">Cakupan</span>
                   {MODES.map((m) => {
                     const selected = mode === m.id;
                     return (
@@ -395,88 +407,55 @@ export default function SidakReportsData() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {mode === "layanan" ? (
-                  <div className="space-y-1">
-                    <label htmlFor="reports-data-service" className="text-xs font-medium text-fg2">
-                      Layanan
-                    </label>
-                    <select
-                      id="reports-data-service"
-                      value={serviceType}
-                      onChange={(e) => setServiceType(e.target.value)}
-                      className={CONTROL}
-                    >
-                      <option value="">Semua Layanan</option>
-                      {SERVICE_TYPES.map((st) => (
-                        <option key={st} value={st}>{SERVICE_LABELS[st]}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <FilterSelect
+                    id="reports-data-service"
+                    label="Layanan"
+                    className="space-y-1"
+                    value={toSelect(serviceType)}
+                    onValueChange={(v) => setServiceType(fromSelect(v))}
+                    items={SERVICE_ITEMS}
+                  />
                 ) : (
-                  <div className="space-y-1">
-                    <label htmlFor="reports-data-agent" className="text-xs font-medium text-fg2">
-                      Agen
-                    </label>
-                    <select
-                      id="reports-data-agent"
-                      value={pesertaId}
-                      onChange={(e) => setPesertaId(e.target.value)}
-                      className={CONTROL}
-                    >
-                      <option value="">
-                        {agentsLoading ? "Memuat agen..." : "Pilih Agen"}
-                      </option>
-                      {agents.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.nama}{a.batch_name ? ` — ${a.batch_name}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <FilterSelect
+                    id="reports-data-agent"
+                    label="Agen"
+                    className="space-y-1"
+                    value={toSelect(pesertaId)}
+                    onValueChange={(v) => setPesertaId(fromSelect(v))}
+                    items={[
+                      { value: NONE, label: agentsLoading ? "Memuat agen..." : "Pilih Agen" },
+                      ...agents.map((a) => ({
+                        value: a.id,
+                        label: `${a.nama}${a.batch_name ? ` — ${a.batch_name}` : ""}`,
+                      })),
+                    ]}
+                  />
                 )}
-                <div className="space-y-1">
-                  <label htmlFor="reports-data-year" className="text-xs font-medium text-fg2">
-                    Tahun
-                  </label>
-                  <select
-                    id="reports-data-year"
-                    value={year}
-                    onChange={(e) => setYear(Number(e.target.value))}
-                    className={CONTROL}
-                  >
-                    {availableYears.map((y) => (<option key={y} value={y}>{y}</option>))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="reports-data-from" className="text-xs font-medium text-fg2">
-                    Dari bulan
-                  </label>
-                  <select
-                    id="reports-data-from"
-                    value={startMonth}
-                    onChange={(e) => setStartMonth(Number(e.target.value))}
-                    className={CONTROL}
-                  >
-                    {MONTH_NAMES.map((name, i) => (
-                      <option key={i + 1} value={i + 1}>{name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label htmlFor="reports-data-to" className="text-xs font-medium text-fg2">
-                    Ke bulan
-                  </label>
-                  <select
-                    id="reports-data-to"
-                    value={endMonth}
-                    onChange={(e) => setEndMonth(Number(e.target.value))}
-                    className={CONTROL}
-                  >
-                    {MONTH_NAMES.map((name, i) => (
-                      <option key={i + 1} value={i + 1}>{name}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Filter parameter: satu kontrol native untuk KEDUA mode, jadi
+                <FilterSelect
+                  id="reports-data-year"
+                  label="Tahun"
+                  className="space-y-1"
+                  value={String(year)}
+                  onValueChange={(v) => setYear(Number(v))}
+                  items={availableYears.map((y) => ({ value: String(y), label: String(y) }))}
+                />
+                <FilterSelect
+                  id="reports-data-from"
+                  label="Dari bulan"
+                  className="space-y-1"
+                  value={String(startMonth)}
+                  onValueChange={(v) => setStartMonth(Number(v))}
+                  items={MONTH_ITEMS}
+                />
+                <FilterSelect
+                  id="reports-data-to"
+                  label="Ke bulan"
+                  className="space-y-1"
+                  value={String(endMonth)}
+                  onValueChange={(v) => setEndMonth(Number(v))}
+                  items={MONTH_ITEMS}
+                />
+                {/* Filter parameter: satu kontrol untuk KEDUA mode, jadi
                     nama label dan urutan Tab sama di Per Layanan dan Per
                     Individu. "Semuanya" = tidak ada `indicatorId` di request.
                     Selama katalog cakupan ini belum tervalidasi, kontrol
@@ -484,29 +463,29 @@ export default function SidakReportsData() {
                     cakupan sebelumnya tidak boleh terlihat seolah-olah cocok
                     dengan cakupan yang baru. */}
                 <div className="space-y-1">
-                  <label htmlFor="reports-data-parameter" className="text-xs font-medium text-fg2">
-                    Parameter
-                  </label>
-                  <select
+                  <FilterSelect
                     id="reports-data-parameter"
-                    value={activeIndicatorId}
-                    onChange={(e) => setIndicatorId(e.target.value)}
+                    label="Parameter"
+                    className="space-y-1"
+                    value={toSelect(activeIndicatorId)}
+                    onValueChange={(v) => setIndicatorId(fromSelect(v))}
                     disabled={parameterPending || parameterFailed}
-                    aria-busy={parameterPending}
-                    className={`${CONTROL} disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    <option value="">Semuanya</option>
-                    {parameterOptions.map((option) => (
-                      <option key={option.id} value={option.id}>{option.label}</option>
-                    ))}
-                  </select>
+                    busy={parameterPending}
+                    items={[
+                      { value: NONE, label: "Semuanya" },
+                      ...parameterOptions.map((option) => ({
+                        value: option.id,
+                        label: option.label,
+                      })),
+                    ]}
+                  />
                   {parameterPending ? (
-                    <p role="status" className="text-xs leading-relaxed text-fg2">
+                    <p role="status" className="text-[12px] leading-relaxed text-fg2">
                       Memuat daftar parameter...
                     </p>
                   ) : parameterFailed ? (
                     <div role="alert" className="space-y-1.5">
-                      <p className="text-xs leading-relaxed text-destructive">
+                      <p className="text-[12px] leading-relaxed text-destructive">
                         {settledCatalog?.error}
                       </p>
                       <Button
@@ -574,7 +553,7 @@ export default function SidakReportsData() {
                 >
                   {results.length} temuan
                 </h2>
-                <p className="text-xs leading-relaxed text-fg2">
+                <p className="text-[12px] leading-relaxed text-fg2">
                   Temuan dan Rekomendasi berasal dari input QA, bukan ringkasan AI.
                 </p>
               </div>
@@ -599,14 +578,14 @@ export default function SidakReportsData() {
                         </caption>
                         <thead>
                           <tr className="border-b border-border">
-                            <th scope="col" className="w-[5.5rem] px-3 py-2 text-left text-xs font-medium text-fg2">Layanan</th>
-                            <th scope="col" className="w-[5rem] px-3 py-2 text-left text-xs font-medium text-fg2">Periode</th>
-                            <th scope="col" className="w-[9rem] px-3 py-2 text-left text-xs font-medium text-fg2">Agen</th>
-                            <th scope="col" className="w-[8rem] px-3 py-2 text-left text-xs font-medium text-fg2">No. Tiket</th>
-                            <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-fg2">Parameter</th>
-                            <th scope="col" className="w-[26%] min-w-[15rem] px-3 py-2 text-left text-xs font-medium text-foreground">Temuan</th>
-                            <th scope="col" className="w-[26%] min-w-[15rem] px-3 py-2 text-left text-xs font-medium text-foreground">Rekomendasi</th>
-                            <th scope="col" className="w-[3.5rem] px-3 py-2 text-right text-xs font-medium text-fg2">Skor</th>
+                            <th scope="col" className="w-[5.5rem] px-3 py-2 text-left text-[12px] font-medium text-fg2">Layanan</th>
+                            <th scope="col" className="w-[5rem] px-3 py-2 text-left text-[12px] font-medium text-fg2">Periode</th>
+                            <th scope="col" className="w-[9rem] px-3 py-2 text-left text-[12px] font-medium text-fg2">Agen</th>
+                            <th scope="col" className="w-[8rem] px-3 py-2 text-left text-[12px] font-medium text-fg2">No. Tiket</th>
+                            <th scope="col" className="px-3 py-2 text-left text-[12px] font-medium text-fg2">Parameter</th>
+                            <th scope="col" className="w-[26%] min-w-[15rem] px-3 py-2 text-left text-[12px] font-medium text-foreground">Temuan</th>
+                            <th scope="col" className="w-[26%] min-w-[15rem] px-3 py-2 text-left text-[12px] font-medium text-foreground">Rekomendasi</th>
+                            <th scope="col" className="w-[3.5rem] px-3 py-2 text-right text-[12px] font-medium text-fg2">Skor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -618,14 +597,14 @@ export default function SidakReportsData() {
                                 className="even:bg-muted/40 transition-colors hover:bg-muted"
                               >
                                 <td className={`${CELL} text-foreground`}>{facts.service}</td>
-                                <td className={`${CELL} font-mono text-xs tabular-nums text-fg2`}>{facts.period}</td>
+                                <td className={`${CELL} font-mono text-[12px] tabular-nums text-fg2`}>{facts.period}</td>
                                 <td className={`${CELL} text-foreground`}>
                                   <span className="font-medium">{facts.agent}</span>
                                   {facts.batch ? (
                                     <span className="text-fg2"> · {facts.batch}</span>
                                   ) : null}
                                 </td>
-                                <td className={`${CELL} whitespace-nowrap font-mono text-xs text-foreground`}>
+                                <td className={`${CELL} whitespace-nowrap font-mono text-[12px] text-foreground`}>
                                   {facts.ticket}
                                 </td>
                                 <td className={`${CELL} text-fg2`}>{facts.parameter}</td>
@@ -659,27 +638,27 @@ export default function SidakReportsData() {
                                 <span className="font-normal text-fg2"> · {facts.batch}</span>
                               ) : null}
                             </p>
-                            <p className="whitespace-nowrap font-mono text-xs text-foreground">
+                            <p className="whitespace-nowrap font-mono text-[12px] text-foreground">
                               <span className="font-sans text-fg2">Tiket </span>
                               {facts.ticket}
                             </p>
                           </div>
-                          <p className="mt-1 text-xs break-words text-fg2">
+                          <p className="mt-1 text-[12px] break-words text-fg2">
                             {facts.service} · {facts.period} · {facts.parameter}
                           </p>
-                          <p className="mt-1 text-xs text-fg2">
+                          <p className="mt-1 text-[12px] text-fg2">
                             Skor{" "}
                             <span className="font-mono tabular-nums text-foreground">{facts.score}</span>
                           </p>
                           <dl className="mt-3 space-y-2.5">
                             <div>
-                              <dt className="text-xs font-medium text-foreground">Temuan</dt>
+                              <dt className="text-[12px] font-medium text-foreground">Temuan</dt>
                               <dd className="mt-0.5 whitespace-normal break-words text-sm leading-relaxed text-fg2">
                                 {facts.finding}
                               </dd>
                             </div>
                             <div>
-                              <dt className="text-xs font-medium text-foreground">Rekomendasi</dt>
+                              <dt className="text-[12px] font-medium text-foreground">Rekomendasi</dt>
                               <dd className="mt-0.5 whitespace-normal break-words text-sm leading-relaxed text-fg2">
                                 {facts.recommendation}
                               </dd>
