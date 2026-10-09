@@ -42,3 +42,38 @@ jobs:
       # transitive advisories that pnpm 11 missed, so keep it blocking.
       - name: Dependency audit (prod)
         run: pnpm audit --prod
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: New migrations have rollback scripts
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-migration-rollbacks.mjs origin/${{ github.base_ref }}
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # supabase/config.toml is gitignored, so generate a default one. Starting
+      # the stack replays every migration on a clean database. Only Postgres +
+      # auth are needed for that.
+      #
+      # ADVISORY until fixed: 20260716163000_publish_slik_subparameter_baseline_january
+      # (and 20260910000000_simulation_subject_attribution) RAISE when
+      # production-only rows are absent, so a clean replay cannot pass yet. The
+      # step still runs and reports the failing migration as a warning; drop
+      # continue-on-error once those migrations tolerate an empty database.
+      - name: Replay all migrations on a fresh local Supabase (advisory)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          supabase init --force
+          if ! supabase start -x storage-api,imgproxy,realtime,studio,edge-runtime,logflare,vector,mailpit,supavisor,postgres-meta 2>&1 | tee replay.log; then
+            failed=$(grep -o 'Applying migration [^ ]*' replay.log | tail -1)
+            echo "::warning title=Migration replay failed::${failed:-unknown migration} - $(grep -m1 '^ERROR' replay.log)"
+            exit 1
+          fi
