@@ -201,6 +201,18 @@ Halaman `/sidak/settings` mengelola versi aturan penilaian per layanan. Setiap p
 - **Metadata parameter** (`N/A diizinkan`, `Urutan #n`, `Ambang x`, `Tertaut ke parameter lama`) berupa teks kecil netral dipisah `·`, bukan badge berwarna. Teks porsi kategori SLIK dihitung dari bobot versi, bukan angka tetap.
 - Kontrol minimal 44px (`h-[44px]`; root 14px membuat `h-11` hanya 38,5px), teks sekunder minimal 12px.
 
+### Forecast (SIDAK)
+
+Halaman `/sidak/forecast` mengutamakan isi utama (grafik tren + proyeksi), bukan blok metrik:
+
+- **Urutan:** `h1 "Forecast"` + deskripsi satu baris + `Perbarui` (header biasa, tidak sticky, tanpa blur) → bar filter satu blok (`DashboardFilters` `showHeader={false}` + `Periode proyeksi`, flex-wrap, tanpa judul sendiri) → `Tren layanan` → `Prioritas agen`.
+- **Tren layanan:** ringkasan proyeksi _inline_ di header section (arah/rekomendasi dengan ikon, satu kalimat status data, metode · titik data · periode sebagai teks sekunder), lalu kontrol seri, grafik, dan `ForecastInsightPanel`. Tidak ada blok metrik "Proyeksi temuan" / "Kecukupan data" terpisah.
+- **Kontrol seri:** segmented `ui/tabs` "Total temuan | Per parameter". Chip parameter (`aria-pressed`) hanya tampil di mode Per parameter; maksimal 2 seri, dan teks batas muncul hanya saat batas tercapai.
+- **Prioritas agen:** satu baris "{n} agen siap diproyeksikan · periode {x} bulan", lalu empat kelompok (1 kolom di mobile, 4 kolom di ≥xl). Jumlah per status hanya tampil di header kelompok.
+- **Satu peta status:** `components/sidak/forecast-status.ts` memegang `{label, icon, textClass, dotClass}` untuk Membaik / Memburuk / Stabil/stagnan / Pantauan beserta peta confidence; arah layanan, header kelompok, dan baris agen semuanya memakainya. Empat titik kelompok berwarna berbeda, pasangan terang/gelap mengikuti `SIDAK_SCORE_TEXT`/`SIDAK_SCORE_FILL`.
+- **Istilah:** "Pantauan" (bukan Watchlist), "agen" (bukan agent), "Stabil/stagnan" satu ejaan.
+- Kontrol `h-[44px]` / `min-h-[44px]`, teks halaman minimal 12px.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`
