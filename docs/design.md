@@ -201,6 +201,15 @@ Halaman `/sidak/settings` mengelola versi aturan penilaian per layanan. Setiap p
 - **Metadata parameter** (`N/A diizinkan`, `Urutan #n`, `Ambang x`, `Tertaut ke parameter lama`) berupa teks kecil netral dipisah `·`, bukan badge berwarna. Teks porsi kategori SLIK dihitung dari bobot versi, bukan angka tetap.
 - Kontrol minimal 44px (`h-[44px]`; root 14px membuat `h-11` hanya 38,5px), teks sekunder minimal 12px.
 
+### Periode QA (SIDAK)
+
+Halaman `/sidak/periods` mengelola periode audit (bulan + tahun) yang dipakai Input Temuan, Parameter QA, dan analitik:
+
+- **Struktur:** `h1 "Periode QA"` + satu baris deskripsi, `max-w-3xl` karena halaman ringkas. Form tambah satu baris (`Select` Bulan, `Select` Tahun, tombol `Tambah periode`), lalu daftar per tahun terbaru dulu: `h2` tahun biasa (bukan uppercase), baris per bulan dipisah divider, bukan kartu bersarang.
+- **Rentang tahun** = min(tahun terlama di data − 1, tahun lalu) s.d. tahun berjalan + 1. Kombinasi yang sudah ada menonaktifkan tombol dan menampilkan teks inline "Periode {Bulan Tahun} sudah ada." (bukan kotak merah).
+- **Hapus** selalu terlihat (ikon `Trash2`, `aria-label="Hapus {Bulan Tahun}"`, target 44px), lewat `ConfirmDialog` bersama di `components/sidak/ConfirmDialog.tsx` (juga dipakai Parameter QA).
+- **Umpan balik** lewat `notify` (toast): sukses "Periode {X} ditambahkan./dihapus."; error berbahasa manusia. Penolakan hapus karena periode sudah punya temuan menampilkan pesan backend bila berbahasa Indonesia, selain itu pesan baku. Tidak ada banner error menempel; gagal memuat memakai `QaStatePanel` + `Coba lagi`.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`

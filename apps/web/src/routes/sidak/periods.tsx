@@ -1,348 +1,295 @@
+import { useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
+import type { QAPeriod } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
-import { useState } from "react";
-import type { QAPeriod } from "@trainers/types";
-import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, CalendarDays, Check, AlertCircle } from "lucide-react";
+import { notify } from "../../lib/toast";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import { ConfirmDialog } from "../../components/sidak/ConfirmDialog";
+import { MONTHS, periodLabel } from "../../components/sidak/sidak-input.constants";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const MONTHS = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
+// Kasus "sudah punya temuan" datang dari backend dalam bahasa Indonesia; cadangan
+// ini untuk kegagalan lain (jaringan, error mentah) sehingga tidak menebak penyebab.
+const DELETE_FALLBACK = "Periode gagal dihapus. Coba lagi.";
 
-const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = [currentYear - 1, currentYear, currentYear + 1];
+/** Pesan backend dipakai hanya bila sudah berbahasa Indonesia. */
+function deleteErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  return /\b(periode|temuan|dihapus|gagal|tidak|sudah)\b/i.test(message)
+    ? message
+    : DELETE_FALLBACK;
+}
+
+const monthItems = MONTHS.map((label, i) => ({
+  value: String(i + 1),
+  label,
+}));
 
 export default function SidakPeriodsPage() {
-  const { data: periods, loading, refetch } = useApi<QAPeriod[]>("/sidak/periods");
-  const [showForm, setShowForm] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const {
+    data: periods,
+    loading,
+    error,
+    refetch,
+  } = useApi<QAPeriod[]>("/sidak/periods");
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(currentYear);
   const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<QAPeriod | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<QAPeriod | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const yearItems = useMemo(() => {
+    const oldest = Math.min(...(periods ?? []).map((p) => p.year), currentYear);
+    const first = Math.min(oldest - 1, currentYear - 1);
+    const items: { value: string; label: string }[] = [];
+    for (let y = currentYear + 1; y >= first; y -= 1) {
+      items.push({ value: String(y), label: String(y) });
+    }
+    return items;
+  }, [periods, currentYear]);
+
+  const grouped = useMemo(() => {
+    const byYear = new Map<number, QAPeriod[]>();
+    for (const p of periods ?? []) {
+      byYear.set(p.year, [...(byYear.get(p.year) ?? []), p]);
+    }
+    return [...byYear.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([y, rows]) => ({
+        year: y,
+        rows: [...rows].sort((a, b) => b.month - a.month),
+      }));
+  }, [periods]);
+
+  const duplicate = (periods ?? []).some(
+    (p) => p.month === month && p.year === year,
+  );
+  const selectedLabel = periodLabel({ month, year });
+
   const handleAdd = async () => {
-    if (saving) return;
+    if (saving || duplicate) return;
     setSaving(true);
-    setErrorMsg(null);
     try {
-      await unwrapResponse(await sidakClient.periods.$post({ json: { month: selectedMonth, year: selectedYear } }));
-      setShowForm(false);
-      refetch();
-    } catch (e: any) {
-      setErrorMsg(e.message);
+      await unwrapResponse(
+        await sidakClient.periods.$post({ json: { month, year } }),
+      );
+      notify.success(`Periode ${selectedLabel} ditambahkan.`);
+      await refetch();
+    } catch {
+      notify.error("Periode gagal ditambahkan. Coba lagi.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirmDelete || deleting) return;
+    if (!deleteTarget || deleting) return;
+    const target = deleteTarget;
     setDeleting(true);
-    setErrorMsg(null);
     try {
-      await unwrapResponse(await sidakClient.periods[":id"].$delete({ param: { id: confirmDelete.id } }));
-      setConfirmDelete(null);
-      refetch();
-    } catch (e: any) {
-      setErrorMsg(e.message);
-      setConfirmDelete(null);
+      await unwrapResponse(
+        await sidakClient.periods[":id"].$delete({ param: { id: target.id } }),
+      );
+      notify.success(`Periode ${periodLabel(target)} dihapus.`);
+      setDeleteTarget(null);
+      await refetch();
+    } catch (e) {
+      notify.error(deleteErrorMessage(e));
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }
   };
 
-  const alreadyExists = (periods ?? []).some(
-    (p) => p.month === selectedMonth && p.year === selectedYear,
-  );
-
-  const grouped: Record<number, QAPeriod[]> = {};
-  (periods ?? []).forEach((p) => {
-    if (!grouped[p.year]) grouped[p.year] = [];
-    grouped[p.year].push(p);
-  });
+  const showSkeleton = loading && !periods;
+  const showError = !periods && !loading && error;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 max-w-2xl mx-auto w-full px-4 md:px-6 py-6 overflow-y-auto space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center border border-border text-muted-foreground">
-              <CalendarDays className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="font-outfit text-xl font-black tracking-tight text-foreground">
-                Periode Pelaporan
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Kelola periode audit SIDAK
-              </p>
-            </div>
-          </div>
-        </motion.div>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
+        <div className="mx-auto max-w-3xl space-y-8">
+          <header className="space-y-1">
+            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
+              Periode QA
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Kelola periode audit bulanan yang dipakai Input Temuan, Parameter
+              QA, dan analitik.
+            </p>
+          </header>
 
-        {/* Messages */}
-        <AnimatePresence>
-          {errorMsg && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              {errorMsg}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Add Period Form */}
-        <AnimatePresence mode="wait">
-          {showForm ? (
-            <motion.div
-              key="form"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="bg-surface rounded-2xl border border-border p-5 space-y-4">
-                <p className="font-outfit text-sm font-bold text-foreground">
-                  Tambah Periode Baru
-                </p>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
-                      Bulan
-                    </p>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {MONTHS.map((m, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setSelectedMonth(i + 1)}
-                          className={`py-2 rounded-xl text-xs font-semibold uppercase transition-all border ${
-                            selectedMonth === i + 1
-                              ? "bg-foreground text-background border-foreground"
-                              : "bg-transparent text-muted-foreground border-border hover:border-foreground/20"
-                          }`}
-                        >
-                          {m.slice(0, 3)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
-                      Tahun
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {YEAR_OPTIONS.map((y) => (
-                        <button
-                          key={y}
-                          onClick={() => setSelectedYear(y)}
-                          className={`py-2 px-4 rounded-xl text-xs font-semibold transition-all border ${
-                            selectedYear === y
-                              ? "bg-foreground text-background border-foreground"
-                              : "bg-transparent text-muted-foreground border-border hover:border-foreground/20"
-                          }`}
-                        >
-                          {y}
-                        </button>
-                      ))}
-                    </div>
-                    <div
-                      className={`mt-4 px-3 py-2.5 rounded-xl text-center text-xs font-semibold border transition-colors ${
-                        alreadyExists
-                          ? "bg-destructive/10 text-destructive border-destructive/20"
-                          : "bg-muted text-muted-foreground border-border"
-                      }`}
-                    >
-                      {alreadyExists
-                        ? "Sudah ada"
-                        : `${MONTHS[selectedMonth - 1]} ${selectedYear}`}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={handleAdd}
-                    disabled={saving || alreadyExists}
-                    className="flex-1 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2"
-                  >
-                    {saving ? (
-                      <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-                    ) : (
-                      <Check className="w-5 h-5" />
-                    )}
-                    {saving ? "Menyimpan..." : "Simpan Periode"}
-                  </button>
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="px-6 py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-xl text-sm font-semibold transition-all"
-                  >
-                    Batal
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.button
-              key="add-btn"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                setShowForm(true);
-                setErrorMsg(null);
-              }}
-              className="w-full h-14 flex items-center justify-center gap-2 bg-transparent border border-dashed border-border hover:border-foreground/20 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground transition-all group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-foreground/5 group-hover:bg-foreground/10 flex items-center justify-center transition-colors">
-                <Plus className="w-4 h-4" />
-              </div>
-              Tambah Periode Pelaporan
-            </motion.button>
-          )}
-        </AnimatePresence>
-
-        {/* Periods List */}
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2].map((y) => (
-              <div key={y} className="space-y-3">
-                <div className="h-4 w-24 bg-foreground/5 rounded animate-pulse" />
-                <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-                  {[1, 2, 3].map((p) => (
-                    <div key={p} className="h-16 bg-foreground/5 animate-pulse border-t border-border/50" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (periods ?? []).length === 0 ? (
-          <QaStatePanel
-            type="empty"
-            title="Periode pelaporan belum tersedia"
-            description="Tambahkan periode pertama agar proses input dan analisis SIDAK bisa dimulai."
-            className="text-center"
-          />
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(grouped)
-              .sort(([a], [b]) => Number(b) - Number(a))
-              .map(([year, items]) => (
-                <motion.div
-                  key={year}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-3"
+          <section aria-label="Tambah periode" className="space-y-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="space-y-1.5 sm:w-48">
+                <Label htmlFor="period-month" className="text-sm">
+                  Bulan
+                </Label>
+                <Select
+                  items={monthItems}
+                  value={String(month)}
+                  disabled={saving}
+                  onValueChange={(value) => {
+                    if (value !== null) setMonth(Number(value));
+                  }}
                 >
-                  <div className="flex items-center gap-2 px-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-foreground" />
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      TAHUN {year}
-                    </p>
-                  </div>
-                  <div className="bg-surface rounded-2xl border border-border overflow-hidden">
-                    {items
-                      .sort((a, b) => b.month - a.month)
-                      .map((period, i) => (
-                        <div
-                          key={period.id}
-                          className={`flex items-center gap-4 px-6 py-4 group transition-colors hover:bg-muted ${
-                            i !== 0 ? "border-t border-border" : ""
-                          }`}
-                        >
-                          <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-semibold text-foreground">
-                              {String(period.month).padStart(2, "0")}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-foreground">
-                              {MONTHS[period.month - 1]}
-                            </p>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                              {year}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setErrorMsg(null);
-                              setConfirmDelete(period);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                </motion.div>
-              ))}
-          </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        <AnimatePresence>
-          {confirmDelete && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 backdrop-blur-md"
-              onClick={() => !deleting && setConfirmDelete(null)}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-surface w-full max-w-sm rounded-2xl p-8 border border-border overflow-hidden relative"
-                onClick={(e) => e.stopPropagation()}
+                  <SelectTrigger
+                    id="period-month"
+                    aria-label="Bulan"
+                    className="!h-[44px] w-full min-w-0 bg-background px-3 text-sm"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {monthItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:w-32">
+                <Label htmlFor="period-year" className="text-sm">
+                  Tahun
+                </Label>
+                <Select
+                  items={yearItems}
+                  value={String(year)}
+                  disabled={saving}
+                  onValueChange={(value) => {
+                    if (value !== null) setYear(Number(value));
+                  }}
+                >
+                  <SelectTrigger
+                    id="period-year"
+                    aria-label="Tahun"
+                    className="!h-[44px] w-full min-w-0 bg-background px-3 text-sm"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {yearItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                className="h-[44px] px-4"
+                disabled={saving || duplicate || showSkeleton}
+                onClick={() => void handleAdd()}
               >
-                <div className="flex justify-center mb-6">
-                  <div className="w-16 h-16 bg-muted border border-border text-destructive rounded-2xl flex items-center justify-center">
-                    <Trash2 className="w-8 h-8" />
-                  </div>
-                </div>
-                <h3 className="font-outfit text-xl font-bold text-foreground text-center mb-2">
-                  Hapus Periode?
-                </h3>
-                <div className="px-4 py-2 bg-muted rounded-xl mx-auto w-fit mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center">
-                    {MONTHS[confirmDelete.month - 1]} {confirmDelete.year}
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground text-center mb-8 leading-relaxed">
-                  Penghapusan tidak dapat dibatalkan. Periode yang sudah memiliki
-                  data temuan otomatis tidak dapat dihapus.
-                </p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="w-full py-3 bg-destructive hover:opacity-90 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all"
-                  >
-                    {deleting ? "Menghapus..." : "Ya, Hapus Permanen"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(null)}
-                    disabled={deleting}
-                    className="w-full py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-xl font-semibold text-sm transition-all"
-                  >
-                    Batal
-                  </button>
-                </div>
-              </motion.div>
+                {saving ? "Menyimpan…" : "Tambah periode"}
+              </Button>
+            </div>
+            {duplicate && (
+              <p className="text-[12px] text-muted-foreground" role="status">
+                Periode {selectedLabel} sudah ada.
+              </p>
+            )}
+          </section>
+
+          {showSkeleton && (
+            <div className="space-y-3" aria-busy="true" aria-label="Memuat periode">
+              <Skeleton className="h-5 w-16" />
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-[44px] w-full" />
+              ))}
             </div>
           )}
-        </AnimatePresence>
+
+          {showError && (
+            <QaStatePanel
+              type="error"
+              title="Periode gagal dimuat"
+              description="Daftar periode tidak dapat dimuat. Periksa koneksi lalu coba lagi."
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-[44px] px-4"
+                  onClick={() => void refetch()}
+                >
+                  Coba lagi
+                </Button>
+              }
+            />
+          )}
+
+          {periods && grouped.length === 0 && (
+            <QaStatePanel
+              type="empty"
+              title="Belum ada periode"
+              description="Tambahkan periode pertama lewat form di atas."
+            />
+          )}
+
+          {grouped.length > 0 && (
+            <div className="space-y-6">
+              {grouped.map(({ year: y, rows }) => (
+                <section key={y} className="space-y-1">
+                  <h2 className="font-outfit text-base font-semibold text-foreground">
+                    {y}
+                  </h2>
+                  <ul
+                    aria-label={`Periode ${y}`}
+                    className="divide-y divide-border border-y border-border"
+                  >
+                    {rows.map((period) => (
+                      <li
+                        key={period.id}
+                        className="flex min-h-[44px] items-center justify-between gap-3 py-1"
+                      >
+                        <span className="text-sm text-foreground">
+                          {MONTHS[period.month - 1]}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-[44px] w-[44px] text-muted-foreground hover:text-destructive"
+                          aria-label={`Hapus ${periodLabel(period)}`}
+                          onClick={() => setDeleteTarget(period)}
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Hapus periode?"
+        description={
+          deleteTarget
+            ? `Periode ${periodLabel(deleteTarget)} akan dihapus dan tidak dapat dibatalkan. Periode yang sudah punya data temuan tidak dapat dihapus.`
+            : ""
+        }
+        confirmLabel="Hapus"
+        busy={deleting}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
