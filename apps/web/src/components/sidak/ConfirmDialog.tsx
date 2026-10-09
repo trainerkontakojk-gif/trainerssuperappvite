@@ -18,7 +18,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/** Konfirmasi aksi destruktif (hapus parameter / hapus draft). */
+/** Konfirmasi aksi destruktif SIDAK (hapus parameter, draft, periode). */
 export function ConfirmDialog({
   open,
   title,

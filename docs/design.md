@@ -201,13 +201,22 @@ Halaman `/sidak/settings` mengelola versi aturan penilaian per layanan. Setiap p
 - **Metadata parameter** (`N/A diizinkan`, `Urutan #n`, `Ambang x`, `Tertaut ke parameter lama`) berupa teks kecil netral dipisah `·`, bukan badge berwarna. Teks porsi kategori SLIK dihitung dari bobot versi, bukan angka tetap.
 - Kontrol minimal 44px (`h-[44px]`; root 14px membuat `h-11` hanya 38,5px), teks sekunder minimal 12px.
 
+### Periode QA (SIDAK)
+
+Halaman `/sidak/periods` mengelola periode audit (bulan + tahun) yang dipakai Input Temuan, Parameter QA, dan analitik:
+
+- **Struktur:** `h1 "Periode QA"` + satu baris deskripsi, `max-w-3xl` karena halaman ringkas. Form tambah satu baris (`Select` Bulan, `Select` Tahun, tombol `Tambah periode`), lalu daftar per tahun terbaru dulu: `h2` tahun biasa (bukan uppercase), baris per bulan dipisah divider, bukan kartu bersarang.
+- **Rentang tahun** = min(tahun terlama di data − 1, tahun lalu) s.d. tahun berjalan + 1. Kombinasi yang sudah ada menonaktifkan tombol dan menampilkan teks inline "Periode {Bulan Tahun} sudah ada." (bukan kotak merah).
+- **Hapus** selalu terlihat (ikon `Trash2`, `aria-label="Hapus {Bulan Tahun}"`, target 44px), lewat `ConfirmDialog` bersama di `components/sidak/ConfirmDialog.tsx` (juga dipakai Parameter QA).
+- **Umpan balik** lewat `notify` (toast): sukses "Periode {X} ditambahkan./dihapus."; error berbahasa manusia. Penolakan hapus karena periode sudah punya temuan menampilkan pesan backend bila berbahasa Indonesia, selain itu pesan baku. Tidak ada banner error menempel; gagal memuat memakai `QaStatePanel` + `Coba lagi`.
+
 ### Forecast (SIDAK)
 
 Halaman `/sidak/forecast` mengutamakan isi utama (grafik tren + proyeksi), bukan blok metrik:
 
 - **Urutan:** `h1 "Forecast"` + deskripsi satu baris + `Perbarui` (header biasa, tidak sticky, tanpa blur) → bar filter satu blok (`DashboardFilters` `showHeader={false}` + `Periode proyeksi`, flex-wrap, tanpa judul sendiri) → `Tren layanan` → `Prioritas agen`.
 - **Tren layanan:** ringkasan proyeksi _inline_ di header section (arah/rekomendasi dengan ikon, satu kalimat status data, metode · titik data · periode sebagai teks sekunder), lalu kontrol seri, grafik, dan `ForecastInsightPanel`. Tidak ada blok metrik "Proyeksi temuan" / "Kecukupan data" terpisah.
-- **Kontrol seri:** segmented `ui/tabs` "Total temuan | Per parameter". Chip parameter (`aria-pressed`) hanya tampil di mode Per parameter; maksimal 2 seri, dan teks batas muncul hanya saat batas tercapai.
+- **Kontrol seri:** satu grup tombol toggle (`aria-pressed`): "Total temuan" dan chip per parameter. Maksimal 2 seri tampil (Total dihitung sebagai satu seri); tombol yang akan melewati batas nonaktif, dan grafik tidak pernah kosong (mematikan Total tanpa parameter aktif menyalakan parameter pertama).
 - **Prioritas agen:** satu baris "{n} agen siap diproyeksikan · periode {x} bulan", lalu empat kelompok (1 kolom di mobile, 4 kolom di ≥xl). Jumlah per status hanya tampil di header kelompok.
 - **Satu peta status:** `components/sidak/forecast-status.ts` memegang `{label, icon, textClass, dotClass}` untuk Membaik / Memburuk / Stabil/stagnan / Pantauan beserta peta confidence; arah layanan, header kelompok, dan baris agen semuanya memakainya. Empat titik kelompok berwarna berbeda, pasangan terang/gelap mengikuti `SIDAK_SCORE_TEXT`/`SIDAK_SCORE_FILL`.
 - **Istilah:** "Pantauan" (bukan Watchlist), "agen" (bukan agent), "Stabil/stagnan" satu ejaan.
