@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { E2E_SUPABASE_STORAGE_KEY, E2E_SUPABASE_URL } from "./e2eTargets";
 
 /**
  * Mock Supabase auth untuk Playwright — staging-safe.
@@ -32,8 +33,8 @@ import type { Page } from "@playwright/test";
  * Memakai `mockSupabaseAuth` lalu memanggil `/api` sungguhan adalah bug, bukan
  * "spec yang sedang gagal": kombinasi itu tidak akan pernah hijau.
  */
-const SUPABASE_URL = "https://ruosnjmtywcrghjgqugz.supabase.co";
-const SUPABASE_STORAGE_KEY = "sb-ruosnjmtywcrghjgqugz-auth-token";
+const SUPABASE_URL = E2E_SUPABASE_URL;
+const SUPABASE_STORAGE_KEY = E2E_SUPABASE_STORAGE_KEY;
 
 export type MockAuthOptions = {
   email?: string;

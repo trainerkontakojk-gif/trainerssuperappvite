@@ -45,6 +45,7 @@ import type {
 } from "@trainers/types";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
 import { buildMockAuth, mockSupabaseAuth, type MockAuthOptions } from "./mockAuth";
+import { E2E_SUPABASE_URL } from "./e2eTargets";
 
 /**
  * Akar repo. Helper ini berada di `apps/web/e2e/helpers/`, jadi satu level
@@ -57,7 +58,7 @@ const REPO_ROOT = path.resolve(
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
-const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
+const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 
 type MockedEndpoint = {
   id: string;

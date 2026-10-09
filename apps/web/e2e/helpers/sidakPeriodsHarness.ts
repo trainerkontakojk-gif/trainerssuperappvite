@@ -12,12 +12,13 @@
 
 import { expect, type Page, type Route } from "@playwright/test";
 import { installMockAuthSession } from "./mockAuth";
+import { E2E_SUPABASE_URL } from "./e2eTargets";
 
 export { assertLocalDevOnlyTarget } from "./sidakJadwalShiftingHarness";
 
 export const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
-const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
+const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 const API_PREFIX = "/api/v1/sidak";
 const EXTERNAL_FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 

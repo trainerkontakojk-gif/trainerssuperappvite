@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { E2E_WEB_SERVER_ENV } from "./e2e/helpers/e2eTargets";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +22,8 @@ export default defineConfig({
   webServer: {
     command: "pnpm --filter @trainers/web dev --host 127.0.0.1 --strictPort",
     url: "http://localhost:3005",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
+    env: E2E_WEB_SERVER_ENV,
     cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."),
   },
 });

@@ -11,10 +11,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { mockSupabaseAuth } from "./helpers/mockAuth";
 import { createResponseGate } from "./helpers/responseGate";
 import { pickSelect } from "./helpers/pickSelect";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
-const SUPABASE_ORIGIN = "https://ruosnjmtywcrghjgqugz.supabase.co";
+const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 
 /** Endpoint `/api` yang boleh menyentuh proxy dev. Selain ini → abort. */
 const MOCKED_API: RegExp[] = [
