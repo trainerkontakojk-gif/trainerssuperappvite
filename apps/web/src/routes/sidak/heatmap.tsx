@@ -6,6 +6,9 @@ import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "../../components/sidak/SidakHeatmapCalendar";
 import SidakHeatmapInsights from "../../components/sidak/SidakHeatmapInsights";
+import QaStatePanel from "../../components/sidak/QaStatePanel";
+import { FilterSelect } from "../../components/sidak/FilterSelect";
+import { Button } from "@/components/ui/button";
 import {
   VALID_SERVICE_TYPES,
   type SidakHeatmapCountBy,
@@ -15,6 +18,14 @@ import {
 } from "@trainers/types";
 
 const YEARS = [2024, 2025, 2026];
+
+/** Base UI Select memegang nilai string; "" (semua layanan) dipetakan ke sentinel. */
+const ALL_SERVICES = "__all__";
+const YEAR_ITEMS = YEARS.map((y) => ({ value: String(y), label: String(y) }));
+const SERVICE_ITEMS = [
+  { value: ALL_SERVICES, label: "Semua layanan" },
+  ...VALID_SERVICE_TYPES.map((s) => ({ value: s, label: s })),
+];
 
 function formatTanggalPanjang(iso: string) {
   const [y, m, d] = iso.split("-");
@@ -110,7 +121,7 @@ export default function SidakHeatmap() {
         aria-label="Filter heatmap"
       >
         <fieldset>
-          <legend className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <legend className="text-[12px] font-semibold text-muted-foreground">
             Dasar tanggal
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -120,25 +131,22 @@ export default function SidakHeatmap() {
                 ["qa", "QA — Tanggal sampel"],
               ] as const
             ).map(([value, label]) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant={mode === value ? "default" : "outline"}
                 aria-pressed={mode === value}
                 onClick={() => setMode(value)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
-                  mode === value
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-background text-foreground hover:bg-muted"
-                }`}
+                className="h-[44px] px-4"
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </fieldset>
 
         <fieldset>
-          <legend className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <legend className="text-[12px] font-semibold text-muted-foreground">
             Satuan
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -148,85 +156,57 @@ export default function SidakHeatmap() {
                 ["tiket", "Tiket"],
               ] as const
             ).map(([value, label]) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant={countBy === value ? "default" : "outline"}
                 aria-pressed={countBy === value}
                 onClick={() => setCountBy(value)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
-                  countBy === value
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-background text-foreground hover:bg-muted"
-                }`}
+                className="h-[44px] px-4"
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </fieldset>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="heatmap-year"
-              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              Tahun
-            </label>
-            <select
-              id="heatmap-year"
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-foreground"
-            >
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label
-              htmlFor="heatmap-service"
-              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-              Layanan
-            </label>
-            <select
-              id="heatmap-service"
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value as ServiceType | "")}
-              className="mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-foreground"
-            >
-              <option value="">Semua layanan</option>
-              {VALID_SERVICE_TYPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FilterSelect
+            id="heatmap-year"
+            label="Tahun"
+            value={String(year)}
+            onValueChange={(y) => setYear(Number(y))}
+            items={YEAR_ITEMS}
+          />
+          <FilterSelect
+            id="heatmap-service"
+            label="Layanan"
+            value={serviceType === "" ? ALL_SERVICES : serviceType}
+            onValueChange={(v) =>
+              setServiceType(v === ALL_SERVICES ? "" : (v as ServiceType))
+            }
+            items={SERVICE_ITEMS}
+          />
         </div>
       </section>
 
       {error && (
-        <div
-          role="alert"
-          className="mt-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4"
-        >
-          <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-            Gagal memuat heatmap
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-          <button
-            type="button"
-            onClick={retry}
-            className="mt-3 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-          >
-            Coba lagi
-          </button>
-        </div>
+        <QaStatePanel
+          type="error"
+          title="Gagal memuat heatmap"
+          description={error}
+          className="mt-6"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={retry}
+              className="h-[44px] px-4"
+            >
+              Coba lagi
+            </Button>
+          }
+        />
       )}
 
       {loading && (
@@ -245,7 +225,7 @@ export default function SidakHeatmap() {
         <section className="mt-6 space-y-4" aria-label="Ringkasan heatmap">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 Total temuan {heatmap.year}
               </p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
@@ -253,11 +233,11 @@ export default function SidakHeatmap() {
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Temuan tanpa tanggal</p>
+              <p className="text-[12px] text-muted-foreground">Temuan tanpa tanggal</p>
               <p className="text-2xl font-extrabold tabular-nums text-foreground">
                 {heatmap.missingDateFindingsAllPeriods}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-[12px] text-muted-foreground">
                 Dari semua tahun,{" "}
                 {heatmap.serviceType
                   ? `layanan ${SERVICE_LABELS[heatmap.serviceType as ServiceType] ?? heatmap.serviceType}`
@@ -266,7 +246,7 @@ export default function SidakHeatmap() {
               </p>
             </div>
             <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Tanggal dipilih</p>
+              <p className="text-[12px] text-muted-foreground">Tanggal dipilih</p>
               {selected ? (
                 <p
                   className="text-sm font-semibold text-foreground"

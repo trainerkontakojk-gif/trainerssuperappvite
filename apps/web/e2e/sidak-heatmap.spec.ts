@@ -10,6 +10,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mockSupabaseAuth } from "./helpers/mockAuth";
 import { createResponseGate } from "./helpers/responseGate";
+import { pickSelect } from "./helpers/pickSelect";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
@@ -212,10 +213,10 @@ test.describe("Halaman Heatmap", () => {
     await page.getByRole("button", { name: "QA — Tanggal sampel" }).click();
     await expect.poll(() => captured.at(-1)?.mode).toBe("qa");
 
-    await page.locator("#heatmap-year").selectOption("2025");
+    await pickSelect(page, "Tahun", "2025");
     await expect.poll(() => captured.at(-1)?.year).toBe("2025");
 
-    await page.locator("#heatmap-service").selectOption("slik");
+    await pickSelect(page, "Layanan", "slik");
     await expect.poll(() => captured.at(-1)?.service_type).toBe("slik");
   });
 

@@ -222,6 +222,16 @@ Halaman `/sidak/forecast` mengutamakan isi utama (grafik tren + proyeksi), bukan
 - **Istilah:** "Pantauan" (bukan Watchlist), "agen" (bukan agent), "Stabil/stagnan" satu ejaan.
 - Kontrol `h-[44px]` / `min-h-[44px]`, teks halaman minimal 12px.
 
+### Filter analitik (SIDAK)
+
+Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
+
+- **Select:** `components/sidak/FilterSelect.tsx` (label terlihat 12px + `ui/select` Base UI, `!h-[44px]`, `aria-label` = label). Bukan `<select>` native. Opsi "kosong" dipetakan ke sentinel string (`__none__`/`__all__`) di batas komponen; state halaman dan body request tetap `""`. Opsi berkelompok memakai `groups` (pengganti `<optgroup>`). `onValueChange` hanya meneruskan pilihan pengguna, bukan reset otomatis Base UI saat daftar opsi berubah.
+- **Toggle:** `ui/button` (`default` aktif, `outline` tidak) dengan `aria-pressed`, `h-[44px]`. Tombol sort header tabel: `ui/button variant="ghost"` + `aria-sort` di `<th>`.
+- **Warna skor:** `sidakScoreTone` + `SIDAK_SCORE_TEXT` (target 95). Perubahan posisi Ranking: naik prioritas = `.bad`, turun = `.ok`, baru/tetap = `text-muted-foreground`; teks tetap menyebut arahnya.
+- **Label** minimal 12px, tanpa `uppercase tracking`. Error memuat memakai `QaStatePanel type="error"` + `Coba lagi`; skeleton memakai `ui/skeleton`, tanpa framer-motion.
+- **E2E:** pilih opsi lewat `e2e/helpers/pickSelect.ts` (klik pemicu berlabel, lalu `role="option"`); `selectOption` tidak berlaku.
+
 ### Inputs & Forms
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`

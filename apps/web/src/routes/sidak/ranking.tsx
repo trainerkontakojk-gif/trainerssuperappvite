@@ -9,13 +9,19 @@ import {
   normalizeSidakFolderOptions,
   type NormalizedSidakFolderOption,
 } from "../../lib/sidak-folder-options";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import { FilterSelect } from "../../components/sidak/FilterSelect";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  SIDAK_SCORE_TEXT,
+  sidakScoreTone,
+} from "../../utils/sidakScoreStatus";
 
 const SERVICE_LABELS: Record<string, string> = {
   call: "Call",
@@ -237,11 +243,14 @@ export default function SidakRankingPage() {
       : <ArrowDown className="w-3.5 h-3.5" />;
   };
 
-  const scoreColor = (score: number) => {
-    if (score >= 85) return "text-green-600 dark:text-green-400";
-    if (score >= 70) return "text-amber-600 dark:text-amber-400";
-    return "text-red-600 dark:text-red-400";
-  };
+  const scoreColor = (score: number) => SIDAK_SCORE_TEXT[sidakScoreTone(score)];
+
+  const ariaSort = (key: SortKey) =>
+    sortKey === key
+      ? sortDirection === "asc"
+        ? "ascending"
+        : "descending"
+      : "none";
 
   const isYearToDate = selectedPeriod === "ytd";
   const scoreColumnLabel = isYearToDate ? "Rata-rata Skor QA" : "Skor QA";
@@ -266,117 +275,88 @@ export default function SidakRankingPage() {
           {/* FILTER BAR */}
           <section aria-label="Filter ranking" className="border-y border-border py-4 md:py-5">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              {/* Layanan */}
-              <div className="space-y-2">
-                <label htmlFor="sidak-ranking-service" className="text-xs font-semibold text-foreground">Layanan</label>
-                <select
-                  id="sidak-ranking-service"
-                  value={leaderLockedService ?? selectedService}
-                  onChange={(e) => {
-                    if (leaderLockedService) return;
-                    const svc = e.target.value;
-                    setSelectedService(svc);
-                    const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
-                    const folders = allFolders;
-                    if (targetFolderName && folders.length > 0) {
-                      const matchedFolder = folders.find(
-                        (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
-                      );
-                      if (matchedFolder) {
-                        setSelectedFolder(matchedFolder.id);
-                      } else {
-                        setSelectedFolder("ALL");
-                      }
+              <FilterSelect
+                id="sidak-ranking-service"
+                label="Layanan"
+                value={leaderLockedService ?? selectedService}
+                disabled={!!leaderLockedService}
+                items={(leaderLockedService
+                  ? [leaderLockedService]
+                  : availableServices.length > 0
+                    ? availableServices
+                    : Object.keys(SERVICE_LABELS)
+                ).map((st) => ({ value: st, label: SERVICE_LABELS[st] || st }))}
+                onValueChange={(svc) => {
+                  if (leaderLockedService) return;
+                  setSelectedService(svc);
+                  const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
+                  const folders = allFolders;
+                  if (targetFolderName && folders.length > 0) {
+                    const matchedFolder = folders.find(
+                      (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
+                    );
+                    if (matchedFolder) {
+                      setSelectedFolder(matchedFolder.id);
                     } else {
                       setSelectedFolder("ALL");
                     }
-                  }}
-                  disabled={!!leaderLockedService}
-                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
-                >
-                  {(leaderLockedService
-                    ? [leaderLockedService]
-                    : availableServices.length > 0
-                      ? availableServices
-                      : Object.keys(SERVICE_LABELS)
-                  ).map((st) => (
-                    <option key={st} value={st}>
-                      {SERVICE_LABELS[st] || st}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  } else {
+                    setSelectedFolder("ALL");
+                  }
+                }}
+              />
 
-              {/* Periode */}
-              <div className="space-y-2">
-                <label htmlFor="sidak-ranking-period" className="text-xs font-semibold text-foreground">Periode</label>
-                <select
-                  id="sidak-ranking-period"
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
-                >
-                  <option value="ytd">Year to Date (YTD)</option>
-                  <option value="alltime">All Time</option>
-                  <optgroup label="Bulan">
-                    {periodsForYear.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {MONTHS[(p.month ?? 1) - 1]} {p.year}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
+              <FilterSelect
+                id="sidak-ranking-period"
+                label="Periode"
+                value={selectedPeriod}
+                onValueChange={setSelectedPeriod}
+                items={[
+                  { value: "ytd", label: "Year to Date (YTD)" },
+                  { value: "alltime", label: "All Time" },
+                ]}
+                groups={[
+                  {
+                    label: "Bulan",
+                    items: periodsForYear.map((p) => ({
+                      value: p.id,
+                      label: `${MONTHS[(p.month ?? 1) - 1]} ${p.year}`,
+                    })),
+                  },
+                ]}
+              />
 
-              {/* Tahun */}
-              <div className="space-y-2">
-                <label htmlFor="sidak-ranking-year" className="text-xs font-semibold text-foreground">Tahun</label>
-                <select
-                  id="sidak-ranking-year"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
-                >
-                  {(data?.availableYears ?? []).map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                id="sidak-ranking-year"
+                label="Tahun"
+                value={String(selectedYear)}
+                onValueChange={(y) => setSelectedYear(Number(y))}
+                items={(data?.availableYears ?? []).map((y) => ({
+                  value: String(y),
+                  label: String(y),
+                }))}
+              />
 
-              {/* Folder/Tim */}
-              <div className="space-y-2">
-                <label htmlFor="sidak-ranking-folder" className="text-xs font-semibold text-foreground">Folder/tim</label>
-                <select
-                  id="sidak-ranking-folder"
-                  value={selectedFolder}
-                  onChange={(e) => setSelectedFolder(e.target.value)}
-                  className="w-full h-9 bg-transparent border border-border rounded-md px-3 focus:outline-none focus:border-foreground focus-visible:ring-2 focus-visible:ring-primary/30 transition-colors text-sm cursor-pointer"
-                >
-                  <option value="ALL">Semua Tim</option>
-                  {standaloneFolders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.nama}
-                    </option>
-                  ))}
-                  {groupedFolders.map((group) => (
-                    <optgroup
-                      key={group.parent.id}
-                      label={`${group.parent.nama} (gabungan + batch)`}
-                    >
-                      <option value={group.parent.id}>
-                        {group.parent.nama} — Semua batch
-                      </option>
-                      {group.children.map((child) => (
-                        <option key={child.id} value={child.id}>
-                          ↳ {child.nama}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
+              <FilterSelect
+                id="sidak-ranking-folder"
+                label="Folder/tim"
+                value={selectedFolder}
+                onValueChange={setSelectedFolder}
+                items={[
+                  { value: "ALL", label: "Semua Tim" },
+                  ...standaloneFolders.map((f) => ({ value: f.id, label: f.nama })),
+                ]}
+                groups={groupedFolders.map((group) => ({
+                  label: `${group.parent.nama} (gabungan + batch)`,
+                  items: [
+                    { value: group.parent.id, label: `${group.parent.nama} — Semua batch` },
+                    ...group.children.map((child) => ({
+                      value: child.id,
+                      label: `↳ ${child.nama}`,
+                    })),
+                  ],
+                }))}
+              />
             </div>
           </section>
 
@@ -386,61 +366,67 @@ export default function SidakRankingPage() {
               <table className="w-full text-left border-collapse">
                 <thead className="hidden md:table-header-group">
                   <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground w-16">
+                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground w-16">
                       Rank
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground">
-                      <button
+                    <th
+                      aria-sort={ariaSort("nama")}
+                      className="px-4 py-1 text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => toggleSort("nama", "asc")}
-                        className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                        className="-ml-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
                       >
                         Agen
                         {renderSortIcon("nama")}
-                      </button>
+                      </Button>
                     </th>
-                    <th className={showBatchColumn ? "px-4 py-3 text-xs font-semibold text-muted-foreground" : "hidden"}>
+                    <th className={showBatchColumn ? "px-4 py-3 text-[12px] font-semibold text-muted-foreground" : "hidden"}>
                       Tim/Batch
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
-                      <button
+                    <th
+                      aria-sort={ariaSort("defects")}
+                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => toggleSort("defects", "desc")}
-                        className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
                       >
                         Total Temuan
                         {renderSortIcon("defects")}
-                      </button>
+                      </Button>
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
-                      <button
+                    <th
+                      aria-sort={ariaSort("score")}
+                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => toggleSort("score", "desc")}
-                        className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
                       >
                         {scoreColumnLabel}
                         {renderSortIcon("score")}
-                      </button>
+                      </Button>
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">
+                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground text-center">
                       Perubahan posisi
                     </th>
                   </tr>
                 </thead>
                 <tbody className="block md:table-row-group">
-                  <AnimatePresence mode="sync">
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
-                        <motion.tr
-                          key={`skeleton-${i}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                        >
+                        <tr key={`skeleton-${i}`}>
                           <td colSpan={6} className="px-6 py-8">
-                            <div className="h-6 bg-foreground/5 rounded-lg w-full animate-pulse" />
+                            <Skeleton className="h-6 w-full rounded-lg" />
                           </td>
-                        </motion.tr>
+                        </tr>
                       ))
                     ) : sortedRankings.length > 0 ? (
                       sortedRankings.map((agent, i) => {
@@ -458,16 +444,14 @@ export default function SidakRankingPage() {
                                 : rankChange < 0
                                   ? `Prioritas turun ${Math.abs(rankChange)}`
                                   : "Tetap";
+                        // Prioritas naik = temuan makin banyak (perlu perhatian);
+                        // turun = membaik. Teks label tetap menyatakan arahnya.
                         const rankChangeClass =
-                          rankChange === undefined
+                          typeof rankChange !== "number" || rankChange === 0
                             ? "text-muted-foreground"
-                            : rankChange === null
-                              ? "text-blue-600 dark:text-blue-400"
-                              : rankChange > 0
-                                ? "text-red-600 dark:text-red-400"
-                                : rankChange < 0
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-muted-foreground";
+                            : rankChange > 0
+                              ? SIDAK_SCORE_TEXT.bad
+                              : SIDAK_SCORE_TEXT.ok;
                         return (
                           <tr
                             key={agent.agentId}
@@ -490,24 +474,24 @@ export default function SidakRankingPage() {
                               >
                                 {agent.nama}
                               </Link>
-                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:hidden">
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground md:hidden">
                                 {agent.batch && <span>{agent.batch}</span>}
                                 <span>{agent.defects} temuan</span>
                                 <span>Skor QA {agent.score.toFixed(1)}%</span>
                               </div>
                               {rankChangeLabel && (
-                                <span className={`mt-2 block text-xs font-semibold md:hidden ${rankChangeClass}`}>
+                                <span className={`mt-2 block text-[12px] font-semibold md:hidden ${rankChangeClass}`}>
                                   {rankChangeLabel}
                                 </span>
                               )}
                               {tieLabel && (
-                                <span className="mt-1 block text-[11px] text-muted-foreground">
+                                <span className="mt-1 block text-[12px] text-muted-foreground">
                                   {tieLabel}
                                 </span>
                               )}
                             </td>
                             <td className={showBatchColumn ? "hidden px-4 py-4 align-middle md:table-cell" : "hidden"}>
-                              <div className="text-xs font-semibold text-muted-foreground">
+                              <div className="text-[12px] font-semibold text-muted-foreground">
                                 {agent.batch}
                               </div>
                             </td>
@@ -520,7 +504,7 @@ export default function SidakRankingPage() {
                               {agent.score.toFixed(1)}%
                             </td>
                             <td className="hidden px-4 py-4 text-left align-middle md:table-cell">
-                              <div className="space-y-1 text-xs">
+                              <div className="space-y-1 text-[12px]">
                                 {rankChangeLabel && (
                                   <span className={`block font-semibold ${rankChangeClass}`}>
                                     {rankChangeLabel}
@@ -537,10 +521,7 @@ export default function SidakRankingPage() {
                         );
                       })
                     ) : (
-                      <motion.tr
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
+                      <tr>
                         <td colSpan={6} className="px-6 py-24 text-center">
                           <QaStatePanel
                             type="empty"
@@ -549,9 +530,8 @@ export default function SidakRankingPage() {
                             className="mx-auto max-w-md text-left"
                           />
                         </td>
-                      </motion.tr>
+                      </tr>
                     )}
-                  </AnimatePresence>
                 </tbody>
               </table>
             </div>

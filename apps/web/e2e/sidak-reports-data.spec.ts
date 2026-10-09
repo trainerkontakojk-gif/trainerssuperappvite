@@ -5,6 +5,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildMockAuth, mockSupabaseAuth } from "./helpers/mockAuth";
+import {
+  closeSelect,
+  openSelect,
+  pickFromTrigger,
+  pickSelect,
+  selectedLabel,
+  selectOptionLabels,
+  selectTrigger,
+  selectValue,
+} from "./helpers/pickSelect";
 
 /**
  * E2E untuk workspace `/sidak/reports-data`.
@@ -1086,33 +1096,30 @@ const MIDDLE_FROM_MONTH = { label: "Maret", value: "3" } as const;
 const MIDDLE_TO_MONTH = { label: "Mei", value: "5" } as const;
 
 /**
- * Nama aksesibel setiap `<option>` di dalam satu `<select>`.
+ * Pembacaan opsi/nilai `ui/select` (Base UI) lewat `helpers/pickSelect`.
  *
- * Dibaca lewat accessible name (untuk `<option>` itu isi teksnya), bukan lewat
- * `value` — supaya test ini benar-benar membuktikan apa yang dibaca user dan
- * assistive tech, bukan format angka yang tersembunyi di DOM.
+ * Opsi dibaca dari popup yang dibuka (nama aksesibel = teks yang dibaca user dan
+ * assistive tech). Nilai terpilih dibaca dari teks pemicu; nilai yang benar-benar
+ * dikirim tetap dibuktikan lewat body request (`dataRequests`), karena Base UI
+ * tidak mengekspos `value` di DOM.
  */
-async function optionLabels(select: Locator): Promise<string[]> {
-  return select
-    .locator("option")
-    .evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? "").trim()));
-}
-
-/** Opsi terpilih satu `<select>`: label yang terlihat + nilai yang dikirim. */
-async function selectedOption(select: Locator): Promise<{ label: string; value: string }> {
-  return select.evaluate((node: HTMLSelectElement) => {
-    const option = node.options[node.selectedIndex];
-    return { label: (option?.textContent ?? "").trim(), value: node.value };
-  });
-}
-
-async function monthOptionNames(select: Locator): Promise<string[]> {
-  return optionLabels(select);
-}
-
-/** Nama bulan + nilai yang sedang dipilih satu `<select>`. */
-async function selectedMonth(select: Locator): Promise<{ label: string; value: string }> {
-  return selectedOption(select);
+/**
+ * Jumlah opsi sebuah select (polling, seperti `toHaveCount`). Pemicu yang
+ * `disabled` tidak bisa dibuka (juga oleh user), jadi yang tampil hanya satu
+ * opsi terpilih: untuk Parameter itu harus "Semuanya", bukan daftar lama.
+ */
+async function expectOptionCount(select: Locator, count: number) {
+  await expect
+    .poll(async () => {
+      if (await select.isDisabled()) {
+        return [await selectedLabel(select)].length;
+      }
+      return (await selectOptionLabels(select)).length;
+    })
+    .toBe(count);
+  if (count === 1 && (await select.isDisabled())) {
+    await expect(selectValue(select)).toHaveText("Semuanya");
+  }
 }
 
 /**
@@ -1120,23 +1127,28 @@ async function selectedMonth(select: Locator): Promise<{ label: string; value: s
  * tidak boleh menyisakan label angka `01`..`12` lama.
  */
 async function assertIndonesianMonthOptions(page: Page) {
-  const from = page.getByRole("combobox", { name: "Dari bulan" });
-  const to = page.getByRole("combobox", { name: "Ke bulan" });
+  const from = selectTrigger(page, "Dari bulan");
+  const to = selectTrigger(page, "Ke bulan");
 
   for (const [label, select] of [
     ["Dari bulan", from],
     ["Ke bulan", to],
   ] as const) {
-    await expect(select.locator("option"), label).toHaveCount(12);
-    expect(await monthOptionNames(select), `label opsi ${label}`).toEqual([
-      ...MONTH_OPTION_LABELS,
-    ]);
+    // Popup dibuka sekali; semua pembacaan opsi terjadi di listbox yang sama.
+    const listbox = await openSelect(select);
+    await expect(listbox.getByRole("option"), label).toHaveCount(12);
+    expect(
+      await listbox
+        .getByRole("option")
+        .evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? "").trim())),
+      `label opsi ${label}`,
+    ).toEqual([...MONTH_OPTION_LABELS]);
 
     // Tiga titik yang diminta kontrak: awal, tengah, akhir — lewat ROLE
     // `option` supaya yang diperiksa benar-benar accessible name.
     for (const name of ["Januari", "Maret", "Mei", "Desember"]) {
       await expect(
-        select.getByRole("option", { name, exact: true }),
+        listbox.getByRole("option", { name, exact: true }),
         `opsi aksesibel "${name}" di ${label}`,
       ).toHaveCount(1);
     }
@@ -1144,22 +1156,17 @@ async function assertIndonesianMonthOptions(page: Page) {
     // Label angka lama tidak boleh bocor lewat nama lain yang bisa dipilih.
     for (const legacy of ["01", "02", "03", "05", "12"]) {
       await expect(
-        select.getByRole("option", { name: legacy, exact: true }),
+        listbox.getByRole("option", { name: legacy, exact: true }),
         `label lama "${legacy}" masih ada di ${label}`,
       ).toHaveCount(0);
     }
+    await closeSelect(select);
   }
 
-  // Default tetap setahun penuh: Januari..Desember (1..12). Tidak ada
-  // inferensi periode berjalan/latest.
-  expect(await selectedMonth(from), "default Dari bulan").toEqual({
-    label: "Januari",
-    value: "1",
-  });
-  expect(await selectedMonth(to), "default Ke bulan").toEqual({
-    label: "Desember",
-    value: "12",
-  });
+  // Default tetap setahun penuh: Januari..Desember. Nilai angka 1..12 yang
+  // dikirim dibuktikan oleh body POST di test pemanggil (startMonth/endMonth).
+  expect(await selectedLabel(from), "default Dari bulan").toBe("Januari");
+  expect(await selectedLabel(to), "default Ke bulan").toBe("Desember");
 }
 
 // ── Bukti visual & responsif ────────────────────────────────────────────────
@@ -1779,8 +1786,8 @@ const TICKET_MOBILE_VIEWPORT = { width: 390, height: 844 };
  * pembacaan daftar penuh berikutnya tidak bisa menangkap keadaan setengah jalan.
  */
 async function settledAgentOptions(agentSelect: Locator): Promise<string[]> {
-  await expect(agentSelect.locator("option").first()).toHaveText("Pilih Agen");
-  return optionLabels(agentSelect);
+  await expect(selectValue(agentSelect)).toHaveText("Pilih Agen");
+  return selectOptionLabels(agentSelect);
 }
 
 /**
@@ -1946,19 +1953,15 @@ test.describe("SIDAK reports data workspace", () => {
     await page.getByRole("button", { name: "Cari Data" }).click();
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveText("2 temuan");
 
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("email");
+    await pickSelect(page, "Layanan", "Email");
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Export Excel" })).toHaveCount(0);
 
-    await page.getByRole("combobox", { name: "Tahun" }).selectOption("2025");
+    await pickSelect(page, "Tahun", "2025");
     // Dipilih berdasarkan LABEL yang terlihat, bukan angka: ini yang membuktikan
     // label Indonesia terikat ke `value` angka yang benar.
-    await page
-      .getByRole("combobox", { name: "Dari bulan" })
-      .selectOption({ label: MIDDLE_FROM_MONTH.label });
-    await page
-      .getByRole("combobox", { name: "Ke bulan" })
-      .selectOption({ label: MIDDLE_TO_MONTH.label });
+    await pickSelect(page, "Dari bulan", MIDDLE_FROM_MONTH.label);
+    await pickSelect(page, "Ke bulan", MIDDLE_TO_MONTH.label);
     await page.getByRole("button", { name: "Cari Data" }).click();
 
     await expect(page.getByTestId(RESULTS_COUNT)).toBeVisible();
@@ -1982,14 +1985,8 @@ test.describe("SIDAK reports data workspace", () => {
 
     // Label terpilih mengikuti nilai yang dikirim, jadi tidak ada ambigu
     // "Maret" = bulan ke berapa.
-    expect(await selectedMonth(page.getByRole("combobox", { name: "Dari bulan" }))).toEqual({
-      label: MIDDLE_FROM_MONTH.label,
-      value: MIDDLE_FROM_MONTH.value,
-    });
-    expect(await selectedMonth(page.getByRole("combobox", { name: "Ke bulan" }))).toEqual({
-      label: MIDDLE_TO_MONTH.label,
-      value: MIDDLE_TO_MONTH.value,
-    });
+    expect(await selectedLabel(page.getByRole("combobox", { name: "Dari bulan" }))).toBe(MIDDLE_FROM_MONTH.label);
+    expect(await selectedLabel(page.getByRole("combobox", { name: "Ke bulan" }))).toBe(MIDDLE_TO_MONTH.label);
 
     expectNoApplicationTraffic(audit);
   });
@@ -2014,7 +2011,7 @@ test.describe("SIDAK reports data workspace", () => {
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
 
     // (2) User mengubah filter (tahun → 2025) sebelum respons request pertama tiba.
-    await page.getByRole("combobox", { name: "Tahun" }).selectOption("2025");
+    await pickSelect(page, "Tahun", "2025");
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
 
     // (3) Respons request LAMA sekarang tiba dan diproses aplikasi.
@@ -2062,11 +2059,13 @@ test.describe("SIDAK reports data workspace", () => {
     await page.getByRole("button", { name: "Per Individu" }).click();
 
     // Direktori `{agents,batches}` diterima tanpa crash.
-    await expect(page.getByRole("option", { name: /Alya Pranoto/ })).toHaveCount(1);
-    await expect(page.getByRole("option", { name: /Bima Saputra/ })).toHaveCount(1);
+    const agentListbox = await openSelect(selectTrigger(page, "Agen"));
+    await expect(agentListbox.getByRole("option", { name: /Alya Pranoto/ })).toHaveCount(1);
+    await expect(agentListbox.getByRole("option", { name: /Bima Saputra/ })).toHaveCount(1);
+    await closeSelect(selectTrigger(page, "Agen"));
     await expect(searchButton).toBeDisabled();
 
-    await page.getByRole("combobox", { name: "Agen" }).selectOption("agent-1");
+    await pickSelect(page, "Agen", "Alya Pranoto — Batch 7");
     await expect(searchButton).toBeEnabled();
     await searchButton.click();
 
@@ -2106,22 +2105,24 @@ test.describe("SIDAK reports data workspace", () => {
     // (1) Tidak ada agen yang bisa dipilih, dan label placeholder bukan "Memuat
     // agen..." — jadi respons SUDAH sampai dan ditolak oleh normalisasi, bukan
     // sekadar masih di-flight.
-    await expect(agentSelect).toHaveValue("");
+    await expect(selectValue(agentSelect)).toHaveText("Pilih Agen");
     expect(await settledAgentOptions(agentSelect), "label opsi Agen saat malformed").toEqual([
       "Pilih Agen",
     ]);
+    const malformedListbox = await openSelect(agentSelect);
     for (const agent of ["Alya Pranoto", "Bima Saputra"]) {
       await expect(
-        page.getByRole("option", { name: new RegExp(agent) }),
+        malformedListbox.getByRole("option", { name: new RegExp(agent) }),
         `agen "${agent}" tidak boleh tetap selectable`,
       ).toHaveCount(0);
     }
+    await closeSelect(agentSelect);
 
     // (2) Penyebab `disabled` harus terbukti JUSTRU direktori agen, bukan
     // katalog Parameter: katalog sudah selesai dan utuh saat tombol dinilai.
     const parameter = parameterSelect(page);
     await expect(parameter).toBeEnabled();
-    expect(await optionLabels(parameter), "katalog Parameter belum selesai").toEqual(
+    expect(await selectOptionLabels(parameter), "katalog Parameter belum selesai").toEqual(
       ALL_SCOPE_PARAMETER_LABELS,
     );
     await expect(parameterPendingStatus(page)).toHaveCount(0);
@@ -2140,7 +2141,7 @@ test.describe("SIDAK reports data workspace", () => {
     // (4) Bentuk malformed kedua, lewat Tahun yang sama: `data: null`. Request
     // direktori agen yang kedua harus benar-benar terkirim — kalau tidak, test
     // ini hanya mengulang bentuk pertama.
-    await page.getByRole("combobox", { name: "Tahun" }).selectOption("2025");
+    await pickSelect(page, "Tahun", "2025");
     expect(
       await settledAgentOptions(agentSelect),
       "label opsi Agen saat data null",
@@ -2376,8 +2377,8 @@ test.describe("SIDAK reports data workspace", () => {
     // parameter bernama sama wajib terbaca berbeda lewat label layanan, dan
     // `parameter_group` ikut tampil lewat `formatQAIndicatorName`.
     await expect(parameter).toBeVisible();
-    expect(await selectedOption(parameter)).toEqual({ label: "Semuanya", value: "" });
-    expect(await optionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
+    expect(await selectedLabel(parameter)).toBe("Semuanya");
+    expect(await selectOptionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
     // Katalog diambil tanpa `service_type` saat "Semua Layanan" dipilih.
     // Dev server memakai StrictMode, jadi effect mount bisa jalan dua kali;
     // yang dibuktikan adalah ISI query setiap request, bukan jumlah request.
@@ -2401,9 +2402,9 @@ test.describe("SIDAK reports data workspace", () => {
     // (3) Per Layanan + satu layanan → katalog dipersempit dengan query PERSIS
     // `service_type`, dan label tidak perlu prefiks layanan karena sudah pasti.
     const catalogBeforeCall = indicatorRequestLabels(audit).length;
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("call");
-    await expect(parameter.locator("option")).toHaveCount(3);
-    expect(await optionLabels(parameter)).toEqual([
+    await pickSelect(page, "Layanan", "Call");
+    await expectOptionCount(parameter, 3);
+    expect(await selectOptionLabels(parameter)).toEqual([
       "Semuanya",
       "Akurasi informasi produk",
       "Compliance — Kepatuhan prosedur",
@@ -2420,8 +2421,8 @@ test.describe("SIDAK reports data workspace", () => {
     // tersimpan di state layanan TIDAK boleh ikut terpakai.
     const catalogBeforeModeSwitch = indicatorRequestLabels(audit).length;
     await page.getByRole("button", { name: "Per Individu" }).click();
-    await expect(parameter.locator("option")).toHaveCount(5);
-    expect(await optionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
+    await expectOptionCount(parameter, 5);
+    expect(await selectOptionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
     const modeSwitchRequests = indicatorRequestLabels(audit).slice(catalogBeforeModeSwitch);
     expect(modeSwitchRequests).not.toHaveLength(0);
     expect(
@@ -2432,12 +2433,9 @@ test.describe("SIDAK reports data workspace", () => {
     // (5) Per Individu + parameter: `indicatorId` menambah satu field pada
     // POST yang sudah ada, field lain tidak berubah dan `serviceType` tetap
     // tidak ada. Nilainya UUID dari katalog, bukan nama parameter.
-    await page.getByRole("combobox", { name: "Agen" }).selectOption("agent-1");
-    await parameter.selectOption(IND_CHAT_AKURASI.id);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Chat · Akurasi informasi produk",
-      value: IND_CHAT_AKURASI.id,
-    });
+    await pickSelect(page, "Agen", "Alya Pranoto — Batch 7");
+    await pickFromTrigger(parameter, "Chat · Akurasi informasi produk");
+    expect(await selectedLabel(parameter)).toBe("Chat · Akurasi informasi produk");
     await searchButton.click();
 
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveText("1 temuan");
@@ -2483,12 +2481,9 @@ test.describe("SIDAK reports data workspace", () => {
     // (7) Per Layanan: layanan + parameter bisa digabung, dan pilihan yang
     // masih valid setelah penyempitan cakupannya TETAP terpilih.
     await page.getByRole("button", { name: "Per Layanan" }).click();
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("call");
-    await parameter.selectOption(IND_CALL_KEPATUHAN.id);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Compliance — Kepatuhan prosedur",
-      value: IND_CALL_KEPATUHAN.id,
-    });
+    await pickSelect(page, "Layanan", "Call");
+    await pickFromTrigger(parameter, "Compliance — Kepatuhan prosedur");
+    expect(await selectedLabel(parameter)).toBe("Compliance — Kepatuhan prosedur");
     await searchButton.click();
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveText("1 temuan");
     expect(lastDataRequest(dataRequests)).toEqual({
@@ -2511,11 +2506,11 @@ test.describe("SIDAK reports data workspace", () => {
     // (8) Cakupan berubah jadi layanan yang tidak punya parameter itu:
     // pilihan lama tidak bisa dikirim sebagai filter yatim, jadi dibersihkan
     // ke "Semuanya" dan hasil lama (count + export) langsung hilang.
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("email");
-    await expect(parameter).toHaveValue("");
-    expect(await selectedOption(parameter)).toEqual({ label: "Semuanya", value: "" });
-    await expect(parameter.locator("option")).toHaveCount(2);
-    expect(await optionLabels(parameter)).toEqual(["Semuanya", "Kelengkapan dokumen"]);
+    await pickSelect(page, "Layanan", "Email");
+    await expect(selectValue(parameter)).toHaveText("Semuanya");
+    expect(await selectedLabel(parameter)).toBe("Semuanya");
+    await expectOptionCount(parameter, 2);
+    expect(await selectOptionLabels(parameter)).toEqual(["Semuanya", "Kelengkapan dokumen"]);
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Export Excel" })).toHaveCount(0);
     await searchButton.click();
@@ -2530,14 +2525,14 @@ test.describe("SIDAK reports data workspace", () => {
     // (9) Respons yang telat untuk parameter LAMA tidak boleh muncul sebagai
     // hasil parameter baru: request Email ditahan, filter diganti ke
     // Kepatuhan prosedur, baru responsnya dilepas.
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("");
-    await parameter.selectOption(IND_EMAIL_DOKUMEN.id);
+    await pickSelect(page, "Layanan", "Semua Layanan");
+    await pickFromTrigger(parameter, "Email · Kelengkapan dokumen");
     const deferred = createDeferredReportResponse();
     await searchButton.click();
     await deferred.arrived;
     expect(lastDataRequest(dataRequests).indicatorId).toBe(IND_EMAIL_DOKUMEN.id);
 
-    await parameter.selectOption(IND_CALL_KEPATUHAN.id);
+    await pickFromTrigger(parameter, "Call · Compliance — Kepatuhan prosedur");
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
 
     deferred.release();
@@ -2565,8 +2560,8 @@ test.describe("SIDAK reports data workspace", () => {
 
     // (11) Mengosongkan filter mengembalikan hasil penuh: `indicatorId` dihapus
     // dari payload, tabel dan Excel kembali ke semua baris actionable.
-    await parameter.selectOption("");
-    expect(await selectedOption(parameter)).toEqual({ label: "Semuanya", value: "" });
+    await pickFromTrigger(parameter, "Semuanya");
+    expect(await selectedLabel(parameter)).toBe("Semuanya");
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveCount(0);
     await searchButton.click();
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveText("4 temuan");
@@ -2620,14 +2615,11 @@ test.describe("SIDAK reports data workspace", () => {
 
     // (1) Titik awal: seluruh katalog aktif, lalu cakupannya menyempit ke Call
     // dan satu parameter dipilih.
-    await expect(parameter.locator("option")).toHaveCount(5);
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("call");
-    await expect(parameter.locator("option")).toHaveCount(3);
-    await parameter.selectOption(IND_CALL_KEPATUHAN.id);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Compliance — Kepatuhan prosedur",
-      value: IND_CALL_KEPATUHAN.id,
-    });
+    await expectOptionCount(parameter, 5);
+    await pickSelect(page, "Layanan", "Call");
+    await expectOptionCount(parameter, 3);
+    await pickFromTrigger(parameter, "Compliance — Kepatuhan prosedur");
+    expect(await selectedLabel(parameter)).toBe("Compliance — Kepatuhan prosedur");
 
     // (2) Cakupan MELAR: Per Individu tidak punya select Layanan, jadi katalognya
     // seluruh katalog aktif. Respons ditahan supaya keadaan transisi benar-benar
@@ -2640,11 +2632,11 @@ test.describe("SIDAK reports data workspace", () => {
     await expect(parameter).toBeDisabled();
     // Katalog lama (2 parameter Call) tidak boleh stubbornly offering diri
     // sebagai daftar Parameter cakupan baru.
-    await expect(parameter.locator("option")).toHaveCount(1);
+    await expectOptionCount(parameter, 1);
     await expect(parameterPendingStatus(page)).toBeVisible();
     // Agen dipilih lebih dulu, jadi satu-satunya alasan "Cari Data" disabled
     // adalah katalog yang belum divalidasi.
-    await page.getByRole("combobox", { name: "Agen" }).selectOption("agent-1");
+    await pickSelect(page, "Agen", "Alya Pranoto — Batch 7");
     await expect(search).toBeDisabled();
     // Klik paksa ke tombol disabled tidak boleh menghasilkan request: inilah
     // fail-closed-nya, bukan sekadar tombol yang terlihat mati.
@@ -2655,12 +2647,9 @@ test.describe("SIDAK reports data workspace", () => {
     // (3) Katalog baru sudah settle dan UUID itu MASIH ADA di sana, jadi
     // pilihan wajib utuh. Cakupan melebar tidak berarti pilihan dibuang.
     pending.release();
-    await expect(parameter.locator("option")).toHaveCount(5);
-    expect(await optionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Call · Compliance — Kepatuhan prosedur",
-      value: IND_CALL_KEPATUHAN.id,
-    });
+    await expectOptionCount(parameter, 5);
+    expect(await selectOptionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
+    expect(await selectedLabel(parameter)).toBe("Call · Compliance — Kepatuhan prosedur");
     await expect(search).toBeEnabled();
 
     // (4) Yang terkirim harus sama dengan yang tampil.
@@ -2692,19 +2681,19 @@ test.describe("SIDAK reports data workspace", () => {
     const parameter = parameterSelect(page);
     const search = cariDataButton(page);
 
-    await expect(parameter.locator("option")).toHaveCount(5);
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("call");
-    await expect(parameter.locator("option")).toHaveCount(3);
-    await parameter.selectOption(IND_CALL_KEPATUHAN.id);
+    await expectOptionCount(parameter, 5);
+    await pickSelect(page, "Layanan", "Call");
+    await expectOptionCount(parameter, 3);
+    await pickFromTrigger(parameter, "Compliance — Kepatuhan prosedur");
 
     // Cakupan melebar ke seluruh layanan, tapi request katalognya gagal (500).
     indicators.mode = "error";
     indicators.message = "Gagal memuat daftar parameter.";
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("");
+    await pickSelect(page, "Layanan", "Semua Layanan");
 
     await expect(parameterErrorAlert(page)).toBeVisible();
     await expect(parameter).toBeDisabled();
-    await expect(parameter.locator("option")).toHaveCount(1);
+    await expectOptionCount(parameter, 1);
     // Kegagalan katalog tidak boleh dipresentasikan sebagai "Semuanya" yang
     // sah: tombol cari harus tetap tertutup supaya tidak ada laporan
     // tak terfilter yang diklaim.
@@ -2717,12 +2706,9 @@ test.describe("SIDAK reports data workspace", () => {
     // kegagalan sesaat tidak boleh menghapus pilihan user.
     indicators.mode = "ok";
     await page.getByRole("button", { name: "Coba lagi" }).click();
-    await expect(parameter.locator("option")).toHaveCount(5);
-    expect(await optionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Call · Compliance — Kepatuhan prosedur",
-      value: IND_CALL_KEPATUHAN.id,
-    });
+    await expectOptionCount(parameter, 5);
+    expect(await selectOptionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
+    expect(await selectedLabel(parameter)).toBe("Call · Compliance — Kepatuhan prosedur");
     await expect(search).toBeEnabled();
 
     await search.click();
@@ -2749,34 +2735,28 @@ test.describe("SIDAK reports data workspace", () => {
     const parameter = parameterSelect(page);
     const search = cariDataButton(page);
 
-    await expect(parameter.locator("option")).toHaveCount(5);
-    await parameter.selectOption(IND_CHAT_AKURASI.id);
+    await expectOptionCount(parameter, 5);
+    await pickFromTrigger(parameter, "Chat · Akurasi informasi produk");
 
     // Request Email ditahan: user sudah pindah cakupan sebelum responsnya tiba.
     const stale = createDeferredIndicatorResponse(indicators);
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("email");
+    await pickSelect(page, "Layanan", "Email");
     await stale.arrived;
     await expect(parameter).toBeDisabled();
 
     // Klik kedua SAAT request pertama masih tertahan: katalog seluruh layanan
     // dilayani normal dan harus menang.
     await page.getByRole("button", { name: "Per Individu" }).click();
-    await expect(parameter.locator("option")).toHaveCount(5);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Chat · Akurasi informasi produk",
-      value: IND_CHAT_AKURASI.id,
-    });
+    await expectOptionCount(parameter, 5);
+    expect(await selectedLabel(parameter)).toBe("Chat · Akurasi informasi produk");
 
     // Respons Email yang telat sekarang dilepas. Kalau tidak diabaikan, katalog
     // Email (2 opsi) akan menggantikan katalog seluruh layanan dan pilihan Chat
     // ikut terhapus.
     stale.release();
     await page.waitForTimeout(400);
-    expect(await optionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Chat · Akurasi informasi produk",
-      value: IND_CHAT_AKURASI.id,
-    });
+    expect(await selectOptionLabels(parameter)).toEqual(ALL_SCOPE_PARAMETER_LABELS);
+    expect(await selectedLabel(parameter)).toBe("Chat · Akurasi informasi produk");
 
     // Bukti kedua request benar-benar terjadi, jadi test ini tidak lolos
     // karena tidak ada balasan yang perlu diabaikan.
@@ -2787,7 +2767,7 @@ test.describe("SIDAK reports data workspace", () => {
       "katalog seluruh layanan tidak diminta ulang setelah pindah cakupan",
     ).toBeGreaterThan(1);
 
-    await page.getByRole("combobox", { name: "Agen" }).selectOption("agent-1");
+    await pickSelect(page, "Agen", "Alya Pranoto — Batch 7");
     await search.click();
     await expect(page.getByTestId(RESULTS_COUNT)).toHaveText("1 temuan");
     expect(lastDataRequest(dataRequests)).toEqual({
@@ -2816,23 +2796,20 @@ test.describe("SIDAK reports data workspace", () => {
     const parameter = parameterSelect(page);
     const search = cariDataButton(page);
 
-    await expect(parameter.locator("option")).toHaveCount(5);
-    await parameter.selectOption(IND_CALL_AKURASI.id);
-    expect(await selectedOption(parameter)).toEqual({
-      label: "Call · Akurasi informasi produk",
-      value: IND_CALL_AKURASI.id,
-    });
+    await expectOptionCount(parameter, 5);
+    await pickFromTrigger(parameter, "Call · Akurasi informasi produk");
+    expect(await selectedLabel(parameter)).toBe("Call · Akurasi informasi produk");
 
     // Cakupan menyempit ke Email dan responsnya ditahan.
     const pending = createDeferredIndicatorResponse(indicators);
-    await page.getByRole("combobox", { name: "Layanan" }).selectOption("email");
+    await pickSelect(page, "Layanan", "Email");
     await pending.arrived;
 
     // Selama transisi UUID lama tidak boleh terlihat sebagai pilihan yang masih
     // berlaku...
     await expect(parameter).toBeDisabled();
-    await expect(parameter).toHaveValue("");
-    await expect(parameter.locator("option")).toHaveCount(1);
+    await expect(selectValue(parameter)).toHaveText("Semuanya");
+    await expectOptionCount(parameter, 1);
     await expect(parameterPendingStatus(page)).toBeVisible();
     await expect(search).toBeDisabled();
     // ...dan tidak boleh terkirim sebagai filter yatim di tengah jalan.
@@ -2843,9 +2820,9 @@ test.describe("SIDAK reports data workspace", () => {
     // Baru setelah katalog Email selesai dan UUID itu memang tidak ada di sana,
     // pilihan dibersihkan ke "Semuanya".
     pending.release();
-    await expect(parameter.locator("option")).toHaveCount(2);
-    expect(await optionLabels(parameter)).toEqual(["Semuanya", "Kelengkapan dokumen"]);
-    expect(await selectedOption(parameter)).toEqual({ label: "Semuanya", value: "" });
+    await expectOptionCount(parameter, 2);
+    expect(await selectOptionLabels(parameter)).toEqual(["Semuanya", "Kelengkapan dokumen"]);
+    expect(await selectedLabel(parameter)).toBe("Semuanya");
 
     await search.click();
     expect(lastDataRequest(dataRequests)).toEqual({
@@ -2898,8 +2875,8 @@ test.describe("SIDAK reports data workspace", () => {
 
     await openReportsData(page, audit, dataRequests, ALL_ROWS);
 
-    await page.getByRole("combobox", { name: "Dari bulan" }).selectOption("7");
-    await page.getByRole("combobox", { name: "Ke bulan" }).selectOption("3");
+    await pickSelect(page, "Dari bulan", "Juli");
+    await pickSelect(page, "Ke bulan", "Maret");
     await page.getByRole("button", { name: "Cari Data" }).click();
 
     await expect(page.getByText("Bulan awal tidak boleh setelah bulan akhir.")).toBeVisible();
@@ -2922,8 +2899,8 @@ test.describe("SIDAK reports data workspace", () => {
     await openReportsData(page, audit, dataRequests, ALL_ROWS);
 
     // (1) Rentang terbalik ditolak, jadi tidak ada request data sama sekali.
-    await page.getByRole("combobox", { name: "Dari bulan" }).selectOption("7");
-    await page.getByRole("combobox", { name: "Ke bulan" }).selectOption("3");
+    await pickSelect(page, "Dari bulan", "Juli");
+    await pickSelect(page, "Ke bulan", "Maret");
     await page.getByRole("button", { name: "Cari Data" }).click();
     await expect(page.getByText("Bulan awal tidak boleh setelah bulan akhir.")).toBeVisible();
     expect(dataRequests).toEqual([]);
@@ -2933,7 +2910,7 @@ test.describe("SIDAK reports data workspace", () => {
     // boleh terus menyalahkan filter yang sekarang sudah valid — harus kembali
     // ke prompt netral "belum ada pencarian". Kalau bocor, user akan mengira
     // rentang 1..12 juga tidak valid.
-    await page.getByRole("combobox", { name: "Dari bulan" }).selectOption("1");
+    await pickSelect(page, "Dari bulan", "Januari");
     await expect(
       page.getByText("Bulan awal tidak boleh setelah bulan akhir."),
     ).toHaveCount(0);
