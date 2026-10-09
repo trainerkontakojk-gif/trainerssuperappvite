@@ -155,9 +155,10 @@ Wrapper mechanics and the history-row write are therefore proven; migration 1's 
 
 ## 6. What still needs Fajar
 
-1. Merge of PR #38 — it does not touch production and is safe any time now that the rollout is done.
-2. Optional: the literal Postgres log-window check for `ruosnjmtywcrghjgqugz` around 2026-10-09 22:51 UTC in the Dashboard (§3b limitation).
-3. Optional: one live `anon` rejection probe against a guarded production RPC, if you want production-side proof of the 401/42501 behaviour on top of the local E2E.
-4. Optional: confirm patch level `17.6.1.121` out of band.
+PR #38 was merged 2026-10-09 22:48 UTC (`97fd7e3`).
+
+1. Optional: the literal Postgres log-window check for `ruosnjmtywcrghjgqugz` around 2026-10-09 22:51 UTC in the Dashboard (§3b limitation).
+2. Optional: one live `anon` rejection probe against a guarded production RPC, if you want production-side proof of the 401/42501 behaviour on top of the local E2E.
+3. Optional: confirm patch level `17.6.1.121` out of band.
 
 Still open by decision: the durable-Telefun original-caller gap accepted in T4 remains a staging/at-deploy verification, not something this rollout proved.
