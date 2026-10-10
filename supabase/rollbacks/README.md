@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261010120000_add_telefun_coaching_summary_annotation_columns.sql` | No-op by design: production had these columns before the migration; never drop them |
 | Latest | `rollback_20260622150000_repair_telefun_scoring_lifecycle_contract.sql`  | DATA LOSS: revert API and back up scoring data first                    |
 | 1  | `rollback_20260619090000_telefun_live_per_minute_billing.sql`                | Restores pre-per-minute billing view, then drops nullable Telefun billing columns. |
 | 2  | `rollback_20260612000000_fix_profiles_rls_recursion.sql`                     | Independently reversible                                               |
