@@ -1,6 +1,6 @@
 # Jadwal Shifting SIDAK
 
-**Status:** perubahan lokal mengalihkan adapter ke Supabase PostgREST read-only, server-side, memakai URL/key backend dan exact-origin allowlist tanpa redirect. E2E API lokal 35/35 lulus dengan key sintetis/stub; tidak ada probe live oleh adapter baru. Zona waktu `Asia/Jakarta` terkonfirmasi. Produksi **NO-GO** sampai pemilik menyetujui jenis/izin key, kebijakan akses/RLS dan runtime env, lalu role smoke test pada environment target diverifikasi. Tidak ada row jadwal mentah atau credential yang disimpan di repo/fixture.
+**Status:** perubahan lokal mengalihkan adapter ke Supabase PostgREST read-only, server-side, memakai URL/key backend dan exact-origin allowlist tanpa redirect. E2E API lokal 35/35 lulus dengan key sintetis/stub; tidak ada probe live oleh adapter baru. Zona waktu `Asia/Jakarta` terkonfirmasi. Produksi terverifikasi live untuk `admin` pada 2026-10-10 (sisa: smoke test `trainer` dan tinjauan RLS pemilik WFM). Sebelumnya produksi **NO-GO** sampai pemilik menyetujui jenis/izin key, kebijakan akses/RLS dan runtime env, lalu role smoke test pada environment target diverifikasi. Tidak ada row jadwal mentah atau credential yang disimpan di repo/fixture.
 
 ## Requirement
 
@@ -84,13 +84,17 @@ Gunakan komponen/token SIDAK yang ada—termasuk pola status `QaStatePanel`—da
 - [x] Perbarui dokumentasi kanonik: direct Supabase server-only env; origin exact di-allowlist sebelum key dikirim; redirect ditolak; timezone `Asia/Jakarta` tercatat.
 - [x] Buktikan satu tanggal dapat dibaca langsung dari Supabase dengan key yang tersimpan aman; ini bukan smoke test adapter Node atau verifikasi produksi.
 - [x] Implementasikan allowlist exact origin `WFM_SCHEDULE_API_ALLOWED_ORIGINS` dan uji origin mismatch/redirect dengan stub lokal. Env aktual pada service API belum diisi atau diverifikasi.
-- [ ] Set secret/env pada service API dan smoke-test akses `admin` + `trainer` pada environment target sebelum rilis.
+- [x] Set secret/env pada service API dan smoke-test akses `admin` pada environment target. Selesai 2026-10-10: env lengkap, `401` tanpa token, admin melihat Hari ini (78 jadwal, sama dengan hitungan count-only WFM) dan Kalender; log Railway `200` untuk kedua endpoint.
+- [ ] Smoke-test akses `trainer` pada production.
+- [ ] Pemilik WFM meninjau RLS `wfm_schedules`: key publishable saat ini dapat membaca seluruh tabel.
 
 **E2E yang dijalankan:** API spec **35 passed** dan UI spec **20 passed** dengan config sementara tanpa `webServer` agar command tidak memulai root `pnpm dev`; target Vite lokal `http://localhost:3005` lolos preflight, UI memakai mock API, dan router API memakai stub WFM loopback + fixture sintetis. Cakupan membuktikan URL di luar origin allowlist ditolak sebelum key/query dikirim, redirect PostgREST tidak diikuti, key hanya dipasang pada header ke stub, dan kegagalan upstream tidak bocor ke log/respons. Tidak ada live WFM/Supabase atau row jadwal mentah yang dipakai dalam E2E ini.
 
 **Rollback:** nonaktifkan route/menu dan cabut secret/identitas integrasi. MVP tidak memigrasikan atau menyimpan jadwal di database Trainers.
 
-**Production NO-GO:** adapter direct Supabase belum selesai diverifikasi; origin allowlist dan env aktual service API belum diverifikasi pada target deployment; secret dan otorisasi role produksi juga belum diverifikasi. Probe 29 September 2026 membuktikan satu request langsung memakai key yang tersedia dapat membaca jadwal untuk satu tanggal, tetapi bukan smoke test adapter Node, seluruh histori, atau perilaku RLS untuk identitas lain. Tidak ada production deploy, perubahan konfigurasi service API, atau live probe baru yang dilakukan untuk perubahan adapter ini.
+**Production — 10 Oktober 2026:** berjalan dan terverifikasi live untuk `admin` (lihat tasklist). Sisa: smoke test `trainer` dan tinjauan RLS oleh pemilik WFM. Paragraf berikut adalah status sebelum verifikasi.
+
+**Production NO-GO (historis, sebelum 2026-10-10):** adapter direct Supabase belum selesai diverifikasi; origin allowlist dan env aktual service API belum diverifikasi pada target deployment; secret dan otorisasi role produksi juga belum diverifikasi. Probe 29 September 2026 membuktikan satu request langsung memakai key yang tersedia dapat membaca jadwal untuk satu tanggal, tetapi bukan smoke test adapter Node, seluruh histori, atau perilaku RLS untuk identitas lain. Tidak ada production deploy, perubahan konfigurasi service API, atau live probe baru yang dilakukan untuk perubahan adapter ini.
 
 ## Dua format tampilan — 2026-09-29
 

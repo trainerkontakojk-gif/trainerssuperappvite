@@ -106,7 +106,9 @@ Aturan penempatan:
 - Endpoint kalender `GET .../jadwal-shifting/month` membaca paling banyak satu bulan (≤31 hari) per permintaan dan memakai batas `WFM_SCHEDULE_MAX_MONTH_ROWS` (default 3000). Bulan yang sama sekali di luar jendela `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS` ditolak `400` sebelum query.
 - Web service tidak memerlukan env WFM apa pun.
 
-Gate sebelum rilis, berurutan — production **NO-GO** sampai key dan runtime diverifikasi:
+Status 10 Oktober 2026: gate 2 terpenuhi dan gate 3 terpenuhi untuk `admin` (halaman Hari ini dan Kalender tampil, log `200`). Sisa: smoke test `trainer`, dan tinjauan RLS oleh pemilik WFM (key publishable saat ini dapat membaca `wfm_schedules`). Rincian di [`docs/architecture.md`](architecture.md#sidak--jadwal-shifting-wfm-dash-pro-read-only).
+
+Gate sebelum rilis, berurutan:
 
 1. Pemilik WFM mengonfirmasi key yang disetujui untuk backend, jenis/izin key, akses baca ke `wfm_schedules`, serta RLS atau pembatasan setara. Jangan meminta key dikirim lewat chat.
 2. Pasang tiga env wajib hanya pada service API, pastikan origin allowlist sama persis dengan URL, dan lakukan smoke test read-only satu tanggal melalui service yang akan dipakai. Jangan menjalankan fungsi Apps Script yang membuat/menghapus jadwal.
