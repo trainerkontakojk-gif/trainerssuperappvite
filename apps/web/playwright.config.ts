@@ -8,6 +8,10 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   testDir: "./e2e",
+  // API specs run under playwright.api.config.ts / playwright.access-api.config.ts,
+  // one project per env. Sharing this single worker leaks one spec's API env
+  // stubs into the next.
+  testIgnore: "**/*-api.spec.ts",
   timeout: 30000,
   expect: {
     timeout: 5000,

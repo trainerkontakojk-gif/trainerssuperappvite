@@ -40,5 +40,6 @@ No browser spec needs the real API or Telefun process: every spec either mocks `
 
 ## Follow-ups (out of scope)
 
-- The default config also matches `*-api.spec.ts`, so API specs share one worker and `access-matrix-api` env stubs leak into `access-scope-api`. They already run in `playwright.api.config.ts` / `playwright.access-api.config.ts`; consider `testIgnore: "*-api.spec.ts"` in the browser config.
-- `accessibility.spec.ts` fails on landing-page color contrast (`#a3a3a3` on `#fafafa`, 2.41:1).
+- [x] Done 2026-10-10: the browser config sets `testIgnore: "**/*-api.spec.ts"` (607 → 439 listed tests). `sidak-temuan-dates-api.spec.ts` ran only under the browser config, so it moved to its own project in `playwright.api.config.ts`. Original note: the default config also matches `*-api.spec.ts`, so API specs share one worker and `access-matrix-api` env stubs leak into `access-scope-api`. They already run in `playwright.api.config.ts` / `playwright.access-api.config.ts`; consider `testIgnore: "*-api.spec.ts"` in the browser config.
+- [x] Done 2026-10-10: `accessibility.spec.ts` passes. In `apps/web/src/routes/landing.css`, `--fg3` is `#6b6b6b` (light, ≥4.89:1 on `--bg`/`--surface`) and `#8a8a8a` (dark, ≥5.19:1). The blinking "Panggilan Masuk..." status uses `#065F46` (dark mode `#34D399`) and never drops below 0.8 opacity (≥4.62:1). RED had 17 nodes. Original note: `accessibility.spec.ts` fails on landing-page color contrast (`#a3a3a3` on `#fafafa`, 2.41:1).
+- Open: `sidak-temuan-dates-api.spec.ts` has 13 failures against the local disposable DB (persistence and heatmap: 500 or missing seed rows). They reproduce on `main` with the old config, so they are unrelated to the exclusion.
