@@ -23,5 +23,9 @@ export default defineConfig({
       testMatch: "exposed-function-guard-api.spec.ts",
     },
     { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
+    {
+      name: "telefun-schema-real-backend",
+      testMatch: "telefun-schema-contract-api.spec.ts",
+    },
   ],
 });

@@ -73,7 +73,6 @@
       "src/__tests__/telefun-recording-access.test.ts",
       "src/__tests__/telefun-recording-state.test.ts",
       "src/__tests__/telefun-routes.test.ts",
-      "src/__tests__/telefun-schema-contract.test.ts",
       "src/__tests__/telefun-scoring-claim-fencing.test.ts",
       "src/__tests__/telefun-scoring-errors.test.ts",
       "src/__tests__/telefun-scoring-routing.test.ts",
