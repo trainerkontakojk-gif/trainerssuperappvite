@@ -11,6 +11,12 @@ import {
   Clock,
 } from "lucide-react";
 import type { ChatMessage, KetikTypoFinding } from "@trainers/types";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 
 interface SessionReplayModalProps {
   isOpen: boolean;
@@ -99,24 +105,19 @@ export function SessionReplayModal({
     }
   }, [currentIndex]);
 
-  if (!isOpen) return null;
-
   const currentMessages = messages.slice(0, currentIndex + 1);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-2xl rounded-[2rem] overflow-hidden flex flex-col h-full max-h-[86vh] shadow-2xl shadow-black/10 bg-card border border-border/50"
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        aria-modal="true"
+        className="z-[200] w-[calc(100%-1.5rem)] max-w-2xl gap-0 p-0 rounded-[2rem] overflow-hidden flex flex-col h-[86vh] max-h-[86vh] shadow-2xl shadow-black/10 bg-card text-base text-foreground ring-0 border border-border/50 sm:max-w-2xl"
       >
         <header className="px-5 py-4 sm:px-6 sm:py-5 border-b flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -124,9 +125,9 @@ export function SessionReplayModal({
               <Play className="w-5 h-5 text-primary fill-current" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight line-clamp-1">
+              <DialogTitle className="font-sans text-lg sm:text-xl font-black text-foreground tracking-tight leading-normal line-clamp-1">
                 {scenarioTitle}
-              </h2>
+              </DialogTitle>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs font-black uppercase tracking-widest text-primary">
                   Replay
@@ -138,12 +139,12 @@ export function SessionReplayModal({
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
+          <DialogClose
+            aria-label="Tutup replay"
             className="w-10 h-10 flex items-center justify-center hover:bg-foreground/5 rounded-xl transition-all"
           >
             <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+          </DialogClose>
         </header>
 
         <div
@@ -270,7 +271,7 @@ export function SessionReplayModal({
             </p>
           </div>
         </footer>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

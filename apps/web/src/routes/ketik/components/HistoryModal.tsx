@@ -127,8 +127,11 @@ export function HistoryModal({
   onDelete,
   onReview,
 }: HistoryModalProps) {
+  // The session is kept after close so the replay's exit animation still
+  // shows its content; only the open flag flips.
   const [replaySession, setReplaySession] =
     useState<KetikSessionHistoryItem | null>(null);
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
 
   return (
     <>
@@ -306,6 +309,7 @@ export function HistoryModal({
                             onClick={(event) => {
                               event.stopPropagation();
                               setReplaySession(session);
+                              setIsReplayOpen(true);
                             }}
                             aria-label="Replay sesi"
                             title="Replay Sesi"
@@ -391,16 +395,18 @@ export function HistoryModal({
               Data lokal terenkripsi di browser Anda
             </p>
           </DialogFooter>
+
+          {/* Rendered inside the history popup so Base UI nests the dialogs:
+              Escape closes only the replay and focus returns to its trigger. */}
+          <SessionReplayModal
+            isOpen={isReplayOpen}
+            onClose={() => setIsReplayOpen(false)}
+            messages={replaySession?.messages || []}
+            scenarioTitle={replaySession?.scenarioTitle}
+            consumerName={replaySession?.consumerName}
+          />
         </DialogContent>
       </Dialog>
-
-      <SessionReplayModal
-        isOpen={!!replaySession}
-        onClose={() => setReplaySession(null)}
-        messages={replaySession?.messages || []}
-        scenarioTitle={replaySession?.scenarioTitle}
-        consumerName={replaySession?.consumerName}
-      />
     </>
   );
 }

@@ -43,6 +43,30 @@ const HISTORY_UNAVAILABLE_PARTICIPANT: readonly KetikSessionHistoryItem[] = [
   },
 ];
 
+/** Sesi yang sudah direview dan punya pesan, supaya replay bisa diputar. */
+const REPLAY_SESSION: KetikSessionHistoryItem = {
+  id: "ketik-history-reviewed",
+  date: "2026-09-11T03:00:00.000Z",
+  scenarioTitle: "Skenario Replay",
+  consumerName: "Budi",
+  reviewStatus: "completed",
+  finalScore: 82,
+  messages: [
+    {
+      id: "msg-1",
+      sender: "consumer",
+      text: "Halo, saya mau tanya soal tagihan.",
+      timestamp: "2026-09-11T03:00:00.000Z",
+    },
+    {
+      id: "msg-2",
+      sender: "agent",
+      text: "Baik Bapak Budi, saya bantu cek tagihannya.",
+      timestamp: "2026-09-11T03:00:30.000Z",
+    },
+  ],
+};
+
 /** Sesi selesai dengan review lengkap (termasuk edukasi), untuk scan ukuran teks. */
 const REVIEWED_AT = "2026-09-12T08:00:00.000Z";
 const REVIEWED_SESSION: KetikSessionHistoryItem = {
@@ -289,14 +313,10 @@ test.describe("KETIK (hermetic)", () => {
     const offenders = (await findTextBelowFloor(history)).map((o) => `[riwayat] ${o}`);
 
     await history.getByRole("button", { name: "Replay sesi" }).first().click();
-    // Modal replay belum punya role="dialog"; dikenali lewat label "Replay".
-    const replay = page
-      .locator("div.fixed")
-      .filter({ has: page.getByText("Replay", { exact: true }) })
-      .last();
+    const replay = page.getByRole("dialog", { name: "Tagihan Kartu Kredit" });
     await expect(replay.getByText("Tagihan saya dobel.").first()).toBeVisible();
     offenders.push(...(await findTextBelowFloor(replay)).map((o) => `[replay] ${o}`));
-    await replay.locator("header button").click();
+    await replay.getByRole("button", { name: "Tutup replay" }).click();
     await expect(replay).toHaveCount(0);
 
     await history
@@ -311,6 +331,63 @@ test.describe("KETIK (hermetic)", () => {
 
     const unique = [...new Set(offenders)];
     expect(unique, unique.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("replay sesi adalah dialog modal: berlabel, Escape menutup, fokus kembali", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/ketik",
+      apiMocks: ketikMocks([REPLAY_SESSION]),
+      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
+    });
+    console.log("[audit]", formatAudit(audit));
+
+    await page
+      .getByRole("button", { name: /^Riwayat/ })
+      .first()
+      .click();
+    const history = page.getByRole("dialog", { name: /Riwayat/ });
+    await expect(history).toBeVisible({ timeout: 20000 });
+
+    const replayTrigger = history.getByRole("button", { name: "Replay sesi" });
+    await replayTrigger.click();
+
+    const replay = page.getByRole("dialog", { name: "Skenario Replay" });
+    await expect(replay).toBeVisible();
+    await expect(replay).toHaveAttribute("aria-modal", "true");
+    await expect(replay.getByText("Replay", { exact: true })).toBeVisible();
+    await expect(replay.getByText("Budi")).toBeVisible();
+
+    // Fokus terperangkap di dalam dialog replay.
+    await expect
+      .poll(() =>
+        replay.evaluate((el) => el.contains(document.activeElement)),
+      )
+      .toBe(true);
+
+    // Kontrol playback tetap berjalan.
+    await expect(replay.getByText("1 / 2")).toBeVisible();
+    await replay.getByTitle("Next").click();
+    await expect(replay.getByText("2 / 2")).toBeVisible();
+    await expect(
+      replay.getByText("Baik Bapak Budi, saya bantu cek tagihannya."),
+    ).toBeVisible();
+
+    // Escape menutup replay saja; Riwayat tetap terbuka dan fokus kembali.
+    await page.keyboard.press("Escape");
+    await expect(replay).toBeHidden();
+    await expect(history).toBeVisible();
+    await expect(replayTrigger).toBeFocused();
+
+    // Tombol tutup ikon punya nama aksesibel dan menutup replay.
+    await replayTrigger.click();
+    await expect(replay).toBeVisible();
+    await replay.getByRole("button", { name: "Tutup replay" }).click();
+    await expect(replay).toBeHidden();
+    await expect(history).toBeVisible();
+
     expectHermetic(audit);
   });
 });
