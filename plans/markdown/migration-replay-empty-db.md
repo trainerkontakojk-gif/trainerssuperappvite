@@ -39,4 +39,4 @@ The CI comment also names `20260910000000_simulation_subject_attribution`. That 
 - [x] **T2 GREEN:** Guard in `163000`; the isolated full replay completes (NOTICE `Belum ada aturan SLIK: baseline Januari 2026 dilewati`). Fail-closed probe: with a published SLIK rule for February 2026 and no January period, the migration still raises `Periode Januari 2026 tidak ditemukan`.
 - [x] **T3:** The seed script re-runs `160000` and `163000` while the baseline is missing. Run against the isolated stack (a copy pointed at port 55322 in an unlinked folder; the repo itself is linked to production, so the script's guard refuses there): `published | Baseline SLIK Januari 2026 … | 13`. A second run applies nothing.
 - [x] **T4:** CI step blocking; skill note; `git diff --check`.
-- [ ] **T5:** The PR's CI replay step passes as a blocking step.
+- [x] **T5:** PR #46 CI run 38041303023: the blocking replay step passed (`Started supabase local development setup.`).
