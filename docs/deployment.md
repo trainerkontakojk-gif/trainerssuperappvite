@@ -106,7 +106,7 @@ Aturan penempatan:
 - Endpoint kalender `GET .../jadwal-shifting/month` membaca paling banyak satu bulan (≤31 hari) per permintaan dan memakai batas `WFM_SCHEDULE_MAX_MONTH_ROWS` (default 3000). Bulan yang sama sekali di luar jendela `WFM_SCHEDULE_MAX_DATE_OFFSET_DAYS` ditolak `400` sebelum query.
 - Web service tidak memerlukan env WFM apa pun.
 
-Status 10 Oktober 2026: gate 2 terpenuhi dan gate 3 terpenuhi untuk `admin` (halaman Hari ini dan Kalender tampil, log `200`). Sisa: smoke test `trainer`, dan tinjauan RLS oleh pemilik WFM (key publishable saat ini dapat membaca `wfm_schedules`). Rincian di [`docs/architecture.md`](architecture.md#sidak--jadwal-shifting-wfm-dash-pro-read-only).
+Status 10 Oktober 2026: gate 2 terpenuhi dan gate 3 terpenuhi untuk `admin` dan `trainer` (data tampil, log `200`); penolakan `leader`/`agent` dibuktikan oleh E2E lokal. Sisa: tinjauan RLS oleh pemilik WFM (key publishable saat ini dapat membaca `wfm_schedules`). Rincian di [`docs/architecture.md`](architecture.md#sidak--jadwal-shifting-wfm-dash-pro-read-only).
 
 Gate sebelum rilis, berurutan:
 
