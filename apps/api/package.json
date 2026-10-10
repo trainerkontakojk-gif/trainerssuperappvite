@@ -31,7 +31,7 @@
     "@supabase/supabase-js": "^2.117.2",
     "@trainers/types": "workspace:*",
     "hono": "^4.13.13",
-    "tsx": "^4.0.0",
+    "tsx": "^4.23.15",
     "zod": "^4.6.5"
   },
   "devDependencies": {
