@@ -25,7 +25,13 @@ const ACCESS_MOCK: ApiMock = {
   body: { success: true, data: {} },
 };
 
-function agent(id: string, nama: string, batch: string) {
+function agent(
+  id: string,
+  nama: string,
+  batch: string,
+  avgScore = 96,
+  atRisk = false,
+) {
   return {
     id,
     nama,
@@ -34,10 +40,10 @@ function agent(id: string, nama: string, batch: string) {
     batch_name: batch,
     foto_url: null,
     jabatan: null,
-    avgScore: 96,
+    avgScore,
     trend: "same",
     trendValue: null,
-    atRisk: false,
+    atRisk,
     periodMonth: null,
   };
 }
@@ -94,6 +100,45 @@ test.describe("Sisa perapian SIDAK (hermetic)", () => {
 
     await pickSelect(page, "Batch", "Semua batch");
     await expect(page.getByText("Alya Pranoto")).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("Daftar agen: warna skor mengikuti target QA 95 seperti detail agent", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/agents",
+      apiMocks: [
+        ACCESS_MOCK,
+        {
+          method: "GET",
+          path: "/api/v1/sidak/agents",
+          body: {
+            success: true,
+            data: {
+              agents: [
+                agent("a-1", "Alya Pranoto", "batch alpha", 96),
+                agent("a-2", "Bima Saputra", "batch alpha", 88, true),
+                agent("a-3", "Citra Lestari", "batch alpha", 72, true),
+              ],
+              batches: ["batch alpha"],
+            },
+          },
+        },
+      ],
+    });
+    await waitForMockedApi(audit, ["/sidak/agents"]);
+
+    // Same tones as utils/sidakScoreStatus.ts: >=95 met, >=85 near, else attention.
+    await expect(page.getByText("96.0%", { exact: true })).toHaveClass(
+      /text-emerald-700/,
+    );
+    await expect(page.getByText("88.0%", { exact: true })).toHaveClass(
+      /text-amber-700/,
+    );
+    await expect(page.getByText("72.0%", { exact: true })).toHaveClass(
+      /text-rose-700/,
+    );
     expectHermetic(audit);
   });
 

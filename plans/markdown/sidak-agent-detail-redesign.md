@@ -102,7 +102,7 @@ Acceptance criteria:
 - [x] E2E: layout 6/6 + states 20/20 (RED lebih dulu untuk layout), regresi 84/84 spec detail/ekspor; detector `[]`; typecheck web + e2e.
 - [x] `docs/modules.md` diperbarui.
 - [x] Review visual Fajar (fase 2 disetujui; fase 3 menindaklanjuti masukan).
-- [ ] Opsional: samakan ambang status di layar SIDAK lain (ranking, kartu direktori, input, `lib/scoring.ts`).
+- [x] Opsional: samakan ambang status di layar SIDAK lain (ranking, kartu direktori, input, `lib/scoring.ts`). 2026-10-10: Ranking dan Input sudah memakai `sidakScoreStatus`; kartu direktori (`AgentCard`) dipindah ke `sidakScoreTone`/`SIDAK_SCORE_TEXT` dengan E2E RED→GREEN di `sidak-minor-polish.spec.ts`; `ScoreDisplay.tsx` (tidak dipakai) dihapus. `scoreColor`/`scoreBg`/`scoreLabel` (ambang 85) di `lib/scoring.ts` tidak punya pemanggil runtime; dihapus beserta 5 kasus unit test legacy-nya di `sidak-scoring-core.test.tsx` atas persetujuan Fajar.
 
 ---
 
