@@ -25,6 +25,9 @@ real-backend specs forward `/api` to the in-process Hono app.
 - `reuseExistingServer` is `false`. If `:3005` is busy (for example your own `pnpm dev`), the run
   fails instead of testing against a server whose env cannot be verified. Stop that server first.
 - `e2e-target-isolation.spec.ts` guards both properties.
+- The browser configs ignore `*-api.spec.ts`. API specs run under `playwright.api.config.ts` or
+  `playwright.access-api.config.ts`, one project per env, because a shared worker leaks one spec's
+  API env stubs into the next. A new API spec needs a project in one of those configs, or it never runs.
 
 ## `mockSupabaseAuth` is UI-only
 

@@ -2,7 +2,7 @@
   --bg: #fafafa;
   --fg: #0a0a0a;
   --fg2: #525252;
-  --fg3: #a3a3a3;
+  --fg3: #6b6b6b; /* WCAG AA 4.5:1 on --bg and --surface */
   --border: #e5e5e5;
   --surface: #f5f5f5;
   --inv-bg: #0a0a0a;
@@ -19,7 +19,7 @@
   --bg: #0a0a0a;
   --fg: #fafafa;
   --fg2: #a3a3a3;
-  --fg3: #525252;
+  --fg3: #8a8a8a; /* WCAG AA 4.5:1 on --bg and --surface */
   --border: #262626;
   --surface: #171717;
   --inv-bg: #fafafa;
@@ -315,9 +315,10 @@
   font-size: 13px; font-weight: 600; color: var(--fg); margin: 0; line-height: 1.2;
 }
 .landing-wrapper .sc-call-status {
-  font-size: 10px; color: #10B981; font-weight: 600; margin: 0;
+  font-size: 10px; color: #065F46; font-weight: 600; margin: 0;
   animation: statusBlink 1.5s infinite ease-in-out;
 }
+.dark .landing-wrapper .sc-call-status { color: #34D399; }
 .landing-wrapper .sc-call-time {
   font-size: 10px; color: var(--fg3); display: flex; align-items: center; gap: 4px; margin: 0;
 }
@@ -367,8 +368,9 @@
   10%, 30%, 50%, 70%, 90% { transform: rotate(-6deg) scale(1.04); }
   20%, 40%, 60%, 80% { transform: rotate(6deg) scale(1.04); }
 }
+/* Opacity never drops below 0.8, so the text keeps 4.5:1 through the blink. */
 @keyframes statusBlink {
-  0%, 100% { opacity: 0.5; }
+  0%, 100% { opacity: 0.8; }
   50% { opacity: 1; }
 }
 @keyframes acceptPulseCall {

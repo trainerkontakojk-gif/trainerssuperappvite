@@ -22,5 +22,6 @@ export default defineConfig({
       name: "db-guard-real-backend",
       testMatch: "exposed-function-guard-api.spec.ts",
     },
+    { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
   ],
 });
