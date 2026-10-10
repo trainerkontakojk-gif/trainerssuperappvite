@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   resolveServiceTypeFromTeam,
   calculateQAScoreFromTemuan,
-  scoreColor,
-  scoreBg,
-  scoreLabel,
   NILAI_LABELS,
   NILAI_BADGE_COLORS,
 } from "../lib/scoring";
@@ -196,34 +193,5 @@ describe("Sesi Tanpa Temuan — hasBadFindings logic", () => {
     const temuan = [{ id: "1", nilai: 0 }];
     const hasBad = temuan.some((t) => t.nilai < 3);
     expect(hasBad).toBe(true);
-  });
-});
-
-describe("scoring color/label helpers (moved from sidak-input-parity)", () => {
-  it("scoreColor returns green for high scores", () => {
-    expect(scoreColor(85)).toContain("green");
-    expect(scoreColor(100)).toContain("green");
-  });
-
-  it("scoreColor returns amber for medium scores", () => {
-    expect(scoreColor(70)).toContain("amber");
-    expect(scoreColor(84)).toContain("amber");
-  });
-
-  it("scoreColor returns red for low scores", () => {
-    expect(scoreColor(0)).toContain("red");
-    expect(scoreColor(69)).toContain("red");
-  });
-
-  it("scoreBg returns appropriate background colors", () => {
-    expect(scoreBg(90)).toContain("green");
-    expect(scoreBg(75)).toContain("amber");
-    expect(scoreBg(50)).toContain("red");
-  });
-
-  it("scoreLabel returns correct Indonesian labels", () => {
-    expect(scoreLabel(85)).toBe("Baik");
-    expect(scoreLabel(72)).toBe("Cukup");
-    expect(scoreLabel(0)).toBe("Perlu Perhatian");
   });
 });

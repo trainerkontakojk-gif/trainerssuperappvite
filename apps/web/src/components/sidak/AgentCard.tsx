@@ -16,6 +16,7 @@ import {
   humanizeTrend,
   titleize,
 } from "../../lib/humanize";
+import { SIDAK_SCORE_TEXT, sidakScoreTone } from "../../utils/sidakScoreStatus";
 
 const MONTHS_SHORT = [
   "Jan",
@@ -34,9 +35,7 @@ const MONTHS_SHORT = [
 
 function scoreColor(score: number | null): string {
   if (score === null) return "text-muted-foreground";
-  if (score >= 85) return "text-emerald-700 dark:text-emerald-400";
-  if (score >= 70) return "text-amber-700 dark:text-amber-400";
-  return "text-rose-700 dark:text-rose-400";
+  return SIDAK_SCORE_TEXT[sidakScoreTone(score)];
 }
 
 type RiskKey = "atRisk" | "compliant" | "none";

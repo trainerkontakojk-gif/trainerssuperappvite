@@ -149,6 +149,8 @@ Graphify diperiksa; import/caller langsung mengonfirmasi scope. Tidak ada penggu
 
 ## Iteration 5 — Order repair after rejected redesign (Lane D)
 
+> **Superseded (dicatat 2026-10-10):** iterasi ini tidak dieksekusi. Fajar memilih arah "Ringkas terarah" di Iteration 6 (2026-10-05), yang sudah selesai dan diverifikasi di bawah. Tasklist di bawah dibiarkan sebagai catatan, bukan pekerjaan terbuka.
+
 ### Requirement
 User rejected iteration 4 as messy. Preserve all facts, KPI/delta/sparklines, filters, two-series limit, forecast controls/cache, heatmap scope/states and navigation. No branding, API, business logic, shell or dependency changes. Ownership is the seven paths in the verified orchestration contract; nav-config.ts remains untouched.
 
