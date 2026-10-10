@@ -56,7 +56,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.120.0
 
       # supabase/config.toml is gitignored, so generate a default one. Starting
       # the stack replays every migration on a clean database. Only Postgres +
