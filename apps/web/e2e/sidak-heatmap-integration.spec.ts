@@ -23,7 +23,6 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
-import { getSidakHeatmap } from "../../api/src/services/sidak/heatmap-service";
 
 const PERIOD_ID = "32e01554-79f1-4b05-b007-d73f451be60c";
 const INDICATOR_IDS = [
@@ -149,17 +148,37 @@ type Envelope = {
   error?: { code: string; message: string };
 };
 
-let routerModulePromise: Promise<unknown> | null = null;
-function loadTemuanRouter(): Promise<unknown> {
-  routerModulePromise ??= (async () => {
+type ApiModules = {
+  sidakTemuan: unknown;
+  heatmapService: typeof import("../../api/src/services/sidak/heatmap-service");
+};
+
+/**
+ * Semua modul `apps/api` dimuat di sini, di dalam pin env. JANGAN meng-import
+ * modul `apps/api` secara statis di file ini: import statis di-hoist dan
+ * berjalan sebelum pin, sehingga `lib/env` mengunci env REMOTE dari `.env.local`
+ * untuk seluruh worker dan semua query diblokir guard egress.
+ */
+let apiModulesPromise: Promise<ApiModules> | null = null;
+function loadApiModules(): Promise<ApiModules> {
+  apiModulesPromise ??= (async () => {
     const saved = ENV_KEYS_PINNED.map((key) => [key, process.env[key]] as const);
     process.env.VITE_SUPABASE_URL = LOCAL.SUPABASE_URL;
     process.env.VITE_SUPABASE_ANON_KEY = LOCAL.SUPABASE_ANON_KEY ?? "";
     process.env.SUPABASE_ANON_KEY = LOCAL.SUPABASE_ANON_KEY ?? "";
     process.env.SUPABASE_SERVICE_ROLE_KEY = LOCAL.SUPABASE_SERVICE_ROLE_KEY;
     try {
-      const mod = await import("../../api/src/routes/sidak/temuan");
-      return mod.sidakTemuan;
+      const [{ env: apiEnv }, temuan, heatmapService] = await Promise.all([
+        import("../../api/src/lib/env"),
+        import("../../api/src/routes/sidak/temuan"),
+        import("../../api/src/services/sidak/heatmap-service"),
+      ]);
+      // Fail-closed: berhenti sebelum query kalau modul API terikat ke remote.
+      assertLoopback(
+        new URL(apiEnv.VITE_SUPABASE_URL).hostname,
+        "API lib/env VITE_SUPABASE_URL",
+      );
+      return { sidakTemuan: temuan.sidakTemuan, heatmapService };
     } finally {
       for (const [key, value] of saved) {
         if (value === undefined) delete process.env[key];
@@ -167,11 +186,17 @@ function loadTemuanRouter(): Promise<unknown> {
       }
     }
   })();
-  return routerModulePromise;
+  return apiModulesPromise;
+}
+
+async function getSidakHeatmap(
+  ...args: Parameters<ApiModules["heatmapService"]["getSidakHeatmap"]>
+) {
+  return (await loadApiModules()).heatmapService.getSidakHeatmap(...args);
 }
 
 async function mountTemuanRouter(role: string | undefined) {
-  const sidakTemuan = (await loadTemuanRouter()) as never;
+  const sidakTemuan = (await loadApiModules()).sidakTemuan as never;
   const app = new Hono<{
     Variables: { user: unknown; profile: unknown };
   }>()
@@ -409,7 +434,7 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
     });
     expect(created.status).toBe(201);
 
-    // `supabaseAdmin` di `lib/env` sudah terikat loopback setelah import router.
+    // `supabaseAdmin` di `lib/env` sudah terikat loopback setelah `loadApiModules`.
     const { getAgentDetail } = await import(
       "../../api/src/services/sidak/agent-directory"
     );

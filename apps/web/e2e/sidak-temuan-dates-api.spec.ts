@@ -53,7 +53,7 @@ const REPO_ROOT = path.resolve(
 //   2. `globalThis.fetch` dibungkus fail-closed: host non-loopback di-`abort`
 //      dan dicatat, jadi tidak ada jalan egress walau pin env somehow gagal.
 //   3. Env Supabase di-pin ke nilai lokal itu HANYA selama import router, lalu
-//      dikembalikan — lihat `loadTemuanRouter`.
+//      dikembalikan — lihat `loadApiModules`.
 const ENV_KEYS_PINNED = [
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
@@ -146,7 +146,7 @@ const guard: GuardState = (globalScope[GUARD_KEY] ??= {
 
 /**
  * Teardown `fetch`. `process.env` SENGAJA tidak dipin di level modul — lihat
- * `loadTemuanRouter`. Playwright menjalankan tiap file spec di proses worker
+ * `loadApiModules`. Playwright menjalankan tiap file spec di proses worker
  * yang diwarisi dari proses sebelumnya, sehingga pin env di level modul bocor ke
  * file lain dan tidak bisa dipulihkan dari dalam file ini. Env dipin hanya
  * selama import router dan langsung dikembalikan setelahnya.
@@ -327,8 +327,9 @@ type TestEnv = {
  * variabel yang diuji, jadi menyuntikkannya tidak melemahkan apa pun.
  */
 /**
- * Memuat router temuan asli dengan env Supabase di-pin ke loopback mati HANYA
- * selama import, lalu langsung dipulihkan.
+ * Memuat SEMUA modul API yang dipakai spec ini (router temuan, router heatmap,
+ * heatmap service) dalam satu import ber-pin: env Supabase di-pin ke stack
+ * lokal HANYA selama import, lalu langsung dipulihkan.
  *
  * Kenapa tidak men-pin di level modul: `apps/api/src/lib/env.ts` membaca
  * `.env.local` (project REMOTE) dan `supabaseAdmin` dibangun saat import. Kalau
@@ -339,11 +340,22 @@ type TestEnv = {
  * Pin hanya perlu bertahan sampai `lib/env` selesai mem-parse dan meng-export
  * snapshot-nya; setelah import selesai, modul yang sudah ter-import tidak lagi
  * membaca `process.env`, jadi env bisa dikembalikan dengan aman.
+ *
+ * JANGAN meng-import modul `apps/api` secara statis di file ini. Import statis
+ * di-hoist dan berjalan sebelum pin, sehingga `lib/env` mengunci env REMOTE untuk
+ * seluruh worker (pernah terjadi: 13 test persistence/heatmap gagal karena semua
+ * query diblokir guard egress). Assertion loopback di bawah menangkapnya.
  */
-let routerModulePromise: Promise<unknown> | null = null;
+type ApiModules = {
+  sidakTemuan: unknown;
+  sidakHeatmap: unknown;
+  heatmapService: typeof import("../../api/src/services/sidak/heatmap-service");
+};
 
-function loadTemuanRouter(): Promise<unknown> {
-  routerModulePromise ??= (async () => {
+let apiModulesPromise: Promise<ApiModules> | null = null;
+
+function loadApiModules(): Promise<ApiModules> {
+  apiModulesPromise ??= (async () => {
     const saved = ENV_KEYS_PINNED.map((key) => [key, process.env[key]] as const);
 
     process.env.VITE_SUPABASE_URL = LOCAL_ENV.apiUrl;
@@ -352,8 +364,24 @@ function loadTemuanRouter(): Promise<unknown> {
     process.env.SUPABASE_SERVICE_ROLE_KEY = LOCAL_ENV.serviceRoleKey;
 
     try {
-      const mod = await import("../../api/src/routes/sidak/temuan");
-      return mod.sidakTemuan;
+      const [{ env: apiEnv }, temuan, heatmap, heatmapService] =
+        await Promise.all([
+          import("../../api/src/lib/env"),
+          import("../../api/src/routes/sidak/temuan"),
+          import("../../api/src/routes/sidak/heatmap"),
+          import("../../api/src/services/sidak/heatmap-service"),
+        ]);
+      // Fail-closed: kalau `lib/env` sudah ter-evaluasi sebelum pin, modul API
+      // terikat ke project remote. Berhenti di sini, sebelum ada query.
+      assertLoopback(
+        new URL(apiEnv.VITE_SUPABASE_URL).hostname,
+        "API lib/env VITE_SUPABASE_URL",
+      );
+      return {
+        sidakTemuan: temuan.sidakTemuan,
+        sidakHeatmap: heatmap.sidakHeatmap,
+        heatmapService,
+      };
     } finally {
       for (const [key, value] of saved) {
         if (value === undefined) delete process.env[key];
@@ -362,11 +390,11 @@ function loadTemuanRouter(): Promise<unknown> {
     }
   })();
 
-  return routerModulePromise;
+  return apiModulesPromise;
 }
 
 async function mountRouter(role: string | undefined) {
-  const sidakTemuan = (await loadTemuanRouter()) as never;
+  const sidakTemuan = (await loadApiModules()).sidakTemuan as never;
 
   const app = new Hono<TestEnv>()
     .use("*", async (c, next) => {
@@ -1112,8 +1140,14 @@ test.describe("Persistence tanggal (route nyata + DB disposable)", () => {
  * query, jadi RLS tetap sungguhan).
  */
 import { createClient } from "@supabase/supabase-js";
-import { getSidakHeatmap } from "../../api/src/services/sidak/heatmap-service";
 import { buildMockAuth } from "./helpers/mockAuth";
+
+/** Heatmap service asli, dimuat lewat `loadApiModules` (bukan import statis). */
+async function getSidakHeatmap(
+  ...args: Parameters<ApiModules["heatmapService"]["getSidakHeatmap"]>
+) {
+  return (await loadApiModules()).heatmapService.getSidakHeatmap(...args);
+}
 
 type HeatmapEnv = {
   apiUrl: string;
@@ -1135,23 +1169,7 @@ async function mountHeatmapRouter(
   token: string,
   userId = "user-test",
 ) {
-  // Pin env loopback HANYA selama import modul route (yang meng-import `lib/env`
-  // + `supabaseAdmin`). Tanpa ini, worker yang di-restart Playwright bisa
-  // mengevaluasi `lib/env` tanpa `VITE_SUPABASE_URL` dan keluar dengan exit 1.
-  const saved = ENV_KEYS_PINNED.map((key) => [key, process.env[key]] as const);
-  process.env.VITE_SUPABASE_URL = LOCAL_ENV.apiUrl;
-  process.env.VITE_SUPABASE_ANON_KEY = LOCAL_ENV.anonKey;
-  process.env.SUPABASE_ANON_KEY = LOCAL_ENV.anonKey;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = LOCAL_ENV.serviceRoleKey;
-  let sidakHeatmap: unknown;
-  try {
-    ({ sidakHeatmap } = await import("../../api/src/routes/sidak/heatmap"));
-  } finally {
-    for (const [key, value] of saved) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
+  const { sidakHeatmap } = await loadApiModules();
   const app = new Hono<TestEnv>()
     .use("*", async (c, next) => {
       c.set("user", { id: userId, email: "e2e@local.test" });
