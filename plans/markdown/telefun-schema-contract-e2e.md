@@ -34,7 +34,8 @@ A text grep of migrations proves none of these about the database that actually 
 - [x] RED (schema gap): on the clean local database the RPC test fails with `42703: column "ai_annotation_count" … does not exist`, for the 2-argument call too.
 - [x] GREEN: migration `20261010120000_add_telefun_coaching_summary_annotation_columns.sql` applied to the local database with `psql`; spec 3/3. A second apply (columns and constraints present, the production state) is a no-op. Full `playwright.api.config.ts`: 105 passed.
 - [x] Unit test and its entries in `scripts/test-fast.json` and `scripts/test-core.json` removed; `tsc -p tsconfig.e2e.json` exit 0; `git diff --check` clean.
-- [ ] CI: the blocking clean replay applies the new migration.
+- [x] CI: PR #49 run 38046212172: the rollback check passed, and the blocking clean replay applied `20261010120000` (`Started supabase local development setup.`). Merged as 6eb4527.
+- [x] Production ledger (Fajar's approval; Hermes ran it 2026-10-10, 10:54:41–43 UTC): the pre-check found the version absent and both constraints present. A dry-run on production (`ROLLBACK`) left no dummy row. `apply-20261010120000.sql` (one transaction: migration, history row, `COMMIT`) exited 0. Post-check: version recorded with the full 1790-byte statement, 8 columns and both constraints unchanged, 32 rows untouched. NOTICE output is not returned through `supabase db query --linked`, so the no-op is shown by the identical before/after schema.
 
 ## Finding (2026-10-10): coaching summary RPC fails on a database built from migrations
 
