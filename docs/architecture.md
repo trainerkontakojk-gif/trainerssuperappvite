@@ -300,6 +300,15 @@ Dua endpoint jadwal WFM, keduanya `admin`/`trainer` dan hanya-baca:
 
 **Status verifikasi.** Pada 29 September 2026, request REST langsung read-only dengan key yang tersimpan aman menghasilkan 78 baris untuk satu tanggal. Ini membuktikan endpoint REST dan key tersebut pernah dapat membaca tanggal uji, bukan otorisasi permanen atau izin seluruh histori. Adapter Node kini memakai jalur direct PostgREST, tetapi yang sudah diuji pada kode adalah E2E lokal dengan key sintetis dan stub loopback; belum ada smoke test live dari adapter/service runtime. Alur lama melalui `google.script.run` adalah bukti historis saja dan tidak dipakai adapter. Karena tipe/izin key, RLS, konfigurasi runtime, dan role smoke test belum diverifikasi pada environment target, production tetap **NO-GO**.
 
+**Verifikasi production — 10 Oktober 2026.** Production kini **berjalan dan terverifikasi live untuk role `admin`**:
+
+- Keempat env `WFM_SCHEDULE_*` ada pada service API Railway; origin cocok dengan allowlist; timezone `Asia/Jakarta`. Key bertipe publishable (`sb_publishable_…`), bukan service-role.
+- Tanpa token, endpoint menjawab `401`.
+- Sebagai admin di `https://trainers-superapp.vercel.app/sidak/jadwal-shifting`, format **Hari ini** menampilkan "78 jadwal pada 2026-10-10" dan format **Kalender** (Oktober 2026) menampilkan matriks shift tanpa pesan error. Log Railway: `GET /api/v1/sidak/jadwal-shifting` `200` dan `GET .../month` `200`, tanpa baris `WFM_*` di jendela itu.
+- Angka 78 sama dengan hitungan count-only langsung ke `wfm_schedules` untuk tanggal yang sama, jadi adapter membaca WFM, bukan data cadangan.
+
+Yang belum terbukti live: smoke test role `trainer`, dan penolakan `leader`/`agent` (masih dibuktikan oleh E2E lokal saja). **Temuan terbuka (milik pemilik WFM):** RLS `wfm_schedules` mengizinkan pembacaan dengan key publishable, sehingga siapa pun yang memegang key itu dapat membaca jadwal; ini kebijakan di project WFM, bukan di Trainers SuperApp.
+
 Penempatan env dan gate rilis ada di [`.env.example`](../.env.example) serta [`docs/deployment.md`](deployment.md#sidak--jadwal-shifting-wfm-dash-pro).
 
 ### Telefun Server (`apps/telefun`) — variabel langsung:
