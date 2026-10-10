@@ -28,4 +28,4 @@ Schema, RLS, grant, and RPC changes are Lane D. Load `trainers-superapp-tdd` fir
 
 - Apply to a remote project (`supabase db push`, MCP `apply_migration`/`execute_sql`) without Fajar's explicit OK. The guard hook asks for confirmation and blocks the production ref `ruosnjmtywcrghjgqugz` outright.
 - Treat Supabase MCP output as production facts; the MCP points at a different project.
-- Edit an already-applied migration; add a new one instead.
+- Edit an already-applied migration; add a new one instead. The one approved exception (Fajar, 2026-10-10) is the empty-database guard in `20260716163000`, needed because a clean replay stopped there before any later migration could run; see `plans/markdown/migration-replay-empty-db.md`.

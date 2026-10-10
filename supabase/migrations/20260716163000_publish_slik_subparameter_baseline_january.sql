@@ -3,6 +3,11 @@
 --
 -- This migration fails closed if SLIK findings already exist, so an established
 -- scoring history can never be silently reinterpreted.
+--
+-- On a database that has never held a SLIK rule (a clean replay: CI, local
+-- reset) there is nothing to promote, so it is a no-op. Added 2026-10-10 after
+-- the production apply, approved by Fajar; see
+-- plans/markdown/migration-replay-empty-db.md.
 
 DO $$
 DECLARE
@@ -11,6 +16,15 @@ DECLARE
   existing_findings bigint;
   published_at_time timestamptz := now();
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.qa_service_rule_versions
+    WHERE service_type = 'slik'
+  ) THEN
+    RAISE NOTICE 'Belum ada aturan SLIK: baseline Januari 2026 dilewati';
+    RETURN;
+  END IF;
+
   SELECT id
   INTO target_period_id
   FROM public.qa_periods

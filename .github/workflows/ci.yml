@@ -60,15 +60,9 @@ jobs:
 
       # supabase/config.toml is gitignored, so generate a default one. Starting
       # the stack replays every migration on a clean database. Only Postgres +
-      # auth are needed for that.
-      #
-      # ADVISORY until fixed: 20260716163000_publish_slik_subparameter_baseline_january
-      # (and 20260910000000_simulation_subject_attribution) RAISE when
-      # production-only rows are absent, so a clean replay cannot pass yet. The
-      # step still runs and reports the failing migration as a warning; drop
-      # continue-on-error once those migrations tolerate an empty database.
-      - name: Replay all migrations on a fresh local Supabase (advisory)
-        continue-on-error: true
+      # auth are needed for that. Blocking: every migration must apply to an
+      # empty database (plans/markdown/migration-replay-empty-db.md).
+      - name: Replay all migrations on a fresh local Supabase
         run: |
           set -o pipefail
           supabase init --force
