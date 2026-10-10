@@ -29,6 +29,16 @@ real-backend specs forward `/api` to the in-process Hono app.
   `playwright.access-api.config.ts`, one project per env, because a shared worker leaks one spec's
   API env stubs into the next. A new API spec needs a project in one of those configs, or it never runs.
 
+## Real-backend specs: never import `apps/api` statically
+
+`apps/api/src/lib/env.ts` loads the root `.env.local` (production) and parses env once, at first
+import; `lib/supabase.ts` builds `supabaseAdmin` from it. A spec that imports in-process API modules
+must pin the loopback env first and load **every** `apps/api` module with a dynamic `import()` inside
+that pin, then assert `lib/env` is loopback (`loadApiModules()` in `sidak-temuan-dates-api.spec.ts`).
+A static `import … from "../../api/src/…"` is hoisted above the pin and binds the whole worker to
+production. The fetch guard blocks the traffic, so the symptom is unexplained 400/500 responses,
+not egress. The `[API] Supabase client initialized for project …` log line shows which project won.
+
 ## `mockSupabaseAuth` is UI-only
 
 `helpers/mockAuth.ts` makes the app _believe_ it is logged in; its `access_token` is not a
