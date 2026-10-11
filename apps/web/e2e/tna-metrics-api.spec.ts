@@ -41,7 +41,14 @@ function deleteCountable(
   );
 }
 
-async function parameters(query: string) {
+function deleteMappedAgent2Finding() {
+  runSql(
+    fixture.env,
+    `DELETE FROM qa_temuan WHERE period_id='${fixture.ids.periods[2]}' AND indicator_id='${fixture.ids.indicators[0]}' AND peserta_id='${fixture.ids.participants[2]}';`,
+  );
+}
+
+async function parameters(query: string, expectedStatus = 200) {
   const response = await tnaApiRequest(
     app,
     `http://localhost/api/v1/tna/parameters${query}`,
@@ -54,6 +61,8 @@ async function parameters(query: string) {
     data: TnaParametersResponse;
     error?: { code: string; message: string };
   };
+  expect(response.status, JSON.stringify(body.error)).toBe(expectedStatus);
+  expect(body.success, JSON.stringify(body.error)).toBe(expectedStatus === 200);
   return { status: response.status, body };
 }
 
@@ -93,11 +102,12 @@ test.afterAll(async () => {
 });
 
 test("parameters endpoint validates input and reports an unknown period", async () => {
-  const invalid = await parameters("?service_type=chat&compare_count=9");
+  const invalid = await parameters("?service_type=chat&compare_count=9", 400);
   expect(invalid.status).toBe(400);
 
   const missing = await parameters(
     `?service_type=chat&period_id=${randomUUID()}`,
+    404,
   );
   expect(missing.status).toBe(404);
   expect(missing.body.error?.code).toBe("TNA_PERIOD_NOT_FOUND");
@@ -269,11 +279,7 @@ test("parameter list reads more than 1000 rows for one service and period", asyn
 });
 
 test("data below MIN_FINDINGS is insufficient and not a candidate", async () => {
-  const [agent2] = [fixture.ids.participants[2]!];
-  runSql(
-    fixture.env,
-    `DELETE FROM qa_temuan WHERE period_id='${fixture.ids.periods[2]}' AND indicator_id='${fixture.ids.indicators[0]}' AND peserta_id='${agent2}';`,
-  );
+  deleteMappedAgent2Finding();
 
   const { body } = await parameters(periodQuery(fixture.ids.periods[2]!));
   const mapped = item(body, fixture.ids.indicators[0]!);
@@ -296,6 +302,10 @@ test("data below MIN_FINDINGS is insufficient and not a candidate", async () => 
 });
 
 test("trendStatus separates no comparison, new from zero, and zero to zero", async () => {
+  // Own the selected-period setup: this deletion is idempotent when the full
+  // serial spec ran MIN_FINDINGS first, and also works with --grep alone.
+  deleteMappedAgent2Finding();
+
   // No earlier audited period: no_comparison_data even with findings.
   const earliest = await parameters(periodQuery(fixture.ids.periods[0]!));
   const earliestMapped = item(earliest.body, fixture.ids.indicators[0]!);
