@@ -23,6 +23,10 @@ const MUTATION_FUNCTIONS = [
   "tna_update_draft_plan(uuid,uuid,timestamptz,jsonb,jsonb)",
   "tna_activate_plan(uuid,uuid,timestamptz,jsonb,jsonb)",
   "tna_cancel_plan(uuid,uuid,timestamptz)",
+  "tna_start_plan_evaluation(uuid,uuid,timestamptz,uuid)",
+  "tna_update_evaluation_period(uuid,uuid,timestamptz,uuid)",
+  "tna_complete_plan(uuid,uuid,timestamptz,jsonb,jsonb,text,text,text)",
+  "tna_cancel_plan(uuid,uuid,timestamptz,text)",
 ];
 const users: Record<string, Awaited<ReturnType<typeof createUserWithJwt>>> = {};
 const admin = createAdmin(fixture.env);
@@ -184,6 +188,13 @@ test("mutation RPCs stay callable by client roles and helpers stay private", asy
       `${role} USAGE tna_internal`,
     ).toBe("f");
   }
+  expect(
+    sqlOne(
+      fixture.env,
+      "SELECT has_schema_privilege('service_role', 'tna_internal', 'USAGE');",
+    ),
+    "service_role must execute the trigger's private SQL validation helper",
+  ).toBe("t");
 });
 
 test("real JWT reads fixture substrate; TNA tables deny direct DML and RPC", async () => {
@@ -298,6 +309,34 @@ test("real JWT reads fixture substrate; TNA tables deny direct DML and RPC", asy
       p_plan_id: planId,
       p_expected_updated_at: plan.data.updated_at,
     },
+    tna_start_plan_evaluation: {
+      p_actor_id: users.trainer!.userId,
+      p_plan_id: planId,
+      p_expected_updated_at: plan.data.updated_at,
+      p_evaluation_period_id: fixture.ids.periods[2],
+    },
+    tna_update_evaluation_period: {
+      p_actor_id: users.trainer!.userId,
+      p_plan_id: planId,
+      p_expected_updated_at: plan.data.updated_at,
+      p_evaluation_period_id: fixture.ids.periods[2],
+    },
+    tna_complete_plan: {
+      p_actor_id: users.trainer!.userId,
+      p_plan_id: planId,
+      p_expected_updated_at: plan.data.updated_at,
+      p_evaluation_snapshot: {},
+      p_participant_evaluations: [],
+      p_verdict: "tercapai",
+      p_conclusion_note: "Catatan uji lengkap",
+      p_follow_up: "selesai_tuntas",
+    },
+    tna_cancel_plan_4arg: {
+      p_actor_id: users.trainer!.userId,
+      p_plan_id: planId,
+      p_expected_updated_at: plan.data.updated_at,
+      p_cancel_reason: null,
+    },
   };
   const before = {
     postmaster: checkpointerStart(),
@@ -309,7 +348,10 @@ test("real JWT reads fixture substrate; TNA tables deny direct DML and RPC", asy
   };
   for (const role of ["anon", "admin", "trainer", "leader", "agent"]) {
     for (const [fn, args] of Object.entries(rpcArgs)) {
-      const result = await client(role).rpc(fn, args);
+      const result = await client(role).rpc(
+        fn === "tna_cancel_plan_4arg" ? "tna_cancel_plan" : fn,
+        args,
+      );
       expect(result.error?.code, `${role} ${fn}`).toBe("42501");
       expect(result.error?.message, `${role} ${fn}`).toBe("TNA_FORBIDDEN");
     }
@@ -341,6 +383,54 @@ test("real JWT reads fixture substrate; TNA tables deny direct DML and RPC", asy
     p_payload: {},
   });
   expect(forgedActor.error?.message).toBe("TNA_ACTOR_FORBIDDEN");
+  const missingPlan = "00000000-0000-4000-8000-000000000000";
+  for (const [fn, args] of [
+    [
+      "tna_start_plan_evaluation",
+      {
+        p_actor_id: users.trainer!.userId,
+        p_plan_id: missingPlan,
+        p_expected_updated_at: plan.data.updated_at,
+        p_evaluation_period_id: fixture.ids.periods[2],
+      },
+    ],
+    [
+      "tna_update_evaluation_period",
+      {
+        p_actor_id: users.trainer!.userId,
+        p_plan_id: missingPlan,
+        p_expected_updated_at: plan.data.updated_at,
+        p_evaluation_period_id: fixture.ids.periods[2],
+      },
+    ],
+    [
+      "tna_complete_plan",
+      {
+        p_actor_id: users.trainer!.userId,
+        p_plan_id: missingPlan,
+        p_expected_updated_at: plan.data.updated_at,
+        p_evaluation_snapshot: {},
+        p_participant_evaluations: [],
+        p_verdict: "tercapai",
+        p_conclusion_note: "Catatan uji lengkap",
+        p_follow_up: "selesai_tuntas",
+      },
+    ],
+    [
+      "tna_cancel_plan",
+      {
+        p_actor_id: users.trainer!.userId,
+        p_plan_id: missingPlan,
+        p_expected_updated_at: plan.data.updated_at,
+        p_cancel_reason: null,
+      },
+    ],
+  ] as const) {
+    const result = await admin.rpc(fn, args);
+    expect(result.error?.message, `${fn} service-role validation`).toBe(
+      "TNA_PLAN_NOT_FOUND",
+    );
+  }
   expect(
     sqlOne(
       fixture.env,
