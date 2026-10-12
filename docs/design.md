@@ -247,6 +247,16 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Loading state** — skeleton rows (bukan spinner doang).
 - **Empty state** — pesan jelas + CTA action.
 
+### Landing publik (`/`)
+
+Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti aturan produk di atas.
+
+- **Hero** hanya wordmark "Trainers SuperApp" pada papan split-flap 2 × 8 (`components/landing/SplitFlapBoard.tsx`). Intro melewati nama modul berwarna token `--module-*` lalu mendarat di wordmark (±4 detik); hover/ketuk mengocok ulang. Huruf maksimal ±4,4rem, tetap di bawah batas display 6rem.
+- **Papan split-flap** dekoratif dan `aria-hidden`; karakter dirender lewat `data-ch` + `::before`, teks yang dibaca pembaca layar berasal dari `sr-only` di sebelahnya. Status papan tersedia di `data-state` / `data-frame` untuk E2E.
+- **Modul** (`components/landing/ModuleStory.tsx`): papan kode modul yang mendarat saat terlihat, lalu langkah yang digulir menggerakkan panggung contoh sticky (data ilustrasi, `aria-hidden`). Di ≤900px panggung menempel di atas dan langkah aktif dihitung dari area di bawahnya.
+- **Pengecualian motion terbatas:** intro papan dan adegan panggung boleh lebih dari 0,6 detik, tetapi setiap animasi otomatis selesai atau berhenti dalam ±5 detik (WCAG 2.2.2), dan `prefers-reduced-motion: reduce` menampilkan keadaan akhir tanpa animasi.
+- Aksi masuk/akses tetap memakai `AuthContext` dari `LandingAuthClient`; tamu melihat `Masuk ke Platform` / `Ajukan Akses`, sesi aktif melihat `Buka Dashboard`.
+
 ---
 
 ## 6. Motion & Animation
