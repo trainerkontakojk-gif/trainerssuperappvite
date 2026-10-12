@@ -28,6 +28,7 @@ type PlanDetail = TnaPlanDetail & {
   participant_preview: Array<{
     peserta_id: string | null;
     baseline_findings: number;
+    baseline_sessions: number;
     was_affected: boolean;
   }> | null;
 };
@@ -190,8 +191,18 @@ test("draft create/list/detail uses server need, previews population and roster,
   });
   expect(loaded.participant_preview).toEqual(
     expect.arrayContaining([
-      { peserta_id: participant(0), baseline_findings: 1, was_affected: true },
-      { peserta_id: participant(1), baseline_findings: 1, was_affected: true },
+      {
+        peserta_id: participant(0),
+        baseline_findings: 1,
+        baseline_sessions: 12,
+        was_affected: true,
+      },
+      {
+        peserta_id: participant(1),
+        baseline_findings: 1,
+        baseline_sessions: 5,
+        was_affected: true,
+      },
     ]),
   );
   expect(
@@ -279,8 +290,18 @@ test("draft PATCH replaces roster, updates live preview, rejects stale revision 
   );
   expect(loaded.participant_preview).toEqual(
     expect.arrayContaining([
-      { peserta_id: participant(2), baseline_findings: 1, was_affected: true },
-      { peserta_id: participant(3), baseline_findings: 0, was_affected: false },
+      {
+        peserta_id: participant(2),
+        baseline_findings: 1,
+        baseline_sessions: 5,
+        was_affected: true,
+      },
+      {
+        peserta_id: participant(3),
+        baseline_findings: 0,
+        baseline_sessions: 6,
+        was_affected: false,
+      },
     ]),
   );
   const stale = await call(`/plans/${plan.id}`, "PATCH", {
