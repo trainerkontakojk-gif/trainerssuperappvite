@@ -120,7 +120,14 @@ async function makePlan(dueDate: string) {
     env,
     "SELECT (clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::date::text;",
   );
-  const endDate = sqlOne(env, `SELECT ('${today}'::date - 1)::text;`);
+  // The fixture calendar sits before every seeded audit, so a training that
+  // ended yesterday would make all fixture periods ineligible. End the
+  // training the day before the fixture year so its periods stay valid
+  // evaluation months, while the due date still exercises the WIB gate.
+  const endDate = sqlOne(
+    env,
+    `SELECT make_date(year - 1, 12, 31)::text FROM qa_periods WHERE id='${fixture.ids.periods[0]}';`,
+  );
   const plan = await admin.rpc("tna_create_plan", {
     p_actor_id: users.trainer.userId,
     p_plan: {
