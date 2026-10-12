@@ -137,9 +137,31 @@ export function createTnaFixture(namespace: string) {
       // Recover only this namespace's interrupted attempt, never reuse unknown
       // calendar rows/accounts. Existing year/month collisions fail closed.
       await cleanup();
+      // Product comparison selection spans all visible chat audits, not our
+      // namespace. Keep all four fixture months before every existing audit,
+      // within qa_periods' 2000..2100 CHECK and (month, year) unique constraint.
+      // Count every chat row conservatively, including phantom/zero findings.
+      const availableYear = runSql(
+        env,
+        `SELECT candidate.year FROM generate_series(2000, 2100) AS candidate(year)
+         WHERE candidate.year < coalesce((
+           SELECT min(p.year) FROM qa_periods p
+           JOIN qa_temuan t ON t.period_id = p.id WHERE t.service_type = 'chat'
+         ), 2101)
+         AND NOT EXISTS (
+           SELECT 1 FROM qa_periods p
+           WHERE p.year = candidate.year AND p.month BETWEEN 1 AND 4
+         )
+         ORDER BY candidate.year DESC LIMIT 1;`,
+      );
+      if (!availableYear) {
+        throw new Error(
+          "TNA fixture requires a free January-April year before all chat audits within 2000..2100",
+        );
+      }
+      const year = Number(availableYear);
       const adminUser = await createUserWithJwt(env, "admin", namespace);
       const trainerUser = await createUserWithJwt(env, "trainer", namespace);
-      const year = 2080 + (parseInt(namespace.slice(0, 4), 16) % 20);
       const periods = [...ids.periods, ...ids.extraPeriods]
         .map((id, i) => `(${quoted(id)},${i + 1},${year})`)
         .join(",");
