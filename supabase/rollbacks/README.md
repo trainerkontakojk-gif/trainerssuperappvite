@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261012150000_tna_need_previous_plan.sql` | Restore guard-first Phase 1 need writer; preserve existing links/data; disable API link feature first; apply before Phase 2 foundation rollback |
 | New | `rollback_20261011130000_tna_phase2_evaluation.sql` | Fails closed if evaluation, cancellation, participant-session, or predecessor-link data exists; restore Phase 1 RPC/trigger behavior only when reversible |
 | New | `rollback_20261010120000_add_telefun_coaching_summary_annotation_columns.sql` | No-op by design: production had these columns before the migration; never drop them |
 | Latest | `rollback_20260622150000_repair_telefun_scoring_lifecycle_contract.sql`  | DATA LOSS: revert API and back up scoring data first                    |

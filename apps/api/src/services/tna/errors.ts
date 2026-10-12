@@ -17,6 +17,53 @@ const rpcErrors: Record<
     message: "Akun ini tidak diizinkan mengubah data TNA.",
   },
   TNA_PLAN_NOT_FOUND: { status: 404, message: "Rencana tidak ditemukan." },
+  TNA_PLAN_NOT_ACTIVE: {
+    status: 409,
+    message:
+      "Rencana sudah bukan aktif. Muat ulang untuk melihat status terbaru.",
+  },
+  TNA_PLAN_NOT_EVALUATING: {
+    status: 409,
+    message:
+      "Rencana tidak sedang dievaluasi. Muat ulang untuk melihat status terbaru.",
+  },
+  TNA_EVALUATION_NOT_DUE: {
+    status: 422,
+    message: "Evaluasi belum jatuh tempo sesuai jadwal (WIB).",
+  },
+  TNA_EVALUATION_PERIOD_INVALID: {
+    status: 422,
+    message: "Pilih periode evaluasi setelah bulan berakhirnya pelatihan.",
+  },
+  TNA_EVALUATION_NO_AUDIT: {
+    status: 422,
+    message:
+      "Belum ada audit pada periode evaluasi. Pilih periode lain atau tunggu data audit sebelum menyelesaikan.",
+  },
+  TNA_EVALUATION_PARTICIPANT_MISMATCH: {
+    status: 422,
+    message:
+      "Data evaluasi peserta tidak sesuai rencana. Muat ulang sebelum melanjutkan.",
+  },
+  TNA_INVALID_EVALUATION: {
+    status: 422,
+    message:
+      "Data evaluasi atau tindak lanjut belum valid. Periksa kembali data yang diisi.",
+  },
+  TNA_CANCEL_REASON_REQUIRED: {
+    status: 422,
+    message:
+      "Alasan pembatalan wajib diisi untuk rencana aktif atau sedang dievaluasi.",
+  },
+  TNA_INVALID_CANCEL_REASON: {
+    status: 422,
+    message: "Alasan pembatalan harus berisi 10–1000 karakter.",
+  },
+  TNA_PREVIOUS_PLAN_INVALID: {
+    status: 422,
+    message:
+      "Rencana sebelumnya harus sudah selesai, memerlukan rencana lanjutan, dan memiliki layanan serta parameter yang sama.",
+  },
   TNA_PLAN_EXISTS: {
     status: 409,
     message: "Kebutuhan ini sudah memiliki rencana terbuka.",
