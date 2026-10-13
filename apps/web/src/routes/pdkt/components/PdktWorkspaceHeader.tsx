@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import type { PdktMailboxListItem } from "@trainers/types";
-import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { normalizeRoleLabel } from "../../../lib/app-config";
+import { formatPdktSubjectLabel } from "../utils/sessionHistory";
 import { PdktStageNav, type PdktStage } from "./PdktStageNav";
 
 type ParticipantSource = Pick<
@@ -15,19 +16,17 @@ function describePdktParticipant(item: ParticipantSource) {
   const subject = item.simulationSubject;
   const participant =
     subject?.type === "participant"
-      ? [formatSimulationSubjectLabel(subject), subject.batchName, subject.team]
+      ? [formatPdktSubjectLabel(subject), subject.batchName, subject.team]
           .filter(Boolean)
           .join(" · ")
-      : formatSimulationSubjectLabel(subject, {
-          unknownLabel: "Tidak tercatat",
-        });
+      : formatPdktSubjectLabel(subject);
 
   const creator = item.created_by_user;
   const executor = !creator
     ? "Tidak tercatat"
     : creator.is_current_user
       ? "Anda"
-      : `${creator.full_name}${creator.role ? ` (${creator.role})` : ""}`;
+      : `${creator.full_name}${creator.role ? ` · ${normalizeRoleLabel(creator.role)}` : ""}`;
 
   return { participant, executor };
 }
@@ -35,7 +34,7 @@ function describePdktParticipant(item: ParticipantSource) {
 function ParticipantInfo({ item }: { item: ParticipantSource }) {
   const { participant, executor } = describePdktParticipant(item);
   return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-full border border-border bg-surface-elevated px-3 py-1.5 text-xs text-muted-foreground">
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg2">
       <span>
         Peserta:{" "}
         <strong className="font-semibold text-foreground">{participant}</strong>

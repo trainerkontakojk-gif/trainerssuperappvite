@@ -4,6 +4,7 @@ import { Button } from "../../../components/ui/button";
 import { EmailAttachments } from "./EmailAttachments";
 import { PdktStageNav } from "./PdktStageNav";
 import {
+  PDKT_NO_SUBJECT,
   formatPdktEmailDate,
   getPdktInitials,
   readInboundEmail,
@@ -74,7 +75,7 @@ export function EmailDetailPane({
                   : "text-2xl leading-8 text-muted-foreground italic"
               }
             >
-              {item.subject || "(Tanpa subjek)"}
+              {item.subject || PDKT_NO_SUBJECT}
             </h2>
             <div className="flex items-start gap-3">
               <span
@@ -108,22 +109,24 @@ export function EmailDetailPane({
 
       {item.status === "open" && (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 md:px-6">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onDelete}
-            disabled={!canDelete}
-            aria-label={canDelete ? "Hapus email ini" : "Tidak memiliki izin menghapus"}
-            title={
-              canDelete
-                ? undefined
-                : "Hanya pembuat email, admin, atau trainer yang bisa menghapus"
-            }
-            className="min-h-11 gap-2 px-3 text-xs"
-          >
-            <Trash2 aria-hidden="true" className="text-destructive" />
-            Hapus
-          </Button>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onDelete}
+              disabled={!canDelete}
+              aria-describedby={canDelete ? undefined : "pdkt-delete-hint"}
+              className="min-h-11 gap-2 px-3 text-xs"
+            >
+              <Trash2 aria-hidden="true" className="text-destructive" />
+              Hapus email
+            </Button>
+            {!canDelete && (
+              <span id="pdkt-delete-hint" className="text-xs text-fg2">
+                Hanya pembuat email, admin, atau trainer yang bisa menghapus.
+              </span>
+            )}
+          </span>
           <Button
             type="button"
             onClick={onReply}

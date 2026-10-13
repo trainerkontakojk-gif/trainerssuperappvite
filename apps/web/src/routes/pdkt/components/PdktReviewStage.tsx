@@ -17,7 +17,11 @@ import {
 import { EmailAttachments } from "./EmailAttachments";
 import { EmailBody } from "./EmailDetailPane";
 import type { MailboxReviewState } from "./MailboxSidebar";
-import { readAgentReply, readInboundEmail } from "../utils/emailDisplay";
+import {
+  PDKT_NO_SUBJECT,
+  readAgentReply,
+  readInboundEmail,
+} from "../utils/emailDisplay";
 import {
   formatPdktDuration,
   pdktRankedActionItems,
@@ -29,7 +33,7 @@ interface Props {
   item: PdktMailboxDetailItem;
   status: MailboxReviewState["status"] | null;
   result: PdktEvaluationResult | null;
-  error: string | null;
+  /** Memulai atau mengulang telaah (status `failed` atau `not_started`). */
   onRetry: () => void;
   onInbox: () => void;
   onDelete?: () => void;
@@ -107,8 +111,8 @@ function ScoreSummary({
       </div>
 
       {first && (
-        <div className="flex flex-col gap-1.5 rounded-lg bg-chart-orange/10 p-4">
-          <span className="text-xs font-semibold text-foreground">
+        <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+          <span className="text-[12px] font-semibold text-foreground">
             Perbaiki ini dulu
           </span>
           <p className="text-sm leading-6 text-foreground">{first.text}</p>
@@ -117,8 +121,8 @@ function ScoreSummary({
               Contoh: <q>{first.example}</q>
             </p>
           )}
-          <span className="text-xs text-foreground">
-            Berdampak ke: {PDKT_DIMENSION_LABELS[first.dimension]}
+          <span className="text-[12px] text-fg2">
+            Aspek: {PDKT_DIMENSION_LABELS[first.dimension]}
           </span>
         </div>
       )}
@@ -161,7 +165,7 @@ function ScoreSummary({
           )}
           {timeTaken ? (
             <div className="flex gap-1">
-              <dt className="text-muted-foreground">Dikerjakan dalam</dt>
+              <dt className="text-muted-foreground">Waktu pengerjaan</dt>
               <dd className="font-medium text-foreground">
                 {formatPdktDuration(timeTaken)}
               </dd>
@@ -191,7 +195,7 @@ function ScoreBreakdown({ result }: { result: PdktEvaluationResult }) {
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {row.low && (
-                  <span className="rounded-full bg-chart-orange/15 px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                  <span className="text-[12px] font-semibold text-foreground">
                     Perlu perbaikan
                   </span>
                 )}
@@ -235,7 +239,7 @@ function ReplyFeedback({
     (text, number) => (
       <mark
         key={number}
-        className="rounded-sm border-b-2 border-chart-orange bg-chart-orange/15 px-0.5 text-foreground"
+        className="bg-chart-orange/15 px-0.5 text-foreground underline decoration-chart-orange decoration-2 underline-offset-4 [box-decoration-break:clone]"
       >
         {text}
         <sup className="ml-0.5 text-[11px] font-bold">{number}</sup>
@@ -243,9 +247,12 @@ function ReplyFeedback({
     ),
   );
   const otherFindings = [
-    ...(result.typos ?? []).map((text) => ({ kind: "Typo", text })),
+    ...(result.typos ?? []).map((text) => ({ kind: "Ejaan", text })),
     ...(result.clarityIssues ?? []).map((text) => ({ kind: "Kejelasan", text })),
-    ...(result.contentGaps ?? []).map((text) => ({ kind: "Isi", text })),
+    ...(result.contentGaps ?? []).map((text) => ({
+      kind: "Isi yang kurang",
+      text,
+    })),
   ];
 
   return (
@@ -257,7 +264,7 @@ function ReplyFeedback({
       </Section>
 
       {notes.length > 0 && (
-        <Section title="Yang perlu diperbaiki">
+        <Section title="Catatan pada balasan">
           <ol className="flex flex-col gap-3">
             {notes.map((note) => (
               <li key={note.number} className="flex gap-3 text-sm">
@@ -311,19 +318,20 @@ function ReplyFeedback({
 
 function ReviewPending({
   status,
-  error,
   onRetry,
-}: Pick<Props, "status" | "error" | "onRetry">) {
+}: Pick<Props, "status" | "onRetry">) {
   if (status === "failed") {
+    // Teks galat dari server/AI tidak pernah ditampilkan ke peserta.
     return (
       <Alert variant="destructive" className="items-start">
         <AlertCircle aria-hidden="true" />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <AlertDescription className="font-semibold text-foreground">
-            Penilaian gagal
+            Telaah gagal
           </AlertDescription>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {error || "Terjadi gangguan saat menilai balasan."}
+          <p className="text-xs leading-5 text-foreground">
+            AI belum bisa menelaah balasan ini. Balasan Anda tetap tersimpan.
+            Coba lagi dalam beberapa saat.
           </p>
         </div>
         <Button
@@ -340,9 +348,19 @@ function ReviewPending({
   }
   if (status === "not_started") {
     return (
-      <p className={cn(card, "text-sm text-muted-foreground")}>
-        Penilaian belum dimulai.
-      </p>
+      <div
+        className={cn(card, "flex flex-wrap items-center justify-between gap-3")}
+      >
+        <p className="text-sm text-fg2">Telaah belum dimulai.</p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onRetry}
+          className="min-h-11 text-xs"
+        >
+          Mulai telaah
+        </Button>
+      </div>
     );
   }
   return (
@@ -352,21 +370,21 @@ function ReviewPending({
         className="size-5 shrink-0 animate-spin text-module-pdkt motion-reduce:animate-none"
       />
       <span className="flex flex-col">
-        <span className="text-sm font-semibold">Sedang dinilai AI…</span>
+        <span className="text-sm font-semibold">Sedang ditelaah AI…</span>
         <span className="text-xs text-muted-foreground">
-          Halaman ini diperbarui otomatis setelah penilaian selesai.
+          Hasil telaah muncul di sini begitu selesai. Anda boleh kembali ke
+          kotak masuk.
         </span>
       </span>
     </div>
   );
 }
 
-/** Tahap Telaah: hasil penilaian AI atas balasan yang sudah dikirim. */
+/** Tahap Telaah: hasil telaah AI atas balasan yang sudah dikirim. */
 export function PdktReviewStage({
   item,
   status,
   result,
-  error,
   onRetry,
   onInbox,
   onDelete,
@@ -387,7 +405,7 @@ export function PdktReviewStage({
             Balasan untuk {item.sender_name}
           </span>
           <span className="font-display text-2xl leading-8 font-bold tracking-tight text-balance">
-            {item.subject || "(Tanpa subjek)"}
+            {item.subject || PDKT_NO_SUBJECT}
           </span>
         </h2>
 
@@ -403,7 +421,7 @@ export function PdktReviewStage({
           </div>
         ) : (
           <>
-            <ReviewPending status={status} error={error} onRetry={onRetry} />
+            <ReviewPending status={status} onRetry={onRetry} />
             {replyBody && (
               <Section title="Balasan Anda">
                 <p className="text-sm leading-[26px] whitespace-pre-wrap">

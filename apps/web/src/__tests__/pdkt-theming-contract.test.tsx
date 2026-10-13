@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 const targets = [
   "src/routes/pdkt/components/CreateEmailModal.tsx",
   "src/routes/pdkt/components/EmailComposer.tsx",
-  "src/routes/pdkt/components/HistoryModal.tsx",
 ];
 
 describe("PDKT theme contract", () => {

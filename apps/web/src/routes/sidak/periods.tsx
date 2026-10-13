@@ -5,7 +5,7 @@ import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
-import { ConfirmDialog } from "../../components/sidak/ConfirmDialog";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { MONTHS, periodLabel } from "../../components/sidak/sidak-input.constants";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { X, AlertCircle, Loader2 } from "lucide-react";
 import type { PdktScenario } from "@trainers/types";
-import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -64,11 +63,10 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                   id="pdkt-create-email-title"
                   className="text-lg tracking-tight"
                 >
-                  Buat Email Baru
+                  Buat email baru
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-sm">
-                  Setiap skenario aktif dibuat sebagai email terpisah. Pilih
-                  satu skenario untuk memulai sesi.
+                  Pilih skenario. Email konsumen baru masuk ke kotak masuk Anda.
                 </DialogDescription>
               </div>
               <Button
@@ -76,7 +74,7 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                 variant="ghost"
                 size="icon-lg"
                 onClick={onClose}
-                aria-label="Tutup buat email baru"
+                aria-label="Tutup"
               >
                 <X data-icon="inline" />
               </Button>
@@ -98,12 +96,15 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {activeScenarios.map((scenario) => {
-                  const hasTemplate = Boolean(
-                    (scenario as any).sampleEmailTemplate?.body,
-                  );
-                  const alwaysUsesTemplate =
-                    Boolean((scenario as any).alwaysUseSampleEmail) &&
-                    hasTemplate;
+                  // Email tetap: isi email sama untuk semua peserta. Ringkasannya
+                  // disalin dari isi email itu, jadi tidak boleh tampil di sini.
+                  const isFixedEmail = Boolean(scenario.alwaysUseSampleEmail);
+                  const meta = [
+                    scenario.category,
+                    isFixedEmail ? "Email tetap" : "Dibuat AI",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
 
                   return (
                     <li key={scenario.id}>
@@ -114,26 +115,17 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                         disabled={isLoading}
                         className="h-auto min-h-20 w-full flex-col items-stretch justify-start gap-1.5 whitespace-normal px-4 py-3 text-left"
                       >
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">
-                            {scenario.title}
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {scenario.title}
+                        </span>
+                        <span className="text-xs font-normal text-fg2">
+                          {meta}
+                        </span>
+                        {!isFixedEmail && scenario.description && (
+                          <span className="line-clamp-2 text-xs leading-relaxed font-normal text-muted-foreground">
+                            {scenario.description}
                           </span>
-                          <Badge
-                            variant={
-                              alwaysUsesTemplate ? "secondary" : "outline"
-                            }
-                            className="shrink-0"
-                          >
-                            {alwaysUsesTemplate
-                              ? "Template tetap"
-                              : hasTemplate
-                                ? "Template tersedia"
-                                : "Dibuat AI"}
-                          </Badge>
-                        </span>
-                        <span className="line-clamp-2 text-xs leading-relaxed font-normal text-muted-foreground">
-                          {scenario.description}
-                        </span>
+                        )}
                       </Button>
                     </li>
                   );
@@ -165,7 +157,7 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                 className="size-6 animate-spin text-module-pdkt motion-reduce:animate-none"
               />
               <span className="text-sm font-medium text-foreground">
-                Menghasilkan email...
+                Membuat email konsumen…
               </span>
             </div>
           )}

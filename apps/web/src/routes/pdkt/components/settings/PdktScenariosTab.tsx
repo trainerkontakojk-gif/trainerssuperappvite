@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { PdktScenario } from "@trainers/types";
+import { ConfirmDialog } from "../../../../components/ConfirmDialog";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
@@ -16,13 +17,14 @@ import {
 } from "./scenarios/ScenarioCreationValidation";
 
 interface Props {
+  /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
+  confirmContainer?: HTMLElement | null;
   scenarios: PdktScenario[];
   scenarioForm: ReturnType<typeof useCrudForm<PdktScenario>>;
   setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 type ErrorKey = ScenarioValidationErrorKey;
-const CONFIRM_MESSAGE = "Perubahan belum diterapkan. Yakin ingin keluar?";
 
 function focusField(id: string) {
   window.setTimeout(() => {
@@ -39,10 +41,14 @@ function inferScenarioCreationMode(
 }
 
 export function PdktScenariosTab({
+  confirmContainer,
   scenarios,
   scenarioForm,
   setLocalSettings,
 }: Props) {
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: "discard" } | { kind: "delete"; id: string } | null
+  >(null);
   const [creationMode, setCreationMode] = useState<ScenarioCreationMode>("ai");
   const [newCategory, setNewCategory] = useState("");
   const [newCategoryMode, setNewCategoryMode] = useState(false);
@@ -100,19 +106,52 @@ export function PdktScenariosTab({
   };
 
   const cancel = () => {
-    if (scenarioForm.isDirty(scenarios) && !window.confirm(CONFIRM_MESSAGE))
+    if (scenarioForm.isDirty(scenarios)) {
+      setPendingConfirm({ kind: "discard" });
       return;
+    }
     closeEditor();
   };
 
-  const deleteScenario = (id: string) => {
-    if (!window.confirm("Hapus skenario ini?")) return false;
-    setLocalSettings((previous) => ({
-      ...previous,
-      scenarios: previous.scenarios.filter((scenario) => scenario.id !== id),
-    }));
-    return true;
+  const requestDelete = (id: string) => {
+    setPendingConfirm({ kind: "delete", id });
   };
+
+  const confirmPending = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === "delete") {
+      const { id } = pendingConfirm;
+      setLocalSettings((previous) => ({
+        ...previous,
+        scenarios: previous.scenarios.filter((scenario) => scenario.id !== id),
+      }));
+      if (scenarioForm.isOpen && scenarioForm.editingId === id) closeEditor();
+    } else {
+      closeEditor();
+    }
+    setPendingConfirm(null);
+  };
+
+  const confirmDialog = (
+    <ConfirmDialog
+      open={pendingConfirm !== null}
+      container={confirmContainer}
+      {...(pendingConfirm?.kind === "discard"
+        ? {
+            title: "Buang perubahan skenario?",
+            description: "Perubahan yang belum diterapkan akan hilang.",
+            cancelLabel: "Lanjut mengubah",
+            confirmLabel: "Buang perubahan",
+          }
+        : {
+            title: "Hapus skenario ini?",
+            description: "Perubahan berlaku setelah Anda memilih Simpan.",
+            confirmLabel: "Hapus skenario",
+          })}
+      onConfirm={confirmPending}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
 
   const applyScenario = () => {
     if (pendingAttachmentReads > 0) return;
@@ -186,8 +225,8 @@ export function PdktScenariosTab({
     } else if (file.size > (isPdf ? 2 * 1024 * 1024 : 500 * 1024)) {
       notify.error(
         isPdf
-          ? "Ukuran PDF terlalu besar! Maksimal 2MB per PDF agar pengaturan dapat disimpan."
-          : "Ukuran gambar terlalu besar! Maksimal 500KB per gambar agar pengaturan dapat disimpan.",
+          ? "PDF terlalu besar. Ukuran maksimal 2 MB."
+          : "Gambar terlalu besar. Ukuran maksimal 500 KB.",
       );
     } else if ((draft.attachmentImages || []).length >= 5) {
       notify.warning("Maksimal 5 lampiran per skenario.");
@@ -219,7 +258,9 @@ export function PdktScenariosTab({
           return;
         }
         if (typeof reader.result !== "string") {
-          notify.error(`Gagal membaca file ${file.name}.`);
+          notify.error(
+            `Berkas ${file.name} tidak bisa dibaca. Pilih ulang berkasnya.`,
+          );
           finishRead();
           return;
         }
@@ -239,7 +280,11 @@ export function PdktScenariosTab({
       };
       reader.onerror = () => {
         if (settled) return;
-        if (isCurrentEditor()) notify.error(`Gagal membaca file ${file.name}.`);
+        if (isCurrentEditor()) {
+          notify.error(
+            `Berkas ${file.name} tidak bisa dibaca. Pilih ulang berkasnya.`,
+          );
+        }
         finishRead();
       };
       reader.readAsDataURL(file);
@@ -250,84 +295,84 @@ export function PdktScenariosTab({
   if (scenarioForm.isOpen) {
     const editingId = scenarioForm.editingId;
     return (
-      <ScenarioEditor
-        isNew={!editingId}
-        draft={draft}
-        onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-        creationMode={creationMode}
-        onModeChange={setCreationMode}
-        categories={categories}
-        newCategory={newCategory}
-        newCategoryMode={newCategoryMode}
-        onNewCategoryChange={setNewCategory}
-        onNewCategoryModeChange={setNewCategoryMode}
-        errors={visibleErrors}
-        advancedOpen={advancedOpen}
-        onAdvancedOpenChange={setAdvancedOpen}
-        onIdentityChange={updateIdentity}
-        attachments={{
-          onUpload: uploadAttachment,
-          onRemove: (index) =>
-            scenarioForm.setDraft({
-              attachmentImages: (draft.attachmentImages || []).filter(
-                (_, current) => current !== index,
-              ),
-            }),
-          fileInputRef,
-          pendingReads: pendingAttachmentReads,
-        }}
-        onCancel={cancel}
-        onApply={applyScenario}
-        onDelete={
-          editingId
-            ? () => {
-                if (deleteScenario(editingId)) closeEditor();
-              }
-            : undefined
-        }
-      />
+      <>
+        <ScenarioEditor
+          isNew={!editingId}
+          draft={draft}
+          onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+          creationMode={creationMode}
+          onModeChange={setCreationMode}
+          categories={categories}
+          newCategory={newCategory}
+          newCategoryMode={newCategoryMode}
+          onNewCategoryChange={setNewCategory}
+          onNewCategoryModeChange={setNewCategoryMode}
+          errors={visibleErrors}
+          advancedOpen={advancedOpen}
+          onAdvancedOpenChange={setAdvancedOpen}
+          onIdentityChange={updateIdentity}
+          attachments={{
+            onUpload: uploadAttachment,
+            onRemove: (index) =>
+              scenarioForm.setDraft({
+                attachmentImages: (draft.attachmentImages || []).filter(
+                  (_, current) => current !== index,
+                ),
+              }),
+            fileInputRef,
+            pendingReads: pendingAttachmentReads,
+          }}
+          onCancel={cancel}
+          onApply={applyScenario}
+          onDelete={editingId ? () => requestDelete(editingId) : undefined}
+        />
+        {confirmDialog}
+      </>
     );
   }
 
   const activeCount = scenarios.filter((scenario) => scenario.isActive).length;
   return (
-    <ScenarioList
-      scenarios={scenarios}
-      activeCount={activeCount}
-      totalScenarios={scenarios.length}
-      allSelected={activeCount === scenarios.length && scenarios.length > 0}
-      noneSelected={activeCount === 0}
-      onSelectAll={() =>
-        setLocalSettings((previous) => ({
-          ...previous,
-          scenarios: previous.scenarios.map((scenario) => ({
-            ...scenario,
-            isActive: true,
-          })),
-        }))
-      }
-      onUnselectAll={() =>
-        setLocalSettings((previous) => ({
-          ...previous,
-          scenarios: previous.scenarios.map((scenario) => ({
-            ...scenario,
-            isActive: false,
-          })),
-        }))
-      }
-      onToggleScenario={(id) =>
-        setLocalSettings((previous) => ({
-          ...previous,
-          scenarios: previous.scenarios.map((scenario) =>
-            scenario.id === id
-              ? { ...scenario, isActive: !scenario.isActive }
-              : scenario,
-          ),
-        }))
-      }
-      onEdit={openEditor}
-      onDelete={deleteScenario}
-      onAdd={() => openEditor(null)}
-    />
+    <>
+      <ScenarioList
+        scenarios={scenarios}
+        activeCount={activeCount}
+        totalScenarios={scenarios.length}
+        allSelected={activeCount === scenarios.length && scenarios.length > 0}
+        noneSelected={activeCount === 0}
+        onSelectAll={() =>
+          setLocalSettings((previous) => ({
+            ...previous,
+            scenarios: previous.scenarios.map((scenario) => ({
+              ...scenario,
+              isActive: true,
+            })),
+          }))
+        }
+        onUnselectAll={() =>
+          setLocalSettings((previous) => ({
+            ...previous,
+            scenarios: previous.scenarios.map((scenario) => ({
+              ...scenario,
+              isActive: false,
+            })),
+          }))
+        }
+        onToggleScenario={(id) =>
+          setLocalSettings((previous) => ({
+            ...previous,
+            scenarios: previous.scenarios.map((scenario) =>
+              scenario.id === id
+                ? { ...scenario, isActive: !scenario.isActive }
+                : scenario,
+            ),
+          }))
+        }
+        onEdit={openEditor}
+        onDelete={requestDelete}
+        onAdd={() => openEditor(null)}
+      />
+      {confirmDialog}
+    </>
   );
 }

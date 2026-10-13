@@ -1,5 +1,8 @@
 import type { PdktMailboxDetailItem } from "@trainers/types";
 
+/** Pengganti subjek email yang kosong; satu teks untuk seluruh PDKT. */
+export const PDKT_NO_SUBJECT = "Tanpa subjek";
+
 /** "11 Okt 2026, 14.20" dalam zona waktu perangkat. */
 export function formatPdktEmailDate(value: string): string {
   const date = new Date(value);

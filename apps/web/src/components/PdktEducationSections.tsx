@@ -12,6 +12,7 @@ import type {
   PdktReplyAnnotation,
 } from "@trainers/types";
 import { Button } from "./ui/button";
+import { notify } from "../lib/toast";
 import { PDKT_DIMENSION_LABELS } from "../lib/pdkt-dimensions";
 import {
   placeReplyAnnotations,
@@ -38,13 +39,13 @@ export function CopyInlineButton({ text }: { text: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          // clipboard unavailable
+          notify.error("Teks belum bisa disalin. Pilih teksnya lalu salin manual.");
         }
       }}
-      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-bold uppercase tracking-wider"
+      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-medium"
     >
       {copied ? (
-        <Check className="w-3 h-3 text-emerald-500" />
+        <Check className="w-3 h-3 text-chart-green" />
       ) : (
         <Copy className="w-3 h-3" />
       )}

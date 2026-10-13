@@ -67,9 +67,9 @@ export function ScenarioList({
           <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
             Skenario
           </h3>
-          <p className="text-[13px] leading-5 text-foreground/80">
-            Kasus yang dipakai AI untuk membuat email konsumen. Hanya skenario
-            aktif yang masuk ke sesi.
+          <p className="text-[13px] leading-5 text-fg2">
+            Kasus yang menjadi dasar email konsumen. Hanya skenario aktif yang
+            bisa dipilih saat membuat email.
           </p>
         </div>
         <Button type="button" onClick={onAdd} className="min-h-11 shrink-0">
@@ -108,7 +108,7 @@ export function ScenarioList({
                     "min-h-[38px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                     selected
                       ? "bg-background text-foreground shadow-sm"
-                      : "text-foreground/80 hover:text-foreground",
+                      : "text-fg2 hover:text-foreground",
                   )}
                 >
                   {item || "Semua"}
@@ -164,7 +164,7 @@ export function ScenarioList({
                         "inline-flex items-center gap-1.5",
                         direction.id === "ojk_request_in_body"
                           ? "text-module-pdkt"
-                          : "text-foreground/80",
+                          : "text-fg2",
                       )}
                     >
                       <span
@@ -178,7 +178,7 @@ export function ScenarioList({
                     </span>
                     <span className="whitespace-nowrap">
                       {scenario.alwaysUseSampleEmail
-                        ? "Tulis sendiri"
+                        ? "Email tetap"
                         : "Dibuat AI"}
                     </span>
                   </span>

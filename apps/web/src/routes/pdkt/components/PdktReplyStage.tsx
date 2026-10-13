@@ -2,7 +2,11 @@ import type { PdktMailboxDetailItem } from "@trainers/types";
 import { EmailAttachments } from "./EmailAttachments";
 import { EmailBody } from "./EmailDetailPane";
 import { ReplyComposer } from "./ReplyComposer";
-import { formatPdktEmailDate, readInboundEmail } from "../utils/emailDisplay";
+import {
+  PDKT_NO_SUBJECT,
+  formatPdktEmailDate,
+  readInboundEmail,
+} from "../utils/emailDisplay";
 
 interface Props {
   item: PdktMailboxDetailItem;
@@ -29,7 +33,7 @@ export function PdktReplyStage({ item, onSend, isSending }: Props) {
           </span>
         </div>
         <p className="font-display text-lg leading-6 font-bold tracking-tight text-balance">
-          {item.subject || "(Tanpa subjek)"}
+          {item.subject || PDKT_NO_SUBJECT}
         </p>
         <p className="text-xs text-muted-foreground">
           Dari{" "}

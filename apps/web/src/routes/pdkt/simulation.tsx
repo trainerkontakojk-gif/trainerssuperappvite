@@ -10,7 +10,8 @@ import { PdktReviewStage } from "./components/PdktReviewStage";
 import { PdktWorkspaceHeader } from "./components/PdktWorkspaceHeader";
 import { CreateEmailModal } from "./components/CreateEmailModal";
 import { SettingsModal } from "./components/SettingsModal";
-import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
+import { useNavigate } from "@tanstack/react-router";
+import { mapHistoryRow, type SessionHistory } from "./utils/sessionHistory";
 import { useApi } from "../../hooks/useApi";
 import { ApiError, pdktClient, unwrapResponse } from "../../lib/api";
 import type {
@@ -28,58 +29,17 @@ import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { notify } from "../../lib/toast";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
 import {
   type PdktAppSettings,
   generatePdktSessionConfig,
   DEFAULT_PDKT_MODEL_ID,
+  PDKT_FALLBACK_CONSUMER_TYPES as defaultConsumerTypes,
 } from "./pdktSettings";
-
-const defaultConsumerTypes: PdktConsumerType[] = [
-  {
-    id: "marah",
-    name: "Marah & Emosional",
-    description: "Sangat marah, emosional, tidak sabar.",
-    difficulty: "Hard",
-    tone: "Marah, menggunakan tanda seru.",
-  },
-  {
-    id: "bingung",
-    name: "Bingung & Gaptek",
-    description: "Kebingungan, tidak paham teknologi.",
-    difficulty: "Medium",
-    tone: "Bingung, ragu-ragu.",
-  },
-  {
-    id: "kritis",
-    name: "Kritis & Detail",
-    description: "Kritis, menanyakan dasar hukum.",
-    difficulty: "Hard",
-    tone: "Kritis, logis, skeptis.",
-  },
-  {
-    id: "ramah",
-    name: "Ramah & Kooperatif",
-    description: "Ramah, sopan, kooperatif.",
-    difficulty: "Easy",
-    tone: "Ramah, sopan.",
-  },
-  {
-    id: "terburu-buru",
-    name: "Terburu-buru",
-    description: "Ingin jawaban singkat dan cepat.",
-    difficulty: "Medium",
-    tone: "Singkat, padat.",
-  },
-  {
-    id: "pasrah",
-    name: "Pasrah & Sedih",
-    description: "Putus asa, nada sedih.",
-    difficulty: "Medium",
-    tone: "Sedih, memohon bantuan.",
-  },
-];
+import { PDKT_NO_SUBJECT } from "./utils/emailDisplay";
+import { pdktReplyErrorMessage } from "./utils/pdktErrors";
 
 const EVALUATION_RETRY_START_GRACE_MS = 15_000;
 
@@ -87,7 +47,8 @@ interface PdktSimulationProps {
   simulationSubject?: SimulationSubjectSelection;
   onBack?: () => void;
   onBeforeActivity?: () => Promise<void>;
-  onAfterActivity?: () => void;
+  /** `reply` setelah balasan terkirim; `review` setelah telaah selesai. */
+  onAfterActivity?: (reason: "reply" | "review") => void;
   initialReplaySession?: SessionHistory | null;
   onConsumeReplaySession?: () => void;
   /** Email yang langsung dipilih saat kotak masuk dibuka dari landing. */
@@ -148,10 +109,17 @@ export default function PdktSimulation({
     new Set(),
   );
   const [isBulkMode, setIsBulkMode] = useState(false);
+  // Konfirmasi hapus email; dirender di dalam lapisan ruang kerja.
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "single"; id: string } | { kind: "bulk"; ids: string[] } | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [dialogContainer, setDialogContainer] =
+    useState<HTMLDivElement | null>(null);
 
   // Modals visibility
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Settings state
   const [settings, setSettings] = useState<PdktAppSettings | null>(
@@ -333,22 +301,7 @@ export default function PdktSimulation({
         await pdktClient.history.$get(),
       )) as any[];
       if (res) {
-        const mapped = res.map((item: any) => ({
-          id: item.id,
-          timestamp: item.timestamp,
-          user_id: item.user_id ?? null,
-          user_email: item.user_email ?? null,
-          user_role: item.user_role ?? null,
-          config: item.config,
-          emails: item.emails || [],
-          evaluation: item.evaluation,
-          evaluationStatus:
-            item.evaluation_status ||
-            (item.evaluation ? "completed" : "processing"),
-          evaluationError: item.evaluation_error,
-          timeTaken: item.time_taken,
-          simulationSubject: item.simulationSubject ?? null,
-        }));
+        const mapped = res.map(mapHistoryRow);
         setHistory(mapped);
         onHistoryChangeRef.current?.(mapped);
       }
@@ -419,9 +372,12 @@ export default function PdktSimulation({
     setIsReplyOpen(false);
   }, [selectedId]);
 
-  const notifyAfter = useCallback(() => {
-    onAfterActivity?.();
-  }, [onAfterActivity]);
+  const notifyAfter = useCallback(
+    (reason: "reply" | "review") => {
+      onAfterActivity?.(reason);
+    },
+    [onAfterActivity],
+  );
 
   // Synchronize evaluations state from history and the visible mailbox.
   useEffect(() => {
@@ -571,7 +527,7 @@ export default function PdktSimulation({
       await Promise.all([refetch(), fetchHistory()]);
 
       if (!cancelled) {
-        notifyAfter();
+        notifyAfter("review");
       }
     };
 
@@ -606,34 +562,6 @@ export default function PdktSimulation({
     await fetchHistory();
   };
 
-  // Delete specific history session
-  const handleDeleteSession = async (historyId: string) => {
-    try {
-      await unwrapResponse(
-        await pdktClient.history[":id"].$delete({ param: { id: historyId } }),
-      );
-      setHistory((prev) => {
-        const next = prev.filter((h) => h.id !== historyId);
-        onHistoryChangeRef.current?.(next);
-        return next;
-      });
-    } catch (err) {
-      console.error("[PDKT] Failed to delete session:", err);
-      notify.error("Gagal menghapus riwayat sesi.");
-    }
-  };
-
-  // Clear all history
-  const handleClearHistory = async () => {
-    try {
-      await unwrapResponse(await pdktClient.history.$delete());
-      setHistory([]);
-      onHistoryChangeRef.current?.([]);
-    } catch (err) {
-      notify.error("Gagal membersihkan riwayat.");
-    }
-  };
-
   // Select session from history
   const handleSelectSession = (session: SessionHistory) => {
     const matchingMailbox = visibleMailboxItems.find(
@@ -647,7 +575,6 @@ export default function PdktSimulation({
         setFilter(matchingMailbox.status);
       }
       setSelectedId(matchingMailbox.id);
-      setIsHistoryOpen(false);
       return;
     }
     const sessionEmails = Array.isArray(session.emails)
@@ -673,7 +600,7 @@ export default function PdktSimulation({
         subject:
           (typeof (firstInbound as any)?.subject === "string"
             ? (firstInbound as any).subject
-            : "") || "Tanpa Subjek",
+            : "") || PDKT_NO_SUBJECT,
         snippet:
           (typeof (firstInbound as any)?.body === "string"
             ? ((firstInbound as any).body as string).substring(0, 100)
@@ -713,7 +640,6 @@ export default function PdktSimulation({
       setFilter("replied");
       setSelectedId(syntheticId);
     }
-    setIsHistoryOpen(false);
   };
 
   const appliedReplayIdRef = useRef<string | null>(null);
@@ -742,13 +668,10 @@ export default function PdktSimulation({
       setReplayItem(null);
       setFilter("open");
       setSelectedId(mailboxId);
-      notify.success("Email berhasil disimpan ke mailbox.");
+      notify.success("Email masuk ke kotak masuk.");
     } catch (err) {
-      notify.error(
-        err instanceof Error
-          ? err.message
-          : "Draft email belum berhasil disimpan. Coba lagi.",
-      );
+      console.error("[PDKT] Failed to save pending mailbox draft:", err);
+      notify.error("Email belum bisa disimpan. Coba lagi.");
     } finally {
       setIsRetryingMailboxSave(false);
     }
@@ -842,10 +765,12 @@ export default function PdktSimulation({
               : undefined,
         });
         notify.error(
-          "Email sudah dibuat, tetapi belum tersimpan. Draft aman dan siap dicoba lagi.",
+          "Email konsumen sudah dibuat, tetapi belum masuk ke kotak masuk. Pilih Simpan lagi di bagian atas.",
         );
       } else {
-        notify.error("Gagal memulai simulasi baru.");
+        notify.error(
+          "Email konsumen belum bisa dibuat. Coba lagi dalam beberapa saat.",
+        );
       }
     } finally {
       setIsStartingNew(false);
@@ -886,12 +811,12 @@ export default function PdktSimulation({
       invalidateMailboxDetail(selectedId);
       setIsReplyOpen(false);
       setFilter("replied");
-      notifyAfter();
-      notify.success("Balasan terkirim. AI sedang menilai.");
+      notifyAfter("reply");
+      notify.success("Balasan terkirim. AI sedang menelaah.");
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[PDKT] Reply error:", err);
-      notify.error(err?.message || "Gagal mengirim balasan.");
+      notify.error(pdktReplyErrorMessage(err));
       return false;
     } finally {
       setIsReplying(false);
@@ -924,15 +849,17 @@ export default function PdktSimulation({
         evaluationsRef.current = next;
         return next;
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("[PDKT] Failed to retry evaluation:", err);
       retryStartDeadlinesRef.current.delete(historyId);
+      notify.error("Telaah belum bisa diulang. Coba lagi dalam beberapa saat.");
       setEvaluations((prev) => {
         const next = {
           ...prev,
           [mailboxId]: {
             result: null,
             status: "failed" as const,
-            error: err?.message || "Gagal memulai ulang evaluasi.",
+            error: null,
           },
         };
         evaluationsRef.current = next;
@@ -960,12 +887,22 @@ export default function PdktSimulation({
     setSelectedBulkIds(new Set());
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedBulkIds.size === 0) return;
-    if (!confirm(`Hapus ${selectedBulkIds.size} email terpilih?`)) return;
+  // Teks galat dari server tidak ditampilkan ke peserta; cukup di log.
+  useEffect(() => {
+    if (error) console.error("[PDKT] Failed to load mailbox:", error);
+  }, [error]);
 
+  const handleBulkDelete = () => {
+    if (selectedBulkIds.size === 0) return;
+    setPendingDelete({ kind: "bulk", ids: Array.from(selectedBulkIds) });
+  };
+
+  const handleDelete = (id: string) => {
+    setPendingDelete({ kind: "single", id });
+  };
+
+  const deleteBulk = async (ids: string[]) => {
     try {
-      const ids = Array.from(selectedBulkIds);
       const result = (await unwrapResponse(
         await pdktClient.mailbox["batch-delete"].$post({
           json: { ids },
@@ -977,27 +914,28 @@ export default function PdktSimulation({
       };
 
       if (result.failureCount > 0) {
+        // Pesan server memuat ID email; jangan ditampilkan.
+        console.warn("[PDKT] Bulk delete partially failed:", result.errors);
         notify.warning(
-          `${result.successCount} email berhasil dihapus, ${result.failureCount} gagal.`,
-          result.errors[0],
+          `${result.successCount} email dihapus. ${result.failureCount} email tidak bisa dihapus karena hanya pembuatnya, admin, atau trainer yang boleh menghapus.`,
         );
       } else {
-        notify.success(`${result.successCount} email berhasil dihapus.`);
+        notify.success(`${result.successCount} email dihapus.`);
       }
 
       setSelectedBulkIds(new Set());
       setIsBulkMode(false);
       await refetch();
-      if (selectedId && selectedBulkIds.has(selectedId)) {
+      if (selectedId && ids.includes(selectedId)) {
         setSelectedId(null);
       }
-    } catch (_err) {
-      notify.error("Gagal menghapus email.");
+    } catch (err) {
+      console.error("[PDKT] Bulk delete failed:", err);
+      notify.error("Email belum bisa dihapus. Coba lagi.");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Hapus email ini?")) return;
+  const deleteOne = async (id: string) => {
     try {
       await unwrapResponse(
         await pdktClient.mailbox[":id"].$delete({
@@ -1006,8 +944,24 @@ export default function PdktSimulation({
       );
       await refetch();
       if (selectedId === id) setSelectedId(null);
-    } catch (_err) {
-      notify.error("Gagal menghapus email.");
+    } catch (err) {
+      console.error("[PDKT] Delete failed:", err);
+      notify.error("Email belum bisa dihapus. Coba lagi.");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      if (pendingDelete.kind === "bulk") {
+        await deleteBulk(pendingDelete.ids);
+      } else {
+        await deleteOne(pendingDelete.id);
+      }
+    } finally {
+      setIsDeleting(false);
+      setPendingDelete(null);
     }
   };
 
@@ -1015,10 +969,8 @@ export default function PdktSimulation({
     return (
       <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
         <PdktWorkspaceHeader mode="inbox" onBack={onBack} />
-        <div
-          aria-label="Memuat kotak masuk"
-          className="flex min-h-0 flex-1 motion-safe:animate-pulse"
-        >
+        <div role="status" className="flex min-h-0 flex-1">
+          <span className="sr-only">Memuat kotak masuk…</span>
           <div className="flex w-full flex-col gap-4 border-r border-border p-4 md:w-[22rem]">
             <Skeleton className="h-6 w-28" />
             <Skeleton className="h-11 w-full" />
@@ -1044,27 +996,31 @@ export default function PdktSimulation({
 
   if (error && !mailboxItems) {
     return (
-      <div className="flex h-[calc(100vh-10rem)] items-center justify-center px-4">
-        <Alert variant="destructive" className="max-w-md items-start">
-          <AlertCircle aria-hidden="true" />
-          <div>
-            <AlertDescription className="font-semibold text-foreground">
-              Gagal Memuat Email
-            </AlertDescription>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {error}
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={refetch}
-            className="ml-auto min-h-11 gap-2 text-xs"
-          >
-            <RefreshCw aria-hidden="true" />
-            Coba Lagi
-          </Button>
-        </Alert>
-      </div>
+      <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
+        <PdktWorkspaceHeader mode="inbox" onBack={onBack} />
+        <div className="flex flex-1 items-center justify-center px-4">
+          <Alert variant="destructive" className="max-w-md items-start">
+            <AlertCircle aria-hidden="true" />
+            <div>
+              <AlertDescription className="font-semibold text-foreground">
+                Kotak masuk belum bisa dimuat
+              </AlertDescription>
+              <p className="mt-1 text-xs leading-relaxed text-foreground">
+                Periksa koneksi Anda, lalu coba lagi. Email yang sudah ada tidak
+                hilang.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={refetch}
+              className="ml-auto min-h-11 gap-2 text-xs"
+            >
+              <RefreshCw aria-hidden="true" />
+              Coba lagi
+            </Button>
+          </Alert>
+        </div>
+      </main>
     );
   }
 
@@ -1077,7 +1033,7 @@ export default function PdktSimulation({
     consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
     enableImageGeneration: true,
     globalConsumerTypeId: "random",
-    selectedModel: "gemini-3.8-flash",
+    selectedModel: DEFAULT_PDKT_MODEL_ID,
     consumerNameMentionPattern: "random",
     writingStyleMode: "training",
     customIdentity: {
@@ -1131,10 +1087,8 @@ export default function PdktSimulation({
     : undefined;
 
   const detailSkeleton = (
-    <div
-      aria-label="Memuat detail email"
-      className="flex flex-1 flex-col gap-4 p-6"
-    >
+    <div role="status" className="flex flex-1 flex-col gap-4 p-6">
+      <span className="sr-only">Memuat detail email…</span>
       <Skeleton className="h-7 w-2/3" />
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-32 w-full" />
@@ -1158,7 +1112,6 @@ export default function PdktSimulation({
         item={selectedItem}
         status={review?.status ?? null}
         result={(review?.result as PdktEvaluationResult | null) ?? null}
-        error={review?.error ?? null}
         onRetry={() => {
           if (selectedItem.history_id) {
             void handleRetryEval(selectedItem.id, selectedItem.history_id);
@@ -1167,7 +1120,7 @@ export default function PdktSimulation({
         onInbox={backToInbox}
         onDelete={
           selectedItem.permissions?.can_delete === true
-            ? () => void handleDelete(selectedItem.id)
+            ? () => handleDelete(selectedItem.id)
             : undefined
         }
         onPracticeAgain={
@@ -1177,7 +1130,7 @@ export default function PdktSimulation({
         }
         practiceLabel={
           practiceScenario
-            ? "Latihan lagi dengan skenario serupa"
+            ? "Latihan lagi dengan skenario ini"
             : "Buat email baru"
         }
         isStartingPractice={isStartingNew}
@@ -1199,10 +1152,7 @@ export default function PdktSimulation({
             onSelect={handleSelectMailboxItem}
             onNew={() => setIsNewModalOpen(true)}
             onSettings={() => setIsSettingsOpen(true)}
-            onHistory={async () => {
-              await fetchHistory();
-              setIsHistoryOpen(true);
-            }}
+            onHistory={() => void navigate({ to: "/pdkt/history" })}
             filter={filter}
             onFilterChange={handleFilterChange}
             selectedBulkIds={selectedBulkIds}
@@ -1220,7 +1170,7 @@ export default function PdktSimulation({
             <EmailDetailPane
               item={selectedItem}
               onReply={() => setIsReplyOpen(true)}
-              onDelete={() => void handleDelete(selectedItem.id)}
+              onDelete={() => handleDelete(selectedItem.id)}
               onBackToList={() => setSelectedId(null)}
             />
           ) : selectedId ? (
@@ -1279,11 +1229,11 @@ export default function PdktSimulation({
         >
           <div className="min-w-0">
             <AlertDescription className="font-semibold text-foreground">
-              Email belum tersimpan
+              Email konsumen belum masuk ke kotak masuk
             </AlertDescription>
-            <p className="truncate text-xs text-muted-foreground">
-              {pendingMailboxRetry.subjectLabel || "Email yang dibuat"} — tidak
-              ada AI generation ulang saat retry.
+            <p className="truncate text-xs text-foreground">
+              {pendingMailboxRetry.subjectLabel || PDKT_NO_SUBJECT}: simpan lagi
+              tanpa membuat ulang email.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -1301,7 +1251,7 @@ export default function PdktSimulation({
                     : ""
                 }
               />
-              {isRetryingMailboxSave ? "Menyimpan..." : "Coba simpan lagi"}
+              {isRetryingMailboxSave ? "Menyimpan…" : "Simpan lagi"}
             </Button>
             <Button
               type="button"
@@ -1337,13 +1287,24 @@ export default function PdktSimulation({
         }
       />
 
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        onClearHistory={handleClearHistory}
+      <div ref={setDialogContainer} className="contents" />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        container={dialogContainer}
+        title={
+          pendingDelete?.kind === "bulk"
+            ? `Hapus ${pendingDelete.ids.length} email?`
+            : "Hapus email ini?"
+        }
+        description={
+          pendingDelete?.kind === "bulk"
+            ? `${pendingDelete.ids.length} email terpilih akan dihapus dari kotak masuk.`
+            : "Email ini akan dihapus dari kotak masuk."
+        }
+        confirmLabel="Hapus email"
+        busy={isDeleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
       />
     </main>
   );

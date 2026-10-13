@@ -27,7 +27,7 @@ export const REPLY_DIRECTIONS: {
   },
   {
     id: "ojk_request_in_body",
-    title: "Tembusan, tapi minta bantuan OJK",
+    title: "Tembusan, tetapi meminta bantuan OJK",
     tag: "Jebakan",
     description:
       "Email ditujukan ke perusahaan, tetapi di tengah isinya konsumen meminta bantuan OJK. Peserta harus menyadarinya sendiri.",

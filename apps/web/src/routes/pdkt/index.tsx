@@ -1,15 +1,10 @@
 import { can } from "@trainers/types";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  ArrowRight,
-  Check,
-  History,
-  Mail,
-  SlidersHorizontal,
-} from "lucide-react";
+import { ArrowRight, History, Mail, SlidersHorizontal } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { PdktStageDemo } from "./components/PdktStageDemo";
 import {
@@ -19,12 +14,15 @@ import {
 import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
-import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
+import { mapHistoryRow, type SessionHistory } from "./utils/sessionHistory";
 import { UsagePopover } from "./components/UsagePopover";
 import { useApi } from "../../hooks/useApi";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
-import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
+import {
+  DEFAULT_PDKT_MODEL_ID,
+  PDKT_FALLBACK_CONSUMER_TYPES as defaultConsumerTypes,
+} from "./pdktSettings";
 import type {
   PdktMailboxListItem,
   PdktScenario,
@@ -41,58 +39,7 @@ import {
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
 
-const HERO_POINTS = [
-  "Kasus selalu baru",
-  "Tanpa bocoran jawaban",
-  "Ditelaah AI",
-] as const;
-
 const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
-
-const defaultConsumerTypes: PdktConsumerType[] = [
-  {
-    id: "marah",
-    name: "Marah & Emosional",
-    description: "Sangat marah, emosional, tidak sabar.",
-    difficulty: "Hard",
-    tone: "Marah, menggunakan tanda seru.",
-  },
-  {
-    id: "bingung",
-    name: "Bingung & Gaptek",
-    description: "Kebingungan, tidak paham teknologi.",
-    difficulty: "Medium",
-    tone: "Bingung, ragu-ragu.",
-  },
-  {
-    id: "kritis",
-    name: "Kritis & Detail",
-    description: "Kritis, menanyakan dasar hukum.",
-    difficulty: "Hard",
-    tone: "Kritis, logis, skeptis.",
-  },
-  {
-    id: "ramah",
-    name: "Ramah & Kooperatif",
-    description: "Ramah, sopan, kooperatif.",
-    difficulty: "Easy",
-    tone: "Ramah, sopan.",
-  },
-  {
-    id: "terburu-buru",
-    name: "Terburu-buru",
-    description: "Ingin jawaban singkat dan cepat.",
-    difficulty: "Medium",
-    tone: "Singkat, padat.",
-  },
-  {
-    id: "pasrah",
-    name: "Pasrah & Sedih",
-    description: "Putus asa, nada sedih.",
-    difficulty: "Medium",
-    tone: "Sedih, memohon bantuan.",
-  },
-];
 
 export default function PdktLanding() {
   const [view, setView] = useState<"home" | "mailbox">("home");
@@ -104,7 +51,6 @@ export default function PdktLanding() {
   const accountKey = session?.user?.id ?? null;
   const canPickParticipant = can(profile?.role, "simulation.subject.select");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const [settings, setSettings] = useState<PdktAppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -129,7 +75,7 @@ export default function PdktLanding() {
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
     "/pdkt/consumer-types",
   );
-  // Daftar ringan (tanpa snapshot) untuk "Menunggu balasan" dan "Belum dibalas".
+  // Daftar ringan (tanpa snapshot) untuk ringkasan dan daftar "Belum dibalas".
   const {
     data: mailboxItems,
     error: mailboxError,
@@ -164,23 +110,7 @@ export default function PdktLanding() {
         await pdktClient.history.$get(),
       )) as any[];
       if (res) {
-        const mapped = res.map((item: any) => ({
-          id: item.id,
-          timestamp: item.timestamp,
-          user_id: item.user_id ?? null,
-          user_email: item.user_email ?? null,
-          user_role: item.user_role ?? null,
-          config: item.config,
-          emails: item.emails || [],
-          evaluation: item.evaluation,
-          evaluationStatus:
-            item.evaluation_status ||
-            (item.evaluation ? "completed" : "processing"),
-          evaluationError: item.evaluation_error,
-          timeTaken: item.time_taken,
-          simulationSubject: item.simulationSubject ?? null,
-        }));
-        setHistory(mapped);
+        setHistory(res.map(mapHistoryRow));
         setHistoryReady(true);
       }
     } catch (err) {
@@ -208,36 +138,37 @@ export default function PdktLanding() {
     await fetchHistory();
   };
 
-  const handleDeleteSession = async (historyId: string) => {
-    try {
-      await unwrapResponse(
-        await pdktClient.history[":id"].$delete({ param: { id: historyId } }),
-      );
-      setHistory((prev) => prev.filter((h) => h.id !== historyId));
-    } catch (err) {
-      console.error("[PDKT] Failed to delete session:", err);
-      notify.error("Gagal menghapus riwayat sesi.");
-    }
-  };
-
-  const handleClearHistory = async () => {
-    try {
-      await unwrapResponse(await pdktClient.history.$delete());
-      setHistory([]);
-    } catch (err) {
-      notify.error("Gagal membersihkan riwayat.");
-    }
-  };
-
   const [replaySession, setReplaySession] = useState<SessionHistory | null>(
     null,
   );
 
   const handleSelectSession = (session: SessionHistory) => {
     setReplaySession(session);
-    setIsHistoryOpen(false);
     setView("mailbox");
   };
+
+  // `/pdkt?sesi=<id>` dari halaman Riwayat: buka sesi itu setelah riwayat termuat.
+  const navigate = useNavigate();
+  const { sesi: requestedSessionId } = useSearch({ from: "/pdkt" });
+  useEffect(() => {
+    if (!requestedSessionId) return;
+    if (historyError) {
+      notify.error(
+        "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka.",
+      );
+    } else if (!historyReady) {
+      return;
+    } else {
+      const session = history.find((item) => item.id === requestedSessionId);
+      if (session) {
+        handleSelectSession(session);
+      } else {
+        notify.error("Sesi itu tidak ada lagi di riwayat Anda.");
+      }
+    }
+    void navigate({ to: "/pdkt", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedSessionId, historyReady, historyError, history]);
 
   const captureUsageBaseline = async () => {
     try {
@@ -250,8 +181,15 @@ export default function PdktLanding() {
     }
   };
 
-  const computeUsageDeltaNow = async () => {
-    if (!usageSnapshotRef.current) return;
+  // Baseline diambil ulang tepat sebelum setiap balasan, jadi selisihnya adalah
+  // pemakaian balasan terakhir (kirim + telaah). "Masih dihitung" hanya tampil
+  // selama `computeUsageDeltaNow` berjalan; balasan yang gagal terkirim tidak
+  // menyalakannya.
+  const computeUsageDeltaNow = async (reason: "reply" | "review") => {
+    if (!usageSnapshotRef.current) {
+      setSessionDeltaPending(false);
+      return;
+    }
     setSessionDeltaPending(true);
     try {
       const delta = await pollUsageDelta(
@@ -259,24 +197,33 @@ export default function PdktLanding() {
         usageSnapshotRef.current,
       );
       setSessionDelta(delta);
-      if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+      // Satu pemberitahuan per balasan: setelah telaah selesai, saat biaya
+      // pembuatan email dan telaah sudah tercatat.
+      if (
+        reason === "review" &&
+        delta &&
+        (delta.costIdr > 0 || delta.totalTokens > 0)
+      ) {
         const format = (v: number) =>
           v.toLocaleString("id-ID", {
             style: "currency",
             currency: "IDR",
             minimumFractionDigits: 0,
           });
-        const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+        const parts: string[] = [];
         const sim = delta.breakdown.simulation;
         const rev = delta.breakdown.review;
 
         if (sim.costIdr > 0 || sim.calls > 0) {
-          parts.push(`Simulasi ${format(sim.costIdr)}`);
+          parts.push(`Pembuatan email ${format(sim.costIdr)}`);
         }
         if (rev.costIdr > 0 || rev.calls > 0) {
-          parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+          parts.push(`Telaah balasan ${format(rev.costIdr)}`);
         }
-        notify.success(parts.join(" | "));
+        notify.info(
+          `Pemakaian AI: ${formatUsageDeltaLabel(delta)}`,
+          parts.length ? parts.join(" · ") : undefined,
+        );
       }
     } catch (err) {
       console.error("[PDKT] Failed to compute usage delta:", err);
@@ -311,7 +258,7 @@ export default function PdktLanding() {
     // opening the mailbox on it.
     void captureUsageBaseline();
     setSessionDelta(null);
-    setSessionDeltaPending(true);
+    setSessionDeltaPending(false);
     setReplaySession(null);
     setView("mailbox");
   };
@@ -337,9 +284,8 @@ export default function PdktLanding() {
     setIsSettingsOpen(true);
   };
 
-  const handleOpenHistory = async () => {
-    await fetchHistory();
-    setIsHistoryOpen(true);
+  const handleOpenHistory = () => {
+    void navigate({ to: "/pdkt/history" });
   };
 
   const hasSessionDelta = Boolean(
@@ -391,7 +337,7 @@ export default function PdktLanding() {
             >
               <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pt-6 pb-16">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background py-1 pr-3 pl-1.5 text-xs font-semibold text-foreground/80">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background py-1 pr-3 pl-1.5 text-xs font-semibold text-fg2">
                     <span className="flex size-6 items-center justify-center rounded-full bg-module-pdkt/10">
                       <Mail
                         aria-hidden="true"
@@ -418,7 +364,9 @@ export default function PdktLanding() {
                         hasSessionDelta &&
                         sessionDelta && (
                           <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
-                            <span className="sr-only">Sesi terakhir </span>
+                            <span className="sr-only">
+                              Kunjungan terakhir ke kotak masuk{" "}
+                            </span>
                             {formatUsageDeltaLabel(sessionDelta)}
                           </span>
                         )
@@ -448,11 +396,10 @@ export default function PdktLanding() {
                           Balas dengan tepat.
                         </span>
                       </h1>
-                      <p className="max-w-[46ch] text-base leading-7 text-pretty text-foreground/80 sm:text-[17px]">
-                        Hadapi email konsumen yang terasa seperti kasus
-                        sungguhan. Tanpa petunjuk jawaban: Anda yang membaca,
-                        menilai, dan menulis balasannya. Setelah terkirim, AI
-                        menelaah dan menunjukkan apa yang perlu diperbaiki.
+                      <p className="max-w-[46ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]">
+                        Baca email konsumen, tulis balasan sendiri tanpa
+                        petunjuk jawaban, lalu lihat telaah AI tentang apa yang
+                        perlu diperbaiki.
                       </p>
                     </div>
 
@@ -466,29 +413,7 @@ export default function PdktLanding() {
                         Mulai simulasi
                         <ArrowRight data-icon="inline-end" />
                       </Button>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        onClick={handleOpenSettings}
-                        className="min-h-12 gap-2 bg-surface-elevated px-4 text-sm"
-                      >
-                        <SlidersHorizontal data-icon="inline-start" />
-                        Atur skenario
-                      </Button>
                     </div>
-
-                    <ul className="flex flex-wrap gap-x-6 gap-y-2.5 border-t border-border pt-5 text-[13px] text-foreground/80">
-                      {HERO_POINTS.map((point) => (
-                        <li key={point} className="flex items-center gap-2">
-                          <Check
-                            aria-hidden="true"
-                            className="size-4 text-module-pdkt"
-                          />
-                          {point}
-                        </li>
-                      ))}
-                    </ul>
                   </div>
 
                   <div className="mx-auto flex min-w-0 flex-[1_1_480px] max-w-[600px]">
@@ -533,7 +458,7 @@ export default function PdktLanding() {
                   void refetchMailbox();
                 }}
                 onBeforeActivity={captureUsageBaseline}
-                onAfterActivity={computeUsageDeltaNow}
+                onAfterActivity={(reason) => void computeUsageDeltaNow(reason)}
                 initialSelectedMailboxId={initialMailboxId}
                 initialReplaySession={replaySession}
                 onConsumeReplaySession={() => setReplaySession(null)}
@@ -572,15 +497,6 @@ export default function PdktLanding() {
         defaultConsumerTypes={
           defaultConsumerTypesFromApi || defaultConsumerTypes
         }
-      />
-
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        onClearHistory={handleClearHistory}
       />
     </div>
   );

@@ -43,8 +43,8 @@ export function PdktIdentityTab({
           <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
             Identitas konsumen
           </h3>
-          <p className="text-[13px] leading-5 text-foreground/80">
-            Nama dan alamat konsumen yang mengirim email kasus. Biarkan kosong
+          <p className="text-[13px] leading-5 text-fg2">
+            Nama dan alamat konsumen yang mengirim email konsumen. Biarkan kosong
             agar sistem memakai identitas acak di setiap sesi.
           </p>
         </div>
@@ -105,7 +105,7 @@ export function PdktIdentityTab({
           <h4 className="text-[15px] font-semibold text-foreground">
             Penyebutan nama di email
           </h4>
-          <p className="mt-1 text-[13px] leading-5 text-foreground/80">
+          <p className="mt-1 text-[13px] leading-5 text-fg2">
             Di bagian mana konsumen menyebut namanya. Pilih "Tidak disebut" untuk
             melatih peserta mencari identitas dari konteks.
           </p>
@@ -129,7 +129,7 @@ export function PdktIdentityTab({
             <option value="upfront">Nama disebut di awal</option>
             <option value="middle">Nama disebut di tengah</option>
             <option value="late">Nama disebut di akhir</option>
-            <option value="none">Tidak menyebut nama</option>
+            <option value="none">Tidak disebut</option>
           </SettingsSelect>
         </SettingsField>
       </section>
