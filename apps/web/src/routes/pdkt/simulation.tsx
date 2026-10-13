@@ -1,7 +1,13 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { MailboxSidebar } from "./components/MailboxSidebar";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import {
+  MailboxSidebar,
+  type MailboxFilter,
+  type MailboxReviewState,
+} from "./components/MailboxSidebar";
 import { EmailDetailPane } from "./components/EmailDetailPane";
-import { ReplyComposer } from "./components/ReplyComposer";
+import { PdktReplyStage } from "./components/PdktReplyStage";
+import { PdktReviewStage } from "./components/PdktReviewStage";
+import { PdktWorkspaceHeader } from "./components/PdktWorkspaceHeader";
 import { CreateEmailModal } from "./components/CreateEmailModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
@@ -13,15 +19,14 @@ import type {
   PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
+  PdktEvaluationResult,
   PdktIdentity,
   EmailMessage,
   SimulationSubjectSelection,
 } from "@trainers/types";
-import { Link } from "@tanstack/react-router";
-import { Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
-import { Card } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { notify } from "../../lib/toast";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
@@ -161,7 +166,7 @@ export default function PdktSimulation({
   const [historyLoading, setHistoryLoading] = useState(!hasInitialHistory);
 
   // Tab filter state
-  const [filter, setFilter] = useState<"all" | "open" | "replied">("open");
+  const [filter, setFilter] = useState<MailboxFilter>("open");
   const [replayItem, setReplayItem] = useState<PdktMailboxItem | null>(null);
 
   // Timer for time_taken (per mailbox)
@@ -367,43 +372,38 @@ export default function PdktSimulation({
     }
   }, [initialSettingsVersion]);
 
-  // Auto-sync selection when filter tab changes or items change
+  // Pilihan hanya dilepas saat emailnya hilang dari kotak masuk (dihapus) atau
+  // saat peserta mengganti filter (lihat handleFilterChange). Status email yang
+  // berubah karena dibalas tidak melepas pilihan, sehingga layar lanjut ke Telaah.
   useEffect(() => {
-    if (window.innerWidth < 768) {
-      if (selectedId && mailboxItems) {
-        const currentFiltered =
-          filter === "all"
-            ? visibleMailboxItems
-            : visibleMailboxItems.filter((item) => item.status === filter);
-        if (!currentFiltered.some((item) => item.id === selectedId)) {
-          setSelectedId(null);
-        }
-      }
-      return;
-    }
-
     // Tunggu daftar termuat supaya pilihan awal dari landing tidak terhapus.
     if (!mailboxItems) return;
+    if (selectedId && visibleMailboxItems.some((item) => item.id === selectedId)) {
+      return;
+    }
+    if (window.innerWidth < 768) {
+      // Di HP daftar tampil sendiri; tidak ada email yang dibuka otomatis.
+      if (selectedId) setSelectedId(null);
+      return;
+    }
+    // Hanya email yang belum dibalas yang dibuka otomatis (tahap Pahami).
+    // Telaah membuka layar fokus, jadi hanya dibuka lewat klik peserta.
+    const currentFiltered =
+      filter === "all"
+        ? visibleMailboxItems
+        : visibleMailboxItems.filter((item) => item.status === filter);
+    const next =
+      currentFiltered.find((item) => item.status === "open")?.id ?? null;
+    if (next !== selectedId) setSelectedId(next);
+  }, [mailboxItems, visibleMailboxItems, filter, selectedId]);
 
-    if (visibleMailboxItems.length > 0) {
-      const currentFiltered =
-        filter === "all"
-          ? visibleMailboxItems
-          : visibleMailboxItems.filter((item) => item.status === filter);
-      if (currentFiltered.length > 0) {
-        if (
-          !selectedId ||
-          !currentFiltered.some((item) => item.id === selectedId)
-        ) {
-          setSelectedId(currentFiltered[0].id);
-        }
-      } else {
-        setSelectedId(null);
-      }
-    } else {
+  const handleFilterChange = (next: MailboxFilter) => {
+    setFilter(next);
+    const selected = visibleMailboxItems.find((item) => item.id === selectedId);
+    if (selected && next !== "all" && selected.status !== next) {
       setSelectedId(null);
     }
-  }, [mailboxItems, visibleMailboxItems, filter, selectedId]);
+  };
 
   // Start timer for open items when selected
   useEffect(() => {
@@ -852,12 +852,8 @@ export default function PdktSimulation({
     }
   };
 
-  const handleReplyOpen = () => {
-    setIsReplyOpen(true);
-  };
-
-  const handleReplySubmit = async (replyText: string) => {
-    if (!selectedId || !selectedItem) return;
+  const handleReplySubmit = async (replyText: string): Promise<boolean> => {
+    if (!selectedId || !selectedItem) return false;
     setIsReplying(true);
     await notifyBefore();
     try {
@@ -885,14 +881,18 @@ export default function PdktSimulation({
 
       await refetch();
       await fetchHistory();
+      // Email tetap terpilih; setelah detail termuat ulang statusnya `replied`
+      // sehingga layar pindah ke tahap Telaah.
       invalidateMailboxDetail(selectedId);
       setIsReplyOpen(false);
       setFilter("replied");
       notifyAfter();
-      notify.success("Balasan terkirim! Evaluasi AI sedang berjalan.");
+      notify.success("Balasan terkirim. AI sedang menilai.");
+      return true;
     } catch (err: any) {
       console.error("[PDKT] Reply error:", err);
       notify.error(err?.message || "Gagal mengirim balasan.");
+      return false;
     } finally {
       setIsReplying(false);
     }
@@ -1014,107 +1014,28 @@ export default function PdktSimulation({
   if (loading && !mailboxItems) {
     return (
       <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)] shrink-0 z-10">
-          <div className="flex items-center gap-3">
-            {onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-                title="Kembali ke Laman Utama"
-                aria-label="Kembali ke Laman Utama"
-              >
-                <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
-              </button>
-            ) : (
-              <Link
-                to="/pdkt"
-                className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-                title="Kembali ke Laman Utama"
-                aria-label="Kembali ke Laman Utama"
-              >
-                <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
-              </Link>
-            )}
-            <h1 className="font-semibold text-[var(--fg)] text-lg">
-              Simulasi PDKT
-            </h1>
+        <PdktWorkspaceHeader mode="inbox" onBack={onBack} />
+        <div
+          aria-label="Memuat kotak masuk"
+          className="flex min-h-0 flex-1 motion-safe:animate-pulse"
+        >
+          <div className="flex w-full flex-col gap-4 border-r border-border p-4 md:w-[22rem]">
+            <Skeleton className="h-6 w-28" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
+            {[1, 2, 3, 4].map((row) => (
+              <div key={row} className="flex flex-col gap-2 py-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            ))}
           </div>
-        </div>
-
-        {/* Main Content Area Skeleton */}
-        <div className="flex flex-1 overflow-hidden p-4 gap-4">
-          <div className="flex-1 flex bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden relative">
-            {/* Sidebar Skeleton (w-80) */}
-            <div className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0 animate-pulse motion-reduce:animate-none">
-              {/* Header skeleton */}
-              <div className="p-4 border-b border-[var(--border)] space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="h-4 bg-[var(--border)] rounded w-24"></div>
-                  <div className="flex gap-2">
-                    <div className="w-7 h-7 bg-[var(--border)] rounded-lg"></div>
-                    <div className="w-7 h-7 bg-[var(--border)] rounded-lg"></div>
-                    <div className="w-7 h-7 bg-[var(--border)] rounded-lg"></div>
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-full rounded-lg" />
-                <div className="h-6 bg-[var(--bg)] rounded-lg w-full"></div>
-              </div>
-
-              {/* Items list skeleton */}
-              <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex gap-3 items-start">
-                    <div className="w-10 h-10 bg-[var(--border)] rounded-full shrink-0"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex justify-between">
-                        <div className="h-3 bg-[var(--border)] rounded w-20"></div>
-                        <div className="h-2 bg-[var(--border)] rounded w-10"></div>
-                      </div>
-                      <div className="h-3 bg-[var(--border)] rounded w-36"></div>
-                      <div className="h-2 bg-[var(--bg)] rounded w-24"></div>
-                      <div className="h-2.5 bg-[var(--border)] rounded w-16 mt-1"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Main Detail Pane Skeleton */}
-            <div className="hidden md:flex flex-1 flex-col min-w-0 bg-[var(--surface)] animate-pulse motion-reduce:animate-none">
-              {/* Detail Header skeleton */}
-              <div className="p-6 border-b border-[var(--border)] flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-[var(--border)] rounded-full"></div>
-                  <div className="space-y-2">
-                    <div className="h-4 bg-[var(--border)] rounded w-32"></div>
-                    <div className="h-3 bg-[var(--bg)] rounded w-48"></div>
-                  </div>
-                </div>
-                <div className="h-8 bg-[var(--bg)] rounded-lg w-24"></div>
-              </div>
-
-              {/* Detail Body skeleton */}
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-                <div className="space-y-3">
-                  <div className="h-4 bg-[var(--border)] rounded w-1/3"></div>
-                  <div className="h-3 bg-[var(--bg)] rounded w-full"></div>
-                  <div className="h-3 bg-[var(--bg)] rounded w-full"></div>
-                  <div className="h-3 bg-[var(--bg)] rounded w-4/5"></div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="h-4 bg-[var(--border)] rounded w-1/4"></div>
-                  <div className="h-3 bg-[var(--bg)] rounded w-full"></div>
-                  <div className="h-3 bg-[var(--bg)] rounded w-5/6"></div>
-                </div>
-
-                <div className="pt-6 border-t border-[var(--border)] flex justify-end">
-                  <div className="h-10 bg-[var(--border)] rounded-lg w-32"></div>
-                </div>
-              </div>
-            </div>
+          <div className="hidden flex-1 flex-col gap-4 p-8 md:flex">
+            <Skeleton className="h-9 w-72 rounded-full" />
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-40 w-full max-w-[720px]" />
           </div>
         </div>
       </main>
@@ -1167,36 +1088,189 @@ export default function PdktSimulation({
     },
   };
 
-  return (
-    <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)] shrink-0 z-10">
-        <div className="flex items-center gap-3">
-          {onBack ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-              title="Kembali ke Laman Utama"
-              aria-label="Kembali ke Laman Utama"
-            >
-              <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
-            </button>
+  // Tahap mengikuti status email terpilih; daftar dipakai selama detail dimuat.
+  const selectedListItem = selectedId
+    ? visibleMailboxItems.find((item) => item.id === selectedId)
+    : undefined;
+  const selectedStatus = selectedItem?.status ?? selectedListItem?.status;
+  const stage =
+    selectedStatus === "replied"
+      ? "telaah"
+      : selectedStatus === "open" && isReplyOpen
+        ? "tanggapi"
+        : "pahami";
+  const headerItem = selectedListItem ?? selectedItem ?? null;
+  const openCount = visibleMailboxItems.filter(
+    (item) => item.status === "open",
+  ).length;
+  const reviews: Record<string, MailboxReviewState> = {};
+  for (const [mailboxId, review] of Object.entries(evaluations)) {
+    reviews[mailboxId] = {
+      status: review.status,
+      score: typeof review.result?.score === "number" ? review.result.score : null,
+    };
+  }
+
+  const backToInbox = () => {
+    setIsReplyOpen(false);
+    if (stage === "telaah") setSelectedId(null);
+  };
+
+  // "Latihan lagi" memakai skenario sesi itu bila masih ada di pengaturan.
+  const reviewHistory = selectedItem?.history_id
+    ? history.find((entry) => entry.id === selectedItem.history_id)
+    : undefined;
+  const reviewScenarioId = (
+    reviewHistory?.config as { scenarios?: Array<{ id?: string }> } | null
+  )?.scenarios?.[0]?.id;
+  const practiceScenario = reviewScenarioId
+    ? activeScenarios.find(
+        (scenario) =>
+          scenario.id === reviewScenarioId && scenario.isActive !== false,
+      )
+    : undefined;
+
+  const detailSkeleton = (
+    <div
+      aria-label="Memuat detail email"
+      className="flex flex-1 flex-col gap-4 p-6"
+    >
+      <Skeleton className="h-7 w-2/3" />
+      <Skeleton className="h-4 w-1/3" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+
+  let body: React.ReactNode;
+  if (stage === "tanggapi" && selectedItem) {
+    body = (
+      <PdktReplyStage
+        item={selectedItem}
+        onSend={handleReplySubmit}
+        isSending={isReplying}
+      />
+    );
+  } else if (stage === "telaah") {
+    const review = selectedItem ? evaluations[selectedItem.id] : undefined;
+    body = selectedItem ? (
+      <PdktReviewStage
+        key={selectedItem.id}
+        item={selectedItem}
+        status={review?.status ?? null}
+        result={(review?.result as PdktEvaluationResult | null) ?? null}
+        error={review?.error ?? null}
+        onRetry={() => {
+          if (selectedItem.history_id) {
+            void handleRetryEval(selectedItem.id, selectedItem.history_id);
+          }
+        }}
+        onInbox={backToInbox}
+        onDelete={
+          selectedItem.permissions?.can_delete === true
+            ? () => void handleDelete(selectedItem.id)
+            : undefined
+        }
+        onPracticeAgain={
+          practiceScenario
+            ? () => void handleStartNew(practiceScenario)
+            : () => setIsNewModalOpen(true)
+        }
+        practiceLabel={
+          practiceScenario
+            ? "Latihan lagi dengan skenario serupa"
+            : "Buat email baru"
+        }
+        isStartingPractice={isStartingNew}
+      />
+    ) : (
+      detailSkeleton
+    );
+  } else {
+    body = (
+      <div className="flex min-h-0 flex-1">
+        <div
+          className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[22rem] md:shrink-0`}
+        >
+          <MailboxSidebar
+            items={filteredByTab}
+            openCount={openCount}
+            reviews={reviews}
+            selectedId={selectedId}
+            onSelect={handleSelectMailboxItem}
+            onNew={() => setIsNewModalOpen(true)}
+            onSettings={() => setIsSettingsOpen(true)}
+            onHistory={async () => {
+              await fetchHistory();
+              setIsHistoryOpen(true);
+            }}
+            filter={filter}
+            onFilterChange={handleFilterChange}
+            selectedBulkIds={selectedBulkIds}
+            onToggleBulkId={handleToggleBulkId}
+            isBulkMode={isBulkMode}
+            onToggleBulkMode={handleToggleBulkMode}
+            onBulkDelete={handleBulkDelete}
+          />
+        </div>
+
+        <div
+          className={`${selectedId ? "flex" : "hidden md:flex"} relative min-w-0 flex-1 flex-col`}
+        >
+          {selectedItem ? (
+            <EmailDetailPane
+              item={selectedItem}
+              onReply={() => setIsReplyOpen(true)}
+              onDelete={() => void handleDelete(selectedItem.id)}
+              onBackToList={() => setSelectedId(null)}
+            />
+          ) : selectedId ? (
+            detailSkeleton
           ) : (
-            <Link
-              to="/pdkt"
-              className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
-              title="Kembali ke Laman Utama"
-              aria-label="Kembali ke Laman Utama"
-            >
-              <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
-            </Link>
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-card p-12 text-center">
+              <Inbox
+                aria-hidden="true"
+                className="size-10 text-muted-foreground"
+              />
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Pilih email dari kotak masuk, atau buat email baru untuk mulai
+                berlatih.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setIsNewModalOpen(true)}
+                className="min-h-11 text-xs"
+              >
+                Buat email baru
+              </Button>
+            </div>
           )}
-          <h1 className="font-semibold text-[var(--fg)] text-lg">
-            Simulasi PDKT
-          </h1>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <main className="relative flex h-screen w-full flex-col bg-background text-foreground">
+      {stage !== "pahami" && headerItem ? (
+        <PdktWorkspaceHeader
+          mode="focus"
+          stage={stage}
+          item={headerItem}
+          onInbox={backToInbox}
+          onSelectStage={
+            stage === "tanggapi"
+              ? { pahami: () => setIsReplyOpen(false) }
+              : undefined
+          }
+        />
+      ) : (
+        <PdktWorkspaceHeader
+          mode="inbox"
+          onBack={onBack}
+          item={headerItem}
+          hideBackOnMobile={Boolean(selectedId)}
+        />
+      )}
 
       {pendingMailboxRetry && (
         <Alert
@@ -1242,132 +1316,35 @@ export default function PdktSimulation({
         </Alert>
       )}
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden gap-4 p-4">
-        <Card className="flex min-h-0 flex-1 flex-row overflow-hidden rounded-xl border-border bg-card p-0">
-          <div
-            className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-80 md:shrink-0`}
-          >
-            <MailboxSidebar
-              items={filteredByTab}
-              selectedId={selectedId}
-              onSelect={handleSelectMailboxItem}
-              onNew={() => setIsNewModalOpen(true)}
-              onSettings={() => setIsSettingsOpen(true)}
-              onHistory={async () => {
-                await fetchHistory();
-                setIsHistoryOpen(true);
-              }}
-              filter={filter}
-              onFilterChange={setFilter}
-              selectedBulkIds={selectedBulkIds}
-              onToggleBulkId={handleToggleBulkId}
-              isBulkMode={isBulkMode}
-              onToggleBulkMode={handleToggleBulkMode}
-              onBulkDelete={handleBulkDelete}
-            />
-          </div>
+      {body}
 
-          <div
-            className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex flex-col min-w-0 relative`}
-          >
-            {selectedItem ? (
-              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <EmailDetailPane
-                  item={selectedItem}
-                  onReply={handleReplyOpen}
-                  onDelete={() => handleDelete(selectedItem.id)}
-                  isComposerOpen={isReplyOpen}
-                  evaluation={evaluations[selectedItem.id]?.result || null}
-                  evaluationStatus={
-                    evaluations[selectedItem.id]?.status || null
-                  }
-                  evaluationError={evaluations[selectedItem.id]?.error || null}
-                  onRetryEval={() =>
-                    selectedItem.history_id &&
-                    handleRetryEval(selectedItem.id, selectedItem.history_id)
-                  }
-                  onBackToList={() => setSelectedId(null)}
-                />
-                {isReplyOpen && (
-                  <div className="shrink-0">
-                    <ReplyComposer
-                      key={selectedItem.id}
-                      mailboxId={selectedItem.id}
-                      recipient={selectedItem.sender_email}
-                      subject={`Re: ${selectedItem.subject}`}
-                      onSend={handleReplySubmit}
-                      onClose={() => setIsReplyOpen(false)}
-                      isLoading={isReplying}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : selectedId ? (
-              <div
-                aria-label="Memuat detail email"
-                className="flex flex-1 flex-col gap-4 p-6"
-              >
-                <Skeleton className="h-7 w-2/3" />
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-32 w-full" />
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-[var(--fg2)]">
-                <Plus className="w-12 h-12 mb-4 text-[var(--fg3)]" />
-                <p className="text-sm font-medium text-[var(--fg)]">
-                  Pilih email atau buat simulasi baru
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => setIsNewModalOpen(true)}
-                    className="mt-4 min-h-11 text-xs"
-                  >
-                    Simulasi Baru
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="mt-4 min-h-11 text-xs"
-                  >
-                    Pengaturan
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+      <CreateEmailModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        scenarios={activeScenarios}
+        onCreate={handleStartNew}
+        isLoading={isStartingNew}
+      />
 
-          <CreateEmailModal
-            isOpen={isNewModalOpen}
-            onClose={() => setIsNewModalOpen(false)}
-            scenarios={activeScenarios}
-            onCreate={handleStartNew}
-            isLoading={isStartingNew}
-          />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={currentSettings}
+        onSave={handleSaveSettings}
+        defaultScenarios={defaultScenarios || []}
+        defaultConsumerTypes={
+          defaultConsumerTypesFromApi || defaultConsumerTypes
+        }
+      />
 
-          <SettingsModal
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            settings={currentSettings}
-            onSave={handleSaveSettings}
-            defaultScenarios={defaultScenarios || []}
-            defaultConsumerTypes={
-              defaultConsumerTypesFromApi || defaultConsumerTypes
-            }
-          />
-
-          <HistoryModal
-            isOpen={isHistoryOpen}
-            onClose={() => setIsHistoryOpen(false)}
-            history={history}
-            onSelectSession={handleSelectSession}
-            onDeleteSession={handleDeleteSession}
-            onClearHistory={handleClearHistory}
-          />
-        </Card>
-      </div>
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onClearHistory={handleClearHistory}
+      />
     </main>
   );
 }

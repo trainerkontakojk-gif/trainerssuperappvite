@@ -36,10 +36,6 @@ describe("PDKT AI Image Rendering", () => {
         item={mockItem}
         onReply={() => {}}
         onDelete={() => {}}
-        evaluation={null}
-        evaluationStatus={null}
-        evaluationError={null}
-        onRetryEval={() => {}}
       />
     );
 
@@ -47,7 +43,7 @@ describe("PDKT AI Image Rendering", () => {
     expect(screen.getByText(/Lampiran \(1\)/i)).toBeDefined();
 
     // Should have an image with specific src
-    const img = screen.getByAltText(/Attachment 1/i) as HTMLImageElement;
+    const img = screen.getByAltText(/Lampiran 1/i) as HTMLImageElement;
     expect(img.src).toContain("data:image/png;base64,ai-generated-image");
   });
 
@@ -73,10 +69,6 @@ describe("PDKT AI Image Rendering", () => {
         item={itemWithDiagnostics}
         onReply={() => {}}
         onDelete={() => {}}
-        evaluation={null}
-        evaluationStatus={null}
-        evaluationError={null}
-        onRetryEval={() => {}}
       />
     );
 

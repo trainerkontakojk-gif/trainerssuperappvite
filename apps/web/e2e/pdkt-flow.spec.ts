@@ -129,7 +129,14 @@ function mailboxItem(
     },
   };
 }
-const OPEN_MAIL = mailboxItem("mail-open", "open");
+const OPEN_MAIL = mailboxItem("mail-open", "open", {
+  created_by_user: {
+    id: "trainer-1",
+    full_name: "Siti Aminah",
+    role: "Trainer",
+    is_current_user: false,
+  },
+});
 /** Email terbuka yang lebih baru; API mengurutkannya lebih dulu. */
 const NEWER_OPEN_MAIL = mailboxItem("mail-newer", "open", {
   created_at: "2026-09-16T08:00:00.000Z",
@@ -318,6 +325,57 @@ async function openScenarioSettings(page: Page) {
   return { audit, dialog: page.getByRole("dialog") };
 }
 
+/**
+ * Tab filter "Dibalas" hanya ada di kotak masuk ruang kerja. Baris "Belum
+ * dibalas" di landing juga memuat subjek email, jadi subjek bukan penanda.
+ */
+function workspaceMarker(page: Page) {
+  return page
+    .getByRole("group", { name: "Saring email" })
+    .getByRole("button", { name: "Dibalas", exact: true });
+}
+
+/** Lewati pemilih peserta (bila muncul) sampai ruang kerja tampil. */
+async function enterWorkspace(page: Page) {
+  const picker = page
+    .getByRole("dialog")
+    .filter({ hasText: "Pilih peserta latihan" });
+  const workspace = workspaceMarker(page);
+  await expect
+    .poll(async () => (await picker.isVisible()) || (await workspace.isVisible()), {
+      timeout: 20000,
+    })
+    .toBe(true);
+  if (await picker.isVisible()) {
+    // "Diri sendiri" sudah terpilih secara default.
+    await picker.getByRole("button", { name: "Mulai" }).click();
+  }
+  await expect(workspace).toBeVisible({ timeout: 20000 });
+}
+
+/** Buka /pdkt, klik Mulai simulasi, dan tunggu ruang kerja. */
+async function openWorkspace(page: Page, apiMocks: readonly ApiMock[]) {
+  const audit = await openHermeticShell(page, { path: "/pdkt", apiMocks });
+  await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+  await enterWorkspace(page);
+  return audit;
+}
+
+/** Ganti respons JSON satu endpoint setelah halaman terbuka (handler terakhir menang). */
+async function overrideJson(page: Page, url: string | RegExp, data: unknown) {
+  await page.route(url, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true, data }),
+    }),
+  );
+}
+
+function stageNav(page: Page) {
+  return page.getByRole("navigation", { name: "Tahap latihan" });
+}
+
 test.describe("PDKT (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
@@ -436,18 +494,7 @@ test.describe("PDKT (hermetic)", () => {
     // Membuka email terlama: kotak masuk terbuka dengan email itu terpilih,
     // bukan email pertama yang dipilih otomatis.
     await rows.nth(0).click();
-    const picker = page
-      .getByRole("dialog")
-      .filter({ hasText: "Pilih peserta latihan" });
-    const workspace = page.getByRole("button", { name: "Terbalas" });
-    await expect
-      .poll(async () => (await picker.isVisible()) || (await workspace.isVisible()), {
-        timeout: 20000,
-      })
-      .toBe(true);
-    if (await picker.isVisible()) {
-      await picker.getByRole("button", { name: "Mulai" }).click();
-    }
+    await enterWorkspace(page);
     await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
     expect(
       audit.mockedApi.some((entry) =>
@@ -612,7 +659,7 @@ test.describe("PDKT (hermetic)", () => {
     const picker = page
       .getByRole("dialog")
       .filter({ hasText: "Pilih peserta latihan" });
-    const mailboxEmpty = page.getByText(/Pilih email atau buat simulasi baru/);
+    const mailboxEmpty = page.getByText(/Pilih email dari kotak masuk/);
 
     await expect
       .poll(
@@ -705,21 +752,7 @@ test.describe("PDKT (hermetic)", () => {
       apiMocks: pdktMocks([], [OPEN_MAIL]),
     });
     await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
-    const picker = page
-      .getByRole("dialog")
-      .filter({ hasText: "Pilih peserta latihan" });
-    // Baris "Belum dibalas" di landing juga memuat subjek email, jadi penanda
-    // workspace adalah tab filter kotak masuk.
-    const workspace = page.getByRole("button", { name: "Terbalas" });
-    await expect
-      .poll(
-        async () => (await picker.isVisible()) || (await workspace.isVisible()),
-        { timeout: 20000 },
-      )
-      .toBe(true);
-    if (await picker.isVisible()) {
-      await picker.getByRole("button", { name: "Mulai" }).click();
-    }
+    await enterWorkspace(page);
     await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
 
     // Isi email tampil; penerima (arah balasan) tidak.
@@ -855,17 +888,192 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("panel telaah menandai kalimat balasan yang dikomentari AI", async ({
+  test("tahap Pahami: kotak masuk, navigasi tahap, dan panel baca", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(
+      page,
+      pdktMocks(EVALUATED_HISTORY, [OPEN_MAIL, REPLIED_MAIL]),
+    );
+
+    await expect(
+      page.getByRole("heading", { name: "Kotak masuk", level: 2 }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Baru" })).toBeVisible();
+    const filters = page.getByRole("group", { name: "Saring email" });
+    await expect(filters.getByRole("button")).toHaveText([
+      "Semua",
+      "Belum dibalas · 1",
+      "Dibalas",
+    ]);
+    await expect(page.getByPlaceholder("Cari pengirim atau subjek")).toBeVisible();
+
+    await page.getByRole("button", { name: "Menu lainnya" }).click();
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Riwayat",
+      "Pengaturan",
+      "Pilih beberapa",
+    ]);
+    await page.keyboard.press("Escape");
+
+    // Filter bawaan "Belum dibalas" memilih email terbuka: tahap Pahami.
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    const nav = stageNav(page);
+    await expect(nav.locator('[aria-current="step"]')).toHaveText(/Pahami/);
+    await expect(nav).toContainText("Telaah terbuka setelah balasan dikirim");
+    await expect(nav.getByRole("button", { name: /Telaah/ })).toHaveCount(0);
+
+    const reading = page.getByRole("article");
+    await expect(
+      reading.getByRole("heading", { name: OPEN_MAIL.list.subject }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(reading).toContainText(OPEN_MAIL.detail.inbound_email.body);
+    await expect(reading).toContainText("rina@local.test");
+    await expect(reading.getByText("Lampiran (1)")).toBeVisible();
+    // Data peserta dan pelaksana pindah dari panel baca ke header ruang kerja.
+    await expect(page.getByText("Pelaksana: Siti Aminah (Trainer)")).toBeVisible();
+    await expect(reading.getByRole("button", { name: "Lampiran 1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hapus email ini" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Tulis balasan" })).toBeVisible();
+
+    // Baris yang sudah dibalas menampilkan skor; memilih filter tidak membuka
+    // Telaah dengan sendirinya.
+    await filters.getByRole("button", { name: "Dibalas", exact: true }).click();
+    const repliedRow = page.getByRole("button", {
+      name: new RegExp(REPLIED_MAIL.list.subject),
+    });
+    await expect(repliedRow).toContainText("Skor 85");
+    await expect(page.getByText(/Pilih email dari kotak masuk/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Balasan untuk/ })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("tahap Tanggapi: tulis, konfirmasi, kirim, lalu Telaah menunggu penilaian", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(page, [
+      ...pdktMocks([], [OPEN_MAIL]),
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/mailbox/reply",
+        body: { success: true, data: { historyId: "pdkt-new-1" } },
+      },
+    ]);
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    await page.getByRole("button", { name: "Tulis balasan" }).click();
+
+    // Layar fokus: daftar email disembunyikan, email konsumen tetap terlihat.
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Tanggapi/,
+    );
+    await expect(page.getByRole("heading", { name: "Kotak masuk" })).toHaveCount(0);
+    const email = page.getByRole("region", { name: "Email konsumen" });
+    await expect(email).toContainText(OPEN_MAIL.detail.inbound_email.body);
+    const compose = page.getByRole("region", { name: "Tulis balasan" });
+    await expect(compose).toContainText(`Re: ${OPEN_MAIL.list.subject}`);
+
+    const replyText = "Kami akan cek transaksi Ibu hari ini.";
+    await compose.getByLabel("Balasan Anda").fill(replyText);
+    await expect(compose).toContainText("7 kata");
+
+    await compose.getByRole("button", { name: "Kirim balasan" }).click();
+    const confirm = page.getByRole("dialog", { name: "Kirim balasan sekarang?" });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: "Periksa lagi" }).click();
+    await expect(confirm).toHaveCount(0);
+
+    // Setelah terkirim, server melaporkan email sudah dibalas dan sedang dinilai.
+    const replied = mailboxItem(OPEN_MAIL.list.id, "replied", {
+      history_id: "pdkt-new-1",
+    });
+    await overrideJson(page, "**/api/v1/pdkt/mailbox", [replied.list]);
+    await overrideJson(
+      page,
+      `**/api/v1/pdkt/mailbox/${OPEN_MAIL.list.id}`,
+      replied.detail,
+    );
+    await overrideJson(page, "**/api/v1/pdkt/history", [
+      {
+        id: "pdkt-new-1",
+        timestamp: MAIL_AT,
+        config: SESSION_CONFIG,
+        emails: [],
+        evaluation: null,
+        evaluation_status: "processing",
+      },
+    ]);
+    await overrideJson(page, /\/api\/v1\/pdkt\/history\/eval\//, {
+      evaluation_status: "processing",
+      evaluation: null,
+      evaluation_error: null,
+    });
+
+    await compose.getByRole("button", { name: "Kirim balasan" }).click();
+    const sent = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        request.url().endsWith("/api/v1/pdkt/mailbox/reply"),
+    );
+    await page
+      .getByRole("dialog", { name: "Kirim balasan sekarang?" })
+      .getByRole("button", { name: "Kirim dan nilai" })
+      .click();
+    const body = (await sent).postDataJSON();
+    expect(body.mailboxId).toBe(OPEN_MAIL.list.id);
+    expect(body.reply.body).toBe(replyText);
+
+    await expect(
+      page.getByRole("heading", { name: "Balasan untuk Rina" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Telaah/,
+    );
+    await expect(
+      page.getByRole("status").filter({ hasText: "Sedang dinilai AI" }),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("tahap Telaah: skor, rincian, catatan bernomor, dan contoh balasan", async ({
     page,
   }) => {
     const reply = "Terima kasih, kami cek transaksinya.";
     const matchedQuote = "kami cek transaksinya";
     const start = reply.indexOf(matchedQuote);
+    const base = EVALUATED_HISTORY[0].evaluation as Record<string, unknown>;
     const history = [
       {
         ...EVALUATED_HISTORY[0],
         evaluation: {
-          ...EVALUATED_HISTORY[0].evaluation,
+          ...base,
+          scoreBreakdown: {
+            recipientDirectionScore: 90,
+            normativeResponseScore: 70,
+            clarityScore: 85,
+            typoScore: 88,
+            templateComplianceScore: 82,
+          },
+          edu: {
+            dimensionTips: { normative: "Tuliskan batas waktu tindak lanjut." },
+            actionItems: [
+              {
+                dimension: "normative",
+                text: "Sebut kanal pengaduan resmi.",
+                example: "Silakan hubungi 157.",
+                priorityRank: 1,
+              },
+              {
+                dimension: "clarity",
+                text: "Pecah kalimat pembuka.",
+                priorityRank: 2,
+              },
+            ],
+            suggestedRewrite: { body: "Terima kasih, kami cek transaksi Ibu." },
+          },
+          expectedAnswerAlignment: {
+            category: "Hampir sesuai",
+            reason: "Solusi benar tetapi tanpa batas waktu.",
+          },
           annotations: [
             {
               quote: matchedQuote,
@@ -885,89 +1093,178 @@ test.describe("PDKT (hermetic)", () => {
         },
       },
     ] as unknown as SessionHistory[];
-    const audit = await openHermeticShell(page, {
-      path: "/pdkt",
-      apiMocks: pdktMocks(history, [REPLIED_MAIL]),
-    });
-    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
-    const picker = page
-      .getByRole("dialog")
-      .filter({ hasText: "Pilih peserta latihan" });
-    const terbalas = page.getByRole("button", { name: "Terbalas" });
-    await expect
-      .poll(async () => (await picker.isVisible()) || (await terbalas.isVisible()), {
-        timeout: 20000,
-      })
-      .toBe(true);
-    if (await picker.isVisible()) {
-      await picker.getByRole("button", { name: "Mulai" }).click();
-    }
-    await terbalas.click();
-    await page.getByText(REPLIED_MAIL.list.subject).first().click();
+    const audit = await openWorkspace(page, pdktMocks(history, [REPLIED_MAIL]));
+
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
 
-    const card = page.getByRole("region", { name: "Catatan di balasan Anda" });
-    await expect(card).toBeVisible({ timeout: 20000 });
-    const marks = card.locator("mark");
+    await expect(
+      page.getByRole("heading", { name: "Balasan untuk Rina" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name: "Kotak masuk" })).toHaveCount(0);
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Telaah/,
+    );
+
+    const summary = page.getByRole("region", { name: "Ringkasan skor" });
+    await expect(summary.getByTestId("pdkt-review-score")).toHaveText("85");
+    await expect(summary).toContainText("Perbaiki ini dulu");
+    await expect(summary).toContainText("Sebut kanal pengaduan resmi.");
+    await expect(summary).toContainText("Silakan hubungi 157.");
+    await expect(summary).toContainText("Berdampak ke: Kualitas OJK");
+    await expect(summary).toContainText("Pecah kalimat pembuka.");
+    await expect(summary).toContainText("Hampir sesuai");
+    await expect(summary).toContainText("3 menit 45 detik");
+
+    const breakdown = page.getByRole("region", { name: "Rincian skor" });
+    const rows = breakdown.getByRole("listitem");
+    await expect(rows).toHaveCount(5);
+    await expect(rows.nth(0)).toContainText("Arah Penerima");
+    await expect(rows.nth(0)).toContainText("90");
+    await expect(breakdown.getByText("Perlu perbaikan")).toHaveCount(1);
+    await expect(rows.nth(1)).toContainText("Perlu perbaikan");
+    await expect(rows.nth(1)).toContainText("Tuliskan batas waktu tindak lanjut.");
+
+    const answer = page.getByRole("region", { name: "Balasan Anda" });
+    const marks = answer.locator("mark");
     await expect(marks).toHaveCount(1);
     await expect(marks.first()).toHaveText(`${matchedQuote}1`);
-    await expect(card).toContainText("Terima kasih,");
+    await expect(answer).toContainText("Terima kasih,");
 
-    const notes = card.getByRole("listitem");
+    const fixes = page.getByRole("region", { name: "Yang perlu diperbaiki" });
+    const notes = fixes.getByRole("listitem");
     await expect(notes).toHaveCount(2);
-    await expect(notes.nth(0)).toContainText("1");
     await expect(notes.nth(0)).toContainText(
       "Sebutkan kapan konsumen akan menerima kabar.",
     );
-    await expect(notes.nth(1)).toContainText(
-      "Tambahkan nomor tiket supaya konsumen bisa menindaklanjuti.",
-    );
     await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
+
+    const other = page.getByRole("region", { name: "Temuan lain" });
+    await expect(other).toContainText("transkasi");
+    await expect(other).toContainText("Kalimat pembuka terlalu panjang");
+    await expect(other).toContainText("Belum menyebut kanal pengaduan resmi");
+    await expect(page.getByRole("region", { name: "Catatan AI" })).toContainText(
+      "Jawaban relevan dan jelas.",
+    );
+
+    // Teks abu di kotak oranye "Perbaiki ini dulu" dan label rincian tetap terbaca.
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      for (const region of [summary, breakdown]) {
+        const low = await findLowContrastText(region, {
+          selector: "span, p, dt, dd, q",
+          leafOnly: true,
+        });
+        expect(low, `${theme}: ${low.join("\n")}`).toEqual([]);
+      }
+    }
+    await setDocumentTheme(page, "light");
+
+    const rewrite = page.getByText("Terima kasih, kami cek transaksi Ibu.");
+    await expect(rewrite).toBeHidden();
+    await page.getByText("Lihat contoh balasan yang lebih baik").click();
+    await expect(rewrite).toBeVisible();
+
+    // Kembali ke kotak masuk tidak membuka ulang email yang sama.
+    await page.getByRole("button", { name: "Kembali ke kotak masuk" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Kotak masuk", level: 2 }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Balasan untuk Rina" })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("tahap Telaah gagal bisa dicoba lagi", async ({ page }) => {
+    const failed = [
+      {
+        ...EVALUATED_HISTORY[0],
+        evaluation: null,
+        // Bentuk respons API /pdkt/history memakai snake_case.
+        evaluation_status: "failed",
+        evaluation_error: "Model AI sedang sibuk.",
+      },
+    ] as unknown as SessionHistory[];
+    const audit = await openWorkspace(page, [
+      ...pdktMocks(failed, [REPLIED_MAIL]),
+      {
+        method: "GET",
+        path: /\/api\/v1\/pdkt\/history\/eval\//,
+        body: {
+          success: true,
+          data: {
+            evaluation_status: "failed",
+            evaluation: null,
+            evaluation_error: "Model AI sedang sibuk.",
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/history/retry-eval",
+        body: { success: true, data: null },
+      },
+    ]);
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
+
+    await expect(page.getByText("Model AI sedang sibuk.")).toBeVisible({
+      timeout: 20000,
+    });
+    const retry = page.waitForRequest((request) =>
+      request.url().endsWith("/api/v1/pdkt/history/retry-eval"),
+    );
+    await page.getByRole("button", { name: "Coba lagi" }).click();
+    expect((await retry).postDataJSON()).toEqual({
+      historyId: "pdkt-evaluated-1",
+    });
+    await expect(
+      page.getByRole("status").filter({ hasText: "Sedang dinilai AI" }),
+    ).toBeVisible();
     expectHermetic(audit);
   });
 
   test(`teks mailbox, evaluasi, dan lampiran PDKT minimal ${MIN_TEXT_PX}px`, async ({
     page,
   }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/pdkt",
-      apiMocks: pdktMocks(EVALUATED_HISTORY, [OPEN_MAIL, REPLIED_MAIL]),
-    });
-    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
-    const picker = page
-      .getByRole("dialog")
-      .filter({ hasText: "Pilih peserta latihan" });
-    const workspace = page.getByRole("button", { name: "Terbalas" });
-    await expect
-      .poll(async () => (await picker.isVisible()) || (await workspace.isVisible()), {
-        timeout: 20000,
-      })
-      .toBe(true);
-    if (await picker.isVisible()) {
-      await picker.getByRole("button", { name: "Mulai" }).click();
-    }
-    await expect(
-      page.locator("main").first().getByText(OPEN_MAIL.list.subject).first(),
-    ).toBeVisible({ timeout: 20000 });
-
-    // Filter default "Belum Dibalas" memilih email terbuka (berlampiran) otomatis.
-    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
-    await expect(
-      page.getByRole("button", { name: "Attachment 1" }),
-    ).toBeVisible({ timeout: 20000 });
-    const offenders = (await findTextBelowFloor(page.locator("main").first())).map(
-      (o) => `[mailbox + lampiran] ${o}`,
+    const audit = await openWorkspace(
+      page,
+      pdktMocks(EVALUATED_HISTORY, [OPEN_MAIL, REPLIED_MAIL]),
     );
 
-    await page.getByRole("button", { name: "Terbalas" }).click();
-    await page.getByText(REPLIED_MAIL.list.subject).first().click();
+    // Filter bawaan "Belum dibalas" memilih email terbuka (berlampiran) otomatis.
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    await expect(page.getByRole("button", { name: "Lampiran 1" })).toBeVisible({
+      timeout: 20000,
+    });
+    const offenders = (await findTextBelowFloor(page.locator("main").first())).map(
+      (o) => `[pahami + lampiran] ${o}`,
+    );
+
+    await page.getByRole("button", { name: "Tulis balasan" }).click();
+    await expect(page.getByLabel("Balasan Anda")).toBeVisible();
+    offenders.push(
+      ...(await findTextBelowFloor(page.locator("main").first())).map(
+        (o) => `[tanggapi] ${o}`,
+      ),
+    );
+    await page.getByRole("button", { name: "Kotak masuk" }).click();
+
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
     await expect(page.getByText("Sebut kanal pengaduan resmi.").first()).toBeVisible({
       timeout: 20000,
     });
     offenders.push(
       ...(await findTextBelowFloor(page.locator("main").first())).map(
-        (o) => `[terbalas + evaluasi] ${o}`,
+        (o) => `[telaah] ${o}`,
       ),
     );
 
