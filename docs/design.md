@@ -43,8 +43,8 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 --surface: #f5f5f5;    /* Background untuk Card, Modal, Input */
 --border: #e5e5e5;     /* Warna garis pembatas (stroke) */
 --fg: #0a0a0a;         /* Teks utama (Heading, Judul) */
---fg2: #525252;        /* Teks sekunder (Deskripsi, Label) */
---fg3: #a3a3a3;        /* Teks tersier (Placeholder, Meta info) */
+--fg2: #404040;        /* Teks sekunder (Deskripsi, Label) */
+--fg3: #707070;        /* Teks tersier (Placeholder, Meta info) — ≥4.5:1 di bg/surface */
 --inv-bg: #0a0a0a;     /* Background kebalikan (Tombol Primary) */
 --inv-fg: #fafafa;     /* Teks kebalikan (Teks Tombol Primary) */
 
@@ -54,7 +54,7 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 --border: #262626;
 --fg: #fafafa;
 --fg2: #a3a3a3;
---fg3: #525252;
+--fg3: #8a8a8a;        /* ≥4.5:1 di bg/surface */
 --inv-bg: #fafafa;
 --inv-fg: #0a0a0a;
 ```
@@ -246,6 +246,23 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Pagination** — 10–25 rows/page, dengan page size selector.
 - **Loading state** — skeleton rows (bukan spinner doang).
 - **Empty state** — pesan jelas + CTA action.
+
+### Shell & navigasi
+
+Satu model navigasi, `buildNavModel(role)` di `components/layout/nav-config.ts`, menjadi sumber sidebar, drawer ponsel, tab bar, dan Beranda. Jangan membuat daftar modul lokal di komponen; modul dan sub-halaman tersaring capability `access.ts`.
+
+- **Sidebar (≥1024px)** 248px berlabel: tiap item berisi ikon, nama (`nav-name`, 13px), dan fungsi singkat (`nav-sub`, 12px, `aria-describedby`). Grup: Beranda · Latihan · Kualitas · Data · Administrasi. Item aktif memakai `aria-current="page"`; SIDAK memakai `Collapsible` dan terbuka otomatis di `/sidak/*`.
+- **Rail ciut** 64px, disimpan di `localStorage` (`trainers.sidebar.collapsed`). Label tetap ada untuk pembaca layar; nama tampil lewat Base UI Tooltip. Lebar sidebar tidak dianimasikan.
+- **Menu akun** di kaki sidebar dan drawer (Base UI Menu): Pengaturan akun, Ganti tema (menu tetap terbuka), Keluar. Teks "Keluar" memakai `--fg`; hanya ikonnya merah karena `--destructive` tidak mencapai 4.5:1 sebagai teks kecil.
+- **Ponsel (<1024px):** header dengan breadcrumb (root "Beranda") dan tombol menu; tab bar berisi 4 tab sesuai peran + "Lainnya"; drawer adalah Base UI Dialog berisi daftar navigasi yang sama.
+- **Fokus:** skip link "Lewati ke konten"; setelah navigasi fokus pindah ke `h1` halaman baru (atau region "Konten halaman") dan `document.title` mengikuti breadcrumb.
+- Target kontrol minimal 44px — karena root font 14px, pakai `h-[44px]`/`min-h-[44px]`, bukan `h-11`. Teks shell minimal 12px; `text-xs` di root 14px hanya 10,5px.
+
+### Beranda (`/dashboard`)
+
+- **Staff (admin/trainer/leader):** salam + tanggal (WIB) dan aksi utama sesuai peran → **Perlu tindakan** (`GET /api/v1/home/attention`, daftar berbaris dengan hitungan dan CTA) → panel **Tren Temuan QA** (`DashboardTrendPanel`, termasuk ringkasan per layanan) → **Aktivitas terakhir** (hanya baca) + **Pintasan**.
+- **Agent:** aksi "Lanjutkan KETIK" → **Latihan** (modul yang diizinkan) → **Riwayat sesi** gabungan KETIK + PDKT.
+- Setiap section memuat datanya sendiri dengan state loading, kosong, dan error + "Coba lagi"; gagal satu section tidak mengosongkan section lain. Data tidak dikarang: kolom yang tidak ada di respons tidak ditampilkan.
 
 ### Landing publik (`/`)
 

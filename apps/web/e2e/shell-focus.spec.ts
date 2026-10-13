@@ -50,6 +50,11 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
     path: "/api/v1/admin/activity-logs",
     body: { success: true, data: [] },
   },
+  {
+    method: "GET",
+    path: "/api/v1/home/attention",
+    body: { success: true, data: { items: [], partial: false } },
+  },
 ];
 
 const SHELL_MOCKS: readonly ApiMock[] = [...DASHBOARD_MOCKS, ...PROFILER_MOCKS];
@@ -118,8 +123,14 @@ test.describe("Header, drawer, dan fokus shell", () => {
     await expect(page.locator("h1").first()).toBeFocused();
     await expect(page).toHaveTitle("KTP · Trainers SuperApp");
 
-    // Landing SIDAK (route lazy) tidak punya h1. Selama dimuat, h1 KTP masih
-    // tampil; fokus tidak boleh jatuh ke h1 lama itu, tapi ke region konten.
+    await nav.getByRole("link", { name: "Beranda", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Trainer/ }),
+    ).toBeFocused();
+    await expect(page).toHaveTitle("Beranda · Trainers SuperApp");
+
+    // Landing SIDAK tidak punya h1: fokus jatuh ke region konten.
     await nav.getByRole("button", { name: "SIDAK", exact: true }).click();
     await nav.getByRole("link", { name: "Beranda SIDAK", exact: true }).click();
     await expect(page).toHaveURL(/\/sidak$/);
@@ -127,14 +138,6 @@ test.describe("Header, drawer, dan fokus shell", () => {
       page.getByRole("region", { name: "Konten halaman" }),
     ).toBeFocused();
     await expect(page).toHaveTitle("SIDAK · Trainers SuperApp");
-
-    // Beranda belum punya h1: fokus jatuh ke region konten.
-    await nav.getByRole("link", { name: "Beranda", exact: true }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(
-      page.getByRole("region", { name: "Konten halaman" }),
-    ).toBeFocused();
-    await expect(page).toHaveTitle("Beranda · Trainers SuperApp");
     expectHermetic(audit);
   });
 

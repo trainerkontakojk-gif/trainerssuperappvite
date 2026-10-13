@@ -99,6 +99,11 @@ const dashboardMocks = (trendData: unknown): ApiMock[] => [
   },
   // Only serves the first, pre-reload load; each test overrides it below.
   {
+    method: "GET",
+    path: "/api/v1/home/attention",
+    body: { success: true, data: { items: [], partial: false } },
+  },
+  {
     method: "POST",
     path: FORECAST_PATH,
     body: { success: true, data: { status: "missing", snapshot: null } },

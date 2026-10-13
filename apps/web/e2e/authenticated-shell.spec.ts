@@ -44,6 +44,22 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
     path: "/api/v1/admin/activity-logs",
     body: { success: true, data: [] },
   },
+  {
+    method: "GET",
+    path: "/api/v1/home/attention",
+    body: { success: true, data: { items: [], partial: false } },
+  },
+  // Beranda agent memuat riwayat latihan, bukan data SIDAK.
+  {
+    method: "GET",
+    path: "/api/v1/ketik/history",
+    body: { success: true, data: [] },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/pdkt/history",
+    body: { success: true, data: [] },
+  },
 ];
 
 /**
@@ -72,11 +88,9 @@ test.describe("Shell terautentikasi (hermetic)", () => {
     });
     console.log("[audit]", formatAudit(audit));
 
-    // Dashboard tidak punya `h1`; judulnya `h2` dengan nama pengguna dari sesi
-    // mock. Assertion lama (`h1 "Pusat Kendali"`) sudah usang sejak redesign
-    // dashboard — itu sebab kedua spec lama selalu gagal selain soal auth.
+    // Beranda: `h1` berisi salam dengan nama depan dari sesi mock.
     await expect(
-      page.getByRole("heading", { name: /Halo, Trainer Visual\./ }),
+      page.getByRole("heading", { level: 1, name: /Trainer\./ }),
     ).toBeVisible({ timeout: 20000 });
 
     // Sidebar terautentikasi: bukti yang dirender adalah shell, bukan landing.
