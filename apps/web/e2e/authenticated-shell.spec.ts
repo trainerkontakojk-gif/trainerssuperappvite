@@ -26,11 +26,6 @@ const EMPTY_TREND = {
 const DASHBOARD_MOCKS: readonly ApiMock[] = [
   {
     method: "GET",
-    path: "/api/v1/sidak/dashboard/available-years",
-    body: { success: true, data: [2026] },
-  },
-  {
-    method: "GET",
     path: "/api/v1/sidak/dashboard/trend",
     body: {
       success: true,
@@ -108,7 +103,7 @@ test.describe("Shell terautentikasi (hermetic)", () => {
     // Buktikan fetch awal dashboard memang terjadi DAN semuanya dilayani mock,
     // baru simpulkan tidak ada yang bocor.
     await waitForMockedApi(audit, [
-      "available-years",
+      "/home/attention",
       "/dashboard/trend",
       "/activity-logs",
     ]);

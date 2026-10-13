@@ -102,7 +102,7 @@ test.describe("Beranda agent", () => {
     );
     await expect(practice.getByRole("link")).toHaveCount(2);
 
-    for (const absent of ["Tren Temuan QA", "Perlu tindakan"]) {
+    for (const absent of ["Tren temuan QA", "Perlu tindakan"]) {
       await expect(main.getByRole("heading", { name: absent })).toHaveCount(0);
     }
     await expect(history(page).getByRole("row")).toHaveCount(4);

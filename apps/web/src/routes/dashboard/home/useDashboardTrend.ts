@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
+import { SERVICE_LABELS } from "../../../lib/scoring";
 
 export interface TrendData {
+  /** Label periode dari API, mis. "Sep 26" (urut lama → baru). */
   labels: string[];
   totalData: number[];
   serviceData: Record<string, number[]>;
@@ -10,51 +12,41 @@ export interface TrendData {
     string,
     { totalDefects: number; auditedAgents: number }
   >;
+  /** Ringkasan periode terakhir dalam rentang. */
   totalSummary: {
     totalDefects: number;
     auditedAgents: number;
     activeServiceCount: number;
   };
-  topParameters?: Record<string, { name: string; count: number }>;
 }
 
-export type TrendMap = Record<"3m" | "6m" | "all", TrendData>;
+/** Rentang yang disediakan `GET /sidak/dashboard/trend`; `all` = 12 periode. */
+export type TrendRange = "3m" | "6m" | "all";
+export type TrendMap = Record<TrendRange, TrendData>;
 
-/**
- * Data tren temuan untuk Beranda staff. Pengambilan dan pemilihan rentang
- * sama seperti dashboard sebelumnya; yang baru hanya status muat/gagal
- * eksplisit agar section bisa menampilkan state error + coba lagi.
- */
+/** Nama tampilan layanan, mis. `call` → "Call". */
+export function serviceLabel(service: string) {
+  return SERVICE_LABELS[service as keyof typeof SERVICE_LABELS] ?? service;
+}
+
+type State =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; trendMap: TrendMap };
+
+/** Tren temuan untuk Beranda staff, dengan status muat/gagal eksplisit. */
 export function useDashboardTrend() {
-  const [status, setStatus] = useState<"loading" | "error" | "ready">(
-    "loading",
-  );
-  const [serviceTrendMap, setServiceTrendMap] = useState<TrendMap | null>(null);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [trendStartMonth, setTrendStartMonth] = useState<number | null>(null);
-  const [trendEndMonth, setTrendEndMonth] = useState<number | null>(null);
-  const [trendLoading, setTrendLoading] = useState(false);
-  const [localTrendData, setLocalTrendData] = useState<TrendData | null>(null);
+  const [state, setState] = useState<State>({ status: "loading" });
 
   const load = useCallback(async () => {
-    setStatus("loading");
+    setState({ status: "loading" });
     try {
-      const years = await unwrapResponse(
-        await sidakClient.dashboard["available-years"].$get(),
-      );
-      setAvailableYears((years as number[]) || []);
-    } catch {
-      // Tahun hanya mengisi pemilih; tren tetap bisa tampil tanpanya.
-    }
-    try {
-      const trends = (await unwrapResponse(
+      const data = (await unwrapResponse(
         await sidakClient.dashboard.trend.$get(),
       )) as { trendMap: TrendMap };
-      setServiceTrendMap(trends.trendMap);
-      setStatus("ready");
+      setState({ status: "ready", trendMap: data.trendMap });
     } catch {
-      setStatus("error");
+      setState({ status: "error" });
     }
   }, []);
 
@@ -62,75 +54,5 @@ export function useDashboardTrend() {
     void load();
   }, [load]);
 
-  const fetchTrendDataByRange = async (
-    year: number,
-    start: number | null,
-    end: number | null,
-  ) => {
-    setTrendLoading(true);
-    try {
-      const data = await unwrapResponse(
-        await sidakClient.dashboard.trend.$get({
-          query: {
-            year: String(year),
-            ...(start !== null ? { startMonth: String(start) } : {}),
-            ...(end !== null ? { endMonth: String(end) } : {}),
-          },
-        }),
-      );
-      setLocalTrendData(data as TrendData);
-    } catch (err) {
-      console.error("Fetch trend range error:", err);
-    } finally {
-      setTrendLoading(false);
-    }
-  };
-
-  const handleYearChange = async (year: number) => {
-    setSelectedYear(year);
-    setTrendStartMonth(null);
-    setTrendEndMonth(null);
-    await fetchTrendDataByRange(year, 1, 12);
-  };
-
-  const handleRangeChange = async (
-    start: number | null,
-    end: number | null,
-  ) => {
-    let targetStart = start;
-    let targetEnd = end;
-
-    if (targetStart === null && targetEnd !== null) targetStart = 1;
-    else if (targetStart !== null && targetEnd === null)
-      targetEnd = new Date().getMonth() + 1;
-
-    setTrendStartMonth(targetStart);
-    setTrendEndMonth(targetEnd);
-
-    if (
-      targetStart !== null &&
-      targetEnd !== null &&
-      targetEnd >= targetStart
-    ) {
-      await fetchTrendDataByRange(selectedYear, targetStart, targetEnd);
-    } else if (targetStart === null && targetEnd === null) {
-      setLocalTrendData(null);
-    }
-  };
-
-  return {
-    status,
-    reload: load,
-    serviceTrendMap,
-    availableYears,
-    selectedYear,
-    trendStartMonth,
-    trendEndMonth,
-    trendLoading,
-    localTrendData,
-    /** Data yang sedang ditampilkan: rentang pilihan, atau seluruh data. */
-    activeTrend: localTrendData ?? serviceTrendMap?.all ?? null,
-    handleYearChange,
-    handleRangeChange,
-  };
+  return { ...state, reload: load };
 }

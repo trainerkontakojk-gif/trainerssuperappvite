@@ -25,23 +25,29 @@ function greeting(now: Date) {
 /** Judul Beranda: salam (WIB), tanggal, dan aksi utama sesuai peran. */
 export function HomeHeader({
   displayName,
+  meta,
   children,
 }: {
   displayName: string;
+  /** Keterangan tambahan setelah tanggal, mis. periode QA terakhir. */
+  meta?: string | null;
   children?: ReactNode;
 }) {
   const now = new Date();
   const firstName = displayName.trim().split(/\s+/)[0] || displayName;
 
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+    <header className="home-head">
       <div className="min-w-0">
         <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-fg text-balance">
           {greeting(now)}, {firstName}.
         </h1>
-        <p className="mt-1.5 text-[13px] text-fg2">{DATE.format(now)}</p>
+        <p className="mt-1.5 text-[13px] text-fg2">
+          {DATE.format(now)}
+          {meta ? ` · ${meta}` : ""}
+        </p>
       </div>
-      {children && <div className="flex flex-wrap gap-2">{children}</div>}
+      {children && <div className="home-actions">{children}</div>}
     </header>
   );
 }
