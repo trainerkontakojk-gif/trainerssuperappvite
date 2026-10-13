@@ -480,7 +480,17 @@ test.describe("PDKT (hermetic)", () => {
         name: /Pahami keluhannya\.\s*Balas dengan tepat\./,
       }),
     ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText("PDKT · Simulasi email konsumen")).toBeVisible();
+    // Kepanjangan PDKT dijelaskan di paragraf hero; pill "PDKT · …" tidak ada lagi.
+    const intro = page.getByTestId("pdkt-hero-intro");
+    await expect(intro).toContainText(
+      "PDKT (Paham Dulu Kasih Tanggapan) adalah latihan membalas email konsumen.",
+    );
+    await expect(intro).toContainText(
+      "Baca emailnya sampai paham, tulis balasan dengan kata-kata Anda sendiri, lalu AI menelaah balasan itu dan menunjukkan bagian yang perlu diperbaiki.",
+    );
+    await expect(page.getByText("PDKT · Simulasi email konsumen")).toHaveCount(
+      0,
+    );
     // Daftar centang "janji" di hero dihapus: salah satunya tidak benar untuk
     // skenario email tetap.
     for (const point of [
@@ -504,23 +514,29 @@ test.describe("PDKT (hermetic)", () => {
       page.getByRole("button", { name: "Atur skenario" }),
     ).toHaveCount(0);
 
-    // Tanpa data: setiap bagian menjelaskan keadaannya, tanpa angka karangan.
+    // Pengguna baru: satu blok penjelasan, bukan deretan bagian kosong.
     await waitForMockedApi(audit, ["/pdkt/history", "/pdkt/mailbox"]);
-    const progress = page.getByRole("region", { name: "Progres latihan" });
-    await expect(progress.getByText("Belum ada sesi yang ditelaah")).toBeVisible();
-    await expect(
-      page
-        .getByRole("region", { name: "Belum dibalas" })
-        .getByText("Tidak ada email yang menunggu balasan."),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("region", { name: "Hasil telaah terbaru" }),
-    ).toContainText("Belum ada hasil telaah");
+    const start = page.getByRole("region", { name: "Belum ada latihan" });
+    await expect(start).toBeVisible();
+    await expect(start).toContainText(
+      "Setelah balasan pertama Anda ditelaah, halaman ini menampilkan email yang belum dibalas, skor rata-rata, aspek yang perlu dilatih, dan hasil telaah terbaru.",
+    );
+    for (const section of [
+      "Progres latihan",
+      "Belum dibalas",
+      "Fokus berikutnya",
+      "Hasil telaah terbaru",
+    ]) {
+      await expect(page.getByRole("region", { name: section })).toHaveCount(0);
+    }
+    await start.getByRole("button", { name: "Buka kotak masuk" }).click();
+    await enterWorkspace(page);
 
     // Copy landing lama tidak boleh kembali.
     for (const stale of [
       /Latih balasan email/,
       /PDKT — singkatan dari/,
+      /tanpa petunjuk jawaban/,
       /Mulai latihan/,
       /Daftar email masuk/,
       /Pemakaian bulan ini/,
@@ -555,12 +571,18 @@ test.describe("PDKT (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/pdkt/history", "/pdkt/mailbox"]);
 
+    // Ringkasan progres berupa satu baris kalimat, bukan kartu statistik.
     const progress = page.getByRole("region", { name: "Progres latihan" });
-    await expect(progress.getByTestId("pdkt-stat-waiting")).toContainText("2", {
+    const summary = progress.getByTestId("pdkt-progress-summary");
+    await expect(summary).toContainText("2 email belum dibalas", {
       timeout: 20000,
     });
-    await expect(progress.getByTestId("pdkt-stat-average")).toContainText("85");
-    await expect(progress.getByTestId("pdkt-stat-reviewing")).toContainText("1");
+    await expect(summary).toContainText("85 rata-rata skor dari sesi terakhir");
+    await expect(summary).toContainText("1 sedang ditelaah AI");
+    await expect(page.getByTestId(/^pdkt-stat-/)).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Belum ada latihan" })).toHaveCount(
+      0,
+    );
 
     const unreplied = page.getByRole("region", { name: "Belum dibalas" });
     const rows = unreplied.getByRole("button", { name: /Transaksi gagal/ });

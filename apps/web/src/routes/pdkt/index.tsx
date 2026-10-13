@@ -4,7 +4,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { ArrowRight, History, Mail, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, History, SlidersHorizontal } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { PdktStageDemo } from "./components/PdktStageDemo";
 import {
@@ -30,6 +30,7 @@ import type {
   SimulationSubjectSelection,
 } from "@trainers/types";
 import { notify } from "../../lib/toast";
+import { APP_MODULES } from "../../lib/app-config";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
@@ -38,6 +39,11 @@ import {
 } from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
+
+/** Kepanjangan PDKT dari metadata modul kanonik (`lib/app-config.ts`). */
+const PDKT_EXPANDED_TITLE =
+  APP_MODULES.find((module) => module.id === "pdkt")?.expandedTitle ??
+  "Paham Dulu Kasih Tanggapan";
 
 const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
@@ -335,90 +341,86 @@ export default function PdktLanding() {
               aria-labelledby="pdkt-hero-title"
               className="border-b border-border bg-surface-elevated"
             >
-              <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pt-6 pb-16">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background py-1 pr-3 pl-1.5 text-xs font-semibold text-fg2">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-module-pdkt/10">
-                      <Mail
-                        aria-hidden="true"
-                        className="size-3.5 text-module-pdkt"
-                      />
-                    </span>
-                    PDKT · Simulasi email konsumen
-                  </span>
-                  <nav aria-label="Menu PDKT" className="flex flex-wrap gap-2">
+              <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-14 gap-y-10 px-6 pt-10 pb-14">
+                <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
+                  <div className="flex flex-col gap-5">
+                    <h1
+                      id="pdkt-hero-title"
+                      className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
+                    >
+                      Pahami keluhannya.{" "}
+                      <span className="block text-module-pdkt">
+                        Balas dengan tepat.
+                      </span>
+                    </h1>
+                    <p
+                      data-testid="pdkt-hero-intro"
+                      className="max-w-[52ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]"
+                    >
+                      PDKT (
+                      <span className="font-semibold text-foreground">
+                        {PDKT_EXPANDED_TITLE}
+                      </span>
+                      ) adalah latihan membalas email konsumen. Baca emailnya
+                      sampai paham, tulis balasan dengan kata-kata Anda sendiri,
+                      lalu AI menelaah balasan itu dan menunjukkan bagian yang
+                      perlu diperbaiki.
+                    </p>
+                  </div>
+
+                  {/* Aksi utama, lalu menu PDKT sebagai baris kedua yang lebih tenang. */}
+                  <div className="flex flex-col items-start gap-3">
                     <Button
                       type="button"
-                      variant="outline"
-                      onClick={handleOpenHistory}
-                      className={navButtonClass}
+                      size="lg"
+                      onClick={() => handleStartSimulation()}
+                      className="min-h-11 gap-2.5 px-5 text-sm font-semibold"
                     >
-                      <History data-icon="inline-start" />
-                      Riwayat
+                      Mulai simulasi
+                      <ArrowRight data-icon="inline-end" />
                     </Button>
-                    <UsagePopover
-                      triggerClassName={navButtonClass}
-                      sessionDelta={sessionDelta}
-                      sessionDeltaPending={sessionDeltaPending}
-                      triggerBadge={
-                        hasSessionDelta &&
-                        sessionDelta && (
-                          <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
-                            <span className="sr-only">
-                              Kunjungan terakhir ke kotak masuk{" "}
-                            </span>
-                            {formatUsageDeltaLabel(sessionDelta)}
-                          </span>
-                        )
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleOpenSettings}
-                      className={navButtonClass}
+                    <nav
+                      aria-label="Menu PDKT"
+                      className="flex flex-wrap gap-2"
                     >
-                      <SlidersHorizontal data-icon="inline-start" />
-                      Pengaturan
-                    </Button>
-                  </nav>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-14">
-                  <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
-                    <div className="flex flex-col gap-5">
-                      <h1
-                        id="pdkt-hero-title"
-                        className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
-                      >
-                        Pahami keluhannya.{" "}
-                        <span className="block text-module-pdkt">
-                          Balas dengan tepat.
-                        </span>
-                      </h1>
-                      <p className="max-w-[46ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]">
-                        Baca email konsumen, tulis balasan sendiri tanpa
-                        petunjuk jawaban, lalu lihat telaah AI tentang apa yang
-                        perlu diperbaiki.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
                       <Button
                         type="button"
-                        size="lg"
-                        onClick={() => handleStartSimulation()}
-                        className="min-h-12 gap-2.5 px-5 text-sm font-semibold"
+                        variant="outline"
+                        onClick={handleOpenHistory}
+                        className={navButtonClass}
                       >
-                        Mulai simulasi
-                        <ArrowRight data-icon="inline-end" />
+                        <History data-icon="inline-start" />
+                        Riwayat
                       </Button>
-                    </div>
+                      <UsagePopover
+                        triggerClassName={navButtonClass}
+                        sessionDelta={sessionDelta}
+                        sessionDeltaPending={sessionDeltaPending}
+                        triggerBadge={
+                          hasSessionDelta &&
+                          sessionDelta && (
+                            <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
+                              <span className="sr-only">Balasan terakhir </span>
+                              {formatUsageDeltaLabel(sessionDelta)}
+                            </span>
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleOpenSettings}
+                        className={navButtonClass}
+                      >
+                        <SlidersHorizontal data-icon="inline-start" />
+                        Pengaturan
+                      </Button>
+                    </nav>
                   </div>
+                </div>
 
-                  <div className="mx-auto flex min-w-0 flex-[1_1_480px] max-w-[600px]">
-                    <PdktStageDemo />
-                  </div>
+                <div className="mx-auto flex min-w-0 max-w-[600px] flex-[1_1_480px]">
+                  <PdktStageDemo />
                 </div>
               </div>
             </section>
