@@ -350,8 +350,11 @@ test.describe("Monitoring (hermetic)", () => {
     const reply = "Yth. Bapak, kami akan melakukan pengecekkan data.";
     const quote = "pengecekkan";
     const start = reply.indexOf(quote);
+    const baseReview = REVIEWS["pdkt-1"] as {
+      evaluation: Record<string, unknown>;
+    } & Record<string, unknown>;
     const pdktReview = {
-      ...REVIEWS["pdkt-1"],
+      ...baseReview,
       emails: [
         {
           id: "inbound",
@@ -373,7 +376,7 @@ test.describe("Monitoring (hermetic)", () => {
         },
       ],
       evaluation: {
-        ...REVIEWS["pdkt-1"].evaluation,
+        ...baseReview.evaluation,
         annotations: [
           { quote, dimension: "typo", note: "Tulis “pengecekan”.", start, end: start + quote.length },
           {
