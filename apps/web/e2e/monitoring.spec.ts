@@ -344,6 +344,80 @@ test.describe("Monitoring (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("detail review PDKT menandai kalimat balasan yang dikomentari AI", async ({
+    page,
+  }) => {
+    const reply = "Yth. Bapak, kami akan melakukan pengecekkan data.";
+    const quote = "pengecekkan";
+    const start = reply.indexOf(quote);
+    const baseReview = REVIEWS["pdkt-1"] as {
+      evaluation: Record<string, unknown>;
+    } & Record<string, unknown>;
+    const pdktReview = {
+      ...baseReview,
+      emails: [
+        {
+          id: "inbound",
+          from: "budi@local.test",
+          to: "",
+          subject: "Undian",
+          body: "Saya menerima pesan undian.",
+          timestamp: CREATED_AT,
+          isAgent: false,
+        },
+        {
+          id: "reply",
+          from: "agent@local.test",
+          to: "budi@local.test",
+          subject: "Re: Undian",
+          body: reply,
+          timestamp: CREATED_AT,
+          isAgent: true,
+        },
+      ],
+      evaluation: {
+        ...baseReview.evaluation,
+        annotations: [
+          { quote, dimension: "typo", note: "Tulis “pengecekan”.", start, end: start + quote.length },
+          {
+            quote: "nomor tiket",
+            dimension: "clarity",
+            note: "Tambahkan nomor tiket pengaduan.",
+            start: null,
+            end: null,
+          },
+        ],
+      },
+    };
+    const audit = await openHermeticShell(page, {
+      path: "/monitoring",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/ai/monitoring/history/pdkt/pdkt-1/review",
+          body: { success: true, data: pdktReview },
+        },
+        ...POPULATED_MOCKS,
+      ],
+    });
+    await waitForMockedApi(audit, ["/ai/monitoring/history"]);
+    const pdktIndex = HISTORY_ENTRIES.findIndex((entry) => entry.module === "pdkt");
+    await page.getByRole("button", { name: "Lihat Detail" }).nth(pdktIndex).click();
+    await waitForMockedApi(audit, ["/pdkt-1/review"]);
+
+    const card = page
+      .getByRole("dialog")
+      .getByRole("region", { name: "Catatan di balasan agent" });
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card.locator("mark")).toHaveCount(1);
+    await expect(card.locator("mark")).toHaveText(`${quote}1`);
+    const notes = card.getByRole("listitem");
+    await expect(notes).toHaveCount(2);
+    await expect(notes.nth(0)).toContainText("Tulis “pengecekan”.");
+    await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
+    expectHermetic(audit);
+  });
+
   test(`teks penggunaan token minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/monitoring",

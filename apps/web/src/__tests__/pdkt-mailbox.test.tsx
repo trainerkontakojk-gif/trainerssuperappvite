@@ -360,29 +360,6 @@ describe("EmailDetailPane Component", () => {
     expect(screen.getByText("I want a refund")).toBeDefined();
   });
 
-  it("renders the actual recipient string from the inbound email payload", () => {
-    render(
-      <EmailDetailPane
-        item={{
-          ...mockItem,
-          inbound_email: {
-            ...(mockItem.inbound_email as any),
-            to: "alpha@test.com, beta@test.com",
-          },
-        }}
-        onReply={() => {}}
-        onDelete={() => {}}
-        evaluation={null}
-        evaluationStatus={null}
-        evaluationError={null}
-        onRetryEval={() => {}}
-      />,
-    );
-
-    expect(screen.getByText("Kepada:")).toBeDefined();
-    expect(screen.getByText("alpha@test.com, beta@test.com")).toBeDefined();
-  });
-
   it("shows loader when evaluation is processing", () => {
     render(
       <EmailDetailPane

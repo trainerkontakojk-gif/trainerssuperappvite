@@ -1,6 +1,16 @@
-import { useState } from "react";
-import { ListChecks, FileEdit, Copy, Check } from "lucide-react";
-import type { PdktDimensionKey, PdktEvaluationEdu } from "@trainers/types";
+import React, { useId, useState } from "react";
+import {
+  ListChecks,
+  FileEdit,
+  Copy,
+  Check,
+  MessageSquareText,
+} from "lucide-react";
+import type {
+  PdktDimensionKey,
+  PdktEvaluationEdu,
+  PdktReplyAnnotation,
+} from "@trainers/types";
 import { Button } from "./ui/button";
 
 /**
@@ -174,5 +184,123 @@ export function PdktDimensionTip({
     <p className="mt-1.5 text-xs leading-snug text-amber-600 dark:text-amber-500 font-medium border-t border-amber-500/20 pt-1.5 text-left">
       💡 {tip}
     </p>
+  );
+}
+
+const DIMENSION_LABELS: Record<PdktDimensionKey, string> = {
+  recipientDirection: "Arah Penerima",
+  normative: "Kualitas OJK",
+  clarity: "Kejelasan",
+  typo: "Typo",
+  template: "Template",
+};
+
+type PlacedAnnotation = PdktReplyAnnotation & { number: number };
+
+const collapseSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
+
+/** Tandai hanya bila teks di posisi itu memang kutipannya (data lama/berbeda tidak salah tempat). */
+function hasValidRange(
+  annotation: PdktReplyAnnotation,
+  body: string,
+): annotation is PdktReplyAnnotation & { start: number; end: number } {
+  return (
+    typeof annotation.start === "number" &&
+    typeof annotation.end === "number" &&
+    annotation.start >= 0 &&
+    annotation.start < annotation.end &&
+    annotation.end <= body.length &&
+    collapseSpaces(body.slice(annotation.start, annotation.end)) ===
+      collapseSpaces(annotation.quote)
+  );
+}
+
+/**
+ * Balasan agent dengan kalimat yang dikomentari AI ditandai dan diberi nomor.
+ * Posisi tanda dihitung backend; catatan tanpa posisi tetap tampil di daftar.
+ */
+export function PdktReplyAnnotationsCard({
+  annotations,
+  replyBody,
+  title = "Catatan di balasan Anda",
+}: {
+  annotations: PdktReplyAnnotation[] | null | undefined;
+  replyBody: string | null | undefined;
+  /** Peserta melihat "Anda"; panel review trainer memakai "agent". */
+  title?: string;
+}) {
+  const titleId = useId();
+  const body = replyBody ?? "";
+  if (!annotations?.length || !body) return null;
+
+  // Nomor mengikuti urutan baca; catatan tanpa tanda di akhir daftar.
+  const ordered: PlacedAnnotation[] = [...annotations]
+    .sort((a, b) => {
+      const aStart = hasValidRange(a, body) ? a.start : Infinity;
+      const bStart = hasValidRange(b, body) ? b.start : Infinity;
+      return aStart - bStart;
+    })
+    .map((annotation, index) => ({ ...annotation, number: index + 1 }));
+  const marked = ordered.filter((annotation) =>
+    hasValidRange(annotation, body),
+  ) as Array<PlacedAnnotation & { start: number; end: number }>;
+
+  const segments: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const annotation of marked) {
+    if (annotation.start < cursor) continue;
+    segments.push(body.slice(cursor, annotation.start));
+    segments.push(
+      <mark
+        key={annotation.number}
+        className="rounded-sm border-b-2 border-amber-500 bg-amber-500/15 px-0.5 text-[var(--fg)]"
+      >
+        {body.slice(annotation.start, annotation.end)}
+        <sup className="ml-0.5 text-[11px] font-bold">{annotation.number}</sup>
+      </mark>,
+    );
+    cursor = annotation.end;
+  }
+  segments.push(body.slice(cursor));
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]"
+    >
+      <h4
+        id={titleId}
+        className="flex items-center gap-2 text-xs font-bold text-[var(--fg)] mb-3"
+      >
+        <MessageSquareText className="w-4 h-4 text-amber-500" aria-hidden="true" />
+        {title}
+      </h4>
+      <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--fg2)] font-medium">
+        {segments}
+      </p>
+      <ol className="mt-4 space-y-2 border-t border-[var(--border)] pt-3">
+        {ordered.map((annotation) => {
+          const isMarked = hasValidRange(annotation, body);
+          return (
+            <li key={annotation.number} className="flex gap-2.5 text-xs">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[11px] font-bold text-[var(--fg)]">
+                {annotation.number}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-semibold text-[var(--fg)]">
+                  {annotation.note}
+                </span>
+                <span className="text-[var(--fg3)] font-medium">
+                  {DIMENSION_LABELS[annotation.dimension] ?? annotation.dimension}
+                  {isMarked
+                    ? null
+                    : ` · Tidak ditandai di balasan: “${annotation.quote}”`}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

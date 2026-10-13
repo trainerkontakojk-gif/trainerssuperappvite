@@ -3,6 +3,7 @@ import {
   chatMessageSchema,
   emailMessageSchema,
   pdktEvaluationAiOutputSchema,
+  pdktStoredReplyAnnotationsSchema,
   pdktSessionConfigSchema,
   parseTelefunTranscript,
   parseVoiceQualityAssessment,
@@ -131,14 +132,17 @@ export function normalizePdktEmails(value: unknown): EmailMessage[] {
 export function normalizePdktEvaluation(
   value: unknown,
 ): PdktEvaluationResult | null {
-  const full = pdktEvaluationAiOutputSchema.safeParse(value);
-  const raw = object(value);
+  // `annotations` disimpan sesudah dinormalkan backend (berisi posisi), jadi
+  // divalidasi terpisah dari skema output AI yang strict.
+  const { annotations: rawAnnotations, ...raw } = object(value);
+  const full = pdktEvaluationAiOutputSchema.safeParse(raw);
   const { scoreBreakdown: _scoreBreakdown, ...legacyInput } = raw;
   const legacy = pdktEvaluationAiOutputSchema
     .omit({ scoreBreakdown: true })
     .safeParse(legacyInput);
   const parsed = full.success ? full.data : legacy.success ? legacy.data : null;
   if (!parsed) return null;
+  const annotations = pdktStoredReplyAnnotationsSchema.safeParse(rawAnnotations);
   return {
     score: parsed.score,
     feedback: parsed.feedback,
@@ -148,6 +152,9 @@ export function normalizePdktEvaluation(
     scoreBreakdown: full.success ? full.data.scoreBreakdown : undefined,
     ...(parsed.expectedAnswerAlignment
       ? { expectedAnswerAlignment: parsed.expectedAnswerAlignment }
+      : {}),
+    ...(annotations.success && annotations.data.length > 0
+      ? { annotations: annotations.data }
       : {}),
     ...(parsed.edu
       ? {

@@ -1,3 +1,5 @@
+import type { PdktRecipientContext } from "@trainers/types";
+
 export const PDKT_FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
 
 export type PdktRecipientMode = "single" | "multiple";
@@ -6,13 +8,6 @@ export interface PdktRecipientTargetInput {
   primaryRecipientType?: "ojk" | "reported_company" | null;
   recipientMode?: PdktRecipientMode | null;
   recipientEmails?: unknown;
-}
-
-export interface PdktRecipientContext {
-  primaryRecipientType: "ojk" | "reported_company";
-  primaryRecipientAddress: string;
-  ccRecipients: string[];
-  replyIntent: "reply_to_company_with_ojk_cc" | "reply_to_ojk";
 }
 
 function normalizePdktRecipientEmail(value: string): string {
@@ -75,6 +70,7 @@ function dedupeRecipients(recipients: string[]): string[] {
 export function resolvePdktRecipientContext(input: {
   recipients: string[];
   primaryRecipientType?: "ojk" | "reported_company" | null;
+  ojkRequestInBody?: boolean | null;
 }): PdktRecipientContext {
   const nonFallbackRecipients = input.recipients.filter(
     (recipient) => recipient !== PDKT_FALLBACK_RECIPIENT,
@@ -106,6 +102,8 @@ export function resolvePdktRecipientContext(input: {
     replyIntent:
       primaryRecipientType === "ojk"
         ? "reply_to_ojk"
-        : "reply_to_company_with_ojk_cc",
+        : input.ojkRequestInBody === true
+          ? "reply_to_ojk_request_in_company_email"
+          : "reply_to_company_with_ojk_cc",
   };
 }

@@ -35,5 +35,9 @@ export default defineConfig({
       name: "telefun-schema-real-backend",
       testMatch: "telefun-schema-contract-api.spec.ts",
     },
+    {
+      name: "pdkt-privacy-real-backend",
+      testMatch: "pdkt-mailbox-privacy-api.spec.ts",
+    },
   ],
 });

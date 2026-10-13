@@ -254,6 +254,7 @@ export async function initializeEmailSession(
     resolvePdktRecipientContext({
       recipients: recipientTargets.recipients,
       primaryRecipientType: scenario.primaryRecipientType,
+      ojkRequestInBody: scenario.ojkRequestInBody,
     });
   const configWithRecipientContext: PdktSessionConfig = {
     ...config,
@@ -508,6 +509,7 @@ export function resolvePdktGenerationConfig(body: {
         recipientEmails: scenario.recipientEmails,
       }).recipients,
       primaryRecipientType: scenario.primaryRecipientType,
+      ojkRequestInBody: scenario.ojkRequestInBody,
     }),
     enableImageGeneration: body.enableImageGeneration ?? true,
     selectedModel: body.selectedModel || DEFAULT_AI_MODEL_ID,

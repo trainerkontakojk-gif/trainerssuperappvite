@@ -9,6 +9,7 @@ import { useApi } from "../../hooks/useApi";
 import { ApiError, pdktClient, unwrapResponse } from "../../lib/api";
 import type {
   PdktMailboxItem,
+  PdktMailboxDetailItem,
   PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
@@ -245,7 +246,7 @@ export default function PdktSimulation({
   // Detail rows (attachments + full thread) are fetched on demand so opening
   // the session never downloads every inline attachment of the inbox.
   const [mailboxDetails, setMailboxDetails] = useState<
-    Record<string, PdktMailboxItem>
+    Record<string, PdktMailboxDetailItem>
   >({});
 
   useEffect(() => {
@@ -259,7 +260,7 @@ export default function PdktSimulation({
       try {
         const detail = (await unwrapResponse(
           await pdktClient.mailbox[":id"].$get({ param: { id: selectedId } }),
-        )) as PdktMailboxItem | null;
+        )) as PdktMailboxDetailItem | null;
         if (!cancelled && detail) {
           setMailboxDetails((prev) => ({ ...prev, [detail.id]: detail }));
         }
