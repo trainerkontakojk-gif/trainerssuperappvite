@@ -38,7 +38,7 @@ export default function TnaParameter() {
       />
       {!response.loading && !response.error && response.data && (
         <ParameterContent
-          key={`${search.service}/${search.period}/${search.indicator}/${search.compare}`}
+          key={`${search.service}/${search.period}/${search.indicator}/${search.compare}/${search.previous_plan}`}
           detail={response.data}
         />
       )}
@@ -55,6 +55,12 @@ function ParameterContent({ detail: d }: { detail: TnaParameterDetail }) {
     d.metrics.auditStatus === "no_audit" || d.metrics.findings === 0;
   return (
     <div className="space-y-8">
+      {search.previous_plan && (
+        <p role="status" className="text-sm">
+          Validasi lanjutan dari rencana sebelumnya. Kebutuhan baru akan
+          ditautkan setelah validasi server.
+        </p>
+      )}
       {!d.metrics.isCandidate && (
         <QaStatePanel
           className="text-foreground!"
@@ -174,6 +180,9 @@ function ParameterContent({ detail: d }: { detail: TnaParameterDetail }) {
             period_id: search.period,
             indicator_id: search.indicator,
             compare_count: search.compare,
+            ...(search.previous_plan
+              ? { previous_plan_id: search.previous_plan }
+              : {}),
             validated_cluster_id: fields.get("cluster"),
             cause_note: fields.get("note"),
             gap_type: fields.get("gap"),

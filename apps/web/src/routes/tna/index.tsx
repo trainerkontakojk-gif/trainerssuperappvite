@@ -38,6 +38,7 @@ export default function TnaIndex() {
       : null,
   );
   const plans = useApi<{ items: TnaPlan[] }>("/tna/plans");
+  const duePlans = useApi<{ items: TnaPlan[] }>("/tna/plans?due=1");
   const update = (next: Partial<typeof search>) =>
     navigate({
       to: "/tna",
@@ -187,6 +188,44 @@ export default function TnaIndex() {
           ))}
         </section>
       )}
+      <section className="space-y-4" aria-label="Perlu dievaluasi">
+        <h2 className="font-heading text-xl font-bold">Perlu dievaluasi</h2>
+        <State
+          loading={duePlans.loading}
+          error={duePlans.error}
+          retry={duePlans.refetch}
+        />
+        {!duePlans.loading &&
+          !duePlans.error &&
+          duePlans.data?.items.length === 0 && (
+            <QaStatePanel
+              type="empty"
+              title="Tidak ada rencana yang perlu dievaluasi"
+              description="Rencana aktif muncul di sini saat jatuh tempo menurut waktu WIB."
+            />
+          )}
+        {!duePlans.loading &&
+          !duePlans.error &&
+          duePlans.data?.items.map((p) => (
+            <div
+              key={p.id}
+              className="flex flex-wrap items-center gap-x-4 border-b border-border py-3"
+            >
+              <Link
+                to="/tna/rencana/$id"
+                params={{ id: p.id }}
+                className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
+              >
+                {p.title}
+              </Link>
+              <span className="text-sm text-muted-foreground">
+                {p.status === "evaluasi"
+                  ? "Sedang dievaluasi"
+                  : `Jatuh tempo ${p.evaluation_due_date} (WIB)`}
+              </span>
+            </div>
+          ))}
+      </section>
       <section className="space-y-4">
         <h2 className="font-heading text-xl font-bold">
           Kebutuhan & rencana terbaru

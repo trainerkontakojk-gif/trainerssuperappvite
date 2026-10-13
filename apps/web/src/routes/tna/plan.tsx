@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import type {
   CreateTnaPlan,
@@ -24,6 +24,9 @@ import {
   tnaResponse,
 } from "./utils";
 import { PlanForm } from "./PlanForm";
+import { Evaluation } from "./Evaluation";
+import { Textarea } from "../../components/ui/textarea";
+import { Field } from "./shared";
 
 export default function TnaPlanPage() {
   const { id } = useParams({ from: "/tna/rencana/$id" });
@@ -56,7 +59,13 @@ function PlanContent({
   reload: () => Promise<void>;
 }) {
   const mutation = useTnaMutation();
+  const mutationPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mutation.error)
+      mutationPanel.current?.scrollIntoView({ block: "center" });
+  }, [mutation.error]);
   const [confirm, setConfirm] = useState<"activate" | "cancel" | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const p = d.plan;
   const draft = p.status === "draft";
   const baseline = draft ? d.preview : p.baseline_snapshot;
@@ -79,13 +88,15 @@ function PlanContent({
       <p className="text-sm font-medium">
         Status: {planStatusLabels[p.status]}
       </p>
-      <MutationState
-        mutation={mutation}
-        reload={async () => {
-          mutation.reset();
-          await reload();
-        }}
-      />
+      <div ref={mutationPanel}>
+        <MutationState
+          mutation={mutation}
+          reload={async () => {
+            mutation.reset();
+            await reload();
+          }}
+        />
+      </div>
       <section className="space-y-4">
         <h2 className="font-heading text-xl font-bold">
           {draft
@@ -209,6 +220,12 @@ function PlanContent({
           {d.narrative}
         </p>
       </section>
+      <Evaluation detail={d} mutation={mutation} reload={reload} />
+      {p.cancel_reason && (
+        <p className="max-w-[70ch] whitespace-pre-wrap text-sm">
+          Alasan pembatalan: {p.cancel_reason}
+        </p>
+      )}
       <div className="flex flex-wrap gap-3">
         {draft && (
           <Button
@@ -219,7 +236,7 @@ function PlanContent({
             Aktifkan
           </Button>
         )}
-        {(draft || p.status === "aktif") && (
+        {(draft || p.status === "aktif" || p.status === "evaluasi") && (
           <Button
             className="min-h-[44px]"
             variant="outline"
@@ -245,6 +262,22 @@ function PlanContent({
               ? "Baseline dan peserta akan dibekukan berdasarkan data QA terbaru. Pastikan perubahan draft sudah disimpan."
               : "Rencana tidak dapat dilanjutkan setelah dibatalkan. Baseline yang sudah beku tetap tersimpan."}
           </DialogDescription>
+          {confirm === "cancel" && !draft && (
+            <Field label="Alasan pembatalan">
+              <Textarea
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                minLength={10}
+                maxLength={1000}
+                required
+                disabled={mutation.busy}
+                aria-describedby="cancel-help"
+              />
+              <p id="cancel-help" className="text-sm text-muted-foreground">
+                Wajib 10–1.000 karakter.
+              </p>
+            </Field>
+          )}
           <DialogFooter>
             <Button
               className="min-h-[44px]"
@@ -256,7 +289,13 @@ function PlanContent({
             </Button>
             <Button
               className="min-h-[44px]"
-              disabled={mutation.busy || mutation.conflict}
+              disabled={
+                mutation.busy ||
+                mutation.conflict ||
+                (confirm === "cancel" &&
+                  !draft &&
+                  cancelReason.trim().length < 10)
+              }
               onClick={() => {
                 const action = confirm;
                 if (!action) return;
@@ -270,6 +309,9 @@ function PlanContent({
                             init: {
                               body: JSON.stringify({
                                 expected_updated_at: p.updated_at,
+                                ...(action === "cancel" && !draft
+                                  ? { cancel_reason: cancelReason.trim() }
+                                  : {}),
                               }),
                             },
                           },
