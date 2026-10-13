@@ -9,6 +9,7 @@ export {
   adminClient,
   profilerClient,
   profilerSubjectClient,
+  homeClient,
 } from "./rpc-client";
 export type {
   KetikMonitoringReview,

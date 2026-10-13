@@ -24,6 +24,10 @@ export default defineConfig({
     },
     { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
     {
+      name: "home-attention-real-backend",
+      testMatch: "home-attention-api.spec.ts",
+    },
+    {
       name: "telefun-schema-real-backend",
       testMatch: "telefun-schema-contract-api.spec.ts",
     },
