@@ -70,33 +70,15 @@ function LoadProblem({
   );
 }
 
-function Stat({
-  testId,
-  label,
-  value,
-  note,
-  busy,
-}: {
-  testId: string;
-  label: string;
-  value: string;
-  note: string;
-  busy: boolean;
-}) {
+/** Satu bagian ringkasan progres: angka tebal lalu keterangannya. */
+function SummaryItem({ value, label }: { value: string; label: string }) {
   return (
-    <div
-      data-testid={testId}
-      aria-busy={busy}
-      className="flex min-w-[220px] flex-1 flex-col gap-1.5 rounded-xl border border-border bg-surface-elevated px-6 py-5"
-    >
-      <span className="text-xs font-medium text-fg2">{label}</span>
-      <span className="font-mono text-3xl leading-9 font-bold tabular-nums text-foreground">
-        {busy ? "–" : value}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {busy ? "Memuat…" : note}
-      </span>
-    </div>
+    <span>
+      <strong className="font-mono font-bold tabular-nums text-foreground">
+        {value}
+      </strong>{" "}
+      {label}
+    </span>
   );
 }
 
@@ -116,58 +98,100 @@ export function PdktLandingOverview({
   const { waiting, average, reviewing, unreplied, focus, recent } = summary;
   const latestReviewed = recent[0]?.session;
   const reviewedCount = average?.sessions ?? 0;
+  // Pengguna baru: belum ada email yang menunggu dan belum ada sesi sama sekali.
+  const isNewUser =
+    historyState === "ready" &&
+    mailboxState === "ready" &&
+    waiting.count === 0 &&
+    unreplied.length === 0 &&
+    reviewing === 0 &&
+    recent.length === 0 &&
+    !average;
+
+  if (isNewUser) {
+    return (
+      <div className="mx-auto w-full max-w-6xl px-6 pt-10 pb-16">
+        <section
+          aria-labelledby="pdkt-start-title"
+          className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-xl border border-border bg-surface-elevated px-7 py-6"
+        >
+          <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-1.5">
+            <h2 id="pdkt-start-title" className={headingClass}>
+              Belum ada latihan
+            </h2>
+            <p className="max-w-[64ch] text-fg2">
+              Setelah balasan pertama Anda ditelaah, halaman ini menampilkan
+              email yang belum dibalas, skor rata-rata, aspek yang perlu
+              dilatih, dan hasil telaah terbaru.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 px-4 text-[13px]"
+            onClick={() => onOpenMailbox()}
+          >
+            Buka kotak masuk
+          </Button>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-12 pb-16">
       <section
         aria-labelledby="pdkt-progress-title"
-        className="flex flex-col gap-4"
+        className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-border pb-6"
       >
-        <SectionHeader
-          id="pdkt-progress-title"
-          title="Progres latihan"
-          description="Ringkasan dari kotak masuk dan riwayat sesi yang bisa Anda lihat."
-        />
-        <div className="flex flex-wrap gap-4">
-          <Stat
-            testId="pdkt-stat-waiting"
-            label="Belum dibalas"
-            busy={mailboxBusy}
-            value={mailboxState === "error" ? "–" : String(waiting.count)}
-            note={
-              mailboxState === "error"
-                ? "Kotak masuk belum bisa dimuat"
-                : waiting.oldestAt
-                  ? `Paling lama masuk ${formatPdktRelativeDay(waiting.oldestAt).toLowerCase()}`
-                  : "Tidak ada email yang belum dibalas"
-            }
-          />
-          <Stat
-            testId="pdkt-stat-average"
-            label="Skor rata-rata"
-            busy={historyBusy}
-            value={average ? String(average.score) : "–"}
-            note={
-              historyState === "error"
-                ? "Riwayat belum bisa dimuat"
-                : average
-                  ? average.sessions === 1
-                    ? "Dari sesi terakhir yang sudah ditelaah"
-                    : `Dari ${average.sessions} sesi terakhir yang sudah ditelaah`
-                  : "Belum ada sesi yang ditelaah"
-            }
-          />
-          <Stat
-            testId="pdkt-stat-reviewing"
-            label="Sedang ditelaah AI"
-            busy={historyBusy}
-            value={historyState === "error" ? "–" : String(reviewing)}
-            note="Hasilnya tampil di Hasil telaah terbaru."
-          />
-        </div>
+        <h2 id="pdkt-progress-title" className={headingClass}>
+          Progres latihan
+        </h2>
+        <p
+          data-testid="pdkt-progress-summary"
+          aria-busy={historyBusy || mailboxBusy}
+          className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-fg2"
+        >
+          {mailboxBusy ? (
+            <span>Memuat kotak masuk…</span>
+          ) : mailboxState === "error" ? (
+            <span>Kotak masuk belum bisa dimuat</span>
+          ) : (
+            <SummaryItem
+              value={String(waiting.count)}
+              label="email belum dibalas"
+            />
+          )}
+          {historyBusy ? (
+            <span>Memuat riwayat…</span>
+          ) : historyState === "error" ? (
+            <span>Riwayat belum bisa dimuat</span>
+          ) : (
+            <>
+              {average ? (
+                <SummaryItem
+                  value={String(average.score)}
+                  label={
+                    average.sessions === 1
+                      ? "rata-rata skor dari sesi terakhir"
+                      : `rata-rata skor dari ${average.sessions} sesi terakhir`
+                  }
+                />
+              ) : (
+                <span>Belum ada skor</span>
+              )}
+              {reviewing > 0 && (
+                <SummaryItem
+                  value={String(reviewing)}
+                  label="sedang ditelaah AI"
+                />
+              )}
+            </>
+          )}
+        </p>
       </section>
 
-      <div className="flex flex-wrap items-start gap-6">
+      <div className="flex flex-wrap items-start gap-x-10 gap-y-8">
         <section
           aria-labelledby="pdkt-unreplied-title"
           className="flex min-w-0 flex-[999_1_520px] flex-col gap-4"
