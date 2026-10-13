@@ -35,7 +35,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
             <span
               aria-hidden="true"
               className={cn(
-                "inline-flex size-5 items-center justify-center rounded-full text-[11px] font-bold",
+                "inline-flex size-5 items-center justify-center rounded-full text-[12px] font-bold",
                 index === currentIndex
                   ? "bg-background text-foreground"
                   : "bg-muted text-foreground",
@@ -71,7 +71,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
                   onClick={handler}
                   className={cn(
                     pill,
-                    "border border-border text-foreground/80 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    "border border-border text-fg2 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   )}
                 >
                   {marker}

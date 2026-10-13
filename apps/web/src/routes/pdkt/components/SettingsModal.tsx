@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Lock, SlidersHorizontal, X } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { cn } from "cn";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -45,6 +46,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
     null,
   );
+  // Konfirmasi tutup tanpa menyimpan atau pulihkan bawaan.
+  const [pendingConfirm, setPendingConfirm] = useState<
+    "close" | "reset" | null
+  >(null);
 
   const {
     activeTab,
@@ -85,15 +90,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     defaultConsumerTypes,
   });
 
-  const requestClose = () => {
-    if (isSaving) return;
-    if (
-      hasUnsavedChanges() &&
-      !window.confirm("Perubahan belum disimpan. Yakin ingin keluar?")
-    )
-      return;
+  const closeWithoutSaving = () => {
+    setPendingConfirm(null);
     discardUnsavedChanges();
     onClose();
+  };
+
+  const requestClose = () => {
+    if (isSaving) return;
+    if (hasUnsavedChanges()) {
+      setPendingConfirm("close");
+      return;
+    }
+    closeWithoutSaving();
+  };
+
+  const confirmReset = async () => {
+    await handleResetDefaults();
+    setPendingConfirm(null);
   };
 
   if (!isOpen) return null;
@@ -137,12 +151,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 sm:px-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-module-pdkt/10"
-                  >
-                    <SlidersHorizontal className="size-[18px] text-module-pdkt" />
-                  </span>
                   <div className="min-w-0">
                     <DialogTitle
                       id="settings-modal-title"
@@ -205,7 +213,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <p className="m-3 mt-auto hidden gap-2.5 rounded-lg border border-border bg-surface-elevated p-3 text-xs leading-[17px] text-foreground/80 md:flex">
+              <p className="mx-3 mb-3 flex gap-2.5 rounded-lg border border-border bg-surface-elevated p-3 text-xs leading-[17px] text-fg2 md:m-3 md:mt-auto">
                 <Lock
                   aria-hidden="true"
                   className="mt-px size-4 shrink-0 text-module-pdkt"
@@ -231,6 +239,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
               >
                 <PdktScenariosTab
+                  confirmContainer={dialogContainer}
                   scenarios={localSettings.scenarios}
                   scenarioForm={scenarioForm}
                   setLocalSettings={setLocalSettings}
@@ -239,6 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <TabsContent value="consumers">
                 <PdktConsumersTab
+                  confirmContainer={dialogContainer}
                   consumerTypes={localSettings.consumerTypes}
                   globalConsumerTypeId={globalConsumerTypeId}
                   setGlobalConsumerTypeId={setGlobalConsumerTypeId}
@@ -282,9 +292,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={handleResetDefaults}
+                  onClick={() => setPendingConfirm("reset")}
                   disabled={isSaving}
-                  className="-ml-2.5 min-h-11 px-2.5 text-foreground/80"
+                  className="-ml-2.5 min-h-11 px-2.5 text-fg2"
                 >
                   Pulihkan bawaan
                 </Button>
@@ -292,11 +302,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {isDirty && !isSaving && (
                     <span
                       role="status"
-                      className="inline-flex items-center gap-1.5 text-xs text-foreground/80"
+                      className="inline-flex items-center gap-1.5 text-xs text-fg2"
                     >
                       <span
                         aria-hidden="true"
-                        className="size-1.5 rounded-full bg-[var(--chart-orange)]"
+                        className="size-1.5 rounded-full bg-chart-orange"
                       />
                       Belum disimpan
                     </span>
@@ -316,12 +326,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     disabled={isSaving}
                     className="min-h-11 px-5"
                   >
-                    {isSaving ? "Menyimpan..." : "Simpan"}
+                    {isSaving ? "Menyimpan…" : "Simpan"}
                   </Button>
                 </div>
               </DialogFooter>
             </>
           )}
+
+          <ConfirmDialog
+            open={pendingConfirm === "close"}
+            container={dialogContainer}
+            title="Tutup tanpa menyimpan?"
+            description="Perubahan yang belum disimpan akan hilang."
+            cancelLabel="Lanjut mengubah"
+            confirmLabel="Buang perubahan"
+            onConfirm={closeWithoutSaving}
+            onCancel={() => setPendingConfirm(null)}
+          />
+          <ConfirmDialog
+            open={pendingConfirm === "reset"}
+            container={dialogContainer}
+            title="Pulihkan pengaturan bawaan?"
+            description="Skenario, karakter konsumen, identitas konsumen, gaya tulisan, dan model AI kembali ke bawaan dan langsung disimpan. Skenario dan karakter buatan Anda akan hilang."
+            confirmLabel="Pulihkan bawaan"
+            busy={isSaving}
+            busyLabel="Memulihkan…"
+            onConfirm={() => void confirmReset()}
+            onCancel={() => setPendingConfirm(null)}
+          />
         </DialogContent>
       </Dialog>
     </div>

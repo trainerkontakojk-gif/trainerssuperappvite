@@ -12,6 +12,7 @@ import {
 import { cn } from "cn";
 import type { PdktMailboxListItem } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
+import { PDKT_NO_SUBJECT } from "../utils/emailDisplay";
 import { Input } from "../../../components/ui/input";
 import {
   DropdownMenu,
@@ -22,7 +23,7 @@ import {
 
 export type MailboxFilter = "all" | "open" | "replied";
 
-/** Status penilaian per email yang sudah dibalas, untuk baris kotak masuk. */
+/** Status telaah per email yang sudah dibalas, untuk baris kotak masuk. */
 export interface MailboxReviewState {
   status: "not_started" | "pending" | "processing" | "completed" | "failed";
   score: number | null;
@@ -85,7 +86,7 @@ function RowStatus({
           aria-hidden="true"
           className="size-3 text-chart-orange"
         />
-        Penilaian gagal
+        Telaah gagal
       </span>
     );
   }
@@ -100,14 +101,14 @@ function RowStatus({
           />
           Dibalas
         </span>
-        <span className="rounded-full border border-border px-2 font-mono font-bold text-foreground">
+        <span className="font-semibold tabular-nums text-foreground">
           Skor {review.score}
         </span>
       </span>
     );
   }
   if (review?.status === "not_started") {
-    return <span>Dibalas · belum dinilai</span>;
+    return <span>Dibalas · belum ditelaah</span>;
   }
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -115,7 +116,7 @@ function RowStatus({
         aria-hidden="true"
         className="size-3 animate-spin motion-reduce:animate-none"
       />
-      Sedang dinilai AI…
+      Sedang ditelaah…
     </span>
   );
 }
@@ -172,7 +173,7 @@ export function MailboxSidebar({
                   className="min-h-11 gap-1.5 px-3 text-xs"
                 >
                   <Trash2 aria-hidden="true" className="text-destructive" />
-                  Hapus {selectedBulkIds.size}
+                  Hapus {selectedBulkIds.size} email
                 </Button>
               )}
               <Button
@@ -192,7 +193,7 @@ export function MailboxSidebar({
                 className="min-h-11 gap-1.5 px-3.5 text-xs font-semibold"
               >
                 <Plus aria-hidden="true" />
-                Baru
+                Email baru
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -257,7 +258,7 @@ export function MailboxSidebar({
                 "min-h-11 flex-auto rounded-md px-2 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                 filter === tab.id
                   ? "bg-background font-semibold text-foreground shadow-sm"
-                  : "text-foreground/80 hover:text-foreground",
+                  : "text-fg2 hover:text-foreground",
               )}
             >
               {tab.label}
@@ -274,9 +275,11 @@ export function MailboxSidebar({
               className="mb-3 size-10 text-muted-foreground"
             />
             <p className="text-xs font-medium text-muted-foreground">
-              {query || filter !== "all"
+              {query
                 ? "Tidak ada email yang cocok."
-                : "Kotak masuk masih kosong."}
+                : filter !== "all"
+                  ? "Belum ada email di filter ini."
+                  : "Kotak masuk masih kosong."}
             </p>
             {!(query || filter !== "all") && (
               <Button
@@ -294,20 +297,22 @@ export function MailboxSidebar({
             {filteredItems.map((item) => {
               const selected = !isBulkMode && selectedId === item.id;
               const canDelete = item.permissions?.can_delete !== false;
+              // Teks meta di atas latar ungu baris terpilih memakai fg2 agar kontras.
+              const metaText = selected ? "text-fg2" : "text-muted-foreground";
               const content = (
                 <>
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-sm font-semibold text-foreground">
                       {item.sender_name}
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className={cn("shrink-0 text-xs", metaText)}>
                       {formatTime(item.last_activity_at)}
                     </span>
                   </span>
                   <span className="truncate text-xs font-medium text-foreground">
-                    {item.subject || "(Tanpa subjek)"}
+                    {item.subject || PDKT_NO_SUBJECT}
                   </span>
-                  <span className="flex text-xs text-muted-foreground">
+                  <span className={cn("flex text-xs", metaText)}>
                     <RowStatus item={item} review={reviews[item.id]} />
                   </span>
                 </>

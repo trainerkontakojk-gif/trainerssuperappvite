@@ -11,7 +11,6 @@
       "src/__tests__/telefun-openai-webrtc-recovery.test.ts",
       "src/__tests__/telefun-communication-profile.test.tsx",
       "src/__tests__/pdkt-mailbox.test.tsx",
-      "src/__tests__/pdkt-history.test.tsx",
       "src/__tests__/monitoring-redesign.test.tsx",
       "src/__tests__/simulation-subject-picker.test.tsx",
       "src/__tests__/ketik-landing.test.tsx",

@@ -4,8 +4,8 @@ import type {
   PdktMailboxListItem,
 } from "@trainers/types";
 import { PDKT_DIMENSION_LABELS } from "../../../lib/pdkt-dimensions";
-import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
-import type { SessionHistory } from "../components/HistoryModal";
+import { PDKT_NO_SUBJECT } from "./emailDisplay";
+import { formatPdktSubjectLabel, type SessionHistory } from "./sessionHistory";
 
 /** Jumlah sesi telaah terbaru yang dipakai untuk rata-rata dan fokus. */
 export const PDKT_LANDING_REVIEW_WINDOW = 5;
@@ -72,13 +72,13 @@ function sessionSubject(session: SessionHistory): string {
   const title = session.config?.scenarios?.[0]?.title;
   return typeof title === "string" && title.trim()
     ? title.trim()
-    : "Tanpa subjek";
+    : PDKT_NO_SUBJECT;
 }
 
 function mailboxMeta(item: PdktMailboxListItem): string {
   const subject = item.simulationSubject;
   if (subject?.type === "participant") {
-    return `Untuk ${formatSimulationSubjectLabel(subject, {
+    return `Untuk ${formatPdktSubjectLabel(subject, {
       includeParticipantDetails: true,
     }).replaceAll(" — ", " · ")}`;
   }
@@ -148,7 +148,7 @@ export function summarizePdktLanding(
     ).length,
     unreplied: open.slice(0, LIST_LIMIT).map((item) => ({
       id: item.id,
-      subject: item.subject?.trim() || "Tanpa subjek",
+      subject: item.subject?.trim() || PDKT_NO_SUBJECT,
       meta: mailboxMeta(item),
       createdAt: item.created_at,
     })),
@@ -156,9 +156,7 @@ export function summarizePdktLanding(
     recent: reviewed.slice(0, LIST_LIMIT).map((session) => ({
       session,
       subject: sessionSubject(session),
-      subjectLabel: formatSimulationSubjectLabel(session.simulationSubject, {
-        unknownLabel: "Tidak tercatat",
-      }),
+      subjectLabel: formatPdktSubjectLabel(session.simulationSubject),
       timestamp: new Date(session.timestamp).toISOString(),
       score: readScore(session)!,
     })),

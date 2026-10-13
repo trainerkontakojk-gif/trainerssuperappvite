@@ -26,7 +26,7 @@ export function ScenarioAttachments({
           Lampiran (opsional)
         </h4>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Gambar maksimal 500KB atau PDF maksimal 2MB, maksimal 5 lampiran per
+          Gambar maksimal 500 KB atau PDF maksimal 2 MB, maksimal 5 lampiran per
           skenario.
         </p>
       </div>
@@ -38,7 +38,7 @@ export function ScenarioAttachments({
         >
           <FileUp aria-hidden="true" className="size-5 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">
-            Pilih Gambar / PDF
+            Pilih gambar atau PDF
           </span>
           <input
             id="scenario-attachment-upload"

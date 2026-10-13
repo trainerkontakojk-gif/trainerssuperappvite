@@ -8,6 +8,10 @@ import {
   isPdfAttachment,
 } from "../utils/detectMimeType";
 import { Button } from "../../../components/ui/button";
+import { notify } from "../../../lib/toast";
+
+const PDF_OPEN_ERROR =
+  "Lampiran PDF tidak bisa dibuka. Izinkan pop-up untuk situs ini, lalu coba lagi.";
 
 interface Props {
   attachments: readonly string[];
@@ -54,15 +58,21 @@ export function EmailAttachments({ attachments, size = "default" }: Props) {
     }
     try {
       const pdfBlob = getPdfBlob(base64);
-      if (!pdfBlob || typeof URL.createObjectURL !== "function") return;
+      if (!pdfBlob || typeof URL.createObjectURL !== "function") {
+        notify.error(PDF_OPEN_ERROR);
+        return;
+      }
       const objectUrl = URL.createObjectURL(pdfBlob);
       try {
+        // Dengan `noopener` hasil `window.open` selalu null, jadi pop-up yang
+        // diblokir tidak bisa dideteksi di sini; yang dilaporkan hanya galat.
         window.open(objectUrl, "_blank", "noopener,noreferrer");
       } finally {
         window.setTimeout(() => URL.revokeObjectURL?.(objectUrl), 60_000);
       }
     } catch {
-      // Lampiran rusak atau popup diblokir tidak boleh merusak panel.
+      // Lampiran rusak tidak boleh merusak panel.
+      notify.error(PDF_OPEN_ERROR);
     }
   };
 

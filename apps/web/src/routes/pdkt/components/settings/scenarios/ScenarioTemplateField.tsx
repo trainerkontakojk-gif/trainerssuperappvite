@@ -28,7 +28,6 @@ export function ScenarioTemplateField({
           <SettingsInput
             id={subjectId}
             type="text"
-            placeholder="Subjek email"
             value={draft.sampleEmailTemplate?.subject || ""}
             onChange={(event) =>
               onDraftChange({
@@ -51,7 +50,6 @@ export function ScenarioTemplateField({
           <SettingsTextarea
             id={bodyId}
             rows={6}
-            placeholder="Tulis email konsumen di sini."
             value={draft.sampleEmailTemplate?.body || ""}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? bodyErrorId : undefined}

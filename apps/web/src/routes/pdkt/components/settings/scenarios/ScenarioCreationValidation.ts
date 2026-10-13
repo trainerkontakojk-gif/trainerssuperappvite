@@ -1,7 +1,7 @@
 import type { PdktScenario } from "@trainers/types";
 import { isValidPdktRecipientEmail } from "../pdktDraftNormalizers";
 
-/** Cara email kasus dibuat: AI dari ringkasan, atau ditulis sendiri. */
+/** Cara email konsumen dibuat: AI dari ringkasan, atau ditulis sendiri. */
 export type ScenarioCreationMode = "ai" | "manual";
 
 export type ScenarioValidationErrorKey =
@@ -38,7 +38,7 @@ export function getScenarioCreationValidation({
       email:
         draft.identity?.email?.trim() &&
         !isValidPdktRecipientEmail(draft.identity.email.trim())
-          ? "Format email tidak valid."
+          ? "Alamat email tidak valid. Contoh: nama@perusahaan.co.id"
           : "",
     },
     manualEmailBody,

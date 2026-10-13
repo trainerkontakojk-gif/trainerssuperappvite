@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   expectHermetic,
   formatAudit,
@@ -9,7 +9,7 @@ import {
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
-import type { SessionHistory } from "../src/routes/pdkt/components/HistoryModal";
+import type { SessionHistory } from "../src/routes/pdkt/utils/sessionHistory";
 
 /**
  * PDKT — landing + modal workspace (hermetic).
@@ -181,6 +181,38 @@ const EVALUATED_HISTORY: readonly SessionHistory[] = [
       },
     },
   },
+];
+
+/** Riwayat untuk halaman Riwayat: ditelaah, sedang ditelaah, gagal, dan peserta terhapus. */
+const HISTORY_PAGE_SESSIONS: readonly SessionHistory[] = [
+  {
+    ...EVALUATED_HISTORY[0],
+    emails: [{ subject: REPLIED_MAIL.list.subject }],
+  },
+  {
+    id: "pdkt-processing-1",
+    timestamp: "2026-09-14T08:00:00.000Z",
+    config: SESSION_CONFIG as SessionHistory["config"],
+    emails: [{ subject: "Saldo belum kembali" }],
+    evaluation: null,
+    evaluationStatus: "processing",
+  },
+  {
+    id: "pdkt-failed-1",
+    timestamp: "2026-09-13T08:00:00.000Z",
+    config: SESSION_CONFIG as SessionHistory["config"],
+    emails: [{ subject: "Kartu terblokir" }],
+    evaluation: null,
+    evaluationStatus: "failed",
+    // Bentuk respons API (`mapHistoryRow` membaca kolom snake_case).
+    evaluation_status: "failed",
+    evaluation_error: "Penilaian AI gagal.",
+  } as SessionHistory,
+  {
+    ...HISTORY_UNAVAILABLE_PARTICIPANT[0],
+    // Bentuk respons API: tanpa ini `mapHistoryRow` menganggapnya "processing".
+    evaluation_status: "not_started",
+  } as SessionHistory,
 ];
 
 /** Settings tersimpan dengan dua skenario beda kategori, arah, dan cara pembuatan. */
@@ -384,12 +416,15 @@ function workspaceMarker(page: Page) {
     .getByRole("button", { name: "Dibalas", exact: true });
 }
 
-/** Lewati pemilih peserta (bila muncul) sampai ruang kerja tampil. */
-async function enterWorkspace(page: Page) {
+/**
+ * Lewati pemilih peserta (bila muncul) sampai ruang kerja tampil. `marker`
+ * menggantikan penanda kotak masuk untuk ruang kerja yang gagal dimuat.
+ */
+async function enterWorkspace(page: Page, marker?: Locator) {
   const picker = page
     .getByRole("dialog")
     .filter({ hasText: "Pilih peserta latihan" });
-  const workspace = workspaceMarker(page);
+  const workspace = marker ?? workspaceMarker(page);
   await expect
     .poll(async () => (await picker.isVisible()) || (await workspace.isVisible()), {
       timeout: 20000,
@@ -446,12 +481,14 @@ test.describe("PDKT (hermetic)", () => {
       }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText("PDKT · Simulasi email konsumen")).toBeVisible();
+    // Daftar centang "janji" di hero dihapus: salah satunya tidak benar untuk
+    // skenario email tetap.
     for (const point of [
       "Kasus selalu baru",
       "Tanpa bocoran jawaban",
       "Ditelaah AI",
     ]) {
-      await expect(page.getByText(point, { exact: true })).toBeVisible();
+      await expect(page.getByText(point, { exact: true })).toHaveCount(0);
     }
     const nav = page.getByRole("navigation", { name: "Menu PDKT" });
     for (const label of ["Riwayat", "Pemakaian AI", "Pengaturan"]) {
@@ -462,9 +499,10 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("button", { name: /^Mulai simulasi/ }),
     ).toBeVisible();
+    // "Atur skenario" sama dengan "Pengaturan" di menu; hanya satu yang tersisa.
     await expect(
       page.getByRole("button", { name: "Atur skenario" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     // Tanpa data: setiap bagian menjelaskan keadaannya, tanpa angka karangan.
     await waitForMockedApi(audit, ["/pdkt/history", "/pdkt/mailbox"]);
@@ -615,7 +653,7 @@ test.describe("PDKT (hermetic)", () => {
       hasText: OJK_SCENARIO.title,
     });
     await expect(ojkRow).toContainText("Langsung ke OJK");
-    await expect(ojkRow).toContainText("Tulis sendiri");
+    await expect(ojkRow).toContainText("Email tetap");
 
     // Filter kategori dan pencarian menyaring daftar tanpa mengubah data.
     await dialog
@@ -645,27 +683,93 @@ test.describe("PDKT (hermetic)", () => {
     ).toHaveAttribute("aria-checked", "false");
     await expect(dialog.getByText("Belum disimpan")).toBeVisible();
 
+    // Karakter konsumen: daftar baris dengan pilihan "Acak", bukan kartu.
+    await dialog.getByRole("tab", { name: /^Karakter konsumen/ }).click();
+    await expect(dialog).toContainText("Pilih Acak agar peserta");
+    await expect(
+      dialog.getByRole("button", { name: "Pakai karakter Acak" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      dialog.getByRole("button", { name: "Karakter baru" }),
+    ).toBeVisible();
+
     await dialog.getByRole("tab", { name: /^Gaya & AI/ }).click();
     await expect(
       dialog.getByRole("switch", { name: "Gambar lampiran" }),
     ).toBeVisible();
+
+    // Menutup dengan perubahan belum disimpan meminta konfirmasi lewat dialog
+    // aplikasi, bukan `window.confirm`.
+    page.on("dialog", () => {
+      throw new Error("window.confirm tidak boleh dipakai");
+    });
+    await dialog.getByRole("button", { name: "Tutup", exact: true }).click();
+    const discard = page.getByRole("dialog", { name: "Tutup tanpa menyimpan?" });
+    await expect(discard).toBeVisible();
+    await expect(discard).toContainText(
+      "Perubahan yang belum disimpan akan hilang.",
+    );
+    await discard.getByRole("button", { name: "Lanjut mengubah" }).click();
+    await expect(discard).toHaveCount(0);
+    await expect(dialog.getByText("Belum disimpan")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Tutup", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Tutup tanpa menyimpan?" })
+      .getByRole("button", { name: "Buang perubahan" })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     expectHermetic(audit);
   });
 
-  test("Riwayat membuka modal riwayat dengan empty state", async ({ page }) => {
+  test("Pulihkan bawaan meminta konfirmasi sebelum menyimpan", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openScenarioSettings(page);
+    const posts = () =>
+      audit.mockedApi.filter((call) =>
+        call.startsWith("POST /api/v1/pdkt/settings"),
+      ).length;
+
+    await dialog.getByRole("button", { name: "Pulihkan bawaan" }).click();
+    const confirm = page.getByRole("dialog", {
+      name: "Pulihkan pengaturan bawaan?",
+    });
+    await expect(confirm).toContainText("langsung disimpan");
+    await confirm.getByRole("button", { name: "Batal" }).click();
+    await expect(confirm).toHaveCount(0);
+    expect(posts()).toBe(0);
+
+    await dialog.getByRole("button", { name: "Pulihkan bawaan" }).click();
+    await page
+      .getByRole("dialog", { name: "Pulihkan pengaturan bawaan?" })
+      .getByRole("button", { name: "Pulihkan bawaan" })
+      .click();
+    await expect.poll(posts, { timeout: 20000 }).toBe(1);
+
+    expectHermetic(audit);
+  });
+
+  test("Riwayat membuka halaman riwayat, bukan modal", async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/pdkt",
       apiMocks: pdktMocks([]),
     });
 
     await page
+      .getByRole("navigation", { name: "Menu PDKT" })
       .getByRole("button", { name: /^Riwayat/ })
-      .first()
       .click();
-    await expect(page.getByText("Riwayat Simulasi PDKT").first()).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText("Belum Ada Riwayat").first()).toBeVisible();
+
+    await expect(page).toHaveURL(/\/pdkt\/history$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Riwayat latihan" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByText("Belum ada sesi latihan")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Mulai simulasi" }),
+    ).toHaveAttribute("href", "/pdkt");
 
     expectHermetic(audit);
   });
@@ -690,17 +794,17 @@ test.describe("PDKT (hermetic)", () => {
     });
     await expect(popover).toBeVisible({ timeout: 20000 });
     await expect(popover.getByText(/^Rp\s?48\.320$/)).toBeVisible();
-    await expect(popover.getByText("74 panggilan")).toBeVisible();
+    await expect(popover.getByText("74 permintaan AI")).toBeVisible();
 
-    // Rincian per jenis panggilan memakai bahasa peserta, bukan nama action.
+    // Rincian per jenis permintaan memakai bahasa peserta, bukan nama action.
     const rows = popover.getByRole("listitem");
     await expect(rows).toHaveCount(2);
     await expect(rows.nth(0)).toContainText("Menelaah balasan");
     await expect(rows.nth(0)).toContainText(/Rp\s?26\.920/);
-    await expect(rows.nth(1)).toContainText("Membuat email kasus");
+    await expect(rows.nth(1)).toContainText("Membuat email konsumen");
     await expect(rows.nth(1)).toContainText(/Rp\s?21\.400/);
     await expect(
-      popover.getByText("Estimasi dari jumlah token AI."),
+      popover.getByText("Perkiraan biaya dari pemakaian AI."),
     ).toBeVisible();
 
     // Popover kecil, bukan modal lama dengan kartu token.
@@ -732,7 +836,10 @@ test.describe("PDKT (hermetic)", () => {
         {
           ...USAGE_SUMMARY_MOCK,
           status: 500,
-          body: { success: false, error: "Server sedang sibuk." },
+          body: {
+            success: false,
+            error: { code: "DATABASE_ERROR", message: "Server sedang sibuk." },
+          },
         },
         ...pdktMocks([]).filter((mock) => mock.path !== USAGE_SUMMARY_PATH),
       ],
@@ -804,28 +911,246 @@ test.describe("PDKT (hermetic)", () => {
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);
   });
-  test("kartu riwayat menandai peserta yang record-nya tidak tersedia", async ({
+  test("halaman Riwayat merangkum, menyaring, dan mencari sesi", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
-      path: "/pdkt",
-      apiMocks: pdktMocks(HISTORY_UNAVAILABLE_PARTICIPANT),
+      path: "/pdkt/history",
+      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS),
+    });
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Riwayat latihan" }),
+    ).toBeVisible({ timeout: 20000 });
+    // Ringkasan berupa kalimat, bukan kartu metrik.
+    await expect(page.getByTestId("pdkt-history-summary")).toHaveText(
+      "4 sesi · 1 ditelaah · rata-rata skor 85",
+    );
+
+    const table = page.getByRole("table", { name: "Daftar sesi PDKT" });
+    const rows = table.getByRole("row").filter({ has: page.getByRole("cell") });
+    await expect(rows).toHaveCount(4);
+    const evaluated = rows.filter({ hasText: REPLIED_MAIL.list.subject });
+    await expect(evaluated.getByTestId("pdkt-history-score")).toHaveText("85");
+    await expect(rows.filter({ hasText: "Saldo belum kembali" })).toContainText(
+      "Sedang ditelaah",
+    );
+    await expect(rows.filter({ hasText: "Kartu terblokir" })).toContainText(
+      "Telaah gagal",
+    );
+    // Peserta yang datanya sudah dihapus: nama snapshot + catatan biasa.
+    const removed = rows.filter({ hasText: "Andi" });
+    await expect(removed).toContainText("data peserta sudah dihapus");
+    await expect(removed).toContainText("Belum ditelaah");
+    await expect(page.getByText(/record peserta/)).toHaveCount(0);
+    await expect(page.getByText(/Target:|Pelaksana:|Export CSV/)).toHaveCount(0);
+
+    // Filter status.
+    const filters = page.getByRole("group", { name: "Saring status" });
+    await filters.getByRole("button", { name: /^Ditelaah/ }).click();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(REPLIED_MAIL.list.subject);
+    await filters.getByRole("button", { name: /^Semua/ }).click();
+    await expect(rows).toHaveCount(4);
+
+    // Pencarian subjek atau peserta.
+    const search = page.getByRole("searchbox", { name: "Cari sesi" });
+    await search.fill("kartu");
+    await expect(rows).toHaveCount(1);
+    await search.fill("tidak ada yang cocok");
+    await expect(page.getByText("Tidak ada sesi yang cocok.")).toBeVisible();
+    await page.getByRole("button", { name: "Reset filter" }).click();
+    await expect(search).toHaveValue("");
+    await expect(rows).toHaveCount(4);
+
+    await expect(page.getByRole("button", { name: "Unduh CSV" })).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("Riwayat membuka sesi yang ditelaah di tahap Telaah", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS, [REPLIED_MAIL]),
+    });
+
+    const link = page
+      .getByRole("table", { name: "Daftar sesi PDKT" })
+      .getByRole("link", { name: REPLIED_MAIL.list.subject });
+    await expect(link).toHaveAttribute("href", "/pdkt?sesi=pdkt-evaluated-1", {
+      timeout: 20000,
+    });
+    await link.click();
+
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Telaah/,
+      { timeout: 20000 },
+    );
+    // Parameter `sesi` dibersihkan setelah sesi dibuka.
+    await expect(page).toHaveURL(/\/pdkt$/);
+    await expect(
+      page
+        .getByRole("region", { name: "Ringkasan skor" })
+        .getByTestId("pdkt-review-score"),
+    ).toHaveText("85");
+
+    expectHermetic(audit);
+  });
+
+  test("Riwayat menghapus sesi lewat dialog konfirmasi", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: [
+        {
+          method: "DELETE",
+          path: "/api/v1/pdkt/history/pdkt-processing-1",
+          body: { success: true, data: null },
+        },
+        ...pdktMocks(HISTORY_PAGE_SESSIONS),
+      ],
+    });
+
+    const row = page.getByRole("row").filter({ hasText: "Saldo belum kembali" });
+    await row
+      .getByRole("button", { name: "Hapus sesi Saldo belum kembali" })
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog", { name: "Hapus sesi ini?" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(row).toHaveCount(1);
+    expect(audit.mockedApi.filter((call) => call.startsWith("DELETE"))).toEqual(
+      [],
+    );
+
+    await row
+      .getByRole("button", { name: "Hapus sesi Saldo belum kembali" })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Hapus sesi ini?" })
+      .getByRole("button", { name: "Hapus sesi" })
+      .click();
+    await waitForMockedApi(audit, [
+      "DELETE /api/v1/pdkt/history/pdkt-processing-1",
+    ]);
+    await expect(row).toHaveCount(0);
+
+    expectHermetic(audit);
+  });
+
+  test("Riwayat menghapus semua sesi lewat dialog konfirmasi", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: [
+        {
+          method: "DELETE",
+          path: "/api/v1/pdkt/history",
+          body: { success: true, data: null },
+        },
+        ...pdktMocks(HISTORY_PAGE_SESSIONS),
+      ],
     });
 
     await page
-      .getByRole("button", { name: /^Riwayat/ })
-      .first()
-      .click();
-    const dialog = page
-      .getByRole("dialog")
-      .filter({ hasText: "Riwayat Simulasi PDKT" });
-    await expect(dialog).toBeVisible({ timeout: 20000 });
+      .getByRole("button", { name: "Hapus semua riwayat" })
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog", { name: "Hapus semua riwayat?" });
+    await expect(dialog).toContainText("4 sesi");
+    await dialog.getByRole("button", { name: "Hapus semua" }).click();
+    await waitForMockedApi(audit, ["DELETE /api/v1/pdkt/history"]);
+    await expect(page.getByText("Belum ada sesi latihan")).toBeVisible();
+    await expect(page.getByTestId("pdkt-history-summary")).toHaveCount(0);
 
-    await expect(dialog.getByText(/Target: Andi/)).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("tautan sesi yang tidak ada lagi memberi tahu dan tetap di landing", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt?sesi=sesi-yang-sudah-dihapus",
+      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS),
+    });
+
     await expect(
-      dialog.getByText(/record peserta tidak lagi tersedia/),
+      page.getByText("Sesi itu tidak ada lagi di riwayat Anda."),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page).toHaveURL(/\/pdkt$/);
+    await expect(
+      page.getByRole("navigation", { name: "Menu PDKT" }),
     ).toBeVisible();
+    await expect(stageNav(page)).toHaveCount(0);
 
+    expectHermetic(audit);
+  });
+
+  test("Riwayat yang gagal dimuat bisa dicoba lagi dan muat di ponsel", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/pdkt/history",
+          status: 500,
+          body: {
+            success: false,
+            error: { code: "DATABASE_ERROR", message: "Server sedang sibuk." },
+          },
+        },
+        ...pdktMocks([]).filter(
+          (mock) => mock.path !== "/api/v1/pdkt/history",
+        ),
+      ],
+    });
+
+    await expect(page.getByText("Riwayat belum bisa dimuat.")).toBeVisible({
+      timeout: 20000,
+    });
+    const before = audit.mockedApi.filter((call) =>
+      call.endsWith("/api/v1/pdkt/history"),
+    ).length;
+    await page.getByRole("button", { name: "Coba lagi" }).click();
+    await expect
+      .poll(
+        () =>
+          audit.mockedApi.filter((call) =>
+            call.endsWith("/api/v1/pdkt/history"),
+          ).length,
+      )
+      .toBeGreaterThan(before);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    expectHermetic(audit);
+  });
+
+  test("tabel Riwayat tidak menggeser layar ponsel", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS),
+    });
+    await expect(page.getByTestId("pdkt-history-summary")).toBeVisible({
+      timeout: 20000,
+    });
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector("main") ?? document.body;
+      return Math.max(
+        document.documentElement.scrollWidth - window.innerWidth,
+        main.scrollWidth - main.clientWidth,
+      );
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    expect(await findTextBelowFloor(page.locator("main").first())).toEqual([]);
     expectHermetic(audit);
   });
 
@@ -891,6 +1216,187 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("menghapus email memakai dialog konfirmasi, bukan window.confirm", async ({
+    page,
+  }) => {
+    const deletePath = `/api/v1/pdkt/mailbox/${OPEN_MAIL.list.id}`;
+    const audit = await openWorkspace(page, [
+      {
+        method: "DELETE",
+        path: deletePath,
+        body: { success: true, data: null },
+      },
+      ...pdktMocks([], [OPEN_MAIL]),
+    ]);
+    page.on("dialog", () => {
+      throw new Error("window.confirm tidak boleh dipakai");
+    });
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    const deletes: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "DELETE") deletes.push(request.url());
+    });
+
+    const deleteButton = page.getByRole("button", {
+      name: "Hapus email",
+      exact: true,
+    });
+    await deleteButton.click();
+    const confirm = page.getByRole("dialog", { name: "Hapus email ini?" });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: "Batal" }).click();
+    await expect(confirm).toHaveCount(0);
+    expect(deletes, "Batal tidak boleh menghapus").toEqual([]);
+
+    await deleteButton.click();
+    const deleted = page.waitForRequest(
+      (request) =>
+        request.method() === "DELETE" && request.url().endsWith(deletePath),
+    );
+    await page
+      .getByRole("dialog", { name: "Hapus email ini?" })
+      .getByRole("button", { name: "Hapus email" })
+      .click();
+    await deleted;
+    await expect(
+      page.getByRole("dialog", { name: "Hapus email ini?" }),
+    ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("kotak masuk yang gagal dimuat menyembunyikan galat server dan bisa kembali", async ({
+    page,
+  }) => {
+    const rawError = "relation pdkt_mailbox_items does not exist";
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/pdkt/mailbox",
+          status: 500,
+          body: {
+            success: false,
+            error: { code: "DATABASE_ERROR", message: rawError },
+          },
+        },
+        ...pdktMocks([]),
+      ],
+    });
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    const workspaceTitle = page.getByRole("heading", {
+      level: 1,
+      name: "Simulasi PDKT",
+    });
+    await enterWorkspace(page, workspaceTitle);
+
+    const problem = page
+      .getByRole("alert")
+      .filter({ hasText: "Kotak masuk belum bisa dimuat" });
+    await expect(problem).toBeVisible({ timeout: 20000 });
+    await expect(problem).toContainText(
+      "Periksa koneksi Anda, lalu coba lagi.",
+    );
+    await expect(problem.getByRole("button", { name: "Coba lagi" })).toBeVisible();
+    await expect(page.getByText(rawError)).toHaveCount(0);
+
+    // Bukan jalan buntu: header ruang kerja tetap punya tombol kembali.
+    await page
+      .getByRole("button", { name: "Kembali ke halaman awal PDKT" })
+      .click();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: /Pahami keluhannya\.\s*Balas dengan tepat\./,
+      }),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("balasan yang gagal terkirim memakai pesan PDKT, bukan teks server", async ({
+    page,
+  }) => {
+    const rawError = "Email mailbox tidak ditemukan.";
+    const audit = await openWorkspace(page, [
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/mailbox/reply",
+        status: 404,
+        body: {
+          success: false,
+          error: { code: "NOT_FOUND", message: rawError },
+        },
+      },
+      ...pdktMocks([], [OPEN_MAIL]),
+    ]);
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    await page.getByRole("button", { name: "Tulis balasan" }).click();
+    const compose = page.getByRole("region", { name: "Tulis balasan" });
+    await compose.getByLabel("Balasan Anda").fill("Kami cek transaksi Ibu.");
+    await compose.getByRole("button", { name: "Kirim balasan" }).click();
+    await page
+      .getByRole("dialog", { name: "Kirim balasan sekarang?" })
+      .getByRole("button", { name: "Kirim balasan" })
+      .click();
+
+    await expect(
+      page.getByText("Email ini sudah dihapus dan tidak bisa dibalas."),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(rawError)).toHaveCount(0);
+    // Balasan tetap di editor; tidak ada yang hilang.
+    await expect(compose.getByLabel("Balasan Anda")).toHaveValue(
+      "Kami cek transaksi Ibu.",
+    );
+
+    // Balasan gagal tidak memakai AI: popover tidak boleh tertahan "masih dihitung".
+    await page.getByRole("button", { name: "Kotak masuk" }).click();
+    await page
+      .getByRole("button", { name: "Kembali ke halaman awal PDKT" })
+      .click();
+    await page
+      .getByRole("navigation", { name: "Menu PDKT" })
+      .getByRole("button", { name: /^Pemakaian AI/ })
+      .click();
+    const usage = page.getByRole("dialog", { name: /^Pemakaian AI/ });
+    await expect(usage.getByText(/^Rp\s?50\.000$/)).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(usage.getByText(/masih dihitung/)).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("dialog Buat email baru tidak menampilkan ringkasan skenario email tetap", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(page, [
+      {
+        method: "GET",
+        path: "/api/v1/pdkt/settings",
+        body: { success: true, data: SAVED_SETTINGS },
+        headers: { "x-settings-version": "absent" },
+      },
+      ...pdktMocks([], [OPEN_MAIL]).filter(
+        (mock) => mock.path !== "/api/v1/pdkt/settings",
+      ),
+    ]);
+    await page.getByRole("button", { name: "Email baru", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Buat email baru" });
+    await expect(dialog).toBeVisible({ timeout: 20000 });
+
+    // Skenario email tetap: judul dan kategori saja. Ringkasannya disalin dari
+    // isi email, jadi peserta tidak boleh membacanya sebelum mulai.
+    const fixed = dialog.getByRole("button", { name: new RegExp(OJK_SCENARIO.title) });
+    await expect(fixed).toContainText("Asuransi · Email tetap");
+    await expect(dialog.getByText(OJK_SCENARIO.description)).toHaveCount(0);
+
+    const generated = dialog.getByRole("button", {
+      name: new RegExp(COMPANY_SCENARIO.title),
+    });
+    await expect(generated).toContainText("Pembiayaan · Dibuat AI");
+    await expect(generated).toContainText(COMPANY_SCENARIO.description);
+    expectHermetic(audit);
+  });
+
   test("editor skenario satu halaman mengubah kasus, arah balasan, dan kunci jawaban", async ({
     page,
   }) => {
@@ -903,7 +1409,7 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       dialog.getByRole("heading", { name: "Ubah skenario" }),
     ).toBeVisible();
-    for (const section of ["Kasusnya", "Arah balasan", "Kunci jawaban"]) {
+    for (const section of ["Kasus", "Arah balasan", "Kunci jawaban"]) {
       await expect(
         dialog.getByRole("region", { name: section }),
       ).toBeVisible();
@@ -919,7 +1425,7 @@ test.describe("PDKT (hermetic)", () => {
       direction.getByRole("radio", { name: /Hanya tembusan ke OJK/ }),
     ).toBeChecked();
     await direction
-      .getByRole("radio", { name: /Tembusan, tapi minta bantuan OJK/ })
+      .getByRole("radio", { name: /Tembusan, tetapi meminta bantuan OJK/ })
       .check();
     // Petunjuk kunci jawaban mengikuti arah yang dipilih.
     const answer = dialog.getByRole("region", { name: "Kunci jawaban" });
@@ -932,7 +1438,7 @@ test.describe("PDKT (hermetic)", () => {
     const row = dialog.getByRole("listitem").filter({
       hasText: "Pinjaman lunas tetapi masih ditelepon penagih",
     });
-    await expect(row).toContainText("Tembusan, tapi minta bantuan OJK");
+    await expect(row).toContainText("Tembusan, tetapi meminta bantuan OJK");
 
     const saveRequest = page.waitForRequest(
       (request) =>
@@ -973,7 +1479,9 @@ test.describe("PDKT (hermetic)", () => {
     await dialog.getByLabel(/^Judul skenario/).fill("Klaim ditolak tanpa alasan");
     await dialog.getByLabel(/^Kategori/).selectOption("Asuransi");
     const mode = dialog.getByRole("radiogroup", { name: "Isi email dibuat oleh" });
-    await mode.getByRole("radio", { name: "Saya tulis sendiri" }).click();
+    await mode
+      .getByRole("radio", { name: "Ditulis sendiri (email tetap)" })
+      .click();
     // Mode tulis sendiri mengganti ringkasan dengan isi email.
     await expect(dialog.getByLabel(/^Ringkasan masalah/)).toHaveCount(0);
     await dialog
@@ -988,7 +1496,7 @@ test.describe("PDKT (hermetic)", () => {
       hasText: "Klaim ditolak tanpa alasan",
     });
     await expect(row).toContainText("Asuransi");
-    await expect(row).toContainText("Tulis sendiri");
+    await expect(row).toContainText("Email tetap");
     await expect(dialog.getByText("Belum disimpan")).toBeVisible();
     expectHermetic(audit);
   });
@@ -998,8 +1506,19 @@ test.describe("PDKT (hermetic)", () => {
     await dialog
       .getByRole("button", { name: `Ubah ${OJK_SCENARIO.title}` })
       .click({ timeout: 20000 });
-    page.once("dialog", (confirm) => void confirm.accept());
+    page.on("dialog", () => {
+      throw new Error("window.confirm tidak boleh dipakai");
+    });
     await dialog.getByRole("button", { name: "Hapus skenario" }).click();
+    const confirmDelete = page.getByRole("dialog", {
+      name: "Hapus skenario ini?",
+    });
+    await expect(confirmDelete).toBeVisible();
+    await expect(confirmDelete).toContainText(
+      "Perubahan berlaku setelah Anda memilih Simpan.",
+    );
+    await confirmDelete.getByRole("button", { name: "Hapus skenario" }).click();
+    await expect(confirmDelete).toHaveCount(0);
 
     await expect(
       dialog.getByRole("heading", { name: "Skenario", exact: true }),
@@ -1024,7 +1543,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("heading", { name: "Kotak masuk", level: 2 }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Baru" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Email baru", exact: true }),
+    ).toBeVisible();
     const filters = page.getByRole("group", { name: "Saring email" });
     await expect(filters.getByRole("button")).toHaveText([
       "Semua",
@@ -1056,9 +1577,11 @@ test.describe("PDKT (hermetic)", () => {
     await expect(reading).toContainText("rina@local.test");
     await expect(reading.getByText("Lampiran (1)")).toBeVisible();
     // Data peserta dan pelaksana pindah dari panel baca ke header ruang kerja.
-    await expect(page.getByText("Pelaksana: Siti Aminah (Trainer)")).toBeVisible();
+    await expect(page.getByText("Pelaksana: Siti Aminah · Trainer")).toBeVisible();
     await expect(reading.getByRole("button", { name: "Lampiran 1" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Hapus email ini" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Hapus email", exact: true }),
+    ).toBeEnabled();
     await expect(page.getByRole("button", { name: "Tulis balasan" })).toBeVisible();
 
     // Baris yang sudah dibalas menampilkan skor; memilih filter tidak membuka
@@ -1141,7 +1664,7 @@ test.describe("PDKT (hermetic)", () => {
     );
     await page
       .getByRole("dialog", { name: "Kirim balasan sekarang?" })
-      .getByRole("button", { name: "Kirim dan nilai" })
+      .getByRole("button", { name: "Kirim balasan" })
       .click();
     const body = (await sent).postDataJSON();
     expect(body.mailboxId).toBe(OPEN_MAIL.list.id);
@@ -1154,7 +1677,7 @@ test.describe("PDKT (hermetic)", () => {
       /Telaah/,
     );
     await expect(
-      page.getByRole("status").filter({ hasText: "Sedang dinilai AI" }),
+      page.getByRole("status").filter({ hasText: "Sedang ditelaah AI" }),
     ).toBeVisible();
     expectHermetic(audit);
   });
@@ -1239,7 +1762,7 @@ test.describe("PDKT (hermetic)", () => {
     await expect(summary).toContainText("Perbaiki ini dulu");
     await expect(summary).toContainText("Sebut kanal pengaduan resmi.");
     await expect(summary).toContainText("Silakan hubungi 157.");
-    await expect(summary).toContainText("Berdampak ke: Kualitas OJK");
+    await expect(summary).toContainText("Aspek: Kualitas OJK");
     await expect(summary).toContainText("Pecah kalimat pembuka.");
     await expect(summary).toContainText("Hampir sesuai");
     await expect(summary).toContainText("3 menit 45 detik");
@@ -1247,7 +1770,7 @@ test.describe("PDKT (hermetic)", () => {
     const breakdown = page.getByRole("region", { name: "Rincian skor" });
     const rows = breakdown.getByRole("listitem");
     await expect(rows).toHaveCount(5);
-    await expect(rows.nth(0)).toContainText("Arah Penerima");
+    await expect(rows.nth(0)).toContainText("Arah penerima");
     await expect(rows.nth(0)).toContainText("90");
     await expect(breakdown.getByText("Perlu perbaikan")).toHaveCount(1);
     await expect(rows.nth(1)).toContainText("Perlu perbaikan");
@@ -1259,7 +1782,7 @@ test.describe("PDKT (hermetic)", () => {
     await expect(marks.first()).toHaveText(`${matchedQuote}1`);
     await expect(answer).toContainText("Terima kasih,");
 
-    const fixes = page.getByRole("region", { name: "Yang perlu diperbaiki" });
+    const fixes = page.getByRole("region", { name: "Catatan pada balasan" });
     const notes = fixes.getByRole("listitem");
     await expect(notes).toHaveCount(2);
     await expect(notes.nth(0)).toContainText(
@@ -1268,6 +1791,7 @@ test.describe("PDKT (hermetic)", () => {
     await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
 
     const other = page.getByRole("region", { name: "Temuan lain" });
+    await expect(other).toContainText("Ejaan:");
     await expect(other).toContainText("transkasi");
     await expect(other).toContainText("Kalimat pembuka terlalu panjang");
     await expect(other).toContainText("Belum menyebut kanal pengaduan resmi");
@@ -1337,9 +1861,12 @@ test.describe("PDKT (hermetic)", () => {
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
 
-    await expect(page.getByText("Model AI sedang sibuk.")).toBeVisible({
-      timeout: 20000,
-    });
+    // Galat dari server/AI tidak ditampilkan; peserta melihat pesan tetap.
+    await expect(
+      page.getByText("AI belum bisa menelaah balasan ini."),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText("Telaah gagal", { exact: true })).toBeVisible();
+    await expect(page.getByText("Model AI sedang sibuk.")).toHaveCount(0);
     const retry = page.waitForRequest((request) =>
       request.url().endsWith("/api/v1/pdkt/history/retry-eval"),
     );
@@ -1348,7 +1875,7 @@ test.describe("PDKT (hermetic)", () => {
       historyId: "pdkt-evaluated-1",
     });
     await expect(
-      page.getByRole("status").filter({ hasText: "Sedang dinilai AI" }),
+      page.getByRole("status").filter({ hasText: "Sedang ditelaah AI" }),
     ).toBeVisible();
     expectHermetic(audit);
   });

@@ -1,6 +1,6 @@
 import { cn } from "cn";
 import { Button } from "../../../../components/ui/button";
-import { TEXT_MODELS } from "../../pdktSettings";
+import { DEFAULT_PDKT_MODEL_ID, TEXT_MODELS } from "../../pdktSettings";
 import { PdktSwitch } from "./PdktSwitch";
 
 export interface PdktSystemTabProps {
@@ -59,9 +59,9 @@ export function PdktSystemTab({
         <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
           Gaya &amp; AI
         </h3>
-        <p className="text-[13px] leading-5 text-foreground/80">
-          Atur gaya tulisan konsumen dan AI yang membuat email serta menilai
-          balasan.
+        <p className="text-[13px] leading-5 text-fg2">
+          Atur gaya tulisan konsumen dan AI yang membuat email konsumen dan
+          menelaah balasan.
         </p>
       </div>
 
@@ -98,10 +98,10 @@ export function PdktSystemTab({
                   </span>
                   <RadioIndicator isSelected={isSelected} />
                 </span>
-                <span className="text-xs leading-relaxed font-normal text-foreground/80">
+                <span className="text-xs leading-relaxed font-normal text-fg2">
                   {style.description}
                 </span>
-                <span className="rounded-md bg-muted px-2.5 py-2 text-xs leading-relaxed font-normal italic text-foreground/80">
+                <span className="rounded-md bg-muted px-2.5 py-2 text-xs leading-relaxed font-normal italic text-fg2">
                   {style.sample}
                 </span>
               </Button>
@@ -115,7 +115,7 @@ export function PdktSystemTab({
           <h4 className="text-[15px] font-semibold text-foreground">
             Model AI
           </h4>
-          <p className="mt-1 text-[13px] leading-5 text-foreground/80">
+          <p className="mt-1 text-[13px] leading-5 text-fg2">
             Model yang dipakai untuk membuat email konsumen dan menelaah
             balasan.
           </p>
@@ -143,18 +143,15 @@ export function PdktSystemTab({
                     : "border-border bg-card hover:bg-muted/40",
                 )}
               >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-                      {model.name}
-                    </span>
-                    <span className="shrink-0 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {model.provider === "gemini" ? "Gemini" : "OpenAI"}
-                    </span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                    {model.name}
                   </span>
-                  <span className="text-xs leading-relaxed font-normal text-muted-foreground">
-                    {model.description}
-                  </span>
+                  {model.id === DEFAULT_PDKT_MODEL_ID && (
+                    <span className="shrink-0 text-xs font-normal text-fg2">
+                      Bawaan
+                    </span>
+                  )}
                 </span>
                 <RadioIndicator isSelected={isSelected} />
               </Button>

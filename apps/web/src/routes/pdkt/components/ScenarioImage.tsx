@@ -12,7 +12,7 @@ interface ScenarioImageProps {
 
 export default function ScenarioImage({
   base64,
-  alt = "Scenario image",
+  alt = "Lampiran",
   variant,
   onClick,
   className = "",
@@ -25,7 +25,7 @@ export default function ScenarioImage({
         onClick,
         role: "button",
         tabIndex: 0,
-        "aria-label": isPdf ? "PDF" : alt,
+        "aria-label": isPdf ? `${alt} (PDF)` : alt,
         onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -44,7 +44,7 @@ export default function ScenarioImage({
         <iframe
           src={src}
           title={alt}
-          className={`max-w-full max-h-full rounded-xl bg-[var(--surface)] ${className}`}
+          className={`max-w-full max-h-full rounded-xl bg-card ${className}`}
         />
       );
     }
@@ -62,13 +62,11 @@ export default function ScenarioImage({
   if (isPdf) {
     return (
       <div
-        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex flex-col items-center justify-center gap-1 text-[var(--fg)] ${interactiveClass} ${className}`}
+        className={`relative min-w-20 min-h-20 bg-background rounded-lg border border-border overflow-hidden flex flex-col items-center justify-center gap-1 text-foreground ${interactiveClass} ${className}`}
         {...interactiveProps}
       >
-        <FileText className="w-5 h-5 text-[var(--fg2)]" />
-        <span className="text-xs font-semibold leading-none text-[var(--fg2)]">
-          PDF
-        </span>
+        <FileText className="w-5 h-5 text-fg2" />
+        <span className="text-xs font-semibold leading-none text-fg2">PDF</span>
       </div>
     );
   }
@@ -76,7 +74,7 @@ export default function ScenarioImage({
   if (variant === "thumbnail") {
     return (
       <div
-        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
+        className={`relative min-w-20 min-h-20 bg-background rounded-lg overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
         {...interactiveProps}
       >
         <img
@@ -92,7 +90,7 @@ export default function ScenarioImage({
   // variant === 'grid'
   return (
     <div
-      className={`relative aspect-[4/3] bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
+      className={`relative aspect-[4/3] bg-background rounded-lg border border-border overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
       {...interactiveProps}
     >
       <img

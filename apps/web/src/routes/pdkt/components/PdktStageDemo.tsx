@@ -11,8 +11,8 @@ const STAGES = [
 
 const BARS = [
   { label: "Kejelasan", value: 90, color: "bg-foreground/70" },
-  { label: "Kualitas OJK", value: 64, color: "bg-[var(--chart-orange)]" },
-  { label: "Typo", value: 92, color: "bg-foreground/70" },
+  { label: "Kualitas OJK", value: 64, color: "bg-chart-orange" },
+  { label: "Ejaan", value: 92, color: "bg-foreground/70" },
 ] as const;
 
 /**
@@ -220,9 +220,9 @@ export function PdktStageDemo() {
               </div>
               <div
                 data-anim="tip"
-                className="flex gap-2.5 rounded-lg border border-[var(--chart-orange)]/40 bg-[var(--chart-orange)]/10 px-3.5 py-3 text-xs leading-[18px] text-foreground"
+                className="flex gap-2.5 rounded-lg border border-chart-orange/40 bg-chart-orange/10 px-3.5 py-3 text-xs leading-[18px] text-foreground"
               >
-                <Lightbulb className="mt-px size-4 shrink-0 text-[var(--chart-orange)]" />
+                <Lightbulb className="mt-px size-4 shrink-0 text-chart-orange" />
                 <span>
                   <strong>Saran:</strong> sampaikan kapan status pinjaman
                   diperbarui, supaya konsumen tahu harus menunggu sampai kapan.

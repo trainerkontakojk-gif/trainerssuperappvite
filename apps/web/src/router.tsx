@@ -378,6 +378,9 @@ const pdktRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt",
   component: PdktLanding,
+  // `sesi` membuka satu sesi riwayat langsung di tahap Telaah.
+  validateSearch: (search: Record<string, unknown>): { sesi?: string } =>
+    typeof search.sesi === "string" && search.sesi ? { sesi: search.sesi } : {},
   beforeLoad: requireCapability("pdkt.use"),
 });
 

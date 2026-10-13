@@ -15,17 +15,17 @@ import {
   type UsageSnapshot,
 } from "../../../lib/usage-snapshot";
 
-/** Nama jenis panggilan AI PDKT dalam bahasa peserta; kunci dari `ai-usage-categories`. */
+/** Nama jenis permintaan AI PDKT dalam bahasa peserta; kunci dari `ai-usage-categories`. */
 const PDKT_ITEM_LABELS: Record<string, string> = {
-  pdkt_create_email: "Membuat email kasus",
-  pdkt_template: "Membuat template email",
+  pdkt_create_email: "Membuat email konsumen",
+  pdkt_template: "Menyiapkan email skenario",
   pdkt_image_generation: "Membuat lampiran",
   pdkt_review: "Menelaah balasan",
 };
 
 const CATEGORY_LABELS: Record<keyof UsageBreakdown, string> = {
-  simulation: "Simulasi",
-  review: "Penilaian AI",
+  simulation: "Pembuatan email",
+  review: "Telaah balasan",
   uncategorized: "Lainnya",
 };
 
@@ -130,11 +130,11 @@ export function UsagePopover({
           </PopoverTitle>
           {state.status === "ready" && (
             <p className="flex items-baseline gap-2">
-              <span className="font-mono text-[28px] leading-[34px] font-bold tabular-nums text-foreground">
+              <span className="font-display text-[28px] leading-[34px] font-bold tabular-nums text-foreground">
                 {formatIdr(state.usage.totalCostIdr)}
               </span>
               <span className="text-xs text-muted-foreground">
-                {state.usage.totalCalls} panggilan
+                {state.usage.totalCalls} permintaan AI
               </span>
             </p>
           )}
@@ -172,23 +172,23 @@ export function UsagePopover({
         </div>
 
         {(sessionDeltaPending || hasDelta(sessionDelta)) && (
-          <p className="rounded-lg bg-muted px-3 py-2.5 text-xs text-foreground/80">
+          <p className="rounded-lg bg-muted px-3 py-2.5 text-xs text-fg2">
             {hasDelta(sessionDelta) ? (
               <>
-                Sesi terakhir menambah{" "}
+                Balasan terakhir memakai{" "}
                 <strong className="font-semibold text-foreground">
                   {formatIdr(sessionDelta.costIdr)}
                 </strong>{" "}
-                ({sessionDelta.totalCalls} panggilan AI).
+                ({sessionDelta.totalCalls} permintaan AI).
               </>
             ) : (
-              "Pemakaian sesi terakhir masih dihitung."
+              "Pemakaian balasan terakhir masih dihitung…"
             )}
           </p>
         )}
 
         <p className="text-xs text-muted-foreground">
-          Estimasi dari jumlah token AI.
+          Perkiraan biaya dari pemakaian AI.
         </p>
       </PopoverContent>
     </Popover>
@@ -213,8 +213,8 @@ function UsageRows({ usage }: { usage: UsageSnapshot }) {
         return (
           <li key={row.key} className="flex flex-col gap-1.5">
             <span className="flex justify-between gap-3">
-              <span className="text-foreground/80">{row.label}</span>
-              <span className="font-mono font-bold tabular-nums text-foreground">
+              <span className="text-fg2">{row.label}</span>
+              <span className="font-semibold tabular-nums text-foreground">
                 {formatIdr(row.costIdr)}
               </span>
             </span>

@@ -5,12 +5,12 @@ import type { ScenarioCreationMode } from "./ScenarioCreationValidation";
 const MODES: { id: ScenarioCreationMode; label: string; hint: string }[] = [
   {
     id: "ai",
-    label: "AI, berbeda tiap sesi",
-    hint: "AI menulis email baru dari ringkasan masalah setiap kali sesi dimulai, mengikuti arah balasan di bagian 2.",
+    label: "Dibuat AI tiap sesi",
+    hint: "AI menulis email baru dari ringkasan masalah setiap kali sesi dimulai, mengikuti Arah balasan di bawah.",
   },
   {
     id: "manual",
-    label: "Saya tulis sendiri",
+    label: "Ditulis sendiri (email tetap)",
     hint: "Semua peserta menerima email yang sama persis. Cocok untuk ujian.",
   },
 ];
@@ -20,7 +20,7 @@ interface Props {
   onChange: (mode: ScenarioCreationMode) => void;
 }
 
-/** Pilihan cara email kasus dibuat, berbentuk segmen dengan navigasi panah. */
+/** Pilihan cara email konsumen dibuat, berbentuk segmen dengan navigasi panah. */
 export function ScenarioModeField({ value, onChange }: Props) {
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
   const active = MODES.find((mode) => mode.id === value) ?? MODES[0];
@@ -35,7 +35,7 @@ export function ScenarioModeField({ value, onChange }: Props) {
     <div className="flex flex-col gap-2">
       <span
         id="scenario-mode-label"
-        className="text-xs font-medium text-muted-foreground"
+        className="text-[12px] font-medium text-muted-foreground"
       >
         Isi email dibuat oleh
       </span>
@@ -74,7 +74,7 @@ export function ScenarioModeField({ value, onChange }: Props) {
                 "min-h-10 rounded-md px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                 checked
                   ? "bg-background text-foreground shadow-sm"
-                  : "text-foreground/80 hover:text-foreground",
+                  : "text-fg2 hover:text-foreground",
               )}
             >
               {mode.label}

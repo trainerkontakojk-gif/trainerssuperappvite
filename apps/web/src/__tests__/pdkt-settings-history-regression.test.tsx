@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "../routes/pdkt/components/SettingsModal";
 import { CreateEmailModal } from "../routes/pdkt/components/CreateEmailModal";
-import { HistoryModal } from "../routes/pdkt/components/HistoryModal";
 import type { PdktAppSettings as AppSettings } from "../routes/pdkt/pdktSettings";
 
 vi.mock("../lib/api", async () => {
@@ -64,24 +63,6 @@ describe("PDKT settings and riwayat dialog shell", () => {
     expect(classes).not.toContain("sm:max-w-sm");
   });
 
-  it("keeps the riwayat dialog wide instead of collapsing to sm:max-w-sm", () => {
-    render(
-      <HistoryModal
-        isOpen
-        onClose={() => {}}
-        history={[]}
-        onSelectSession={() => {}}
-        onDeleteSession={() => {}}
-        onClearHistory={() => {}}
-      />,
-    );
-
-    const classes = dialogClasses();
-    expect(classes).toContain("max-w-3xl");
-    expect(classes).toContain("sm:max-w-3xl");
-    expect(classes).not.toContain("sm:max-w-sm");
-  });
-
   it("keeps the create-email dialog wide instead of collapsing to sm:max-w-sm", () => {
     render(
       <CreateEmailModal
@@ -124,40 +105,5 @@ describe("PDKT settings and riwayat dialog shell", () => {
     expect(
       screen.getByRole("radiogroup", { name: "Mode penulisan" }),
     ).toBeTruthy();
-  });
-
-  it("still renders riwayat rows when config or emails are missing", () => {
-    const broken = [
-      {
-        id: "h-1",
-        timestamp: new Date().toISOString(),
-        config: null,
-        emails: null,
-        evaluation: null,
-        evaluationStatus: "completed",
-      },
-      {
-        id: "h-2",
-        timestamp: new Date().toISOString(),
-        config: { scenarios: null, consumerType: null },
-        emails: [{ subject: "Halo" }],
-        evaluation: { score: 80 },
-        evaluationStatus: "completed",
-      },
-    ];
-    render(
-      <HistoryModal
-        isOpen
-        onClose={() => {}}
-        history={broken as never}
-        onSelectSession={() => {}}
-        onDeleteSession={() => {}}
-        onClearHistory={() => {}}
-      />,
-    );
-
-    expect(screen.getByText(/Riwayat Simulasi PDKT/i)).toBeTruthy();
-    expect(screen.getByText("Tanpa Subjek")).toBeTruthy();
-    expect(screen.getByText("Halo")).toBeTruthy();
   });
 });

@@ -3,12 +3,12 @@ import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
-import { getSettingsSaveErrorMessage } from "../../../../lib/settings-contract";
 import { DEFAULT_PDKT_MODEL_ID, coercePdktModelId } from "../../pdktSettings";
 import {
   normalizePdktConsumerDraft,
   normalizePdktScenarioDraft,
 } from "./pdktDraftNormalizers";
+import { pdktSettingsSaveErrorMessage } from "../../utils/pdktErrors";
 
 export interface UsePdktSettingsDraftProps {
   settings: AppSettings;
@@ -194,7 +194,7 @@ export function usePdktSettingsDraft({
           ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       notify.warning(
-        "Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.",
+        "Skenario baru belum lengkap. Isi judul dan ringkasan masalah, atau pilih Batal.",
       );
       return;
     }
@@ -209,9 +209,7 @@ export function usePdktSettingsDraft({
           .getElementById("scenario-form")
           ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
-      notify.warning(
-        "Isi body template email jika opsi template selalu digunakan aktif.",
-      );
+      notify.warning("Isi email tetap belum diisi.");
       return;
     }
 
@@ -223,7 +221,7 @@ export function usePdktSettingsDraft({
           ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       notify.warning(
-        "Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.",
+        "Karakter baru belum lengkap. Isi nama dan deskripsi, atau pilih Batal.",
       );
       return;
     }
@@ -235,47 +233,38 @@ export function usePdktSettingsDraft({
       ? consumerForm.save(localSettings.consumerTypes)
       : localSettings.consumerTypes;
 
-    try {
-      const settingsToSave = buildPdktSettingsForSave({
-        localSettings,
-        scenarios: nextScenarios,
-        consumerTypes: nextConsumerTypes,
-        system: {
-          enableImageGeneration,
-          globalConsumerTypeId,
-          selectedModel,
-          consumerNameMentionPattern,
-          writingStyleMode,
-          customIdentity: {
-            senderName: customSenderName,
-            bodyName: customBodyName,
-            email: customEmail,
-            city: customCity,
-          },
+    const settingsToSave = buildPdktSettingsForSave({
+      localSettings,
+      scenarios: nextScenarios,
+      consumerTypes: nextConsumerTypes,
+      system: {
+        enableImageGeneration,
+        globalConsumerTypeId,
+        selectedModel,
+        consumerNameMentionPattern,
+        writingStyleMode,
+        customIdentity: {
+          senderName: customSenderName,
+          bodyName: customBodyName,
+          email: customEmail,
+          city: customCity,
         },
-      });
+      },
+    });
 
-      saveInFlightRef.current = true;
-      setIsSaving(true);
-      try {
-        await onSave(settingsToSave);
-        if (scenarioDirty) scenarioForm.close();
-        if (consumerDirty) consumerForm.close();
-        onClose();
-      } catch (e) {
-        console.error(e);
-        notify.error(
-          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
-        );
-      } finally {
-        saveInFlightRef.current = false;
-        setIsSaving(false);
-      }
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    try {
+      await onSave(settingsToSave);
+      if (scenarioDirty) scenarioForm.close();
+      if (consumerDirty) consumerForm.close();
+      onClose();
     } catch (e) {
-      notify.error(
-        "Gagal menyimpan! Ukuran data (gambar) terlalu besar untuk penyimpanan browser. Silakan hapus beberapa gambar.",
-      );
       console.error(e);
+      notify.error(pdktSettingsSaveErrorMessage(e));
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -328,55 +317,48 @@ export function usePdktSettingsDraft({
     consumerForm.close();
   };
 
+  /** Pulihkan bawaan dan langsung simpan; konfirmasi ada di pemanggil. */
   const handleResetDefaults = async () => {
     if (saveInFlightRef.current) return;
-    if (
-      window.confirm(
-        "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
-      )
-    ) {
-      const defaultSettings: AppSettings = {
-        scenarios: defaultScenarios,
-        consumerTypes: defaultConsumerTypes,
-        enableImageGeneration: true,
-        globalConsumerTypeId: "random",
-        selectedModel: DEFAULT_PDKT_MODEL_ID,
-        consumerNameMentionPattern: "random",
-        writingStyleMode: "training",
-        customIdentity: {
-          senderName: "",
-          email: "",
-          city: "",
-          bodyName: "",
-        },
-      };
+    const defaultSettings: AppSettings = {
+      scenarios: defaultScenarios,
+      consumerTypes: defaultConsumerTypes,
+      enableImageGeneration: true,
+      globalConsumerTypeId: "random",
+      selectedModel: DEFAULT_PDKT_MODEL_ID,
+      consumerNameMentionPattern: "random",
+      writingStyleMode: "training",
+      customIdentity: {
+        senderName: "",
+        email: "",
+        city: "",
+        bodyName: "",
+      },
+    };
 
-      saveInFlightRef.current = true;
-      setIsSaving(true);
-      try {
-        await onSave(defaultSettings);
-        setLocalSettings(defaultSettings);
-        setEnableImageGeneration(true);
-        setGlobalConsumerTypeId("random");
-        setSelectedModel(DEFAULT_PDKT_MODEL_ID);
-        setConsumerNameMentionPattern("random");
-        setWritingStyleMode("training");
-        setCustomSenderName("");
-        setCustomBodyName("");
-        setCustomEmail("");
-        setCustomCity("");
-        scenarioForm.close();
-        consumerForm.close();
-        onClose();
-      } catch (e) {
-        console.error(e);
-        notify.error(
-          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
-        );
-      } finally {
-        saveInFlightRef.current = false;
-        setIsSaving(false);
-      }
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    try {
+      await onSave(defaultSettings);
+      setLocalSettings(defaultSettings);
+      setEnableImageGeneration(true);
+      setGlobalConsumerTypeId("random");
+      setSelectedModel(DEFAULT_PDKT_MODEL_ID);
+      setConsumerNameMentionPattern("random");
+      setWritingStyleMode("training");
+      setCustomSenderName("");
+      setCustomBodyName("");
+      setCustomEmail("");
+      setCustomCity("");
+      scenarioForm.close();
+      consumerForm.close();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      notify.error(pdktSettingsSaveErrorMessage(e));
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   };
 

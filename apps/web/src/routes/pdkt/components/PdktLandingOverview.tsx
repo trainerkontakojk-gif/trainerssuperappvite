@@ -1,7 +1,7 @@
 import { ArrowRight, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../../../components/ui/button";
-import type { SessionHistory } from "./HistoryModal";
+import type { SessionHistory } from "../utils/sessionHistory";
 import {
   formatPdktDate,
   formatPdktRelativeDay,
@@ -89,7 +89,7 @@ function Stat({
       aria-busy={busy}
       className="flex min-w-[220px] flex-1 flex-col gap-1.5 rounded-xl border border-border bg-surface-elevated px-6 py-5"
     >
-      <span className="text-xs font-medium text-foreground/80">{label}</span>
+      <span className="text-xs font-medium text-fg2">{label}</span>
       <span className="font-mono text-3xl leading-9 font-bold tabular-nums text-foreground">
         {busy ? "–" : value}
       </span>
@@ -131,15 +131,15 @@ export function PdktLandingOverview({
         <div className="flex flex-wrap gap-4">
           <Stat
             testId="pdkt-stat-waiting"
-            label="Menunggu balasan"
+            label="Belum dibalas"
             busy={mailboxBusy}
             value={mailboxState === "error" ? "–" : String(waiting.count)}
             note={
               mailboxState === "error"
-                ? "Kotak masuk gagal dimuat"
+                ? "Kotak masuk belum bisa dimuat"
                 : waiting.oldestAt
                   ? `Paling lama masuk ${formatPdktRelativeDay(waiting.oldestAt).toLowerCase()}`
-                  : "Semua email sudah dibalas"
+                  : "Tidak ada email yang belum dibalas"
             }
           />
           <Stat
@@ -149,9 +149,11 @@ export function PdktLandingOverview({
             value={average ? String(average.score) : "–"}
             note={
               historyState === "error"
-                ? "Riwayat gagal dimuat"
+                ? "Riwayat belum bisa dimuat"
                 : average
-                  ? `Dari ${average.sessions} sesi terakhir yang sudah ditelaah`
+                  ? average.sessions === 1
+                    ? "Dari sesi terakhir yang sudah ditelaah"
+                    : `Dari ${average.sessions} sesi terakhir yang sudah ditelaah`
                   : "Belum ada sesi yang ditelaah"
             }
           />
@@ -160,7 +162,7 @@ export function PdktLandingOverview({
             label="Sedang ditelaah AI"
             busy={historyBusy}
             value={historyState === "error" ? "–" : String(reviewing)}
-            note="Hasilnya muncul otomatis di riwayat"
+            note="Hasilnya tampil di Hasil telaah terbaru."
           />
         </div>
       </section>
@@ -187,7 +189,7 @@ export function PdktLandingOverview({
           <div className="overflow-hidden rounded-xl border border-border bg-surface-elevated">
             {mailboxState === "error" ? (
               <LoadProblem
-                message="Kotak masuk gagal dimuat."
+                message="Kotak masuk belum bisa dimuat."
                 onRetry={onRetryMailbox}
               />
             ) : mailboxBusy ? (
@@ -242,7 +244,7 @@ export function PdktLandingOverview({
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface-elevated p-6">
             {historyState === "error" ? (
               <LoadProblem
-                message="Riwayat gagal dimuat."
+                message="Riwayat belum bisa dimuat."
                 onRetry={onRetryHistory}
               />
             ) : historyBusy ? (
@@ -251,11 +253,11 @@ export function PdktLandingOverview({
               </p>
             ) : focus && latestReviewed ? (
               <>
-                <p className="text-foreground/80">
+                <p className="text-fg2">
                   {reviewedCount > 1
                     ? `Dari ${reviewedCount} sesi terakhir`
                     : "Di sesi terakhir"}
-                  , nilai paling rendah ada di aspek{" "}
+                  , skor terendah ada di aspek{" "}
                   <strong className="text-foreground">{focus.label}</strong>.
                 </p>
                 <div className="flex flex-col gap-2">
@@ -269,7 +271,7 @@ export function PdktLandingOverview({
                   </div>
                   <div className="h-2 rounded-full bg-surface-sunken">
                     <div
-                      className="h-2 rounded-full bg-[var(--chart-orange)]"
+                      className="h-2 rounded-full bg-chart-orange"
                       style={{
                         width: `${Math.max(0, Math.min(100, focus.score))}%`,
                       }}
@@ -277,8 +279,7 @@ export function PdktLandingOverview({
                   </div>
                 </div>
                 <p className="text-xs leading-[18px] text-muted-foreground">
-                  Pelajari catatan AI di sesi terakhir sebelum mencoba kasus
-                  berikutnya.
+                  Buka telaah terakhir untuk melihat catatan aspek ini.
                 </p>
                 <Button
                   type="button"
@@ -286,7 +287,7 @@ export function PdktLandingOverview({
                   className="min-h-11"
                   onClick={() => onOpenSession(latestReviewed)}
                 >
-                  Lihat catatan AI
+                  Buka telaah terakhir
                   <ArrowRight data-icon="inline-end" />
                 </Button>
               </>
@@ -320,7 +321,7 @@ export function PdktLandingOverview({
         <div className="overflow-x-auto rounded-xl border border-border bg-surface-elevated">
           {historyState === "error" ? (
             <LoadProblem
-              message="Riwayat gagal dimuat."
+              message="Riwayat belum bisa dimuat."
               onRetry={onRetryHistory}
             />
           ) : historyBusy ? (
@@ -366,7 +367,7 @@ export function PdktLandingOverview({
                         {row.subjectLabel} · {formatPdktDate(row.timestamp)}
                       </span>
                     </td>
-                    <td className="hidden px-5 py-1 text-foreground/80 sm:table-cell">
+                    <td className="hidden px-5 py-1 text-fg2 sm:table-cell">
                       {row.subjectLabel}
                     </td>
                     <td className="hidden px-5 py-1 whitespace-nowrap text-muted-foreground sm:table-cell">

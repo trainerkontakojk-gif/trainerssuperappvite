@@ -13,18 +13,33 @@ interface ConfirmDialogProps {
   title: string;
   description: string;
   confirmLabel: string;
+  /** Label tombol batal. Bawaan "Batal". */
+  cancelLabel?: string;
+  /** `default` untuk konfirmasi yang tidak menghapus data. Bawaan `destructive`. */
+  confirmVariant?: "destructive" | "default";
+  /** Label tombol konfirmasi saat `busy`. Bawaan "Menghapus…". */
+  busyLabel?: string;
   busy?: boolean;
+  /**
+   * Tempat dialog dirender. Wajib diisi di dalam lapisan `fixed z-[100]`
+   * (ruang kerja PDKT) supaya dialog tidak tertutup lapisan itu.
+   */
+  container?: HTMLElement | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-/** Konfirmasi aksi destruktif SIDAK (hapus parameter, draft, periode). */
+/** Konfirmasi aksi (SIDAK: parameter, draft, periode; PDKT: riwayat, email, pengaturan). */
 export function ConfirmDialog({
   open,
   title,
   description,
   confirmLabel,
+  cancelLabel = "Batal",
+  confirmVariant = "destructive",
+  busyLabel = "Menghapus…",
   busy = false,
+  container,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -35,7 +50,11 @@ export function ConfirmDialog({
         if (!next && !busy) onCancel();
       }}
     >
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={false}
+        container={container}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -48,16 +67,16 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={onCancel}
           >
-            Batal
+            {cancelLabel}
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant={confirmVariant}
             className="h-[44px] px-4"
             disabled={busy}
             onClick={onConfirm}
           >
-            {busy ? "Menghapus…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

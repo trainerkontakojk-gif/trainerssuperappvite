@@ -3,16 +3,16 @@ import type {
   PdktEvaluationScoreBreakdown,
 } from "@trainers/types";
 
-/** Nama aspek penilaian PDKT yang tampil ke pengguna. */
+/** Nama aspek telaah PDKT yang tampil ke pengguna. */
 export const PDKT_DIMENSION_LABELS: Record<PdktDimensionKey, string> = {
-  recipientDirection: "Arah Penerima",
+  recipientDirection: "Arah penerima",
   normative: "Kualitas OJK",
   clarity: "Kejelasan",
-  typo: "Typo",
-  template: "Template",
+  typo: "Ejaan",
+  template: "Format balasan",
 };
 
-/** Penjelasan singkat apa yang dinilai tiap aspek. */
+/** Penjelasan singkat apa yang ditelaah tiap aspek. */
 export const PDKT_DIMENSION_DESCRIPTIONS: Record<PdktDimensionKey, string> = {
   recipientDirection: "balasan ditujukan ke pihak yang benar",
   normative: "kronologi, solusi, dan batas waktu lengkap",

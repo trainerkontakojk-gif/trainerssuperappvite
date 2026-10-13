@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Textarea } from "../../../components/ui/textarea";
+import { PDKT_NO_SUBJECT } from "../utils/emailDisplay";
 import {
   Dialog,
   DialogContent,
@@ -98,7 +99,7 @@ export function ReplyComposer({
       aria-busy={isLoading}
       className="flex min-h-0 flex-1 flex-col bg-surface-elevated"
     >
-      <dl className="flex shrink-0 flex-col gap-1.5 border-b border-border px-4 py-3 text-xs md:px-6">
+      <dl className="flex shrink-0 flex-col gap-1.5 border-b border-border px-4 py-3 text-[12px] md:px-6">
         <div className="flex gap-3">
           <dt className="w-14 shrink-0 text-muted-foreground">Kepada</dt>
           <dd className="truncate font-medium text-foreground">{recipient}</dd>
@@ -106,7 +107,7 @@ export function ReplyComposer({
         <div className="flex gap-3">
           <dt className="w-14 shrink-0 text-muted-foreground">Subjek</dt>
           <dd className="truncate font-medium text-foreground">
-            {subject || "Tanpa subjek"}
+            {subject || PDKT_NO_SUBJECT}
           </dd>
         </div>
       </dl>
@@ -123,7 +124,6 @@ export function ReplyComposer({
           value={replyText}
           onChange={(event) => setReplyText(event.target.value)}
           readOnly={isLoading}
-          placeholder="Tulis balasan Anda di sini…"
           className="min-h-64 flex-1 resize-none bg-background p-4 text-[15px] leading-[26px]"
           autoFocus
         />
@@ -131,7 +131,8 @@ export function ReplyComposer({
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
         <span className="text-xs text-muted-foreground">
-          Draf tersimpan otomatis · {words} kata · {replyText.length} karakter
+          Draf disimpan di perangkat ini · {words} kata · {replyText.length}{" "}
+          karakter
         </span>
         <Button
           type="button"
@@ -166,7 +167,7 @@ export function ReplyComposer({
               Kirim balasan sekarang?
             </DialogTitle>
             <DialogDescription>
-              Setelah dikirim, balasan tidak bisa diubah dan langsung dinilai
+              Setelah dikirim, balasan tidak bisa diubah dan langsung ditelaah
               AI.
             </DialogDescription>
           </DialogHeader>
@@ -184,7 +185,7 @@ export function ReplyComposer({
               onClick={() => void send()}
               className="min-h-11"
             >
-              Kirim dan nilai
+              Kirim balasan
             </Button>
           </DialogFooter>
         </DialogContent>

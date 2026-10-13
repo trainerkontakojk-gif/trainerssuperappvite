@@ -90,20 +90,19 @@ export function ScenarioRecipientsField({
               />
               <span className="flex min-w-0 flex-1 flex-col gap-2.5">
                 <span className="flex flex-col gap-0.5">
-                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                  <span className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
                     {direction.title}
-                    <span
-                      className={cn(
-                        "rounded-md px-1.5 py-px text-xs font-semibold",
-                        direction.id === "ojk_request_in_body"
-                          ? "bg-module-pdkt/10 text-module-pdkt"
-                          : "bg-muted text-foreground/80",
+                    <span className="inline-flex items-center gap-1.5 text-xs font-normal text-fg2">
+                      {direction.id === "ojk_request_in_body" && (
+                        <span
+                          aria-hidden="true"
+                          className="size-1.5 shrink-0 rounded-full bg-module-pdkt"
+                        />
                       )}
-                    >
                       {direction.tag}
                     </span>
                   </span>
-                  <span className="text-xs leading-[18px] text-foreground/80">
+                  <span className="text-xs leading-[18px] text-fg2">
                     {direction.description}
                   </span>
                 </span>
@@ -121,7 +120,7 @@ export function ScenarioRecipientsField({
                   <span className="font-medium text-foreground">
                     {direction.cc}
                   </span>
-                  <span className="text-muted-foreground">Jawaban benar</span>
+                  <span className="text-muted-foreground">Bentuk balasan</span>
                   <span className="font-medium text-foreground">
                     {direction.expected}
                   </span>
@@ -187,7 +186,7 @@ export function ScenarioRecipientsField({
                         className="text-xs text-destructive"
                         role="alert"
                       >
-                        Format email tidak valid.
+                        Alamat email tidak valid. Contoh: nama@perusahaan.co.id
                       </p>
                     )}
                   </div>

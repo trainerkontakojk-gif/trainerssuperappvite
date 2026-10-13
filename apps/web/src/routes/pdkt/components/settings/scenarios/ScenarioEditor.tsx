@@ -74,7 +74,7 @@ function SectionHeading({
         </h4>
       </div>
       {description && (
-        <p className="pl-[34px] text-[13px] leading-5 text-foreground/80">
+        <p className="pl-[34px] text-[13px] leading-5 text-fg2">
           {description}
         </p>
       )}
@@ -126,7 +126,7 @@ export function ScenarioEditor({
           type="button"
           variant="ghost"
           onClick={onCancel}
-          className="-ml-2.5 min-h-11 gap-1.5 px-2.5 text-xs text-foreground/80"
+          className="-ml-2.5 min-h-11 gap-1.5 px-2.5 text-xs text-fg2"
         >
           <ChevronLeft data-icon="inline-start" />
           Semua skenario
@@ -148,7 +148,7 @@ export function ScenarioEditor({
             <SectionHeading
               id="scenario-section-case"
               number={1}
-              title="Kasusnya"
+              title="Kasus"
             />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
               <SettingsField
@@ -295,7 +295,7 @@ export function ScenarioEditor({
               id="scenario-section-direction"
               number={2}
               title="Arah balasan"
-              description="Kepada siapa konsumen sebenarnya meminta jawaban? Inilah yang dinilai QA pada aspek Arah Penerima. Peserta tidak melihat pilihan ini."
+              description="Kepada siapa konsumen sebenarnya meminta jawaban? AI menelaah ini pada aspek Arah penerima. Peserta tidak melihat pilihan ini."
             />
             <ScenarioRecipientsField
               draft={draft}
@@ -314,7 +314,7 @@ export function ScenarioEditor({
               id="scenario-section-answer"
               number={3}
               title="Kunci jawaban"
-              description="Inti tindakan atau informasi yang wajib ada di balasan. AI memakainya untuk menilai, tanpa pernah menampilkannya ke peserta."
+              description="Inti tindakan atau informasi yang wajib ada di balasan. AI memakainya untuk menelaah, tanpa pernah menampilkannya ke peserta."
             />
             <SettingsTextarea
               id="scenario-expected-answer"
@@ -416,7 +416,7 @@ export function ScenarioEditor({
               </div>
               {attachments.pendingReads > 0 && (
                 <p role="status" className="text-xs text-muted-foreground">
-                  Membaca lampiran...
+                  Membaca lampiran…
                 </p>
               )}
               <ScenarioAttachments
