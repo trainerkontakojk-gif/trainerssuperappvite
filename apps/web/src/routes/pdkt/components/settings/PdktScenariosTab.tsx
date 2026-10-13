@@ -796,15 +796,10 @@ export function PdktScenariosTab(props: Props) {
   return (
     <ScenarioList
       scenarios={scenarios}
-      isOpen={false}
       activeCount={activeCount}
       totalScenarios={scenarios.length}
       allSelected={activeCount === scenarios.length && scenarios.length > 0}
       noneSelected={activeCount === 0}
-      enableImageGeneration={enableImageGeneration}
-      onToggleImageGeneration={() =>
-        setEnableImageGeneration(!enableImageGeneration)
-      }
       onSelectAll={() =>
         setLocalSettings((previous) => ({
           ...previous,

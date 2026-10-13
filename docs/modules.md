@@ -74,6 +74,8 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
 - **Routes**: `/pdkt`, `/pdkt/simulation`, `/pdkt/history`
 - **Akses**: Trainer, QA, Admin, Leader, dan Agent. Agent dan Leader dapat mengakses simulasi PDKT.
 - **Fitur Utama**:
+  - **Halaman awal**: Hero "Pahami keluhannya. Balas dengan tepat." dengan menu Riwayat, Pemakaian AI (lencana biaya sesi terakhir), dan Pengaturan; ilustrasi tiga tahap Pahami → Tanggapi → Telaah (dekoratif, bisa dijeda, statis saat reduced-motion). Di bawahnya: **Progres latihan** (email `open` di kotak masuk, rata-rata skor 5 sesi terakhir yang ditelaah, sesi yang sedang ditelaah), **Belum dibalas** (maks. 3 email terlama; klik membuka kotak masuk dengan email itu terpilih setelah pemilih peserta), **Fokus berikutnya** (aspek dengan rata-rata terendah), dan **Hasil telaah terbaru**. Semua angka dihitung dari `GET /pdkt/history` dan daftar ringan `GET /pdkt/mailbox`; tiap bagian punya keadaan memuat, kosong, dan gagal + "Coba lagi".
+  - **Pengaturan PDKT**: Menu Skenario (jumlah aktif), Karakter konsumen, Identitas konsumen, dan Gaya & AI (gaya tulisan, model AI, sakelar Gambar lampiran). Daftar skenario memakai sakelar aktif, label arah balasan, cara pembuatan email (Dibuat AI / Tulis sendiri), pencarian, dan filter kategori. Footer menampilkan "Belum disimpan" saat ada perubahan.
   - **Durable Mailbox**: Inbound email tersimpan secara persisten di database.
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.

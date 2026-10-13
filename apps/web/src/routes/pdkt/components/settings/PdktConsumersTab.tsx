@@ -178,14 +178,14 @@ export function PdktConsumersTab({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2 border-b border-border pb-4">
-        <h3 className="text-sm font-semibold tracking-tight text-foreground">
-          Karakter Konsumen
+        <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+          Karakter konsumen
         </h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Karakter aktif dipakai untuk{" "}
-          <span className="font-medium text-foreground">semua skenario</span>{" "}
-          PDKT. Pilih <span className="font-medium text-foreground">Acak</span>{" "}
-          agar sistem memilih karakter berbeda setiap sesi.
+        <p className="text-[13px] leading-5 text-foreground/80">
+          Sifat dan gaya bicara konsumen yang menulis email. Pilihan ini berlaku
+          untuk semua skenario. Pilih
+          <span className="font-medium text-foreground">Acak</span> supaya
+          peserta tidak bisa menebak karakter berikutnya.
         </p>
       </div>
 
