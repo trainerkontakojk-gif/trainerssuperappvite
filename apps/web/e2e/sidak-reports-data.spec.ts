@@ -1311,7 +1311,11 @@ async function readPageLayout(
           lastTag = `${el.tagName.toLowerCase()}${el.dataset.testid ? `[${el.dataset.testid}]` : ""}`;
         }
       }
-      const nav = document.querySelector<HTMLElement>('nav[aria-label="Navigasi utama"]');
+      // Sidebar dan tab bar sama-sama "Navigasi utama"; tab bar yang `fixed`.
+      const nav =
+        Array.from(
+          document.querySelectorAll<HTMLElement>('nav[aria-label="Navigasi utama"]'),
+        ).find((el) => getComputedStyle(el).position === "fixed") ?? null;
       // `lg:hidden` tetap ada di DOM, jadi "tampil" harus diukur dari box,
       // bukan dari keberadaan elemen.
       const navVisible = Boolean(nav && nav.getBoundingClientRect().height > 0);

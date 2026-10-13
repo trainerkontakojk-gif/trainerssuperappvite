@@ -14,6 +14,8 @@ vi.mock("@tanstack/react-router", () => ({
   Outlet: () => <div data-testid="outlet" />,
   useLocation: () => ({ pathname: "/sidak/agents" }),
   useNavigate: () => vi.fn(),
+  // `useRouteFocus` berlangganan event router; di sini tidak ada navigasi.
+  useRouter: () => ({ subscribe: () => () => {} }),
 }));
 
 vi.mock("../store/authStore", () => ({

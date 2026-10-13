@@ -21,11 +21,20 @@ export interface AppModuleConfig {
   accentClassName: string;
   accentSoftClassName: string;
   capability?: Capability;
+  /** Label navigasi shell (sidebar, drawer, tab bar). Default: `shortTitle`. */
+  navLabel?: string;
+  /** Fungsi singkat di bawah label navigasi. */
+  navDescription?: string;
+  /** Grup navigasi shell; lihat `buildNavModel` di `nav-config.ts`. */
+  group?: "beranda" | "latihan" | "kualitas" | "data";
 }
 
 export const APP_MODULES: AppModuleConfig[] = [
   {
     id: "dashboard",
+    navLabel: "Beranda",
+    navDescription: "Ringkasan & tindakan",
+    group: "beranda",
     title: "Unified Dashboard",
     shortTitle: "Dashboard",
     expandedTitle: "Unified Dashboard",
@@ -38,6 +47,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "ketik",
+    navLabel: "KETIK",
+    navDescription: "Simulasi chat",
+    group: "latihan",
     title: "KETIK",
     shortTitle: "Ketik",
     expandedTitle: "Kelas Etika & Trik Komunikasi",
@@ -50,6 +62,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "pdkt",
+    navLabel: "PDKT",
+    navDescription: "Simulasi email",
+    group: "latihan",
     title: "PDKT",
     shortTitle: "PDKT",
     expandedTitle: "Paham Dulu Kasih Tanggapan",
@@ -63,6 +78,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "telefun",
+    navLabel: "TELEFUN",
+    navDescription: "Simulasi telepon",
+    group: "latihan",
     title: "TELEFUN",
     shortTitle: "Telefun",
     expandedTitle: "Telephone Fun",
@@ -76,6 +94,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "profiler",
+    navLabel: "KTP",
+    navDescription: "Profil agen & peserta",
+    group: "data",
     title: "KTP / Profiler",
     shortTitle: "KTP",
     expandedTitle: "Kotak Tool Profil",
@@ -89,6 +110,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "qa-analyzer",
+    navLabel: "SIDAK",
+    navDescription: "Analitik kualitas QA",
+    group: "kualitas",
     title: "SIDAK",
     shortTitle: "SIDAK",
     expandedTitle: "Sistem Informasi Data Analisis Kualitas",
@@ -102,6 +126,9 @@ export const APP_MODULES: AppModuleConfig[] = [
   },
   {
     id: "tna",
+    navLabel: "TNA",
+    navDescription: "Kebutuhan pelatihan",
+    group: "kualitas",
     title: "TNA",
     shortTitle: "TNA",
     expandedTitle: "Training Needs Analysis",
