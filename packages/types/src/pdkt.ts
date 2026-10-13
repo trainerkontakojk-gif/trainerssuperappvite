@@ -440,6 +440,15 @@ export interface PdktMailboxItem {
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
+/**
+ * Simulation-facing mailbox detail. Scenario/config snapshots and the email
+ * recipient stay server-side so the participant gets no hint beyond the email.
+ */
+export type PdktMailboxDetailItem = Omit<
+  PdktMailboxItem,
+  "scenario_snapshot" | "config_snapshot"
+>;
+
 export type PdktMailboxListItem = Omit<
   PdktMailboxItem,
   "scenario_snapshot" | "config_snapshot" | "inbound_email" | "emails_thread"

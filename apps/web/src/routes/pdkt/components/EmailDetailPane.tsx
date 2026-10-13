@@ -12,7 +12,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import type {
-  PdktMailboxItem,
+  PdktMailboxDetailItem,
   PdktDimensionKey,
   PdktEvaluationEdu,
 } from "@trainers/types";
@@ -34,7 +34,7 @@ import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 
 interface EmailDetailPaneProps {
-  item: PdktMailboxItem;
+  item: PdktMailboxDetailItem;
   onReply: () => void;
   onDelete: () => void;
   isComposerOpen?: boolean;
@@ -155,7 +155,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
     return name.substring(0, 2).toUpperCase();
   };
 
-  const formatCreatorLabel = (item: PdktMailboxItem) => {
+  const formatCreatorLabel = (item: PdktMailboxDetailItem) => {
     const creator = item.created_by_user;
     if (!creator) return "Dibuat oleh user lama";
     if (creator.is_current_user) return "Dibuat oleh Anda";
@@ -212,18 +212,6 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
     setZoomedImage(attachmentUri);
   };
-  const recipientText = (() => {
-    const toValue = inboundEmail.to;
-    if (typeof toValue !== "string" || !toValue.trim()) {
-      return "konsumen@ojk.go.id";
-    }
-    return toValue
-      .split(",")
-      .map((value: string) => value.trim())
-      .filter(Boolean)
-      .join(", ");
-  })();
-
   return (
     <section
       aria-label="Detail email"
@@ -382,12 +370,6 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
               <div className="text-[11px] font-medium text-[var(--fg2)] bg-[var(--bg)] border border-[var(--border)] px-2 py-1 rounded-md whitespace-nowrap">
                 {formatEmailDate(item.created_at)}
               </div>
-            </div>
-            <div className="text-[11px] text-[var(--fg3)]">
-              Kepada:{" "}
-              <span className="text-[var(--fg2)] font-medium">
-                {recipientText}
-              </span>
             </div>
           </div>
         </div>

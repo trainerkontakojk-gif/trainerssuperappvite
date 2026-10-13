@@ -106,8 +106,9 @@ function mailboxItem(
       sender_email: "rina@local.test",
       subject: inbound.subject,
       snippet: inbound.body,
-      scenario_snapshot: SCENARIO,
-      config_snapshot: SESSION_CONFIG,
+      // Kontrak detail tidak memuat snapshot skenario/config. `inbound.to`
+      // sengaja tetap terisi (payload lama) untuk membuktikan UI tidak
+      // menampilkan penerima email.
       inbound_email: inbound,
       emails_thread:
         status === "replied"
@@ -474,6 +475,40 @@ test.describe("PDKT (hermetic)", () => {
       exclude: '[data-testid="pdkt-motion-frame"]',
     });
     expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("panel email tidak menampilkan penerima email kepada peserta", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks([], [OPEN_MAIL]),
+    });
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    const picker = page
+      .getByRole("dialog")
+      .filter({ hasText: "Pilih peserta latihan" });
+    const openSubject = page.getByText(OPEN_MAIL.list.subject).first();
+    await expect
+      .poll(
+        async () => (await picker.isVisible()) || (await openSubject.isVisible()),
+        { timeout: 20000 },
+      )
+      .toBe(true);
+    if (await picker.isVisible()) {
+      await picker.getByRole("button", { name: "Mulai" }).click();
+    }
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+
+    // Isi email tampil; penerima (arah balasan) tidak.
+    const main = page.locator("main").first();
+    await expect(
+      main.getByText(OPEN_MAIL.detail.inbound_email.body).first(),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(main.getByText(/Kepada:/)).toHaveCount(0);
+    await expect(main.getByText(OPEN_MAIL.detail.inbound_email.to)).toHaveCount(0);
+    await expect(main.getByText("konsumen@ojk.go.id")).toHaveCount(0);
     expectHermetic(audit);
   });
 
