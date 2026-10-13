@@ -27,7 +27,11 @@ import type {
   ParetoData,
 } from "@trainers/types";
 import { formatQAIndicatorName } from "@trainers/types";
-import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
+import {
+  countFindingTickets,
+  emptyDashboardResponse,
+  isCountableFinding,
+} from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
@@ -233,6 +237,7 @@ export async function getDashboardData(params: {
   const auditedAgents = groupTemuanByAgent(rows);
   const auditedAgentsWithMetrics: DashboardAgentWithMetrics[] = [];
   let totalFindings = 0;
+  const countableFindingRows: DashboardTemuanRow[] = [];
   let totalScore = 0;
   let zeroErrorCount = 0;
   let complianceCount = 0;
@@ -279,6 +284,7 @@ export async function getDashboardData(params: {
 
       const findingRows = periodRows.filter((r) => isCountableFinding(r));
       agentFindings += findingRows.length;
+      countableFindingRows.push(...findingRows);
 
       const agentServiceType = svc;
       serviceDefects[agentServiceType] =
@@ -359,10 +365,7 @@ export async function getDashboardData(params: {
   ) {
     summary = {
       totalDefects: totalFindings,
-      avgDefectsPerAudit: roundTo(
-        totalAgents > 0 ? totalFindings / totalAgents : 0,
-        2,
-      ),
+      totalTickets: countFindingTickets(countableFindingRows),
       zeroErrorRate: roundTo(
         totalAgents > 0 ? (zeroErrorCount / totalAgents) * 100 : 0,
         2,
@@ -380,6 +383,7 @@ export async function getDashboardData(params: {
     if (trends.periodMetrics && trends.periodMetrics.length > 0) {
       const metrics = trends.periodMetrics;
       const totalDefects = metrics.reduce((acc, m) => acc + m.total, 0);
+      const totalTickets = metrics.reduce((acc, m) => acc + m.totalTickets, 0);
       const totalAudited = metrics.reduce((acc, m) => acc + m.totalAudited, 0);
       const totalCompliant = metrics.reduce((acc, m) => acc + m.compliance, 0);
       const avgAgentScoreSum = metrics.reduce(
@@ -393,8 +397,7 @@ export async function getDashboardData(params: {
 
       summary = {
         totalDefects,
-        avgDefectsPerAudit:
-          totalAgents > 0 ? roundTo(totalDefects / totalAgents, 2) : 0,
+        totalTickets,
         zeroErrorRate:
           totalAudited > 0
             ? roundTo((totalZeroError / totalAudited) * 100, 2)
@@ -412,7 +415,7 @@ export async function getDashboardData(params: {
     } else {
       summary = {
         totalDefects: 0,
-        avgDefectsPerAudit: 0,
+        totalTickets: 0,
         zeroErrorRate: 0,
         avgAgentScore: 0,
         complianceRate: 0,

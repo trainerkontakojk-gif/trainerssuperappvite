@@ -38,7 +38,7 @@ const hoistedMock = vi.hoisted(() => ({
   dashboardData: vi.fn().mockResolvedValue({
     periods: [],
     folders: [],
-    summary: { totalDefects: 0, avgDefectsPerAudit: 0, avgAgentScore: 90, complianceRate: 100, complianceCount: 0, totalAgents: 5 },
+    summary: { totalDefects: 0, totalTickets: 0, avgAgentScore: 90, complianceRate: 100, complianceCount: 0, totalAgents: 5 },
     serviceData: [],
     topAgents: [],
     paretoData: [],

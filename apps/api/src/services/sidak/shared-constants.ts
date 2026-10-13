@@ -41,13 +41,36 @@ export function isCountableFinding(
   );
 }
 
+export function hasTicketNumber(
+  value: string | null | undefined,
+): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Satuan `tiket` SIDAK: nomor tiket yang sama dihitung sekali; baris tanpa
+ * nomor tiket dihitung per baris karena tidak bisa dikelompokkan. Pemanggil
+ * hanya mengirim baris yang sudah lolos `isCountableFinding`.
+ */
+export function countFindingTickets(
+  rows: Iterable<{ no_tiket?: string | null }>,
+): number {
+  const tickets = new Set<string>();
+  let withoutTicket = 0;
+  for (const row of rows) {
+    if (hasTicketNumber(row.no_tiket)) tickets.add(row.no_tiket);
+    else withoutTicket += 1;
+  }
+  return tickets.size + withoutTicket;
+}
+
 export function emptyDashboardResponse(periods: QAPeriod[]): DashboardData {
   return {
     periods,
     folders: [],
     summary: {
       totalDefects: 0,
-      avgDefectsPerAudit: 0,
+      totalTickets: 0,
       zeroErrorRate: 0,
       avgAgentScore: 0,
       complianceRate: 0,
