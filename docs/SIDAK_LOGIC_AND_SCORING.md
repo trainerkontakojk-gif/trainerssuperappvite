@@ -136,14 +136,16 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 
 ## Metrik Dashboard Dan Ranking
 
-| Metrik               | Rumus                                            |
-| -------------------- | ------------------------------------------------ |
-| `totalAgents`        | Jumlah agent dengan audit presence               |
-| `totalDefects`       | Jumlah `findingRows` countable                   |
-| `avgDefectsPerAudit` | `totalDefects / totalAgents`                     |
-| `zeroErrorRate`      | `(agent tanpa findingRows / totalAgents) * 100`  |
-| `avgAgentScore`      | `sum(finalAgentScore) / totalAgents`             |
-| `complianceRate`     | `(agent dengan score >= 95 / totalAgents) * 100` |
+| Metrik           | Rumus                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `totalAgents`    | Jumlah agent dengan audit presence                                                                  |
+| `totalDefects`   | Jumlah `findingRows` countable (kartu **Total Temuan QA per Parameter**)                            |
+| `totalTickets`   | Tiket dengan ≥1 `findingRows` countable, dihitung per periode (kartu **Total Temuan QA per Tiket**) |
+| `zeroErrorRate`  | `(agent tanpa findingRows / totalAgents) * 100`                                                     |
+| `avgAgentScore`  | `sum(finalAgentScore) / totalAgents`                                                                |
+| `complianceRate` | `(agent dengan score >= 95 / totalAgents) * 100`                                                    |
+
+`totalTickets` memakai aturan satuan `tiket` yang sama dengan heatmap SIDAK (`countFindingTickets()` di `apps/api/src/services/sidak/shared-constants.ts`): nomor tiket yang sama dihitung sekali, sedangkan baris tanpa nomor tiket dihitung satu tiket per baris karena tidak bisa dikelompokkan. Untuk rentang bulan, total adalah jumlah tiket per periode, sama seperti `totalDefects`. Bukti regresi: `apps/web/e2e/sidak-dashboard-kpi-api.spec.ts` (backend nyata + Supabase lokal).
 
 > [!NOTE]
 > Dashboard SIDAK menghitung summary endpoint dari row `qa_temuan` secara real-time memakai scoring engine aplikasi. Materialized view/cache summary tidak menjadi sumber kebenaran untuk response dashboard karena formula SQL/cache dapat tertinggal dari rule-version, grouping sesi, dan `isCountableFinding()`.
@@ -152,7 +154,7 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 
 Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua titik terakhir dari data tren (sparkline). Unit delta disesuaikan dengan jenis metrik:
 
-1. **Metrik Count/Ratio** (`total-defects` dan `avg-defects`): Delta ditampilkan sebagai persentase relatif terhadap periode sebelumnya. Rumusnya: `((current - previous) / previous) * 100`.
+1. **Metrik Count** (`total-defects` dan `total-tickets`): Delta ditampilkan sebagai persentase relatif terhadap periode sebelumnya. Rumusnya: `((current - previous) / previous) * 100`.
 2. **Metrik Persen** (`avg-score` dan `compliance`): Delta ditampilkan sebagai perubahan poin persentase (poin) absolut agar operator tidak bingung. Rumusnya: `current - previous` (dengan nilai mutlak untuk magnitudo).
 3. **Kepatuhan (Compliance)**: Delta kepatuhan dihitung menggunakan `complianceRate` (persentase) alih-alih `complianceCount` (jumlah agen) agar konsisten dengan nilai utama KPI.
 

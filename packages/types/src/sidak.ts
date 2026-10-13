@@ -292,7 +292,8 @@ export interface QAScore {
 
 export interface DashboardSummary {
   totalDefects: number;
-  avgDefectsPerAudit: number;
+  /** Tiket dengan ≥1 temuan; tanpa nomor tiket = satu tiket per baris. */
+  totalTickets: number;
   zeroErrorRate: number;
   avgAgentScore: number;
   complianceRate: number;
@@ -381,7 +382,7 @@ export interface DashboardData {
     periodId: string;
     label: string;
     total: number;
-    avg: number;
+    totalTickets: number;
     zero: number;
     compliance: number;
     complianceRate: number;

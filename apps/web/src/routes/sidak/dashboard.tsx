@@ -394,17 +394,17 @@ export default function SidakDashboardPage() {
   const KPI_CARDS = [
     {
       id: "total-defects",
-      label: "Total Temuan QA",
+      label: "Total Temuan QA per Parameter",
       value: summary?.totalDefects ?? 0,
-      desc: "Kumulatif temuan parameter",
+      desc: "Setiap parameter bermasalah dihitung satu",
       deltaUnit: "relative-percent" as const,
       lowerIsBetter: true,
     },
     {
-      id: "avg-defects",
-      label: "Rata-rata Temuan per Agen",
-      value: (summary?.avgDefectsPerAudit ?? 0).toFixed(1),
-      desc: "Rasio temuan / sesi audit",
+      id: "total-tickets",
+      label: "Total Temuan QA per Tiket",
+      value: summary?.totalTickets ?? 0,
+      desc: "Tiket dengan minimal satu temuan",
       deltaUnit: "relative-percent" as const,
       lowerIsBetter: true,
     },

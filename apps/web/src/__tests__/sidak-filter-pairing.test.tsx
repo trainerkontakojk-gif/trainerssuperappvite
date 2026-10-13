@@ -68,7 +68,7 @@ const mockFolders = [
 const mockDashboardData = {
   summary: {
     totalDefects: 10,
-    avgDefectsPerAudit: 1.5,
+    totalTickets: 2,
     avgAgentScore: 90,
     complianceRate: 100,
     complianceCount: 5,
@@ -80,7 +80,7 @@ const mockDashboardData = {
   paramTrend: { labels: [], datasets: [] },
   sparklines: {
     "total-defects": [],
-    "avg-defects": [],
+    "total-tickets": [],
     "avg-score": [],
     compliance: [],
   },
@@ -94,7 +94,7 @@ const mockDashboardData = {
 const chatOnlyDashboardData = {
   summary: {
     totalDefects: 5,
-    avgDefectsPerAudit: 1.2,
+    totalTickets: 1,
     avgAgentScore: 92,
     complianceRate: 100,
     complianceCount: 3,
@@ -106,7 +106,7 @@ const chatOnlyDashboardData = {
   paramTrend: { labels: [], datasets: [] },
   sparklines: {
     "total-defects": [],
-    "avg-defects": [],
+    "total-tickets": [],
     "avg-score": [],
     compliance: [],
   },
@@ -135,7 +135,7 @@ const chatOnlyDashboardDataEmpty = {
   ...chatOnlyDashboardData,
   summary: {
     totalDefects: 0,
-    avgDefectsPerAudit: 0,
+    totalTickets: 0,
     avgAgentScore: 0,
     complianceRate: 0,
     complianceCount: 0,
