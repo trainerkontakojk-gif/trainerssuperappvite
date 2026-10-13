@@ -591,6 +591,77 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("panel telaah menandai kalimat balasan yang dikomentari AI", async ({
+    page,
+  }) => {
+    const reply = "Terima kasih, kami cek transaksinya.";
+    const matchedQuote = "kami cek transaksinya";
+    const start = reply.indexOf(matchedQuote);
+    const history = [
+      {
+        ...EVALUATED_HISTORY[0],
+        evaluation: {
+          ...EVALUATED_HISTORY[0].evaluation,
+          annotations: [
+            {
+              quote: matchedQuote,
+              dimension: "normative",
+              note: "Sebutkan kapan konsumen akan menerima kabar.",
+              start,
+              end: start + matchedQuote.length,
+            },
+            {
+              quote: "nomor tiket pengaduan",
+              dimension: "clarity",
+              note: "Tambahkan nomor tiket supaya konsumen bisa menindaklanjuti.",
+              start: null,
+              end: null,
+            },
+          ],
+        },
+      },
+    ] as unknown as SessionHistory[];
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks(history, [REPLIED_MAIL]),
+    });
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    const picker = page
+      .getByRole("dialog")
+      .filter({ hasText: "Pilih peserta latihan" });
+    const terbalas = page.getByRole("button", { name: "Terbalas" });
+    await expect
+      .poll(async () => (await picker.isVisible()) || (await terbalas.isVisible()), {
+        timeout: 20000,
+      })
+      .toBe(true);
+    if (await picker.isVisible()) {
+      await picker.getByRole("button", { name: "Mulai" }).click();
+    }
+    await terbalas.click();
+    await page.getByText(REPLIED_MAIL.list.subject).first().click();
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
+
+    const card = page.getByRole("region", { name: "Catatan di balasan Anda" });
+    await expect(card).toBeVisible({ timeout: 20000 });
+    const marks = card.locator("mark");
+    await expect(marks).toHaveCount(1);
+    await expect(marks.first()).toHaveText(`${matchedQuote}1`);
+    await expect(card).toContainText("Terima kasih,");
+
+    const notes = card.getByRole("listitem");
+    await expect(notes).toHaveCount(2);
+    await expect(notes.nth(0)).toContainText("1");
+    await expect(notes.nth(0)).toContainText(
+      "Sebutkan kapan konsumen akan menerima kabar.",
+    );
+    await expect(notes.nth(1)).toContainText(
+      "Tambahkan nomor tiket supaya konsumen bisa menindaklanjuti.",
+    );
+    await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
+    expectHermetic(audit);
+  });
+
   test(`teks mailbox, evaluasi, dan lampiran PDKT minimal ${MIN_TEXT_PX}px`, async ({
     page,
   }) => {

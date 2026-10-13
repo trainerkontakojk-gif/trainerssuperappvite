@@ -18,6 +18,7 @@ import type {
 } from "@trainers/types";
 import {
   PdktActionItemsCard,
+  PdktReplyAnnotationsCard,
   PdktDimensionTip,
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
@@ -175,6 +176,8 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   // Safe check for emails_thread
   const thread = Array.isArray(item.emails_thread) ? item.emails_thread : [];
   const historyEmails = thread.slice(1);
+  const agentReplyBody: string =
+    thread.find((email: { isAgent?: boolean }) => email.isAgent)?.body ?? "";
   const isEvaluationProcessing =
     evalStatus === "processing" || evalStatus === "pending";
   const isEvaluationNotStarted = evalStatus === "not_started";
@@ -588,6 +591,11 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                     </p>
                   </div>
                 </div>
+
+                <PdktReplyAnnotationsCard
+                  annotations={evalData.annotations}
+                  replyBody={agentReplyBody}
+                />
 
                 {/* Evaluasi Edukatif */}
                 <PdktActionItemsCard edu={edu} />

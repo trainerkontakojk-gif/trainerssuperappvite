@@ -9,6 +9,9 @@ import {
   PdktActionItemAI,
   PdktEvaluationEdu,
   PdktExpectedAnswerAlignment,
+  PdktReplyAnnotation,
+  PDKT_DIMENSION_KEYS,
+  PDKT_REPLY_ANNOTATION_LIMITS,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
@@ -16,6 +19,7 @@ import { parseJsonFromModelText } from "../../lib/ai-json";
 import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { callAI, isTransientAiError } from "./shared-utils";
+import { readPdktReplyAnnotations } from "./reply-annotations";
 import {
   buildPdktRecipientConflictHints,
   getExpectedReplyParty,
@@ -136,7 +140,9 @@ export function buildPdktEvaluationPrompt(input: {
     '    "improvementTips": string[],',
     '    "actionItems": [{ "dimension": string, "text": string, "example": string }],',
     '    "suggestedRewrite": { "subject": string, "body": string, "highlights": string[] }',
-    expectedAnswer ? "  }," : "  }",
+    "  },",
+    '  "annotations": [{ "quote": string, "dimension": string, "note": string }]' +
+      (expectedAnswer ? "," : ""),
     ...(expectedAnswer
       ? [
           '  "expectedAnswerAlignment": {',
@@ -153,6 +159,13 @@ export function buildPdktEvaluationPrompt(input: {
     '- "actionItems" array {dimension,text,example} — JANGAN isi field prioritas; backend yang menentukan urutan.',
     '- "suggestedRewrite": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga lawan bicara utama sesuai replyIntent dari recipientContext.',
     "- Semua teks edukasi dalam Bahasa Indonesia.",
+    "",
+    "ATURAN ANNOTATIONS:",
+    `- "annotations" berisi maksimal ${PDKT_REPLY_ANNOTATION_LIMITS.count} temuan paling penting yang menunjuk bagian tertentu dari balasan agent.`,
+    "- quote WAJIB disalin persis karakter demi karakter dari agentReplyBody (maksimal satu kalimat, tanpa tanda kutip tambahan). Jangan mengutip email konsumen atau referensi.",
+    `- dimension salah satu dari: ${PDKT_DIMENSION_KEYS.join(", ")}.`,
+    "- note: satu kalimat yang menjelaskan masalahnya dan cara memperbaikinya.",
+    "- Temuan yang tidak menunjuk bagian tertentu (misalnya informasi yang terlewat) cukup ditulis di contentGaps, bukan di annotations.",
   ].join("\n");
 
   const emptyDataBlock = buildPdktPromptDataBlock("evaluation_context", {});
@@ -341,6 +354,7 @@ function readExpectedAnswerAlignment(
 function normalizePdktEvaluationResponse(
   raw: unknown,
   expectedAnswer = "",
+  agentReplyBody = "",
 ): {
   score: number;
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
@@ -349,6 +363,7 @@ function normalizePdktEvaluationResponse(
   contentGaps: string[];
   feedback: string;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations: PdktReplyAnnotation[];
 } | null {
   if (!isPlainObject(raw)) return null;
 
@@ -368,6 +383,8 @@ function normalizePdktEvaluationResponse(
     : undefined;
   if (hasExpectedAnswer && !expectedAnswerAlignment) return null;
 
+  const annotations = readPdktReplyAnnotations(raw.annotations, agentReplyBody);
+
   const scoreBreakdown = readScoreBreakdown(raw.scoreBreakdown);
   if (scoreBreakdown) {
     return {
@@ -378,6 +395,7 @@ function normalizePdktEvaluationResponse(
       contentGaps,
       feedback,
       ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
+      annotations,
     };
   }
 
@@ -391,6 +409,7 @@ function normalizePdktEvaluationResponse(
     contentGaps,
     feedback,
     ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
+    annotations,
   };
 }
 
@@ -442,13 +461,7 @@ class InvalidPdktEvaluationResponseError extends Error {
 
 // ── Evaluasi Edukatif: deterministic edu builder ─────────────────
 
-const PDKT_DIMENSION_ORDER: PdktDimensionKey[] = [
-  "recipientDirection",
-  "normative",
-  "clarity",
-  "typo",
-  "template",
-];
+const PDKT_DIMENSION_ORDER = PDKT_DIMENSION_KEYS;
 
 const PDKT_DIMENSION_SCORE_KEY: Record<
   PdktDimensionKey,
@@ -653,6 +666,7 @@ export async function evaluateAgentResponse(
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations?: PdktReplyAnnotation[];
   error?: string;
 }> {
   const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
@@ -739,6 +753,7 @@ export async function evaluateAgentResponse(
       const normalizedResult = normalizePdktEvaluationResponse(
         rawResult,
         expectedAnswer,
+        agentReplyBody,
       );
       if (!normalizedResult) {
         throw new InvalidPdktEvaluationResponseError();
@@ -778,6 +793,9 @@ export async function evaluateAgentResponse(
                 expectedAnswerAlignment:
                   normalizedResult.expectedAnswerAlignment,
               }
+            : {}),
+          ...(normalizedResult.annotations.length > 0
+            ? { annotations: normalizedResult.annotations }
             : {}),
         },
         expectedAnswer,
@@ -900,6 +918,7 @@ export async function processPdktEvaluation(
       ...(result.expectedAnswerAlignment
         ? { expectedAnswerAlignment: result.expectedAnswerAlignment }
         : {}),
+      ...(result.annotations ? { annotations: result.annotations } : {}),
     };
 
     const { data: saved, error: updateEndError } = await adminClient

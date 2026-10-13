@@ -68,6 +68,15 @@ export type PdktDimensionKey =
   | "typo"
   | "template";
 
+/** Urutan tetap dimensi penilaian (dipakai untuk prioritas dan validasi). */
+export const PDKT_DIMENSION_KEYS = [
+  "recipientDirection",
+  "normative",
+  "clarity",
+  "typo",
+  "template",
+] as const satisfies readonly PdktDimensionKey[];
+
 /** Shape requested from the model — no priority field from AI. */
 export interface PdktActionItemAI {
   dimension: PdktDimensionKey;
@@ -355,6 +364,31 @@ export const pdktEvaluationAiOutputSchema = z
   })
   .strict();
 
+export const PDKT_REPLY_ANNOTATION_LIMITS = {
+  count: 8,
+  quote: 300,
+} as const;
+
+/**
+ * Catatan AI yang menunjuk kalimat di balasan agent, sesudah dinormalkan backend.
+ * `start`/`end` adalah posisi (indeks karakter) di body balasan; `null` bila
+ * kutipan tidak ketemu atau bertumpuk, sehingga catatan tampil tanpa tanda.
+ */
+export const pdktReplyAnnotationSchema = z
+  .object({
+    quote: z.string().min(1).max(PDKT_REPLY_ANNOTATION_LIMITS.quote),
+    dimension: z.enum(PDKT_DIMENSION_KEYS),
+    note: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+    start: z.number().int().nonnegative().nullable(),
+    end: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+export type PdktReplyAnnotation = z.infer<typeof pdktReplyAnnotationSchema>;
+
+export const pdktStoredReplyAnnotationsSchema = z
+  .array(pdktReplyAnnotationSchema)
+  .max(PDKT_REPLY_ANNOTATION_LIMITS.count);
+
 export interface PdktEvaluationResult {
   score: number;
   feedback: string;
@@ -364,6 +398,7 @@ export interface PdktEvaluationResult {
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations?: PdktReplyAnnotation[];
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";

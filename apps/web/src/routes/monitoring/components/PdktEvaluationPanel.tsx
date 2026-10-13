@@ -20,6 +20,7 @@ import {
 import type { PdktDimensionKey } from "@trainers/types";
 import {
   PdktActionItemsCard,
+  PdktReplyAnnotationsCard,
   PdktDimensionTip,
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
@@ -456,6 +457,12 @@ export function PdktEvaluationPanel({
               </p>
             </div>
           </div>
+
+          <PdktReplyAnnotationsCard
+            annotations={evaluation.annotations}
+            replyBody={emails.find((email) => email.isAgent)?.body}
+            title="Catatan di balasan agent"
+          />
 
           {/* Evaluasi Edukatif */}
           <PdktActionItemsCard edu={edu} />
