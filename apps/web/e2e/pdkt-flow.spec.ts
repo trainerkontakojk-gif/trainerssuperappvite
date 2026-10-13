@@ -216,6 +216,55 @@ const SAVED_SETTINGS = {
   writingStyleMode: "training",
 };
 
+const USAGE_SUMMARY_PATH = "/api/v1/ai/usage/summary";
+
+const USAGE_SUMMARY_MOCK = {
+  method: "GET",
+  path: USAGE_SUMMARY_PATH,
+} as const;
+
+function usageItem(calls: number, costIdr: number) {
+  return {
+    calls,
+    inputTokens: calls * 600,
+    outputTokens: calls * 400,
+    totalTokens: calls * 1000,
+    costIdr,
+    costUsd: costIdr / 16000,
+  };
+}
+
+/** Ringkasan PDKT dengan item per action, seperti `getAiUsageSummary`. */
+const PDKT_USAGE = {
+  totalCalls: 74,
+  totalInputTokens: 44400,
+  totalOutputTokens: 29600,
+  totalTokens: 74000,
+  totalCostIdr: 48320,
+  simulationCostIdr: 21400,
+  reviewCostIdr: 26920,
+  periodLabel: "Oktober 2026",
+  breakdown: {
+    simulation: usageItem(30, 21400),
+    review: usageItem(44, 26920),
+    uncategorized: usageItem(0, 0),
+  },
+  breakdownItems: [
+    {
+      key: "pdkt_create_email",
+      label: "Create Email",
+      category: "simulation",
+      ...usageItem(30, 21400),
+    },
+    {
+      key: "pdkt_review",
+      label: "Penilaian AI",
+      category: "review",
+      ...usageItem(44, 26920),
+    },
+  ],
+};
+
 function pdktMocks(
   history: readonly SessionHistory[],
   mailbox: readonly ReturnType<typeof mailboxItem>[] = [],
@@ -621,24 +670,100 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("Pemakaian AI membuka modal usage", async ({ page }) => {
+  test("Pemakaian AI membuka popover rincian bulan ini", async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/pdkt",
-      apiMocks: pdktMocks([]),
+      apiMocks: [
+        { ...USAGE_SUMMARY_MOCK, body: { success: true, data: PDKT_USAGE } },
+        ...pdktMocks([]).filter((mock) => mock.path !== USAGE_SUMMARY_PATH),
+      ],
+    });
+
+    const trigger = page
+      .getByRole("navigation", { name: "Menu PDKT" })
+      .getByRole("button", { name: /^Pemakaian AI/ });
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const popover = page.getByRole("dialog", {
+      name: "Pemakaian AI · Oktober 2026",
+    });
+    await expect(popover).toBeVisible({ timeout: 20000 });
+    await expect(popover.getByText(/^Rp\s?48\.320$/)).toBeVisible();
+    await expect(popover.getByText("74 panggilan")).toBeVisible();
+
+    // Rincian per jenis panggilan memakai bahasa peserta, bukan nama action.
+    const rows = popover.getByRole("listitem");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText("Menelaah balasan");
+    await expect(rows.nth(0)).toContainText(/Rp\s?26\.920/);
+    await expect(rows.nth(1)).toContainText("Membuat email kasus");
+    await expect(rows.nth(1)).toContainText(/Rp\s?21\.400/);
+    await expect(
+      popover.getByText("Estimasi dari jumlah token AI."),
+    ).toBeVisible();
+
+    // Popover kecil, bukan modal lama dengan kartu token.
+    for (const stale of [
+      "Total Tokens",
+      "Input Tokens",
+      "Pemakaian Bulan Ini",
+    ]) {
+      await expect(page.getByText(stale)).toHaveCount(0);
+    }
+    const box = await popover.boundingBox();
+    expect(box?.width ?? 0).toBeLessThanOrEqual(380);
+
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    await waitForMockedApi(audit, [USAGE_SUMMARY_PATH]);
+    expectHermetic(audit);
+  });
+
+  test("popover Pemakaian AI muat di layar ponsel dan bisa dicoba lagi saat gagal", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: [
+        {
+          ...USAGE_SUMMARY_MOCK,
+          status: 500,
+          body: { success: false, error: "Server sedang sibuk." },
+        },
+        ...pdktMocks([]).filter((mock) => mock.path !== USAGE_SUMMARY_PATH),
+      ],
     });
 
     await page
+      .getByRole("navigation", { name: "Menu PDKT" })
       .getByRole("button", { name: /^Pemakaian AI/ })
-      .first()
       .click();
 
-    const usageDialog = page
-      .getByRole("dialog")
-      .filter({ hasText: "Penilaian AI" });
-    await expect(usageDialog).toBeVisible({ timeout: 20000 });
-    await expect(usageDialog.getByText("Simulasi").first()).toBeVisible();
+    const popover = page.getByRole("dialog", { name: /^Pemakaian AI/ });
+    await expect(
+      popover.getByText("Data pemakaian belum bisa dimuat."),
+    ).toBeVisible({ timeout: 20000 });
+    const box = await popover.boundingBox();
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 999)).toBeLessThanOrEqual(390);
 
-    await waitForMockedApi(audit, ["/ai/usage/summary"]);
+    // Coba lagi meminta ulang ringkasan.
+    const before = audit.mockedApi.filter((url) =>
+      url.includes(USAGE_SUMMARY_PATH),
+    ).length;
+    await popover.getByRole("button", { name: "Coba lagi" }).click();
+    await expect
+      .poll(
+        () =>
+          audit.mockedApi.filter((url) => url.includes(USAGE_SUMMARY_PATH))
+            .length,
+      )
+      .toBeGreaterThan(before);
+
     expectHermetic(audit);
   });
 
