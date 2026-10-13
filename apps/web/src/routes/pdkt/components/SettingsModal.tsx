@@ -1,13 +1,5 @@
 import React, { useState } from "react";
-import {
-  X,
-  User,
-  Settings,
-  FileText,
-  Users,
-  Save,
-  RotateCcw,
-} from "lucide-react";
+import { Lock, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
 import {
@@ -110,12 +102,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // dan footer pengaturan disembunyikan selama wizard terbuka.
   const wizardOpen = scenarioForm.isOpen;
 
+  const activeScenarioCount = localSettings.scenarios.filter(
+    (scenario) => scenario.isActive,
+  ).length;
   const tabs = [
-    { id: "scenarios" as const, label: "Masalah", icon: FileText },
-    { id: "consumers" as const, label: "Karakter", icon: Users },
-    { id: "identity" as const, label: "Identitas", icon: User },
-    { id: "system" as const, label: "Sistem", icon: Settings },
+    {
+      id: "scenarios" as const,
+      label: "Skenario",
+      count: String(activeScenarioCount),
+    },
+    { id: "consumers" as const, label: "Karakter konsumen" },
+    { id: "identity" as const, label: "Identitas konsumen" },
+    { id: "system" as const, label: "Gaya & AI" },
   ];
+  const isDirty = hasUnsavedChanges();
 
   return (
     <div ref={setDialogContainer} className="contents">
@@ -135,17 +135,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         >
           {wizardOpen ? null : (
             <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 sm:px-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <DialogTitle
-                    id="settings-modal-title"
-                    className="text-lg tracking-tight sm:text-xl"
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-module-pdkt/10"
                   >
-                    Pengaturan Simulasi
-                  </DialogTitle>
-                  <DialogDescription className="mt-1 text-sm">
-                    Module PDKT
-                  </DialogDescription>
+                    <SlidersHorizontal className="size-[18px] text-module-pdkt" />
+                  </span>
+                  <div className="min-w-0">
+                    <DialogTitle
+                      id="settings-modal-title"
+                      className="font-display text-lg font-bold tracking-tight sm:text-xl"
+                    >
+                      Pengaturan PDKT
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-muted-foreground">
+                      Berlaku untuk sesi yang Anda mulai berikutnya.
+                    </DialogDescription>
+                  </div>
                 </div>
                 <Button
                   type="button"
@@ -171,24 +179,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             orientation="vertical"
             className="min-h-0 flex-1 flex-col md:flex-row"
           >
-            <TabsList
-              variant="line"
+            <div
               className={cn(
-                "w-full shrink-0 justify-start overflow-x-auto rounded-none border-b bg-muted/20 p-2 md:w-52 md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:p-3",
+                "flex shrink-0 flex-col border-b bg-muted/20 md:w-60 md:border-r md:border-b-0",
                 wizardOpen && "hidden",
               )}
             >
-              {tabs.map((tab) => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="min-h-11 justify-start px-3 py-2.5 text-left"
-                >
-                  <tab.icon aria-hidden="true" className="size-4 shrink-0" />
-                  <span>{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+              <TabsList
+                variant="line"
+                aria-label="Bagian pengaturan"
+                className="w-full shrink-0 justify-start overflow-x-auto rounded-none p-2 max-md:flex-row! md:overflow-x-visible md:overflow-y-auto md:p-3"
+              >
+                {tabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="min-h-11 shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! md:w-full"
+                  >
+                    <span className="flex-1">{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {tab.count}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <p className="m-3 mt-auto hidden gap-2.5 rounded-lg border border-border bg-surface-elevated p-3 text-xs leading-[17px] text-foreground/80 md:flex">
+                <Lock
+                  aria-hidden="true"
+                  className="mt-px size-4 shrink-0 text-module-pdkt"
+                />
+                Karakter, arah balasan, dan kunci jawaban hanya terlihat di
+                sini. Peserta tidak melihatnya saat simulasi.
+              </p>
+            </div>
 
             <div
               className={cn(
@@ -260,6 +285,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   setWritingStyleMode={setWritingStyleMode}
                   selectedModel={selectedModel}
                   setSelectedModel={setSelectedModel}
+                  enableImageGeneration={enableImageGeneration}
+                  setEnableImageGeneration={setEnableImageGeneration}
                 />
               </TabsContent>
             </div>
@@ -268,33 +295,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {wizardOpen ? null : (
             <>
               <Separator />
-              <DialogFooter className="mx-0 mb-0 shrink-0 flex-row items-center justify-between rounded-none border-0 bg-card px-5 py-4 sm:justify-between sm:px-6">
+              <DialogFooter className="mx-0 mb-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none border-0 bg-muted/20 px-5 py-3 sm:justify-between sm:px-6">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleResetDefaults}
                   disabled={isSaving}
-                  className="text-destructive hover:text-destructive"
+                  className="-ml-2.5 min-h-11 px-2.5 text-foreground/80"
                 >
-                  <RotateCcw data-icon="inline-start" />
-                  Reset Default
+                  Pulihkan bawaan
                 </Button>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  {isDirty && !isSaving && (
+                    <span
+                      role="status"
+                      className="inline-flex items-center gap-1.5 text-xs text-foreground/80"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 rounded-full bg-[var(--chart-orange)]"
+                      />
+                      Belum disimpan
+                    </span>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
                     onClick={requestClose}
                     disabled={isSaving}
+                    className="min-h-11"
                   >
-                    Batal
+                    Tutup
                   </Button>
                   <Button
                     type="button"
                     onClick={handleSave}
                     disabled={isSaving}
+                    className="min-h-11 px-5"
                   >
-                    <Save data-icon="inline-start" />
-                    {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                    {isSaving ? "Menyimpan..." : "Simpan"}
                   </Button>
                 </div>
               </DialogFooter>

@@ -85,6 +85,8 @@ interface PdktSimulationProps {
   onAfterActivity?: () => void;
   initialReplaySession?: SessionHistory | null;
   onConsumeReplaySession?: () => void;
+  /** Email yang langsung dipilih saat kotak masuk dibuka dari landing. */
+  initialSelectedMailboxId?: string | null;
   /**
    * Data already loaded by the landing page. `undefined` means "not provided"
    * and keeps the session fetching it itself; `null` (settings only) means the
@@ -109,6 +111,7 @@ export default function PdktSimulation({
   onAfterActivity,
   initialReplaySession = null,
   onConsumeReplaySession,
+  initialSelectedMailboxId = null,
   initialSettings,
   initialSettingsVersion,
   initialHistory,
@@ -121,7 +124,9 @@ export default function PdktSimulation({
   const hasInitialHistory = initialHistory !== undefined;
   const hasInitialScenarios = initialScenarios !== undefined;
   const hasInitialConsumerTypes = initialConsumerTypes !== undefined;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSelectedMailboxId,
+  );
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
@@ -376,6 +381,9 @@ export default function PdktSimulation({
       }
       return;
     }
+
+    // Tunggu daftar termuat supaya pilihan awal dari landing tidak terhapus.
+    if (!mailboxItems) return;
 
     if (visibleMailboxItems.length > 0) {
       const currentFiltered =

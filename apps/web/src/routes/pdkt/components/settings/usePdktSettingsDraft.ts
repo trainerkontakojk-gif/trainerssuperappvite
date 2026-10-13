@@ -279,11 +279,22 @@ export function usePdktSettingsDraft({
     }
   };
 
+  // Settings bisa memuat lampiran base64; bandingkan hanya saat salah satu
+  // sisi berubah, bukan di setiap render (footer membaca status ini terus).
+  const settingsChanged = useMemo(
+    () =>
+      JSON.stringify(localSettings) !==
+      JSON.stringify({
+        ...settings,
+        selectedModel: coercePdktModelId(settings.selectedModel),
+      }),
+    [localSettings, settings],
+  );
+
   const hasUnsavedChanges = () => {
     const baselineModel = coercePdktModelId(settings.selectedModel);
     return (
-      JSON.stringify(localSettings) !==
-        JSON.stringify({ ...settings, selectedModel: baselineModel }) ||
+      settingsChanged ||
       customSenderName !== (settings.customIdentity?.senderName || "") ||
       customBodyName !== (settings.customIdentity?.bodyName || "") ||
       customEmail !== (settings.customIdentity?.email || "") ||

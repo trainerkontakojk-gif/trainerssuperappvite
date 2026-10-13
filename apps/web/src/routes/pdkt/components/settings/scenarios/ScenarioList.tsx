@@ -1,17 +1,17 @@
-import React from "react";
-import { Check, Edit2, Trash2, Plus, Image as ImageIcon } from "lucide-react";
-import { PdktScenario } from "@trainers/types";
+import { useState } from "react";
+import { Plus, Search, Trash2 } from "lucide-react";
+import { cn } from "cn";
+import type { PdktScenario } from "@trainers/types";
 import { Button } from "../../../../../components/ui/button";
+import { PdktSwitch } from "../PdktSwitch";
+import { REPLY_DIRECTIONS, getReplyDirection } from "./replyDirections";
 
 interface ScenarioListProps {
   scenarios: PdktScenario[];
-  isOpen: boolean;
   activeCount: number;
   totalScenarios: number;
   allSelected: boolean;
   noneSelected: boolean;
-  enableImageGeneration: boolean;
-  onToggleImageGeneration: () => void;
   onSelectAll: () => void;
   onUnselectAll: () => void;
   onToggleScenario: (id: string) => void;
@@ -20,15 +20,21 @@ interface ScenarioListProps {
   onAdd: () => void;
 }
 
+const ALL_CATEGORIES = "";
+
+/** Penanda arah balasan di baris skenario; "Jebakan" memakai warna modul. */
+const DIRECTION_DOT: Record<string, string> = {
+  cc_only: "bg-muted-foreground",
+  ojk_request_in_body: "bg-module-pdkt",
+  ojk: "bg-foreground",
+};
+
 export function ScenarioList({
   scenarios,
-  isOpen,
   activeCount,
   totalScenarios,
   allSelected,
   noneSelected,
-  enableImageGeneration,
-  onToggleImageGeneration,
   onSelectAll,
   onUnselectAll,
   onToggleScenario,
@@ -36,132 +42,203 @@ export function ScenarioList({
   onDelete,
   onAdd,
 }: ScenarioListProps) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState(ALL_CATEGORIES);
+  const categories = Array.from(
+    new Set(scenarios.map((scenario) => scenario.category).filter(Boolean)),
+  );
+  const activeCategory = categories.includes(category)
+    ? category
+    : ALL_CATEGORIES;
+  const needle = query.trim().toLowerCase();
+  const visible = scenarios.filter(
+    (scenario) =>
+      (!activeCategory || scenario.category === activeCategory) &&
+      (!needle ||
+        `${scenario.title} ${scenario.description}`
+          .toLowerCase()
+          .includes(needle)),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 border-b border-border pb-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Daftar Skenario
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Skenario
           </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {activeCount} dari {totalScenarios} skenario aktif dipakai saat
-            membuat email baru.
+          <p className="text-[13px] leading-5 text-foreground/80">
+            Kasus yang dipakai AI untuk membuat email konsumen. Hanya skenario
+            aktif yang masuk ke sesi.
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant={enableImageGeneration ? "secondary" : "outline"}
-            aria-pressed={enableImageGeneration}
-            onClick={onToggleImageGeneration}
-          >
-            <ImageIcon data-icon="inline-start" />
-            {enableImageGeneration ? "Gambar AI aktif" : "Gambar AI nonaktif"}
-          </Button>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onSelectAll}
-              disabled={allSelected}
-            >
-              Aktifkan Semua
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onUnselectAll}
-              disabled={noneSelected}
-            >
-              Nonaktifkan Semua
-            </Button>
-          </div>
-        </div>
+        <Button type="button" onClick={onAdd} className="min-h-11 shrink-0">
+          <Plus data-icon="inline-start" />
+          Skenario baru
+        </Button>
       </div>
 
-      <ul className="flex flex-col gap-3">
-        {scenarios.map((scenario) => (
-          <li
-            key={scenario.id}
-            className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20"
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-h-11 min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
+          <Search aria-hidden="true" className="size-4 shrink-0" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cari skenario"
+            aria-label="Cari skenario"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        {categories.length > 1 && (
+          <div
+            role="group"
+            aria-label="Filter kategori"
+            className="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-muted p-[3px] text-xs font-medium"
           >
-            <Button
-              type="button"
-              variant={scenario.isActive ? "default" : "outline"}
-              size="icon-lg"
-              aria-pressed={scenario.isActive}
-              aria-label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} skenario ${scenario.title}`}
-              onClick={() => onToggleScenario(scenario.id)}
-              className={scenario.isActive ? "" : "text-muted-foreground"}
-            >
-              {scenario.isActive ? (
-                <Check data-icon="inline" />
-              ) : (
-                <span aria-hidden="true" className="size-4" />
-              )}
-            </Button>
+            {[ALL_CATEGORIES, ...categories].map((item) => {
+              const selected = item === activeCategory;
+              return (
+                <button
+                  key={item || "semua"}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setCategory(item)}
+                  className={cn(
+                    "min-h-[38px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    selected
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-foreground/80 hover:text-foreground",
+                  )}
+                >
+                  {item || "Semua"}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                  {scenario.category}
+      {visible.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+          {scenarios.length === 0
+            ? "Belum ada skenario. Tambahkan skenario baru untuk mulai."
+            : "Tidak ada skenario yang cocok dengan pencarian."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+          {visible.map((scenario) => {
+            const direction = REPLY_DIRECTIONS.find(
+              (item) => item.id === getReplyDirection(scenario),
+            )!;
+            return (
+              <li
+                key={scenario.id}
+                className="flex items-center gap-2 py-2 pr-2 pl-1.5 transition-colors hover:bg-muted/40"
+              >
+                <PdktSwitch
+                  label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} ${scenario.title}`}
+                  checked={scenario.isActive}
+                  onCheckedChange={() => onToggleScenario(scenario.id)}
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span
+                    className={cn(
+                      "truncate font-semibold",
+                      scenario.isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {scenario.title}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                    {scenario.category && (
+                      <>
+                        <span>{scenario.category}</span>
+                        <span aria-hidden="true">·</span>
+                      </>
+                    )}
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1",
+                        direction.id === "ojk_request_in_body"
+                          ? "text-module-pdkt"
+                          : "text-foreground/80",
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          DIRECTION_DOT[direction.id],
+                        )}
+                      />
+                      {direction.title}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {scenario.alwaysUseSampleEmail
+                        ? "Tulis sendiri"
+                        : "Dibuat AI"}
+                    </span>
+                  </span>
                 </span>
-                <h4 className="truncate text-sm font-medium text-foreground">
-                  {scenario.title}
-                </h4>
-              </div>
-              <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                {scenario.description}
-              </p>
-              {scenario.attachmentImages &&
-                scenario.attachmentImages.length > 0 && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <ImageIcon aria-hidden="true" className="size-3.5" />
-                    {scenario.attachmentImages.length} lampiran
-                  </p>
-                )}
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={() => onEdit(scenario)}
-                className="text-muted-foreground hover:text-foreground"
-                title="Edit"
-                aria-label={`Edit ${scenario.title}`}
-              >
-                <Edit2 data-icon="inline" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={() => onDelete(scenario.id)}
-                className="text-muted-foreground hover:text-destructive"
-                title="Hapus"
-                aria-label={`Hapus ${scenario.title}`}
-              >
-                <Trash2 data-icon="inline" />
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      {!isOpen && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onAdd}
-          className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
-        >
-          <Plus data-icon="inline" />
-          <span className="text-sm font-medium">Tambah Skenario Baru</span>
-        </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(scenario)}
+                  aria-label={`Ubah ${scenario.title}`}
+                  className="min-h-11 shrink-0"
+                >
+                  Ubah
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  onClick={() => onDelete(scenario.id)}
+                  aria-label={`Hapus ${scenario.title}`}
+                  title="Hapus"
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 data-icon="inline" />
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>
+          {activeCount} dari {totalScenarios} skenario aktif. Skenario nonaktif
+          tetap tersimpan.
+        </p>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onSelectAll}
+            disabled={allSelected}
+            className="min-h-11"
+          >
+            Aktifkan semua
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onUnselectAll}
+            disabled={noneSelected}
+            className="min-h-11"
+          >
+            Nonaktifkan semua
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

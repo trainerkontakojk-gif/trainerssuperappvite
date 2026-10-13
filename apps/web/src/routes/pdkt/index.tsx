@@ -1,20 +1,23 @@
 import { can } from "@trainers/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Play, Settings, History, BarChart3 } from "lucide-react";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { Separator } from "../../components/ui/separator";
-import { PdktMotionFrame } from "./components/PdktMotionFrame";
+  ArrowRight,
+  BarChart3,
+  Check,
+  History,
+  Mail,
+  SlidersHorizontal,
+} from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { PdktStageDemo } from "./components/PdktStageDemo";
+import {
+  PdktLandingOverview,
+  type PdktLoadState,
+} from "./components/PdktLandingOverview";
+import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
@@ -24,6 +27,7 @@ import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
 import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
 import type {
+  PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
   SimulationSubjectSelection,
@@ -38,8 +42,13 @@ import {
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
 
-const accentClassName = "text-purple-500";
-const accentSoftClassName = "bg-purple-100";
+const HERO_POINTS = [
+  "Kasus selalu baru",
+  "Tanpa bocoran jawaban",
+  "Ditelaah AI",
+] as const;
+
+const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
 const defaultConsumerTypes: PdktConsumerType[] = [
   {
@@ -103,6 +112,10 @@ export default function PdktLanding() {
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
+  // Email yang dipilih dari landing ("Belum dibalas"), dibuka setelah pemilih peserta.
+  const [pendingMailboxId, setPendingMailboxId] = useState<string | null>(null);
+  const [initialMailboxId, setInitialMailboxId] = useState<string | null>(null);
 
   // Landing data is handed to the session view so it does not refetch it.
   const [settingsReady, setSettingsReady] = useState(false);
@@ -118,6 +131,12 @@ export default function PdktLanding() {
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
     "/pdkt/consumer-types",
   );
+  // Daftar ringan (tanpa snapshot) untuk "Menunggu balasan" dan "Belum dibalas".
+  const {
+    data: mailboxItems,
+    error: mailboxError,
+    refetch: refetchMailbox,
+  } = useApi<PdktMailboxListItem[]>("/pdkt/mailbox");
 
   const fetchSettings = async () => {
     try {
@@ -141,6 +160,7 @@ export default function PdktLanding() {
   };
 
   const fetchHistory = async () => {
+    setHistoryError(false);
     try {
       const res = (await unwrapResponse(
         await pdktClient.history.$get(),
@@ -167,6 +187,7 @@ export default function PdktLanding() {
       }
     } catch (err) {
       console.error("[PDKT] Failed to load history:", err);
+      setHistoryError(true);
     } finally {
       setHistoryLoading(false);
     }
@@ -271,17 +292,23 @@ export default function PdktLanding() {
     setShowSubjectPicker(false);
   }, [accountKey, canPickParticipant]);
 
-  const handleStartSimulation = async () => {
+  const handleStartSimulation = async (mailboxId: string | null = null) => {
+    setPendingMailboxId(mailboxId);
     if (!canPickParticipant) {
-      await handleConfirmSubject({ type: "self" });
+      await handleConfirmSubject({ type: "self" }, mailboxId);
       return;
     }
     setShowSubjectPicker(true);
   };
 
-  const handleConfirmSubject = async (sel: SimulationSubjectSelection) => {
+  const handleConfirmSubject = async (
+    sel: SimulationSubjectSelection,
+    mailboxId: string | null = pendingMailboxId,
+  ) => {
     setSimulationSubject(sel);
     setShowSubjectPicker(false);
+    setInitialMailboxId(mailboxId);
+    setPendingMailboxId(null);
     // Baseline usage is only needed for the delta notification; never block
     // opening the mailbox on it.
     void captureUsageBaseline();
@@ -321,6 +348,27 @@ export default function PdktLanding() {
     setIsUsageOpen(true);
   };
 
+  const hasSessionDelta = Boolean(
+    sessionDelta &&
+    (sessionDelta.costIdr > 0 ||
+      sessionDelta.totalTokens > 0 ||
+      sessionDelta.totalCalls > 0),
+  );
+  const historyState: PdktLoadState = historyLoading
+    ? "loading"
+    : historyError
+      ? "error"
+      : "ready";
+  const mailboxState: PdktLoadState = mailboxError
+    ? "error"
+    : mailboxItems
+      ? "ready"
+      : "loading";
+  const landingSummary = useMemo(
+    () => summarizePdktLanding(history, mailboxItems ?? []),
+    [history, mailboxItems],
+  );
+
   const currentSettings: PdktAppSettings = settings || {
     scenarios: defaultScenarios || [],
     consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
@@ -343,98 +391,135 @@ export default function PdktLanding() {
             transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className="relative z-10"
           >
-            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
-              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                {/* Kiri — HP inbox */}
-                <div className="flex flex-col">
-                  <div className="flex flex-1 flex-col">
-                    <PdktMotionFrame />
-                  </div>
-                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Daftar email masuk ke konsumen@ojk.go.id. Sesi singkat,
-                    telaah langsung tersedia.
-                  </p>
+            <section
+              aria-labelledby="pdkt-hero-title"
+              className="border-b border-border bg-surface-elevated"
+            >
+              <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 pt-6 pb-16">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background py-1 pr-3 pl-1.5 text-xs font-semibold text-foreground/80">
+                    <span className="flex size-6 items-center justify-center rounded-full bg-module-pdkt/10">
+                      <Mail
+                        aria-hidden="true"
+                        className="size-3.5 text-module-pdkt"
+                      />
+                    </span>
+                    PDKT · Simulasi email konsumen
+                  </span>
+                  <nav aria-label="Menu PDKT" className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenHistory}
+                      className={navButtonClass}
+                    >
+                      <History data-icon="inline-start" />
+                      Riwayat
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenUsage}
+                      className={navButtonClass}
+                    >
+                      <BarChart3 data-icon="inline-start" />
+                      Pemakaian AI
+                      {hasSessionDelta && sessionDelta && (
+                        <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
+                          <span className="sr-only">Sesi terakhir </span>
+                          {formatUsageDeltaLabel(sessionDelta)}
+                        </span>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleOpenSettings}
+                      className={navButtonClass}
+                    >
+                      <SlidersHorizontal data-icon="inline-start" />
+                      Pengaturan
+                    </Button>
+                  </nav>
                 </div>
 
-                {/* Kanan — 1 card */}
-                <Card className="flex min-w-0 flex-1 flex-col border-border bg-card py-0">
-                  <CardHeader className="gap-4 p-7 lg:p-8">
-                    <CardTitle className="max-w-xl text-3xl tracking-tight text-balance lg:text-4xl">
-                      Latih balasan email. Pahami dulu, baru tanggapi.
-                    </CardTitle>
-                    <CardDescription className="max-w-xl text-base leading-7">
-                      PDKT — singkatan dari{" "}
-                      <span className="font-semibold text-foreground">
-                        Paham Dulu, Kasih Tanggapan
-                      </span>{" "}
-                      — adalah simulasi balasan email berbasis AI untuk melatih
-                      pemahaman, analisa, dan ketepatan solusi. Pilih skenario,
-                      susun balasan, lalu tinjau telaah secara langsung.
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="flex flex-1 flex-col p-7 pt-0 lg:p-8 lg:pt-0">
-                    <Separator className="mt-2" />
-                    <div className="pt-6">
-                      <h3 className="text-sm font-medium text-foreground">
-                        Mulai latihan
-                      </h3>
-                      <div className="mt-4 space-y-3">
-                        <Button
-                          type="button"
-                          size="lg"
-                          onClick={handleStartSimulation}
-                          className="min-h-12 w-full justify-start gap-2.5 bg-module-pdkt px-3 text-sm font-semibold text-module-pdkt-foreground hover:bg-module-pdkt/90"
-                        >
-                          <Play data-icon="inline-start" fill="currentColor" />
-                          Mulai simulasi
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="outline"
-                          onClick={handleOpenSettings}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
-                        >
-                          <Settings data-icon="inline-start" />
-                          Pengaturan
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="outline"
-                          onClick={handleOpenHistory}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
-                        >
-                          <History data-icon="inline-start" />
-                          Riwayat
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="ghost"
-                          onClick={handleOpenUsage}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm text-muted-foreground"
-                          aria-label="Buka pemakaian bulan ini"
-                        >
-                          <BarChart3 data-icon="inline-start" />
-                          Pemakaian bulan ini
-                          {sessionDelta &&
-                            (sessionDelta.costIdr > 0 ||
-                              sessionDelta.totalTokens > 0 ||
-                              sessionDelta.totalCalls > 0) && (
-                              <Badge variant="secondary" className="ml-auto">
-                                {formatUsageDeltaLabel(sessionDelta)} sesi
-                                terakhir
-                              </Badge>
-                            )}
-                        </Button>
-                      </div>
+                <div className="flex flex-wrap items-center gap-14">
+                  <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
+                    <div className="flex flex-col gap-5">
+                      <h1
+                        id="pdkt-hero-title"
+                        className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
+                      >
+                        Pahami keluhannya.{" "}
+                        <span className="block text-module-pdkt">
+                          Balas dengan tepat.
+                        </span>
+                      </h1>
+                      <p className="max-w-[46ch] text-base leading-7 text-pretty text-foreground/80 sm:text-[17px]">
+                        Hadapi email konsumen yang terasa seperti kasus
+                        sungguhan. Tanpa petunjuk jawaban: Anda yang membaca,
+                        menilai, dan menulis balasannya. Setelah terkirim, AI
+                        menelaah dan menunjukkan apa yang perlu diperbaiki.
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        size="lg"
+                        onClick={() => handleStartSimulation()}
+                        className="min-h-12 gap-2.5 px-5 text-sm font-semibold"
+                      >
+                        Mulai simulasi
+                        <ArrowRight data-icon="inline-end" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="lg"
+                        variant="outline"
+                        onClick={handleOpenSettings}
+                        className="min-h-12 gap-2 bg-surface-elevated px-4 text-sm"
+                      >
+                        <SlidersHorizontal data-icon="inline-start" />
+                        Atur skenario
+                      </Button>
+                    </div>
+
+                    <ul className="flex flex-wrap gap-x-6 gap-y-2.5 border-t border-border pt-5 text-[13px] text-foreground/80">
+                      {HERO_POINTS.map((point) => (
+                        <li key={point} className="flex items-center gap-2">
+                          <Check
+                            aria-hidden="true"
+                            className="size-4 text-module-pdkt"
+                          />
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mx-auto flex min-w-0 flex-[1_1_480px] max-w-[600px]">
+                    <PdktStageDemo />
+                  </div>
+                </div>
               </div>
-            </div>
+            </section>
+
+            <PdktLandingOverview
+              summary={landingSummary}
+              historyState={historyState}
+              mailboxState={mailboxState}
+              onRetryHistory={() => {
+                setHistoryLoading(true);
+                void fetchHistory();
+              }}
+              onRetryMailbox={() => void refetchMailbox()}
+              onOpenMailbox={(mailboxId) =>
+                void handleStartSimulation(mailboxId ?? null)
+              }
+              onOpenSession={handleSelectSession}
+              onOpenHistory={handleOpenHistory}
+            />
           </motion.div>
         ) : (
           <motion.div
@@ -451,9 +536,12 @@ export default function PdktLanding() {
                 onBack={() => {
                   setView("home");
                   setReplaySession(null);
+                  setInitialMailboxId(null);
+                  void refetchMailbox();
                 }}
                 onBeforeActivity={captureUsageBaseline}
                 onAfterActivity={computeUsageDeltaNow}
+                initialSelectedMailboxId={initialMailboxId}
                 initialReplaySession={replaySession}
                 onConsumeReplaySession={() => setReplaySession(null)}
                 initialSettings={settingsReady ? settings : undefined}
@@ -476,7 +564,10 @@ export default function PdktLanding() {
           accountKey={accountKey}
           canPickParticipant={canPickParticipant}
           onConfirm={handleConfirmSubject}
-          onCancel={() => setShowSubjectPicker(false)}
+          onCancel={() => {
+            setShowSubjectPicker(false);
+            setPendingMailboxId(null);
+          }}
         />
       )}
       <SettingsModal

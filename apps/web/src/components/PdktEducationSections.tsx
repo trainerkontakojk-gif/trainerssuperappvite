@@ -12,6 +12,7 @@ import type {
   PdktReplyAnnotation,
 } from "@trainers/types";
 import { Button } from "./ui/button";
+import { PDKT_DIMENSION_LABELS } from "../lib/pdkt-dimensions";
 
 /**
  * Evaluasi Edukatif PDKT — action items (priorityRank dari backend),
@@ -187,14 +188,6 @@ export function PdktDimensionTip({
   );
 }
 
-const DIMENSION_LABELS: Record<PdktDimensionKey, string> = {
-  recipientDirection: "Arah Penerima",
-  normative: "Kualitas OJK",
-  clarity: "Kejelasan",
-  typo: "Typo",
-  template: "Template",
-};
-
 type PlacedAnnotation = PdktReplyAnnotation & { number: number };
 
 const collapseSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
@@ -291,7 +284,7 @@ export function PdktReplyAnnotationsCard({
                   {annotation.note}
                 </span>
                 <span className="text-[var(--fg3)] font-medium">
-                  {DIMENSION_LABELS[annotation.dimension] ?? annotation.dimension}
+                  {PDKT_DIMENSION_LABELS[annotation.dimension] ?? annotation.dimension}
                   {isMarked
                     ? null
                     : ` · Tidak ditandai di balasan: “${annotation.quote}”`}

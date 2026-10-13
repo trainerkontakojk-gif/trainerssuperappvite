@@ -8,56 +8,13 @@ import {
   normalizePdktRecipientEmail,
 } from "../pdktDraftNormalizers";
 import { SettingsInput } from "@/components/settings/SettingsPrimitives";
+import {
+  REPLY_DIRECTIONS,
+  getReplyDirection,
+  toScenarioDirection,
+} from "./replyDirections";
 
 const SCENARIO_FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
-
-type ReplyDirection = "cc_only" | "ojk_request_in_body" | "ojk";
-
-const REPLY_DIRECTIONS: {
-  id: ReplyDirection;
-  title: string;
-  description: string;
-  expected: string;
-}[] = [
-  {
-    id: "cc_only",
-    title: "Hanya tembusan ke OJK",
-    description:
-      "Konsumen mengadu ke perusahaan dan hanya menembuskan email ke OJK.",
-    expected: "Jawaban benar: ucapan terima kasih dan arahan normatif.",
-  },
-  {
-    id: "ojk_request_in_body",
-    title: "Tembusan, tapi minta bantuan OJK",
-    description:
-      "Email ditujukan ke perusahaan, tetapi di tengah isinya konsumen meminta bantuan OJK. Peserta harus menyadarinya sendiri.",
-    expected:
-      "Jawaban benar: tanggapi sebagai pengaduan ke OJK, sesuai kasus dan standar jawaban.",
-  },
-  {
-    id: "ojk",
-    title: "Langsung ke OJK",
-    description: "Konsumen menulis langsung ke OJK 157.",
-    expected: "Jawaban benar: sesuai kasus dan standar jawaban.",
-  },
-];
-
-function getReplyDirection(draft: Partial<PdktScenario>): ReplyDirection {
-  if (draft.primaryRecipientType !== "reported_company") return "ojk";
-  return draft.ojkRequestInBody ? "ojk_request_in_body" : "cc_only";
-}
-
-function toScenarioDirection(
-  direction: ReplyDirection,
-): Pick<PdktScenario, "primaryRecipientType" | "ojkRequestInBody"> {
-  if (direction === "ojk") {
-    return { primaryRecipientType: "ojk", ojkRequestInBody: undefined };
-  }
-  return {
-    primaryRecipientType: "reported_company",
-    ojkRequestInBody: direction === "ojk_request_in_body" ? true : undefined,
-  };
-}
 
 interface ScenarioRecipientsFieldProps {
   draft: Partial<PdktScenario>;
@@ -108,16 +65,16 @@ export function ScenarioRecipientsField({
         >
           Arah balasan
         </h4>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-1 text-xs leading-relaxed text-foreground/80">
           Kepada siapa konsumen sebenarnya meminta jawaban? Inilah yang dinilai
-          pada aspek Arah Penerima. Peserta tidak melihat pilihan ini.
+          QA pada aspek Arah Penerima. Peserta tidak melihat pilihan ini.
         </p>
       </div>
 
       <div
         role="radiogroup"
         aria-labelledby="pdkt-reply-direction-title"
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-2.5"
       >
         {REPLY_DIRECTIONS.map((direction) => {
           const isSelected = replyDirection === direction.id;
@@ -125,9 +82,9 @@ export function ScenarioRecipientsField({
             <label
               key={direction.id}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
+                "flex cursor-pointer items-start gap-3.5 rounded-xl border p-4 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
                 isSelected
-                  ? "border-primary/50 bg-primary/5"
+                  ? "border-foreground bg-muted/40"
                   : "border-border bg-card hover:bg-muted/40",
               )}
             >
@@ -139,17 +96,45 @@ export function ScenarioRecipientsField({
                 onChange={() =>
                   onDraftChange(toScenarioDirection(direction.id))
                 }
-                className="mt-0.5 size-4 shrink-0 accent-primary"
+                className="mt-1 size-4 shrink-0 accent-primary"
               />
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium text-foreground">
-                  {direction.title}
+              <span className="flex min-w-0 flex-1 flex-col gap-2.5">
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                    {direction.title}
+                    <span
+                      className={cn(
+                        "rounded-md px-1.5 py-px text-xs font-semibold",
+                        direction.id === "ojk_request_in_body"
+                          ? "bg-module-pdkt/10 text-module-pdkt"
+                          : "bg-muted text-foreground/80",
+                      )}
+                    >
+                      {direction.tag}
+                    </span>
+                  </span>
+                  <span className="text-xs leading-[18px] text-foreground/80">
+                    {direction.description}
+                  </span>
                 </span>
-                <span className="text-xs leading-relaxed text-muted-foreground">
-                  {direction.description}
-                </span>
-                <span className="text-xs leading-relaxed text-foreground">
-                  {direction.expected}
+                <span
+                  className={cn(
+                    "grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-xs leading-[17px]",
+                    isSelected ? "bg-background" : "bg-muted/40",
+                  )}
+                >
+                  <span className="text-muted-foreground">Kepada</span>
+                  <span className="font-medium text-foreground">
+                    {direction.to}
+                  </span>
+                  <span className="text-muted-foreground">Tembusan</span>
+                  <span className="font-medium text-foreground">
+                    {direction.cc}
+                  </span>
+                  <span className="text-muted-foreground">Jawaban benar</span>
+                  <span className="font-medium text-foreground">
+                    {direction.expected}
+                  </span>
                 </span>
               </span>
             </label>
