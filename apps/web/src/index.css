@@ -769,26 +769,12 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  .home-seg {
+  .home-month-range {
     display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-  .home-seg button {
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: 7px;
-    font-size: 13px;
-    font-weight: 500;
+    align-items: center;
+    gap: 6px;
     color: var(--fg2);
-    transition: background-color 0.15s ease, color 0.15s ease;
-  }
-  .home-seg button:hover {
-    color: var(--fg);
-  }
-  .home-seg button[aria-pressed="true"] {
-    background: var(--inv-bg);
-    color: var(--inv-fg);
+    font-size: 13px;
   }
   .home-select {
     position: relative;
@@ -803,6 +789,9 @@
     background: var(--bg);
     color: var(--fg);
     font-size: 13px;
+  }
+  .home-select-month select {
+    padding-right: 32px;
   }
   .home-select svg {
     position: absolute;
@@ -849,23 +838,115 @@
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     fill: var(--fg2);
+    transition: fill 0.15s ease;
   }
+  .home-chart-axis[data-active] {
+    fill: var(--fg);
+    font-weight: 600;
+  }
+  .home-chart-grid {
+    stroke: var(--border);
+    stroke-dasharray: 2 4;
+  }
+  .home-chart-base {
+    stroke: var(--border);
+  }
+  .home-chart-future {
+    fill: var(--fg);
+    fill-opacity: 0.025;
+  }
+  .home-chart-cursor {
+    stroke: var(--fg3);
+    stroke-dasharray: 3 3;
+  }
+  .home-chart-fill-top {
+    stop-color: var(--fg);
+    stop-opacity: 0.1;
+  }
+  .home-chart-fill-bottom {
+    stop-color: var(--fg);
+    stop-opacity: 0;
+  }
+  .home-chart-line {
+    fill: none;
+    stroke: var(--fg);
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .home-chart-projection {
+    fill: none;
+    stroke: var(--fg2);
+    stroke-width: 2;
+    stroke-dasharray: 4 5;
+    stroke-linecap: round;
+  }
+  .home-chart-projection-dot {
+    fill: var(--surface);
+    stroke: var(--fg2);
+    stroke-width: 2;
+  }
+  .home-chart-dot {
+    fill: var(--surface);
+    stroke: var(--fg);
+    stroke-width: 2;
+  }
+  .home-chart-dot-last {
+    fill: var(--fg);
+    stroke: var(--surface);
+  }
+  .home-chart-halo {
+    fill: var(--fg);
+    fill-opacity: 0.1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .home-chart-line {
+      stroke-dasharray: 1;
+      animation: home-chart-draw 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .home-chart-area {
+      animation: home-chart-fade 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    }
+  }
+  @keyframes home-chart-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes home-chart-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  .home-chart-end,
   .home-chart-tip {
     position: absolute;
-    padding: 6px 8px;
     border-radius: 6px;
     background: var(--inv-bg);
     color: var(--inv-fg);
     font-size: 12px;
     white-space: nowrap;
     pointer-events: none;
-    transform: translate(-50%, calc(-100% - 10px));
+    transform: translate(-50%, calc(-100% - 14px));
   }
+  .home-chart-end {
+    padding: 3px 7px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .home-chart-tip {
+    padding: 6px 8px;
+  }
+  .home-chart-end[data-align="start"],
   .home-chart-tip[data-align="start"] {
-    transform: translate(-12px, calc(-100% - 10px));
+    transform: translate(-12px, calc(-100% - 14px));
   }
+  .home-chart-end[data-align="end"],
   .home-chart-tip[data-align="end"] {
-    transform: translate(calc(-100% + 12px), calc(-100% - 10px));
+    transform: translate(calc(-100% + 12px), calc(-100% - 14px));
   }
   .home-legend {
     display: flex;

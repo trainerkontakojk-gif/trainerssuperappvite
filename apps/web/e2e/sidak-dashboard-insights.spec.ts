@@ -24,7 +24,7 @@ const DASHBOARD_DATA = {
   folders: [{ id: "team-call", name: "Tim Call" }],
   summary: {
     totalDefects: 108,
-    avgDefectsPerAudit: 5.4,
+    totalTickets: 41,
     zeroErrorRate: 12.5,
     avgAgentScore: 92.4,
     complianceRate: 65,
@@ -116,12 +116,12 @@ const DENSE_DATA = {
     ],
   },
   sparklines: Object.fromEntries(
-    ["total-defects", "avg-defects", "avg-score", "compliance"].map(
+    ["total-defects", "total-tickets", "avg-score", "compliance"].map(
       (key, index) => [
         key,
         [
-          { label: PREVIOUS_LABEL, value: [60, 6, 90, 60][index] },
-          { label: LATEST_LABEL, value: [48, 5.4, 92.4, 65][index] },
+          { label: PREVIOUS_LABEL, value: [60, 45, 90, 60][index] },
+          { label: LATEST_LABEL, value: [48, 41, 92.4, 65][index] },
         ],
       ],
     ),
@@ -673,12 +673,20 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     expect(dashboardRequest).toContain("startMonth=1");
     expect(dashboardRequest).toContain(`endMonth=${new Date().getMonth() + 1}`);
 
-    // KPI strip: one region, four indicators, values preserved.
+    // KPI strip: one region, four indicators, values preserved. Findings are
+    // counted per parameter and per ticket; the per-agent average is gone.
     const kpis = page.getByRole("region", { name: "Indikator utama" });
     await expect(kpis.locator("article")).toHaveCount(4);
-    for (const value of ["108", "5.4", "92.4%", "65.0%"]) {
+    for (const value of ["108", "41", "92.4%", "65.0%"]) {
       await expect(kpis.getByText(value, { exact: true })).toBeVisible();
     }
+    await expect(
+      kpis.getByText("Total Temuan QA per Parameter", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      kpis.getByText("Total Temuan QA per Tiket", { exact: true }),
+    ).toBeVisible();
+    await expect(kpis.getByText("Rata-rata Temuan per Agen")).toHaveCount(0);
     await expect(kpis.getByText(`vs ${PREVIOUS_LABEL}`)).toBeVisible();
 
     // Highlights: latest period, critical share, forecast side by side.

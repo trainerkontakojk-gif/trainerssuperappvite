@@ -79,10 +79,7 @@ const dashboardMocks = (trendData: unknown): ApiMock[] => [
   {
     method: "GET",
     path: "/api/v1/sidak/dashboard/trend",
-    body: {
-      success: true,
-      data: { trendMap: { "3m": trendData, "6m": trendData, all: trendData } },
-    },
+    body: { success: true, data: trendData },
   },
   {
     method: "GET",
@@ -193,6 +190,28 @@ test.describe("Proyeksi tren di Beranda (hermetic)", () => {
     await expect(
       card(page).getByRole("button", { name: /Prediksi/ }),
     ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("rentang yang tidak sampai bulan ini: proyeksi tidak disambung", async ({
+    page,
+  }) => {
+    // Oktober, supaya ada bulan akhir sebelum bulan ini. Jam sengaja di masa
+    // lalu agar sesi mock tetap sah.
+    await page.clock.setFixedTime(new Date("2026-10-05T05:00:00Z"));
+    const { audit } = await openDashboard(page, TWO_MONTHS, FRESH);
+    await expect(
+      card(page).getByText("Proyeksi", { exact: true }),
+    ).toBeVisible();
+
+    await card(page)
+      .getByRole("combobox", { name: "Bulan akhir" })
+      .selectOption({ label: "Feb" });
+    await expect(card(page).getByText("Proyeksi", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(card(page).locator("tr[data-projection]")).toHaveCount(0);
+    await expect(card(page)).not.toContainText("putus-putus");
     expectHermetic(audit);
   });
 

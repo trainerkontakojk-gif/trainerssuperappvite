@@ -24,6 +24,10 @@ export default defineConfig({
     },
     { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
     {
+      name: "sidak-dashboard-kpi-real-backend",
+      testMatch: "sidak-dashboard-kpi-api.spec.ts",
+    },
+    {
       name: "home-attention-real-backend",
       testMatch: "home-attention-api.spec.ts",
     },
