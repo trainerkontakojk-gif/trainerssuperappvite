@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import { useId, useState } from "react";
 import {
   ListChecks,
   FileEdit,
@@ -13,6 +13,10 @@ import type {
 } from "@trainers/types";
 import { Button } from "./ui/button";
 import { PDKT_DIMENSION_LABELS } from "../lib/pdkt-dimensions";
+import {
+  placeReplyAnnotations,
+  renderHighlights,
+} from "../lib/pdkt-reply-marks";
 
 /**
  * Evaluasi Edukatif PDKT — action items (priorityRank dari backend),
@@ -21,7 +25,7 @@ import { PDKT_DIMENSION_LABELS } from "../lib/pdkt-dimensions";
  * backfill); tanpa narasi AI (legacy) hanya item prioritas yang tampil.
  */
 
-function CopyInlineButton({ text }: { text: string }) {
+export function CopyInlineButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -112,7 +116,11 @@ export function PdktSuggestedRewriteCard({
         </p>
       )}
       <p className="text-xs text-[var(--fg)] leading-relaxed whitespace-pre-line">
-        {renderHighlights(rewrite.body, rewrite.highlights)}
+        {renderHighlights(
+          rewrite.body,
+          rewrite.highlights,
+          "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded px-0.5",
+        )}
       </p>
       <div className="mt-3">
         <CopyInlineButton
@@ -126,47 +134,6 @@ export function PdktSuggestedRewriteCard({
       </div>
     </div>
   );
-}
-
-function renderHighlights(
-  body: string,
-  highlights?: string[],
-): React.ReactNode[] {
-  if (!highlights || highlights.length === 0) return [body];
-
-  const parts: React.ReactNode[] = [];
-  let remaining = body;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    let earliest: { highlight: string; index: number } | null = null;
-    for (const highlight of highlights) {
-      const index = remaining.indexOf(highlight);
-      if (index !== -1 && (!earliest || index < earliest.index)) {
-        earliest = { highlight, index };
-      }
-    }
-    if (!earliest) {
-      parts.push(<span key={`txt-${key}`}>{remaining}</span>);
-      break;
-    }
-    if (earliest.index > 0) {
-      parts.push(
-        <span key={`txt-${key++}`}>{remaining.slice(0, earliest.index)}</span>,
-      );
-    }
-    parts.push(
-      <mark
-        key={`hl-${key++}`}
-        className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded px-0.5"
-      >
-        {earliest.highlight}
-      </mark>,
-    );
-    remaining = remaining.slice(earliest.index + earliest.highlight.length);
-  }
-
-  return parts;
 }
 
 /** Inline tip rendered below a breakdown row when value < 75. */
@@ -188,26 +155,6 @@ export function PdktDimensionTip({
   );
 }
 
-type PlacedAnnotation = PdktReplyAnnotation & { number: number };
-
-const collapseSpaces = (value: string) => value.replace(/\s+/g, " ").trim();
-
-/** Tandai hanya bila teks di posisi itu memang kutipannya (data lama/berbeda tidak salah tempat). */
-function hasValidRange(
-  annotation: PdktReplyAnnotation,
-  body: string,
-): annotation is PdktReplyAnnotation & { start: number; end: number } {
-  return (
-    typeof annotation.start === "number" &&
-    typeof annotation.end === "number" &&
-    annotation.start >= 0 &&
-    annotation.start < annotation.end &&
-    annotation.end <= body.length &&
-    collapseSpaces(body.slice(annotation.start, annotation.end)) ===
-      collapseSpaces(annotation.quote)
-  );
-}
-
 /**
  * Balasan agent dengan kalimat yang dikomentari AI ditandai dan diberi nomor.
  * Posisi tanda dihitung backend; catatan tanpa posisi tetap tampil di daftar.
@@ -226,35 +173,19 @@ export function PdktReplyAnnotationsCard({
   const body = replyBody ?? "";
   if (!annotations?.length || !body) return null;
 
-  // Nomor mengikuti urutan baca; catatan tanpa tanda di akhir daftar.
-  const ordered: PlacedAnnotation[] = [...annotations]
-    .sort((a, b) => {
-      const aStart = hasValidRange(a, body) ? a.start : Infinity;
-      const bStart = hasValidRange(b, body) ? b.start : Infinity;
-      return aStart - bStart;
-    })
-    .map((annotation, index) => ({ ...annotation, number: index + 1 }));
-  const marked = ordered.filter((annotation) =>
-    hasValidRange(annotation, body),
-  ) as Array<PlacedAnnotation & { start: number; end: number }>;
-
-  const segments: React.ReactNode[] = [];
-  let cursor = 0;
-  for (const annotation of marked) {
-    if (annotation.start < cursor) continue;
-    segments.push(body.slice(cursor, annotation.start));
-    segments.push(
+  const { notes: ordered, segments } = placeReplyAnnotations(
+    annotations,
+    body,
+    (text, number) => (
       <mark
-        key={annotation.number}
+        key={number}
         className="rounded-sm border-b-2 border-amber-500 bg-amber-500/15 px-0.5 text-[var(--fg)]"
       >
-        {body.slice(annotation.start, annotation.end)}
-        <sup className="ml-0.5 text-[11px] font-bold">{annotation.number}</sup>
-      </mark>,
-    );
-    cursor = annotation.end;
-  }
-  segments.push(body.slice(cursor));
+        {text}
+        <sup className="ml-0.5 text-[11px] font-bold">{number}</sup>
+      </mark>
+    ),
+  );
 
   return (
     <section
@@ -273,7 +204,7 @@ export function PdktReplyAnnotationsCard({
       </p>
       <ol className="mt-4 space-y-2 border-t border-[var(--border)] pt-3">
         {ordered.map((annotation) => {
-          const isMarked = hasValidRange(annotation, body);
+          const isMarked = annotation.marked;
           return (
             <li key={annotation.number} className="flex gap-2.5 text-xs">
               <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[11px] font-bold text-[var(--fg)]">
