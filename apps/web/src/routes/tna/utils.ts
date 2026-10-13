@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { TnaMetricsSnapshot, TnaPlanStatus } from "@trainers/types";
+import type {
+  TnaFollowUp,
+  TnaMetricsSnapshot,
+  TnaPlanStatus,
+  TnaVerdict,
+} from "@trainers/types";
 import { unwrapResponse } from "../../lib/api/unwrap-response";
 
 class TnaConflictError extends Error {}
@@ -18,6 +23,16 @@ export const planStatusLabels: Record<TnaPlanStatus, string> = {
   evaluasi: "Evaluasi",
   selesai: "Selesai",
   dibatalkan: "Dibatalkan",
+};
+export const verdictLabels: Record<TnaVerdict, string> = {
+  tercapai: "Tercapai",
+  tercapai_sebagian: "Tercapai sebagian",
+  tidak_tercapai: "Tidak tercapai",
+};
+export const followUpLabels: Record<TnaFollowUp, string> = {
+  selesai_tuntas: "Selesai tuntas",
+  perlu_rencana_lanjutan: "Perlu rencana lanjutan",
+  eskalasi_non_training: "Eskalasi non-training",
 };
 export const interventionLabels = {
   kelas: "Kelas",

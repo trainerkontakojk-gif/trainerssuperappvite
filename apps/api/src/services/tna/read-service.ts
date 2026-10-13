@@ -11,7 +11,7 @@ import {
   tnaParticipantEvaluationSchema,
 } from "@trainers/types";
 import { computeTnaBaseline } from "./baseline";
-import { buildTnaNarrative } from "./narrative";
+import { buildTnaEvaluationNarrative, buildTnaNarrative } from "./narrative";
 import { TnaServiceError } from "./errors";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import {
@@ -185,6 +185,29 @@ export async function getTnaPlanDetail(
       : null;
   if (plan.status === "selesai" && !plan.evaluation_snapshot)
     throw new Error("Completed plan is missing evaluation snapshot");
+  const evaluationSnapshot =
+    evaluation?.snapshot ??
+    (plan.status === "selesai" ? plan.evaluation_snapshot! : null);
+  let evaluationNarrative: string | null = null;
+  if (evaluationSnapshot) {
+    if (!plan.baseline_snapshot)
+      throw new Error("Evaluation narrative requires frozen baseline");
+    // Metadata only: completed plans never read QA rows or recompute metrics.
+    const { data: evaluationPeriod, error } = await supabase
+      .from("qa_periods")
+      .select("id, month, year")
+      .eq("id", evaluationSnapshot.evaluation_period_id)
+      .single();
+    if (error) throw error;
+    evaluationNarrative = buildTnaEvaluationNarrative({
+      baseline: plan.baseline_snapshot,
+      evaluation: evaluationSnapshot,
+      plan,
+      period: evaluationPeriod,
+      participantCount: participants.length,
+      preview: plan.status === "evaluasi",
+    });
+  }
   const frozenParticipants =
     plan.status === "selesai"
       ? tnaParticipantEvaluationSchema.array().parse(
@@ -204,9 +227,8 @@ export async function getTnaPlanDetail(
   return {
     plan,
     participants,
-    evaluation:
-      evaluation?.snapshot ??
-      (plan.status === "selesai" ? plan.evaluation_snapshot! : null),
+    evaluation: evaluationSnapshot,
+    evaluation_narrative: evaluationNarrative,
     participant_evaluation: evaluation?.participants ?? frozenParticipants,
     evaluation_period_options:
       plan.status === "aktif" || plan.status === "evaluasi"

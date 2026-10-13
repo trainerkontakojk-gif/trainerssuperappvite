@@ -114,6 +114,7 @@ export const tnaVerdictSchema = z.enum([
   "tercapai_sebagian",
   "tidak_tercapai",
 ]);
+export type TnaVerdict = z.infer<typeof tnaVerdictSchema>;
 export const tnaCohortMetricsSchema = z
   .object({
     agents: count,
@@ -360,6 +361,7 @@ export interface TnaPlanDetail {
   preview: TnaBaselineSnapshot | null;
   participant_preview: TnaParticipantBaseline[] | null;
   narrative: string;
+  evaluation_narrative?: string | null;
   evaluation?: TnaEvaluationSnapshot | null;
   participant_evaluation?: TnaParticipantEvaluation[] | null;
   evaluation_period_options?: TnaEvaluationPeriodOption[];

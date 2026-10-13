@@ -15,6 +15,21 @@ const baseline = fixture.ids.periods[0]!;
 const evaluation = fixture.ids.periods[1]!;
 const indicator = fixture.ids.metricsIndicators.alpha;
 const roster = fixture.ids.participants.slice(0, 5);
+let evaluationLabel: string;
+const closing = "Perbandingan ini indikatif, bukan bukti sebab-akibat.";
+const cohortSentence =
+  "Peserta yang diaudit (5 dari 5) turun 20,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) tetap.";
+function expectNarrative(actual: string | null | undefined, expected: string) {
+  expect(actual).toBe(expected);
+  console.info(
+    "T4_NARRATIVE",
+    JSON.stringify({ case: test.info().title, actual }),
+  );
+}
+function opening() {
+  // Only the isolated fixture's name/year vary; every displayed number is manual.
+  return `Evaluasi ${evaluationLabel}: tingkat ketidaksesuaian parameter ${fixture.names.alpha} (Chat)`;
+}
 function sql(query: string) {
   try {
     return runSql(fixture.env, query);
@@ -46,9 +61,10 @@ function rows(
   period: string,
   findings: number,
   phantom = false,
+  sessions = 5,
 ) {
   sql(`INSERT INTO qa_temuan(peserta_id,period_id,indicator_id,service_type,no_tiket,nilai,is_phantom_padding,tahun)
-    SELECT '${agent}','${period}','${indicator}','chat','${randomUUID()}-' || s, CASE WHEN s<=${findings} THEN 1 ELSE 3 END,${phantom},(SELECT year FROM qa_periods WHERE id='${period}') FROM generate_series(1,5) s;`);
+    SELECT '${agent}','${period}','${indicator}','chat','${randomUUID()}-' || s, CASE WHEN s<=${findings} THEN 1 ELSE 3 END,${phantom},(SELECT year FROM qa_periods WHERE id='${period}') FROM generate_series(1,${sessions}) s;`);
 }
 async function setup(
   args: {
@@ -58,17 +74,19 @@ async function setup(
     rate?: number;
     spread?: number;
     legacy?: boolean;
+    roundingBoundary?: boolean;
   } = {},
 ) {
   const comparisonCount = args.comparisonCount ?? 5;
+  const sessions = args.roundingBoundary ? 100 : 5;
   for (const agent of roster) {
-    rows(agent, baseline, 2);
+    rows(agent, baseline, 2, false, sessions);
     if (!args.noAudit && !(args.absent && agent === roster[4]))
-      rows(agent, evaluation, 1);
+      rows(agent, evaluation, args.roundingBoundary ? 2 : 1, false, sessions);
   }
   for (const agent of comparisons.slice(0, comparisonCount)) {
-    rows(agent, baseline, 1);
-    if (!args.noAudit) rows(agent, evaluation, 1);
+    rows(agent, baseline, 1, false, sessions);
+    if (!args.noAudit) rows(agent, evaluation, 1, false, sessions);
   }
   // QA rows must never contribute to either population or cohorts.
   rows(fixture.ids.participants[5]!, baseline, 5);
@@ -125,6 +143,7 @@ async function setup(
       expected_updated_at: plan.updated_at,
     });
   const activeDetail = await call(`/plans/${plan.id}`);
+  expect(activeDetail.evaluation_narrative).toBeNull();
   expect(
     activeDetail.evaluation_period_options
       .filter((p: { id: string }) => fixture.ids.periods.includes(p.id))
@@ -139,7 +158,9 @@ async function setup(
     activeDetail.participants.map(
       (p: { baseline_sessions: number }) => p.baseline_sessions,
     ),
-  ).toEqual(args.legacy ? [null, null, null, null, null] : [5, 5, 5, 5, 5]);
+  ).toEqual(
+    args.legacy ? [null, null, null, null, null] : Array(5).fill(sessions),
+  );
   const started = await admin.rpc("tna_start_plan_evaluation", {
     p_actor_id: users.trainer.userId,
     p_plan_id: plan.id,
@@ -176,6 +197,7 @@ test.beforeAll(async () => {
     OPENAI_API_KEY: "e2e-only",
   });
   users = await fixture.seed();
+  evaluationLabel = `Februari ${sql(`SELECT year FROM qa_periods WHERE id='${evaluation}';`)}`;
   sql(
     `INSERT INTO profiler_peserta(id,batch_name,nama,tim,jabatan,nomor_urut) VALUES ${comparisons.map((id, i) => `('${id}',(SELECT name FROM profiler_folders WHERE id='${fixture.ids.folder}'),'Comparison ${i}','Chat','Agent',${i + 10})`).join(",")};`,
   );
@@ -224,8 +246,10 @@ test("comparison sufficient: exact cohorts, scalar delta and SQL-compatible snap
     findings: 0,
     auditedAgents: 0,
   });
+  const expected = `${opening()} turun dari 30,0 menjadi 20,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 100,0%). Target tercapai. ${cohortSentence} ${closing}`;
   // Exercise T1's exact snapshot shape without implementing a T3 route.
   const current = await call(`/plans/${id}`);
+  expectNarrative(current.evaluation_narrative, `Pratinjau: ${expected}`);
   const completed = await admin.rpc("tna_complete_plan", {
     p_actor_id: users.trainer.userId,
     p_plan_id: id,
@@ -249,8 +273,14 @@ test("comparison sufficient: exact cohorts, scalar delta and SQL-compatible snap
     p_follow_up: "selesai_tuntas",
   });
   expect(completed.error).toBeNull();
+  const frozen = await call(`/plans/${id}`);
+  expectNarrative(frozen.evaluation_narrative, expected);
   rows(roster[0]!, evaluation, 5);
-  expect(await preview(id)).toEqual(result); // finished reads the frozen snapshot
+  rows(roster[0]!, baseline, 5);
+  const after = await call(`/plans/${id}`);
+  expect(after.evaluation).toEqual(result); // finished reads the frozen snapshot
+  expectNarrative(after.evaluation_narrative, expected);
+  expect(after.narrative).toBe(current.narrative);
 });
 test("comparison small: intersection excludes baseline-only and evaluation-only agents", async () => {
   const id = await setup({ comparisonCount: 4, spread: 80 });
@@ -277,6 +307,10 @@ test("comparison small: intersection excludes baseline-only and evaluation-only 
     spreadPct: 100,
   });
   expect(result.verdict).toBe("tidak_tercapai");
+  expectNarrative(
+    (await call(`/plans/${id}`)).evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 31,1 menjadi 28,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 80,0%). Target tidak tercapai. Kelompok pembanding terlalu kecil untuk dibandingkan. ${closing}`,
+  );
 });
 test("participant not audited: null evaluation and participant threshold", async () => {
   const id = await setup({ absent: true, spread: 80 });
@@ -289,6 +323,10 @@ test("participant not audited: null evaluation and participant threshold", async
   expect(detail.evaluation.cohorts.comparison_small).toBe(false);
   expect(detail.evaluation.cohorts.net_effect).toBeNull();
   expect(detail.evaluation.verdict).toBe("tercapai_sebagian");
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 30,0 menjadi 20,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 80,0%). Target tercapai sebagian. Peserta yang diaudit (4 dari 5) turun 20,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
   expect(
     detail.participant_evaluation.find(
       (p: { peserta_id: string }) => p.peserta_id === roster[4],
@@ -317,6 +355,10 @@ test("evaluation no_audit: null metrics, null verdict, no fabricated zeros", asy
     insufficientData: true,
   });
   expect(detail.evaluation.verdict).toBeNull();
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: Evaluasi ${evaluationLabel}: belum ada audit untuk parameter ${fixture.names.alpha} (Chat), sehingga tingkat dan sebaran belum dapat dihitung. Kelompok pembanding terlalu kecil untuk dibandingkan. Catatan: data periode evaluasi belum cukup untuk kesimpulan kuat. ${closing}`,
+  );
   expect(detail.evaluation.cohorts.participants).toEqual({
     baseline: cohort(5, 10, 40, 100),
     evaluation: cohort(0, 0, null, null),
@@ -356,6 +398,10 @@ test("baseline drift: frozen participant data, labeled legacy recompute, target 
     auditedAgents: 10,
   });
   expect(detail.evaluation.verdict).toBe("tercapai");
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 30,0 menjadi 20,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 100,0%). Target tercapai. Peserta yang diaudit (5 dari 5) turun 30,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
   expect(
     detail.participant_evaluation.find(
       (p: { peserta_id: string }) => p.peserta_id === roster[0],
@@ -403,6 +449,73 @@ test("baseline drift: frozen participant data, labeled legacy recompute, target 
     frozen.participant_evaluation,
   );
 });
+test("insufficient evaluation: audited low findings keeps verdict with a caution", async () => {
+  const id = await setup();
+  sql(`UPDATE qa_temuan SET nilai=3,ketidaksesuaian=NULL WHERE period_id='${evaluation}';
+    UPDATE qa_temuan SET nilai=1 WHERE id IN (SELECT id FROM qa_temuan WHERE period_id='${evaluation}' AND peserta_id='${roster[0]}' ORDER BY id LIMIT 2);`);
+  const detail = await call(`/plans/${id}`);
+  expect(detail.evaluation.population).toMatchObject({
+    findings: 2,
+    auditedAgents: 10,
+    sampledSessions: 50,
+    ratePer100: 4,
+    spreadPct: 10,
+    insufficientData: true,
+  });
+  expect(detail.evaluation.verdict).toBe("tercapai");
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 30,0 menjadi 4,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 10,0% (target ≤ 100,0%). Target tercapai. Peserta yang diaudit (5 dari 5) turun 32,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) turun 20,0. Catatan: data periode evaluasi belum cukup untuk kesimpulan kuat. ${closing}`,
+  );
+});
+test("not achieved with sufficient comparison: exact unchanged and increasing direction", async () => {
+  const id = await setup({ spread: 80 });
+  // Keep five distinct sessions each. Population 15/50*100 = frozen 30.
+  sql(`UPDATE qa_temuan SET nilai=3 WHERE period_id='${evaluation}' AND peserta_id IN ('${roster.join("','")}');
+    UPDATE qa_temuan SET nilai=1 WHERE id IN (SELECT id FROM (SELECT id,row_number() OVER (PARTITION BY peserta_id ORDER BY id) AS n FROM qa_temuan WHERE period_id='${evaluation}' AND peserta_id IN ('${roster.join("','")}')) numbered WHERE n<=2);`);
+  expectNarrative(
+    (await call(`/plans/${id}`)).evaluation_narrative,
+    `Pratinjau: ${opening()} tetap di 30,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 80,0%). Target tidak tercapai. Peserta yang diaudit (5 dari 5) tetap, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
+  // Three findings per agent: population 30/50*100 = 60; deltas +20/+40.
+  sql(`UPDATE qa_temuan SET nilai=3 WHERE period_id='${evaluation}';
+    UPDATE qa_temuan SET nilai=1 WHERE id IN (SELECT id FROM (SELECT id,row_number() OVER (PARTITION BY peserta_id ORDER BY id) AS n FROM qa_temuan WHERE period_id='${evaluation}') numbered WHERE n<=3);`);
+  expectNarrative(
+    (await call(`/plans/${id}`)).evaluation_narrative,
+    `Pratinjau: ${opening()} naik dari 30,0 menjadi 60,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 80,0%). Target tidak tercapai. Peserta yang diaudit (5 dari 5) naik 20,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) naik 40,0. ${closing}`,
+  );
+});
+test("rounding boundary: nonzero population and cohort changes display tetap", async () => {
+  const id = await setup({ roundingBoundary: true, rate: 1 });
+  // 15/1000 -> 15/1001; participants 10/500 -> 10/502;
+  // comparison 5/500 -> 5/499. All changes round to 0.0.
+  rows(roster[0]!, evaluation, 0, false, 2);
+  sql(
+    `DELETE FROM qa_temuan WHERE id IN (SELECT id FROM qa_temuan WHERE period_id='${evaluation}' AND peserta_id='${comparisons[0]}' AND nilai=3 LIMIT 1);`,
+  );
+  const detail = await call(`/plans/${id}`);
+  expect(detail.evaluation.population.ratePer100).toBeLessThan(
+    detail.plan.baseline_snapshot.ratePer100,
+  );
+  expect(detail.evaluation.cohorts.participants.delta).toBeLessThan(0);
+  expect(detail.evaluation.cohorts.comparison.delta).toBeGreaterThan(0);
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} tetap di 1,5 per 100 sesi sampel (target ≤ 1,0), dengan sebaran 100,0% → 100,0% (target ≤ 100,0%). Target tercapai sebagian. Peserta yang diaudit (5 dari 5) tetap, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
+});
+test("no participants audited: absent cohort delta is not a fabricated zero", async () => {
+  const id = await setup();
+  sql(
+    `DELETE FROM qa_temuan WHERE period_id='${evaluation}' AND peserta_id IN ('${roster.join("','")}');`,
+  );
+  const detail = await call(`/plans/${id}`);
+  expect(detail.evaluation.cohorts.participants.delta).toBeNull();
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 30,0 menjadi 20,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 100,0% (target ≤ 100,0%). Target tercapai. Peserta yang diaudit (0 dari 5) belum memiliki data yang cukup untuk dibandingkan, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
+});
 test("phantom batch: mixed ignores padding, phantom-only stays audited", async () => {
   const id = await setup();
   const before = await preview(id);
@@ -422,6 +535,10 @@ test("phantom batch: mixed ignores padding, phantom-only stays audited", async (
     evaluation: cohort(5, 4, 16, 80),
     delta: -24,
   });
+  expectNarrative(
+    detail.evaluation_narrative,
+    `Pratinjau: ${opening()} turun dari 30,0 menjadi 18,0 per 100 sesi sampel (target ≤ 20,0), dengan sebaran 100,0% → 90,0% (target ≤ 100,0%). Target tercapai. Peserta yang diaudit (5 dari 5) turun 24,0 per 100 sesi, sedangkan kelompok pembanding (5 agent) tetap. ${closing}`,
+  );
   expect(detail.evaluation.cohorts.net_effect).toBe(-24);
   expect(detail.evaluation.population).toMatchObject({
     findings: 9,

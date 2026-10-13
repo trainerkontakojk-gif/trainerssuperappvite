@@ -418,6 +418,8 @@ test("live evaluation changes period, completes server snapshot once and freezes
   const before = await detail(plan.id);
   expect(before.plan.status).toBe("evaluasi");
   expect(before.plan.evaluation_snapshot).toBeNull();
+  const expectedNarrative = `Evaluasi Maret ${year}: tingkat ketidaksesuaian parameter ${fixture.names.alpha} (Chat) tetap di 9,1 per 100 sesi sampel (target ≤ 1,0), dengan sebaran 60,0% → 60,0% (target ≤ 10,0%). Target tidak tercapai. Kelompok pembanding terlalu kecil untuk dibandingkan. Perbandingan ini indikatif, bukan bukti sebab-akibat.`;
+  expect(before.evaluation_narrative).toBe(`Pratinjau: ${expectedNarrative}`);
   const empty = await call(
     `/plans/${plan.id}/evaluation`,
     "PATCH",
@@ -460,6 +462,14 @@ test("live evaluation changes period, completes server snapshot once and freezes
   expect(completed.data.evaluation_snapshot?.population.findings).toBe(3);
   expect(completed.data.baseline_snapshot).toEqual(plan.baseline_snapshot);
   const frozen = await detail(plan.id);
+  expect(frozen.evaluation_narrative).toBe(expectedNarrative);
+  console.info(
+    "T4_NARRATIVE",
+    JSON.stringify({
+      case: test.info().title,
+      actual: frozen.evaluation_narrative,
+    }),
+  );
   expect(frozen.evaluation).toEqual(completed.data.evaluation_snapshot);
   expect(frozen.participant_evaluation?.every((p) => p.audited_in_eval)).toBe(
     true,
@@ -476,7 +486,9 @@ test("live evaluation changes period, completes server snapshot once and freezes
         ),
       ),
     ).toBe(2);
-    expect(await detail(plan.id)).toEqual(frozen);
+    const afterQaChange = await detail(plan.id);
+    expect(afterQaChange.evaluation_narrative).toBe(expectedNarrative);
+    expect(afterQaChange).toEqual(frozen);
   } finally {
     sql(
       `UPDATE qa_temuan SET ketidaksesuaian=CASE WHEN no_tiket LIKE '%-ws' THEN '   ' ELSE NULL END,nilai=3 WHERE period_id='${evaluationPeriod}' AND indicator_id='${fixture.ids.metricsIndicators.alpha}' AND peserta_id='${fixture.ids.participants[3]}' AND no_tiket LIKE '%alpha-%' AND NOT is_phantom_padding;`,
