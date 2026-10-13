@@ -42,6 +42,16 @@ function getClosingSegment(value: string): string {
   return value.slice(Math.max(0, value.length - 320));
 }
 
+/** Pihak yang seharusnya menjadi lawan bicara utama balasan, menurut replyIntent. */
+export function getExpectedReplyParty(
+  recipientContext?: PdktRecipientContext,
+): Exclude<DirectedParty, "unknown"> | null {
+  if (!recipientContext) return null;
+  return recipientContext.replyIntent === "reply_to_company_with_ojk_cc"
+    ? "reported_company"
+    : "ojk";
+}
+
 export function buildPdktRecipientConflictHints(input: {
   agentReplyBody: string;
   recipientContext?: PdktRecipientContext;
@@ -53,13 +63,13 @@ export function buildPdktRecipientConflictHints(input: {
   const openingTarget = detectDirectedParty(getOpeningSegment(input.agentReplyBody));
   const closingTarget = detectDirectedParty(getClosingSegment(input.agentReplyBody));
   const conflictHints: string[] = [];
-  const recipientType = input.recipientContext?.primaryRecipientType;
+  const expectedParty = getExpectedReplyParty(input.recipientContext);
 
-  if (!recipientType) {
+  if (!expectedParty) {
     return { openingTarget, closingTarget, conflictHints };
   }
 
-  if (recipientType === "reported_company") {
+  if (expectedParty === "reported_company") {
     if (openingTarget === "ojk") {
       conflictHints.push("pembuka membuat lawan bicara utama bergeser ke OJK");
     }
@@ -68,7 +78,7 @@ export function buildPdktRecipientConflictHints(input: {
     }
   }
 
-  if (recipientType === "ojk") {
+  if (expectedParty === "ojk") {
     if (openingTarget === "reported_company") {
       conflictHints.push("pembuka membuat lawan bicara utama bergeser ke perusahaan");
     }

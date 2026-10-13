@@ -23,7 +23,17 @@ export type WritingStyleMode = "realistic" | "training";
 
 export type PdktPrimaryRecipientType = "ojk" | "reported_company";
 
-export type PdktReplyIntent = "reply_to_company_with_ojk_cc" | "reply_to_ojk";
+/**
+ * Arah balasan yang dinilai. `reply_to_ojk_request_in_company_email`: header
+ * Kepada perusahaan + Tembusan OJK, tetapi isi email meminta bantuan OJK, jadi
+ * OJK tetap lawan bicara utama yang harus menjawab sesuai kasus.
+ */
+export const pdktReplyIntentSchema = z.enum([
+  "reply_to_company_with_ojk_cc",
+  "reply_to_ojk",
+  "reply_to_ojk_request_in_company_email",
+]);
+export type PdktReplyIntent = z.infer<typeof pdktReplyIntentSchema>;
 
 export interface PdktRecipientContext {
   primaryRecipientType: PdktPrimaryRecipientType;
@@ -124,6 +134,8 @@ export const pdktScenarioSchema = z.object({
     .max(PDKT_PROMPT_INPUT_LIMITS.longText)
     .optional(),
   primaryRecipientType: z.enum(["ojk", "reported_company"]).optional(),
+  /** Hanya berlaku untuk `reported_company`: isi email juga meminta bantuan OJK. */
+  ojkRequestInBody: z.boolean().optional(),
   recipientMode: z.enum(["single", "multiple"]).optional(),
   recipientEmails: z.array(z.string()).optional(),
   script: z.string().optional(),
@@ -157,7 +169,7 @@ export const pdktPromptRecipientContextSchema = z.object({
   ccRecipients: z
     .array(boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.emailAddress))
     .max(PDKT_PROMPT_INPUT_LIMITS.recipientCount),
-  replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+  replyIntent: pdktReplyIntentSchema,
 });
 
 export const pdktPromptConsumerTypeSchema = pdktConsumerTypeSchema.extend({
@@ -210,7 +222,7 @@ export const pdktSessionConfigSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+      replyIntent: pdktReplyIntentSchema,
     })
     .optional(),
   enableImageGeneration: z.boolean().default(true),
@@ -390,7 +402,7 @@ export const emailMessageSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+      replyIntent: pdktReplyIntentSchema,
     })
     .optional(),
   attachments: z.array(z.string()).optional(),

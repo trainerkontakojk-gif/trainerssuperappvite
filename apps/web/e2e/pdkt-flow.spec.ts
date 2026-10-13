@@ -512,6 +512,85 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("editor skenario menyimpan arah balasan tembusan yang meminta bantuan OJK", async ({
+    page,
+  }) => {
+    const companyScenario = {
+      id: "s-company",
+      category: "Pembiayaan",
+      title: "Pinjaman lunas masih ditagih",
+      description: "Konsumen sudah melunasi pinjaman tetapi masih ditagih.",
+      isActive: true,
+      primaryRecipientType: "reported_company",
+      recipientMode: "single",
+      recipientEmails: ["pengaduan@finansial.test"],
+    };
+    const savedSettings = {
+      scenarios: [companyScenario],
+      consumerTypes: [],
+      enableImageGeneration: false,
+      globalConsumerTypeId: "random",
+      selectedModel: "gemini-3.8-flash",
+      consumerNameMentionPattern: "random",
+      writingStyleMode: "training",
+    };
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/pdkt/settings",
+          body: { success: true, data: savedSettings },
+          headers: { "x-settings-version": "absent" },
+        },
+        {
+          method: "POST",
+          path: "/api/v1/pdkt/settings",
+          body: { success: true, data: null },
+          headers: { "x-settings-version": "2026-10-13T05:00:00.000Z" },
+        },
+        ...pdktMocks([]).filter((mock) => mock.path !== "/api/v1/pdkt/settings"),
+      ],
+    });
+    await waitForMockedApi(audit, ["GET /api/v1/pdkt/settings"]);
+
+    await page.getByRole("button", { name: /^Pengaturan/ }).first().click();
+    const dialog = page.getByRole("dialog").filter({ hasText: "Pengaturan Simulasi" });
+    await dialog
+      .getByRole("button", { name: `Edit ${companyScenario.title}` })
+      .click({ timeout: 20000 });
+    await dialog.getByRole("button", { name: "Lanjut" }).click();
+    await dialog.getByRole("button", { name: "Lanjut" }).click();
+
+    const direction = dialog.getByRole("radiogroup", { name: "Arah balasan" });
+    await expect(direction).toBeVisible();
+    await expect(
+      direction.getByRole("radio", { name: /Hanya tembusan ke OJK/ }),
+    ).toBeChecked();
+    await direction
+      .getByRole("radio", { name: /Tembusan, tapi minta bantuan OJK/ })
+      .check();
+
+    await dialog.getByRole("button", { name: "Simpan Skenario" }).click();
+    const saveRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === "/api/v1/pdkt/settings",
+    );
+    await dialog.getByRole("button", { name: "Simpan Perubahan" }).click();
+    const saved = (await saveRequest).postDataJSON() as {
+      settings: { scenarios: Array<Record<string, unknown>> };
+    };
+    const scenario = saved.settings.scenarios.find(
+      (item) => item.id === companyScenario.id,
+    );
+    expect(scenario).toMatchObject({
+      primaryRecipientType: "reported_company",
+      ojkRequestInBody: true,
+    });
+    expectHermetic(audit);
+  });
+
   test(`teks mailbox, evaluasi, dan lampiran PDKT minimal ${MIN_TEXT_PX}px`, async ({
     page,
   }) => {

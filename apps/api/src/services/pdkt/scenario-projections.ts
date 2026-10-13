@@ -1,5 +1,5 @@
 type WithoutExpectedAnswer<T> = T extends object
-  ? Omit<T, "expectedAnswer">
+  ? Omit<T, "expectedAnswer" | "ojkRequestInBody">
   : T;
 
 type SimulationConfig<T> = T extends { scenarios: Array<infer Scenario> }
@@ -17,7 +17,11 @@ export function toPdktSimulationScenario<T>(
   scenario: T,
 ): WithoutExpectedAnswer<T> {
   if (!isRecord(scenario)) return scenario as WithoutExpectedAnswer<T>;
-  const { expectedAnswer: _expectedAnswer, ...simulationScenario } = scenario;
+  const {
+    expectedAnswer: _expectedAnswer,
+    ojkRequestInBody: _ojkRequestInBody,
+    ...simulationScenario
+  } = scenario;
   return simulationScenario as WithoutExpectedAnswer<T>;
 }
 

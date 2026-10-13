@@ -99,7 +99,11 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **No migration/storage redesign**: Perubahan ini tidak menambah migrasi atau merombak storage; namespace `pdkt` tetap disimpan pada row `user_settings` yang sama.
   - **Awaited save/reset**: `usePdktSettingsDraft()` dan wizard menunggu `onSave` selesai sebelum menutup modal; error atau konflik menjaga draf tetap terbuka untuk retry.
   - Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`; `konsumen@ojk.go.id` tetap menjadi fallback bawaan.
-  - Field **Penerima Utama** mengatur arah narasi email awal: jika dipilih perusahaan terlapor, sapaan/isi/penutup ditujukan ke perusahaan dan OJK hanya boleh muncul sebagai fallback, tembusan, atau referensi.
+  - Field **Arah balasan** mengatur header email awal dan arah yang dinilai (`recipientContext.replyIntent`):
+    - *Hanya tembusan ke OJK* (`primaryRecipientType: "reported_company"`, `reply_to_company_with_ojk_cc`): sapaan/isi/penutup ditujukan ke perusahaan, OJK hanya tembusan/referensi, jawaban yang diharapkan normatif.
+    - *Tembusan, tapi minta bantuan OJK* (`reported_company` + `ojkRequestInBody: true`, `reply_to_ojk_request_in_company_email`): header tetap Kepada perusahaan/Tembusan OJK, tetapi email AI wajib memuat permintaan bantuan eksplisit ke OJK di paragraf tengah (validator menolak dan memicu satu retry bila tidak ada). Penilaian memperlakukan OJK sebagai lawan bicara utama; balasan yang hanya berterima kasih/normatif dinilai salah arah. Template "tulis sendiri" yang dipakai apa adanya tidak divalidasi; isinya tanggung jawab trainer.
+    - *Langsung ke OJK* (`ojk`, `reply_to_ojk`): jawaban sesuai kasus dan standar jawaban.
+    - Petunjuk konflik deterministik dan aturan prompt penilaian memakai `replyIntent`, bukan header. `ojkRequestInBody` dibuang dari proyeksi skenario untuk tampilan simulasi, sama seperti `expectedAnswer`.
   - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
   - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper.
   - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.

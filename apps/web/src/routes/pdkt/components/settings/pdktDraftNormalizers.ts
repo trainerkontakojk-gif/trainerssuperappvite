@@ -64,13 +64,20 @@ export function normalizePdktScenarioDraft(
   draft: Partial<Omit<PdktScenario, "id">>,
 ): Omit<PdktScenario, "id"> {
   const expectedAnswer = draft.expectedAnswer?.trim();
+  const primaryRecipientType = draft.primaryRecipientType ?? "ojk";
 
   return {
     category: draft.category || "Umum",
     title: draft.title || "",
     description: draft.description || "",
     ...(expectedAnswer ? { expectedAnswer } : {}),
-    primaryRecipientType: draft.primaryRecipientType ?? "ojk",
+    primaryRecipientType,
+    // Selalu ditulis (boleh undefined) agar nilai lama tidak tertinggal saat
+    // arah diganti; JSON menghapus key yang undefined.
+    ojkRequestInBody:
+      primaryRecipientType === "reported_company" && draft.ojkRequestInBody
+        ? true
+        : undefined,
     recipientMode: draft.recipientMode ?? "single",
     recipientEmails: normalizePdktRecipientEmails(draft.recipientEmails),
     sampleEmailTemplate: draft.sampleEmailTemplate ?? { subject: "", body: "" },
