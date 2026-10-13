@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   expectHermetic,
   formatAudit,
@@ -287,6 +287,35 @@ function pdktMocks(
       },
     },
   ];
+}
+
+/** Buka Pengaturan PDKT dengan SAVED_SETTINGS dan POST settings yang dimock. */
+async function openScenarioSettings(page: Page) {
+  const audit = await openHermeticShell(page, {
+    path: "/pdkt",
+    apiMocks: [
+      {
+        method: "GET",
+        path: "/api/v1/pdkt/settings",
+        body: { success: true, data: SAVED_SETTINGS },
+        headers: { "x-settings-version": "absent" },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/settings",
+        body: { success: true, data: null },
+        headers: { "x-settings-version": "2026-10-13T05:00:00.000Z" },
+      },
+      ...pdktMocks([]).filter((mock) => mock.path !== "/api/v1/pdkt/settings"),
+    ],
+  });
+  await waitForMockedApi(audit, ["GET /api/v1/pdkt/settings"]);
+  await page
+    .getByRole("navigation", { name: "Menu PDKT" })
+    .getByRole("button", { name: /^Pengaturan/ })
+    .click();
+  // Judul dialog berganti saat editor skenario terbuka; hanya satu dialog aktif.
+  return { audit, dialog: page.getByRole("dialog") };
 }
 
 test.describe("PDKT (hermetic)", () => {
@@ -704,49 +733,49 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("editor skenario menyimpan arah balasan tembusan yang meminta bantuan OJK", async ({
+  test("editor skenario satu halaman mengubah kasus, arah balasan, dan kunci jawaban", async ({
     page,
   }) => {
-    const companyScenario = COMPANY_SCENARIO;
-    const audit = await openHermeticShell(page, {
-      path: "/pdkt",
-      apiMocks: [
-        {
-          method: "GET",
-          path: "/api/v1/pdkt/settings",
-          body: { success: true, data: SAVED_SETTINGS },
-          headers: { "x-settings-version": "absent" },
-        },
-        {
-          method: "POST",
-          path: "/api/v1/pdkt/settings",
-          body: { success: true, data: null },
-          headers: { "x-settings-version": "2026-10-13T05:00:00.000Z" },
-        },
-        ...pdktMocks([]).filter((mock) => mock.path !== "/api/v1/pdkt/settings"),
-      ],
-    });
-    await waitForMockedApi(audit, ["GET /api/v1/pdkt/settings"]);
-
-    await page.getByRole("button", { name: /^Pengaturan/ }).first().click();
-    // Judul dialog berganti saat wizard skenario terbuka; hanya satu dialog aktif.
-    const dialog = page.getByRole("dialog");
+    const { audit, dialog } = await openScenarioSettings(page);
     await dialog
-      .getByRole("button", { name: `Ubah ${companyScenario.title}` })
+      .getByRole("button", { name: `Ubah ${COMPANY_SCENARIO.title}` })
       .click({ timeout: 20000 });
-    await dialog.getByRole("button", { name: "Lanjut" }).click();
-    await dialog.getByRole("button", { name: "Lanjut" }).click();
+
+    // Satu halaman: tiga bagian bernomor tampil bersamaan, tanpa langkah "Lanjut".
+    await expect(
+      dialog.getByRole("heading", { name: "Ubah skenario" }),
+    ).toBeVisible();
+    for (const section of ["Kasusnya", "Arah balasan", "Kunci jawaban"]) {
+      await expect(
+        dialog.getByRole("region", { name: section }),
+      ).toBeVisible();
+    }
+    await expect(dialog.getByRole("button", { name: "Lanjut" })).toHaveCount(0);
+
+    const title = dialog.getByLabel(/^Judul skenario/);
+    await expect(title).toHaveValue(COMPANY_SCENARIO.title);
+    await title.fill("Pinjaman lunas tetapi masih ditelepon penagih");
 
     const direction = dialog.getByRole("radiogroup", { name: "Arah balasan" });
-    await expect(direction).toBeVisible();
     await expect(
       direction.getByRole("radio", { name: /Hanya tembusan ke OJK/ }),
     ).toBeChecked();
     await direction
       .getByRole("radio", { name: /Tembusan, tapi minta bantuan OJK/ })
       .check();
+    // Petunjuk kunci jawaban mengikuti arah yang dipilih.
+    const answer = dialog.getByRole("region", { name: "Kunci jawaban" });
+    await expect(answer).toContainText("bukan sekadar ucapan terima kasih");
+    await answer
+      .getByRole("textbox", { name: "Kunci jawaban" })
+      .fill("Minta bukti pelunasan dan jelaskan tindak lanjut OJK.");
 
-    await dialog.getByRole("button", { name: "Simpan Skenario" }).click();
+    await dialog.getByRole("button", { name: "Terapkan perubahan" }).click();
+    const row = dialog.getByRole("listitem").filter({
+      hasText: "Pinjaman lunas tetapi masih ditelepon penagih",
+    });
+    await expect(row).toContainText("Tembusan, tapi minta bantuan OJK");
+
     const saveRequest = page.waitForRequest(
       (request) =>
         request.method() === "POST" &&
@@ -756,13 +785,73 @@ test.describe("PDKT (hermetic)", () => {
     const saved = (await saveRequest).postDataJSON() as {
       settings: { scenarios: Array<Record<string, unknown>> };
     };
-    const scenario = saved.settings.scenarios.find(
-      (item) => item.id === companyScenario.id,
-    );
-    expect(scenario).toMatchObject({
+    expect(
+      saved.settings.scenarios.find((item) => item.id === COMPANY_SCENARIO.id),
+    ).toMatchObject({
+      title: "Pinjaman lunas tetapi masih ditelepon penagih",
       primaryRecipientType: "reported_company",
       ojkRequestInBody: true,
+      expectedAnswer: "Minta bukti pelunasan dan jelaskan tindak lanjut OJK.",
     });
+    expectHermetic(audit);
+  });
+
+  test("skenario baru divalidasi dan bisa memakai email tulisan sendiri", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openScenarioSettings(page);
+    await dialog
+      .getByRole("button", { name: "Skenario baru" })
+      .click({ timeout: 20000 });
+    await expect(
+      dialog.getByRole("heading", { name: "Skenario baru" }),
+    ).toBeVisible();
+
+    // Kosong: tidak tersimpan, pesan muncul, fokus ke isian pertama yang salah.
+    await dialog.getByRole("button", { name: "Tambahkan skenario" }).click();
+    await expect(dialog.getByText("Judul skenario wajib diisi.")).toBeVisible();
+    await expect(dialog.getByLabel(/^Judul skenario/)).toBeFocused();
+
+    await dialog.getByLabel(/^Judul skenario/).fill("Klaim ditolak tanpa alasan");
+    await dialog.getByLabel(/^Kategori/).selectOption("Asuransi");
+    const mode = dialog.getByRole("radiogroup", { name: "Isi email dibuat oleh" });
+    await mode.getByRole("radio", { name: "Saya tulis sendiri" }).click();
+    // Mode tulis sendiri mengganti ringkasan dengan isi email.
+    await expect(dialog.getByLabel(/^Ringkasan masalah/)).toHaveCount(0);
+    await dialog
+      .getByRole("textbox", { name: /^Subjek email/ })
+      .fill("Klaim saya ditolak");
+    await dialog
+      .getByRole("textbox", { name: /^Isi email/ })
+      .fill("Selamat siang, klaim mobil saya ditolak tanpa penjelasan.");
+
+    await dialog.getByRole("button", { name: "Tambahkan skenario" }).click();
+    const row = dialog.getByRole("listitem").filter({
+      hasText: "Klaim ditolak tanpa alasan",
+    });
+    await expect(row).toContainText("Asuransi");
+    await expect(row).toContainText("Tulis sendiri");
+    await expect(dialog.getByText("Belum disimpan")).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("skenario dihapus dari editor setelah konfirmasi", async ({ page }) => {
+    const { audit, dialog } = await openScenarioSettings(page);
+    await dialog
+      .getByRole("button", { name: `Ubah ${OJK_SCENARIO.title}` })
+      .click({ timeout: 20000 });
+    page.once("dialog", (confirm) => void confirm.accept());
+    await dialog.getByRole("button", { name: "Hapus skenario" }).click();
+
+    await expect(
+      dialog.getByRole("heading", { name: "Skenario", exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("listitem").filter({ hasText: OJK_SCENARIO.title }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("listitem").filter({ hasText: COMPANY_SCENARIO.title }),
+    ).toBeVisible();
     expectHermetic(audit);
   });
 

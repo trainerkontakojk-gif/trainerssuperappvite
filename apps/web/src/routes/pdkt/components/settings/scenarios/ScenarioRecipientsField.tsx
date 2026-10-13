@@ -19,11 +19,14 @@ const SCENARIO_FALLBACK_RECIPIENT = "konsumen@ojk.go.id";
 interface ScenarioRecipientsFieldProps {
   draft: Partial<PdktScenario>;
   onDraftChange: (updates: Partial<PdktScenario>) => void;
+  /** Id judul bagian editor yang menamai grup pilihan arah. */
+  labelledBy: string;
 }
 
 export function ScenarioRecipientsField({
   draft,
   onDraftChange,
+  labelledBy,
 }: ScenarioRecipientsFieldProps) {
   const replyDirection = getReplyDirection(draft);
   const recipientEmails = draft.recipientEmails ?? [];
@@ -58,22 +61,9 @@ export function ScenarioRecipientsField({
 
   return (
     <div id="scenario-recipient-targets" className="flex flex-col gap-4">
-      <div>
-        <h4
-          id="pdkt-reply-direction-title"
-          className="text-sm font-medium text-foreground"
-        >
-          Arah balasan
-        </h4>
-        <p className="mt-1 text-xs leading-relaxed text-foreground/80">
-          Kepada siapa konsumen sebenarnya meminta jawaban? Inilah yang dinilai
-          QA pada aspek Arah Penerima. Peserta tidak melihat pilihan ini.
-        </p>
-      </div>
-
       <div
         role="radiogroup"
-        aria-labelledby="pdkt-reply-direction-title"
+        aria-labelledby={labelledBy}
         className="flex flex-col gap-2.5"
       >
         {REPLY_DIRECTIONS.map((direction) => {
@@ -145,21 +135,22 @@ export function ScenarioRecipientsField({
       <div className="flex flex-col gap-3 border-t border-border pt-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-medium text-foreground">
-              Email Tambahan
+            <div className="text-[13px] font-medium text-foreground">
+              Email penerima lain
             </div>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Tambahkan alamat lain untuk simulasi ini.
+              Misalnya email perusahaan terlapor. Alamat OJK di bawah selalu
+              ikut.
             </p>
           </div>
           <Button
             type="button"
             variant="outline"
             onClick={handleAddEmail}
-            className="shrink-0"
+            className="min-h-11 shrink-0"
           >
             <Plus data-icon="inline-start" />
-            Tambah Email
+            Tambah email
           </Button>
         </div>
 

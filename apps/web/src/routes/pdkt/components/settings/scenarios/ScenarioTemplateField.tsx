@@ -23,21 +23,8 @@ export function ScenarioTemplateField({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="min-w-0 max-w-md">
-        <h4 className="text-sm font-medium text-foreground">
-          Ditulis oleh Anda
-        </h4>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Email ini menjadi sumber utama isi simulasi.
-        </p>
-      </div>
-
       <div className="flex flex-col gap-3">
-        <SettingsField
-          label="Subjek email buatan sendiri"
-          id={subjectId}
-          optional
-        >
+        <SettingsField label="Subjek email" id={subjectId} optional>
           <SettingsInput
             id={subjectId}
             type="text"
@@ -55,16 +42,16 @@ export function ScenarioTemplateField({
         </SettingsField>
 
         <SettingsField
-          label="Isi email buatan sendiri"
+          label="Isi email"
           id={bodyId}
           required
           error={error}
-          helperText="Tulis email lengkap yang ingin dipakai dalam simulasi."
+          helperText="Tulis email lengkap seperti yang dikirim konsumen."
         >
           <SettingsTextarea
             id={bodyId}
             rows={6}
-            placeholder="Tulis email buatan sendiri di sini."
+            placeholder="Tulis email konsumen di sini."
             value={draft.sampleEmailTemplate?.body || ""}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? bodyErrorId : undefined}
