@@ -18,8 +18,10 @@ describe("PDKT scenario recipient editor", () => {
 
       return (
         <div>
+          <h4 id="recipients-test-title">Arah balasan</h4>
           <ScenarioRecipientsField
             draft={draft}
+            labelledBy="recipients-test-title"
             onDraftChange={(updates) =>
               setDraft((prev) => ({ ...prev, ...updates }))
             }

@@ -98,8 +98,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Wizard skenario memakai seluruh area modal, sehingga header, navigasi tab,
-  // dan footer pengaturan disembunyikan selama wizard terbuka.
+  // Editor skenario memakai seluruh area modal, sehingga header, navigasi tab,
+  // dan footer pengaturan disembunyikan selama editor terbuka.
   const wizardOpen = scenarioForm.isOpen;
 
   const activeScenarioCount = localSettings.scenarios.filter(
@@ -232,24 +232,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 <PdktScenariosTab
                   scenarios={localSettings.scenarios}
-                  consumerTypes={localSettings.consumerTypes}
                   scenarioForm={scenarioForm}
-                  enableImageGeneration={enableImageGeneration}
-                  setEnableImageGeneration={setEnableImageGeneration}
-                  customIdentity={{
-                    senderName: customSenderName,
-                    bodyName: customBodyName,
-                    email: customEmail,
-                    city: customCity,
-                  }}
-                  globalConsumerTypeId={globalConsumerTypeId}
-                  setGlobalConsumerTypeId={setGlobalConsumerTypeId}
-                  consumerNameMentionPattern={consumerNameMentionPattern}
-                  setConsumerNameMentionPattern={setConsumerNameMentionPattern}
-                  selectedModel={selectedModel}
-                  setSelectedModel={setSelectedModel}
-                  writingStyleMode={writingStyleMode}
-                  setWritingStyleMode={setWritingStyleMode}
                   setLocalSettings={setLocalSettings}
                 />
               </TabsContent>
