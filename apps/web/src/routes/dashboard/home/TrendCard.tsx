@@ -5,14 +5,23 @@ import { sidakClient, unwrapResponse } from "../../../lib/api";
 import { TrendChart, type ChartPoint } from "./TrendChart";
 import {
   serviceLabel,
-  type TrendMap,
-  type TrendRange,
+  type MonthRange,
+  type TrendData,
 } from "./useDashboardTrend";
 
-const RANGES: { value: TrendRange; label: string }[] = [
-  { value: "3m", label: "3 bln" },
-  { value: "6m", label: "6 bln" },
-  { value: "all", label: "12 bln" },
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
 ];
 const NUMBER = new Intl.NumberFormat("id-ID");
 
@@ -80,12 +89,68 @@ function Delta({ last, prev }: { last: number; prev: number }) {
   );
 }
 
-/** Kartu "Tren temuan QA": rentang, filter layanan, ringkasan, dan grafik. */
-export function TrendCard({ trendMap }: { trendMap: TrendMap }) {
-  const [range, setRange] = useState<TrendRange>("6m");
+function MonthSelect({
+  id,
+  label,
+  value,
+  from,
+  to,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  from: number;
+  to: number;
+  onChange: (month: number) => void;
+}) {
+  return (
+    <>
+      <label className="sr-only" htmlFor={id}>
+        {label}
+      </label>
+      <span className="home-select home-select-month">
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+        >
+          {MONTHS.slice(from - 1, to).map((name, i) => (
+            <option key={name} value={from + i}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown aria-hidden="true" />
+      </span>
+    </>
+  );
+}
+
+/**
+ * Kartu "Tren temuan QA": rentang bulan tahun berjalan (default YTD), filter
+ * layanan, ringkasan, dan grafik. Bulan awal tidak bisa melewati bulan akhir.
+ */
+export function TrendCard({
+  trend,
+  year,
+  currentMonth,
+  range,
+  onRangeChange,
+  pending,
+}: {
+  trend: TrendData;
+  year: number;
+  currentMonth: number;
+  range: MonthRange;
+  onRangeChange: (range: MonthRange) => void;
+  pending: boolean;
+}) {
   const [service, setService] = useState("all");
-  const trend = trendMap[range];
-  const services = trendMap.all.activeServices;
+  const services =
+    service === "all" || trend.activeServices.includes(service)
+      ? trend.activeServices
+      : [...trend.activeServices, service];
 
   const values =
     service === "all"
@@ -95,9 +160,11 @@ export function TrendCard({ trendMap }: { trendMap: TrendMap }) {
     label,
     value: values[i] ?? 0,
   }));
+  // Proyeksi menyambung bulan terakhir berdata, jadi hanya relevan bila
+  // rentang berakhir di bulan ini.
   const projection = useCachedProjection(
     service,
-    trendMap.all.labels.length >= 2,
+    range.end === currentMonth && points.length >= 2,
   );
   const total = values.reduce((sum, v) => sum + v, 0);
   const last = points.at(-1);
@@ -111,6 +178,7 @@ export function TrendCard({ trendMap }: { trendMap: TrendMap }) {
     <section
       aria-labelledby="home-trend-title"
       className="home-panel home-trend"
+      aria-busy={pending || undefined}
     >
       <div className="home-trend-head">
         <div>
@@ -118,22 +186,33 @@ export function TrendCard({ trendMap }: { trendMap: TrendMap }) {
             Tren temuan QA
           </h2>
           <p className="home-section-sub">
-            Jumlah temuan per bulan
+            Jumlah temuan per bulan, {MONTHS[range.start - 1]}
+            {range.end !== range.start ? `–${MONTHS[range.end - 1]}` : ""}{" "}
+            {year}
             {projection ? " · garis putus-putus = proyeksi" : ""}
           </p>
         </div>
         <div className="home-trend-controls">
-          <div className="home-seg" role="group" aria-label="Rentang">
-            {RANGES.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={range === option.value}
-                onClick={() => setRange(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="home-month-range" role="group" aria-label="Rentang">
+            <MonthSelect
+              id="home-trend-start"
+              label="Bulan awal"
+              value={range.start}
+              from={1}
+              to={currentMonth}
+              onChange={(start) =>
+                onRangeChange({ start, end: Math.max(start, range.end) })
+              }
+            />
+            <span aria-hidden="true">–</span>
+            <MonthSelect
+              id="home-trend-end"
+              label="Bulan akhir"
+              value={range.end}
+              from={range.start}
+              to={currentMonth}
+              onChange={(end) => onRangeChange({ ...range, end })}
+            />
           </div>
           <label className="sr-only" htmlFor="home-trend-service">
             Layanan

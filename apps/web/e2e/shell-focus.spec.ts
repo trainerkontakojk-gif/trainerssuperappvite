@@ -38,12 +38,7 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
   {
     method: "GET",
     path: "/api/v1/sidak/dashboard/trend",
-    body: {
-      success: true,
-      data: {
-        trendMap: { "3m": EMPTY_TREND, "6m": EMPTY_TREND, all: EMPTY_TREND },
-      },
-    },
+    body: { success: true, data: EMPTY_TREND },
   },
   {
     method: "GET",
