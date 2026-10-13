@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   expectHermetic,
   openHermeticShell,
@@ -16,17 +16,31 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
  * kosong, error + coba lagi, dan sebagian; aksi dan pintasan sesuai peran.
  */
 
-const TREND = {
-  labels: ["Agu 2026", "Sep 2026"],
-  totalData: [40, 30],
-  serviceData: { call: [25, 18], chat: [15, 12] },
-  activeServices: ["call", "chat"],
-  serviceSummary: {
-    call: { totalDefects: 43, auditedAgents: 20 },
-    chat: { totalDefects: 27, auditedAgents: 12 },
-  },
-  totalSummary: { totalDefects: 70, auditedAgents: 32, activeServiceCount: 2 },
+// Label mengikuti format API tren (`MONTHS_SHORT` + tahun dua digit).
+const LABELS = ["Apr 26", "Mei 26", "Jun 26", "Jul 26", "Agu 26", "Sep 26"];
+const CALL = [30, 28, 26, 27, 25, 18];
+const CHAT = [20, 19, 18, 16, 15, 12];
+const series = (months: number) => {
+  const cut = LABELS.length - months;
+  const call = CALL.slice(cut);
+  const chat = CHAT.slice(cut);
+  return {
+    labels: LABELS.slice(cut),
+    totalData: call.map((v, i) => v + chat[i]),
+    serviceData: { call, chat },
+    activeServices: ["call", "chat"],
+    serviceSummary: {
+      call: { totalDefects: 18, auditedAgents: 20 },
+      chat: { totalDefects: 12, auditedAgents: 12 },
+    },
+    totalSummary: {
+      totalDefects: 30,
+      auditedAgents: 32,
+      activeServiceCount: 2,
+    },
+  };
 };
+const TREND_MAP = { "3m": series(3), "6m": series(6), all: series(6) };
 
 const ATTENTION_ITEMS = [
   { kind: "leader_access_pending", count: 3, scope: "all" },
@@ -43,15 +57,10 @@ function mocks(attention: ApiMock["body"], status = 200): ApiMock[] {
   return [
     {
       method: "GET",
-      path: "/api/v1/sidak/dashboard/available-years",
-      body: { success: true, data: [2026] },
-    },
-    {
-      method: "GET",
       path: "/api/v1/sidak/dashboard/trend",
       body: {
         success: true,
-        data: { trendMap: { "3m": TREND, "6m": TREND, all: TREND } },
+        data: { trendMap: TREND_MAP },
       },
     },
     {
@@ -92,6 +101,23 @@ function attentionSection(page: Page) {
   return page.getByRole("region", { name: "Perlu tindakan" });
 }
 
+function trendCard(page: Page) {
+  return page.getByRole("region", { name: "Tren temuan QA" });
+}
+
+/** Nilai `<dd>` milik `<dt>` dengan teks persis `label`. */
+function stat(list: Locator, label: string) {
+  return list
+    .locator("div")
+    .filter({ has: list.page().locator("dt", { hasText: label }) })
+    .locator("dd");
+}
+
+/** Baris data di tabel alternatif grafik (untuk pembaca layar). */
+function chartRows(card: Locator) {
+  return card.locator("table tbody tr:not([data-projection])");
+}
+
 test.describe("Beranda staff", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
@@ -115,14 +141,15 @@ test.describe("Beranda staff", () => {
     ).toHaveAttribute("href", "/sidak/input");
 
     await expect(
-      main.getByRole("heading", { name: "Tren Temuan QA" }),
+      main.getByRole("heading", { name: "Tren temuan QA" }),
     ).toBeVisible();
     const order = await main
       .getByRole("heading", { level: 2 })
       .allTextContents();
     const expected = [
       "Perlu tindakan",
-      "Tren Temuan QA",
+      "Tren temuan QA",
+      "Temuan per layanan",
       "Aktivitas terakhir",
       "Pintasan",
     ];
@@ -205,7 +232,7 @@ test.describe("Beranda staff", () => {
       section.getByText("Daftar tindakan belum dapat dimuat"),
     ).toBeVisible({ timeout: 20000 });
     await expect(
-      content(page).getByRole("heading", { name: "Tren Temuan QA" }),
+      content(page).getByRole("heading", { name: "Tren temuan QA" }),
     ).toBeVisible();
 
     // Rute yang didaftarkan belakangan didahulukan Playwright.
@@ -234,24 +261,126 @@ test.describe("Beranda staff", () => {
     expectHermetic(audit);
   });
 
-  test("ringkasan tren: agen diaudit dan layanan aktif", async ({ page }) => {
+  test("tren temuan: rentang, layanan, dan ringkasan angka", async ({
+    page,
+  }) => {
     const audit = await openHermeticShell(page, {
       path: "/dashboard",
       apiMocks: mocks(ok([])),
     });
-    const main = content(page);
-    await expect(main.getByText("Agen diaudit")).toBeVisible({
+    const card = trendCard(page);
+    const range = card.getByRole("group", { name: "Rentang" });
+    await expect(range.getByRole("button", { name: "6 bln" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+      { timeout: 20000 },
+    );
+    // Kontrol detail tetap di halaman SIDAK, bukan di Beranda.
+    await expect(card.getByRole("button", { name: /Prediksi/ })).toHaveCount(0);
+    await expect(card.getByRole("combobox", { name: /Tahun/ })).toHaveCount(0);
+
+    const stats = card.locator("dl");
+    await expect(stat(stats, "Temuan 6 bulan")).toHaveText("254");
+    await expect(stat(stats, "Sep 26 vs Agu 26")).toHaveText("−25% turun");
+    await expect(stat(stats, "Agen diaudit")).toHaveText("32");
+    await expect(stat(stats, "Layanan aktif")).toHaveText("2");
+    await expect(chartRows(card)).toHaveCount(6);
+
+    await range.getByRole("button", { name: "3 bln" }).click();
+    await expect(stat(stats, "Temuan 3 bulan")).toHaveText("113");
+    await expect(chartRows(card)).toHaveCount(3);
+
+    await card
+      .getByRole("combobox", { name: "Layanan" })
+      .selectOption({ label: "Layanan Chat" });
+    await expect(stat(stats, "Temuan 3 bulan")).toHaveText("43");
+    await expect(stat(stats, "Sep 26 vs Agu 26")).toHaveText("−20% turun");
+    expectHermetic(audit);
+  });
+
+  test("temuan per layanan: bulan terakhir, urut terbanyak, tautan SIDAK", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([])),
+    });
+    const card = page.getByRole("region", { name: "Temuan per layanan" });
+    await expect(card).toContainText("Sep 26 · 30 temuan", { timeout: 20000 });
+    const rows = card.getByRole("listitem");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toHaveText(/Call\s*18/);
+    await expect(rows.nth(1)).toHaveText(/Chat\s*12/);
+    await expect(
+      card.getByRole("link", { name: "Buka Dashboard SIDAK" }),
+    ).toHaveAttribute("href", "/sidak");
+    await expect(content(page)).toContainText("Periode QA terakhir: Sep 26");
+    expectHermetic(audit);
+  });
+
+  test("aktivitas dan pintasan sejajar di desktop", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([])),
+    });
+    const activity = page.getByRole("region", { name: "Aktivitas terakhir" });
+    const shortcuts = page.getByRole("region", { name: "Pintasan" });
+    await expect(activity.getByText("Rina Kusuma")).toBeVisible({
       timeout: 20000,
     });
-    // Temuan per layanan ditampilkan di "Ringkasan Performa" milik panel tren,
-    // jadi Beranda tidak menggandakannya.
-    await expect(
-      main.getByRole("heading", { name: "Temuan per layanan" }),
-    ).toHaveCount(0);
-    const summary = main.locator("dl").filter({ hasText: "Agen diaudit" });
-    await expect(summary).toContainText("32");
-    await expect(summary).toContainText("Layanan aktif");
-    await expect(summary).toContainText("2");
+    const top = async (locator: Locator) =>
+      (await locator.boundingBox())?.y ?? Number.NaN;
+    const [actHead, scHead, actList, scList] = await Promise.all([
+      top(activity.getByRole("heading", { level: 2 })),
+      top(shortcuts.getByRole("heading", { level: 2 })),
+      top(activity.getByRole("list")),
+      top(shortcuts.getByRole("list")),
+    ]);
+    expect(Math.abs(actHead - scHead)).toBeLessThanOrEqual(1);
+    expect(Math.abs(actList - scList)).toBeLessThanOrEqual(1);
+    for (const link of await shortcuts.getByRole("link").all()) {
+      expect((await link.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+    expectHermetic(audit);
+  });
+
+  test("mobile: aksi selebar layar dan CTA tindakan di bawah teks", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok(ATTENTION_ITEMS)),
+    });
+    const main = content(page);
+    const primary = main.getByRole("link", {
+      name: "Input temuan",
+      exact: true,
+    });
+    await expect(primary).toBeVisible({ timeout: 20000 });
+    const heading = main.getByRole("heading", { level: 1 });
+    const [primaryBox, headingBox] = await Promise.all([
+      primary.boundingBox(),
+      heading.boundingBox(),
+    ]);
+    // Tombol aksi memenuhi lebar kolom konten (390 − 2 × 16px gutter).
+    expect(primaryBox!.width).toBeGreaterThanOrEqual(350);
+    expect(Math.abs(primaryBox!.x - headingBox!.x)).toBeLessThanOrEqual(1);
+
+    const row = attentionSection(page).getByRole("listitem").first();
+    const [title, cta] = await Promise.all([
+      row.getByText("Permintaan akses leader", { exact: true }).boundingBox(),
+      row.getByRole("link", { name: /Tinjau/ }).boundingBox(),
+    ]);
+    expect(cta!.y).toBeGreaterThan(title!.y + title!.height);
+    expect(Math.abs(cta!.x - title!.x)).toBeLessThanOrEqual(1);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
     expectHermetic(audit);
   });
 

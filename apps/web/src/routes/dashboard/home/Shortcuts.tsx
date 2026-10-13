@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { Capability } from "@trainers/types";
 import {
+  ArrowRight,
   ChartLine,
   ClipboardList,
   Grid3x3,
@@ -88,28 +89,29 @@ export function Shortcuts({ role }: { role: string | null | undefined }) {
 
   return (
     <section aria-labelledby="home-shortcuts-title" className="home-section">
-      <div className="home-section-head">
+      <div className="home-section-head home-section-head-row">
         <h2 id="home-shortcuts-title" className="home-section-title">
           Pintasan
         </h2>
       </div>
-      <ul className="home-panel flex flex-col gap-1 p-2">
+      <ul className="home-rows">
         {items.map((item) => (
           <li key={item.href}>
             <Link
               to={item.href as any}
-              className="nav-item"
+              className="home-shortcut"
               style={{ "--mc": item.color } as CSSProperties}
             >
-              <item.icon
-                className="nav-icon"
-                style={{ color: item.color }}
-                aria-hidden="true"
-              />
-              <span className="nav-label">
-                <span className="nav-name">{item.label}</span>
-                <span className="nav-sub">{item.description}</span>
+              <item.icon className="home-shortcut-icon" aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-fg">
+                  {item.label}
+                </span>
+                <span className="block text-[12px] text-fg2">
+                  {item.description}
+                </span>
               </span>
+              <ArrowRight className="home-shortcut-arrow" aria-hidden="true" />
             </Link>
           </li>
         ))}

@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { adminClient, unwrapResponse } from "../../../lib/api";
 import QaStatePanel from "../../../components/ui/QaStatePanel";
@@ -65,15 +66,13 @@ export function ActivityFeed() {
 
   return (
     <section aria-labelledby="home-activity-title" className="home-section">
-      <div className="home-section-head flex items-baseline justify-between gap-4">
+      <div className="home-section-head home-section-head-row">
         <h2 id="home-activity-title" className="home-section-title">
           Aktivitas terakhir
         </h2>
-        <Link
-          to="/dashboard/activities"
-          className="inline-flex min-h-[44px] items-center text-[13px] text-fg2 underline-offset-4 hover:text-fg hover:underline"
-        >
+        <Link to="/dashboard/activities" className="home-link">
           Lihat semua<span className="sr-only"> aktivitas</span>
+          <ArrowRight aria-hidden="true" />
         </Link>
       </div>
       {state.status === "loading" && (
@@ -111,28 +110,31 @@ export function ActivityFeed() {
             description="Aktivitas pengguna akan tampil di sini."
           />
         ) : (
-          <ul className="home-panel divide-y divide-border py-0">
-            {state.logs.map((log) => (
-              <li
-                key={log.id}
-                className="flex items-center justify-between gap-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-fg">
-                    {log.user_name || "Pengguna internal"}
-                  </p>
-                  <p className="truncate text-[12px] text-fg2">
-                    {normalizeActionText(log.action)}
-                  </p>
-                </div>
-                <time
-                  dateTime={log.created_at}
-                  className="shrink-0 text-[12px] tabular-nums text-fg2"
-                >
-                  {formatTimeAgo(log.created_at)}
-                </time>
-              </li>
-            ))}
+          <ul className="home-rows">
+            {state.logs.map((log) => {
+              const name = log.user_name || "Pengguna internal";
+              return (
+                <li key={log.id} className="home-activity-row">
+                  <span className="home-avatar" aria-hidden="true">
+                    {name.trim().charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-fg">
+                      {name}
+                    </p>
+                    <p className="truncate text-[13px] text-fg2">
+                      {normalizeActionText(log.action)}
+                    </p>
+                  </div>
+                  <time
+                    dateTime={log.created_at}
+                    className="home-activity-time"
+                  >
+                    {formatTimeAgo(log.created_at)}
+                  </time>
+                </li>
+              );
+            })}
           </ul>
         ))}
     </section>

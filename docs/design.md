@@ -260,7 +260,9 @@ Satu model navigasi, `buildNavModel(role)` di `components/layout/nav-config.ts`,
 
 ### Beranda (`/dashboard`)
 
-- **Staff (admin/trainer/leader):** salam + tanggal (WIB) dan aksi utama sesuai peran → **Perlu tindakan** (`GET /api/v1/home/attention`, daftar berbaris dengan hitungan dan CTA) → panel **Tren Temuan QA** (`DashboardTrendPanel`, termasuk ringkasan per layanan) → **Aktivitas terakhir** (hanya baca) + **Pintasan**.
+- **Staff (admin/trainer/leader):** salam + tanggal (WIB) + periode QA terakhir, dan aksi utama sesuai peran → **Perlu tindakan** (`GET /api/v1/home/attention`, daftar berbaris dengan hitungan dan CTA) → kartu **Tren temuan QA** (rentang 3/6/12 bulan, filter layanan, ringkasan angka, garis aktual + proyeksi putus-putus) di samping **Temuan per layanan** (periode terakhir) → **Aktivitas terakhir** (hanya baca) + **Pintasan**. Dua baris terakhir memakai grid 2:1 yang sama, dan kepala section setinggi 44px supaya kolomnya sejajar.
+- **Proyeksi di Beranda hanya dibaca dari cache** (`POST /sidak/dashboard/forecast` dengan `cacheOnly`). Membuat atau memperbarui prediksi, serta filter tahun/rentang bulan, ada di halaman SIDAK (`/sidak/forecast`, `/sidak`).
+- **Ponsel (≤560px):** aksi header selebar layar; CTA "Perlu tindakan" turun ke bawah teks; label sumbu X grafik dipendekkan/dijarangkan agar tidak bertumpuk.
 - **Agent:** aksi "Lanjutkan KETIK" → **Latihan** (modul yang diizinkan) → **Riwayat sesi** gabungan KETIK + PDKT.
 - Setiap section memuat datanya sendiri dengan state loading, kosong, dan error + "Coba lagi"; gagal satu section tidak mengosongkan section lain. Data tidak dikarang: kolom yang tidak ada di respons tidak ditampilkan.
 
