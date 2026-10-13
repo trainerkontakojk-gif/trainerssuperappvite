@@ -34,24 +34,33 @@ export function useRouteFocus(
 
   useEffect(() => {
     let cancelPending = () => {};
+    // Navigasi berjalan di dalam transition React: saat `onRendered`, halaman
+    // lama bisa masih tampil sampai route lazy selesai dimuat. `h1` lama
+    // dicatat di sini agar tidak dikira milik halaman baru.
+    let staleHeading: Element | null = null;
 
-    const unsubscribe = router.subscribe("onRendered", (event) => {
+    const unsubscribeBefore = router.subscribe("onBeforeNavigate", (event) => {
+      if (event.pathChanged)
+        staleHeading = contentRef.current?.querySelector("h1") ?? null;
+    });
+    const unsubscribeRendered = router.subscribe("onRendered", (event) => {
       if (!event.pathChanged || !event.fromLocation) return;
       const content = contentRef.current;
       if (!enabledRef.current || !content) return;
       cancelPending();
-      cancelPending = moveFocusIntoPage(content);
+      cancelPending = moveFocusIntoPage(content, staleHeading);
     });
 
     return () => {
       cancelPending();
-      unsubscribe();
+      unsubscribeBefore();
+      unsubscribeRendered();
     };
   }, [router, contentRef]);
 }
 
-/** Fokus ke `h1` di `content`; tunggu sebentar bila belum ada. */
-function moveFocusIntoPage(content: HTMLElement) {
+/** Fokus ke `h1` baru di `content`; tunggu sebentar bila belum ada. */
+function moveFocusIntoPage(content: HTMLElement, staleHeading: Element | null) {
   // Pengguna sudah berpindah ke dalam konten (mis. mengetik): jangan direbut.
   const userMovedIntoContent = () =>
     content.contains(document.activeElement) &&
@@ -59,7 +68,7 @@ function moveFocusIntoPage(content: HTMLElement) {
 
   const focusHeading = () => {
     const heading = content.querySelector<HTMLElement>("h1");
-    if (!heading) return false;
+    if (!heading || heading === staleHeading) return false;
     if (userMovedIntoContent()) return true;
     if (!heading.hasAttribute("tabindex")) heading.tabIndex = -1;
     heading.focus({ preventScroll: true });
