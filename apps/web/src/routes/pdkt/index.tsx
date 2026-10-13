@@ -5,7 +5,6 @@ import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
-  BarChart3,
   Check,
   History,
   Mail,
@@ -21,7 +20,7 @@ import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
-import { UsageModal } from "../../components/UsageModal";
+import { UsagePopover } from "./components/UsagePopover";
 import { useApi } from "../../hooks/useApi";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
@@ -106,7 +105,6 @@ export default function PdktLanding() {
   const canPickParticipant = can(profile?.role, "simulation.subject.select");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isUsageOpen, setIsUsageOpen] = useState(false);
 
   const [settings, setSettings] = useState<PdktAppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -344,10 +342,6 @@ export default function PdktLanding() {
     setIsHistoryOpen(true);
   };
 
-  const handleOpenUsage = () => {
-    setIsUsageOpen(true);
-  };
-
   const hasSessionDelta = Boolean(
     sessionDelta &&
     (sessionDelta.costIdr > 0 ||
@@ -416,21 +410,20 @@ export default function PdktLanding() {
                       <History data-icon="inline-start" />
                       Riwayat
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleOpenUsage}
-                      className={navButtonClass}
-                    >
-                      <BarChart3 data-icon="inline-start" />
-                      Pemakaian AI
-                      {hasSessionDelta && sessionDelta && (
-                        <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
-                          <span className="sr-only">Sesi terakhir </span>
-                          {formatUsageDeltaLabel(sessionDelta)}
-                        </span>
-                      )}
-                    </Button>
+                    <UsagePopover
+                      triggerClassName={navButtonClass}
+                      sessionDelta={sessionDelta}
+                      sessionDeltaPending={sessionDeltaPending}
+                      triggerBadge={
+                        hasSessionDelta &&
+                        sessionDelta && (
+                          <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
+                            <span className="sr-only">Sesi terakhir </span>
+                            {formatUsageDeltaLabel(sessionDelta)}
+                          </span>
+                        )
+                      }
+                    />
                     <Button
                       type="button"
                       variant="outline"
@@ -588,14 +581,6 @@ export default function PdktLanding() {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onClearHistory={handleClearHistory}
-      />
-
-      <UsageModal
-        isOpen={isUsageOpen}
-        onClose={() => setIsUsageOpen(false)}
-        module="pdkt"
-        sessionDelta={sessionDelta}
-        sessionDeltaPending={sessionDeltaPending}
       />
     </div>
   );
