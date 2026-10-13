@@ -1,5 +1,11 @@
 # Trainers SuperApp — Product Definition
 
+<!-- impeccable:product-schema 1 -->
+
+## Platform
+
+web
+
 ## Users
 
 Trainers SuperApp is an internal operational workspace for trainers, QA, leaders, admins, and agents. It combines communication training, quality analysis, participant/profile management, access control, monitoring, and AI-assisted feedback.
@@ -25,6 +31,22 @@ Success means users can understand module state, complete the next task, and tru
 
 The runtime and module contracts are maintained in [`docs/architecture.md`](docs/architecture.md) and [`docs/modules.md`](docs/modules.md). Visual rules are maintained in [`docs/design.md`](docs/design.md).
 
+## Positioning
+
+Trainers SuperApp keeps practice and real quality evidence in one place for the same agents:
+
+- **Practice and audit together.** Communication simulations (KETIK, PDKT, Telefun) and real QA audit data (SIDAK) live in one workspace, so a QA finding can lead straight to targeted practice or a training-needs plan.
+- **AI consumer roleplay.** AI plays an OJK consumer in Indonesian across chat, email, and voice, with automatic evaluation of the agent's response.
+- **Trustworthy scores and scope.** SIDAK scoring rules and leader team scope are enforced in the backend, so displayed numbers and data coverage can be trusted.
+- **Replaces manual recaps.** It replaces spreadsheet and per-team folder recaps for finding input, ranking, and reports.
+
+## Operating Context
+
+- Internal tool for the trainer and QA team of the Kontak OJK 157 consumer service contact center.
+- Agents are trained and audited per service channel: Call, Chat (WhatsApp), Email, CSO, Pencatatan, BKO, and SLIK.
+- KETIK, PDKT, and Telefun simulate consumers contacting OJK; SIDAK records monthly QA periods and findings per agent and channel.
+- Used mainly on office laptops and desktops; phones are a secondary, quick-check context.
+
 ## Brand Personality
 
 Professional, calm, precise.
@@ -36,6 +58,19 @@ The product voice should be clear, direct, and supportive. It should explain wha
 Avoid interfaces that feel decorative, noisy, or AI-generated: ornamental badges, neon or excessive gradients, floating decorations, generic repeated card grids, nested cards, oversized rounded panels, low-contrast gray text, and dashboards that require too much scanning effort.
 
 Avoid treating operational modules like marketing pages. KETIK, PDKT, Telefun, KTP/Profiler, SIDAK, Monitoring, and Admin should prioritize task clarity, readable data, stable controls, and predictable state changes.
+
+## Evidence on Hand
+
+- Agent names, scores, and findings are sensitive internal data. Public mockups, screenshots, and demos must use sample data, never real records.
+- There are no testimonials, impact figures, or official case studies. Do not invent such claims, including on the landing page.
+- The OJK logo is a display asset (for example in KETIK). Do not present Trainers SuperApp as an official OJK product.
+
+## Product Principles
+
+1. Evidence leads to practice: surfaces should connect what QA found to what the agent practices next.
+2. Numbers must be defensible: every score, count, and scope shown must match backend rules, and missing or partial data is stated rather than hidden.
+3. Scope is part of the answer: users always know whose data they are looking at (all agents, their team, or themselves).
+4. Built for the daily desk: optimize for repeated desktop use by trainers and QA; keep phone use workable for quick checks.
 
 ## Design Principles
 

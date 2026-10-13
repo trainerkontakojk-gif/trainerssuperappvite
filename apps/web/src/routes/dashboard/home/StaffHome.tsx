@@ -27,14 +27,14 @@ export function StaffHome({
   const trend = useDashboardTrend();
   const canManageSidak = isCapabilityAllowed(role, "sidak.config.manage");
   const canReadActivity = isCapabilityAllowed(role, "admin.activityLogs.read");
-  const lastPeriod =
-    trend.status === "ready" ? trend.trendMap.all.labels.at(-1) : undefined;
 
   return (
     <div className="home-page">
       <HomeHeader
         displayName={displayName}
-        meta={lastPeriod ? `Periode QA terakhir: ${lastPeriod}` : null}
+        meta={
+          trend.latestLabel ? `Periode QA terakhir: ${trend.latestLabel}` : null
+        }
       >
         {canManageSidak ? (
           <Link
@@ -86,7 +86,7 @@ export function StaffHome({
               type="button"
               variant="outline"
               className="min-h-[44px]"
-              onClick={() => void trend.reload()}
+              onClick={trend.reload}
             >
               Coba lagi
             </Button>
@@ -95,8 +95,15 @@ export function StaffHome({
       )}
       {trend.status === "ready" && (
         <div className="home-grid">
-          <TrendCard trendMap={trend.trendMap} />
-          <ServiceBreakdown trend={trend.trendMap.all} />
+          <TrendCard
+            trend={trend.trend}
+            year={trend.year}
+            currentMonth={trend.currentMonth}
+            range={trend.range}
+            onRangeChange={trend.setRange}
+            pending={trend.pending}
+          />
+          <ServiceBreakdown trend={trend.trend} />
         </div>
       )}
 

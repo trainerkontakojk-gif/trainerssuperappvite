@@ -4,11 +4,18 @@ import { serviceLabel, type TrendData } from "./useDashboardTrend";
 
 const NUMBER = new Intl.NumberFormat("id-ID");
 
-/** Temuan per layanan pada periode terakhir, terbanyak dulu. */
+/**
+ * Temuan per layanan, dijumlahkan atas rentang yang sama dengan kartu tren,
+ * terbanyak dulu.
+ */
 export function ServiceBreakdown({ trend }: { trend: TrendData }) {
-  const lastIndex = trend.labels.length - 1;
+  const first = trend.labels[0];
+  const last = trend.labels.at(-1);
   const rows = Object.entries(trend.serviceData)
-    .map(([service, data]) => ({ service, value: data[lastIndex] ?? 0 }))
+    .map(([service, data]) => ({
+      service,
+      value: data.reduce((sum, v) => sum + v, 0),
+    }))
     .filter((row) => row.value > 0)
     .sort((a, b) => b.value - a.value);
   const total = rows.reduce((sum, row) => sum + row.value, 0);
@@ -23,8 +30,8 @@ export function ServiceBreakdown({ trend }: { trend: TrendData }) {
         Temuan per layanan
       </h2>
       <p className="home-section-sub">
-        {lastIndex >= 0
-          ? `${trend.labels[lastIndex]} · ${NUMBER.format(total)} temuan`
+        {first && last
+          ? `${first === last ? last : `${first} – ${last}`} · ${NUMBER.format(total)} temuan`
           : "Belum ada periode QA"}
       </p>
       {rows.length > 0 ? (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import { SERVICE_LABELS } from "../../../lib/scoring";
 
@@ -8,11 +8,12 @@ export interface TrendData {
   totalData: number[];
   serviceData: Record<string, number[]>;
   activeServices: string[];
+  /** Per layanan, dihitung atas seluruh rentang. */
   serviceSummary: Record<
     string,
     { totalDefects: number; auditedAgents: number }
   >;
-  /** Ringkasan periode terakhir dalam rentang. */
+  /** Ringkasan atas seluruh rentang. */
   totalSummary: {
     totalDefects: number;
     auditedAgents: number;
@@ -20,9 +21,11 @@ export interface TrendData {
   };
 }
 
-/** Rentang yang disediakan `GET /sidak/dashboard/trend`; `all` = 12 periode. */
-export type TrendRange = "3m" | "6m" | "all";
-export type TrendMap = Record<TrendRange, TrendData>;
+/** Rentang bulan (1–12) dalam tahun berjalan. */
+export interface MonthRange {
+  start: number;
+  end: number;
+}
 
 /** Nama tampilan layanan, mis. `call` → "Call". */
 export function serviceLabel(service: string) {
@@ -32,27 +35,69 @@ export function serviceLabel(service: string) {
 type State =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; trendMap: TrendMap };
+  | { status: "ready"; trend: TrendData };
 
-/** Tren temuan untuk Beranda staff, dengan status muat/gagal eksplisit. */
+/**
+ * Tren temuan untuk Beranda staff: tahun berjalan, default Januari s.d. bulan
+ * ini (YTD). Data lama tetap tampil selama rentang baru dimuat; respons yang
+ * sudah tidak sesuai rentang terakhir diabaikan.
+ */
 export function useDashboardTrend() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const [range, setRange] = useState<MonthRange>({
+    start: 1,
+    end: currentMonth,
+  });
   const [state, setState] = useState<State>({ status: "loading" });
+  const [pending, setPending] = useState(false);
+  /** Periode QA terakhir tahun ini; hanya diperbarui oleh rentang s.d. bulan ini. */
+  const [latestLabel, setLatestLabel] = useState<string | undefined>();
+  const requestId = useRef(0);
 
-  const load = useCallback(async () => {
-    setState({ status: "loading" });
-    try {
-      const data = (await unwrapResponse(
-        await sidakClient.dashboard.trend.$get(),
-      )) as { trendMap: TrendMap };
-      setState({ status: "ready", trendMap: data.trendMap });
-    } catch {
-      setState({ status: "error" });
-    }
-  }, []);
+  const load = useCallback(
+    async (next: MonthRange) => {
+      const id = ++requestId.current;
+      setPending(true);
+      try {
+        const trend = (await unwrapResponse(
+          await sidakClient.dashboard.trend.$get({
+            query: {
+              year: String(year),
+              startMonth: String(next.start),
+              endMonth: String(next.end),
+            },
+          }),
+        )) as TrendData;
+        if (next.end === currentMonth) setLatestLabel(trend.labels.at(-1));
+        if (id === requestId.current) setState({ status: "ready", trend });
+      } catch {
+        if (id === requestId.current) setState({ status: "error" });
+      } finally {
+        if (id === requestId.current) setPending(false);
+      }
+    },
+    [year, currentMonth],
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(range);
+  }, [load, range]);
 
-  return { ...state, reload: load };
+  const reload = useCallback(() => {
+    setState({ status: "loading" });
+    void load(range);
+  }, [load, range]);
+
+  return {
+    ...state,
+    year,
+    currentMonth,
+    range,
+    setRange,
+    pending,
+    latestLabel,
+    reload,
+  };
 }
