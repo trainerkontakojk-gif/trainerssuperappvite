@@ -114,3 +114,14 @@ E2E hermetic `apps/web/e2e/pdkt-flow.spec.ts`:
     fast-refresh.
 - Unit test lama `apps/web/src/__tests__/pdkt-settings-modal.test.tsx` masih mencari label lama ("Pengaturan
   Simulasi"). Tes itu inventaris legacy, tidak dijalankan CI, dan tidak dijalankan tanpa persetujuan Fajar.
+
+### Perapian (permintaan Fajar "Rapikan dulu")
+
+- Jeda animasi kini berhenti di tahap Telaah yang utuh (`data-static`), sama dengan reduced-motion.
+  Sebelumnya jeda bisa membekukan bingkai setengah jadi yang tampak kosong.
+- Tabel Hasil telaah terbaru di HP tidak lagi digulir ke samping: kolom Peserta dan Tanggal pindah ke bawah
+  judul email.
+- Judul di Belum dibalas dan di daftar skenario boleh dua baris. Butir info skenario tidak lagi memakai
+  pemisah "·" yang menggantung saat baris turun.
+- Menu Pengaturan di HP memakai penanda tab berbentuk kapsul, bukan garis vertikal.
+- `pdkt-flow.spec.ts` 14/14 lulus setelah perapian; screenshot HP terang/gelap dan desktop dicek ulang.

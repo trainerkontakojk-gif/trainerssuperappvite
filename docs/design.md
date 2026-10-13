@@ -290,7 +290,7 @@ Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti
 - **Reduced motion WAJIB** — setiap animasi butuh `@media (prefers-reduced-motion: reduce)`.
 - **Stagger items** dalam satu list itu legitimate — yang jadi tell adalah uniform reflex (setiap section masuk dengan animasi identik).
 - **Reveal animations** harus enhance yang sudah visible — jangan gate content visibility di belakang class-triggered transition.
-- **Ilustrasi berulang di halaman modul** (mis. tiga tahap PDKT di `/pdkt`) boleh berputar lebih dari 5 detik hanya bila bersifat dekoratif (`aria-hidden`, penjelasan di `figcaption` `sr-only`), punya tombol jeda/putar yang terlihat (WCAG 2.2.2), dan menampilkan keadaan akhir statis saat `prefers-reduced-motion: reduce`.
+- **Ilustrasi berulang di halaman modul** (mis. tiga tahap PDKT di `/pdkt`) boleh berputar lebih dari 5 detik hanya bila bersifat dekoratif (`aria-hidden`, penjelasan di `figcaption` `sr-only`), punya tombol jeda/putar yang terlihat (WCAG 2.2.2), dan saat dijeda atau `prefers-reduced-motion: reduce` menampilkan keadaan akhir yang utuh, bukan bingkai setengah jadi.
 
 ---
 

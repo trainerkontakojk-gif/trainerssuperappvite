@@ -194,7 +194,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="min-h-11 shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! md:w-full"
+                    className="min-h-11 shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
                   >
                     <span className="flex-1">{tab.label}</span>
                     {tab.count !== undefined && (

@@ -212,7 +212,7 @@ export function PdktLandingOverview({
                         className="size-2 shrink-0 rounded-full bg-module-pdkt"
                       />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate font-semibold text-foreground">
+                        <span className="line-clamp-2 font-semibold text-foreground">
                           {email.subject}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
@@ -333,16 +333,16 @@ export function PdktLandingOverview({
               mendapat telaah AI.
             </p>
           ) : (
-            <table className="w-full min-w-[600px] border-collapse text-[13px]">
+            <table className="w-full border-collapse text-[13px] sm:min-w-[600px]">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="border-b border-border px-5 py-3 font-medium">
                     Email
                   </th>
-                  <th className="border-b border-border px-5 py-3 font-medium">
+                  <th className="hidden border-b border-border px-5 py-3 font-medium sm:table-cell">
                     Peserta
                   </th>
-                  <th className="border-b border-border px-5 py-3 font-medium">
+                  <th className="hidden border-b border-border px-5 py-3 font-medium sm:table-cell">
                     Tanggal
                   </th>
                   <th className="border-b border-border px-5 py-3 text-right font-medium">
@@ -357,15 +357,19 @@ export function PdktLandingOverview({
                       <button
                         type="button"
                         onClick={() => onOpenSession(row.session)}
-                        className="min-h-11 max-w-[42ch] truncate text-left font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="min-h-11 max-w-[42ch] py-2 text-left font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
-                        {row.subject}
+                        <span className="line-clamp-2">{row.subject}</span>
                       </button>
+                      {/* Di HP kolom Peserta & Tanggal disembunyikan; isinya pindah ke sini. */}
+                      <span className="block pb-2 text-xs text-muted-foreground sm:hidden">
+                        {row.subjectLabel} · {formatPdktDate(row.timestamp)}
+                      </span>
                     </td>
-                    <td className="px-5 py-1 text-foreground/80">
+                    <td className="hidden px-5 py-1 text-foreground/80 sm:table-cell">
                       {row.subjectLabel}
                     </td>
-                    <td className="px-5 py-1 whitespace-nowrap text-muted-foreground">
+                    <td className="hidden px-5 py-1 whitespace-nowrap text-muted-foreground sm:table-cell">
                       {formatPdktDate(row.timestamp)}
                     </td>
                     <td className="px-5 py-1 text-right font-mono font-bold tabular-nums text-foreground">

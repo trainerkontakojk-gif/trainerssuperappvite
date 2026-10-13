@@ -1,8 +1,9 @@
 /*
  * Ilustrasi tiga tahap PDKT (Pahami → Tanggapi → Telaah) di halaman awal.
  * Satu siklus 12 detik. Siklus berulang, jadi tombol jeda wajib ada
- * (WCAG 2.2.2); `data-paused` menghentikan semua animasi di tempatnya.
- * `prefers-reduced-motion` menampilkan tahap Telaah tanpa animasi.
+ * (WCAG 2.2.2). Saat dijeda atau `prefers-reduced-motion`, komponen memberi
+ * `data-static="true"` dan ilustrasi berhenti di tahap Telaah yang utuh, bukan
+ * di bingkai setengah jadi.
  */
 .pdkt-demo {
   --demo-accent: var(--module-pdkt);
@@ -14,9 +15,6 @@
   animation-iteration-count: infinite;
   animation-fill-mode: both;
   animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.pdkt-demo[data-paused="true"] [data-anim] {
-  animation-play-state: paused;
 }
 
 /* Panggung: satu tahap tampil, lalu bergantian. */
@@ -335,27 +333,25 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pdkt-demo [data-anim] {
-    animation: none !important;
-  }
-  .pdkt-demo [data-anim="stage-a"],
-  .pdkt-demo [data-anim="stage-b"],
-  .pdkt-demo [data-anim="cap-a"],
-  .pdkt-demo [data-anim="cap-b"] {
-    opacity: 0;
-  }
-  .pdkt-demo [data-anim="tab-a"],
-  .pdkt-demo [data-anim="tab-b"] {
-    color: var(--fg3);
-  }
-  .pdkt-demo [data-anim="indicator"] {
-    transform: translateX(200%);
-  }
-  .pdkt-demo [data-anim="ring"] {
-    stroke-dashoffset: 47.5;
-  }
-  .pdkt-demo [data-anim="bar"] {
-    transform: none;
-  }
+.pdkt-demo[data-static="true"] [data-anim] {
+  animation: none;
+}
+.pdkt-demo[data-static="true"] [data-anim="stage-a"],
+.pdkt-demo[data-static="true"] [data-anim="stage-b"],
+.pdkt-demo[data-static="true"] [data-anim="cap-a"],
+.pdkt-demo[data-static="true"] [data-anim="cap-b"] {
+  opacity: 0;
+}
+.pdkt-demo[data-static="true"] [data-anim="tab-a"],
+.pdkt-demo[data-static="true"] [data-anim="tab-b"] {
+  color: var(--fg3);
+}
+.pdkt-demo[data-static="true"] [data-anim="indicator"] {
+  transform: translateX(200%);
+}
+.pdkt-demo[data-static="true"] [data-anim="ring"] {
+  stroke-dashoffset: 47.5;
+}
+.pdkt-demo[data-static="true"] [data-anim="bar"] {
+  transform: none;
 }

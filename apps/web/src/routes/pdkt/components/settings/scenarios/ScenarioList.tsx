@@ -144,7 +144,7 @@ export function ScenarioList({
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span
                     className={cn(
-                      "truncate font-semibold",
+                      "line-clamp-2 font-semibold",
                       scenario.isActive
                         ? "text-foreground"
                         : "text-muted-foreground",
@@ -152,16 +152,16 @@ export function ScenarioList({
                   >
                     {scenario.title}
                   </span>
-                  <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                  {/* Tanpa pemisah "·": di layar sempit butir turun ke baris baru tanpa titik menggantung. */}
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                     {scenario.category && (
-                      <>
-                        <span>{scenario.category}</span>
-                        <span aria-hidden="true">·</span>
-                      </>
+                      <span className="whitespace-nowrap">
+                        {scenario.category}
+                      </span>
                     )}
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1",
+                        "inline-flex items-center gap-1.5",
                         direction.id === "ojk_request_in_body"
                           ? "text-module-pdkt"
                           : "text-foreground/80",
@@ -170,14 +170,13 @@ export function ScenarioList({
                       <span
                         aria-hidden="true"
                         className={cn(
-                          "size-1.5 rounded-full",
+                          "size-1.5 shrink-0 rounded-full",
                           DIRECTION_DOT[direction.id],
                         )}
                       />
                       {direction.title}
                     </span>
-                    <span aria-hidden="true">·</span>
-                    <span>
+                    <span className="whitespace-nowrap">
                       {scenario.alwaysUseSampleEmail
                         ? "Tulis sendiri"
                         : "Dibuat AI"}

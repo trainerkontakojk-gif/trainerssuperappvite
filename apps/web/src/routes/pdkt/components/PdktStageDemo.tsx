@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { Lightbulb, Mail, Pause, Play, Reply, Send } from "lucide-react";
 import "./PdktStageDemo.css";
 
@@ -21,11 +22,13 @@ const BARS = [
  */
 export function PdktStageDemo() {
   const [paused, setPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   return (
     <figure
       data-testid="pdkt-stage-demo"
       data-paused={paused}
+      data-static={paused || Boolean(reduceMotion)}
       className="pdkt-demo m-0 w-full min-w-0"
     >
       <figcaption className="sr-only">
