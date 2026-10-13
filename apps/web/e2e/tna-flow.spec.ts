@@ -34,7 +34,7 @@ test("trainer: semua parameter → validasi → rencana → edit peserta → akt
   ]);
   await expect(
     page.getByRole("link", { name: "TNA", exact: true }),
-  ).toHaveAttribute("data-active", "true", { timeout: 20000 });
+  ).toHaveAttribute("aria-current", "page", { timeout: 20000 });
   await expect(
     page.getByLabel("Layanan").locator("option[value='call']"),
   ).toHaveText("Call");

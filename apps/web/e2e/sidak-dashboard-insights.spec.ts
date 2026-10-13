@@ -451,16 +451,23 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
       for (const width of [320, 390, 768, 1024, 1280, 1440]) {
         await page.setViewportSize({ width, height: 900 });
         for (const expanded of width >= 1024 ? [false, true] : [false]) {
-          const rail = page.locator(".sidebar-rail");
           if (width >= 1024) {
-            const flyout = page.locator(".sidebar-flyout");
-            if ((await flyout.getAttribute("data-open")) !== String(expanded)) {
-              await rail
-                .getByRole("button")
-                .filter({ hasText: "SIDAK" })
+            // Lebar sidebar (248px) vs rail ciut (64px).
+            const sidebar = page.locator(".app-sidebar");
+            if (
+              (await sidebar.getAttribute("data-collapsed")) !==
+              String(!expanded)
+            ) {
+              await page
+                .getByRole("button", {
+                  name: expanded ? "Lebarkan sidebar" : "Ciutkan sidebar",
+                })
                 .click();
             }
-            await expect(flyout).toHaveAttribute("data-open", String(expanded));
+            await expect(sidebar).toHaveAttribute(
+              "data-collapsed",
+              String(!expanded),
+            );
           }
           await page.waitForTimeout(350);
           await workspace.evaluate((element) => {

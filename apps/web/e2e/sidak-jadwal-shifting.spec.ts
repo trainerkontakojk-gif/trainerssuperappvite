@@ -200,7 +200,7 @@ async function readCalendarGeometry(
         },
       };
     };
-    const sidebarRail = required(".sidebar-rail", "sidebar rail");
+    const sidebarRail = required(".app-sidebar", "sidebar");
     const sidebarRailStyle = getComputedStyle(sidebarRail);
     const sidebarRailRect = rect(sidebarRail);
     const sidebarRailVisible =
@@ -227,7 +227,11 @@ async function readCalendarGeometry(
       '[data-testid="jadwal-shifting-calendar"]',
       "calendar matrix",
     );
-    const tabBar = document.querySelector('[aria-label="Navigasi utama"]');
+    // Sidebar dan tab bar sama-sama "Navigasi utama"; tab bar yang `fixed`.
+    const tabBar =
+      Array.from(document.querySelectorAll('[aria-label="Navigasi utama"]')).find(
+        (el) => getComputedStyle(el).position === "fixed",
+      ) ?? null;
     const tabBarElement = tabBar instanceof HTMLElement ? tabBar : null;
     const tabBarRect = tabBarElement ? rect(tabBarElement) : null;
     const tabBarStyle = tabBarElement ? getComputedStyle(tabBarElement) : null;
@@ -314,13 +318,13 @@ function expectCalendarLayoutContract(metrics: CalendarGeometry) {
     metrics.documentElement.scrollHeight - metrics.viewport.height;
   expect(
     metrics.documentElement.scrollHeight,
-    "document height may exceed the viewport only by measured sidebar-rail overflow",
+    "document height may exceed the viewport only by measured sidebar overflow",
   ).toBeLessThanOrEqual(
     metrics.viewport.height + metrics.sidebarRail.overflow + 1,
   );
   expect(
     Math.abs(documentHeightDelta - metrics.sidebarRail.overflow),
-    "document overflow must match sidebar-rail overflow within 2px",
+    "document overflow must match sidebar overflow within 2px",
   ).toBeLessThanOrEqual(2);
   expect(
     metrics.documentElement.scrollWidth,
@@ -328,7 +332,7 @@ function expectCalendarLayoutContract(metrics: CalendarGeometry) {
   ).toBeLessThanOrEqual(metrics.documentElement.clientWidth + 1);
   expect(
     metrics.body.scrollHeight,
-    "body may exceed the viewport only by measured sidebar-rail overflow",
+    "body may exceed the viewport only by measured sidebar overflow",
   ).toBeLessThanOrEqual(
     metrics.viewport.height + metrics.sidebarRail.overflow + 1,
   );

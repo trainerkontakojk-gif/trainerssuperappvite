@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   expectHermetic,
   formatAudit,
@@ -9,23 +9,43 @@ import { PROFILER_MOCKS } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
- * Sidebar — pemisahan "aktif" dan "flyout terbuka" (hermetic).
+ * Sidebar berlabel (≥1024px) — hermetic.
  *
- * Kontrak dari `Sidebar`: modul yang sedang dibuka route-nya memakai
- * `data-active`, sedangkan modul yang flyout-nya terbuka memakai `data-open`.
- * Keduanya harus terpisah — membuka flyout SIDAK saat berada di halaman lain
- * tidak boleh memindahkan status aktif.
+ * Kontrak dari `Sidebar`/`NavList`/`UserMenu` (rencana
+ * `plans/markdown/shell-beranda-redesign.md`, hasil B):
+ * - item aktif memakai `aria-current="page"`; grup SIDAK memakai
+ *   `aria-expanded` dan terbuka otomatis di `/sidak/*`;
+ * - sidebar bisa diciutkan menjadi rail, nama aksesibel item tetap ada, dan
+ *   pilihan itu bertahan setelah reload;
+ * - item Administrasi terakhir tetap bisa dijangkau di layar pendek;
+ * - menu pengguna bisa dipakai dengan keyboard dan Esc mengembalikan fokus.
  *
  * Halaman Profiler dipakai sebagai halaman non-SIDAK karena murah dan sudah punya
  * fixture bersama (`helpers/profilerMocks.ts`).
  */
 
-test.describe("Sidebar — state aktif vs flyout", () => {
+const SIDAK_LANDING_MOCKS: readonly ApiMock[] = [
+  {
+    method: "GET",
+    path: "/api/v1/me/access-status",
+    body: { success: true, data: {} },
+  },
+];
+
+function sidebar(page: Page) {
+  return page.getByRole("navigation", { name: "Navigasi utama" });
+}
+
+test.describe("Sidebar berlabel", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("membuka flyout SIDAK tidak memindahkan modul yang aktif", async ({
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  test("item aktif memakai aria-current dan membawa label + fungsi", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -33,72 +53,234 @@ test.describe("Sidebar — state aktif vs flyout", () => {
       apiMocks: PROFILER_MOCKS,
     });
     console.log("[audit]", formatAudit(audit));
+    const nav = sidebar(page);
 
-    // Nama aksesibel rail berasal dari tooltip modul ("KTP" untuk Profiler).
-    const profilerItem = page.getByRole("link", { name: "KTP", exact: true });
-    const sidakButton = page.getByRole("button", { name: "SIDAK" });
+    const ktp = nav.getByRole("link", { name: "KTP", exact: true });
+    await expect(ktp).toBeVisible({ timeout: 20000 });
+    await expect(ktp).toHaveAttribute("aria-current", "page");
+    // Fungsi singkat tampil sebagai teks dan menjadi deskripsi aksesibel.
+    await expect(ktp).toContainText("Profil agen & peserta");
+    await expect(ktp).toHaveAccessibleDescription("Profil agen & peserta");
+    await expect(
+      nav.getByRole("link", { name: "Beranda", exact: true }),
+    ).not.toHaveAttribute("aria-current", "page");
 
-    await expect(profilerItem).toBeVisible({ timeout: 20000 });
-    await expect(profilerItem).toHaveAttribute("data-active", "true");
-    await expect(sidakButton).toHaveAttribute("data-active", "false");
-    await expect(sidakButton).toHaveAttribute("data-open", "false");
-
-    await sidakButton.click();
-
-    // Flyout terbuka → `data-open`, TAPI bukan `data-active`.
-    await expect(sidakButton).toHaveAttribute("data-open", "true");
-    await expect(sidakButton).toHaveAttribute("data-active", "false");
-    // Dan modul aktif sebelumnya tidak berpindah.
-    await expect(profilerItem).toHaveAttribute("data-active", "true");
-
+    // Grup tampil sebagai label teks, bukan flyout.
+    for (const group of ["Latihan", "Kualitas", "Data", "Administrasi"]) {
+      await expect(nav.getByText(group, { exact: true })).toBeVisible();
+    }
     expectHermetic(audit);
   });
 
-  test("membuka flyout Management tidak memindahkan modul yang aktif", async ({
+  test("grup SIDAK tertutup di luar /sidak dan bisa dibuka tanpa memindahkan item aktif", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
       path: "/profiler",
       apiMocks: PROFILER_MOCKS,
     });
+    const nav = sidebar(page);
+    const sidak = nav.getByRole("button", { name: "SIDAK", exact: true });
+    await expect(sidak).toHaveAttribute("aria-expanded", "false", {
+      timeout: 20000,
+    });
+    await expect(
+      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+    ).toHaveCount(0);
 
-    const profilerItem = page.getByRole("link", { name: "KTP", exact: true });
-    const managementButton = page.getByRole("button", { name: "Management" });
-    await expect(profilerItem).toBeVisible({ timeout: 20000 });
-
-    await managementButton.click();
-
-    await expect(managementButton).toHaveAttribute("data-open", "true");
-    await expect(managementButton).toHaveAttribute("data-active", "false");
-    await expect(profilerItem).toHaveAttribute("data-active", "true");
-
+    await sidak.click();
+    await expect(sidak).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+    ).toBeVisible();
+    await expect(
+      nav.getByRole("link", { name: "KTP", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     expectHermetic(audit);
   });
 
-  test("di halaman SIDAK, modul SIDAK aktif dan terbuka sekaligus", async ({
+  test("grup SIDAK terbuka otomatis di /sidak dan sub-halaman aktif ditandai", async ({
     page,
   }) => {
-    // Landing SIDAK hanya butuh gate akses; tidak ada endpoint SIDAK lain.
-    const sidakLandingMocks: readonly ApiMock[] = [
-      {
-        method: "GET",
-        path: "/api/v1/me/access-status",
-        body: { success: true, data: {} },
-      },
-    ];
     const audit = await openHermeticShell(page, {
       path: "/sidak",
-      apiMocks: sidakLandingMocks,
+      apiMocks: SIDAK_LANDING_MOCKS,
     });
+    const nav = sidebar(page);
+    await expect(
+      nav.getByRole("button", { name: "SIDAK", exact: true }),
+    ).toHaveAttribute("aria-expanded", "true", { timeout: 20000 });
+    await expect(
+      nav.getByRole("link", { name: "Beranda SIDAK", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    // Trainer boleh mengelola konfigurasi SIDAK.
+    await expect(
+      nav.getByRole("link", { name: "Input Temuan", exact: true }),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
 
-    const sidakButton = page.getByRole("button", { name: "SIDAK" });
-    await expect(sidakButton).toHaveAttribute("data-active", "true");
+  test("leader: sub-halaman SIDAK yang dilarang capability tidak tampil", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak",
+      auth: { role: "leader" },
+      apiMocks: SIDAK_LANDING_MOCKS,
+    });
+    const nav = sidebar(page);
+    await expect(
+      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+    ).toBeVisible({ timeout: 20000 });
+    for (const forbidden of [
+      "Input Temuan",
+      "Periode QA",
+      "Parameter QA",
+      "Laporan",
+      "Jadwal Shifting",
+    ]) {
+      await expect(
+        nav.getByRole("link", { name: forbidden, exact: true }),
+        `leader tidak boleh melihat "${forbidden}"`,
+      ).toHaveCount(0);
+    }
+    expectHermetic(audit);
+  });
 
-    await sidakButton.click();
+  test("rail ciut tetap punya nama aksesibel, tooltip, dan bertahan setelah reload", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler",
+      apiMocks: PROFILER_MOCKS,
+    });
+    const nav = sidebar(page);
+    const collapse = page.getByRole("button", { name: "Ciutkan sidebar" });
+    await expect(collapse).toBeVisible({ timeout: 20000 });
+    await collapse.click();
 
-    await expect(sidakButton).toHaveAttribute("data-open", "true");
-    await expect(sidakButton).toHaveAttribute("data-active", "true");
+    const expand = page.getByRole("button", { name: "Lebarkan sidebar" });
+    await expect(expand).toBeVisible();
+    const box = await nav.boundingBox();
+    expect(box?.width ?? 999).toBeLessThanOrEqual(72);
 
+    for (const name of ["Beranda", "KETIK", "PDKT", "KTP", "TNA"]) {
+      await expect(
+        nav.getByRole("link", { name, exact: true }),
+        `rail: nama aksesibel "${name}"`,
+      ).toBeVisible();
+    }
+    // Teks fungsi tidak tampil di rail, tapi nama muncul sebagai tooltip.
+    await expect(nav.getByText("Profil agen & peserta")).not.toBeVisible();
+    await nav.getByRole("link", { name: "KETIK", exact: true }).hover();
+    // Base UI Tooltip sengaja tanpa role (nama sudah dari label sr-only).
+    await expect(
+      page.locator('[data-slot="rail-tooltip"]', { hasText: "KETIK" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Lebarkan sidebar" }),
+    ).toBeVisible({ timeout: 20000 });
+    await page.getByRole("button", { name: "Lebarkan sidebar" }).click();
+    await expect(
+      page.getByRole("button", { name: "Ciutkan sidebar" }),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("di bawah 1024px sidebar tersembunyi dan hanya tab bar yang menjadi navigasi", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1023, height: 800 });
+    const audit = await openHermeticShell(page, {
+      path: "/profiler",
+      apiMocks: PROFILER_MOCKS,
+    });
+    const nav = sidebar(page);
+    await expect(nav.getByRole("button", { name: "Lainnya" })).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole("button", { name: "Ciutkan sidebar" }),
+    ).toBeHidden();
+    await expect(page.getByRole("button", { name: /menu akun/i })).toBeHidden();
+    expectHermetic(audit);
+  });
+
+  for (const collapsed of [false, true]) {
+    test(`1280x640${collapsed ? " (rail)" : ""}: item Administrasi terakhir bisa dijangkau`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 640 });
+      const audit = await openHermeticShell(page, {
+        path: "/profiler",
+        apiMocks: PROFILER_MOCKS,
+      });
+      const nav = sidebar(page);
+      if (collapsed) {
+        await page
+          .getByRole("button", { name: "Ciutkan sidebar" })
+          .click({ timeout: 20000 });
+      }
+      const last = nav.getByRole("link", {
+        name: "Log Aktivitas",
+        exact: true,
+      });
+      await last.scrollIntoViewIfNeeded({ timeout: 20000 });
+      await expect(last).toBeInViewport();
+      // Sidebar menggulir sendiri; dokumen tidak ikut memanjang.
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollHeight -
+          document.documentElement.clientHeight,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      expectHermetic(audit);
+    });
+  }
+
+  test("menu pengguna: keyboard, ganti tema tanpa menutup, Esc mengembalikan fokus", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/profiler",
+      apiMocks: PROFILER_MOCKS,
+    });
+    const trigger = page.getByRole("button", { name: /menu akun/i });
+    await expect(trigger).toBeVisible({ timeout: 20000 });
+    // Akun, tema, dan keluar tidak lagi memakan slot navigasi.
+    await expect(
+      sidebar(page).getByRole("button", { name: "Keluar" }),
+    ).toHaveCount(0);
+
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    await expect(
+      menu.getByRole("menuitem", { name: "Pengaturan akun" }),
+    ).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: "Keluar" })).toBeVisible();
+
+    const themeItem = menu.getByRole("menuitem", { name: /^Ganti ke tema/ });
+    const wasDark = await page.evaluate(() =>
+      document.documentElement.classList.contains("dark"),
+    );
+    await themeItem.focus();
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.documentElement.classList.contains("dark"),
+        ),
+      )
+      .toBe(!wasDark);
+    await expect(menu).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
     expectHermetic(audit);
   });
 });
