@@ -291,17 +291,46 @@ function ScoreBreakdown({ result }: { result: PdktEvaluationResult }) {
   );
 }
 
-/** Gulir ke penanda atau catatan pasangannya lalu fokuskan, tanpa mengubah URL. */
+/** Gulir `container` agar `target` berada di tengahnya. */
+function centerWithin(
+  container: HTMLElement,
+  target: HTMLElement,
+  behavior: ScrollBehavior,
+) {
+  const box = container.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
+  container.scrollBy({
+    top: rect.top - box.top - (container.clientHeight - rect.height) / 2,
+    behavior,
+  });
+}
+
+/**
+ * Gulir ke penanda atau catatan pasangannya lalu fokuskan, tanpa mengubah URL.
+ * Hanya area Telaah (dan panel yang bergulir sendiri di dalamnya) yang
+ * digulir: `scrollIntoView` ikut menggeser kerangka aplikasi yang
+ * overflow-hidden, dan pengguna tidak bisa menggulirnya balik.
+ */
 function jumpTo(id: string) {
   const target = document.getElementById(id);
-  if (!target) return;
+  const root = target?.closest<HTMLElement>("[data-review-scroll]");
+  if (!target || !root) return;
   const reduceMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
-  target.scrollIntoView({
-    block: "center",
-    behavior: reduceMotion ? "auto" : "smooth",
-  });
+  for (
+    let pane = target.parentElement;
+    pane && pane !== root;
+    pane = pane.parentElement
+  ) {
+    if (
+      pane.scrollHeight > pane.clientHeight &&
+      /auto|scroll/.test(getComputedStyle(pane).overflowY)
+    ) {
+      centerWithin(pane, target, "auto");
+    }
+  }
+  centerWithin(root, target, reduceMotion ? "auto" : "smooth");
   target.focus({ preventScroll: true });
 }
 
@@ -843,7 +872,7 @@ export function PdktReviewStage({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div data-review-scroll className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-8 md:px-6">
         <h2 className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">

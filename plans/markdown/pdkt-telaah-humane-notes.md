@@ -93,3 +93,35 @@ Hunk format-only dari Prettier pada `evaluation-service.ts` dan `packages/types/
 - **Klaim telaah ulang** berbasis `evaluation_completed_at` (`processPdktEvaluation`) tidak punya test otomatis. E2E memakai API tiruan, dan unit test untuk rantai Supabase belum diizinkan.
 - **Mutu tulisan AI sungguhan** setelah aturan prompt baru: perlu uji manual setelah deploy.
 - **Suite unit lama** (`pdkt-evaluation-prompt`, `pdkt-evaluate-edukatif`, `pdkt-evaluate-route`) tidak dijalankan. Mock AI di sana tanpa `consumerPoints` sekarang memicu coba ulang, jadi assertion jumlah panggilan bisa berubah. Suite ini tidak dijalankan CI.
+
+## Tindak lanjut (2026-10-14): kode teknis dalam kurung
+
+Laporan Fajar dari "Catatan AI" di production: "Penggunaan lawan bicara utama (replyIntent: reply_to_ojk) sudah tepat, penjelasan normative …".
+
+- Penyebab utama: telaah itu dibuat server API yang belum memuat `d799772`. Pengaman di `main` sudah mengganti kedua kode itu, dibuktikan dengan menjalankan `humanizePdktText` pada kalimat persisnya.
+- Celah tersisa yang ikut diperbaiki:
+  - hasil penggantian masih kaku: "(arah balasan: balasan langsung ke OJK)";
+  - kata "normative" lolos;
+  - aturan prompt sendiri menulis "sesuai replyIntent" dan label Inggris ("recipient framing", "normative OJK response quality"), yang ditiru AI.
+- Perubahan:
+  - kode dalam kurung, termasuk bentuk `(field: nilai)`, dihapus seluruhnya;
+  - "normative" diganti "normatif";
+  - kriteria penilaian berbahasa Indonesia;
+  - nama field hanya disebut sekali sebagai cara membaca data, disertai larangan menuliskannya di output.
+- Bukti:
+  - RED 2 gagal, lalu GREEN `npx vitest run src/__tests__/pdkt-reply-annotations.test.ts` 26 passed;
+  - `tsc` apps/api lulus;
+  - ESLint, Prettier, dan `git diff --check` bersih.
+- Dua assertion label di `pdkt-evaluation-prompt.test.ts` disesuaikan ke label baru. Suite itu tidak dijalankan (di luar izin; tidak dijalankan CI).
+- Web tidak berubah, jadi E2E tidak dijalankan ulang. E2E memakai API tiruan dan tidak bisa membuktikan teks prompt.
+
+## Tindak lanjut (2026-10-14): lompatan menggeser kerangka aplikasi
+
+Laporan Fajar (screenshot production): sesudah mengklik tautan catatan, bagian atas halaman, yaitu navigasi tahap, terpotong dan tidak bisa digulir balik.
+
+- Penyebab: `jumpTo` memakai `scrollIntoView`, yang menggulir semua induk termasuk kerangka `fixed inset-0 … overflow-hidden`. Pengguna tidak bisa menggulir elemen overflow-hidden.
+- Perbaikan: `jumpTo` hanya menggulir area Telaah (`data-review-scroll`) dan panel yang bergulir sendiri di dalamnya (email konsumen), lewat `scrollBy`. Fokus tetap `preventScroll`.
+- Bukti:
+  - RED: test "tahap Telaah: skor, rincian…" pada viewport 1280×560 gagal dengan `DIV.fixed inset-0 z-[100] … overflow-hidden` tergulir.
+  - GREEN: test fokus lulus, lalu `npx playwright test e2e/pdkt-flow.spec.ts` 65 passed (4.4m).
+  - `tsc` web (+ e2e) dan api lulus, ESLint bersih.

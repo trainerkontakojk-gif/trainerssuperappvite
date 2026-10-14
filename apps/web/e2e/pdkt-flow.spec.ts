@@ -1949,17 +1949,38 @@ test.describe("PDKT (hermetic)", () => {
     // Penanda dan catatan saling tertaut; pembaca layar mendengar "catatan 1",
     // bukan angka yang menempel di kata terakhir.
     const markLink = answer.getByRole("link", { name: "Lihat catatan 1" });
+    // Lompatan hanya menggulir area Telaah; kerangka aplikasi di atasnya
+    // (overflow tersembunyi, tidak bisa digulir balik) tidak boleh bergeser.
+    // Layar pendek memaksa lompatan benar-benar menggulir.
+    const viewport = page.viewportSize();
+    await page.setViewportSize({ width: 1280, height: 560 });
+    const shiftedShell = () =>
+      summary.evaluate((el) => {
+        const shifted: string[] = [];
+        let node: Element | null = el.closest("[data-review-scroll]");
+        if (!node) return ["data-review-scroll tidak ada"];
+        for (node = node.parentElement; node; node = node.parentElement) {
+          if (node.scrollTop !== 0)
+            shifted.push(`${node.tagName}.${node.className}`);
+        }
+        if (window.scrollY !== 0) shifted.push("window");
+        return shifted;
+      });
     await summary
       .getByRole("link", { name: "Lihat kalimat ini di balasan" })
       .click();
     await expect(markLink).toBeFocused();
+    expect(await shiftedShell()).toEqual([]);
     await markLink.click();
     await expect(notes.nth(0)).toBeFocused();
+    expect(await shiftedShell()).toEqual([]);
     await expect(fixes.getByRole("link")).toHaveCount(1);
     await fixes
       .getByRole("link", { name: "Kembali ke kalimat bertanda 1" })
       .click();
     await expect(markLink).toBeFocused();
+    expect(await shiftedShell()).toEqual([]);
+    if (viewport) await page.setViewportSize(viewport);
 
     // Email konsumen dan balasan satu permukaan perbandingan; email konsumen
     // tetap terlihat saat catatan panjang digulir.
