@@ -10,12 +10,7 @@ import {
   type TnaEvaluationSnapshot,
 } from "@trainers/types";
 import { getTnaParameterAnalysis } from "./analysis";
-import {
-  buildPeriodBucket,
-  fetchPeriods,
-  fetchPeriodRows,
-  type TnaPeriodBucket,
-} from "./metrics";
+import { fetchPeriods, hasAuditedAgent } from "./metrics";
 import { cohortMetrics, computeTnaCohorts } from "./cohorts";
 
 function verdict(
@@ -151,24 +146,21 @@ export async function getTnaEvaluationPeriodOptions(
   const periods = (await fetchPeriods(supabase)).filter(
     (p) => p.year * 12 + p.month > endMonth,
   );
-  const options = [];
-  let defaultSelected = false;
-  for (const period of periods) {
-    const rows = await fetchPeriodRows({
-      supabase,
-      serviceType: need.service_type,
-      periodId: period.id,
-      dataScope: { kind: "all" },
-    });
-    const bucket: TnaPeriodBucket = buildPeriodBucket(period, rows);
-    const audited = bucket.auditedAgentIds.size > 0;
-    const is_default = audited && !defaultSelected;
-    if (is_default) defaultSelected = true;
-    options.push({
+  const audited = await Promise.all(
+    periods.map((period) =>
+      hasAuditedAgent({
+        supabase,
+        serviceType: need.service_type,
+        periodId: period.id,
+      }),
+    ),
+  );
+  const defaultIndex = audited.indexOf(true);
+  return tnaEvaluationPeriodOptionSchema.array().parse(
+    periods.map((period, i) => ({
       ...period,
-      auditStatus: audited ? ("audited" as const) : ("no_audit" as const),
-      is_default,
-    });
-  }
-  return tnaEvaluationPeriodOptionSchema.array().parse(options);
+      auditStatus: audited[i] ? "audited" : "no_audit",
+      is_default: i === defaultIndex,
+    })),
+  );
 }
