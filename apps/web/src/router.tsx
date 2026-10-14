@@ -591,6 +591,9 @@ const tnaParameterRoute = createRoute({
     period: typeof search.period === "string" ? search.period : "",
     indicator: typeof search.indicator === "string" ? search.indicator : "",
     compare: Math.min(6, Math.max(1, Number(search.compare) || 2)),
+    ...(typeof search.previous_plan === "string" && search.previous_plan
+      ? { previous_plan: search.previous_plan }
+      : {}),
   }),
   beforeLoad: requireCapability("tna.read"),
 });

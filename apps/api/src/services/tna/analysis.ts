@@ -47,5 +47,10 @@ export async function getTnaParameterAnalysis(
       row.is_phantom_padding !== true &&
       isCountableFinding(row),
   );
-  return { metrics, findings, period: selectedBucket.period };
+  return {
+    metrics,
+    findings,
+    period: selectedBucket.period,
+    bucket: selectedBucket,
+  };
 }

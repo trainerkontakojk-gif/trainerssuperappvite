@@ -102,6 +102,85 @@ export const tnaBaselineSnapshotSchema = tnaMetricsSnapshotSchema.extend({
 });
 export type TnaBaselineSnapshot = z.infer<typeof tnaBaselineSnapshotSchema>;
 
+export const tnaFollowUpSchema = z.enum([
+  "selesai_tuntas",
+  "perlu_rencana_lanjutan",
+  "eskalasi_non_training",
+]);
+export type TnaFollowUp = z.infer<typeof tnaFollowUpSchema>;
+
+export const tnaVerdictSchema = z.enum([
+  "tercapai",
+  "tercapai_sebagian",
+  "tidak_tercapai",
+]);
+export type TnaVerdict = z.infer<typeof tnaVerdictSchema>;
+export const tnaCohortMetricsSchema = z
+  .object({
+    agents: count,
+    findings: count,
+    sampledSessions: count,
+    ratePer100: finiteRate.nullable(),
+    spreadPct: z.number().finite().min(0).max(100).nullable(),
+  })
+  .strict();
+export type TnaCohortMetrics = z.infer<typeof tnaCohortMetricsSchema>;
+const cohortComparisonSchema = z
+  .object({
+    baseline: tnaCohortMetricsSchema,
+    evaluation: tnaCohortMetricsSchema,
+    delta: z.number().finite().nullable(),
+  })
+  .strict();
+export const tnaEvaluationSnapshotSchema = z
+  .object({
+    metric_version: z.literal(1),
+    computed_at: z.string().datetime({ offset: true }),
+    evaluation_period_id: z.string().uuid(),
+    population: tnaPeriodMetricsSchema.strict(),
+    baseline_recompute_drift: z
+      .object({ findings: z.number().int(), auditedAgents: z.number().int() })
+      .strict(),
+    cohorts: z
+      .object({
+        participants: cohortComparisonSchema,
+        comparison: cohortComparisonSchema,
+        comparison_small: z.boolean(),
+        net_effect: z.number().finite().nullable(),
+      })
+      .strict(),
+    verdict: tnaVerdictSchema.nullable(),
+  })
+  .strict();
+export type TnaEvaluationSnapshot = z.infer<typeof tnaEvaluationSnapshotSchema>;
+export const tnaParticipantEvaluationSchema = z
+  .object({
+    participant_id: z.string().uuid(),
+    peserta_id: z.string().uuid().nullable(),
+    baseline_findings: count.nullable(),
+    baseline_sessions: count.nullable(),
+    baseline_sessions_source: z.enum(["frozen", "recomputed", "unavailable"]),
+    eval_findings: count.nullable(),
+    eval_sessions: count.nullable(),
+    audited_in_eval: z.boolean(),
+  })
+  .strict();
+export type TnaParticipantEvaluation = z.infer<
+  typeof tnaParticipantEvaluationSchema
+>;
+export const tnaEvaluationPeriodOptionSchema = z
+  .object({
+    id: z.string().uuid(),
+    month: z.number().int().min(1).max(12),
+    year: z.number().int(),
+    auditStatus: tnaAuditStatusSchema,
+    is_default: z.boolean(),
+  })
+  .strict();
+export type TnaEvaluationPeriodOption = z.infer<
+  typeof tnaEvaluationPeriodOptionSchema
+>;
+
 export const tnaParametersQuerySchema = z.object({
   service_type: serviceTypeSchema,
   period_id: z.string().uuid(),
@@ -111,19 +190,23 @@ export const tnaParametersQuerySchema = z.object({
 export const tnaParameterDetailQuerySchema = tnaParametersQuerySchema
   .omit({ scope: true })
   .extend({ indicator_id: z.string().uuid() });
-export const createTnaNeedSchema = z.object({
-  service_type: serviceTypeSchema,
-  period_id: z.string().uuid(),
-  indicator_id: z.string().uuid(),
-  compare_count: z.number().int().min(1).max(6).default(2),
-  validated_cluster_id: tnaClusterIdSchema,
-  cause_note: z.string().trim().min(10).max(2000),
-  gap_type: tnaGapTypeSchema,
-  outcome: tnaOutcomeSchema,
-});
+export const createTnaNeedSchema = z
+  .object({
+    service_type: serviceTypeSchema,
+    period_id: z.string().uuid(),
+    indicator_id: z.string().uuid(),
+    compare_count: z.number().int().min(1).max(6).default(2),
+    validated_cluster_id: tnaClusterIdSchema,
+    cause_note: z.string().trim().min(10).max(2000),
+    gap_type: tnaGapTypeSchema,
+    outcome: tnaOutcomeSchema,
+    previous_plan_id: z.string().uuid().optional(),
+  })
+  .strict();
 export type CreateTnaNeed = z.infer<typeof createTnaNeedSchema>;
-export interface TnaNeed extends CreateTnaNeed {
+export interface TnaNeed extends Omit<CreateTnaNeed, "previous_plan_id"> {
   id: string;
+  previous_plan_id?: string | null;
   validation_snapshot: TnaMetricsSnapshot;
   suggested_cluster_id: z.infer<typeof tnaClusterIdSchema> | null;
   created_by: string;
@@ -171,6 +254,21 @@ export const updateTnaDraftPlanSchema = draftFields
 export const tnaPlanTransitionSchema = z
   .object({ expected_updated_at: z.string().datetime({ offset: true }) })
   .strict();
+export const tnaEvaluationPeriodInputSchema = tnaPlanTransitionSchema.extend({
+  evaluation_period_id: z.string().uuid(),
+});
+export const completeTnaPlanSchema = tnaPlanTransitionSchema.extend({
+  conclusion_note: z.string().trim().min(10).max(2000),
+  follow_up: tnaFollowUpSchema,
+});
+export const cancelTnaPlanSchema = tnaPlanTransitionSchema.extend({
+  cancel_reason: z.string().trim().min(10).max(1000).optional(),
+});
+export type TnaEvaluationPeriodInput = z.infer<
+  typeof tnaEvaluationPeriodInputSchema
+>;
+export type CompleteTnaPlan = z.infer<typeof completeTnaPlanSchema>;
+export type CancelTnaPlan = z.infer<typeof cancelTnaPlanSchema>;
 export type CreateTnaPlan = z.infer<typeof createTnaPlanSchema>;
 export type UpdateTnaDraftPlan = z.infer<typeof updateTnaDraftPlanSchema>;
 export interface TnaPlan extends z.infer<typeof draftFields> {
@@ -179,6 +277,15 @@ export interface TnaPlan extends z.infer<typeof draftFields> {
   program_id: string;
   status: TnaPlanStatus;
   baseline_snapshot: TnaBaselineSnapshot | null;
+  evaluation_period_id?: string | null;
+  evaluation_snapshot?: TnaEvaluationSnapshot | null;
+  evaluation_started_at?: string | null;
+  verdict?: z.infer<typeof tnaVerdictSchema> | null;
+  conclusion_note?: string | null;
+  follow_up?: TnaFollowUp | null;
+  completed_at?: string | null;
+  cancel_reason?: string | null;
+  evaluation_due?: boolean;
   activated_at: string | null;
   cancelled_at: string | null;
   created_by: string;
@@ -192,6 +299,10 @@ export interface TnaPlanParticipant {
   peserta_name_snapshot: string;
   team_snapshot: string | null;
   baseline_findings: number | null;
+  baseline_sessions?: number | null;
+  eval_findings?: number | null;
+  eval_sessions?: number | null;
+  audited_in_eval?: boolean | null;
   was_affected: boolean | null;
 }
 export const tnaPlanSchema = draftFields.extend({
@@ -200,6 +311,14 @@ export const tnaPlanSchema = draftFields.extend({
   program_id: z.string().uuid(),
   status: tnaPlanStatusSchema,
   baseline_snapshot: tnaBaselineSnapshotSchema.nullable(),
+  evaluation_period_id: z.string().uuid().nullable(),
+  evaluation_snapshot: tnaEvaluationSnapshotSchema.nullable(),
+  evaluation_started_at: z.string().datetime({ offset: true }).nullable(),
+  verdict: tnaVerdictSchema.nullable(),
+  conclusion_note: z.string().nullable(),
+  follow_up: tnaFollowUpSchema.nullable(),
+  completed_at: z.string().datetime({ offset: true }).nullable(),
+  cancel_reason: z.string().nullable(),
   activated_at: z.string().datetime({ offset: true }).nullable(),
   cancelled_at: z.string().datetime({ offset: true }).nullable(),
   created_by: z.string().uuid(),
@@ -213,14 +332,20 @@ export const tnaPlanParticipantSchema = z.object({
   peserta_name_snapshot: z.string(),
   team_snapshot: z.string().nullable(),
   baseline_findings: count.nullable(),
+  baseline_sessions: count.nullable(),
+  eval_findings: count.nullable(),
+  eval_sessions: count.nullable(),
+  audited_in_eval: z.boolean().nullable(),
   was_affected: z.boolean().nullable(),
 });
 export const tnaPlansQuerySchema = z.object({
   status: tnaPlanStatusSchema.optional(),
+  due: z.enum(["0", "1"]).optional(),
 });
 export type TnaParticipantBaseline = {
   peserta_id: string | null;
   baseline_findings: number;
+  baseline_sessions?: number;
   was_affected: boolean;
 };
 export const tnaParametersResponseSchema = z.object({
@@ -236,6 +361,10 @@ export interface TnaPlanDetail {
   preview: TnaBaselineSnapshot | null;
   participant_preview: TnaParticipantBaseline[] | null;
   narrative: string;
+  evaluation_narrative?: string | null;
+  evaluation?: TnaEvaluationSnapshot | null;
+  participant_evaluation?: TnaParticipantEvaluation[] | null;
+  evaluation_period_options?: TnaEvaluationPeriodOption[];
 }
 
 export interface TnaParameterDetail {
@@ -256,8 +385,12 @@ export interface TnaParameterDetail {
   }>;
   suggested_programs: TnaProgram[];
 }
-export const tnaNeedSchema = createTnaNeedSchema.extend({
+// Read rows from `select("*")`: unlike the strict input schema, tolerate
+// additive columns so a migration can land before the API that knows them.
+export const tnaNeedSchema = z.object({
+  ...createTnaNeedSchema.shape,
   id: z.string().uuid(),
+  previous_plan_id: z.string().uuid().nullable(),
   validation_snapshot: tnaMetricsSnapshotSchema,
   suggested_cluster_id: tnaClusterIdSchema.nullable(),
   created_by: z.string().uuid(),

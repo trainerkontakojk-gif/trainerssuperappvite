@@ -135,20 +135,23 @@ test("T3 endpoints enforce 401/403 and allow admin/trainer", async () => {
       );
   }
 });
-test("need recomputes snapshot after QA changes, ignores body numbers and logs activity", async () => {
+test("need recomputes snapshot after QA changes, rejects body numbers and logs activity", async () => {
   const before = (await (await request(`/parameters/detail${query()}`)).json())
     .data.metrics;
   runSql(
     fixture.env,
     `UPDATE qa_temuan SET nilai=3,ketidaksesuaian=NULL,sebaiknya=NULL WHERE peserta_id='${fixture.ids.participants[0]}' AND indicator_id='${fixture.ids.metricsIndicators.alpha}' AND period_id='${fixture.ids.periods[2]}';`,
   );
-  const response = await request("/needs", {
+  const forged = await request("/needs", {
     ...payload(),
     validation_snapshot: { findings: 999999 },
     findings: 999999,
     suggested_cluster_id: "salah_jawaban",
     created_by: users.admin.userId,
   });
+  expect(forged.status).toBe(400);
+  expect((await forged.json()).error.code).toBe("VALIDATION_ERROR");
+  const response = await request("/needs", payload());
   expect(response.status).toBe(201);
   const { data } = await response.json();
   expect(before.findings).toBe(3);
@@ -238,7 +241,7 @@ test("need recomputes snapshot after QA changes, ignores body numbers and logs a
     401,
   );
 });
-test("zero findings rejects forged snapshot with 422 and creates no need", async () => {
+test("zero findings rejects forged input and returns 422 for valid input without creating a need", async () => {
   runSql(
     fixture.env,
     `UPDATE qa_temuan SET nilai=3,ketidaksesuaian=NULL,sebaiknya=NULL WHERE indicator_id='${fixture.ids.metricsIndicators.alpha}' AND period_id='${fixture.ids.periods[2]}';`,
@@ -249,10 +252,13 @@ test("zero findings rejects forged snapshot with 422 and creates no need", async
       `SELECT count(*) FROM tna_needs WHERE period_id='${fixture.ids.periods[2]}';`,
     );
   const before = count();
-  const response = await request("/needs", {
+  const forged = await request("/needs", {
     ...payload(),
     validation_snapshot: { findings: 10 },
   });
+  expect(forged.status).toBe(400);
+  expect(count()).toBe(before);
+  const response = await request("/needs", payload());
   expect(response.status).toBe(422);
   expect((await response.json()).error.code).toBe("TNA_NO_FINDINGS");
   expect(count()).toBe(before);

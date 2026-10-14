@@ -8,6 +8,11 @@ import {
   createTnaPlanSchema,
   updateTnaDraftPlanSchema,
   tnaPlanSchema,
+  tnaEvaluationPeriodInputSchema,
+  completeTnaPlanSchema,
+  cancelTnaPlanSchema,
+  type TnaEvaluationPeriodInput,
+  type CompleteTnaPlan,
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
 import { logActivity } from "../activity-log-service";
@@ -15,6 +20,7 @@ import { computeTnaBaseline, validateTnaParticipants } from "./baseline";
 import { tnaBusinessError, throwTnaRpcError, TnaServiceError } from "./errors";
 import { findTnaNeed, loadTnaPlan } from "./read-service";
 import { getTnaParameterDetail } from "./detail";
+import { computeTnaEvaluation } from "./evaluation";
 
 export class TnaNoFindingsError extends Error {}
 
@@ -25,7 +31,7 @@ export async function createTnaNeed(args: {
   actorName: string;
   input: CreateTnaNeed;
 }) {
-  // Strip client-supplied metrics/identity even for callers outside the route.
+  // Reject client-supplied metrics/identity even for callers outside the route.
   const input = createTnaNeedSchema.parse(args.input);
   const detail = await getTnaParameterDetail({
     supabase: args.supabase,
@@ -166,16 +172,109 @@ export async function activateTnaPlan(
 }
 
 export async function cancelTnaPlan(
-  args: TnaWriteContext & { planId: string; expectedUpdatedAt: string },
+  args: TnaWriteContext & {
+    planId: string;
+    expectedUpdatedAt: string;
+    cancelReason?: string;
+  },
 ) {
+  const input = cancelTnaPlanSchema.parse({
+    expected_updated_at: args.expectedUpdatedAt,
+    cancel_reason: args.cancelReason,
+  });
   await loadTnaPlan(args.supabase, args.planId);
   const { data, error } = await supabaseAdmin.rpc("tna_cancel_plan", {
     p_actor_id: args.actorId,
     p_plan_id: args.planId,
-    p_expected_updated_at: args.expectedUpdatedAt,
+    p_expected_updated_at: input.expected_updated_at,
+    p_cancel_reason: input.cancel_reason ?? null,
   });
   if (error) throwTnaRpcError(error);
   const cancelled = tnaPlanSchema.parse(data);
   await logPlanAction(args, cancelled.id, "Membatalkan", "update");
   return cancelled;
+}
+
+export async function startTnaPlanEvaluation(
+  args: TnaWriteContext & { planId: string; input: TnaEvaluationPeriodInput },
+) {
+  const input = tnaEvaluationPeriodInputSchema.parse(args.input);
+  await loadTnaPlan(args.supabase, args.planId);
+  const { data, error } = await supabaseAdmin.rpc("tna_start_plan_evaluation", {
+    p_actor_id: args.actorId,
+    p_plan_id: args.planId,
+    p_expected_updated_at: input.expected_updated_at,
+    p_evaluation_period_id: input.evaluation_period_id,
+  });
+  if (error) throwTnaRpcError(error);
+  const plan = tnaPlanSchema.parse(data);
+  await logPlanAction(args, plan.id, "Memulai evaluasi", "update");
+  return plan;
+}
+
+export async function updateTnaEvaluationPeriod(
+  args: TnaWriteContext & { planId: string; input: TnaEvaluationPeriodInput },
+) {
+  const input = tnaEvaluationPeriodInputSchema.parse(args.input);
+  await loadTnaPlan(args.supabase, args.planId);
+  const { data, error } = await supabaseAdmin.rpc(
+    "tna_update_evaluation_period",
+    {
+      p_actor_id: args.actorId,
+      p_plan_id: args.planId,
+      p_expected_updated_at: input.expected_updated_at,
+      p_evaluation_period_id: input.evaluation_period_id,
+    },
+  );
+  if (error) throwTnaRpcError(error);
+  const plan = tnaPlanSchema.parse(data);
+  await logPlanAction(args, plan.id, "Mengubah periode evaluasi", "update");
+  return plan;
+}
+
+export async function completeTnaPlan(
+  args: TnaWriteContext & { planId: string; input: CompleteTnaPlan },
+) {
+  const input = completeTnaPlanSchema.parse(args.input);
+  const { plan, participants } = await loadTnaPlan(args.supabase, args.planId);
+  if (plan.status !== "evaluasi")
+    throw tnaBusinessError("TNA_PLAN_NOT_EVALUATING");
+  const need = await findTnaNeed(args.supabase, plan.need_id);
+  if (!need)
+    throw new TnaServiceError(
+      "TNA_NEED_NOT_FOUND",
+      404,
+      "Kebutuhan tidak ditemukan.",
+    );
+  const evaluation = await computeTnaEvaluation(
+    args.supabase,
+    need,
+    plan,
+    participants,
+  );
+  if (evaluation.snapshot.population.auditStatus === "no_audit")
+    throw tnaBusinessError("TNA_EVALUATION_NO_AUDIT");
+  // Snapshot and participant values are server-owned. The RPC locks/rechecks
+  // the revision and verdict, then persists all fields in one transaction.
+  const { data, error } = await supabaseAdmin.rpc("tna_complete_plan", {
+    p_actor_id: args.actorId,
+    p_plan_id: args.planId,
+    p_expected_updated_at: input.expected_updated_at,
+    p_evaluation_snapshot: evaluation.snapshot,
+    p_participant_evaluations: evaluation.participants.map(
+      ({ participant_id, audited_in_eval, eval_findings, eval_sessions }) => ({
+        participant_id,
+        audited_in_eval,
+        eval_findings,
+        eval_sessions,
+      }),
+    ),
+    p_verdict: evaluation.snapshot.verdict,
+    p_conclusion_note: input.conclusion_note,
+    p_follow_up: input.follow_up,
+  });
+  if (error) throwTnaRpcError(error);
+  const completed = tnaPlanSchema.parse(data);
+  await logPlanAction(args, completed.id, "Menyelesaikan", "update");
+  return completed;
 }

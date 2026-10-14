@@ -8,11 +8,16 @@ import {
   tnaPlanParticipantSchema,
   type TnaPlanDetail,
   type TnaPlanStatus,
+  tnaParticipantEvaluationSchema,
 } from "@trainers/types";
 import { computeTnaBaseline } from "./baseline";
-import { buildTnaNarrative } from "./narrative";
+import { buildTnaEvaluationNarrative, buildTnaNarrative } from "./narrative";
 import { TnaServiceError } from "./errors";
 import { fetchAllPages } from "../../lib/supabase-pagination";
+import {
+  computeTnaEvaluation,
+  getTnaEvaluationPeriodOptions,
+} from "./evaluation";
 
 export async function listTnaPrograms(supabase: SupabaseClient) {
   const { data, error } = await supabase
@@ -78,7 +83,12 @@ export async function getTnaNeed(
 export async function listTnaPlans(
   supabase: SupabaseClient,
   status?: TnaPlanStatus,
+  due = false,
 ) {
+  // Match the RPC's Asia/Jakarta calendar day, not the server's local timezone.
+  const today = new Date(Date.now() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
   const rows = await fetchAllPages({
     build: ({ from, to }) => {
       let query = supabase
@@ -88,10 +98,24 @@ export async function listTnaPlans(
         .order("id")
         .range(from, to);
       if (status) query = query.eq("status", status);
+      if (due)
+        query = query.or(
+          `and(status.eq.aktif,evaluation_due_date.lte.${today}),status.eq.evaluasi`,
+        );
       return query;
     },
   });
-  return { items: tnaPlanSchema.array().parse(rows) };
+  return {
+    items: tnaPlanSchema
+      .array()
+      .parse(rows)
+      .map((plan) => ({
+        ...plan,
+        evaluation_due:
+          plan.status === "evaluasi" ||
+          (plan.status === "aktif" && plan.evaluation_due_date <= today),
+      })),
+  };
 }
 
 export async function loadTnaPlan(supabase: SupabaseClient, id: string) {
@@ -155,9 +179,61 @@ export async function getTnaPlanDetail(
   const snapshot = computed?.snapshot ?? plan.baseline_snapshot;
   if (!snapshot && plan.status !== "dibatalkan")
     throw new Error("TNA plan is missing baseline");
+  const evaluation =
+    plan.status === "evaluasi"
+      ? await computeTnaEvaluation(supabase, need, plan, participants)
+      : null;
+  if (plan.status === "selesai" && !plan.evaluation_snapshot)
+    throw new Error("Completed plan is missing evaluation snapshot");
+  const evaluationSnapshot =
+    evaluation?.snapshot ??
+    (plan.status === "selesai" ? plan.evaluation_snapshot! : null);
+  let evaluationNarrative: string | null = null;
+  if (evaluationSnapshot) {
+    if (!plan.baseline_snapshot)
+      throw new Error("Evaluation narrative requires frozen baseline");
+    // Metadata only: completed plans never read QA rows or recompute metrics.
+    const { data: evaluationPeriod, error } = await supabase
+      .from("qa_periods")
+      .select("id, month, year")
+      .eq("id", evaluationSnapshot.evaluation_period_id)
+      .single();
+    if (error) throw error;
+    evaluationNarrative = buildTnaEvaluationNarrative({
+      baseline: plan.baseline_snapshot,
+      evaluation: evaluationSnapshot,
+      plan,
+      period: evaluationPeriod,
+      participantCount: participants.length,
+      preview: plan.status === "evaluasi",
+    });
+  }
+  const frozenParticipants =
+    plan.status === "selesai"
+      ? tnaParticipantEvaluationSchema.array().parse(
+          participants.map((p) => ({
+            participant_id: p.id,
+            peserta_id: p.peserta_id,
+            baseline_findings: p.baseline_findings,
+            baseline_sessions: p.baseline_sessions ?? null,
+            baseline_sessions_source:
+              p.baseline_sessions == null ? "unavailable" : "frozen",
+            eval_findings: p.eval_findings,
+            eval_sessions: p.eval_sessions,
+            audited_in_eval: p.audited_in_eval,
+          })),
+        )
+      : null;
   return {
     plan,
     participants,
+    evaluation: evaluationSnapshot,
+    evaluation_narrative: evaluationNarrative,
+    participant_evaluation: evaluation?.participants ?? frozenParticipants,
+    evaluation_period_options:
+      plan.status === "aktif" || plan.status === "evaluasi"
+        ? await getTnaEvaluationPeriodOptions(supabase, need, plan)
+        : [],
     preview: computed?.snapshot ?? null,
     participant_preview: computed?.participantBaselines ?? null,
     narrative: snapshot

@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { TnaMetricsSnapshot, TnaPlanStatus } from "@trainers/types";
+import type {
+  TnaFollowUp,
+  TnaMetricsSnapshot,
+  TnaPlanStatus,
+  TnaVerdict,
+} from "@trainers/types";
 import { unwrapResponse } from "../../lib/api/unwrap-response";
 
 class TnaConflictError extends Error {}
@@ -18,6 +23,16 @@ export const planStatusLabels: Record<TnaPlanStatus, string> = {
   evaluasi: "Evaluasi",
   selesai: "Selesai",
   dibatalkan: "Dibatalkan",
+};
+export const verdictLabels: Record<TnaVerdict, string> = {
+  tercapai: "Tercapai",
+  tercapai_sebagian: "Tercapai sebagian",
+  tidak_tercapai: "Tidak tercapai",
+};
+export const followUpLabels: Record<TnaFollowUp, string> = {
+  selesai_tuntas: "Selesai tuntas",
+  perlu_rencana_lanjutan: "Perlu rencana lanjutan",
+  eskalasi_non_training: "Eskalasi non-training",
 };
 export const interventionLabels = {
   kelas: "Kelas",
@@ -38,6 +53,14 @@ export const number = (value: number | null) =>
   value === null
     ? "Belum tersedia"
     : value.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+/** Calendar date (`YYYY-MM-DD`) shown as-is, independent of browser timezone. */
+export const calendarDate = (value: string) =>
+  new Date(`${value}T00:00:00Z`).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 export function trend(m: TnaMetricsSnapshot) {
   switch (m.trendStatus) {
     case "no_current_audit":

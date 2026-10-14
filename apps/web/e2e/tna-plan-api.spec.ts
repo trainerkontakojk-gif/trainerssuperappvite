@@ -28,6 +28,7 @@ type PlanDetail = TnaPlanDetail & {
   participant_preview: Array<{
     peserta_id: string | null;
     baseline_findings: number;
+    baseline_sessions: number;
     was_affected: boolean;
   }> | null;
 };
@@ -70,7 +71,6 @@ async function need(
     cause_note: "Trainer memvalidasi tiket untuk rencana pelatihan.",
     gap_type: "skill",
     outcome,
-    validation_snapshot: { findings: 99999, auditedAgents: 99999 },
   });
   expect(result.status).toBe(201);
   expect(result.data.validation_snapshot.findings).not.toBe(99999);
@@ -190,8 +190,18 @@ test("draft create/list/detail uses server need, previews population and roster,
   });
   expect(loaded.participant_preview).toEqual(
     expect.arrayContaining([
-      { peserta_id: participant(0), baseline_findings: 1, was_affected: true },
-      { peserta_id: participant(1), baseline_findings: 1, was_affected: true },
+      {
+        peserta_id: participant(0),
+        baseline_findings: 1,
+        baseline_sessions: 12,
+        was_affected: true,
+      },
+      {
+        peserta_id: participant(1),
+        baseline_findings: 1,
+        baseline_sessions: 5,
+        was_affected: true,
+      },
     ]),
   );
   expect(
@@ -279,8 +289,18 @@ test("draft PATCH replaces roster, updates live preview, rejects stale revision 
   );
   expect(loaded.participant_preview).toEqual(
     expect.arrayContaining([
-      { peserta_id: participant(2), baseline_findings: 1, was_affected: true },
-      { peserta_id: participant(3), baseline_findings: 0, was_affected: false },
+      {
+        peserta_id: participant(2),
+        baseline_findings: 1,
+        baseline_sessions: 5,
+        was_affected: true,
+      },
+      {
+        peserta_id: participant(3),
+        baseline_findings: 0,
+        baseline_sessions: 6,
+        was_affected: false,
+      },
     ]),
   );
   const stale = await call(`/plans/${plan.id}`, "PATCH", {
@@ -482,8 +502,14 @@ test("target validation, cancellation and simultaneous activate/cancel preserve 
   expect((await call("/plans", "POST", planBody(created.need.id))).status).toBe(
     201,
   );
+  const missingReason = await call(`/plans/${frozenPlan.id}/cancel`, "POST", {
+    expected_updated_at: frozenPlan.updated_at,
+  });
+  expect(missingReason.status).toBe(422);
+  expect(missingReason.error?.code).toBe("TNA_CANCEL_REASON_REQUIRED");
   const activeCancelled = await call(`/plans/${frozenPlan.id}/cancel`, "POST", {
     expected_updated_at: frozenPlan.updated_at,
+    cancel_reason: "Pelatihan dibatalkan karena kebutuhan operasional berubah.",
   });
   expect(activeCancelled.status).toBe(200);
   expect(activeCancelled.data.baseline_snapshot).toEqual(
@@ -496,11 +522,15 @@ test("target validation, cancellation and simultaneous activate/cancel preserve 
     }),
     call(`/plans/${concurrent.plan.id}/cancel`, "POST", {
       expected_updated_at: concurrent.plan.updated_at,
+      cancel_reason:
+        "Pelatihan dibatalkan karena kebutuhan operasional berubah.",
     }),
   ]);
   expect(outcomes.map((result) => result.status).sort()).toEqual([200, 409]);
   expect(outcomes.find((result) => result.status === 409)?.error?.code).toBe(
-    "TNA_PLAN_TRANSITION_CONFLICT",
+    outcomes[0]!.status === 409
+      ? "TNA_PLAN_TRANSITION_CONFLICT"
+      : "TNA_PLAN_STALE",
   );
   const winner = outcomes.find((result) => result.status === 200)!;
   const final = await detail(concurrent.plan.id);
@@ -579,7 +609,11 @@ test("plan endpoints admit admin/trainer, reject other roles and validate identi
         await call(
           `/plans/${plan.id}/cancel`,
           "POST",
-          { expected_updated_at: activated.data.updated_at },
+          {
+            expected_updated_at: activated.data.updated_at,
+            cancel_reason:
+              "Pelatihan dibatalkan karena kebutuhan operasional berubah.",
+          },
           user.token,
         )
       ).status,

@@ -104,6 +104,10 @@ test("trainer: semua parameter → validasi → rencana → edit peserta → akt
   await page.getByRole("button", { name: "Batalkan", exact: true }).click();
   await page
     .getByRole("dialog")
+    .getByLabel("Alasan pembatalan")
+    .fill("Jadwal pelatihan perlu disusun ulang.");
+  await page
+    .getByRole("dialog")
     .getByRole("button", { name: "Ya, batalkan" })
     .click();
   await expect(page.getByText("Status: Dibatalkan")).toBeVisible();
@@ -258,7 +262,7 @@ for (const width of [1440, 390]) {
     ).toBe(true);
     const device = width === 390 ? "mobile" : "desktop";
     await page.screenshot({
-      path: `../../plans/markdown/tna-phase-1-t5-${device}.png`,
+      path: testInfo.outputPath(`tna-${device}.png`),
       fullPage: true,
     });
     await page
@@ -270,7 +274,7 @@ for (const width of [1440, 390]) {
         .evaluate((el) => (el as HTMLElement).offsetHeight),
     ).toBeGreaterThanOrEqual(44);
     await page.screenshot({
-      path: `../../plans/markdown/tna-phase-1-t5-${device}-validasi.png`,
+      path: testInfo.outputPath(`tna-${device}-validasi.png`),
     });
     for (const [path, heading, artifact] of [
       ["/tna", "TNA", "daftar"],
@@ -293,7 +297,7 @@ for (const width of [1440, 390]) {
         ),
       ).toBe(true);
       await page.screenshot({
-        path: `../../plans/markdown/tna-phase-1-t5-${device}-${artifact}.png`,
+        path: testInfo.outputPath(`tna-${device}-${artifact}.png`),
       });
     }
     await testInfo.attach(`tna-${width}`, {

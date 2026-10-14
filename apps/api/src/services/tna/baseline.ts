@@ -8,6 +8,7 @@ import type {
 import { isAgentExcluded } from "../../lib/scoring";
 import { getTnaParameterAnalysis } from "./analysis";
 import { tnaBusinessError } from "./errors";
+import { cohortMetrics } from "./cohorts";
 
 export async function validateTnaParticipants(
   supabase: SupabaseClient,
@@ -42,7 +43,7 @@ export async function computeTnaBaseline(
   snapshot: TnaBaselineSnapshot;
   participantBaselines: TnaParticipantBaseline[];
 }> {
-  const { metrics, findings } = await getTnaParameterAnalysis({
+  const { metrics, findings, bucket } = await getTnaParameterAnalysis({
     supabase,
     serviceType: need.service_type,
     periodId: need.period_id,
@@ -71,6 +72,14 @@ export async function computeTnaBaseline(
       return {
         peserta_id: row.peserta_id,
         baseline_findings,
+        baseline_sessions:
+          row.peserta_id === null
+            ? 0
+            : cohortMetrics(
+                bucket,
+                need.indicator_id,
+                new Set([row.peserta_id]),
+              ).sampledSessions,
         was_affected: baseline_findings > 0,
       };
     }),

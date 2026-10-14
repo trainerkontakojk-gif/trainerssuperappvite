@@ -6,6 +6,9 @@ import {
   createTnaPlanSchema,
   updateTnaDraftPlanSchema,
   tnaPlanTransitionSchema,
+  tnaEvaluationPeriodInputSchema,
+  completeTnaPlanSchema,
+  cancelTnaPlanSchema,
   tnaPlansQuerySchema,
   tnaParameterDetailQuerySchema,
   tnaNeedsQuerySchema,
@@ -26,6 +29,9 @@ import {
   updateTnaDraftPlan,
   activateTnaPlan,
   cancelTnaPlan,
+  startTnaPlanEvaluation,
+  updateTnaEvaluationPeriod,
+  completeTnaPlan,
   TnaNoFindingsError,
 } from "../services/tna/write-service";
 import {
@@ -308,6 +314,7 @@ const tna = new Hono<{ Variables: AuthVariables }>()
       const data = await listTnaPlans(
         createUserClient(c.get("token")),
         parsed.data.status,
+        parsed.data.due === "1",
       );
       return c.json({ success: true as const, data });
     } catch (error) {
@@ -362,9 +369,64 @@ const tna = new Hono<{ Variables: AuthVariables }>()
       return tnaFailure(c, error);
     }
   })
+  .post(
+    "/plans/:id/start-evaluation",
+    requireCapability("tna.write"),
+    async (c) => {
+      const id = z.string().uuid().safeParse(c.req.param("id"));
+      const parsed = tnaEvaluationPeriodInputSchema.safeParse(
+        await c.req.json().catch(() => null),
+      );
+      if (!id.success || !parsed.success) return invalidInput(c);
+      try {
+        const data = await startTnaPlanEvaluation({
+          ...writeContext(c),
+          planId: id.data,
+          input: parsed.data,
+        });
+        return c.json({ success: true as const, data });
+      } catch (error) {
+        return tnaFailure(c, error);
+      }
+    },
+  )
+  .patch("/plans/:id/evaluation", requireCapability("tna.write"), async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    const parsed = tnaEvaluationPeriodInputSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!id.success || !parsed.success) return invalidInput(c);
+    try {
+      const data = await updateTnaEvaluationPeriod({
+        ...writeContext(c),
+        planId: id.data,
+        input: parsed.data,
+      });
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
+  .post("/plans/:id/complete", requireCapability("tna.write"), async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    const parsed = completeTnaPlanSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!id.success || !parsed.success) return invalidInput(c);
+    try {
+      const data = await completeTnaPlan({
+        ...writeContext(c),
+        planId: id.data,
+        input: parsed.data,
+      });
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
   .post("/plans/:id/cancel", requireCapability("tna.write"), async (c) => {
     const id = z.string().uuid().safeParse(c.req.param("id"));
-    const parsed = tnaPlanTransitionSchema.safeParse(
+    const parsed = cancelTnaPlanSchema.safeParse(
       await c.req.json().catch(() => null),
     );
     if (!id.success || !parsed.success) return invalidInput(c);
@@ -373,6 +435,7 @@ const tna = new Hono<{ Variables: AuthVariables }>()
         ...writeContext(c),
         planId: id.data,
         expectedUpdatedAt: parsed.data.expected_updated_at,
+        cancelReason: parsed.data.cancel_reason,
       });
       return c.json({ success: true as const, data });
     } catch (error) {

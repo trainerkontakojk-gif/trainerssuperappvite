@@ -17,6 +17,8 @@ export const ids = {
   program: "10000000-0000-4000-8000-000000000005",
   ana: "10000000-0000-4000-8000-000000000006",
   budi: "10000000-0000-4000-8000-000000000007",
+  evaluation: "10000000-0000-4000-8000-000000000008",
+  later: "10000000-0000-4000-8000-000000000009",
 };
 const timestamp = "2026-10-08T10:00:00.000Z";
 export const metrics: TnaMetricsSnapshot = {
@@ -219,5 +221,131 @@ export function openTna(
     auth: { role },
     waitForUrl,
   });
+}
+export function evaluationDetail(
+  status: TnaPlan["status"] = "evaluasi",
+): TnaPlanDetail {
+  const d = planDetail("aktif");
+  const cohort = {
+    agents: 1,
+    findings: 1,
+    sampledSessions: 5,
+    ratePer100: 20,
+    spreadPct: 100,
+  };
+  const evaluation: NonNullable<TnaPlanDetail["evaluation"]> = {
+    metric_version: 1,
+    computed_at: timestamp,
+    evaluation_period_id: ids.evaluation,
+    population: {
+      ...metrics,
+      periodId: ids.evaluation,
+      auditedAgents: 20,
+      sampledSessions: 200,
+      affectedAgents: 1,
+      ratePer100: 1,
+      spreadPct: 5,
+    },
+    baseline_recompute_drift: { findings: 1, auditedAgents: 0 },
+    cohorts: {
+      participants: {
+        baseline: { ...cohort, agents: 2, findings: 2, sampledSessions: 10 },
+        evaluation: { ...cohort, findings: 0, ratePer100: 0, spreadPct: 0 },
+        delta: -20,
+      },
+      comparison: {
+        baseline: {
+          ...cohort,
+          agents: 5,
+          sampledSessions: 25,
+          ratePer100: 4,
+          spreadPct: 20,
+        },
+        evaluation: {
+          ...cohort,
+          agents: 5,
+          sampledSessions: 25,
+          ratePer100: 4,
+          spreadPct: 20,
+        },
+        delta: 0,
+      },
+      comparison_small: false,
+      net_effect: -20,
+    },
+    verdict: "tercapai",
+  };
+  return {
+    ...d,
+    plan: {
+      ...d.plan,
+      status,
+      evaluation_due: true,
+      evaluation_period_id: status === "aktif" ? null : ids.evaluation,
+      evaluation_snapshot: status === "selesai" ? evaluation : null,
+      verdict: status === "selesai" ? "tercapai" : null,
+      conclusion_note:
+        status === "selesai" ? "Hasil evaluasi sudah diperiksa trainer." : null,
+      follow_up: status === "selesai" ? "perlu_rencana_lanjutan" : null,
+    },
+    participants: [
+      ...d.participants,
+      {
+        ...d.participants[0],
+        id: ids.budi,
+        peserta_id: ids.budi,
+        peserta_name_snapshot: "Budi Contoh",
+      },
+    ],
+    evaluation: status === "aktif" ? null : evaluation,
+    participant_evaluation:
+      status === "aktif"
+        ? null
+        : [
+            {
+              participant_id: ids.ana,
+              peserta_id: ids.ana,
+              baseline_findings: 1,
+              baseline_sessions: 5,
+              baseline_sessions_source: "frozen",
+              eval_findings: 0,
+              eval_sessions: 5,
+              audited_in_eval: true,
+            },
+            {
+              participant_id: ids.budi,
+              peserta_id: ids.budi,
+              baseline_findings: 1,
+              baseline_sessions: 5,
+              baseline_sessions_source: "recomputed",
+              eval_findings: null,
+              eval_sessions: null,
+              audited_in_eval: false,
+            },
+          ],
+    evaluation_period_options:
+      status === "selesai"
+        ? []
+        : [
+            {
+              id: ids.evaluation,
+              month: 11,
+              year: 2026,
+              auditStatus: "audited",
+              is_default: true,
+            },
+            {
+              id: ids.later,
+              month: 12,
+              year: 2026,
+              auditStatus: "no_audit",
+              is_default: false,
+            },
+          ],
+    evaluation_narrative:
+      status === "aktif"
+        ? null
+        : `${status === "evaluasi" ? "Pratinjau: " : ""}Evaluasi November 2026: narasi deterministik dari server. Perbandingan ini indikatif, bukan bukti sebab-akibat.`,
+  };
 }
 export const parameterUrl = `/tna/parameter?service=call&period=${ids.period}&indicator=${ids.indicator}&compare=2`;
