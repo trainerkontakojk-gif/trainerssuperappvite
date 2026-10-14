@@ -153,9 +153,7 @@ export function normalizePdktEvaluation(
     ...(parsed.expectedAnswerAlignment
       ? { expectedAnswerAlignment: parsed.expectedAnswerAlignment }
       : {}),
-    ...(annotations.success && annotations.data.length > 0
-      ? { annotations: annotations.data }
-      : {}),
+    ...(annotations.success ? { annotations: annotations.data } : {}),
     ...(parsed.edu
       ? {
           // Persisted edu was ranked by the backend builder before storage;

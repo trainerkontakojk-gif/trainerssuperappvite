@@ -207,6 +207,39 @@ describe("annotations di penilaian PDKT", () => {
     );
     expect(JSON.stringify(result)).not.toContain(reference);
   });
+
+  // Tanpa `annotations` balasan tidak bisa ditandai: penilaian gagal (lalu
+  // bisa dicoba lagi), bukan tersimpan seolah lengkap tanpa tanda.
+  it("menolak jawaban AI tanpa annotations dan menyimpan annotations kosong", async () => {
+    const aiOutput = {
+      score: 90,
+      typos: [],
+      clarityIssues: [],
+      contentGaps: [],
+      feedback: "Baik.",
+    };
+    mockCallAI.mockResolvedValue({
+      success: true,
+      text: JSON.stringify(aiOutput),
+    });
+    const missing = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    expect(missing.success).toBe(false);
+
+    mockCallAI.mockReset();
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({ ...aiOutput, annotations: [] }),
+    });
+    const empty = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    expect(empty.success).toBe(true);
+    expect(empty.annotations).toEqual([]);
+  });
 });
 
 describe("annotations di review trainer (Monitoring)", () => {
@@ -246,6 +279,12 @@ describe("annotations di review trainer (Monitoring)", () => {
     expect(result).not.toBeNull();
     expect(result?.score).toBe(70);
     expect(result?.annotations).toEqual(stored.annotations);
+  });
+
+  it("membedakan telaah tanpa temuan dari telaah lama tanpa annotations", () => {
+    const { annotations: _annotations, ...legacy } = stored;
+    expect(normalizePdktEvaluation({ ...stored, annotations: [] })?.annotations).toEqual([]);
+    expect(normalizePdktEvaluation(legacy)).not.toHaveProperty("annotations");
   });
 
   it("membuang annotations rusak tanpa menghilangkan penilaian", () => {
