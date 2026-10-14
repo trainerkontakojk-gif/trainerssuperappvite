@@ -98,8 +98,8 @@ describe("buildPdktEvaluationPrompt", () => {
       ],
     });
 
-    expect(prompt).toContain("recipient framing");
-    expect(prompt).toContain("normative OJK response quality");
+    expect(prompt).toContain("arah penerima: apakah salam");
+    expect(prompt).toContain("kualitas respons normatif OJK");
     expect(prompt).toContain("primaryRecipientType");
     expect(prompt).toContain("pembuka menyapa perusahaan");
     expect(prompt).toContain("templateComplianceScore");

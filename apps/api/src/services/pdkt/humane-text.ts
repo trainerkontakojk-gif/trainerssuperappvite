@@ -27,14 +27,19 @@ const TERMS: ReadonlyArray<readonly [string, string]> = [
   ["clarityScore", "skor kejelasan"],
   ["typoScore", "skor ejaan"],
   ["templateComplianceScore", "skor kepatuhan template"],
+  ["normative", "normatif"],
 ];
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const termPattern = TERMS.map(([term]) => escape(term)).join("|");
 const humane = new Map(TERMS.map(([term, text]) => [term.toLowerCase(), text]));
-/** Istilah dalam kurung, mis. "arah balasan (replyIntent)", cukup dihapus. */
+/**
+ * Kode dalam kurung cukup dihapus, termasuk nilainya, mis. "arah balasan
+ * (replyIntent)" atau "lawan bicara utama (replyIntent: reply_to_ojk)".
+ */
+const code = `\`?(?:${termPattern})\`?`;
 const parenthesized = new RegExp(
-  `\\s*\\(\\s*\`?(?:${termPattern})\`?\\s*\\)`,
+  `\\s*\\(\\s*${code}(?:\\s*[:=]\\s*\`?[\\w.-]+\`?)?\\s*\\)`,
   "gi",
 );
 const bare = new RegExp(`\`?\\b(${termPattern})\\b\`?`, "gi");

@@ -15,6 +15,7 @@ import {
   readPdktConsumerPoints,
 } from "../services/pdkt/reply-annotations";
 import { normalizePdktEvaluation } from "../services/monitoring-history-service";
+import { humanizePdktText } from "../services/pdkt/humane-text";
 import {
   buildPdktEvaluationPrompt,
   evaluateAgentResponse,
@@ -599,6 +600,31 @@ describe("bahasa catatan untuk agent", () => {
       text: "Sesuaikan penutup dengan arah balasan.",
       quote: "Hormat kami,\nKontak OJK 157",
     });
+  });
+
+  it("menghapus kode teknis dalam kurung beserta nilainya", () => {
+    // Kalimat persis dari telaah produksi (laporan Fajar 2026-10-14).
+    expect(
+      humanizePdktText(
+        "Penggunaan lawan bicara utama (replyIntent: reply_to_ojk) sudah tepat, penjelasan normative terkait wewenang LJK.",
+      ),
+    ).toBe(
+      "Penggunaan lawan bicara utama sudah tepat, penjelasan normatif terkait wewenang LJK.",
+    );
+    expect(
+      humanizePdktText("Arah balasan (`reply_to_company_with_ojk_cc`) keliru."),
+    ).toBe("Arah balasan keliru.");
+  });
+
+  it("aturan prompt tidak memakai nama field sebagai istilah penilaian", () => {
+    const { prompt } = buildPdktEvaluationPrompt({
+      inboundEmailBody: "Saya masih ditagih.",
+      agentReplyBody: REPLY,
+    });
+    const rules = prompt.split("</evaluation_context_data>")[1];
+    expect(rules).not.toMatch(/sesuai replyIntent/);
+    expect(rules).not.toMatch(/recipient framing|normative OJK response/);
+    expect(rules).toMatch(/jangan menulis kode seperti reply_to_ojk/i);
   });
 
   it("catatan sistem pembatasan skor ditulis dalam bahasa Indonesia", async () => {
