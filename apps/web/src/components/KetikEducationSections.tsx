@@ -66,7 +66,7 @@ function GuidanceCard({
     >
       <summary className="flex items-center gap-3 p-4 cursor-pointer select-none list-none hover:bg-foreground/[0.03] transition-colors">
         {rank !== undefined && (
-          <span className="w-6 h-6 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center text-[11px] font-black">
+          <span className="w-6 h-6 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center text-xs font-black">
             {rank}
           </span>
         )}
@@ -149,7 +149,7 @@ export function KetikPriorityFixes({
             key={g.key}
             className="flex gap-3 items-start p-3 rounded-xl bg-amber-500/5 border border-amber-500/15"
           >
-            <span className="mt-0.5 w-6 h-6 shrink-0 rounded-lg bg-amber-500 text-white flex items-center justify-center text-[11px] font-black">
+            <span className="mt-0.5 w-6 h-6 shrink-0 rounded-lg bg-amber-500 text-white flex items-center justify-center text-xs font-black">
               {g.priorityRank}
             </span>
             <div className="min-w-0">

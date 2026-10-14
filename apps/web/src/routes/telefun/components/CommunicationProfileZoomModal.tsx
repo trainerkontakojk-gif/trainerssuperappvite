@@ -188,7 +188,7 @@ export const CommunicationProfileZoomModal: React.FC<
                     {STATUS_LABELS[metric.status] || metric.status}
                   </span>
                   {metric.explanation && (
-                    <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                       {metric.explanation}
                     </p>
                   )}

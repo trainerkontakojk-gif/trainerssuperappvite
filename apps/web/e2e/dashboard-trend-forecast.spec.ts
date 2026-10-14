@@ -19,7 +19,7 @@ import {
   type ShellAudit,
 } from "./helpers/hermeticShell";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
-import { findTextBelowFloor } from "./helpers/typographyFloor";
+import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 const YEAR = new Date().getFullYear();
@@ -276,7 +276,7 @@ test.describe("Proyeksi tren di Beranda (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("Teks Beranda minimal 11px, termasuk tooltip grafik", async ({
+  test(`Teks Beranda minimal ${MIN_TEXT_PX}px, termasuk tooltip grafik`, async ({
     page,
   }) => {
     const { audit } = await openDashboard(page, TWO_MONTHS, FRESH);

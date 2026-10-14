@@ -281,7 +281,7 @@ test.describe("Forecast SIDAK (hermetic)", () => {
     }
   });
 
-  test("g2 kontrol seri, bulan, dan aksi >= 44px, teks halaman >= 12px (di luar grafik/penjelasan)", async ({
+  test("g2 kontrol seri, bulan, dan aksi >= 44px, teks halaman >= 12px", async ({
     page,
   }) => {
     await open(page);
@@ -300,14 +300,7 @@ test.describe("Forecast SIDAK (hermetic)", () => {
         expect(box!.height, `tinggi kontrol "${name}" @${width}`).toBeGreaterThanOrEqual(43.5);
       }
     }
-    const small = await findTextBelowFloor(page.locator("main"), {
-      minPx: 12,
-      // Grafik dan penjelasan proyeksi dipakai bersama /dashboard. Bar filter
-      // memakai DashboardFilters/MonthRangePicker bersama (label 11px, lantai
-      // aplikasi), tidak diubah di redesain ini.
-      exclude:
-        ".recharts-wrapper, [data-testid='forecast-insight-panel'], [data-testid='forecast-filter-bar']",
-    });
+    const small = await findTextBelowFloor(page.locator("main"));
     expect(small).toEqual([]);
   });
 

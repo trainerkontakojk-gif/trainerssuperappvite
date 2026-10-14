@@ -172,7 +172,7 @@ export function MonthRangePicker({
       <div className={cn("flex flex-col gap-2", className)}>
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 sm:flex sm:flex-wrap sm:items-center">
           <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
-            <span className="mb-1 block text-[11px] font-semibold text-muted-foreground sm:hidden">
+            <span className="mb-1 block text-xs font-semibold text-muted-foreground sm:hidden">
               Dari
             </span>
             {startSelect}
@@ -181,7 +181,7 @@ export function MonthRangePicker({
             sampai
           </span>
           <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
-            <span className="mb-1 block text-[11px] font-semibold text-muted-foreground sm:hidden">
+            <span className="mb-1 block text-xs font-semibold text-muted-foreground sm:hidden">
               Sampai
             </span>
             {endSelect}

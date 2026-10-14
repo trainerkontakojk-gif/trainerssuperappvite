@@ -157,7 +157,7 @@ export default function SidakDashboardHeatmap({
                       >
                         <span
                           aria-hidden="true"
-                          className={`absolute inset-x-0 bottom-full mb-1 text-center text-[11px] leading-4 tabular-nums ${
+                          className={`absolute inset-x-0 bottom-full mb-1 text-center text-xs leading-4 tabular-nums ${
                             isPeak
                               ? "font-semibold text-foreground"
                               : "text-muted-foreground"
@@ -173,7 +173,7 @@ export default function SidakDashboardHeatmap({
             </div>
             <div
               aria-hidden="true"
-              className="mt-1.5 flex gap-2 text-center text-[11px] text-muted-foreground"
+              className="mt-1.5 flex gap-2 text-center text-xs text-muted-foreground"
             >
               {WEEKDAY_SHORT.map((label) => (
                 <span key={label} className="flex-1">

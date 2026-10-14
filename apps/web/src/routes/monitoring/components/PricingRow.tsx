@@ -114,7 +114,7 @@ export function PricingRow({
               <Button
                 type="button"
                 onClick={save}
-                className="min-h-11 px-3 text-[11px]"
+                className="min-h-11 px-3 text-xs"
               >
                 Simpan
               </Button>
@@ -122,7 +122,7 @@ export function PricingRow({
                 type="button"
                 variant="outline"
                 onClick={cancel}
-                className="min-h-11 px-3 text-[11px]"
+                className="min-h-11 px-3 text-xs"
               >
                 Batal
               </Button>
@@ -138,7 +138,7 @@ export function PricingRow({
                   : undefined
               }
               onClick={() => setEditing(true)}
-              className="min-h-11 px-3 text-[11px]"
+              className="min-h-11 px-3 text-xs"
             >
               Edit
             </Button>
@@ -158,7 +158,7 @@ export function PricingRow({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {REALTIME_RATE_FIELDS.map(([field, label]) => (
                   <label key={field} className="space-y-1.5">
-                    <span className="block text-[11px] font-medium text-muted-foreground">
+                    <span className="block text-xs font-medium text-muted-foreground">
                       {label}
                     </span>
                     <RateInput

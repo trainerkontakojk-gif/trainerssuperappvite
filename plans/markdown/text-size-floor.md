@@ -172,3 +172,23 @@ Hasil:
 - RED: 10 teks < 11px: tick X "Jan 26", "Feb 26", "Mar 26", tick Y "0", "5", "10", "15", "20", label "PREDIKSI" (semua 10px, SVG tspan) dan badge delta "50" (10px). Dengan sisanya diperbaiki dan hanya badge tooltip dikembalikan ke `text-[9px]`, tes gagal dengan `9px <span> "Prediksi"`, membuktikan hover tooltip terpindai.
 - GREEN: `dashboard-trend-forecast` 5 lulus, 0 gagal.
 - Cek akhir: `impeccable detect`, web dan e2e typecheck, `pnpm build`, `git diff --check` exit 0; `pnpm lint` exit 0 (102 web, 8 api warning, tidak bertambah).
+
+## Lanjutan: batas 12px (2026-10-14)
+
+Keputusan Fajar: ikuti `docs/design.md` (teks sekunder minimal 12px), naikkan batas aplikasi dari 11px ke 12px. Karena token `--text-xs` dipakai di semua halaman, ini Lane D: seluruh suite Playwright default dijalankan.
+
+Requirement: `text-xs` dirender 12px, dan tidak ada teks terlihat < 12px di semua layar yang sudah dipindai spec batas teks.
+
+Design:
+
+- `--text-xs: 12px` di `@theme` (`index.css`).
+- 66 `text-[11px]` di 31 file (SIDAK, Monitoring, KETIK, Telefun, Profiler, PDKT, `ui/`) menjadi `text-xs`. Duplikat `text-xs sm:text-xs` di `MonthRail` dirapikan.
+- `.text-label-mono` dan `.text-stat-label` (`text-[10px]`) menjadi `text-xs`; ukuran tombol `sm` di `ui/button.tsx` `text-[0.8rem]` (11,2px) menjadi `text-xs`.
+- Radar Telefun: tick sudut compact 11 menjadi 12, tick radius 11 menjadi 12.
+- `MIN_TEXT_PX` 11 menjadi 12. `sidak-forecast.spec.ts` tidak lagi memakai `minPx: 12` dan pengecualian grafik/penjelasan/filter: seluruh `<main>` kini dipindai.
+- Tidak diubah: `*MotionFrame` (mockup dekoratif, dikecualikan spec) dan kanvas ekspor Profiler (`ParticipantSlide`, `profilerSlideHtml`, `profilerPptxExport`) serta `agentReportHtml` (dokumen ekspor).
+
+Hasil:
+
+- RED: 16 dari 28 tes batas teks gagal pada 12px (`text-xs` 11px, plus label `text-[11px]` di tiap modul).
+- GREEN: 28 lulus.

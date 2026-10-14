@@ -217,7 +217,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
               Profil Komunikasi
             </h3>
-            <p className="text-[11px] text-slate-400 dark:text-white/35 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-white/35 mt-0.5">
               Semakin sesuai dengan area target, semakin baik
             </p>
           </div>

@@ -81,7 +81,7 @@ export default function GlobalBirthdaysWidget({
           <span className="text-xs font-medium text-muted-foreground">
             Ulang Tahun Terdekat
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             Seluruh data
           </span>
           {status === "loading" && <Skeleton className="mt-1 h-4 w-2/3" />}

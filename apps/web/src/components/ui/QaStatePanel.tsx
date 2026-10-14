@@ -78,7 +78,7 @@ export default function QaStatePanel({
           {description ? (
             <p
               className={`${
-                compact ? "text-[11px]" : "text-xs"
+                compact ? "text-xs" : "text-xs"
               } mt-1.5 leading-relaxed opacity-90`}
             >
               {description}

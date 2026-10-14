@@ -110,7 +110,7 @@ export default function SidakInputManualForm({
       </div>
       <div className="p-6 space-y-6">
         <div>
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
             No. Tiket
           </label>
           <input
@@ -131,7 +131,7 @@ export default function SidakInputManualForm({
           <div>
             <label
               htmlFor="temuan-tanggal-layanan"
-              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
             >
               Tanggal layanan — opsional
             </label>
@@ -149,7 +149,7 @@ export default function SidakInputManualForm({
           <div>
             <label
               htmlFor="temuan-tanggal-sampel"
-              className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
             >
               Tanggal sampel — opsional
             </label>
@@ -191,7 +191,7 @@ export default function SidakInputManualForm({
               </div>
               <div className="p-4 space-y-4">
                 <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
                     Parameter
                   </label>
                   <IndicatorDropdown
@@ -210,7 +210,7 @@ export default function SidakInputManualForm({
                   )}
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
                     Nilai
                   </label>
                   <div className="grid grid-cols-4 gap-2">
@@ -235,7 +235,7 @@ export default function SidakInputManualForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
                       Ketidaksesuaian
                     </label>
                     <textarea
@@ -250,7 +250,7 @@ export default function SidakInputManualForm({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
                       Sebaiknya
                     </label>
                     <textarea

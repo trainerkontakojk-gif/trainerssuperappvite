@@ -270,7 +270,7 @@ function ReplyWithNotes({
         className="bg-chart-orange/15 px-0.5 text-foreground underline decoration-chart-orange decoration-2 underline-offset-4 [box-decoration-break:clone]"
       >
         {text}
-        <sup className="ml-0.5 text-[11px] font-bold">
+        <sup className="ml-0.5 text-xs font-bold">
           <a
             id={markId(number)}
             href={`#${noteId(number)}`}

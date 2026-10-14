@@ -349,7 +349,7 @@ export function KetikReviewPanel({
                     {data.scores?.final || 0}
                   </div>
                   <div
-                    className={`text-[11px] font-bold ${getScoreGrade(data.scores?.final || 0).color} mt-0.5`}
+                    className={`text-xs font-bold ${getScoreGrade(data.scores?.final || 0).color} mt-0.5`}
                   >
                     {getScoreGrade(data.scores?.final || 0).label}
                   </div>

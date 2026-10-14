@@ -132,7 +132,7 @@ export function HoldAssessmentCard({ assessment }: HoldAssessmentCardProps) {
             </div>
           )}
           {assessment.drill && (
-            <p className="mt-3 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-sky-600 dark:text-sky-400">
+            <p className="mt-3 flex items-start gap-1.5 text-xs font-medium leading-relaxed text-sky-600 dark:text-sky-400">
               <Play className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               <span>
                 <span className="font-bold uppercase tracking-wide">Drill:</span>{" "}

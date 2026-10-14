@@ -813,7 +813,7 @@ export function HistoryTab({
           <table className="min-w-[1180px] w-full text-left border-collapse">
             <caption className="sr-only">Riwayat sesi simulasi</caption>
             <thead>
-              <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground/80 text-[11px] font-bold uppercase tracking-wider">
+              <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground/80 text-xs font-bold uppercase tracking-wider">
                 <th
                   scope="col"
                   className="sticky top-0 z-20 bg-muted/20 py-3.5 px-6 font-bold"

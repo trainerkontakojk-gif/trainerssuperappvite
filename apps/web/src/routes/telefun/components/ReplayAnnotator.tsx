@@ -395,7 +395,7 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               onChange={(e) => setTimestampMs(Number(e.target.value))}
               className="w-full accent-module-telefun"
             />
-            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400 dark:text-white/35">
+            <div className="mt-1 flex items-center justify-between text-xs text-slate-400 dark:text-white/35">
               <span>00:00</span>
               <span>{formatTimestamp(maxTimestampMs)}</span>
             </div>

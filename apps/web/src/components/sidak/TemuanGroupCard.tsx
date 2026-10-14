@@ -97,7 +97,7 @@ export default function TemuanGroupCard({
                 <div className="mt-0 p-4 rounded-xl bg-background/50 border border-border space-y-4">
                   <p className="text-xs font-semibold text-foreground tracking-wide">Edit temuan</p>
                   <div>
-                    <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Nilai</label>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block tracking-wide">Nilai</label>
                     <div className="grid grid-cols-4 gap-2">
                       {NILAI_OPTIONS.map((opt) => (
                         <button
@@ -113,7 +113,7 @@ export default function TemuanGroupCard({
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Ketidaksesuaian</label>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block tracking-wide">Ketidaksesuaian</label>
                       <textarea
                         value={editKetidaksesuaian}
                         onChange={(e) => setEditKetidaksesuaian(e.target.value)}
@@ -122,7 +122,7 @@ export default function TemuanGroupCard({
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Sebaiknya</label>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block tracking-wide">Sebaiknya</label>
                       <textarea
                         value={editSebaiknya}
                         onChange={(e) => setEditSebaiknya(e.target.value)}
@@ -135,7 +135,7 @@ export default function TemuanGroupCard({
                     <div>
                       <label
                         htmlFor={`edit-tanggal-layanan-${item.id}`}
-                        className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide"
+                        className="text-xs font-semibold text-muted-foreground mb-1.5 block tracking-wide"
                       >
                         Tanggal layanan
                       </label>
@@ -150,7 +150,7 @@ export default function TemuanGroupCard({
                     <div>
                       <label
                         htmlFor={`edit-tanggal-sampel-${item.id}`}
-                        className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide"
+                        className="text-xs font-semibold text-muted-foreground mb-1.5 block tracking-wide"
                       >
                         Tanggal sampel
                       </label>

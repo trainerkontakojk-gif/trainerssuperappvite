@@ -183,7 +183,7 @@ export function PdktReplyAnnotationsCard({
         className="rounded-sm border-b-2 border-amber-500 bg-amber-500/15 px-0.5 text-[var(--fg)]"
       >
         {text}
-        <sup className="ml-0.5 text-[11px] font-bold">{number}</sup>
+        <sup className="ml-0.5 text-xs font-bold">{number}</sup>
       </mark>
     ),
   );
@@ -208,7 +208,7 @@ export function PdktReplyAnnotationsCard({
           const isMarked = annotation.marked;
           return (
             <li key={annotation.number} className="flex gap-2.5 text-xs">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[11px] font-bold text-[var(--fg)]">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-[var(--fg)]">
                 {annotation.number}
               </span>
               <span className="flex min-w-0 flex-col gap-0.5">

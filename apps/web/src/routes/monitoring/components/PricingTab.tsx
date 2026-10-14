@@ -110,7 +110,7 @@ export function PricingTab({
               Simpan Kurs
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground/70 mt-3 font-medium">
+          <p className="text-xs text-muted-foreground/70 mt-3 font-medium">
             Kurs aktif:{" "}
             <span className="text-foreground font-semibold">
               Rp {localRate.toLocaleString()}

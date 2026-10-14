@@ -324,7 +324,7 @@ export function SessionReviewModal({
                       {session.finalScore || 0}
                     </div>
                     <div
-                      className={`text-[11px] font-bold ${getScoreGrade(session.finalScore || 0).color} mt-0.5`}
+                      className={`text-xs font-bold ${getScoreGrade(session.finalScore || 0).color} mt-0.5`}
                     >
                       {getScoreGrade(session.finalScore || 0).label}
                     </div>
@@ -342,7 +342,7 @@ export function SessionReviewModal({
                     ) : null}
                     , <strong>Tata Tulis</strong>, & <strong>Kepatuhan</strong>.
                   </div>
-                  <div className="flex items-center gap-2 justify-end text-[11px] text-muted-foreground/80">
+                  <div className="flex items-center gap-2 justify-end text-xs text-muted-foreground/80">
                     <TrendingUp className="w-3.5 h-3.5" />
                     <span>Semakin tinggi skor, semakin baik performa</span>
                   </div>
@@ -556,7 +556,7 @@ export function SessionReviewModal({
               )}
 
               {!canStartReview && reviewAccessMessage && (
-                <p className="mt-4 text-center text-[11px] font-medium text-chart-orange">
+                <p className="mt-4 text-center text-xs font-medium text-chart-orange">
                   {reviewAccessMessage}
                 </p>
               )}
