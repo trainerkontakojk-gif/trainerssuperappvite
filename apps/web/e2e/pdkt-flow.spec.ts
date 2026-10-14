@@ -1738,7 +1738,10 @@ test.describe("PDKT (hermetic)", () => {
                 priorityRank: 2,
               },
             ],
-            suggestedRewrite: { body: "Terima kasih, kami cek transaksi Ibu." },
+            suggestedRewrite: {
+              body: "Terima kasih, kami cek transaksi Ibu.",
+              highlights: ["transaksi Ibu"],
+            },
           },
           expectedAnswerAlignment: {
             category: "Hampir sesuai",
@@ -1812,10 +1815,30 @@ test.describe("PDKT (hermetic)", () => {
     );
     await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
 
+    // Penanda dan catatan saling tertaut; pembaca layar mendengar "catatan 1",
+    // bukan angka yang menempel di kata terakhir.
+    const markLink = answer.getByRole("link", { name: "Lihat catatan 1" });
+    await markLink.click();
+    await expect(notes.nth(0)).toBeFocused();
+    await expect(fixes.getByRole("link")).toHaveCount(1);
+    await fixes.getByRole("link", { name: "Kembali ke kalimat bertanda 1" }).click();
+    await expect(markLink).toBeFocused();
+
+    // Email konsumen dan balasan satu permukaan perbandingan; email konsumen
+    // tetap terlihat saat catatan panjang digulir.
+    const comparison = page.getByRole("region", {
+      name: "Perbandingan email",
+    });
+    await expect(comparison.getByRole("region", { name: "Email konsumen" })).toBeVisible();
+    await expect(comparison.getByRole("region", { name: "Balasan Anda" })).toBeVisible();
+
     // Email konsumen selalu terbuka dan berdampingan dengan balasan; catatan
     // berada di kolom balasan. Di ponsel keduanya bertumpuk, konsumen dulu.
     const consumer = page.getByRole("region", { name: "Email konsumen" });
     await expect(consumer).toContainText("Saldo terpotong tetapi transaksi gagal.");
+    expect(
+      await consumer.evaluate((el) => getComputedStyle(el).position),
+    ).toBe("sticky");
     await expect(
       page.getByRole("region", { name: "Telaah lama tanpa penanda" }),
     ).toHaveCount(0);
@@ -1875,6 +1898,23 @@ test.describe("PDKT (hermetic)", () => {
     await expect(rewrite).toBeHidden();
     await page.getByText("Lihat contoh balasan yang lebih baik").click();
     await expect(rewrite).toBeVisible();
+    await expect(page.getByText("Bagian yang disorot hijau")).toBeVisible();
+
+    // Kontrol halaman Telaah minimal 44px (root 14px: min-h-11 hanya 38,5px).
+    const heights = await page
+      .locator("button:visible, summary:visible")
+      .evaluateAll((els) =>
+        els
+          // Isi tahap Telaah saja; header workspace bersama bukan bagian halaman ini.
+          .filter((el) =>
+            [...document.querySelectorAll("h2")]
+              .find((h) => h.textContent?.includes("Balasan untuk"))
+              ?.parentElement?.contains(el),
+          )
+          .map((el) => [el.textContent?.trim(), el.getBoundingClientRect().height]),
+      );
+    expect(heights.length).toBeGreaterThan(3);
+    expect(heights.filter(([, h]) => (h as number) < 44)).toEqual([]);
 
     // Kembali ke kotak masuk tidak membuka ulang email yang sama.
     await page.getByRole("button", { name: "Kembali ke kotak masuk" }).click();

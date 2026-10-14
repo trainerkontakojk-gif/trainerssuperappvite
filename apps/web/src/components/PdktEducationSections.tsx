@@ -42,7 +42,7 @@ export function CopyInlineButton({ text }: { text: string }) {
           notify.error("Teks belum bisa disalin. Pilih teksnya lalu salin manual.");
         }
       }}
-      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-medium"
+      className="min-h-[44px] gap-1 rounded-md px-2.5 text-xs font-medium"
     >
       {copied ? (
         <Check className="w-3 h-3 text-chart-green" />
