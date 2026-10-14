@@ -530,7 +530,7 @@ test.describe("Monitoring (hermetic)", () => {
     // kembali ke landing. Jadi yang diuji di sini adalah hasil yang terlihat
     // pengguna, bukan teks internal komponen.
     await expect(
-      page.getByRole("heading", { name: "Lima modul. Satu pengalaman." }),
+      page.getByRole("heading", { level: 1, name: "Trainers SuperApp" }),
     ).toBeVisible({ timeout: 20000 });
     await expect(
       page.getByRole("heading", { name: "Monitoring AI Usage" }),
