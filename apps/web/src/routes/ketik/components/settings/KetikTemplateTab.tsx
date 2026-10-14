@@ -249,7 +249,7 @@ export function KetikTemplateTab({
             <div className="mb-2 flex items-center gap-2">
               <Badge
                 variant="outline"
-                className="border-primary/20 bg-primary/10 text-[11px] text-primary"
+                className="border-primary/20 bg-primary/10 text-xs text-primary"
               >
                 /{template.keyword}
               </Badge>

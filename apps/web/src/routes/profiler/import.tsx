@@ -513,7 +513,7 @@ export default function ProfilerImport() {
                       <p className="mb-0.5 text-xs font-bold uppercase tracking-wider text-primary">
                         {g.label}
                       </p>
-                      <p className="text-[11px] leading-snug text-muted-foreground">
+                      <p className="text-xs leading-snug text-muted-foreground">
                         {g.items}
                       </p>
                     </div>

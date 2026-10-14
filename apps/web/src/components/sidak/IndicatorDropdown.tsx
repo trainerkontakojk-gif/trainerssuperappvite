@@ -80,7 +80,7 @@ function GroupedOptions({
       <div key={group}>
         {!isStandalone && (
           <div className="border-b border-border bg-muted/35 px-4 py-2">
-            <p className="text-[11px] font-semibold leading-snug text-foreground">
+            <p className="text-xs font-semibold leading-snug text-foreground">
               {group}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">

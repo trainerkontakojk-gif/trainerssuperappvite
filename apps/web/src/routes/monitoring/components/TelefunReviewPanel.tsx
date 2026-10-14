@@ -320,7 +320,7 @@ export function TelefunReviewPanel({
                   {data.score}
                 </div>
                 <div
-                  className={`text-[11px] font-bold ${getTelefunGrade(data.score!).color} mt-0.5`}
+                  className={`text-xs font-bold ${getTelefunGrade(data.score!).color} mt-0.5`}
                 >
                   {getTelefunGrade(data.score!).label}
                 </div>
@@ -372,7 +372,7 @@ export function TelefunReviewPanel({
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Profil Komunikasi
                 </h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Semakin sesuai dengan area target, semakin baik
                 </p>
               </div>

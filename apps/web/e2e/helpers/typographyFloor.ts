@@ -1,5 +1,5 @@
 /**
- * Batas bawah ukuran teks (docs/design.md §7: teks yang dibaca minimal 11px).
+ * Batas bawah ukuran teks (docs/design.md: teks yang dibaca minimal 12px).
  *
  * Memindai setiap elemen yang punya teks langsung dan terlihat di dalam `root`,
  * termasuk `<text>` SVG grafik, lalu mengembalikan yang ukuran fontnya di bawah
@@ -13,7 +13,7 @@
 
 import type { Locator } from "@playwright/test";
 
-export const MIN_TEXT_PX = 11;
+export const MIN_TEXT_PX = 12;
 
 export async function findTextBelowFloor(
   root: Locator,

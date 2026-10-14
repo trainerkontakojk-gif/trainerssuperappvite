@@ -82,7 +82,7 @@ export default function MonthRail({
             bottom: `calc(1.75rem + (100% - 3.25rem) * ${targetPct / 100})`,
           }}
         >
-          <span className="absolute -top-2.5 right-0 bg-background pl-1.5 text-[11px] font-medium text-foreground/70">
+          <span className="absolute -top-2.5 right-0 bg-background pl-1.5 text-xs font-medium text-foreground/70">
             Target {SIDAK_QA_TARGET}%
           </span>
         </div>
@@ -102,7 +102,7 @@ export default function MonthRail({
                   <span className="flex w-full flex-1 items-end justify-center">
                     <span className="h-px w-full bg-border" />
                   </span>
-                  <span className="flex h-6 items-center text-[11px] text-muted-foreground/70 sm:text-xs">
+                  <span className="flex h-6 items-center text-xs text-muted-foreground/70">
                     {label}
                   </span>
                 </div>
@@ -139,7 +139,7 @@ export default function MonthRail({
                   />
                 </span>
                 <span
-                  className={`flex h-6 items-center text-[11px] sm:text-xs ${
+                  className={`flex h-6 items-center text-xs ${
                     isActive
                       ? "font-semibold text-foreground"
                       : "text-muted-foreground"

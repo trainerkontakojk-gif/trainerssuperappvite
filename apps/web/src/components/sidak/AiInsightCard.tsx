@@ -34,7 +34,7 @@ export default function AiInsightCard({ insight }: Props) {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 fill-amber-400 text-amber-400" />
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-500">Area Perbaikan</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Area Perbaikan</span>
           </div>
           <h4 className="font-outfit text-xl font-bold leading-tight tracking-tight sm:text-2xl text-foreground">
             {insight.parameter}
@@ -48,7 +48,7 @@ export default function AiInsightCard({ insight }: Props) {
         </div>
 
         <div className="flex flex-col justify-center lg:border-l lg:border-border lg:pl-8">
-          <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Rekomendasi Strategis
           </div>
           <blockquote className="max-h-56 overflow-y-auto pr-1 text-sm font-medium italic leading-relaxed sm:text-base text-foreground">

@@ -190,7 +190,7 @@ export function MonthMatrix({ month, rows }: Props) {
                         {agent.nama}
                       </span>
                       {agent.tl ? (
-                        <span className="block truncate text-[11px] text-muted-foreground">
+                        <span className="block truncate text-xs text-muted-foreground">
                           {agent.tl}
                         </span>
                       ) : null}
@@ -208,12 +208,12 @@ export function MonthMatrix({ month, rows }: Props) {
                       className={cn(
                         "border-border px-1 py-1.5 text-center align-middle",
                         kind === "kerja" &&
-                          "text-[11px] font-semibold text-foreground",
+                          "text-xs font-semibold text-foreground",
                         kind === "libur" &&
-                          "bg-muted text-[11px] font-semibold text-muted-foreground line-through decoration-muted-foreground/50",
+                          "bg-muted text-xs font-semibold text-muted-foreground line-through decoration-muted-foreground/50",
                         kind === "lainnya" &&
                           shift &&
-                          "text-[11px] text-foreground",
+                          "text-xs text-foreground",
                       )}
                     >
                       {shift ?? ""}
@@ -233,7 +233,7 @@ export function MonthMatrix({ month, rows }: Props) {
                         className={
                           field.key === "work"
                             ? "text-[13px] font-semibold text-foreground"
-                            : "text-[11px] text-muted-foreground"
+                            : "text-xs text-muted-foreground"
                         }
                       >
                         {summary[SUMMARY_FIELD_ALIAS[field.key]]}

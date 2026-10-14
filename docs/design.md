@@ -299,7 +299,7 @@ Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti
 Untuk memastikan antarmuka mudah dibaca oleh semua pengguna (aksesibilitas tinggi):
 - **Contrast Ratio:** Teks utama (`var(--fg)`) harus memiliki kontras minimal 7:1 terhadap latar belakang. Teks sekunder/deskripsi (`var(--fg2)`) harus memiliki kontras minimal 4.5:1.
 - **Muted Text:** Gunakan `var(--fg3)` hanya untuk informasi non-kritis/meta-info. Jangan gunakan `opacity` di bawah `0.8` pada teks yang bertumpuk dengan latar belakang terang.
-- **Font Size Minimum:** Hindari teks dengan ukuran di bawah `11px`. Gunakan minimal `12px` (`text-sm` atau `text-xs`) untuk label formulir, dengan berat sedang (`font-medium`) untuk meningkatkan readability.
+- **Font Size Minimum:** Teks yang dibaca minimal `12px`. `text-xs` sudah 12px lewat token `--text-xs` (root 14px membuat `text-xs` bawaan hanya 10,5px); jangan pakai ukuran manual di bawahnya (`text-[11px]`, `text-[0.8rem]`, `fontSize: 11`). Label formulir memakai berat sedang (`font-medium`). E2E menegakkannya lewat `MIN_TEXT_PX` di `apps/web/e2e/helpers/typographyFloor.ts`. Pengecualian: mockup dekoratif `*MotionFrame` dan kanvas ekspor Profiler (slide/PPTX).
 
 ---
 

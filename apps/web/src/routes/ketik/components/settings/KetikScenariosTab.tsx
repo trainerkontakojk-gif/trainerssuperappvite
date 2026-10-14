@@ -400,7 +400,7 @@ export function KetikScenariosTab({
                   <p className="text-xs font-medium text-foreground">
                     Pilih gambar untuk dilampirkan
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     PNG, JPG (Maksimal 500KB)
                   </p>
                 </div>
@@ -550,7 +550,7 @@ export function KetikScenariosTab({
                 <div className="mb-1.5 flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="border-primary/20 bg-primary/10 text-[11px] text-primary"
+                    className="border-primary/20 bg-primary/10 text-xs text-primary"
                   >
                     {scenario.category}
                   </Badge>
@@ -564,7 +564,7 @@ export function KetikScenariosTab({
                 {scenario.images && scenario.images.length > 0 && (
                   <Badge
                     variant="outline"
-                    className="mt-2.5 gap-1.5 text-[11px]"
+                    className="mt-2.5 gap-1.5 text-xs"
                   >
                     <ImageIcon data-icon="inline-start" />
                     {scenario.images.length} Lampiran

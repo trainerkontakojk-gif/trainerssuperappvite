@@ -210,7 +210,7 @@ export default function SidakHeatmapCalendar({
                       aria-label={`${formatTanggal(iso)}: ${count} temuan`}
                       aria-current={isSelected ? "date" : undefined}
                       data-intensity={bucket.label}
-                      className={`flex aspect-square items-center justify-center rounded text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${LEVEL_CLASS[bucket.level]} ${isSelected ? "ring-2 ring-foreground" : ""}`}
+                      className={`flex aspect-square items-center justify-center rounded text-xs font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-1 focus-visible:ring-offset-surface ${LEVEL_CLASS[bucket.level]} ${isSelected ? "ring-2 ring-foreground" : ""}`}
                     >
                       {/* Angka hari sekaligus pembawa intensitas, jadi warna
                           tidak pernah menjadi satu-satunya pembawa makna. */}

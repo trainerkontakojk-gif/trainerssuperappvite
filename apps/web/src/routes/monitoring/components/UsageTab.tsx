@@ -135,7 +135,7 @@ export function UsageTab({
               </span>
             </p>
           </div>
-          <p className="text-[11px] text-muted-foreground/80 mt-2.5 flex items-center gap-1">
+          <p className="text-xs text-muted-foreground/80 mt-2.5 flex items-center gap-1">
             <Clock
               size={12}
               aria-hidden="true"
@@ -155,7 +155,7 @@ export function UsageTab({
               {totalSummary.tokens.toLocaleString()}
             </p>
           </div>
-          <p className="text-[11px] text-muted-foreground/80 mt-2.5">
+          <p className="text-xs text-muted-foreground/80 mt-2.5">
             Total Input & Output Tokens
           </p>
         </Card>

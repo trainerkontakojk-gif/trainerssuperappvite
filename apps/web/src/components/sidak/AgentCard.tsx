@@ -155,7 +155,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
 
       <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border pt-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-muted-foreground">
+          <p className="text-xs font-semibold text-muted-foreground">
             Skor audit
           </p>
           <p
@@ -174,7 +174,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
 
         <div className="min-w-0 space-y-3">
           <div>
-            <p className="text-[11px] font-semibold text-muted-foreground">
+            <p className="text-xs font-semibold text-muted-foreground">
               Status audit
             </p>
             <div
@@ -189,7 +189,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
           </div>
 
           <div>
-            <p className="text-[11px] font-semibold text-muted-foreground">
+            <p className="text-xs font-semibold text-muted-foreground">
               Perubahan
             </p>
             <div

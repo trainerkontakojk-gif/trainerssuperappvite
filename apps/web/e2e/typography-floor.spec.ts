@@ -3,7 +3,7 @@
  *
  * Root aplikasi 14px membuat `text-xs` Tailwind (0.75rem) jatuh ke 10.5px.
  * Spec ini membuktikan utilitas yang benar-benar dikompilasi untuk aplikasi
- * memenuhi batas 11px. Hermetic: hanya origin dev-server lokal yang boleh lewat.
+ * memenuhi batas 12px. Hermetic: hanya origin dev-server lokal yang boleh lewat.
  */
 
 import { expect, test } from "@playwright/test";
