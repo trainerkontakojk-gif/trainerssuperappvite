@@ -47,6 +47,7 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 
 - [PDKT Telaah — Poin Konsumen, Temuan, Kalimat Penghubung](markdown/pdkt-telaah-consumer-points.md) — Lane C; IMPLEMENTED lokal (worktree `feat/pdkt-telaah-consumer-points`, belum commit): E2E PDKT 65/65, unit annotations 19/19, typecheck/lint/diff check lulus; audit `impeccable` 17/20, semua temuan diperbaiki.
 - [PDKT Telaah — Poin Konsumen Kosong, Langkah Tertaut, Catatan Manusiawi](markdown/pdkt-telaah-humane-notes.md) — Lane C; IMPLEMENTED lokal (worktree `fix/pdkt-telaah-humane-notes`, belum commit): unit 24/24 (disetujui), E2E PDKT 65/65, typecheck/lint/diff check lulus.
+- [PDKT — Email Dibalas Dibuka sebagai Email, Telaah lewat Tombol Terpisah](markdown/pdkt-dibalas-telaah-terpisah.md) — Lane C (frontend saja); IMPLEMENTED: E2E PDKT penuh 70/70; typecheck, lint, build, dan diff check lulus. Evidence di plan.
 
 ## Dependency notes
 

@@ -13,7 +13,9 @@ import {
 interface EmailDetailPaneProps {
   item: PdktMailboxDetailItem;
   onReply: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
+  onOpenReview?: () => void;
+  reviewStatus?: "not_started" | "pending" | "processing" | "completed" | "failed" | null;
   /** Tombol kembali ke daftar email di layar sempit. */
   onBackToList?: () => void;
 }
@@ -34,11 +36,13 @@ export function EmailBody({ body, className }: { body: string; className?: strin
   );
 }
 
-/** Tahap Pahami: membaca email konsumen sebelum menulis balasan. */
+/** Tahap Pahami: membaca email konsumen; untuk email dibalas, pintu ke Telaah. */
 export function EmailDetailPane({
   item,
   onReply,
   onDelete,
+  onOpenReview,
+  reviewStatus,
   onBackToList,
 }: EmailDetailPaneProps) {
   const inbound = readInboundEmail(item);
@@ -62,7 +66,15 @@ export function EmailDetailPane({
             <ArrowLeft aria-hidden="true" />
           </Button>
         )}
-        <PdktStageNav current="pahami" onSelect={{ tanggapi: onReply }} />
+        <PdktStageNav
+          current="pahami"
+          completed={item.status === "replied" ? ["tanggapi"] : undefined}
+          onSelect={
+            item.status === "replied"
+              ? { telaah: onOpenReview }
+              : { tanggapi: onReply }
+          }
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-8 md:px-6">
@@ -135,6 +147,40 @@ export function EmailDetailPane({
             Tulis balasan
             <ArrowRight aria-hidden="true" />
           </Button>
+        </div>
+      )}
+      {item.status === "replied" && onOpenReview && (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 md:px-6">
+          {onDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onDelete}
+              className="min-h-[44px] gap-2 px-3 text-xs"
+            >
+              <Trash2 aria-hidden="true" className="text-destructive" />
+              Hapus email
+            </Button>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <span role="status" className="text-xs text-fg2">
+              {reviewStatus === "completed"
+                ? "Telaah siap"
+                : reviewStatus === "failed"
+                  ? "Telaah gagal"
+                  : reviewStatus === "not_started"
+                    ? "Belum ditelaah"
+                    : "Sedang ditelaah AI"}
+            </span>
+            <Button
+              type="button"
+              onClick={onOpenReview}
+              className="min-h-[44px] gap-2 px-5 text-[13px] font-semibold"
+            >
+              Lihat telaah
+              <ArrowRight aria-hidden="true" />
+            </Button>
+          </div>
         </div>
       )}
     </section>

@@ -11,16 +11,22 @@ const STAGES: { id: PdktStage; label: string }[] = [
 
 interface Props {
   current: PdktStage;
-  /** Tahap yang bisa dibuka dengan klik. Telaah tidak pernah dibuka dari sini. */
-  onSelect?: Partial<Record<Exclude<PdktStage, "telaah">, () => void>>;
+  /** Tahap yang bisa dibuka dengan klik; Telaah setelah balasan dikirim. */
+  onSelect?: Partial<Record<PdktStage, () => void>>;
+  completed?: PdktStage[];
   className?: string;
 }
 
 const pill =
   "inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-xs font-medium";
 
-/** Navigasi tiga tahap latihan; Telaah terkunci sampai balasan dikirim. */
-export function PdktStageNav({ current, onSelect = {}, className }: Props) {
+/** Navigasi tiga tahap latihan dengan akses sesuai status email. */
+export function PdktStageNav({
+  current,
+  onSelect = {},
+  completed = [],
+  className,
+}: Props) {
   const currentIndex = STAGES.findIndex((stage) => stage.id === current);
 
   return (
@@ -30,7 +36,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
     >
       <ol className="flex flex-wrap items-center gap-2">
         {STAGES.map((stage, index) => {
-          const done = index < currentIndex;
+          const done = index < currentIndex || completed.includes(stage.id);
           const marker = (
             <span
               aria-hidden="true"
@@ -44,10 +50,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
               {done ? <Check className="size-3" strokeWidth={3} /> : index + 1}
             </span>
           );
-          const handler =
-            stage.id === "telaah" || index === currentIndex
-              ? undefined
-              : onSelect[stage.id];
+          const handler = index === currentIndex ? undefined : onSelect[stage.id];
 
           return (
             <li key={stage.id} className="flex items-center gap-2">
@@ -71,7 +74,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
                   onClick={handler}
                   className={cn(
                     pill,
-                    "border border-border text-fg2 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    "min-h-[44px] border border-border text-fg2 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   )}
                 >
                   {marker}
@@ -96,7 +99,7 @@ export function PdktStageNav({ current, onSelect = {}, className }: Props) {
           );
         })}
       </ol>
-      {current !== "telaah" && (
+      {current !== "telaah" && !onSelect.telaah && (
         <span className="text-xs text-muted-foreground max-sm:sr-only">
           Telaah terbuka setelah balasan dikirim
         </span>

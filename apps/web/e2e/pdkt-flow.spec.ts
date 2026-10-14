@@ -1663,7 +1663,7 @@ test.describe("PDKT (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("tahap Tanggapi: tulis, konfirmasi, kirim, lalu Telaah menunggu penilaian", async ({
+  test("tahap Tanggapi: tulis, konfirmasi, kirim, lalu kembali ke kotak masuk", async ({
     page,
   }) => {
     const audit = await openWorkspace(page, [
@@ -1727,6 +1727,23 @@ test.describe("PDKT (hermetic)", () => {
       evaluation_error: null,
     });
 
+    // Tab Dibalas tidak boleh aktif sesaat pun selama kembali ke kotak masuk.
+    await page.evaluate(() => {
+      const w = window as Window & { sawRepliedTab?: boolean };
+      w.sawRepliedTab = false;
+      new MutationObserver(() => {
+        for (const button of document.querySelectorAll(
+          'button[aria-pressed="true"]',
+        )) {
+          if (button.textContent?.trim() === "Dibalas") w.sawRepliedTab = true;
+        }
+      }).observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["aria-pressed"],
+      });
+    });
     await compose.getByRole("button", { name: "Kirim balasan" }).click();
     const sent = page.waitForRequest(
       (request) =>
@@ -1741,15 +1758,60 @@ test.describe("PDKT (hermetic)", () => {
     expect(body.mailboxId).toBe(OPEN_MAIL.list.id);
     expect(body.reply.body).toBe(replyText);
 
+    await expectSearch(page, { ruang: "1", email: null, tahap: null });
     await expect(
-      page.getByRole("heading", { name: "Balasan untuk Rina" }),
-    ).toBeVisible({ timeout: 20000 });
+      page.getByRole("heading", { name: "Kotak masuk" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Belum dibalas/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(
+      page.getByText(
+        "Balasan terkirim dan sedang ditelaah AI. Buka dari tab Dibalas kapan saja.",
+      ),
+    ).toBeVisible();
+    await expect(reviewHeading(page)).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => (window as Window & { sawRepliedTab?: boolean }).sawRepliedTab,
+      ),
+    ).toBe(false);
+    await page.getByRole("button", { name: /^Dibalas/ }).click();
+    await page
+      .getByRole("button", { name: new RegExp(replied.list.subject) })
+      .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
     await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
       /Telaah/,
     );
     await expect(
       page.getByRole("status").filter({ hasText: "Sedang ditelaah AI" }),
     ).toBeVisible();
+
+    // Penilaian selesai saat agent kembali ke daftar tanpa seleksi.
+    await stageNav(page)
+      .getByRole("button", { name: /Pahami/ })
+      .click();
+    await page.getByRole("button", { name: /^Belum dibalas/ }).click();
+    await expectSearch(page, { ruang: "1", email: null, tahap: null });
+    await overrideJson(page, "**/api/v1/ai/usage/summary**", PDKT_USAGE);
+    await overrideJson(page, "**/api/v1/pdkt/history", [
+      { ...EVALUATED_HISTORY[0], id: "pdkt-new-1" },
+    ]);
+    await overrideJson(page, /\/api\/v1\/pdkt\/history\/eval\//, {
+      evaluation_status: "completed",
+      evaluation: EVALUATED_HISTORY[0].evaluation,
+      evaluation_error: null,
+    });
+    await expect(page.getByText(/^Pemakaian AI:/)).toBeVisible({
+      timeout: 15000,
+    });
+    await expectSearch(page, { email: null });
+    await page.getByRole("button", { name: /^Dibalas/ }).click();
+    await expect(
+      page.getByRole("button", { name: new RegExp(replied.list.subject) }),
+    ).toContainText("Skor 85");
     expectHermetic(audit);
   });
 
@@ -1889,6 +1951,7 @@ test.describe("PDKT (hermetic)", () => {
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
 
     await expect(
@@ -2263,6 +2326,7 @@ test.describe("PDKT (hermetic)", () => {
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
     const consumer = page.getByRole("region", {
       name: "Email konsumen",
@@ -2332,6 +2396,7 @@ test.describe("PDKT (hermetic)", () => {
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
 
     const notice = page.getByRole("region", {
       name: "Telaah lama tanpa penanda",
@@ -2395,6 +2460,7 @@ test.describe("PDKT (hermetic)", () => {
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
 
     // Galat dari server/AI tidak ditampilkan; peserta melihat pesan tetap.
     await expect(
@@ -2445,6 +2511,7 @@ test.describe("PDKT (hermetic)", () => {
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
     await expect(
       page.getByText("Sebut kanal pengaduan resmi.").first(),
@@ -2563,6 +2630,152 @@ async function requestNewEmail(page: Page) {
 test.describe("PDKT navigation acceptance", () => {
   test.beforeAll(() => assertLocalDevOnlyTarget());
 
+  test("email dibalas dibuka sebagai email dengan tombol Lihat telaah", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(
+      page,
+      pdktNavigationMocks(EVALUATED_HISTORY, [REPLIED_MAIL]),
+    );
+    await page.getByRole("button", { name: /^Dibalas/ }).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
+    await expectSearch(page, { email: REPLIED_MAIL.list.id, tahap: null });
+    const article = page.getByRole("article");
+    await expect(article).toContainText(REPLIED_MAIL.detail.inbound_email.body);
+    await expect(reviewHeading(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Ringkasan skor" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Tulis balasan" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Lihat telaah" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Telaah siap" }),
+    ).toBeVisible();
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Pahami/,
+    );
+    await expect(stageNav(page)).toContainText("Tanggapi (selesai)");
+    await expect(
+      stageNav(page).getByRole("button", { name: "Telaah", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Telaah terbuka setelah balasan dikirim"),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Detail email" }),
+    ).not.toContainText("Terima kasih, kami cek transaksinya.");
+    await expect(
+      page.getByRole("region", { name: "Detail email" }),
+    ).not.toContainText("Skor 85");
+    await expect(
+      page.getByRole("button", { name: "Hapus email", exact: true }),
+    ).toBeVisible();
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      const reviewButton = page.getByRole("button", { name: "Lihat telaah" });
+      await expect(reviewButton).toBeVisible();
+      expect(
+        await reviewButton.evaluate(
+          (element) => (element as HTMLElement).offsetHeight,
+        ),
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: test.info().outputPath(`dibalas-${width}.png`),
+      });
+    }
+    // Footer menghormati izin hapus, tanpa mengubah panel baca.
+    await overrideJson(page, `**/api/v1/pdkt/mailbox/${REPLIED_MAIL.list.id}`, {
+      ...REPLIED_MAIL.detail,
+      permissions: { can_delete: false },
+    });
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Lihat telaah" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Hapus email", exact: true }),
+    ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("Lihat telaah membuka Telaah, Back dan tahap Pahami kembali ke email", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(
+      page,
+      pdktNavigationMocks(EVALUATED_HISTORY, [REPLIED_MAIL]),
+    );
+    await page.getByRole("button", { name: /^Dibalas/ }).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
+    await expectSearch(page, { email: REPLIED_MAIL.list.id, tahap: "telaah" });
+    await expect(reviewHeading(page)).toBeVisible();
+    await page.reload();
+    await expect(reviewHeading(page)).toBeVisible();
+    await page.goBack();
+    await expectSearch(page, { email: REPLIED_MAIL.list.id, tahap: null });
+    await expect(page.getByRole("article")).toBeVisible();
+    await stageNav(page)
+      .getByRole("button", { name: "Telaah", exact: true })
+      .click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await stageNav(page)
+      .getByRole("button", { name: /Pahami/ })
+      .click();
+    await expectSearch(page, { email: REPLIED_MAIL.list.id, tahap: null });
+    await expect(page.getByRole("article")).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("tahap=telaah diabaikan untuk email terbuka", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: `/pdkt?ruang=1&email=${OPEN_MAIL.list.id}&tahap=telaah`,
+      apiMocks: pdktNavigationMocks([], [OPEN_MAIL]),
+    });
+    await expect(page.getByRole("article")).toBeVisible({ timeout: 20000 });
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Pahami/,
+    );
+    await expect(
+      page.getByRole("button", { name: "Tulis balasan" }),
+    ).toBeVisible();
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
+    expectHermetic(audit);
+  });
+
+  test("refresh pada email dibalas memilih tab Dibalas", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    const audit = await openHermeticShell(page, {
+      path: `/pdkt?ruang=1&email=${REPLIED_MAIL.list.id}`,
+      apiMocks: pdktNavigationMocks(EVALUATED_HISTORY, [
+        OPEN_MAIL,
+        REPLIED_MAIL,
+      ]),
+    });
+    await expect(page.getByRole("article")).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.getByRole("button", { name: /^Dibalas/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) }),
+    ).toHaveAttribute("aria-current", "true");
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
+    expectHermetic(audit);
+  });
+
   test("AC1 kotak masuk menambah history dan Back kembali ke landing", async ({
     page,
   }) => {
@@ -2608,17 +2821,10 @@ test.describe("PDKT navigation acceptance", () => {
         .getByRole("button", { name: new RegExp(item.list.subject) })
         .click();
       await expectSearch(page, { ruang: "1", email: item.list.id });
-      if (item.list.status === "replied")
-        await expect(reviewHeading(page)).toBeVisible();
-      else await expect(page.getByRole("article")).toBeVisible();
+      await expect(page.getByRole("article")).toBeVisible();
       await page.reload();
       await expectSearch(page, { ruang: "1", email: item.list.id });
-      if (item.list.status === "replied")
-        await expect(reviewHeading(page)).toBeVisible();
-      else
-        await expect(page.getByRole("article")).toContainText(
-          item.list.subject,
-        );
+      await expect(page.getByRole("article")).toContainText(item.list.subject);
       await expect(hero(page)).toHaveCount(0);
       expectHermetic(audit);
     });
@@ -2654,6 +2860,40 @@ test.describe("PDKT navigation acceptance", () => {
     await page.goBack();
     await expect(page).toHaveURL(/\/pdkt\/history$/);
     await link().click();
+    await page
+      .locator("main header")
+      .getByRole("button", { name: "Riwayat", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/pdkt\/history$/);
+    expectHermetic(audit);
+  });
+
+  test("Telaah dari Riwayat tetap menyediakan Riwayat setelah Pahami dan Lihat telaah", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: pdktNavigationMocks(HISTORY_PAGE_SESSIONS, [REPLIED_MAIL]),
+    });
+    await page
+      .getByRole("table")
+      .getByRole("link", { name: REPLIED_MAIL.list.subject })
+      .click();
+    await expect(reviewHeading(page)).toBeVisible();
+
+    await stageNav(page)
+      .getByRole("button", { name: /Pahami/ })
+      .click();
+    await expect(page.getByRole("article")).toBeVisible();
+    await expectSearch(page, { email: REPLIED_MAIL.list.id, dari: "riwayat" });
+
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await expectSearch(page, {
+      email: REPLIED_MAIL.list.id,
+      tahap: "telaah",
+      dari: "riwayat",
+    });
     await page
       .locator("main header")
       .getByRole("button", { name: "Riwayat", exact: true })
@@ -2738,6 +2978,7 @@ test.describe("PDKT navigation acceptance", () => {
     await page
       .getByRole("button", { name: new RegExp(SUBJECT_MAIL.list.subject) })
       .click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
     await expect(reviewHeading(page)).toBeVisible();
     const request = page.waitForRequest(
       (req) =>
@@ -2779,6 +3020,7 @@ test.describe("PDKT navigation acceptance", () => {
       await page
         .getByRole("button", { name: new RegExp(item.list.subject) })
         .click();
+      await page.getByRole("button", { name: "Lihat telaah" }).click();
       await expect(
         page.getByRole("button", { name: "Latihan lagi dengan skenario ini" }),
       ).toBeDisabled();
@@ -3020,6 +3262,7 @@ async function openSubjectReview(
   await page
     .getByRole("button", { name: new RegExp(item.list.subject) })
     .click();
+  await page.getByRole("button", { name: "Lihat telaah" }).click();
   await expect(reviewHeading(page)).toBeVisible();
   return audit;
 }

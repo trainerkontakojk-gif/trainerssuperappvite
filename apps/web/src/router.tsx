@@ -384,6 +384,7 @@ const pdktRoute = createRoute({
     ruang?: 1;
     email?: string;
     dari?: "riwayat";
+    tahap?: "telaah";
   } => ({
     ...(typeof search.sesi === "string" && search.sesi
       ? { sesi: search.sesi }
@@ -393,6 +394,7 @@ const pdktRoute = createRoute({
       ? { email: search.email }
       : {}),
     ...(search.dari === "riwayat" ? { dari: "riwayat" } : {}),
+    ...(search.tahap === "telaah" ? { tahap: "telaah" } : {}),
   }),
   beforeLoad: requireCapability("pdkt.use"),
 });

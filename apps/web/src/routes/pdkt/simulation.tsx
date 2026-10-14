@@ -52,7 +52,12 @@ const EVALUATION_RETRY_START_GRACE_MS = 15_000;
 interface PdktSimulationProps {
   canPickParticipant: boolean;
   selectedId: string | null;
-  onSelectedIdChange: (id: string | null, replace?: boolean) => Promise<void>;
+  isReviewOpen?: boolean;
+  onSelectedIdChange: (
+    id: string | null,
+    replace?: boolean,
+    review?: boolean,
+  ) => Promise<void>;
   onBackToHistory?: () => void;
   simulationSubject?: SimulationSubjectSelection;
   onBack?: () => void;
@@ -85,6 +90,7 @@ export default function PdktSimulation({
   onAfterActivity,
   initialReplaySession = null,
   selectedId,
+  isReviewOpen = false,
   onSelectedIdChange: setSelectedId,
   onBackToHistory,
   initialSettings,
@@ -274,6 +280,25 @@ export default function PdktSimulation({
     ? (mailboxDetails[selectedId] ??
       (replayItem?.id === selectedId ? replayItem : undefined))
     : undefined;
+
+  const selectedListItem = selectedId
+    ? visibleMailboxItems.find((item) => item.id === selectedId)
+    : undefined;
+  const selectedListStatus = selectedListItem?.status;
+  // Sinkronkan tab sekali per email terpilih, setelah statusnya dimuat. Status
+  // yang berubah karena balasan baru terkirim tidak memindahkan tab.
+  const filterSyncedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedId) {
+      filterSyncedIdRef.current = null;
+      return;
+    }
+    if (!selectedListStatus || filterSyncedIdRef.current === selectedId) return;
+    filterSyncedIdRef.current = selectedId;
+    if (selectedListStatus === "replied") {
+      setFilter((current) => (current === "open" ? "replied" : current));
+    }
+  }, [selectedId, selectedListStatus]);
 
   const handleSelectMailboxItem = async (id: string) => {
     // Auto-select adalah preview desktop. Entri sebelum klik harus tetap daftar.
@@ -796,10 +821,11 @@ export default function PdktSimulation({
 
   const handleReplySubmit = async (replyText: string): Promise<boolean> => {
     if (!selectedId || !selectedItem) return false;
+    const mailboxId = selectedId;
     setIsReplying(true);
     await notifyBefore();
     try {
-      const startTime = sessionStartTimeRef.current[selectedId] || Date.now();
+      const startTime = sessionStartTimeRef.current[mailboxId] || Date.now();
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       const reply = {
         id: "reply_" + Date.now(),
@@ -814,7 +840,7 @@ export default function PdktSimulation({
       await unwrapResponse(
         await pdktClient.mailbox.reply.$post({
           json: {
-            mailboxId: selectedId,
+            mailboxId,
             reply,
             timeTaken,
           },
@@ -823,13 +849,14 @@ export default function PdktSimulation({
 
       await refetch();
       await fetchHistory();
-      // Email tetap terpilih; setelah detail termuat ulang statusnya `replied`
-      // sehingga layar pindah ke tahap Telaah.
-      invalidateMailboxDetail(selectedId);
+      invalidateMailboxDetail(mailboxId);
       setIsReplyOpen(false);
-      setFilter("replied");
+      setFilter("open");
+      await setSelectedId(null);
+      notify.success(
+        "Balasan terkirim dan sedang ditelaah AI. Buka dari tab Dibalas kapan saja.",
+      );
       notifyAfter("reply");
-      notify.success("Balasan terkirim. AI sedang menelaah.");
       return true;
     } catch (err: unknown) {
       console.error("[PDKT] Reply error:", err);
@@ -1061,17 +1088,20 @@ export default function PdktSimulation({
     },
   };
 
-  // Tahap mengikuti status email terpilih; daftar dipakai selama detail dimuat.
-  const selectedListItem = selectedId
-    ? visibleMailboxItems.find((item) => item.id === selectedId)
-    : undefined;
+  // Telaah mengikuti URL; daftar dipakai selama detail email dimuat.
   const selectedStatus = selectedItem?.status ?? selectedListItem?.status;
   const stage =
-    selectedStatus === "replied"
+    selectedStatus === "replied" && isReviewOpen
       ? "telaah"
       : selectedStatus === "open" && isReplyOpen
         ? "tanggapi"
         : "pahami";
+  const openReview = () => {
+    if (selectedId) void setSelectedId(selectedId, false, true);
+  };
+  const closeReview = () => {
+    if (selectedId) void setSelectedId(selectedId);
+  };
   const headerItem = selectedListItem ?? selectedItem ?? null;
   const openCount = visibleMailboxItems.filter(
     (item) => item.status === "open",
@@ -1209,7 +1239,14 @@ export default function PdktSimulation({
             <EmailDetailPane
               item={selectedItem}
               onReply={() => setIsReplyOpen(true)}
-              onDelete={() => handleDelete(selectedItem.id)}
+              onDelete={
+                selectedItem.status === "open" ||
+                selectedItem.permissions?.can_delete === true
+                  ? () => handleDelete(selectedItem.id)
+                  : undefined
+              }
+              onOpenReview={openReview}
+              reviewStatus={evaluations[selectedItem.id]?.status ?? null}
               onBackToList={() => setSelectedId(null)}
             />
           ) : selectedId ? (
@@ -1260,7 +1297,9 @@ export default function PdktSimulation({
           onSelectStage={
             stage === "tanggapi"
               ? { pahami: () => setIsReplyOpen(false) }
-              : undefined
+              : selectedListItem
+                ? { pahami: closeReview }
+                : undefined
           }
         />
       ) : (

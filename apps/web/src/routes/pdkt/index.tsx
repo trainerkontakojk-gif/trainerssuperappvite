@@ -54,6 +54,7 @@ export default function PdktLanding() {
     sesi: requestedSessionId,
     ruang,
     email,
+    tahap,
     dari,
   } = useSearch({ from: "/pdkt" });
   const view = ruang === 1 || requestedSessionId || email ? "mailbox" : "home";
@@ -176,14 +177,20 @@ export default function PdktLanding() {
     void navigate({ to: "/pdkt", search: {}, replace: true });
   }, [requestedSessionId, historyReady, historyError, replaySession, navigate]);
 
+  // Berpindah Pahami/Telaah pada email yang sama mempertahankan asal Riwayat.
   const handleSelectedIdChange = useCallback(
-    (id: string | null, replace = false) =>
+    (id: string | null, replace = false, review = false) =>
       navigate({
         to: "/pdkt",
-        search: { ruang: 1, ...(id ? { email: id } : {}) },
+        search: {
+          ruang: 1,
+          ...(id ? { email: id } : {}),
+          ...(id && review ? { tahap: "telaah" as const } : {}),
+          ...(id && dari && id === selectedId ? { dari } : {}),
+        },
         replace,
       }),
-    [navigate],
+    [navigate, dari, selectedId],
   );
 
   const captureUsageBaseline = useCallback(async () => {
@@ -470,6 +477,9 @@ export default function PdktLanding() {
                   canPickParticipant={canPickParticipant}
                   simulationSubject={simulationSubject}
                   selectedId={selectedId}
+                  isReviewOpen={
+                    tahap === "telaah" || Boolean(requestedSessionId)
+                  }
                   onSelectedIdChange={handleSelectedIdChange}
                   onBack={() => {
                     void navigate({ to: "/pdkt", search: {} });
