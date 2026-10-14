@@ -1812,6 +1812,43 @@ test.describe("PDKT (hermetic)", () => {
     );
     await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
 
+    // Email konsumen selalu terbuka dan berdampingan dengan balasan; catatan
+    // berada di kolom balasan. Di ponsel keduanya bertumpuk, konsumen dulu.
+    const consumer = page.getByRole("region", { name: "Email konsumen" });
+    await expect(consumer).toContainText("Saldo terpotong tetapi transaksi gagal.");
+    await expect(
+      page.getByRole("region", { name: "Telaah lama tanpa penanda" }),
+    ).toHaveCount(0);
+    const box = async (locator: typeof consumer) => {
+      const rect = await locator.boundingBox();
+      expect(rect).not.toBeNull();
+      return rect as NonNullable<typeof rect>;
+    };
+    const [consumerBox, answerBox, fixesBox] = await Promise.all([
+      box(consumer),
+      box(answer),
+      box(fixes),
+    ]);
+    expect(consumerBox.x + consumerBox.width).toBeLessThanOrEqual(answerBox.x);
+    expect(Math.abs(consumerBox.y - answerBox.y)).toBeLessThan(2);
+    expect(Math.abs(fixesBox.x - answerBox.x)).toBeLessThan(2);
+    expect(fixesBox.y).toBeGreaterThan(answerBox.y);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [phoneConsumer, phoneAnswer] = await Promise.all([
+      box(consumer),
+      box(answer),
+    ]);
+    expect(phoneConsumer.y + phoneConsumer.height).toBeLessThanOrEqual(
+      phoneAnswer.y,
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
     const other = page.getByRole("region", { name: "Temuan lain" });
     await expect(other).toContainText("Ejaan:");
     await expect(other).toContainText("transkasi");
@@ -1845,6 +1882,57 @@ test.describe("PDKT (hermetic)", () => {
       page.getByRole("heading", { name: "Kotak masuk", level: 2 }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Balasan untuk Rina" })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("telaah lama tanpa penanda kalimat bisa ditelaah ulang", async ({
+    page,
+  }) => {
+    // EVALUATED_HISTORY dibuat sebelum penanda kalimat ada: tanpa `annotations`.
+    const audit = await openWorkspace(page, [
+      ...pdktMocks(EVALUATED_HISTORY, [REPLIED_MAIL]),
+      {
+        method: "GET",
+        path: /\/api\/v1\/pdkt\/history\/eval\//,
+        body: {
+          success: true,
+          data: {
+            evaluation_status: "processing",
+            evaluation: null,
+            evaluation_error: null,
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/history/retry-eval",
+        body: { success: true, data: null },
+      },
+    ]);
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
+
+    const notice = page.getByRole("region", {
+      name: "Telaah lama tanpa penanda",
+    });
+    await expect(notice).toBeVisible({ timeout: 20000 });
+    await expect(notice).toContainText("belum menandai kalimat");
+    await expect(
+      page.getByRole("region", { name: "Catatan pada balasan" }),
+    ).toHaveCount(0);
+
+    const retry = page.waitForRequest((request) =>
+      request.url().endsWith("/api/v1/pdkt/history/retry-eval"),
+    );
+    await notice.getByRole("button", { name: "Telaah ulang" }).click();
+    expect((await retry).postDataJSON()).toEqual({
+      historyId: "pdkt-evaluated-1",
+    });
+    await expect(
+      page.getByRole("status").filter({ hasText: "Sedang ditelaah AI" }),
+    ).toBeVisible();
     expectHermetic(audit);
   });
 

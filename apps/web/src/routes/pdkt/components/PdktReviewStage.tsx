@@ -226,7 +226,8 @@ function ScoreBreakdown({ result }: { result: PdktEvaluationResult }) {
   );
 }
 
-function ReplyFeedback({
+/** Balasan bertanda dan catatan bernomornya, satu kolom. */
+function ReplyWithNotes({
   result,
   replyBody,
 }: {
@@ -246,17 +247,9 @@ function ReplyFeedback({
       </mark>
     ),
   );
-  const otherFindings = [
-    ...(result.typos ?? []).map((text) => ({ kind: "Ejaan", text })),
-    ...(result.clarityIssues ?? []).map((text) => ({ kind: "Kejelasan", text })),
-    ...(result.contentGaps ?? []).map((text) => ({
-      kind: "Isi yang kurang",
-      text,
-    })),
-  ];
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <Section title="Balasan Anda">
         <p className="text-sm leading-[26px] whitespace-pre-wrap text-foreground">
           {segments}
@@ -291,7 +284,27 @@ function ReplyFeedback({
           </ol>
         </Section>
       )}
+    </div>
+  );
+}
 
+function OtherFindings({ result }: { result: PdktEvaluationResult }) {
+  const otherFindings = [
+    ...(result.typos ?? []).map((text) => ({ kind: "Ejaan", text })),
+    ...(result.clarityIssues ?? []).map((text) => ({
+      kind: "Kejelasan",
+      text,
+    })),
+    ...(result.contentGaps ?? []).map((text) => ({
+      kind: "Isi yang kurang",
+      text,
+    })),
+  ];
+  const feedback = result.feedback?.trim();
+  if (otherFindings.length === 0 && !feedback) return null;
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-2">
       {otherFindings.length > 0 && (
         <Section title="Temuan lain">
           <ul className="flex flex-col gap-2 text-sm leading-6">
@@ -307,12 +320,50 @@ function ReplyFeedback({
         </Section>
       )}
 
-      {result.feedback?.trim() && (
+      {feedback && (
         <Section title="Catatan AI">
           <p className="text-sm leading-6 text-foreground">{result.feedback}</p>
         </Section>
       )}
-    </>
+    </div>
+  );
+}
+
+function ConsumerEmail({ item }: { item: PdktMailboxDetailItem }) {
+  const inbound = readInboundEmail(item);
+  return (
+    <Section title="Email konsumen">
+      <EmailBody
+        body={inbound.body}
+        className="flex flex-col gap-3 text-sm leading-6"
+      />
+      <EmailAttachments attachments={inbound.attachments} size="compact" />
+    </Section>
+  );
+}
+
+/** Telaah yang dibuat sebelum penanda kalimat ada tidak menyimpan `annotations`. */
+function MarksMissingNotice({ onRetry }: Pick<Props, "onRetry">) {
+  return (
+    <section
+      aria-label="Telaah lama tanpa penanda"
+      className={cn(card, "flex flex-wrap items-center justify-between gap-3")}
+    >
+      <p className="max-w-prose text-sm leading-6 text-foreground">
+        Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum
+        menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat
+        tandanya di balasan Anda.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onRetry}
+        className="min-h-11 gap-1.5 text-xs"
+      >
+        <RotateCcw aria-hidden="true" />
+        Telaah ulang
+      </Button>
+    </section>
   );
 }
 
@@ -393,7 +444,6 @@ export function PdktReviewStage({
   isStartingPractice,
 }: Props) {
   const replyBody = readAgentReply(item);
-  const inbound = readInboundEmail(item);
   const completed = status === "completed" && result;
   const rewrite = completed ? result.edu?.suggestedRewrite : null;
 
@@ -410,27 +460,34 @@ export function PdktReviewStage({
         </h2>
 
         {completed ? (
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-            <div className="flex flex-col gap-6">
+          <>
+            {!result.annotations && <MarksMissingNotice onRetry={onRetry} />}
+            <div className="grid items-start gap-6 lg:grid-cols-2">
               <ScoreSummary result={result} timeTaken={item.time_taken} />
               <ScoreBreakdown result={result} />
             </div>
-            <div className="flex flex-col gap-6">
-              <ReplyFeedback result={result} replyBody={replyBody} />
-            </div>
-          </div>
+          </>
         ) : (
-          <>
-            <ReviewPending status={status} onRetry={onRetry} />
-            {replyBody && (
+          <ReviewPending status={status} onRetry={onRetry} />
+        )}
+
+        {/* Email konsumen dan balasan berdampingan agar mudah dicocokkan. */}
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <ConsumerEmail item={item} />
+          {completed ? (
+            <ReplyWithNotes result={result} replyBody={replyBody} />
+          ) : (
+            replyBody && (
               <Section title="Balasan Anda">
                 <p className="text-sm leading-[26px] whitespace-pre-wrap">
                   {replyBody}
                 </p>
               </Section>
-            )}
-          </>
-        )}
+            )
+          )}
+        </div>
+
+        {completed && <OtherFindings result={result} />}
 
         {rewrite?.body && (
           <details className={cn(card, "group")}>
@@ -463,22 +520,6 @@ export function PdktReviewStage({
             </div>
           </details>
         )}
-
-        <details className={card}>
-          <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">
-            Lihat email konsumen
-          </summary>
-          <div className="mt-3 flex flex-col gap-4">
-            <EmailBody
-              body={inbound.body}
-              className="flex flex-col gap-3 text-sm leading-6"
-            />
-            <EmailAttachments
-              attachments={inbound.attachments}
-              size="compact"
-            />
-          </div>
-        </details>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
           {onDelete ? (

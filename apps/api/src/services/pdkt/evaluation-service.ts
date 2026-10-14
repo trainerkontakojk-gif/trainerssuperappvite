@@ -383,6 +383,9 @@ function normalizePdktEvaluationResponse(
     : undefined;
   if (hasExpectedAnswer && !expectedAnswerAlignment) return null;
 
+  // `annotations` wajib ada (boleh kosong): tanpanya balasan tidak bisa
+  // ditandai, jadi respons diperlakukan tidak valid dan dicoba ulang.
+  if (!Array.isArray(raw.annotations)) return null;
   const annotations = readPdktReplyAnnotations(raw.annotations, agentReplyBody);
 
   const scoreBreakdown = readScoreBreakdown(raw.scoreBreakdown);
@@ -794,9 +797,7 @@ export async function evaluateAgentResponse(
                   normalizedResult.expectedAnswerAlignment,
               }
             : {}),
-          ...(normalizedResult.annotations.length > 0
-            ? { annotations: normalizedResult.annotations }
-            : {}),
+          annotations: normalizedResult.annotations,
         },
         expectedAnswer,
       );
@@ -832,6 +833,10 @@ export async function evaluateAgentResponse(
   };
 }
 
+function hasStoredReplyMarks(evaluation: unknown): boolean {
+  return isPlainObject(evaluation) && Array.isArray(evaluation.annotations);
+}
+
 /**
  * Background worker to process PDKT evaluations.
  * Implements a simple claiming mechanism (status='processing') to prevent duplicate work.
@@ -852,14 +857,19 @@ export async function processPdktEvaluation(
     throw new Error("PDKT History not found");
   }
 
-  if (history.evaluation_status === "completed" && history.evaluation) {
+  // Telaah sebelum penanda kalimat ada tidak menyimpan `annotations`; telaah
+  // seperti itu boleh diulang, telaah lain yang sudah selesai tetap dipakai.
+  const reviewWithoutMarks =
+    history.evaluation_status === "completed" &&
+    !hasStoredReplyMarks(history.evaluation);
+  if (history.evaluation_status === "completed" && !reviewWithoutMarks) {
     return history.evaluation as PdktEvaluationResult;
   }
 
   const nowIso = new Date().toISOString();
   const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-  const { data: claimed, error: claimError } = await adminClient
+  const claim = adminClient
     .from("pdkt_history")
     .update({
       evaluation_status: "processing",
@@ -869,9 +879,14 @@ export async function processPdktEvaluation(
     .eq("id", historyId)
     .or(
       `evaluation_started_at.is.null,evaluation_started_at.lt.${staleThreshold}`,
-    )
-    .neq("evaluation_status", "completed")
-    .select("id");
+    );
+  const { data: claimed, error: claimError } = await (
+    reviewWithoutMarks
+      ? claim
+          .eq("evaluation_status", "completed")
+          .is("evaluation->annotations", null)
+      : claim.neq("evaluation_status", "completed")
+  ).select("id");
 
   if (claimError) {
     throw new Error("Failed to claim evaluation");
@@ -918,7 +933,7 @@ export async function processPdktEvaluation(
       ...(result.expectedAnswerAlignment
         ? { expectedAnswerAlignment: result.expectedAnswerAlignment }
         : {}),
-      ...(result.annotations ? { annotations: result.annotations } : {}),
+      annotations: result.annotations ?? [],
     };
 
     const { data: saved, error: updateEndError } = await adminClient

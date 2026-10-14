@@ -57,6 +57,7 @@ function makeAiEvaluation(
     clarityIssues: [],
     contentGaps: [],
     feedback: "Baik.",
+    annotations: [],
     ...overrides,
   };
 }
@@ -261,6 +262,7 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     mockCallAI.mockResolvedValueOnce({
       success: true,
       text: JSON.stringify({
+        annotations: [],
         score: 92,
         scoreBreakdown: {
           recipientDirectionScore: 91,
@@ -501,6 +503,7 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     mockCallAI.mockResolvedValueOnce({
       success: true,
       text: JSON.stringify({
+        annotations: [],
         score: 87,
         feedback: "Baik.",
         extraField: "ignored",
@@ -529,6 +532,7 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     mockCallAI.mockResolvedValueOnce({
       success: true,
       text: JSON.stringify({
+        annotations: [],
         scoreBreakdown: {
           recipientDirectionScore: 91,
           normativeResponseScore: 94,
@@ -665,6 +669,7 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     mockCallAI.mockResolvedValueOnce({
       success: true,
       text: JSON.stringify({
+        annotations: [],
         score: 96,
         scoreBreakdown: {
           recipientDirectionScore: 96,

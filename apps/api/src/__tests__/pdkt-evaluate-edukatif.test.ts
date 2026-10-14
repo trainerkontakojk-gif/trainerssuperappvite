@@ -60,7 +60,7 @@ async function evaluateWith(
 ): Promise<Record<string, unknown>> {
   mockCallAI.mockResolvedValueOnce({
     success: true,
-    text: JSON.stringify(aiPayload),
+    text: JSON.stringify({ annotations: [], ...aiPayload }),
   });
   const emails: EmailMessage[] = [
     makeEmail({ id: "inbound", body: "Keluhan awal.", isAgent: false }),
