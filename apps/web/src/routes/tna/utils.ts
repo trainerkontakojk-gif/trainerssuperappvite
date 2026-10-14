@@ -53,6 +53,14 @@ export const number = (value: number | null) =>
   value === null
     ? "Belum tersedia"
     : value.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+/** Calendar date (`YYYY-MM-DD`) shown as-is, independent of browser timezone. */
+export const calendarDate = (value: string) =>
+  new Date(`${value}T00:00:00Z`).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 export function trend(m: TnaMetricsSnapshot) {
   switch (m.trendStatus) {
     case "no_current_audit":

@@ -10,7 +10,7 @@ test.beforeAll(() => assertLocalDevOnlyTarget());
 for (const width of [1440, 390]) {
   test(`evaluasi ${width}: jatuh tempo → mulai → periode → selesai → validasi ulang`, async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const current = { success: true, data: evaluationDetail("aktif") };
     const audit = await openTna(page, "/tna", [
@@ -36,10 +36,11 @@ for (const width of [1440, 390]) {
         body: { success: true, data: {} },
       },
     ]);
-    await page
-      .getByRole("region", { name: "Perlu dievaluasi" })
-      .getByRole("link", { name: /Latihan verifikasi data/ })
-      .click();
+    const due = page.getByRole("region", { name: "Perlu dievaluasi" });
+    await expect(
+      due.getByText("Jatuh tempo 11 November 2026 (WIB)", { exact: true }),
+    ).toBeVisible();
+    await due.getByRole("link", { name: /Latihan verifikasi data/ }).click();
     await page
       .getByRole("button", { name: "Mulai evaluasi", exact: true })
       .click();
@@ -85,13 +86,17 @@ for (const width of [1440, 390]) {
         .evaluate((el) => (el as HTMLElement).offsetHeight),
     ).toBeGreaterThanOrEqual(44);
     await page.screenshot({
-      path: `../../plans/markdown/tna-phase-2-t5-${width === 390 ? "mobile" : "desktop"}-evaluasi.png`,
+      path: testInfo.outputPath(
+        `tna-phase-2-${width === 390 ? "mobile" : "desktop"}-evaluasi.png`,
+      ),
     });
     await page
       .getByRole("heading", { name: "Evaluasi per peserta", exact: true })
       .evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.screenshot({
-      path: `../../plans/markdown/tna-phase-2-t5-${width === 390 ? "mobile" : "desktop"}-peserta.png`,
+      path: testInfo.outputPath(
+        `tna-phase-2-${width === 390 ? "mobile" : "desktop"}-peserta.png`,
+      ),
     });
     await page.getByLabel("Periode evaluasi").selectOption(ids.later);
     const patch = page.waitForRequest(
@@ -165,7 +170,9 @@ for (const width of [1440, 390]) {
       .getByRole("heading", { name: "Ringkasan Evaluasi", exact: true })
       .evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.screenshot({
-      path: `../../plans/markdown/tna-phase-2-t5-${width === 390 ? "mobile" : "desktop"}-selesai.png`,
+      path: testInfo.outputPath(
+        `tna-phase-2-${width === 390 ? "mobile" : "desktop"}-selesai.png`,
+      ),
     });
     await page.getByRole("link", { name: "Validasi ulang parameter" }).click();
     await expect(page).toHaveURL(
@@ -205,7 +212,11 @@ test("belum jatuh tempo dan periode kosong tidak menawarkan mulai", async ({
   const audit = await openTna(page, url, [
     { method: "GET", path, body: current },
   ]);
-  await expect(page.getByText(/Evaluasi dijadwalkan/)).toBeVisible();
+  await expect(
+    page.getByText("Evaluasi dijadwalkan 11 November 2026 (WIB).", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Mulai evaluasi", exact: true }),
   ).toHaveCount(0);

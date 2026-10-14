@@ -333,7 +333,7 @@ Sumber schema: `supabase/migrations/20261008120000_tna_phase1.sql`. Artefak ini 
 | `tna_plans`             | FK kebutuhan/program RESTRICT, judul, intervensi, jadwal (`end >= start`, evaluasi sesudah end), target 0–100, status, snapshot baseline, waktu aktivasi/pembatalan, actor, `updated_at`. Partial unique `uq_tna_plans_open_need` pada need dengan status selain dibatalkan: maksimal satu rencana terbuka. |
 | `tna_plan_participants` | FK plan CASCADE, FK peserta SET NULL, snapshot nama/tim, `baseline_findings` nonnegatif dan `was_affected`. Unik plan/peserta. Penghapusan profil boleh men-null-kan FK tanpa mengubah snapshot/baseline.                                                                                                   |
 
-Indeks pencarian: kebutuhan layanan/periode, status rencana, dan peserta per plan. Status yang dicadangkan `evaluasi`/`selesai` belum memiliki transisi Fase 1; hanya draft → aktif/dibatalkan dan aktif → dibatalkan.
+Indeks pencarian: kebutuhan layanan/periode, status rencana, dan peserta per plan. Status yang dicadangkan `evaluasi`/`selesai` belum memiliki transisi Fase 1; hanya draft → aktif/dibatalkan dan aktif → dibatalkan. Transisi evaluasi ditambahkan di [Fase 2](#tna--evaluasi-pasca-training-fase-2).
 
 ### RLS dan batas tulis
 
@@ -363,6 +363,48 @@ Snapshot tidak dihitung oleh SQL: TypeScript menghitung semua QA terpaginasikan 
 Image Supabase Postgres lokal 17.6.1.x pernah crash (`signal 11`) ketika PostgREST memanggil fungsi public yang EXECUTE-nya dicabut. Lima entry point TNA sengaja tetap EXECUTE untuk anon/authenticated/service_role; **grant ini bukan izin bisnis**. Guard pertama menolak caller biasa secara normal, tanpa menyentuh data. Jangan mengganti guard dengan pencabutan EXECUTE pada entry point public tanpa investigasi dan persetujuan terpisah. Bukti/alasan: [investigasi crash](../plans/markdown/tna-postgres-crash-investigation.md), [rencana rev. 7 K6](../plans/markdown/tna-phase-1.md), upstream supabase/postgres #2377/#2495 dan supabase/supabase #50900. Jika guard test memicu signal 11/PGRST001, berhenti; jangan mengulang untuk memaksa hijau.
 
 Bukti API lokal RLS/guard/atomisitas/baseline dan batas verifikasi UI: [laporan T6](../plans/markdown/tna-phase-1-t6-report.md). Akses leader membutuhkan rancangan scope dan RLS baru; tidak boleh hanya menambah role ke capability.
+
+## TNA — Evaluasi pasca-training (Fase 2)
+
+Sumber schema: `supabase/migrations/20261011130000_tna_phase2_evaluation.sql` (fondasi evaluasi) dan `supabase/migrations/20261012150000_tna_need_previous_plan.sql` (writer tautan K15), masing-masing dengan rollback berpasangan di `supabase/rollbacks/`. Keduanya baru diuji di Supabase lokal (replay bersih, rollback, regresi API). **Belum diterapkan ke produksi `ruosnjmtywcrghjgqugz`.** Kontrak: [rencana Fase 2](../plans/markdown/tna-phase-2.md).
+
+| Tabel                   | Tambahan Fase 2                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tna_plans`             | `evaluation_period_id` (FK `qa_periods`, RESTRICT), `evaluation_started_at`, `evaluation_snapshot` (objek JSON), `verdict`, `conclusion_note` (10–2000), `follow_up`, `completed_at`, `cancel_reason` (10–1000). CHECK `tna_plan_evaluation_lifecycle`: `evaluasi` wajib punya periode + waktu mulai; `selesai` wajib punya seluruh hasil; hasil hanya ada pada `selesai`. |
+| `tna_plan_participants` | `baseline_sessions` (diisi saat aktivasi rencana baru), `eval_findings`, `eval_sessions`, `audited_in_eval`. CHECK: peserta tidak diaudit menyimpan `NULL`, bukan nol.                                                                                                                                                                                                     |
+| `tna_needs`             | `previous_plan_id` (FK `tna_plans`, RESTRICT) untuk validasi ulang setelah rencana `selesai` dengan tindak lanjut `perlu_rencana_lanjutan`.                                                                                                                                                                                                                                |
+
+Indeks baru: `idx_tna_plans_status_evaluation_due (status, evaluation_due_date)` untuk daftar jatuh tempo. `uq_tna_plans_open_need` dan CHECK status tidak berubah; satu kebutuhan tetap hanya punya satu rencana non-batal, sehingga rencana lanjutan selalu lewat kebutuhan baru.
+
+### Transisi dan RPC
+
+Transisi yang diizinkan trigger: draft → aktif/dibatalkan, aktif → evaluasi/dibatalkan, evaluasi → selesai/dibatalkan. `selesai` dan `dibatalkan` final. Semua entry point memakai pola Fase 1: `SECURITY DEFINER`, guard `assert_service_role()` lalu `require_actor()`, row lock, dan revision `expected_updated_at` (`TNA_PLAN_STALE`).
+
+- `tna_start_plan_evaluation(uuid,uuid,timestamptz,uuid)` — hanya `aktif`; menolak sebelum `evaluation_due_date` menurut tanggal Asia/Jakarta (`TNA_EVALUATION_NOT_DUE`); periode harus sesudah bulan `end_date` (`TNA_EVALUATION_PERIOD_INVALID`).
+- `tna_update_evaluation_period(uuid,uuid,timestamptz,uuid)` — ganti periode selama `evaluasi`, validasi periode sama.
+- `tna_complete_plan(uuid,uuid,timestamptz,jsonb,jsonb,text,text,text)` — menerima snapshot dan nilai peserta yang dihitung backend, memvalidasi bentuk snapshot secara ketat, menolak `no_audit` (`TNA_EVALUATION_NO_AUDIT`), menghitung ulang verdict dari populasi vs target dan menolak bila berbeda, mencocokkan seluruh roster, lalu membekukan hasil dalam satu transaksi.
+- `tna_cancel_plan(uuid,uuid,timestamptz,text)` (overload baru) — draft boleh tanpa alasan; `aktif`/`evaluasi` wajib alasan 10–1000 karakter. Body fungsi tiga argumen lama diganti: hanya draft, dan `aktif`/`evaluasi` ditolak `TNA_CANCEL_REASON_REQUIRED`.
+- `tna_activate_plan` — signature lima argumen sama; menerima `baseline_sessions` opsional per peserta. Rencana aktif dari Fase 1 tanpa nilai ini tetap valid; evaluasi menandai sesi baseline sebagai hasil hitung ulang.
+- `tna_create_need` — signature sama; `previous_plan_id` opsional divalidasi atomik: UUID valid, rencana `selesai` dengan `follow_up = perlu_rencana_lanjutan`, layanan dan indikator sama (`TNA_PREVIOUS_PLAN_INVALID`).
+
+SQL tidak menghitung metrik evaluasi. Backend menghitung populasi, kohort, drift, dan peserta memakai mesin metrik Fase 1; database hanya memvalidasi bentuk dan konsistensi verdict.
+
+### Guard dan helper
+
+- `guard_plan` memperluas aturan Fase 1: periode evaluasi dan waktu mulai hanya berubah lewat marker transaction-local `tna.evaluation_period_plan`; hasil evaluasi dan nilai peserta hanya terisi lewat marker `tna.completing_plan`; seluruh field evaluasi immutable setelah `selesai`; pembatalan dari `aktif`/`evaluasi` wajib alasan. Cek jatuh tempo WIB diulang di trigger.
+- `guard_participant` hanya mengizinkan pengisian nilai evaluasi NULL → final saat completion; peserta rencana `selesai` immutable.
+- Helper baru `tna_internal.valid_eval_period` dan `tna_internal.validate_evaluation_snapshot` dipanggil RPC dan trigger. Fondasi Fase 2 memberi `service_role` USAGE pada `tna_internal` agar UPDATE privileged langsung melewati validasi trigger yang sama. Berbeda dari helper Fase 1, kedua helper baru ini memakai EXECUTE default; anon/authenticated tetap tidak bisa memanggilnya karena tidak punya USAGE schema dan `tna_internal` tidak diekspos PostgREST.
+- Empat fungsi public baru/overload tetap EXECUTE untuk anon/authenticated/service_role dengan guard pertama, sesuai alasan crash di atas. Jangan mencabut EXECUTE.
+
+### Rilis dan rollback
+
+Prosedur produksi hanya dengan izin eksplisit Fajar, mengikuti pola Fase 1 karena riwayat migrasi remote tidak sinkron:
+
+1. Cek read-only jumlah rencana `aktif` (kandidat evaluasi pertama).
+2. Terapkan satu file per migrasi dengan urutan `20261011130000` lalu `20261012150000` (`supabase db query --linked -f <file>`), lalu `supabase migration repair --status applied <versi>` untuk masing-masing. **Bukan** `supabase db push`.
+3. Deploy API + web segera sesudahnya. Schema baca Fase 1 menerima kolom tambahan, tetapi selama jeda ini pembatalan rencana `aktif` dari API lama gagal karena fungsi tiga argumen sekarang mewajibkan alasan.
+
+Rollback: kembalikan deploy aplikasi terlebih dahulu, lalu jalankan `rollback_20261012150000_tna_need_previous_plan.sql` sebelum `rollback_20261011130000_tna_phase2_evaluation.sql`. Rollback fondasi **fail-closed** (`TNA_PHASE2_ROLLBACK_DATA_PRESENT`) bila sudah ada data Fase 2 apa pun: rencana `evaluasi`/`selesai`, field evaluasi, `cancel_reason`, `previous_plan_id`, atau `baseline_sessions` peserta. Karena setiap aktivasi sesudah deploy mengisi `baseline_sessions`, rollback database praktis hanya mungkin sebelum ada aktivasi atau pembatalan beralasan; sesudah itu pilih rollback aplikasi saja atau perbaikan maju.
 
 ## Storage
 

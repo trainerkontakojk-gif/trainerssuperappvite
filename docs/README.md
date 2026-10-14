@@ -29,6 +29,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 - [`LEADER_APPROVAL_ACCESS.md`](LEADER_APPROVAL_ACCESS.md) — leader approval-based KTP/SIDAK access.
 - [`SIDAK_SIMULATION_HISTORY.md`](SIDAK_SIMULATION_HISTORY.md) — SIDAK agent simulation history API, attribution, and leader recording scope.
 - **TNA Fase 1** — [`modules.md`](modules.md#8-tna--training-needs-analysis-fase-1), [`database.md`](database.md#tna--training-needs-analysis-fase-1), and [`auth-rbac.md`](auth-rbac.md#tna--kapabilitas-dan-jalur-tulis-fase-1); implementation/verification evidence in [`T6 report`](../plans/markdown/tna-phase-1-t6-report.md).
+- **TNA Fase 2 (evaluasi pasca-training)** — [`modules.md`](modules.md#9-tna--evaluasi-pasca-training-fase-2), [`database.md`](database.md#tna--evaluasi-pasca-training-fase-2) (including the production release and rollback procedure), and [`auth-rbac.md`](auth-rbac.md#tna--evaluasi-fase-2); evidence in the [Phase 2 T6 report](../plans/markdown/tna-phase-2-t6-report.md). Not yet applied to production.
 - [`telefun.md`](telefun.md) — Telefun module contract and operations.
 - [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md) — Telefun assessment trust boundary and score contract.
 - [`integration-tests.md`](integration-tests.md) — PDKT Mailbox RPC integration tests.

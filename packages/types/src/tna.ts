@@ -385,7 +385,10 @@ export interface TnaParameterDetail {
   }>;
   suggested_programs: TnaProgram[];
 }
-export const tnaNeedSchema = createTnaNeedSchema.extend({
+// Read rows from `select("*")`: unlike the strict input schema, tolerate
+// additive columns so a migration can land before the API that knows them.
+export const tnaNeedSchema = z.object({
+  ...createTnaNeedSchema.shape,
   id: z.string().uuid(),
   previous_plan_id: z.string().uuid().nullable(),
   validation_snapshot: tnaMetricsSnapshotSchema,

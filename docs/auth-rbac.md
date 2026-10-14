@@ -484,6 +484,12 @@ Pembacaan kebutuhan/rencana/roster/program, QA/periode/metadata parameter dan va
 
 Bukti lokal: [laporan T6](../plans/markdown/tna-phase-1-t6-report.md); tidak menyatakan schema/guard TNA sudah diterapkan hosted. Inventaris Fase 0 di awal dokumen tetap catatan historis; katalog capability dan kode live adalah acuan akses sekarang.
 
+## TNA — evaluasi (Fase 2)
+
+Tidak ada kapabilitas baru. `POST /plans/:id/start-evaluation`, `PATCH /plans/:id/evaluation`, `POST /plans/:id/complete`, pembatalan beralasan, dan `previous_plan_id` pada `POST /needs` memakai `tna.write` (admin/trainer); detail evaluasi dan `GET /plans?due=1` memakai `tna.read`. Leader/agent tetap 403 di API dan diarahkan ke `/unauthorized` di web.
+
+Jalur tulis tetap tunggal: route → `write-service.ts` → `supabaseAdmin.rpc()` untuk `tna_start_plan_evaluation`, `tna_update_evaluation_period`, `tna_complete_plan`, `tna_cancel_plan` (overload empat argumen), dan `tna_create_need`. Keempat fungsi public baru/overload tetap EXECUTE untuk anon/authenticated dengan guard service-role pertama (`42501 TNA_FORBIDDEN`). Backend menghitung snapshot evaluasi, verdict, dan nilai peserta dengan JWT pengguna; body klien hanya membawa periode, kesimpulan, tindak lanjut, alasan, dan revision. Pembatalan rencana `aktif`/`evaluasi` wajib alasan, ditegakkan di skema API, RPC, dan trigger. Detail schema: [database TNA Fase 2](database.md#tna--evaluasi-pasca-training-fase-2).
+
 ## Katalog dan scope terpadu (2026-10-06)
 
 `packages/types/src/access.ts` adalah katalog tunggal `ROLES`, `Role`, `CAPABILITIES`, `can()` dan metadata approval leader. Boundary menerima empat role canonical (trim/lowercase); alias `trainers`/`agents` dihapus setelah audit lokal dan remote bersih. Nilai tak dikenal mengembalikan `null` dan tidak mendapat capability. `qa` sebagai mode heatmap, jabatan peserta dan speaker transkrip tetap domain terpisah.

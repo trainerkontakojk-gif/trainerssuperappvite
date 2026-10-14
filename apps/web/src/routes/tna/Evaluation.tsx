@@ -20,6 +20,7 @@ import {
 } from "../../components/ui/dialog";
 import { Field, Metrics, State } from "./shared";
 import {
+  calendarDate,
   number,
   selectClass,
   verdictLabels,
@@ -108,7 +109,7 @@ export function Evaluation({
       {p.status === "aktif" &&
         (!p.evaluation_due ? (
           <p className="text-sm">
-            Evaluasi dijadwalkan {p.evaluation_due_date} (WIB).
+            Evaluasi dijadwalkan {calendarDate(p.evaluation_due_date)} (WIB).
           </p>
         ) : (
           <div className="space-y-3">

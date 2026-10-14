@@ -11,6 +11,7 @@ import { useApi } from "../../hooks/useApi";
 import QaStatePanel from "../../components/ui/QaStatePanel";
 import { Surface, Field, State, Metrics } from "./shared";
 import {
+  calendarDate,
   trend,
   interventionLabels,
   planStatusLabels,
@@ -221,7 +222,7 @@ export default function TnaIndex() {
               <span className="text-sm text-muted-foreground">
                 {p.status === "evaluasi"
                   ? "Sedang dievaluasi"
-                  : `Jatuh tempo ${p.evaluation_due_date} (WIB)`}
+                  : `Jatuh tempo ${calendarDate(p.evaluation_due_date)} (WIB)`}
               </span>
             </div>
           ))}
