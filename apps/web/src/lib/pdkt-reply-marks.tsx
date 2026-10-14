@@ -137,6 +137,48 @@ export function consumerPointReplyEnd(
     : null;
 }
 
+/** Catatan bernomor sesuai urutan kemunculannya di balasan. */
+export function numberReplyNotes(
+  annotations: readonly PdktReplyAnnotation[] | null | undefined,
+  body: string,
+): PlacedReplyAnnotation[] {
+  return orderQuotes(annotations ?? [], body).map((note, index) => ({
+    ...note,
+    number: index + 1,
+  }));
+}
+
+/**
+ * Nomor catatan bertanda yang memuat kutipan langkah perbaikan, atau `null`.
+ * Spasi/baris baru boleh berbeda, sama seperti pencarian kutipan di backend.
+ */
+export function noteNumberForQuote(
+  notes: readonly PlacedReplyAnnotation[],
+  body: string,
+  quote: string | undefined,
+): number | null {
+  const tokens = quote?.split(/\s+/).filter(Boolean) ?? [];
+  if (tokens.length === 0) return null;
+  const match = new RegExp(
+    tokens
+      .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s+"),
+    "u",
+  ).exec(body);
+  if (!match) return null;
+  const start = match.index;
+  const end = start + match[0].length;
+  const note = notes.find(
+    (note) =>
+      note.marked &&
+      note.start !== null &&
+      note.end !== null &&
+      note.start < end &&
+      start < note.end,
+  );
+  return note?.number ?? null;
+}
+
 export type ReplyInsertion = { at: number; node: ReactNode };
 /** Nomor catatan dan label poin berbagi satu urutan teks; label tidak membelah mark. */
 export function placeReplyAnnotations(
@@ -145,10 +187,7 @@ export function placeReplyAnnotations(
   renderMark: (text: string, number: number) => ReactNode,
   insertions: readonly ReplyInsertion[] = [],
 ): { notes: PlacedReplyAnnotation[]; segments: ReactNode[] } {
-  const notes = orderQuotes(annotations ?? [], body).map((note, index) => ({
-    ...note,
-    number: index + 1,
-  }));
+  const notes = numberReplyNotes(annotations, body);
   const labels = insertions
     .filter(({ at }) => Number.isInteger(at) && at >= 0 && at <= body.length)
     .map((label) => {

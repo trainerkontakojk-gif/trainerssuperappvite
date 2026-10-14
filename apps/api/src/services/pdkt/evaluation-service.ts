@@ -12,6 +12,7 @@ import {
   PdktReplyAnnotation,
   PdktConsumerPoint,
   PDKT_DIMENSION_KEYS,
+  PDKT_REPLY_ANNOTATION_LIMITS,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
@@ -22,7 +23,9 @@ import { callAI, isTransientAiError } from "./shared-utils";
 import {
   readPdktReplyAnnotations,
   readPdktConsumerPoints,
+  locateQuote,
 } from "./reply-annotations";
+import { humanizePdktValue } from "./humane-text";
 import {
   buildPdktRecipientConflictHints,
   getExpectedReplyParty,
@@ -386,6 +389,7 @@ export function buildPdktEdu(
   scoreBreakdown: PdktEvaluationScoreBreakdown,
   conflictDetected: boolean,
   recipientContext?: PdktRecipientContext,
+  agentReplyBody = "",
 ): PdktEvaluationEdu {
   const raw = isPlainObject(rawEdu) ? rawEdu : {};
 
@@ -437,10 +441,14 @@ export function buildPdktEdu(
       );
       if (aiItems.some((existing) => existing.dimension === dimension))
         continue;
+      // Kutipan hanya disimpan bila benar ada di balasan, agar UI bisa
+      // menunjuk kalimatnya.
+      const quote = readBounded(item.quote, PDKT_REPLY_ANNOTATION_LIMITS.quote);
       aiItems.push({
         dimension,
         text: sanitizeAiResponse(text),
         ...(example ? { example: sanitizeAiResponse(example) } : {}),
+        ...(quote && locateQuote(agentReplyBody, quote) ? { quote } : {}),
       });
     }
   }
@@ -577,6 +585,9 @@ export async function evaluateAgentResponse(
   );
 
   let lastError: unknown;
+  let withoutConsumerPoints: Awaited<
+    ReturnType<typeof evaluateAgentResponse>
+  > | null = null;
   const retryDelaysMs = [250, 500];
 
   for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
@@ -621,7 +632,7 @@ export async function evaluateAgentResponse(
         conflictHints: conflictAnalysis.conflictHints,
       });
       const feedback = scored.capApplied
-        ? `${normalizedResult.feedback}\n\nCatatan sistem: deterministic recipient conflict cap diterapkan karena arah penerima bertentangan dengan metadata.`
+        ? `${normalizedResult.feedback}\n\nCatatan sistem: skor dibatasi karena sapaan atau penutup balasan tidak sesuai dengan penerima email.`
         : normalizedResult.feedback;
 
       // Evaluasi Edukatif: deterministic edu layer built from the post-failsafe
@@ -634,34 +645,47 @@ export async function evaluateAgentResponse(
             scored.scoreBreakdown,
             conflictAnalysis.conflictHints.length > 0,
             recipientContext,
+            agentReplyBody,
           )
         : undefined;
 
-      const userFacingAssessment = redactExpectedAnswerFromValue(
-        {
-          typos: normalizedResult.typos,
-          clarityIssues: normalizedResult.clarityIssues,
-          contentGaps: normalizedResult.contentGaps,
-          feedback,
-          ...(edu ? { edu } : {}),
-          ...(normalizedResult.expectedAnswerAlignment
-            ? {
-                expectedAnswerAlignment:
-                  normalizedResult.expectedAnswerAlignment,
-              }
-            : {}),
-          annotations: normalizedResult.annotations,
-          consumerPoints: normalizedResult.consumerPoints,
-        },
-        expectedAnswer,
+      const userFacingAssessment = humanizePdktValue(
+        redactExpectedAnswerFromValue(
+          {
+            typos: normalizedResult.typos,
+            clarityIssues: normalizedResult.clarityIssues,
+            contentGaps: normalizedResult.contentGaps,
+            feedback,
+            ...(edu ? { edu } : {}),
+            ...(normalizedResult.expectedAnswerAlignment
+              ? {
+                  expectedAnswerAlignment:
+                    normalizedResult.expectedAnswerAlignment,
+                }
+              : {}),
+            annotations: normalizedResult.annotations,
+            consumerPoints: normalizedResult.consumerPoints,
+          },
+          expectedAnswer,
+        ),
       );
 
-      return {
+      const evaluation = {
         success: true,
         score: scored.score,
         scoreBreakdown: scored.scoreBreakdown,
         ...userFacingAssessment,
       };
+      // Email konsumen selalu memuat minimal satu permintaan; poin kosong
+      // berarti jawaban AI tidak lengkap. Coba ulang dulu, dan simpan hasil
+      // ini sebagai cadangan bila percobaan berikutnya gagal.
+      if (normalizedResult.consumerPoints.length === 0) {
+        withoutConsumerPoints = evaluation;
+        if (attempt < retryDelaysMs.length)
+          throw new InvalidPdktEvaluationResponseError();
+        break;
+      }
+      return evaluation;
     } catch (error: unknown) {
       lastError = error;
       const isRetryableEvaluationError =
@@ -676,6 +700,14 @@ export async function evaluateAgentResponse(
     }
   }
 
+  if (withoutConsumerPoints) {
+    // UI menampilkan pemberitahuan dan tombol telaah ulang untuk hasil ini.
+    console.warn(
+      "[PDKT Evaluation] consumerPoints kosong setelah semua percobaan; telaah disimpan tanpa poin konsumen.",
+    );
+    return withoutConsumerPoints;
+  }
+
   return {
     success: false,
     error:
@@ -687,8 +719,14 @@ export async function evaluateAgentResponse(
   };
 }
 
-function hasStoredReplyMarks(evaluation: unknown): boolean {
-  return isPlainObject(evaluation) && Array.isArray(evaluation.annotations);
+/** Telaah lengkap: menandai balasan dan memuat minimal satu poin konsumen. */
+function isCompleteReview(evaluation: unknown): boolean {
+  return (
+    isPlainObject(evaluation) &&
+    Array.isArray(evaluation.annotations) &&
+    Array.isArray(evaluation.consumerPoints) &&
+    evaluation.consumerPoints.length > 0
+  );
 }
 
 /**
@@ -711,11 +749,11 @@ export async function processPdktEvaluation(
     throw new Error("PDKT History not found");
   }
 
-  // Telaah sebelum penanda kalimat ada tidak menyimpan `annotations`; telaah
-  // seperti itu boleh diulang, telaah lain yang sudah selesai tetap dipakai.
+  // Telaah lama tanpa penanda kalimat atau tanpa poin konsumen boleh diulang;
+  // telaah lengkap yang sudah selesai tetap dipakai.
   const reviewWithoutMarks =
     history.evaluation_status === "completed" &&
-    !hasStoredReplyMarks(history.evaluation);
+    !isCompleteReview(history.evaluation);
   if (history.evaluation_status === "completed" && !reviewWithoutMarks) {
     return history.evaluation as PdktEvaluationResult;
   }
@@ -736,9 +774,14 @@ export async function processPdktEvaluation(
     );
   const { data: claimed, error: claimError } = await (
     reviewWithoutMarks
-      ? claim
-          .eq("evaluation_status", "completed")
-          .is("evaluation->annotations", null)
+      ? // Hanya klaim bila telaah belum berubah sejak dibaca di atas.
+        history.evaluation_completed_at
+        ? claim
+            .eq("evaluation_status", "completed")
+            .eq("evaluation_completed_at", history.evaluation_completed_at)
+        : claim
+            .eq("evaluation_status", "completed")
+            .is("evaluation_completed_at", null)
       : claim.neq("evaluation_status", "completed")
   ).select("id");
 

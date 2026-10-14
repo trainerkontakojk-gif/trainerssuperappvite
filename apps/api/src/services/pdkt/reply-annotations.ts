@@ -27,7 +27,7 @@ function isDimension(value: unknown): value is PdktDimensionKey {
 }
 
 /** Cari kutipan di balasan: persis dulu, lalu dengan spasi/baris baru yang fleksibel. */
-function locateQuote(body: string, quote: string): Range | null {
+export function locateQuote(body: string, quote: string): Range | null {
   const exact = body.indexOf(quote);
   if (exact >= 0) return { start: exact, end: exact + quote.length };
 
@@ -102,12 +102,15 @@ export function readPdktConsumerPoints(
     const status = PDKT_CONSUMER_POINT_STATUSES.find(
       (status) => status === item.status,
     );
-    const quote = readText(item.quote, PDKT_CONSUMER_POINT_LIMITS.quote);
+    // Kutipan terlalu panjang tetap ditampilkan (dipotong, tanpa tanda) dan
+    // alasan kosong boleh: poin yang bermakna tidak dibuang diam-diam.
+    const fullQuote = readText(item.quote, Number.MAX_SAFE_INTEGER);
+    const quote = fullQuote?.slice(0, PDKT_CONSUMER_POINT_LIMITS.quote);
     const summary = readText(item.summary, PDKT_PROMPT_INPUT_LIMITS.issueText);
     const reason = readText(item.reason, PDKT_PROMPT_INPUT_LIMITS.issueText);
-    if (!status || !quote || !summary || (status !== "answered" && !reason))
-      continue;
-    const range = locateQuote(inboundEmailBody, quote);
+    if (!status || !fullQuote || !quote || !summary) continue;
+    const range =
+      fullQuote === quote ? locateQuote(inboundEmailBody, quote) : null;
     const placed = range && !overlaps(range, taken) ? range : null;
     if (placed) taken.push(placed);
     const replyQuote =
@@ -121,7 +124,7 @@ export function readPdktConsumerPoints(
       quote,
       summary,
       status,
-      reason: status === "answered" ? null : reason,
+      reason: status === "answered" ? null : (reason ?? null),
       start: placed?.start ?? null,
       end: placed?.end ?? null,
       replyQuote,

@@ -82,6 +82,8 @@ export interface PdktActionItemAI {
   dimension: PdktDimensionKey;
   text: string;
   example?: string;
+  /** Kalimat di balasan agent yang dimaksud; hanya disimpan bila ketemu. */
+  quote?: string;
 }
 
 export interface PdktActionItem extends PdktActionItemAI {
@@ -331,6 +333,7 @@ export const pdktEducationAiOutputSchema = z
             .string()
             .max(PDKT_PROMPT_INPUT_LIMITS.issueText)
             .optional(),
+          quote: z.string().max(300).optional(),
         }),
       )
       .max(5)

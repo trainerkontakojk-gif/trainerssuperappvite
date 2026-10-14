@@ -1834,6 +1834,7 @@ test.describe("PDKT (hermetic)", () => {
                 dimension: "normative",
                 text: "Sebut kanal pengaduan resmi.",
                 example: "Silakan hubungi 157.",
+                quote: matchedQuote,
                 priorityRank: 1,
               },
               {
@@ -1907,6 +1908,12 @@ test.describe("PDKT (hermetic)", () => {
     await expect(summary).toContainText("Silakan hubungi 157.");
     await expect(summary).toContainText("Aspek: Kualitas OJK");
     await expect(summary).toContainText("Pecah kalimat pembuka.");
+    // Langkah perbaikan menunjuk kalimatnya di balasan tanpa perlu menggulir
+    // mencari sendiri; langkah tanpa kutipan tidak diberi tautan.
+    await expect(summary).toContainText(`Di balasan Anda: “${matchedQuote}”`);
+    await expect(
+      summary.getByRole("link", { name: "Lihat kalimat ini di balasan" }),
+    ).toHaveCount(1);
     await expect(summary).toContainText("Hampir sesuai");
     await expect(summary).toContainText("3 menit 45 detik");
 
@@ -1942,6 +1949,10 @@ test.describe("PDKT (hermetic)", () => {
     // Penanda dan catatan saling tertaut; pembaca layar mendengar "catatan 1",
     // bukan angka yang menempel di kata terakhir.
     const markLink = answer.getByRole("link", { name: "Lihat catatan 1" });
+    await summary
+      .getByRole("link", { name: "Lihat kalimat ini di balasan" })
+      .click();
+    await expect(markLink).toBeFocused();
     await markLink.click();
     await expect(notes.nth(0)).toBeFocused();
     await expect(fixes.getByRole("link")).toHaveCount(1);
@@ -2207,7 +2218,26 @@ test.describe("PDKT (hermetic)", () => {
         },
       },
     ];
-    const audit = await openWorkspace(page, pdktMocks(history, [REPLIED_MAIL]));
+    const audit = await openWorkspace(page, [
+      ...pdktMocks(history, [REPLIED_MAIL]),
+      {
+        method: "GET",
+        path: /\/api\/v1\/pdkt\/history\/eval\//,
+        body: {
+          success: true,
+          data: {
+            evaluation_status: "processing",
+            evaluation: null,
+            evaluation_error: null,
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/history/retry-eval",
+        body: { success: true, data: null },
+      },
+    ]);
     await workspaceMarker(page).click();
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
@@ -2236,6 +2266,20 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("region", { name: "Catatan AI", exact: true }),
     ).toContainText("Jawaban relevan dan jelas.");
+    // Poin konsumen kosong dinyatakan terbuka dan bisa ditelaah ulang, bukan
+    // hilang diam-diam.
+    const notice = page.getByRole("region", {
+      name: "Telaah tanpa poin konsumen",
+      exact: true,
+    });
+    await expect(notice).toContainText("poin mana yang sudah dan belum");
+    const retry = page.waitForRequest((request) =>
+      request.url().endsWith("/api/v1/pdkt/history/retry-eval"),
+    );
+    await notice.getByRole("button", { name: "Telaah ulang" }).click();
+    expect((await retry).postDataJSON()).toEqual({
+      historyId: "pdkt-evaluated-1",
+    });
     expectHermetic(audit);
   });
 

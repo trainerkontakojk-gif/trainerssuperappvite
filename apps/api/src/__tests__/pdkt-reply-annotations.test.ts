@@ -170,7 +170,7 @@ describe("readPdktConsumerPoints", () => {
     });
   });
 
-  it("membuang item rusak, alasan kosong, dan teks melewati batas", () => {
+  it("hanya membuang item rusak; alasan kosong dan kutipan panjang tetap tampil", () => {
     expect(
       readPdktConsumerPoints(
         [
@@ -178,15 +178,29 @@ describe("readPdktConsumerPoints", () => {
           point({ status: "invalid" }),
           point({ quote: " " }),
           point({ summary: " " }),
-          point({ quote: "x".repeat(301) }),
-          point({ status: "partial", reason: " " }),
-          point({ status: "unanswered", reason: null }),
         ],
         inbound,
         REPLY,
       ),
     ).toEqual([]);
     expect(readPdktConsumerPoints(undefined, inbound, REPLY)).toEqual([]);
+    // Poin yang isinya bermakna tidak boleh hilang diam-diam.
+    const [long, noReason, unansweredNoReason] = readPdktConsumerPoints(
+      [
+        point({ quote: "x".repeat(301) }),
+        point({ status: "partial", reason: " " }),
+        point({ status: "unanswered", reason: null }),
+      ],
+      inbound,
+      REPLY,
+    );
+    expect(long.quote).toHaveLength(300);
+    expect(long).toMatchObject({ start: null, end: null });
+    expect(noReason).toMatchObject({ status: "partial", reason: null });
+    expect(unansweredNoReason).toMatchObject({
+      status: "unanswered",
+      reason: null,
+    });
   });
 
   it("membatasi lima poin dan tidak menautkan jawaban untuk unanswered", () => {
@@ -390,26 +404,72 @@ describe("annotations di penilaian PDKT", () => {
     },
   );
 
-  it("consumerPoints bukan array tetap sukses tanpa retry", async () => {
-    mockCallAI.mockResolvedValueOnce({
-      success: true,
-      text: JSON.stringify({
-        score: 90,
-        typos: [],
-        clarityIssues: [],
-        contentGaps: [],
-        feedback: "Baik.",
-        annotations: [],
-        consumerPoints: {},
-      }),
-    });
+  // Email konsumen selalu memuat minimal satu permintaan: poin kosong berarti
+  // jawaban AI tidak lengkap, jadi dicoba ulang dulu.
+  it("mencoba ulang bila consumerPoints kosong lalu memakai jawaban yang lengkap", async () => {
+    const base = {
+      score: 90,
+      typos: [],
+      clarityIssues: [],
+      contentGaps: [],
+      feedback: "Baik.",
+      annotations: [],
+    };
+    mockCallAI
+      .mockResolvedValueOnce({
+        success: true,
+        text: JSON.stringify({ ...base, consumerPoints: {} }),
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        text: JSON.stringify({
+          ...base,
+          consumerPoints: [
+            {
+              quote: "Saya masih ditagih.",
+              summary: "Masih ditagih",
+              status: "answered",
+              reason: null,
+              replyQuote: "pengecekkan",
+            },
+          ],
+        }),
+      });
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    expect(result.success).toBe(true);
+    expect(result.consumerPoints).toHaveLength(1);
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
+  it("menyimpan penilaian tanpa poin konsumen bila semua percobaan kosong", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockCallAI
+      .mockResolvedValueOnce({
+        success: true,
+        text: JSON.stringify({
+          score: 90,
+          typos: [],
+          clarityIssues: [],
+          contentGaps: [],
+          feedback: "Baik.",
+          annotations: [],
+        }),
+      })
+      .mockRejectedValue(new Error("fetch failed"));
     const result = await evaluateAgentResponse(
       { selectedModel: "gemini-3.1-flash-lite" } as never,
       emails,
     );
     expect(result.success).toBe(true);
     expect(result.consumerPoints).toEqual([]);
-    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("consumerPoints"),
+    );
+    warn.mockRestore();
   });
 
   // Tanpa `annotations` balasan tidak bisa ditandai: penilaian gagal (lalu
@@ -433,7 +493,7 @@ describe("annotations di penilaian PDKT", () => {
     expect(missing.success).toBe(false);
 
     mockCallAI.mockReset();
-    mockCallAI.mockResolvedValueOnce({
+    mockCallAI.mockResolvedValue({
       success: true,
       text: JSON.stringify({ ...aiOutput, annotations: [] }),
     });
@@ -444,6 +504,194 @@ describe("annotations di penilaian PDKT", () => {
     expect(empty.success).toBe(true);
     expect(empty.annotations).toEqual([]);
     expect(empty.consumerPoints).toEqual([]);
+  });
+});
+
+describe("bahasa catatan untuk agent", () => {
+  const emails: EmailMessage[] = [
+    {
+      id: "inbound",
+      from: "budi@test.com",
+      to: "konsumen@ojk.go.id",
+      subject: "Tagihan",
+      body: "Saya masih ditagih.",
+      timestamp: "2026-10-13T00:00:00Z",
+      isAgent: false,
+    },
+    {
+      id: "reply",
+      from: "agent@ojk.go.id",
+      to: "budi@test.com",
+      subject: "Re: Tagihan",
+      body: REPLY,
+      timestamp: "2026-10-13T01:00:00Z",
+      isAgent: true,
+    },
+  ];
+  const consumerPoints = [
+    {
+      quote: "Saya masih ditagih.",
+      summary: "Masih ditagih",
+      status: "answered",
+      reason: null,
+      replyQuote: "pengecekkan",
+    },
+  ];
+
+  it("mengganti istilah teknis dengan bahasa sehari-hari tanpa mengubah kutipan", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        scoreBreakdown: {
+          recipientDirectionScore: 50,
+          normativeResponseScore: 80,
+          clarityScore: 80,
+          typoScore: 80,
+          templateComplianceScore: 80,
+        },
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        feedback:
+          "Penutup belum sesuai arah balasan (replyIntent) karena recipientContext reply_to_company_with_ojk_cc.",
+        edu: {
+          actionItems: [
+            {
+              dimension: "recipientDirection",
+              text: "Sesuaikan penutup dengan `replyIntent`.",
+              quote: "Hormat kami,\nKontak OJK 157",
+            },
+          ],
+        },
+        annotations: [
+          annotation("pengecekkan", {
+            dimension: "clarity",
+            note: "Kurang tepat untuk ReplyIntent dan agentReplyBody.",
+          }),
+        ],
+        consumerPoints,
+      }),
+    });
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    expect(result.success).toBe(true);
+    const text = JSON.stringify(result);
+    for (const term of [
+      /replyIntent/i,
+      /recipientContext/,
+      /reply_to_/,
+      /agentReplyBody/,
+      /deterministic/,
+      /`/,
+    ]) {
+      expect(text).not.toMatch(term);
+    }
+    expect(result.feedback).toBe(
+      "Penutup belum sesuai arah balasan karena konteks penerima balasan ke perusahaan dengan OJK sebagai tembusan.",
+    );
+    expect(result.annotations?.[0]).toMatchObject({
+      quote: "pengecekkan",
+      note: "Kurang tepat untuk arah balasan dan balasan Anda.",
+    });
+    expect(result.edu?.actionItems[0]).toMatchObject({
+      text: "Sesuaikan penutup dengan arah balasan.",
+      quote: "Hormat kami,\nKontak OJK 157",
+    });
+  });
+
+  it("catatan sistem pembatasan skor ditulis dalam bahasa Indonesia", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        score: 90,
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        feedback: "Baik.",
+        annotations: [],
+        consumerPoints,
+      }),
+    });
+    const result = await evaluateAgentResponse(
+      {
+        selectedModel: "gemini-3.1-flash-lite",
+        recipientContext: {
+          primaryRecipientType: "company",
+          replyIntent: "reply_to_company_with_ojk_cc",
+        },
+      } as never,
+      [
+        emails[0],
+        {
+          ...emails[1],
+          body: "Yth. Bapak/Ibu OJK,\n\nTerima kasih.\n\nHormat kami,\nKontak OJK 157",
+        },
+      ],
+    );
+    expect(result.success).toBe(true);
+    expect(result.feedback).not.toMatch(/deterministic|metadata|cap/i);
+  });
+
+  it("langkah perbaikan hanya menyimpan kutipan yang ada di balasan", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        scoreBreakdown: {
+          recipientDirectionScore: 50,
+          normativeResponseScore: 50,
+          clarityScore: 80,
+          typoScore: 80,
+          templateComplianceScore: 80,
+        },
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        feedback: "Baik.",
+        edu: {
+          actionItems: [
+            {
+              dimension: "recipientDirection",
+              text: "Ubah penutup.",
+              quote: "Hormat kami, Kontak OJK 157",
+            },
+            {
+              dimension: "normative",
+              text: "Tambahkan arahan.",
+              quote: "kalimat yang tidak ada",
+            },
+          ],
+        },
+        annotations: [],
+        consumerPoints,
+      }),
+    });
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    const [first, second] = result.edu?.actionItems ?? [];
+    expect(first).toMatchObject({
+      dimension: "recipientDirection",
+      quote: "Hormat kami, Kontak OJK 157",
+    });
+    expect(second.dimension).toBe("normative");
+    expect(second).not.toHaveProperty("quote");
+  });
+
+  it("prompt mewajibkan poin konsumen, catatan berupa perbaikan, dan bahasa tanpa istilah teknis", () => {
+    const { prompt } = buildPdktEvaluationPrompt({
+      inboundEmailBody: "Saya masih ditagih.",
+      agentReplyBody: REPLY,
+    });
+    const rules = prompt.split("</evaluation_context_data>")[1];
+    expect(rules).toMatch(/consumerPoints[^\n]*WAJIB[^\n]*minimal 1/);
+    expect(rules).toMatch(/note[^\n]*WAJIB[^\n]*(perbaik|ubah|tambah)/i);
+    expect(rules).toMatch(/example[^\n]*WAJIB/);
+    expect(rules).toMatch(/"actionItems"[^\n]*quote/);
+    expect(rules).toMatch(/ATURAN BAHASA/);
+    expect(rules).toMatch(/nama field/);
   });
 });
 

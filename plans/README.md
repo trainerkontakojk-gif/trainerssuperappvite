@@ -46,6 +46,7 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 - [PDKT Practice Again — Legacy Subject](markdown/pdkt-practice-again-legacy-subject.md) — IMPLEMENTED lokal; E2E PDKT 64/64, root typecheck/lint dan diff check lulus. Lanjutan dari PDKT Navigation Flow.
 
 - [PDKT Telaah — Poin Konsumen, Temuan, Kalimat Penghubung](markdown/pdkt-telaah-consumer-points.md) — Lane C; IMPLEMENTED lokal (worktree `feat/pdkt-telaah-consumer-points`, belum commit): E2E PDKT 65/65, unit annotations 19/19, typecheck/lint/diff check lulus; audit `impeccable` 17/20, semua temuan diperbaiki.
+- [PDKT Telaah — Poin Konsumen Kosong, Langkah Tertaut, Catatan Manusiawi](markdown/pdkt-telaah-humane-notes.md) — Lane C; IMPLEMENTED lokal (worktree `fix/pdkt-telaah-humane-notes`, belum commit): unit 24/24 (disetujui), E2E PDKT 65/65, typecheck/lint/diff check lulus.
 
 ## Dependency notes
 

@@ -12,6 +12,9 @@ import { CopyInlineButton } from "../../../components/PdktEducationSections";
 import { PDKT_DIMENSION_LABELS } from "../../../lib/pdkt-dimensions";
 import {
   placeReplyAnnotations,
+  numberReplyNotes,
+  noteNumberForQuote,
+  type PlacedReplyAnnotation,
   placeConsumerPoints,
   consumerPointReplyEnd,
   type PlacedConsumerPoint,
@@ -79,14 +82,63 @@ function Section({
   );
 }
 
+/** Kalimat balasan yang dimaksud langkah perbaikan, tertaut ke tandanya. */
+function ActionQuote({
+  quote,
+  noteNumber,
+  replyIdBase,
+}: {
+  quote: string | undefined;
+  noteNumber: number | null;
+  replyIdBase: string;
+}) {
+  if (!quote) return null;
+  const target =
+    noteNumber === null ? null : replyMarkId(replyIdBase, noteNumber);
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 text-sm leading-6 text-foreground">
+      <span>Di balasan Anda: “{quote}”</span>
+      {target && (
+        <a
+          href={`#${target}`}
+          onClick={(event) => {
+            event.preventDefault();
+            jumpTo(target);
+          }}
+          className={cn(
+            // Teks tautan kecil agar baris tidak merenggang; area sentuh 44px.
+            "relative text-xs font-semibold text-foreground underline underline-offset-4 after:absolute after:inset-x-0 after:top-1/2 after:h-[44px] after:-translate-y-1/2",
+            focusRing,
+          )}
+        >
+          Lihat kalimat ini di balasan
+        </a>
+      )}
+    </span>
+  );
+}
+
 function ScoreSummary({
   result,
   timeTaken,
+  notes,
+  replyBody,
+  replyIdBase,
 }: {
   result: PdktEvaluationResult;
   timeTaken: number | null | undefined;
+  notes: PlacedReplyAnnotation[];
+  replyBody: string;
+  replyIdBase: string;
 }) {
   const [first, ...rest] = pdktRankedActionItems(result);
+  const quoteOf = (action: (typeof rest)[number]) => (
+    <ActionQuote
+      quote={action.quote}
+      noteNumber={noteNumberForQuote(notes, replyBody, action.quote)}
+      replyIdBase={replyIdBase}
+    />
+  );
   const alignment = result.expectedAnswerAlignment;
   const score = Math.max(0, Math.min(100, Math.round(result.score)));
 
@@ -127,6 +179,7 @@ function ScoreSummary({
             Perbaiki ini dulu
           </span>
           <p className="text-sm leading-6 text-foreground">{first.text}</p>
+          {quoteOf(first)}
           {first.example && (
             <p className="text-sm leading-6 text-foreground">
               Contoh: <q>{first.example}</q>
@@ -153,6 +206,7 @@ function ScoreSummary({
                     Contoh: “{action.example}”
                   </span>
                 )}
+                {quoteOf(action)}
               </li>
             ))}
           </ol>
@@ -280,6 +334,8 @@ const consumerStatus = {
 const statusLine = "underline decoration-2 underline-offset-4";
 const pointLinkLabel = (point: PlacedConsumerPoint) =>
   `Lihat poin konsumen ${point.letter}, ${consumerStatus[point.status].label.toLowerCase()}`;
+const replyMarkId = (base: string, number: number) => `${base}-mark-${number}`;
+const replyNoteId = (base: string, number: number) => `${base}-note-${number}`;
 const consumerNoteId = (base: string, letter: string) =>
   `${base}-consumer-note-${letter}`;
 const consumerMarkId = (base: string, letter: string) =>
@@ -303,15 +359,17 @@ function ReplyWithNotes({
   replyBody,
   consumerPoints,
   consumerIdBase,
+  idBase,
 }: {
   result: PdktEvaluationResult;
   replyBody: string;
   consumerPoints: PlacedConsumerPoint[];
   consumerIdBase: string;
+  /** Dibagi dengan ringkasan skor agar langkah perbaikan bisa menautkan tanda. */
+  idBase: string;
 }) {
-  const idBase = useId();
-  const markId = (number: number) => `${idBase}-mark-${number}`;
-  const noteId = (number: number) => `${idBase}-note-${number}`;
+  const markId = (number: number) => replyMarkId(idBase, number);
+  const noteId = (number: number) => replyNoteId(idBase, number);
   const insertions = consumerPoints.flatMap((point) => {
     const at = consumerPointReplyEnd(point, replyBody);
     if (at === null) return [];
@@ -619,20 +677,35 @@ function Comparison({
   );
 }
 
-/** Telaah yang dibuat sebelum penanda kalimat ada tidak menyimpan `annotations`. */
-function MarksMissingNotice({ onRetry }: Pick<Props, "onRetry">) {
+const incompleteReview = {
+  marks: {
+    label: "Telaah lama tanpa penanda",
+    text: "Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat tandanya di balasan Anda.",
+  },
+  points: {
+    label: "Telaah tanpa poin konsumen",
+    text: "Telaah ini belum menandai permintaan di email konsumen. Telaah ulang untuk melihat poin mana yang sudah dan belum Anda jawab.",
+  },
+} as const;
+
+/**
+ * Telaah tanpa `annotations` (sebelum penanda kalimat ada) atau tanpa poin
+ * konsumen bisa ditelaah ulang; backend mengizinkan keduanya.
+ */
+function IncompleteReviewNotice({
+  missing,
+  onRetry,
+}: Pick<Props, "onRetry"> & { missing: keyof typeof incompleteReview }) {
   return (
     // Pemberitahuan statis: region berlabel, bukan role="alert" yang menyela.
     <Alert
       role="region"
-      aria-label="Telaah lama tanpa penanda"
+      aria-label={incompleteReview[missing].label}
       className="items-start gap-y-3 px-4 py-3"
     >
       <Info aria-hidden="true" className="text-module-pdkt" />
       <p className="max-w-prose text-sm leading-6 text-foreground">
-        Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum
-        menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat
-        tandanya di balasan Anda.
+        {incompleteReview[missing].text}
       </p>
       <div className="col-start-2">
         <Button
@@ -731,6 +804,7 @@ export function PdktReviewStage({
   const completed = status === "completed" && result;
   const rewrite = completed ? result.edu?.suggestedRewrite : null;
   const consumerIdBase = useId();
+  const replyIdBase = useId();
   const consumerMarks = placeConsumerPoints(
     completed ? result.consumerPoints : undefined,
     readInboundEmail(item).body,
@@ -782,9 +856,21 @@ export function PdktReviewStage({
 
         {completed ? (
           <>
-            {!result.annotations && <MarksMissingNotice onRetry={onRetry} />}
+            {!result.annotations ? (
+              <IncompleteReviewNotice missing="marks" onRetry={onRetry} />
+            ) : (
+              !result.consumerPoints?.length && (
+                <IncompleteReviewNotice missing="points" onRetry={onRetry} />
+              )
+            )}
             <div className="grid items-start gap-6 lg:grid-cols-2">
-              <ScoreSummary result={result} timeTaken={item.time_taken} />
+              <ScoreSummary
+                result={result}
+                timeTaken={item.time_taken}
+                notes={numberReplyNotes(result.annotations, replyBody)}
+                replyBody={replyBody}
+                replyIdBase={replyIdBase}
+              />
               <ScoreBreakdown result={result} />
             </div>
           </>
@@ -799,6 +885,7 @@ export function PdktReviewStage({
               replyBody={replyBody}
               consumerPoints={consumerMarks.points}
               consumerIdBase={consumerIdBase}
+              idBase={replyIdBase}
             />
           ) : (
             replyBody && (
