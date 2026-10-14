@@ -75,6 +75,7 @@ async function setup(
     spread?: number;
     legacy?: boolean;
     roundingBoundary?: boolean;
+    endDate?: string;
   } = {},
 ) {
   const comparisonCount = args.comparisonCount ?? 5;
@@ -101,9 +102,11 @@ async function setup(
     gap_type: "skill",
     outcome: "training",
   });
-  const endDate = sql(
-    `SELECT make_date(year-1,12,31)::text FROM qa_periods WHERE id='${baseline}';`,
-  );
+  const endDate =
+    args.endDate ??
+    sql(
+      `SELECT make_date(year-1,12,31)::text FROM qa_periods WHERE id='${baseline}';`,
+    );
   const today = sql(
     "SELECT (clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::date::text;",
   );
@@ -144,16 +147,18 @@ async function setup(
     });
   const activeDetail = await call(`/plans/${plan.id}`);
   expect(activeDetail.evaluation_narrative).toBeNull();
-  expect(
-    activeDetail.evaluation_period_options
-      .filter((p: { id: string }) => fixture.ids.periods.includes(p.id))
-      .map((p: { id: string }) => p.id),
-  ).toEqual(fixture.ids.periods);
-  expect(activeDetail.evaluation_period_options[0]).toMatchObject({
-    id: baseline,
-    auditStatus: "audited",
-    is_default: true,
-  });
+  if (args.endDate === undefined) {
+    expect(
+      activeDetail.evaluation_period_options
+        .filter((p: { id: string }) => fixture.ids.periods.includes(p.id))
+        .map((p: { id: string }) => p.id),
+    ).toEqual(fixture.ids.periods);
+    expect(activeDetail.evaluation_period_options[0]).toMatchObject({
+      id: baseline,
+      auditStatus: "audited",
+      is_default: true,
+    });
+  }
   expect(
     activeDetail.participants.map(
       (p: { baseline_sessions: number }) => p.baseline_sessions,
@@ -376,6 +381,38 @@ test("evaluation no_audit: null metrics, null verdict, no fabricated zeros", asy
         p.eval_findings === null && p.eval_sessions === null,
     ),
   ).toBe(true);
+});
+test("evaluation period options: QA-only and empty months are no_audit, first audited month is default", async () => {
+  // Training ends in the baseline month, so options start at the evaluation month.
+  const id = await setup({
+    noAudit: true,
+    endDate: sql(
+      `SELECT (make_date(year,month,1) + interval '1 month - 1 day')::date::text FROM qa_periods WHERE id='${baseline}';`,
+    ),
+  });
+  const later = fixture.ids.periods[2]!;
+  // The excluded QA agent alone never makes a month audited.
+  rows(fixture.ids.participants[5]!, evaluation, 5);
+  // Audit presence counts phantom padding, like the SIDAK population.
+  rows(roster[0]!, later, 0, true);
+  const detail = await call(`/plans/${id}`);
+  expect(
+    detail.evaluation_period_options
+      .filter((p: { id: string }) => fixture.ids.periods.includes(p.id))
+      .map(({ id, auditStatus, is_default }: Record<string, unknown>) => ({
+        id,
+        auditStatus,
+        is_default,
+      })),
+  ).toEqual([
+    { id: evaluation, auditStatus: "no_audit", is_default: false },
+    { id: later, auditStatus: "audited", is_default: true },
+  ]);
+  expect(
+    detail.evaluation_period_options.filter(
+      (p: { is_default: boolean }) => p.is_default,
+    ),
+  ).toHaveLength(1);
 });
 test("baseline drift: frozen participant data, labeled legacy recompute, target verdict unaffected", async () => {
   const id = await setup({ legacy: true });

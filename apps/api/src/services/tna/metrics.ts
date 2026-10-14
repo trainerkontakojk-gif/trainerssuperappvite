@@ -191,6 +191,48 @@ export function buildPeriodBucket(
   };
 }
 
+type TnaAuditPresenceRow = {
+  profiler_peserta: {
+    tim: string | null;
+    batch_name: string | null;
+    jabatan: string | null;
+  } | null;
+};
+
+/**
+ * Audit presence `buildPeriodBucket` tanpa memuat temuan: periode diaudit bila
+ * ada satu baris (termasuk phantom) milik agent yang tidak dikeluarkan
+ * `isAgentExcluded`. Hanya kolom profil yang dibaca, dan pencarian berhenti di
+ * halaman pertama yang memuat agent service.
+ */
+export async function hasAuditedAgent(args: {
+  supabase: SupabaseClient;
+  serviceType: ServiceType;
+  periodId: string;
+}): Promise<boolean> {
+  const { supabase, serviceType, periodId } = args;
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("qa_temuan")
+      .select("id, profiler_peserta(tim, batch_name, jabatan)")
+      .eq("service_type", serviceType)
+      .eq("period_id", periodId)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as TnaAuditPresenceRow[];
+    if (
+      rows.some(
+        ({ profiler_peserta: p }) =>
+          !isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan),
+      )
+    )
+      return true;
+    if (rows.length < pageSize) return false;
+  }
+}
+
 /**
  * Metrik D1 satu parameter pada satu periode. Pembagian dengan nol dilarang:
  * kalau tidak ada agent diaudit, tingkat dan sebaran `null` (bukan `0`).
