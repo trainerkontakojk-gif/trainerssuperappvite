@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useId } from "react";
-import { AlertCircle, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, Info, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { cn } from "cn";
 import type {
   PdktEvaluationResult,
@@ -47,10 +47,13 @@ const card = "rounded-xl border border-border bg-surface-elevated p-5";
 
 function Section({
   title,
+  pane = false,
   className,
   children,
 }: {
   title: string;
+  /** Bagian dari permukaan bersama: tanpa bingkai kartu sendiri. */
+  pane?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -58,7 +61,7 @@ function Section({
   return (
     <section
       aria-labelledby={id}
-      className={cn(card, "flex flex-col gap-4", className)}
+      className={cn(pane ? "p-5" : card, "flex flex-col gap-4", className)}
     >
       <h3 id={id} className="text-sm font-semibold text-foreground">
         {title}
@@ -226,7 +229,28 @@ function ScoreBreakdown({ result }: { result: PdktEvaluationResult }) {
   );
 }
 
-/** Balasan bertanda dan catatan bernomornya, satu kolom. */
+/** Gulir ke penanda atau catatan pasangannya lalu fokuskan, tanpa mengubah URL. */
+function jumpTo(id: string) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  target.scrollIntoView({
+    block: "center",
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
+  target.focus({ preventScroll: true });
+}
+
+const focusRing =
+  "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-chart-orange focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated";
+// Tujuan lompatan difokuskan lewat skrip sesudah klik mouse; `focus-visible`
+// tidak menyala di situ, jadi sorotannya memakai `focus`.
+const jumpTarget =
+  "outline-none focus:ring-2 focus:ring-chart-orange focus:ring-offset-2 focus:ring-offset-surface-elevated";
+
+/** Balasan bertanda dan catatan bernomornya; penanda dan catatan saling tertaut. */
 function ReplyWithNotes({
   result,
   replyBody,
@@ -234,6 +258,9 @@ function ReplyWithNotes({
   result: PdktEvaluationResult;
   replyBody: string;
 }) {
+  const idBase = useId();
+  const markId = (number: number) => `${idBase}-mark-${number}`;
+  const noteId = (number: number) => `${idBase}-note-${number}`;
   const { notes, segments } = placeReplyAnnotations(
     result.annotations,
     replyBody,
@@ -243,30 +270,69 @@ function ReplyWithNotes({
         className="bg-chart-orange/15 px-0.5 text-foreground underline decoration-chart-orange decoration-2 underline-offset-4 [box-decoration-break:clone]"
       >
         {text}
-        <sup className="ml-0.5 text-[11px] font-bold">{number}</sup>
+        <sup className="ml-0.5 text-[11px] font-bold">
+          <a
+            id={markId(number)}
+            href={`#${noteId(number)}`}
+            aria-label={`Lihat catatan ${number}`}
+            onClick={(event) => {
+              event.preventDefault();
+              jumpTo(noteId(number));
+            }}
+            className={cn("rounded-sm text-foreground no-underline", jumpTarget)}
+          >
+            {number}
+          </a>
+        </sup>
       </mark>
     ),
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <Section title="Balasan Anda">
-        <p className="text-sm leading-[26px] whitespace-pre-wrap text-foreground">
+    <div className="flex flex-col divide-y divide-border">
+      <Section pane title="Balasan Anda">
+        <p className="text-sm leading-7 whitespace-pre-wrap text-foreground">
           {segments}
         </p>
       </Section>
 
       {notes.length > 0 && (
-        <Section title="Catatan pada balasan">
+        <Section pane title="Catatan pada balasan">
           <ol className="flex flex-col gap-3">
             {notes.map((note) => (
-              <li key={note.number} className="flex gap-3 text-sm">
-                <span
-                  aria-hidden="true"
-                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-chart-orange/15 text-xs font-bold"
-                >
-                  {note.number}
-                </span>
+              <li
+                key={note.number}
+                id={noteId(note.number)}
+                tabIndex={-1}
+                className={cn(
+                  "-mx-2 flex gap-3 rounded-lg px-2 py-1 text-sm focus:bg-chart-orange/10",
+                  jumpTarget,
+                )}
+              >
+                {note.marked ? (
+                  <a
+                    href={`#${markId(note.number)}`}
+                    aria-label={`Kembali ke kalimat bertanda ${note.number}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      jumpTo(markId(note.number));
+                    }}
+                    // Lingkaran 24px; area sentuh diperluas ke 44px.
+                    className={cn(
+                      "relative flex size-6 shrink-0 items-center justify-center rounded-full bg-chart-orange/15 text-xs font-bold text-foreground after:absolute after:-inset-[10px] hover:bg-chart-orange/25",
+                      focusRing,
+                    )}
+                  >
+                    {note.number}
+                  </a>
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold"
+                  >
+                    {note.number}
+                  </span>
+                )}
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="sr-only">Catatan {note.number}: </span>
                   <strong className="font-semibold text-foreground">
@@ -332,7 +398,13 @@ function OtherFindings({ result }: { result: PdktEvaluationResult }) {
 function ConsumerEmail({ item }: { item: PdktMailboxDetailItem }) {
   const inbound = readInboundEmail(item);
   return (
-    <Section title="Email konsumen">
+    // Tetap terlihat saat balasan dan catatan yang panjang digulir; email
+    // yang lebih tinggi dari layar bergulir di panelnya sendiri.
+    <Section
+      pane
+      title="Email konsumen"
+      className="lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"
+    >
       <EmailBody
         body={inbound.body}
         className="flex flex-col gap-3 text-sm leading-6"
@@ -342,28 +414,54 @@ function ConsumerEmail({ item }: { item: PdktMailboxDetailItem }) {
   );
 }
 
+/** Email konsumen dan balasan dalam satu permukaan agar mudah dicocokkan. */
+function Comparison({
+  item,
+  children,
+}: {
+  item: PdktMailboxDetailItem;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-label="Perbandingan email"
+      className="grid items-start rounded-xl border border-border bg-surface-elevated lg:grid-cols-2"
+    >
+      <ConsumerEmail item={item} />
+      <div className="border-t border-border lg:border-t-0 lg:border-l">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 /** Telaah yang dibuat sebelum penanda kalimat ada tidak menyimpan `annotations`. */
 function MarksMissingNotice({ onRetry }: Pick<Props, "onRetry">) {
   return (
-    <section
+    // Pemberitahuan statis: region berlabel, bukan role="alert" yang menyela.
+    <Alert
+      role="region"
       aria-label="Telaah lama tanpa penanda"
-      className={cn(card, "flex flex-wrap items-center justify-between gap-3")}
+      className="items-start gap-y-3 px-4 py-3"
     >
+      <Info aria-hidden="true" className="text-module-pdkt" />
       <p className="max-w-prose text-sm leading-6 text-foreground">
         Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum
         menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat
         tandanya di balasan Anda.
       </p>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onRetry}
-        className="min-h-11 gap-1.5 text-xs"
-      >
-        <RotateCcw aria-hidden="true" />
-        Telaah ulang
-      </Button>
-    </section>
+      <div className="col-start-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onRetry}
+          className="min-h-[44px] gap-1.5 text-xs"
+        >
+          <RotateCcw aria-hidden="true" />
+          Telaah ulang
+        </Button>
+      </div>
+    </Alert>
   );
 }
 
@@ -389,7 +487,7 @@ function ReviewPending({
           type="button"
           variant="outline"
           onClick={onRetry}
-          className="min-h-11 gap-1.5 text-xs"
+          className="min-h-[44px] gap-1.5 text-xs"
         >
           <RotateCcw aria-hidden="true" />
           Coba lagi
@@ -407,7 +505,7 @@ function ReviewPending({
           type="button"
           variant="outline"
           onClick={onRetry}
-          className="min-h-11 text-xs"
+          className="min-h-[44px] text-xs"
         >
           Mulai telaah
         </Button>
@@ -471,27 +569,25 @@ export function PdktReviewStage({
           <ReviewPending status={status} onRetry={onRetry} />
         )}
 
-        {/* Email konsumen dan balasan berdampingan agar mudah dicocokkan. */}
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          <ConsumerEmail item={item} />
+        <Comparison item={item}>
           {completed ? (
             <ReplyWithNotes result={result} replyBody={replyBody} />
           ) : (
             replyBody && (
-              <Section title="Balasan Anda">
-                <p className="text-sm leading-[26px] whitespace-pre-wrap">
+              <Section pane title="Balasan Anda">
+                <p className="text-sm leading-7 whitespace-pre-wrap">
                   {replyBody}
                 </p>
               </Section>
             )
           )}
-        </div>
+        </Comparison>
 
         {completed && <OtherFindings result={result} />}
 
         {rewrite?.body && (
           <details className={cn(card, "group")}>
-            <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">
+            <summary className="min-h-[44px] cursor-pointer content-center text-sm font-semibold">
               Lihat contoh balasan yang lebih baik
             </summary>
             <div className="mt-3 flex flex-col gap-3">
@@ -500,7 +596,12 @@ export function PdktReviewStage({
                   Subjek: {rewrite.subject}
                 </p>
               )}
-              <p className="text-sm leading-[26px] whitespace-pre-line">
+              {rewrite.highlights?.some(Boolean) && (
+                <p className="text-xs text-muted-foreground">
+                  Bagian yang disorot hijau adalah perbaikan dari balasan Anda.
+                </p>
+              )}
+              <p className="text-sm leading-7 whitespace-pre-line">
                 {renderHighlights(
                   rewrite.body,
                   rewrite.highlights,
@@ -527,7 +628,7 @@ export function PdktReviewStage({
               type="button"
               variant="ghost"
               onClick={onDelete}
-              className="min-h-11 gap-2 px-3 text-xs"
+              className="min-h-[44px] gap-2 px-3 text-xs"
             >
               <Trash2 aria-hidden="true" className="text-destructive" />
               Hapus email
@@ -540,7 +641,7 @@ export function PdktReviewStage({
               type="button"
               variant="outline"
               onClick={onInbox}
-              className="min-h-11"
+              className="min-h-[44px]"
             >
               Kembali ke kotak masuk
             </Button>
@@ -549,7 +650,7 @@ export function PdktReviewStage({
                 type="button"
                 onClick={onPracticeAgain}
                 disabled={isStartingPractice}
-                className="min-h-11"
+                className="min-h-[44px]"
               >
                 {isStartingPractice ? "Membuat email…" : practiceLabel}
               </Button>

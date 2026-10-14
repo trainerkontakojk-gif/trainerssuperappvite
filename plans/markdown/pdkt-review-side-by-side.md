@@ -22,6 +22,15 @@ Lane C — PDKT web review stage layout plus the PDKT evaluation output contract
 - [x] RED: update the "tahap Telaah" E2E to assert the consumer email region is visible and beside the reply on desktop and stacked on mobile; add an E2E for the legacy notice + "Telaah ulang" request.
 - [x] GREEN: layout + legacy notice in `PdktReviewStage.tsx`; wire `onRetry`.
 - [x] Backend guard and re-evaluation of legacy completed rows.
-- [x] Typecheck api/web, focused E2E, thermo-nuclear, lint, build, `git diff --check`; updated PDKT unit tests (approved by Fajar 2026-10-14). `impeccable` audit not run.
+- [x] Typecheck api/web, focused E2E, thermo-nuclear, lint, build, `git diff --check`; updated PDKT unit tests (approved by Fajar 2026-10-14). `impeccable` audit ran afterwards; see below.
 
 Not provable by hermetic E2E: the backend rejects AI output without `annotations` and re-claims legacy completed rows. Fajar approved updating the PDKT unit tests (2026-10-14); `pdkt-reply-annotations.test.ts` now covers the rejection and the empty-vs-legacy distinction. The re-claim query is checked only against local PostgREST.
+
+## Audit follow-up (impeccable, 2026-10-14)
+
+- [x] Reply marks are links ("Lihat catatan N") to their note, and marked notes link back ("Kembali ke kalimat bertanda N"). Jump targets get visible focus.
+- [x] Consumer email and reply share one comparison surface (`Perbandingan email`); the consumer pane is sticky on wide screens and scrolls itself when tall.
+- [x] Legacy-marks notice uses `Alert` (role `region`) with an info icon instead of another content card.
+- [x] Legend under highlighted rewrite text.
+- [x] Telaah controls are at least 44px (`min-h-[44px]`; the 14px root makes `min-h-11` 38.5px), including `CopyInlineButton`.
+- Open: `--text-xs` is 11px by design token and E2E floor, while `docs/design.md` says 12px for secondary text. Left for Fajar to decide. Other PDKT controls still use `min-h-11` (separate task).
