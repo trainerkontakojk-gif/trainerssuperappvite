@@ -72,3 +72,8 @@ coverage/
 graphify-out/
 .herpes/
 tsconfig.tsbuildinfo
+
+# ── Local tool state (not tracked) ──
+supabase/.branches/
+.claude/launch.json
+.impeccable/
