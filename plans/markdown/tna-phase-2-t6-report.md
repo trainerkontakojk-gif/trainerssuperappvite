@@ -110,7 +110,7 @@ Gate browser (#7) berjalan sebelum P3-2; spec yang sama dijalankan ulang setelah
 
 ## Risiko rilis tersisa
 
-- **Migrasi produksi belum dijalankan.** Kedua migrasi baru diuji lokal saja.
+- **Migrasi produksi sudah dijalankan 2026-10-14** (pasca-T6, atas izin Fajar): kedua file + `migration repair`, verifikasi read-only lulus; catatan lengkap di `docs/database.md` § Apply produksi 2026-10-14. Deploy API + web lewat merge PR #65 masih menunggu.
 - **Riwayat migrasi remote tidak sinkron** dengan repo; wajib pola satu file + `migration repair`, bukan `db push`.
 - **T3 pernah membaca `qa_periods` produksi secara read-only (GET PostgREST, 2026-10-12)** atas izin Fajar, untuk memvalidasi UUID periode. Tidak ada tulis ke produksi.
 - Jeda migrasi → deploy: pembatalan rencana `aktif` dari API lama gagal (P3-8).

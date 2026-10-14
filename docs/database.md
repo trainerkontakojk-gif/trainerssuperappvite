@@ -366,7 +366,7 @@ Bukti API lokal RLS/guard/atomisitas/baseline dan batas verifikasi UI: [laporan 
 
 ## TNA — Evaluasi pasca-training (Fase 2)
 
-Sumber schema: `supabase/migrations/20261011130000_tna_phase2_evaluation.sql` (fondasi evaluasi) dan `supabase/migrations/20261012150000_tna_need_previous_plan.sql` (writer tautan K15), masing-masing dengan rollback berpasangan di `supabase/rollbacks/`. Keduanya baru diuji di Supabase lokal (replay bersih, rollback, regresi API). **Belum diterapkan ke produksi `ruosnjmtywcrghjgqugz`.** Kontrak: [rencana Fase 2](../plans/markdown/tna-phase-2.md).
+Sumber schema: `supabase/migrations/20261011130000_tna_phase2_evaluation.sql` (fondasi evaluasi) dan `supabase/migrations/20261012150000_tna_need_previous_plan.sql` (writer tautan K15), masing-masing dengan rollback berpasangan di `supabase/rollbacks/`. Keduanya diuji di Supabase lokal (replay bersih, rollback, regresi API). **Diterapkan ke produksi `ruosnjmtywcrghjgqugz` pada 2026-10-14** dengan izin Fajar, mengikuti prosedur di bawah; lihat [catatan apply](#apply-produksi-2026-10-14). Kontrak: [rencana Fase 2](../plans/markdown/tna-phase-2.md).
 
 | Tabel                   | Tambahan Fase 2                                                                                                                                                                                                                                                                                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -405,6 +405,14 @@ Prosedur produksi hanya dengan izin eksplisit Fajar, mengikuti pola Fase 1 karen
 3. Deploy API + web segera sesudahnya. Schema baca Fase 1 menerima kolom tambahan, tetapi selama jeda ini pembatalan rencana `aktif` dari API lama gagal karena fungsi tiga argumen sekarang mewajibkan alasan.
 
 Rollback: kembalikan deploy aplikasi terlebih dahulu, lalu jalankan `rollback_20261012150000_tna_need_previous_plan.sql` sebelum `rollback_20261011130000_tna_phase2_evaluation.sql`. Rollback fondasi **fail-closed** (`TNA_PHASE2_ROLLBACK_DATA_PRESENT`) bila sudah ada data Fase 2 apa pun: rencana `evaluasi`/`selesai`, field evaluasi, `cancel_reason`, `previous_plan_id`, atau `baseline_sessions` peserta. Karena setiap aktivasi sesudah deploy mengisi `baseline_sessions`, rollback database praktis hanya mungkin sebelum ada aktivasi atau pembatalan beralasan; sesudah itu pilih rollback aplikasi saja atau perbaikan maju.
+
+#### Apply produksi 2026-10-14
+
+- Preflight read-only: Fase 1 lengkap (`20261008120000` di riwayat), belum ada kolom/fungsi Fase 2, dan 0 kebutuhan, rencana, maupun peserta TNA.
+- `supabase db query --linked -f supabase/migrations/20261011130000_tna_phase2_evaluation.sql` (00:48 UTC) lalu `supabase migration repair --linked --status applied 20261011130000`; keduanya exit 0.
+- `supabase db query --linked -f supabase/migrations/20261012150000_tna_need_previous_plan.sql` (00:50 UTC) lalu `supabase migration repair --linked --status applied 20261012150000`; keduanya exit 0.
+- Verifikasi read-only pasca-apply: 13 kolom baru, 3 constraint, indeks `idx_tna_plans_status_evaluation_due`, fungsi `tna_start_plan_evaluation/4`, `tna_update_evaluation_period/4`, `tna_complete_plan/8`, `tna_cancel_plan/4`, helper `valid_eval_period` dan `validate_evaluation_snapshot`; EXECUTE public tetap dengan guard; `tna_create_need` memuat validasi K15 dan tetap `SECURITY DEFINER`. Riwayat remote memuat `20261011130000` dan `20261012150000`. Data TNA tetap 0 baris.
+- Tidak ada penulisan data selain DDL migrasi dan riwayat; RPC tidak dipanggil ke produksi. Karena belum ada rencana, jeda migrasi → deploy tidak berdampak pada pembatalan.
 
 ## Storage
 
