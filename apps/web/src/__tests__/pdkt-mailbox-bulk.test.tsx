@@ -6,7 +6,7 @@ import {
   createRootRoute,
   createRoute,
 } from "@tanstack/react-router";
-import PdktSimulation from "../routes/pdkt/simulation";
+import PdktSimulation from "./helpers/PdktSimulationHarness";
 
 const useApiMock = vi.hoisted(() => vi.fn());
 

@@ -82,16 +82,15 @@ function DashboardLayoutContent() {
     "/waiting-approval",
     "/reset-password",
   ].includes(pathname);
-  const isStandaloneRoute = ["/pdkt/simulation"].includes(pathname);
-  // Halaman publik dan standalone mengatur judul sendiri, tanpa shell.
-  useRouteFocus(pathname, contentRef, !(isPublicRoute || isStandaloneRoute));
+  // Halaman publik mengatur judul sendiri, tanpa shell.
+  useRouteFocus(pathname, contentRef, !isPublicRoute);
 
   useEffect(() => {
     // Close mobile drawer on route change
     setMobileDrawerOpen(false);
   }, [pathname]);
 
-  if (isPublicRoute || isStandaloneRoute) {
+  if (isPublicRoute) {
     return (
       <Suspense
         fallback={

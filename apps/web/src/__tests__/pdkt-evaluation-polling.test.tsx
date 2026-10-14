@@ -6,7 +6,7 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import PdktSimulation from "../routes/pdkt/simulation";
+import PdktSimulation from "./helpers/PdktSimulationHarness";
 import type { PdktMailboxItem } from "@trainers/types";
 
 const useApiMock = vi.hoisted(() => vi.fn());

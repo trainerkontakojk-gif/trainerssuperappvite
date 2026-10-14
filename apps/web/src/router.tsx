@@ -44,7 +44,6 @@ const SidakAgentDetail = lazy(() => import("./routes/sidak/agents.$id"));
 const SidakReportsData = lazy(() => import("./routes/sidak/reports-data"));
 const KetikLanding = lazy(() => import("./routes/ketik/index"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
-const PdktSimulation = lazy(() => import("./routes/pdkt/simulation"));
 const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
@@ -378,17 +377,32 @@ const pdktRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt",
   component: PdktLanding,
-  // `sesi` membuka satu sesi riwayat langsung di tahap Telaah.
-  validateSearch: (search: Record<string, unknown>): { sesi?: string } =>
-    typeof search.sesi === "string" && search.sesi ? { sesi: search.sesi } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    sesi?: string;
+    ruang?: 1;
+    email?: string;
+    dari?: "riwayat";
+  } => ({
+    ...(typeof search.sesi === "string" && search.sesi
+      ? { sesi: search.sesi }
+      : {}),
+    ...(search.ruang === 1 || search.ruang === "1" ? { ruang: 1 } : {}),
+    ...(typeof search.email === "string" && search.email
+      ? { email: search.email }
+      : {}),
+    ...(search.dari === "riwayat" ? { dari: "riwayat" } : {}),
+  }),
   beforeLoad: requireCapability("pdkt.use"),
 });
 
 const pdktSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/simulation",
-  component: PdktSimulation,
-  beforeLoad: requireCapability("pdkt.use"),
+  beforeLoad: () => {
+    throw redirect({ to: "/pdkt", search: {}, replace: true });
+  },
 });
 
 const pdktHistoryRoute = createRoute({

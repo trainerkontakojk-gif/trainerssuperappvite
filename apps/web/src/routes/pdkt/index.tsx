@@ -1,4 +1,5 @@
 import { can } from "@trainers/types";
+import { usePdktSubject } from "./utils/usePdktSubject";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
@@ -48,14 +49,23 @@ const PDKT_EXPANDED_TITLE =
 const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
 export default function PdktLanding() {
-  const [view, setView] = useState<"home" | "mailbox">("home");
+  const navigate = useNavigate();
+  const {
+    sesi: requestedSessionId,
+    ruang,
+    email,
+    dari,
+  } = useSearch({ from: "/pdkt" });
+  const view = ruang === 1 || requestedSessionId || email ? "mailbox" : "home";
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
-  const [simulationSubject, setSimulationSubject] =
-    useState<SimulationSubjectSelection>({ type: "self" });
   const profile = useAuthStore((st) => st.profile);
   const session = useAuthStore((st) => st.session);
   const accountKey = session?.user?.id ?? null;
   const canPickParticipant = can(profile?.role, "simulation.subject.select");
+  const [simulationSubject, setSimulationSubject] = usePdktSubject(
+    accountKey,
+    canPickParticipant,
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [settings, setSettings] = useState<PdktAppSettings | null>(null);
@@ -63,10 +73,6 @@ export default function PdktLanding() {
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState(false);
-  // Email yang dipilih dari landing ("Belum dibalas"), dibuka setelah pemilih peserta.
-  const [pendingMailboxId, setPendingMailboxId] = useState<string | null>(null);
-  const [initialMailboxId, setInitialMailboxId] = useState<string | null>(null);
-
   // Landing data is handed to the session view so it does not refetch it.
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsVersion, setSettingsVersion] = useState<string | undefined>();
@@ -144,39 +150,43 @@ export default function PdktLanding() {
     await fetchHistory();
   };
 
-  const [replaySession, setReplaySession] = useState<SessionHistory | null>(
-    null,
-  );
+  const replaySession = requestedSessionId
+    ? (history.find((item) => item.id === requestedSessionId) ?? null)
+    : null;
+  const selectedId =
+    email ??
+    (replaySession
+      ? (mailboxItems?.find((item) => item.history_id === replaySession.id)
+          ?.id ?? `replay_${replaySession.id}`)
+      : null);
 
   const handleSelectSession = (session: SessionHistory) => {
-    setReplaySession(session);
-    setView("mailbox");
+    void navigate({ to: "/pdkt", search: { ruang: 1, sesi: session.id } });
   };
 
-  // `/pdkt?sesi=<id>` dari halaman Riwayat: buka sesi itu setelah riwayat termuat.
-  const navigate = useNavigate();
-  const { sesi: requestedSessionId } = useSearch({ from: "/pdkt" });
+  // Tautan valid tetap di URL. Hanya sesi hilang/gagal yang kembali ke landing.
   useEffect(() => {
-    if (!requestedSessionId) return;
-    if (historyError) {
-      notify.error(
-        "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka.",
-      );
-    } else if (!historyReady) {
-      return;
-    } else {
-      const session = history.find((item) => item.id === requestedSessionId);
-      if (session) {
-        handleSelectSession(session);
-      } else {
-        notify.error("Sesi itu tidak ada lagi di riwayat Anda.");
-      }
-    }
+    if (!requestedSessionId || (!historyError && !historyReady)) return;
+    if (!historyError && replaySession) return;
+    notify.error(
+      historyError
+        ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
+        : "Sesi itu tidak ada lagi di riwayat Anda.",
+    );
     void navigate({ to: "/pdkt", search: {}, replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSessionId, historyReady, historyError, history]);
+  }, [requestedSessionId, historyReady, historyError, replaySession, navigate]);
 
-  const captureUsageBaseline = async () => {
+  const handleSelectedIdChange = useCallback(
+    (id: string | null, replace = false) =>
+      navigate({
+        to: "/pdkt",
+        search: { ruang: 1, ...(id ? { email: id } : {}) },
+        replace,
+      }),
+    [navigate],
+  );
+
+  const captureUsageBaseline = useCallback(async () => {
     try {
       const summary = await fetchUsageSummary("pdkt");
       if (summary) {
@@ -185,7 +195,14 @@ export default function PdktLanding() {
     } catch (err) {
       console.error("[PDKT] Failed to capture usage baseline:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (view !== "mailbox") return;
+    void captureUsageBaseline();
+    setSessionDelta(null);
+    setSessionDeltaPending(false);
+  }, [view, captureUsageBaseline]);
 
   // Baseline diambil ulang tepat sebelum setiap balasan, jadi selisihnya adalah
   // pemakaian balasan terakhir (kirim + telaah). "Masih dihitung" hanya tampil
@@ -239,34 +256,23 @@ export default function PdktLanding() {
   };
 
   useEffect(() => {
-    setSimulationSubject({ type: "self" });
     setShowSubjectPicker(false);
   }, [accountKey, canPickParticipant]);
 
-  const handleStartSimulation = async (mailboxId: string | null = null) => {
-    setPendingMailboxId(mailboxId);
-    if (!canPickParticipant) {
-      await handleConfirmSubject({ type: "self" }, mailboxId);
-      return;
+  const handleStartSimulation = (mailboxId: string | null = null) => {
+    if (mailboxId) {
+      void navigate({ to: "/pdkt", search: { ruang: 1, email: mailboxId } });
+    } else if (canPickParticipant) {
+      setShowSubjectPicker(true);
+    } else {
+      handleConfirmSubject({ type: "self" });
     }
-    setShowSubjectPicker(true);
   };
 
-  const handleConfirmSubject = async (
-    sel: SimulationSubjectSelection,
-    mailboxId: string | null = pendingMailboxId,
-  ) => {
-    setSimulationSubject(sel);
+  const handleConfirmSubject = (selection: SimulationSubjectSelection) => {
+    setSimulationSubject(selection);
     setShowSubjectPicker(false);
-    setInitialMailboxId(mailboxId);
-    setPendingMailboxId(null);
-    // Baseline usage is only needed for the delta notification; never block
-    // opening the mailbox on it.
-    void captureUsageBaseline();
-    setSessionDelta(null);
-    setSessionDeltaPending(false);
-    setReplaySession(null);
-    setView("mailbox");
+    void navigate({ to: "/pdkt", search: { ruang: 1 } });
   };
 
   const handleSessionSettingsChange = useCallback(
@@ -451,29 +457,45 @@ export default function PdktLanding() {
             className="fixed inset-0 z-[100] flex flex-col overflow-hidden transition-colors duration-500 bg-background"
           >
             <div className="w-full h-full relative flex flex-col bg-card">
-              <PdktSimulation
-                simulationSubject={simulationSubject}
-                onBack={() => {
-                  setView("home");
-                  setReplaySession(null);
-                  setInitialMailboxId(null);
-                  void refetchMailbox();
-                }}
-                onBeforeActivity={captureUsageBaseline}
-                onAfterActivity={(reason) => void computeUsageDeltaNow(reason)}
-                initialSelectedMailboxId={initialMailboxId}
-                initialReplaySession={replaySession}
-                onConsumeReplaySession={() => setReplaySession(null)}
-                initialSettings={settingsReady ? settings : undefined}
-                initialSettingsVersion={
-                  settingsReady ? settingsVersion : undefined
-                }
-                initialHistory={historyReady ? history : undefined}
-                onSettingsChange={handleSessionSettingsChange}
-                onHistoryChange={handleSessionHistoryChange}
-                initialScenarios={defaultScenarios ?? undefined}
-                initialConsumerTypes={defaultConsumerTypesFromApi ?? undefined}
-              />
+              {requestedSessionId && !replaySession ? (
+                <div
+                  role="status"
+                  className="p-6 text-sm text-muted-foreground"
+                >
+                  Memuat sesi latihan…
+                </div>
+              ) : (
+                <PdktSimulation
+                  key={accountKey}
+                  canPickParticipant={canPickParticipant}
+                  simulationSubject={simulationSubject}
+                  selectedId={selectedId}
+                  onSelectedIdChange={handleSelectedIdChange}
+                  onBack={() => {
+                    void navigate({ to: "/pdkt", search: {} });
+                    void refetchMailbox();
+                  }}
+                  onBackToHistory={
+                    dari === "riwayat" ? handleOpenHistory : undefined
+                  }
+                  onBeforeActivity={captureUsageBaseline}
+                  onAfterActivity={(reason) =>
+                    void computeUsageDeltaNow(reason)
+                  }
+                  initialReplaySession={replaySession}
+                  initialSettings={settingsReady ? settings : undefined}
+                  initialSettingsVersion={
+                    settingsReady ? settingsVersion : undefined
+                  }
+                  initialHistory={historyReady ? history : undefined}
+                  onSettingsChange={handleSessionSettingsChange}
+                  onHistoryChange={handleSessionHistoryChange}
+                  initialScenarios={defaultScenarios ?? undefined}
+                  initialConsumerTypes={
+                    defaultConsumerTypesFromApi ?? undefined
+                  }
+                />
+              )}
             </div>
           </motion.div>
         )}
@@ -486,7 +508,6 @@ export default function PdktLanding() {
           onConfirm={handleConfirmSubject}
           onCancel={() => {
             setShowSubjectPicker(false);
-            setPendingMailboxId(null);
           }}
         />
       )}

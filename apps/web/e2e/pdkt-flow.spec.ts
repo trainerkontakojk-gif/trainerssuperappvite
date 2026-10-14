@@ -236,7 +236,10 @@ const OJK_SCENARIO = {
   recipientMode: "single",
   recipientEmails: [],
   alwaysUseSampleEmail: true,
-  sampleEmailTemplate: { subject: "Klaim ditolak", body: "Klaim saya ditolak." },
+  sampleEmailTemplate: {
+    subject: "Klaim ditolak",
+    body: "Klaim saya ditolak.",
+  },
 };
 const SAVED_SETTINGS = {
   scenarios: [COMPANY_SCENARIO, OJK_SCENARIO],
@@ -426,9 +429,12 @@ async function enterWorkspace(page: Page, marker?: Locator) {
     .filter({ hasText: "Pilih peserta latihan" });
   const workspace = marker ?? workspaceMarker(page);
   await expect
-    .poll(async () => (await picker.isVisible()) || (await workspace.isVisible()), {
-      timeout: 20000,
-    })
+    .poll(
+      async () => (await picker.isVisible()) || (await workspace.isVisible()),
+      {
+        timeout: 20000,
+      },
+    )
     .toBe(true);
   if (await picker.isVisible()) {
     // "Diri sendiri" sudah terpilih secara default.
@@ -580,9 +586,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(summary).toContainText("85 rata-rata skor dari sesi terakhir");
     await expect(summary).toContainText("1 sedang ditelaah AI");
     await expect(page.getByTestId(/^pdkt-stat-/)).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Belum ada latihan" })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByRole("region", { name: "Belum ada latihan" }),
+    ).toHaveCount(0);
 
     const unreplied = page.getByRole("region", { name: "Belum dibalas" });
     const rows = unreplied.getByRole("button", { name: /Transaksi gagal/ });
@@ -622,7 +628,9 @@ test.describe("PDKT (hermetic)", () => {
     const pause = page.getByRole("button", { name: "Jeda animasi" });
     await expect(pause).toBeVisible({ timeout: 20000 });
     await pause.click();
-    await expect(page.getByRole("button", { name: "Putar animasi" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Putar animasi" }),
+    ).toBeVisible();
     await expect(page.getByTestId("pdkt-stage-demo")).toHaveAttribute(
       "data-paused",
       "true",
@@ -642,7 +650,9 @@ test.describe("PDKT (hermetic)", () => {
           body: { success: true, data: SAVED_SETTINGS },
           headers: { "x-settings-version": "absent" },
         },
-        ...pdktMocks([]).filter((mock) => mock.path !== "/api/v1/pdkt/settings"),
+        ...pdktMocks([]).filter(
+          (mock) => mock.path !== "/api/v1/pdkt/settings",
+        ),
       ],
     });
     await waitForMockedApi(audit, ["GET /api/v1/pdkt/settings"]);
@@ -726,7 +736,9 @@ test.describe("PDKT (hermetic)", () => {
       throw new Error("window.confirm tidak boleh dipakai");
     });
     await dialog.getByRole("button", { name: "Tutup", exact: true }).click();
-    const discard = page.getByRole("dialog", { name: "Tutup tanpa menyimpan?" });
+    const discard = page.getByRole("dialog", {
+      name: "Tutup tanpa menyimpan?",
+    });
     await expect(discard).toBeVisible();
     await expect(discard).toContainText(
       "Perubahan yang belum disimpan akan hilang.",
@@ -965,7 +977,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(removed).toContainText("data peserta sudah dihapus");
     await expect(removed).toContainText("Belum ditelaah");
     await expect(page.getByText(/record peserta/)).toHaveCount(0);
-    await expect(page.getByText(/Target:|Pelaksana:|Export CSV/)).toHaveCount(0);
+    await expect(page.getByText(/Target:|Pelaksana:|Export CSV/)).toHaveCount(
+      0,
+    );
 
     // Filter status.
     const filters = page.getByRole("group", { name: "Saring status" });
@@ -1000,17 +1014,21 @@ test.describe("PDKT (hermetic)", () => {
     const link = page
       .getByRole("table", { name: "Daftar sesi PDKT" })
       .getByRole("link", { name: REPLIED_MAIL.list.subject });
-    await expect(link).toHaveAttribute("href", "/pdkt?sesi=pdkt-evaluated-1", {
-      timeout: 20000,
-    });
+    await expect(link).toHaveAttribute(
+      "href",
+      "/pdkt?ruang=1&sesi=pdkt-evaluated-1&dari=riwayat",
+      {
+        timeout: 20000,
+      },
+    );
     await link.click();
 
     await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
       /Telaah/,
       { timeout: 20000 },
     );
-    // Parameter `sesi` dibersihkan setelah sesi dibuka.
-    await expect(page).toHaveURL(/\/pdkt$/);
+    // Parameter sesi bertahan agar reload membuka telaah yang sama.
+    await expectSearch(page, { sesi: "pdkt-evaluated-1", dari: "riwayat" });
     await expect(
       page
         .getByRole("region", { name: "Ringkasan skor" })
@@ -1125,9 +1143,7 @@ test.describe("PDKT (hermetic)", () => {
             error: { code: "DATABASE_ERROR", message: "Server sedang sibuk." },
           },
         },
-        ...pdktMocks([]).filter(
-          (mock) => mock.path !== "/api/v1/pdkt/history",
-        ),
+        ...pdktMocks([]).filter((mock) => mock.path !== "/api/v1/pdkt/history"),
       ],
     });
 
@@ -1233,7 +1249,9 @@ test.describe("PDKT (hermetic)", () => {
       main.getByText(OPEN_MAIL.detail.inbound_email.body).first(),
     ).toBeVisible({ timeout: 20000 });
     await expect(main.getByText(/Kepada:/)).toHaveCount(0);
-    await expect(main.getByText(OPEN_MAIL.detail.inbound_email.to)).toHaveCount(0);
+    await expect(main.getByText(OPEN_MAIL.detail.inbound_email.to)).toHaveCount(
+      0,
+    );
     await expect(main.getByText("konsumen@ojk.go.id")).toHaveCount(0);
     expectHermetic(audit);
   });
@@ -1319,7 +1337,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(problem).toContainText(
       "Periksa koneksi Anda, lalu coba lagi.",
     );
-    await expect(problem.getByRole("button", { name: "Coba lagi" })).toBeVisible();
+    await expect(
+      problem.getByRole("button", { name: "Coba lagi" }),
+    ).toBeVisible();
     await expect(page.getByText(rawError)).toHaveCount(0);
 
     // Bukan jalan buntu: header ruang kerja tetap punya tombol kembali.
@@ -1371,7 +1391,7 @@ test.describe("PDKT (hermetic)", () => {
     );
 
     // Balasan gagal tidak memakai AI: popover tidak boleh tertahan "masih dihitung".
-    await page.getByRole("button", { name: "Kotak masuk" }).click();
+    await page.getByRole("button", { name: "Kembali ke email" }).click();
     await page
       .getByRole("button", { name: "Kembali ke halaman awal PDKT" })
       .click();
@@ -1407,7 +1427,9 @@ test.describe("PDKT (hermetic)", () => {
 
     // Skenario email tetap: judul dan kategori saja. Ringkasannya disalin dari
     // isi email, jadi peserta tidak boleh membacanya sebelum mulai.
-    const fixed = dialog.getByRole("button", { name: new RegExp(OJK_SCENARIO.title) });
+    const fixed = dialog.getByRole("button", {
+      name: new RegExp(OJK_SCENARIO.title),
+    });
     await expect(fixed).toContainText("Asuransi · Email tetap");
     await expect(dialog.getByText(OJK_SCENARIO.description)).toHaveCount(0);
 
@@ -1432,9 +1454,7 @@ test.describe("PDKT (hermetic)", () => {
       dialog.getByRole("heading", { name: "Ubah skenario" }),
     ).toBeVisible();
     for (const section of ["Kasus", "Arah balasan", "Kunci jawaban"]) {
-      await expect(
-        dialog.getByRole("region", { name: section }),
-      ).toBeVisible();
+      await expect(dialog.getByRole("region", { name: section })).toBeVisible();
     }
     await expect(dialog.getByRole("button", { name: "Lanjut" })).toHaveCount(0);
 
@@ -1500,7 +1520,9 @@ test.describe("PDKT (hermetic)", () => {
 
     await dialog.getByLabel(/^Judul skenario/).fill("Klaim ditolak tanpa alasan");
     await dialog.getByLabel(/^Kategori/).selectOption("Asuransi");
-    const mode = dialog.getByRole("radiogroup", { name: "Isi email dibuat oleh" });
+    const mode = dialog.getByRole("radiogroup", {
+      name: "Isi email dibuat oleh",
+    });
     await mode
       .getByRole("radio", { name: "Ditulis sendiri (email tetap)" })
       .click();
@@ -1574,7 +1596,9 @@ test.describe("PDKT (hermetic)", () => {
       "Belum dibalas · 1",
       "Dibalas",
     ]);
-    await expect(page.getByPlaceholder("Cari pengirim atau subjek")).toBeVisible();
+    await expect(
+      page.getByPlaceholder("Cari pengirim atau subjek"),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Menu lainnya" }).click();
     await expect(page.getByRole("menuitem")).toHaveText([
@@ -1599,12 +1623,18 @@ test.describe("PDKT (hermetic)", () => {
     await expect(reading).toContainText("rina@local.test");
     await expect(reading.getByText("Lampiran (1)")).toBeVisible();
     // Data peserta dan pelaksana pindah dari panel baca ke header ruang kerja.
-    await expect(page.getByText("Pelaksana: Siti Aminah · Trainer")).toBeVisible();
-    await expect(reading.getByRole("button", { name: "Lampiran 1" })).toBeVisible();
+    await expect(
+      page.getByText("Pelaksana: Siti Aminah · Trainer"),
+    ).toBeVisible();
+    await expect(
+      reading.getByRole("button", { name: "Lampiran 1" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Hapus email", exact: true }),
     ).toBeEnabled();
-    await expect(page.getByRole("button", { name: "Tulis balasan" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Tulis balasan" }),
+    ).toBeVisible();
 
     // Baris yang sudah dibalas menampilkan skor; memilih filter tidak membuka
     // Telaah dengan sendirinya.
@@ -1614,7 +1644,9 @@ test.describe("PDKT (hermetic)", () => {
     });
     await expect(repliedRow).toContainText("Skor 85");
     await expect(page.getByText(/Pilih email dari kotak masuk/)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /^Balasan untuk/ })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /^Balasan untuk/ }),
+    ).toHaveCount(0);
     expectHermetic(audit);
   });
 
@@ -1636,7 +1668,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
       /Tanggapi/,
     );
-    await expect(page.getByRole("heading", { name: "Kotak masuk" })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Kotak masuk" }),
+    ).toHaveCount(0);
     const email = page.getByRole("region", { name: "Email konsumen" });
     await expect(email).toContainText(OPEN_MAIL.detail.inbound_email.body);
     const compose = page.getByRole("region", { name: "Tulis balasan" });
@@ -1647,7 +1681,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(compose).toContainText("7 kata");
 
     await compose.getByRole("button", { name: "Kirim balasan" }).click();
-    const confirm = page.getByRole("dialog", { name: "Kirim balasan sekarang?" });
+    const confirm = page.getByRole("dialog", {
+      name: "Kirim balasan sekarang?",
+    });
     await expect(confirm).toBeVisible();
     await confirm.getByRole("button", { name: "Periksa lagi" }).click();
     await expect(confirm).toHaveCount(0);
@@ -1777,7 +1813,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("heading", { name: "Balasan untuk Rina" }),
     ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole("heading", { name: "Kotak masuk" })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Kotak masuk" }),
+    ).toHaveCount(0);
     await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
       /Telaah/,
     );
@@ -1799,7 +1837,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(rows.nth(0)).toContainText("90");
     await expect(breakdown.getByText("Perlu perbaikan")).toHaveCount(1);
     await expect(rows.nth(1)).toContainText("Perlu perbaikan");
-    await expect(rows.nth(1)).toContainText("Tuliskan batas waktu tindak lanjut.");
+    await expect(rows.nth(1)).toContainText(
+      "Tuliskan batas waktu tindak lanjut.",
+    );
 
     const answer = page.getByRole("region", { name: "Balasan Anda" });
     const marks = answer.locator("mark");
@@ -1829,16 +1869,22 @@ test.describe("PDKT (hermetic)", () => {
     const comparison = page.getByRole("region", {
       name: "Perbandingan email",
     });
-    await expect(comparison.getByRole("region", { name: "Email konsumen" })).toBeVisible();
-    await expect(comparison.getByRole("region", { name: "Balasan Anda" })).toBeVisible();
+    await expect(
+      comparison.getByRole("region", { name: "Email konsumen" }),
+    ).toBeVisible();
+    await expect(
+      comparison.getByRole("region", { name: "Balasan Anda" }),
+    ).toBeVisible();
 
     // Email konsumen selalu terbuka dan berdampingan dengan balasan; catatan
     // berada di kolom balasan. Di ponsel keduanya bertumpuk, konsumen dulu.
     const consumer = page.getByRole("region", { name: "Email konsumen" });
-    await expect(consumer).toContainText("Saldo terpotong tetapi transaksi gagal.");
-    expect(
-      await consumer.evaluate((el) => getComputedStyle(el).position),
-    ).toBe("sticky");
+    await expect(consumer).toContainText(
+      "Saldo terpotong tetapi transaksi gagal.",
+    );
+    expect(await consumer.evaluate((el) => getComputedStyle(el).position)).toBe(
+      "sticky",
+    );
     await expect(
       page.getByRole("region", { name: "Telaah lama tanpa penanda" }),
     ).toHaveCount(0);
@@ -1877,9 +1923,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(other).toContainText("transkasi");
     await expect(other).toContainText("Kalimat pembuka terlalu panjang");
     await expect(other).toContainText("Belum menyebut kanal pengaduan resmi");
-    await expect(page.getByRole("region", { name: "Catatan AI" })).toContainText(
-      "Jawaban relevan dan jelas.",
-    );
+    await expect(
+      page.getByRole("region", { name: "Catatan AI" }),
+    ).toContainText("Jawaban relevan dan jelas.");
 
     // Teks abu di kotak oranye "Perbaiki ini dulu" dan label rincian tetap terbaca.
     for (const theme of ["light", "dark"] as const) {
@@ -1911,7 +1957,10 @@ test.describe("PDKT (hermetic)", () => {
               .find((h) => h.textContent?.includes("Balasan untuk"))
               ?.parentElement?.contains(el),
           )
-          .map((el) => [el.textContent?.trim(), el.getBoundingClientRect().height]),
+          .map((el) => [
+            el.textContent?.trim(),
+            el.getBoundingClientRect().height,
+          ]),
       );
     expect(heights.length).toBeGreaterThan(3);
     expect(heights.filter(([, h]) => (h as number) < 44)).toEqual([]);
@@ -1921,7 +1970,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("heading", { name: "Kotak masuk", level: 2 }),
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Balasan untuk Rina" })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Balasan untuk Rina" }),
+    ).toHaveCount(0);
     expectHermetic(audit);
   });
 
@@ -2043,9 +2094,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(page.getByRole("button", { name: "Lampiran 1" })).toBeVisible({
       timeout: 20000,
     });
-    const offenders = (await findTextBelowFloor(page.locator("main").first())).map(
-      (o) => `[pahami + lampiran] ${o}`,
-    );
+    const offenders = (
+      await findTextBelowFloor(page.locator("main").first())
+    ).map((o) => `[pahami + lampiran] ${o}`);
 
     await page.getByRole("button", { name: "Tulis balasan" }).click();
     await expect(page.getByLabel("Balasan Anda")).toBeVisible();
@@ -2054,14 +2105,16 @@ test.describe("PDKT (hermetic)", () => {
         (o) => `[tanggapi] ${o}`,
       ),
     );
-    await page.getByRole("button", { name: "Kotak masuk" }).click();
+    await page.getByRole("button", { name: "Kembali ke email" }).click();
 
     await workspaceMarker(page).click();
     await page
       .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
       .click();
     await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
-    await expect(page.getByText("Sebut kanal pengaduan resmi.").first()).toBeVisible({
+    await expect(
+      page.getByText("Sebut kanal pengaduan resmi.").first(),
+    ).toBeVisible({
       timeout: 20000,
     });
     offenders.push(
@@ -2074,4 +2127,672 @@ test.describe("PDKT (hermetic)", () => {
     expect(unique, unique.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
+});
+
+function pdktNavigationMocks(
+  history: readonly SessionHistory[],
+  mailbox: readonly ReturnType<typeof mailboxItem>[] = [],
+): readonly ApiMock[] {
+  return [
+    ...pdktMocks(history, mailbox),
+    ...history.map((session) => ({
+      method: "GET" as const,
+      path: `/api/v1/pdkt/history/eval/${session.id}`,
+      body: {
+        success: true,
+        data: {
+          evaluation_status: session.evaluation
+            ? "completed"
+            : session.evaluationStatus,
+          evaluation: session.evaluation,
+          evaluation_error: null,
+        },
+      },
+    })),
+  ];
+}
+
+// Regresi navigasi: API hermetic, satu worker, request atribusi diperiksa di browser.
+const SUBJECT_X = {
+  type: "participant" as const,
+  participantId: "11111111-1111-4111-8111-111111111111",
+  displayName: "Peserta X",
+  batchName: "Batch 1",
+  team: "Alpha",
+};
+const SUBJECT_Y = {
+  type: "participant" as const,
+  participantId: "22222222-2222-4222-8222-222222222222",
+};
+const SUBJECT_MAIL = mailboxItem("subject-review", "replied", {
+  history_id: EVALUATED_HISTORY[0].id,
+  simulationSubject: SUBJECT_X,
+});
+const CREATE_MOCKS: ApiMock[] = [
+  {
+    method: "GET",
+    path: "/api/v1/pdkt/consumer-types",
+    body: { success: true, data: [SESSION_CONFIG.consumerType] },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/pdkt/scenarios",
+    body: { success: true, data: [SCENARIO] },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/pdkt/generate-identity",
+    body: { success: true, data: SESSION_CONFIG.identity },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/pdkt/session/create",
+    body: {
+      success: true,
+      data: { id: OPEN_MAIL.list.id, message: OPEN_MAIL.detail.inbound_email },
+    },
+  },
+];
+const picker = (page: Page) =>
+  page.getByRole("dialog").filter({ hasText: "Pilih peserta latihan" });
+const hero = (page: Page) =>
+  page.getByRole("heading", { name: /Pahami keluhannya/ });
+const reviewHeading = (page: Page) =>
+  page.getByRole("heading", { name: "Balasan untuk Rina" });
+async function expectSearch(page: Page, values: Record<string, string | null>) {
+  await expect
+    .poll(() => {
+      const search = new URL(page.url()).searchParams;
+      return Object.fromEntries(
+        Object.keys(values).map((key) => [key, search.get(key)]),
+      );
+    })
+    .toEqual(values);
+}
+async function requestNewEmail(page: Page) {
+  const request = page.waitForRequest(
+    (req) =>
+      req.method() === "POST" &&
+      req.url().endsWith("/api/v1/pdkt/session/create"),
+  );
+  await page
+    .getByRole("button", { name: "Email baru", exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: new RegExp(SCENARIO.title) })
+    .click();
+  return (await request).postDataJSON();
+}
+
+test.describe("PDKT navigation acceptance", () => {
+  test.beforeAll(() => assertLocalDevOnlyTarget());
+
+  test("AC1 kotak masuk menambah history dan Back kembali ke landing", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(page, pdktNavigationMocks([]));
+    await expectSearch(page, { ruang: "1" });
+    await page.goBack();
+    await expect(hero(page)).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  for (const width of [390, 1280]) {
+    test(`AC2 detail email Back kembali ke daftar pada ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      const audit = await openWorkspace(
+        page,
+        pdktNavigationMocks([], [OPEN_MAIL, NEWER_OPEN_MAIL]),
+      );
+      await page
+        .getByRole("button", { name: new RegExp(NEWER_OPEN_MAIL.list.subject) })
+        .click();
+      await expectSearch(page, { email: NEWER_OPEN_MAIL.list.id });
+      await page.goBack();
+      await expectSearch(page, { ruang: "1", email: null });
+      await expect(workspaceMarker(page)).toBeVisible();
+      await expect(page.getByRole("article")).toHaveCount(0);
+      expectHermetic(audit);
+    });
+  }
+
+  for (const item of [OPEN_MAIL, SUBJECT_MAIL]) {
+    test(`AC3 refresh mempertahankan email ${item.list.status}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const audit = await openWorkspace(
+        page,
+        pdktNavigationMocks(EVALUATED_HISTORY, [item]),
+      );
+      if (item.list.status === "replied") await workspaceMarker(page).click();
+      await page
+        .getByRole("button", { name: new RegExp(item.list.subject) })
+        .click();
+      await expectSearch(page, { ruang: "1", email: item.list.id });
+      if (item.list.status === "replied")
+        await expect(reviewHeading(page)).toBeVisible();
+      else await expect(page.getByRole("article")).toBeVisible();
+      await page.reload();
+      await expectSearch(page, { ruang: "1", email: item.list.id });
+      if (item.list.status === "replied")
+        await expect(reviewHeading(page)).toBeVisible();
+      else
+        await expect(page.getByRole("article")).toContainText(
+          item.list.subject,
+        );
+      await expect(hero(page)).toHaveCount(0);
+      expectHermetic(audit);
+    });
+  }
+
+  test("AC4 Riwayat ke Telaah tanpa hero, refresh dan kedua aksi kembali", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: pdktNavigationMocks(HISTORY_PAGE_SESSIONS, [REPLIED_MAIL]),
+    });
+    await page.evaluate(() => {
+      (window as Window & { sawPdktHero?: boolean }).sawPdktHero = false;
+      new MutationObserver(() => {
+        if (document.getElementById("pdkt-hero-title"))
+          (window as Window & { sawPdktHero?: boolean }).sawPdktHero = true;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    const link = () =>
+      page
+        .getByRole("table")
+        .getByRole("link", { name: REPLIED_MAIL.list.subject });
+    await link().click();
+    await expect(reviewHeading(page)).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => (window as Window & { sawPdktHero?: boolean }).sawPdktHero,
+      ),
+    ).toBe(false);
+    await page.reload();
+    await expect(reviewHeading(page)).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/pdkt\/history$/);
+    await link().click();
+    await page
+      .locator("main header")
+      .getByRole("button", { name: "Riwayat", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/pdkt\/history$/);
+    expectHermetic(audit);
+  });
+
+  test("AC5 peserta ruang kerja bertahan setelah Riwayat dan Back", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: [
+        ...CREATE_MOCKS,
+        ...pdktNavigationMocks([], [OPEN_MAIL]),
+        {
+          method: "GET",
+          path: "/api/v1/profiler/peserta/options",
+          body: {
+            success: true,
+            data: [
+              {
+                id: SUBJECT_X.participantId,
+                nama: "Peserta X",
+                batch_name: "Batch 1",
+                tim: "Alpha",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first()
+      .click();
+    await picker(page)
+      .getByRole("radio", { name: /Peserta resmi/ })
+      .check();
+    await picker(page)
+      .getByLabel("Cari peserta (min. 2 huruf)")
+      .fill("Peserta");
+    await picker(page)
+      .getByRole("button", { name: /Peserta X/ })
+      .click();
+    await picker(page)
+      .getByRole("button", { name: "Mulai", exact: true })
+      .click();
+    await expect(workspaceMarker(page)).toBeVisible();
+    await page.getByRole("button", { name: "Menu lainnya" }).click();
+    await page.getByRole("menuitem", { name: "Riwayat", exact: true }).click();
+    await page.goBack();
+    await expect(workspaceMarker(page)).toBeVisible();
+    await expect(picker(page)).toHaveCount(0);
+    await page.reload();
+    await expect(workspaceMarker(page)).toBeVisible();
+    expect((await requestNewEmail(page)).simulationSubject).toEqual({
+      type: "participant",
+      participantId: SUBJECT_X.participantId,
+    });
+    expectHermetic(audit);
+  });
+
+  test("AC6 latihan lagi memakai peserta email X meski ruang kerja Y", async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      (subject) =>
+        sessionStorage.setItem("pdkt_subject_user-1", JSON.stringify(subject)),
+      SUBJECT_Y,
+    );
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt?ruang=1",
+      apiMocks: [
+        ...CREATE_MOCKS,
+        ...pdktNavigationMocks(EVALUATED_HISTORY, [SUBJECT_MAIL, OPEN_MAIL]),
+      ],
+    });
+    await expect(workspaceMarker(page)).toBeVisible();
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(SUBJECT_MAIL.list.subject) })
+      .click();
+    await expect(reviewHeading(page)).toBeVisible();
+    const request = page.waitForRequest(
+      (req) =>
+        req.method() === "POST" &&
+        req.url().endsWith("/api/v1/pdkt/session/create"),
+    );
+    await page
+      .getByRole("button", { name: "Latihan lagi dengan skenario ini" })
+      .click();
+    expect((await request).postDataJSON().simulationSubject).toEqual({
+      type: "participant",
+      participantId: SUBJECT_X.participantId,
+    });
+    expectHermetic(audit);
+  });
+
+  for (const subject of [
+    { ...SUBJECT_X, participantId: null },
+    {
+      type: "unknown",
+      participantId: null,
+      displayName: null,
+      batchName: null,
+      team: null,
+    },
+  ]) {
+    test(`AC6 atribusi ${subject.type} tanpa ID tidak menjadi self`, async ({
+      page,
+    }) => {
+      const item = mailboxItem("unavailable", "replied", {
+        history_id: EVALUATED_HISTORY[0].id,
+        simulationSubject: subject,
+      });
+      const audit = await openWorkspace(page, [
+        ...CREATE_MOCKS,
+        ...pdktNavigationMocks(EVALUATED_HISTORY, [item]),
+      ]);
+      await workspaceMarker(page).click();
+      await page
+        .getByRole("button", { name: new RegExp(item.list.subject) })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Latihan lagi dengan skenario ini" }),
+      ).toBeDisabled();
+      await expect(page.getByText(/Latihan lagi tidak tersedia/)).toBeVisible();
+      expectHermetic(audit);
+    });
+  }
+
+  test("AC7 Belum dibalas melewati picker, Mulai simulasi tetap memilih", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktNavigationMocks([], [OPEN_MAIL]),
+    });
+    await page
+      .getByRole("region", { name: "Belum dibalas" })
+      .getByRole("button", { name: new RegExp(OPEN_MAIL.list.subject) })
+      .click();
+    await expect(page.getByRole("article")).toBeVisible();
+    await expect(picker(page)).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Kembali ke halaman awal PDKT" })
+      .click();
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first()
+      .click();
+    await expect(picker(page)).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("AC8 Tanggapi kembali ke email dengan label yang sesuai", async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    page.on("pageerror", (error) => consoleErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    const audit = await openWorkspace(
+      page,
+      pdktNavigationMocks([], [OPEN_MAIL]),
+    );
+    await page.getByRole("button", { name: "Tulis balasan" }).click();
+    await expect(stageNav(page).locator('[aria-current="step"]')).toHaveText(
+      /Tanggapi/,
+    );
+    if (process.env.PDKT_FLOW_CAPTURE === "1") {
+      await page.screenshot({ path: test.info().outputPath("pdkt-tanggapi-desktop.png") });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    const back = page
+      .locator("main header")
+      .getByRole("button", { name: "Kembali ke email" });
+    await expect(back).toBeVisible();
+    expect((await back.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    if (process.env.PDKT_FLOW_CAPTURE === "1") {
+      await page.screenshot({ path: test.info().outputPath("pdkt-tanggapi-mobile.png") });
+    }
+    await page
+      .locator("main header")
+      .getByRole("button", { name: "Kembali ke email" })
+      .click();
+    await expect(page.getByRole("article")).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("AC9 breadcrumb PDKT bertaut dan Riwayat aktif", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: pdktNavigationMocks([]),
+    });
+    const crumbs = page.getByRole("navigation", { name: /breadcrumb/i });
+    await expect(
+      crumbs.getByRole("link", { name: "PDKT", exact: true }),
+    ).toHaveAttribute("href", "/pdkt");
+    await expect(crumbs).toContainText("Riwayat");
+    expectHermetic(audit);
+  });
+
+  test("AC10 route simulation redirect ke landing", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/simulation",
+      waitForUrl: /\/pdkt$/,
+      apiMocks: pdktNavigationMocks([]),
+    });
+    await expect(hero(page)).toBeVisible();
+    expectHermetic(audit);
+  });
+});
+
+test.describe("PDKT navigation boundaries", () => {
+  test.beforeAll(() => assertLocalDevOnlyTarget());
+  test("replay tanpa mailbox mempertahankan sesi dan peserta setelah refresh", async ({
+    page,
+  }) => {
+    const session = {
+      ...EVALUATED_HISTORY[0],
+      simulationSubject: SUBJECT_X,
+      emails: [
+        SUBJECT_MAIL.detail.inbound_email,
+        ...SUBJECT_MAIL.detail.emails_thread,
+      ],
+    } as unknown as SessionHistory;
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: [
+        ...CREATE_MOCKS,
+        ...pdktNavigationMocks([session], [OPEN_MAIL]),
+      ],
+    });
+    await page
+      .getByRole("table")
+      .getByRole("link", { name: `Re: ${SUBJECT_MAIL.list.subject}` })
+      .click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await expectSearch(page, {
+      sesi: session.id,
+      ruang: "1",
+      dari: "riwayat",
+      email: null,
+    });
+    await page.reload();
+    await expect(reviewHeading(page)).toBeVisible();
+    await expectSearch(page, { sesi: session.id, email: null });
+    await expect(page.locator("main header").last()).toContainText("Peserta X");
+    const request = page.waitForRequest(
+      (req) =>
+        req.method() === "POST" &&
+        req.url().endsWith("/api/v1/pdkt/session/create"),
+    );
+    await page
+      .getByRole("button", { name: "Latihan lagi dengan skenario ini" })
+      .click();
+    expect((await request).postDataJSON().simulationSubject).toEqual({
+      type: "participant",
+      participantId: SUBJECT_X.participantId,
+    });
+    expectHermetic(audit);
+  });
+
+  for (const state of ["corrupt", "blocked", "other-account"] as const) {
+    test(`storage ${state} kembali aman ke self untuk email baru`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ({ state, subject }) => {
+          if (state === "blocked")
+            Object.defineProperty(window, "sessionStorage", {
+              get() {
+                throw new DOMException("Blocked", "SecurityError");
+              },
+            });
+          else
+            sessionStorage.setItem(
+              state === "other-account"
+                ? "pdkt_subject_other-user"
+                : "pdkt_subject_user-1",
+              state === "corrupt" ? "{broken" : JSON.stringify(subject),
+            );
+        },
+        { state, subject: SUBJECT_Y },
+      );
+      const audit = await openHermeticShell(page, {
+        path: "/pdkt?ruang=1",
+        apiMocks: [...CREATE_MOCKS, ...pdktNavigationMocks([], [OPEN_MAIL])],
+      });
+      await expect(workspaceMarker(page)).toBeVisible();
+      expect((await requestNewEmail(page)).simulationSubject).toEqual({
+        type: "self",
+      });
+      expectHermetic(audit);
+    });
+  }
+});
+
+
+const LEGACY_PRACTICE_SUBJECTS = [
+  {
+    label: "unknown",
+    value: {
+      type: "unknown",
+      participantId: null,
+      displayName: null,
+      batchName: null,
+      team: null,
+    },
+  },
+  { label: "null", value: null },
+  { label: "missing", value: undefined },
+  {
+    label: "participant-deleted",
+    value: { ...SUBJECT_X, participantId: null },
+  },
+] as const;
+
+async function openSubjectReview(
+  page: Page,
+  role: string,
+  subject: unknown,
+  retiredScenario = false,
+) {
+  const item = mailboxItem("legacy-practice-review", "replied", {
+    history_id: EVALUATED_HISTORY[0].id,
+    ...(subject === undefined ? {} : { simulationSubject: subject }),
+  });
+  const history: readonly SessionHistory[] = retiredScenario
+    ? [
+        {
+          ...EVALUATED_HISTORY[0],
+          config: {
+            ...SESSION_CONFIG,
+            writingStyleMode: "training" as const,
+            scenarios: [{ ...SCENARIO, id: "retired", isActive: false }],
+          },
+        },
+      ]
+    : EVALUATED_HISTORY;
+  const audit = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1",
+    auth: { role },
+    apiMocks: [
+      ...CREATE_MOCKS,
+      ...pdktNavigationMocks(history, [item, OPEN_MAIL]),
+    ],
+  });
+  await expect(workspaceMarker(page)).toBeVisible();
+  await workspaceMarker(page).click();
+  await page
+    .getByRole("button", { name: new RegExp(item.list.subject) })
+    .click();
+  await expect(reviewHeading(page)).toBeVisible();
+  return audit;
+}
+
+async function createPracticeAgain(page: Page, retiredScenario = false) {
+  const action = page.getByRole("button", {
+    name: retiredScenario
+      ? "Buat email baru"
+      : "Latihan lagi dengan skenario ini",
+    exact: true,
+  });
+  await expect(action).toBeEnabled();
+  await expect(page.getByText(/Latihan lagi tidak tersedia/)).toHaveCount(0);
+  if (retiredScenario) await action.click();
+  const request = page.waitForRequest(
+    (req) =>
+      req.method() === "POST" &&
+      req.url().endsWith("/api/v1/pdkt/session/create"),
+  );
+  if (retiredScenario)
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: new RegExp(SCENARIO.title) })
+      .click();
+  else await action.click();
+  return (await request).postDataJSON();
+}
+
+test.describe("PDKT practice again subject policy", () => {
+  test.beforeAll(() => assertLocalDevOnlyTarget());
+
+  for (const subject of [
+    ...LEGACY_PRACTICE_SUBJECTS,
+    {
+      label: "self",
+      value: {
+        type: "self",
+        participantId: null,
+        displayName: "Agent",
+        batchName: null,
+        team: null,
+      },
+    },
+    { label: "participant-known", value: SUBJECT_X },
+  ]) {
+    test(`agent legacy langsung ${subject.label} membuat sesi self`, async ({
+      page,
+    }) => {
+      const audit = await openSubjectReview(page, "agent", subject.value);
+      expect((await createPracticeAgain(page)).simulationSubject).toEqual({
+        type: "self",
+      });
+      expectHermetic(audit);
+    });
+  }
+
+  for (const subject of LEGACY_PRACTICE_SUBJECTS.filter(
+    (subject) => subject.label !== "missing",
+  )) {
+    test(`agent legacy pemilih skenario ${subject.label} membuat sesi self`, async ({
+      page,
+    }) => {
+      const audit = await openSubjectReview(page, "agent", subject.value, true);
+      expect((await createPracticeAgain(page, true)).simulationSubject).toEqual(
+        { type: "self" },
+      );
+      expectHermetic(audit);
+    });
+  }
+
+  for (const role of ["trainer", "admin"] as const) {
+    test(`${role} latihan ulang snapshot self tetap self`, async ({ page }) => {
+      const audit = await openSubjectReview(page, role, {
+        type: "self",
+        participantId: null,
+        displayName: "Pelaksana",
+        batchName: null,
+        team: null,
+      });
+      expect((await createPracticeAgain(page)).simulationSubject).toEqual({
+        type: "self",
+      });
+      expectHermetic(audit);
+    });
+  }
+
+  test("admin latihan ulang tetap memakai peserta snapshot", async ({
+    page,
+  }) => {
+    const audit = await openSubjectReview(page, "admin", SUBJECT_X);
+    expect((await createPracticeAgain(page)).simulationSubject).toEqual({
+      type: "participant",
+      participantId: SUBJECT_X.participantId,
+    });
+    expectHermetic(audit);
+  });
+
+  for (const subject of LEGACY_PRACTICE_SUBJECTS.filter(
+    (subject) =>
+      subject.label === "unknown" || subject.label === "participant-deleted",
+  )) {
+    test(`admin latihan ulang ${subject.label} tetap diblokir`, async ({
+      page,
+    }) => {
+      const audit = await openSubjectReview(page, "admin", subject.value);
+      await expect(
+        page.getByRole("button", { name: "Latihan lagi dengan skenario ini" }),
+      ).toBeDisabled();
+      await expect(page.getByText(/Latihan lagi tidak tersedia/)).toBeVisible();
+      expectHermetic(audit);
+    });
+  }
 });

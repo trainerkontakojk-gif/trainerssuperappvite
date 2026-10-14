@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import PdktSimulation from "../routes/pdkt/simulation";
+import PdktSimulation from "./helpers/PdktSimulationHarness";
 import type {
   PdktMailboxItem,
   PdktScenario,

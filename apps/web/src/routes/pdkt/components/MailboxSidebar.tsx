@@ -209,7 +209,11 @@ export function MailboxSidebar({
                 >
                   <MoreHorizontal aria-hidden="true" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuContent
+                  align="end"
+                  className="w-44"
+                  positionerClassName="z-[110]"
+                >
                   <DropdownMenuItem onClick={onHistory} className="min-h-11">
                     Riwayat
                   </DropdownMenuItem>

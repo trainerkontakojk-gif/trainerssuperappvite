@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   MailboxSidebar,
   type MailboxFilter,
@@ -44,15 +50,16 @@ import { pdktReplyErrorMessage } from "./utils/pdktErrors";
 const EVALUATION_RETRY_START_GRACE_MS = 15_000;
 
 interface PdktSimulationProps {
+  canPickParticipant: boolean;
+  selectedId: string | null;
+  onSelectedIdChange: (id: string | null, replace?: boolean) => Promise<void>;
+  onBackToHistory?: () => void;
   simulationSubject?: SimulationSubjectSelection;
   onBack?: () => void;
   onBeforeActivity?: () => Promise<void>;
   /** `reply` setelah balasan terkirim; `review` setelah telaah selesai. */
   onAfterActivity?: (reason: "reply" | "review") => void;
   initialReplaySession?: SessionHistory | null;
-  onConsumeReplaySession?: () => void;
-  /** Email yang langsung dipilih saat kotak masuk dibuka dari landing. */
-  initialSelectedMailboxId?: string | null;
   /**
    * Data already loaded by the landing page. `undefined` means "not provided"
    * and keeps the session fetching it itself; `null` (settings only) means the
@@ -71,13 +78,15 @@ interface PdktSimulationProps {
 }
 
 export default function PdktSimulation({
+  canPickParticipant,
   simulationSubject = { type: "self" },
   onBack,
   onBeforeActivity,
   onAfterActivity,
   initialReplaySession = null,
-  onConsumeReplaySession,
-  initialSelectedMailboxId = null,
+  selectedId,
+  onSelectedIdChange: setSelectedId,
+  onBackToHistory,
   initialSettings,
   initialSettingsVersion,
   initialHistory,
@@ -85,17 +94,19 @@ export default function PdktSimulation({
   initialConsumerTypes,
   onSettingsChange,
   onHistoryChange,
-}: PdktSimulationProps = {}) {
+}: PdktSimulationProps) {
   const hasInitialSettings = initialSettings !== undefined;
   const hasInitialHistory = initialHistory !== undefined;
   const hasInitialScenarios = initialScenarios !== undefined;
   const hasInitialConsumerTypes = initialConsumerTypes !== undefined;
-  const [selectedId, setSelectedId] = useState<string | null>(
-    initialSelectedMailboxId,
-  );
+  // Auto-select hanya pada pembukaan pertama; Back/aksi daftar tidak membukanya lagi.
+  const autoSelectPendingRef = useRef(!selectedId && !initialReplaySession);
+  const autoSelectedIdRef = useRef<string | null>(null);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
+  const [practiceSubject, setPracticeSubject] =
+    useState<SimulationSubjectSelection | null>(null);
   const [isReplying, setIsReplying] = useState(false);
   const [isRetryingMailboxSave, setIsRetryingMailboxSave] = useState(false);
   const [pendingMailboxRetry, setPendingMailboxRetry] = useState<{
@@ -114,8 +125,9 @@ export default function PdktSimulation({
     { kind: "single"; id: string } | { kind: "bulk"; ids: string[] } | null
   >(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [dialogContainer, setDialogContainer] =
-    useState<HTMLDivElement | null>(null);
+  const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   // Modals visibility
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -153,11 +165,7 @@ export default function PdktSimulation({
       {
         result: any | null;
         status:
-          | "not_started"
-          | "pending"
-          | "processing"
-          | "completed"
-          | "failed";
+          "not_started" | "pending" | "processing" | "completed" | "failed";
         error: string | null;
       }
     >
@@ -263,16 +271,18 @@ export default function PdktSimulation({
   };
 
   const selectedItem = selectedId
-    ? mailboxDetails[selectedId] ??
-      (replayItem?.id === selectedId ? replayItem : undefined)
+    ? (mailboxDetails[selectedId] ??
+      (replayItem?.id === selectedId ? replayItem : undefined))
     : undefined;
 
-  const handleSelectMailboxItem = (id: string) => {
-    setSelectedId(id);
-
-    if (replayItem && replayItem.id !== id) {
-      setReplayItem(null);
+  const handleSelectMailboxItem = async (id: string) => {
+    // Auto-select adalah preview desktop. Entri sebelum klik harus tetap daftar.
+    if (autoSelectedIdRef.current && autoSelectedIdRef.current === selectedId) {
+      await setSelectedId(null, true);
     }
+    autoSelectedIdRef.current = null;
+    await setSelectedId(id);
+    if (replayItem && replayItem.id !== id) setReplayItem(null);
   };
 
   // Fetch Settings & History from DB
@@ -325,30 +335,33 @@ export default function PdktSimulation({
     }
   }, [initialSettingsVersion]);
 
-  // Pilihan hanya dilepas saat emailnya hilang dari kotak masuk (dihapus) atau
-  // saat peserta mengganti filter (lihat handleFilterChange). Status email yang
-  // berubah karena dibalas tidak melepas pilihan, sehingga layar lanjut ke Telaah.
   useEffect(() => {
-    // Tunggu daftar termuat supaya pilihan awal dari landing tidak terhapus.
-    if (!mailboxItems) return;
-    if (selectedId && visibleMailboxItems.some((item) => item.id === selectedId)) {
+    if (!mailboxItems || initialReplaySession) return;
+    if (
+      selectedId &&
+      visibleMailboxItems.some((item) => item.id === selectedId)
+    ) {
+      autoSelectPendingRef.current = false;
       return;
     }
-    if (window.innerWidth < 768) {
-      // Di HP daftar tampil sendiri; tidak ada email yang dibuka otomatis.
-      if (selectedId) setSelectedId(null);
+    if (!autoSelectPendingRef.current) {
+      if (selectedId) void setSelectedId(null, true);
       return;
     }
-    // Hanya email yang belum dibalas yang dibuka otomatis (tahap Pahami).
-    // Telaah membuka layar fokus, jadi hanya dibuka lewat klik peserta.
-    const currentFiltered =
-      filter === "all"
-        ? visibleMailboxItems
-        : visibleMailboxItems.filter((item) => item.status === filter);
-    const next =
-      currentFiltered.find((item) => item.status === "open")?.id ?? null;
-    if (next !== selectedId) setSelectedId(next);
-  }, [mailboxItems, visibleMailboxItems, filter, selectedId]);
+    autoSelectPendingRef.current = false;
+    if (window.innerWidth < 768) return;
+    const next = visibleMailboxItems.find((item) => item.status === "open")?.id;
+    if (next) {
+      autoSelectedIdRef.current = next;
+      void setSelectedId(next, true);
+    }
+  }, [
+    mailboxItems,
+    visibleMailboxItems,
+    initialReplaySession,
+    selectedId,
+    setSelectedId,
+  ]);
 
   const handleFilterChange = (next: MailboxFilter) => {
     setFilter(next);
@@ -574,7 +587,6 @@ export default function PdktSimulation({
       ) {
         setFilter(matchingMailbox.status);
       }
-      setSelectedId(matchingMailbox.id);
       return;
     }
     const sessionEmails = Array.isArray(session.emails)
@@ -638,19 +650,21 @@ export default function PdktSimulation({
 
       setReplayItem(syntheticItem);
       setFilter("replied");
-      setSelectedId(syntheticId);
     }
   };
 
   const appliedReplayIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!initialReplaySession) return;
+    if (!initialReplaySession) {
+      appliedReplayIdRef.current = null;
+      setReplayItem(null);
+      return;
+    }
     if (appliedReplayIdRef.current === initialReplaySession.id) return;
     // Tunggu mailbox selesai load agar pencocokan history_id akurat.
     if (loading) return;
     appliedReplayIdRef.current = initialReplaySession.id;
     handleSelectSession(initialReplaySession);
-    onConsumeReplaySession?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialReplaySession, loading, visibleMailboxItems.length]); // Start new simulation session
   const handleRetryMailboxSave = async () => {
@@ -677,7 +691,10 @@ export default function PdktSimulation({
     }
   };
 
-  const handleStartNew = async (scenario: PdktScenario) => {
+  const handleStartNew = async (
+    scenario: PdktScenario,
+    subject: SimulationSubjectSelection = simulationSubject,
+  ) => {
     setIsStartingNew(true);
     try {
       // 1. Determine Identity (Fallback)
@@ -718,7 +735,7 @@ export default function PdktSimulation({
               config.resolvedConsumerNameMentionPattern,
             writingStyleMode: config.writingStyleMode,
             client_request_id: clientRequestId,
-            simulationSubject,
+            simulationSubject: subject,
           },
         }),
       )) as { id: string; message: EmailMessage };
@@ -1086,6 +1103,20 @@ export default function PdktSimulation({
       )
     : undefined;
 
+  // Tanpa pemilih peserta, subjek sah hanya self; role lain memakai snapshot email.
+  const reviewedSubject = selectedItem?.simulationSubject;
+  const repeatSubject: SimulationSubjectSelection | null =
+    !canPickParticipant || reviewedSubject?.type === "self"
+      ? { type: "self" }
+      : reviewedSubject?.type === "participant" && reviewedSubject.participantId
+        ? { type: "participant", participantId: reviewedSubject.participantId }
+        : null;
+  const practiceUnavailableReason = repeatSubject
+    ? undefined
+    : reviewedSubject?.type === "participant"
+      ? "Latihan lagi tidak tersedia karena peserta ini sudah dihapus. Kembali ke halaman awal PDKT untuk memilih peserta aktif."
+      : "Latihan lagi tidak tersedia karena peserta sesi ini tidak tercatat. Kembali ke halaman awal PDKT untuk memilih peserta.";
+
   const detailSkeleton = (
     <div role="status" className="flex flex-1 flex-col gap-4 p-6">
       <span className="sr-only">Memuat detail email…</span>
@@ -1123,17 +1154,22 @@ export default function PdktSimulation({
             ? () => handleDelete(selectedItem.id)
             : undefined
         }
-        onPracticeAgain={
-          practiceScenario
-            ? () => void handleStartNew(practiceScenario)
-            : () => setIsNewModalOpen(true)
-        }
+        onPracticeAgain={() => {
+          if (!repeatSubject) return;
+          if (practiceScenario)
+            void handleStartNew(practiceScenario, repeatSubject);
+          else {
+            setPracticeSubject(repeatSubject);
+            setIsNewModalOpen(true);
+          }
+        }}
         practiceLabel={
           practiceScenario
             ? "Latihan lagi dengan skenario ini"
             : "Buat email baru"
         }
         isStartingPractice={isStartingNew}
+        practiceUnavailableReason={practiceUnavailableReason}
       />
     ) : (
       detailSkeleton
@@ -1150,7 +1186,10 @@ export default function PdktSimulation({
             reviews={reviews}
             selectedId={selectedId}
             onSelect={handleSelectMailboxItem}
-            onNew={() => setIsNewModalOpen(true)}
+            onNew={() => {
+              setPracticeSubject(null);
+              setIsNewModalOpen(true);
+            }}
             onSettings={() => setIsSettingsOpen(true)}
             onHistory={() => void navigate({ to: "/pdkt/history" })}
             filter={filter}
@@ -1187,7 +1226,10 @@ export default function PdktSimulation({
               </p>
               <Button
                 type="button"
-                onClick={() => setIsNewModalOpen(true)}
+                onClick={() => {
+                  setPracticeSubject(null);
+                  setIsNewModalOpen(true);
+                }}
                 className="min-h-11 text-xs"
               >
                 Buat email baru
@@ -1207,6 +1249,14 @@ export default function PdktSimulation({
           stage={stage}
           item={headerItem}
           onInbox={backToInbox}
+          backLabel={
+            stage === "tanggapi"
+              ? "Kembali ke email"
+              : onBackToHistory
+                ? "Riwayat"
+                : "Kotak masuk"
+          }
+          onBack={stage === "telaah" ? onBackToHistory : undefined}
           onSelectStage={
             stage === "tanggapi"
               ? { pahami: () => setIsReplyOpen(false) }
@@ -1272,7 +1322,9 @@ export default function PdktSimulation({
         isOpen={isNewModalOpen}
         onClose={() => setIsNewModalOpen(false)}
         scenarios={activeScenarios}
-        onCreate={handleStartNew}
+        onCreate={(scenario) =>
+          handleStartNew(scenario, practiceSubject ?? simulationSubject)
+        }
         isLoading={isStartingNew}
       />
 

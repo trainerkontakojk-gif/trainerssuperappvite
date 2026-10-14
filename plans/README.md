@@ -39,6 +39,12 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 | 026  | Monitoring E2E Spec (first coverage)          | P2       | M      | 025                      | DONE — 5 passed, hermetic; unit files kept by design                                    |
 | 027  | Access Approval E2E Spec                      | P2       | L      | 025                      | TODO                                                                                    |
 
+## Module behavior plans
+
+- [PDKT Navigation Flow](markdown/pdkt-navigation-flow.md) — Lane C; IMPLEMENTED lokal: PDKT 50/50, root typecheck/lint/build lulus; suite default tertahan assertion copy Monitoring yang stale. Tanpa commit, push, atau PR.
+
+- [PDKT Practice Again — Legacy Subject](markdown/pdkt-practice-again-legacy-subject.md) — IMPLEMENTED lokal; E2E PDKT 64/64, root typecheck/lint dan diff check lulus. Lanjutan dari PDKT Navigation Flow.
+
 ## Dependency notes
 
 - All plans under the "Radical Redesign Wave" follow the design pattern established by Plan 001 (Design Tokens).

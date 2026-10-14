@@ -427,7 +427,7 @@ function HistoryRow({
       <td className="px-4 py-1.5 sm:px-5">
         <Link
           to="/pdkt"
-          search={{ sesi: session.id }}
+          search={{ ruang: 1, sesi: session.id, dari: "riwayat" }}
           className="inline-flex min-h-[44px] max-w-full items-center rounded-sm font-semibold text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <span className="line-clamp-2 break-words">{subject}</span>

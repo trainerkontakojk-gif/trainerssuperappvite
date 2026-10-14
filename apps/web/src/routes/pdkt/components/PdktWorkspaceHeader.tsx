@@ -45,7 +45,7 @@ function ParticipantInfo({ item }: { item: ParticipantSource }) {
 }
 
 const iconButton =
-  "flex min-h-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 interface InboxProps {
   mode: "inbox";
@@ -63,6 +63,8 @@ interface FocusProps {
   mode: "focus";
   stage: PdktStage;
   onInbox: () => void;
+  backLabel?: string;
+  onBack?: () => void;
   onSelectStage?: Partial<Record<"pahami" | "tanggapi", () => void>>;
   item: ParticipantSource;
 }
@@ -107,11 +109,11 @@ export function PdktWorkspaceHeader(props: InboxProps | FocusProps) {
       <>
         <button
           type="button"
-          onClick={props.onInbox}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          onClick={props.onBack ?? props.onInbox}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Kotak masuk
+          {props.backLabel ?? "Kotak masuk"}
         </button>
         <PdktStageNav current={props.stage} onSelect={props.onSelectStage} />
         <div className="ml-auto max-lg:hidden">

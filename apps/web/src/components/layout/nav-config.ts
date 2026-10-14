@@ -308,8 +308,8 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   }
   if (pathname.startsWith("/pdkt")) {
     crumbs.push({ label: "PDKT", href: "/pdkt" });
-    if (pathname === "/pdkt/simulation") {
-      crumbs.push({ label: "Simulasi" });
+    if (pathname === "/pdkt/history") {
+      crumbs.push({ label: "Riwayat" });
       return crumbs;
     }
     return crumbs.map((c, i) =>

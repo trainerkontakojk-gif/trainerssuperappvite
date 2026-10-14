@@ -41,6 +41,7 @@ interface Props {
   onPracticeAgain?: () => void;
   practiceLabel: string;
   isStartingPractice: boolean;
+  practiceUnavailableReason?: string;
 }
 
 const card = "rounded-xl border border-border bg-surface-elevated p-5";
@@ -279,7 +280,10 @@ function ReplyWithNotes({
               event.preventDefault();
               jumpTo(noteId(number));
             }}
-            className={cn("rounded-sm text-foreground no-underline", jumpTarget)}
+            className={cn(
+              "rounded-sm text-foreground no-underline",
+              jumpTarget,
+            )}
           >
             {number}
           </a>
@@ -465,10 +469,7 @@ function MarksMissingNotice({ onRetry }: Pick<Props, "onRetry">) {
   );
 }
 
-function ReviewPending({
-  status,
-  onRetry,
-}: Pick<Props, "status" | "onRetry">) {
+function ReviewPending({ status, onRetry }: Pick<Props, "status" | "onRetry">) {
   if (status === "failed") {
     // Teks galat dari server/AI tidak pernah ditampilkan ke peserta.
     return (
@@ -498,7 +499,10 @@ function ReviewPending({
   if (status === "not_started") {
     return (
       <div
-        className={cn(card, "flex flex-wrap items-center justify-between gap-3")}
+        className={cn(
+          card,
+          "flex flex-wrap items-center justify-between gap-3",
+        )}
       >
         <p className="text-sm text-fg2">Telaah belum dimulai.</p>
         <Button
@@ -540,7 +544,9 @@ export function PdktReviewStage({
   onPracticeAgain,
   practiceLabel,
   isStartingPractice,
+  practiceUnavailableReason,
 }: Props) {
+  const practiceReasonId = useId();
   const replyBody = readAgentReply(item);
   const completed = status === "completed" && result;
   const rewrite = completed ? result.edu?.suggestedRewrite : null;
@@ -649,7 +655,12 @@ export function PdktReviewStage({
               <Button
                 type="button"
                 onClick={onPracticeAgain}
-                disabled={isStartingPractice}
+                disabled={
+                  isStartingPractice || Boolean(practiceUnavailableReason)
+                }
+                aria-describedby={
+                  practiceUnavailableReason ? practiceReasonId : undefined
+                }
                 className="min-h-[44px]"
               >
                 {isStartingPractice ? "Membuat email…" : practiceLabel}
@@ -657,6 +668,11 @@ export function PdktReviewStage({
             )}
           </div>
         </div>
+        {practiceUnavailableReason && (
+          <p id={practiceReasonId} className="text-sm text-muted-foreground">
+            {practiceUnavailableReason}
+          </p>
+        )}
       </div>
     </div>
   );

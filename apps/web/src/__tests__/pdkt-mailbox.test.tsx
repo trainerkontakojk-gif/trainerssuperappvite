@@ -7,7 +7,7 @@ import {
   createRootRoute,
   createRoute,
 } from "@tanstack/react-router";
-import PdktSimulation from "../routes/pdkt/simulation";
+import PdktSimulation from "./helpers/PdktSimulationHarness";
 import { EmailDetailPane } from "../routes/pdkt/components/EmailDetailPane";
 import type { PdktMailboxItem } from "@trainers/types";
 
