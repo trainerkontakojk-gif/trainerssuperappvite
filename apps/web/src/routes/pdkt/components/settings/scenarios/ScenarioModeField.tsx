@@ -71,7 +71,7 @@ export function ScenarioModeField({ value, onChange }: Props) {
                 }
               }}
               className={cn(
-                "min-h-10 rounded-md px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                "min-h-[44px] rounded-md px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                 checked
                   ? "bg-background text-foreground shadow-sm"
                   : "text-fg2 hover:text-foreground",

@@ -141,21 +141,26 @@ export function pdktErrorMessage(err: unknown): string {
       ? (err as { status: number }).status
       : null;
   if (explicitStatus === 401) {
-    return "Sesi Anda telah berakhir. Silakan login kembali.";
+    return "Sesi Anda telah berakhir. Silakan masuk kembali.";
   }
 
   const msg = original.toLowerCase();
   if (msg.includes("duplicate key") || msg.includes("unique constraint"))
     return "Data sudah ada, tidak dapat membuat duplikat.";
-  if (msg.includes("conflict") && msg.includes("idempotency"))
-    return "Idempotency key digunakan untuk target berbeda.";
+  if (
+    (msg.includes("conflict") && msg.includes("idempotency")) ||
+    msg.includes("idempotency key digunakan untuk target berbeda") ||
+    msg.includes("permintaan ganda terdeteksi")
+  )
+    return "Permintaan ganda terdeteksi. Muat ulang halaman.";
   if (msg.includes("cannot reply to a deleted"))
     return "Email yang sudah dihapus tidak dapat dibalas.";
   if (
     msg.includes("mailbox item not found") ||
-    msg.includes("mailbox tidak ditemukan")
+    msg.includes("mailbox tidak ditemukan") ||
+    msg.includes("email tidak ditemukan")
   )
-    return "Email mailbox tidak ditemukan.";
+    return "Email tidak ditemukan.";
   if (msg.includes("participant reply requires"))
     return "Hanya admin/trainer yang dapat membalas email bertarget peserta.";
   if (msg.includes("participant attribution requires"))
@@ -163,10 +168,15 @@ export function pdktErrorMessage(err: unknown): string {
   if (msg.includes("foreign key") || msg.includes("violates foreign key"))
     return "Data terkait tidak ditemukan atau rusak.";
   if (msg.includes("jwt expired") || msg.includes("token"))
-    return "Sesi Anda telah berakhir. Silakan login kembali.";
+    return "Sesi Anda telah berakhir. Silakan masuk kembali.";
   if (msg.includes("permission") || msg.includes("policy"))
     return "Anda tidak memiliki izin untuk melakukan tindakan ini.";
-  if (msg.includes("validation")) return "Data mailbox tidak valid.";
+  if (
+    msg.includes("validation") ||
+    msg.includes("data mailbox tidak valid") ||
+    msg.includes("data email tidak valid")
+  )
+    return "Data email tidak valid.";
   if (msg.includes("hanya dapat menghapus"))
     return "Anda hanya dapat menghapus email yang Anda buat sendiri.";
 

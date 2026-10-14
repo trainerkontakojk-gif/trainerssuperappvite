@@ -69,7 +69,7 @@ mailbox.get("/:id", requireCapability("pdkt.mailbox.read"), async (c) => {
     );
 
     if (!data) {
-      return jsonNotFound(c, "Email mailbox tidak ditemukan.");
+      return jsonNotFound(c, "Email tidak ditemukan.");
     }
 
     return c.json({ success: true, data });
@@ -274,7 +274,14 @@ mailbox.post(
     );
 
     if (!result.success) {
-      return jsonAiError(c, result.error || "Gagal evaluasi.");
+      console.error(
+        "[PDKT /mailbox/evaluate] Evaluation failed:",
+        result.error,
+      );
+      return jsonAiError(
+        c,
+        "AI belum bisa menelaah balasan ini. Coba lagi beberapa saat lagi.",
+      );
     }
 
     return c.json({

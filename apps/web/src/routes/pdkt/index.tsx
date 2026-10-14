@@ -46,7 +46,8 @@ const PDKT_EXPANDED_TITLE =
   APP_MODULES.find((module) => module.id === "pdkt")?.expandedTitle ??
   "Paham Dulu Kasih Tanggapan";
 
-const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
+const navButtonClass =
+  "min-h-[44px] gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
 export default function PdktLanding() {
   const navigate = useNavigate();
@@ -387,7 +388,7 @@ export default function PdktLanding() {
                       type="button"
                       size="lg"
                       onClick={() => handleStartSimulation()}
-                      className="min-h-11 gap-2.5 px-5 text-sm font-semibold"
+                      className="min-h-[44px] gap-2.5 px-5 text-sm font-semibold"
                     >
                       Mulai simulasi
                       <ArrowRight data-icon="inline-end" />

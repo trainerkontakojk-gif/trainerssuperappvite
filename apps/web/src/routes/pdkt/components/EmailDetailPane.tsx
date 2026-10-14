@@ -60,7 +60,7 @@ export function EmailDetailPane({
             variant="ghost"
             size="icon"
             onClick={onBackToList}
-            className="-ml-2 min-h-11 min-w-11 md:hidden"
+            className="-ml-2 min-h-[44px] min-w-[44px] md:hidden"
             aria-label="Kembali ke daftar email"
           >
             <ArrowLeft aria-hidden="true" />
@@ -128,7 +128,7 @@ export function EmailDetailPane({
               onClick={onDelete}
               disabled={!canDelete}
               aria-describedby={canDelete ? undefined : "pdkt-delete-hint"}
-              className="min-h-11 gap-2 px-3 text-xs"
+              className="min-h-[44px] gap-2 px-3 text-xs"
             >
               <Trash2 aria-hidden="true" className="text-destructive" />
               Hapus email
@@ -142,7 +142,7 @@ export function EmailDetailPane({
           <Button
             type="button"
             onClick={onReply}
-            className="min-h-11 gap-2 px-5 text-[13px] font-semibold"
+            className="min-h-[44px] gap-2 px-5 text-[13px] font-semibold"
           >
             Tulis balasan
             <ArrowRight aria-hidden="true" />

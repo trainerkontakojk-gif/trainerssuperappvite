@@ -282,6 +282,33 @@ test.describe("Monitoring (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
+  for (const [error, copy] of [
+    ["ai_unavailable", "AI belum bisa dihubungi saat menelaah. Coba telaah ulang beberapa saat lagi."],
+    ["ai_invalid_output", "Hasil telaah AI tidak lengkap. Coba telaah ulang."],
+    ["evaluation_failed", "Telaah gagal. Coba telaah ulang."],
+    ["TypeError: fetch failed at https://generativelanguage...", "Telaah gagal. Coba telaah ulang."],
+    [null, null],
+  ] as const) {
+    test(`PDKT evaluation error safe copy: ${error ?? "null"}`, async ({ page }) => {
+      const audit = await openHermeticShell(page, {
+        path: "/monitoring",
+        apiMocks: monitoringMocks([
+          { method: "GET", path: "/api/v1/ai/monitoring/history/pdkt/pdkt-1/review", body: { success: true, data: { ...(REVIEWS["pdkt-1"] as Record<string, unknown>), evaluation: null, review_status: "failed", evaluation_error: error } } },
+          ...POPULATED_MOCKS,
+        ]),
+      });
+      await waitForMockedApi(audit, ["/ai/monitoring/history"]);
+      await page.getByRole("button", { name: "Lihat Detail" }).nth(1).click({ timeout: 20000 });
+      await waitForMockedApi(audit, ["/ai/monitoring/history/pdkt/pdkt-1/review"]);
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByText("Evaluasi AI belum tersedia")).toBeVisible({ timeout: 20000 });
+      if (copy) await expect(dialog.getByText(copy, { exact: true })).toBeVisible();
+      else await expect(dialog.locator("p.text-destructive")).toHaveCount(0);
+      if (error) await expect(page.getByText(error, { exact: true })).toHaveCount(0);
+      expectHermetic(audit);
+    });
+  }
+
   test("hero, tab strip, dan empty state riwayat dirender", async ({
     page,
   }) => {

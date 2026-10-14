@@ -9,6 +9,7 @@ import {
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
+import { findTargetsBelow } from "./helpers/touchTarget";
 import type { SessionHistory } from "../src/routes/pdkt/utils/sessionHistory";
 
 /**
@@ -473,6 +474,208 @@ test.describe("PDKT (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
+
+  for (const surface of [
+    "landing",
+    "kotak masuk",
+    "Pahami",
+    "Tanggapi",
+    "buat email",
+    "lampiran",
+    "konsumen",
+    "skenario",
+    "editor",
+    "penerima",
+    "landing gagal",
+    "editor konsumen",
+    "lampiran skenario",
+  ] as const) {
+    test(`touch target 44px: ${surface}`, async ({ page }) => {
+      test.setTimeout(90000);
+      for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        let root = page.locator("main").first();
+        let audit;
+        const extraFindings: Awaited<ReturnType<typeof findTargetsBelow>> = [];
+        const capture = async () => {
+          for (const theme of ["light", "dark"] as const) {
+            await setDocumentTheme(page, theme);
+            await page.screenshot({
+              path: `../../plans/artifacts/pdkt-touch-target-dan-error-backend/${surface}-${width}-${theme}.png`,
+              fullPage: true,
+            });
+          }
+        };
+        if (
+          [
+            "konsumen",
+            "skenario",
+            "editor",
+            "penerima",
+            "editor konsumen",
+            "lampiran skenario",
+          ].includes(surface)
+        ) {
+          const settings = await openScenarioSettings(page);
+          audit = settings.audit;
+          root = settings.dialog;
+          await expect(root).toBeVisible({ timeout: 20000 });
+          if (surface === "konsumen" || surface === "editor konsumen") {
+            await root.getByRole("tab", { name: /^Karakter konsumen/ }).click();
+            if (surface === "editor konsumen") {
+              await root
+                .getByRole("button", { name: "Karakter baru", exact: true })
+                .click();
+              await expect(root.getByLabel("Nama karakter")).toBeVisible();
+              extraFindings.push(...(await findTargetsBelow(page, root)));
+              await root.getByLabel("Nama karakter").fill("Konsumen uji");
+              await root
+                .getByLabel("Deskripsi karakter")
+                .fill("Tenang dan sopan.");
+              await root
+                .getByRole("button", { name: "Simpan", exact: true })
+                .first()
+                .click();
+              await expect(
+                root.getByRole("button", { name: "Hapus Konsumen uji" }),
+              ).toBeVisible();
+            }
+          } else if (
+            surface === "editor" ||
+            surface === "penerima" ||
+            surface === "lampiran skenario"
+          ) {
+            await root
+              .getByRole("button", { name: `Ubah ${COMPANY_SCENARIO.title}` })
+              .click();
+            await expect(
+              root.getByRole("heading", { name: "Ubah skenario" }),
+            ).toBeVisible();
+            if (surface === "penerima") {
+              await root.getByRole("button", { name: "Tambah email" }).click();
+            } else if (surface === "lampiran skenario") {
+              await root.locator("summary").click();
+              await root.locator('input[type="file"]').setInputFiles({
+                name: "lampiran.png",
+                mimeType: "image/png",
+                buffer: Buffer.from(PIXEL_PNG.split(",")[1], "base64"),
+              });
+              await expect(
+                root.getByRole("button", { name: "Hapus lampiran 1" }),
+              ).toBeVisible();
+            }
+          }
+        } else if (surface === "landing" || surface === "landing gagal") {
+          audit = await openHermeticShell(page, {
+            path: "/pdkt",
+            apiMocks: [
+              ...(surface === "landing gagal"
+                ? [
+                    {
+                      method: "GET" as const,
+                      path: "/api/v1/pdkt/history",
+                      status: 500,
+                      body: {
+                        success: false,
+                        error: {
+                          code: "DATABASE_ERROR",
+                          message: "Gagal memuat riwayat.",
+                        },
+                      },
+                    },
+                    {
+                      method: "GET" as const,
+                      path: "/api/v1/pdkt/mailbox",
+                      status: 500,
+                      body: {
+                        success: false,
+                        error: {
+                          code: "DATABASE_ERROR",
+                          message: "Gagal memuat email.",
+                        },
+                      },
+                    },
+                  ]
+                : []),
+              ...pdktMocks(EVALUATED_HISTORY, [OPEN_MAIL, REPLIED_MAIL]),
+            ],
+          });
+          await waitForMockedApi(audit, ["/pdkt/history", "/pdkt/mailbox"]);
+          await expect(
+            page.getByRole("region", { name: "Belum dibalas" }),
+          ).toBeVisible({ timeout: 20000 });
+        } else {
+          audit = await openWorkspace(page, [
+            {
+              method: "GET",
+              path: "/api/v1/pdkt/settings",
+              body: { success: true, data: SAVED_SETTINGS },
+              headers: { "x-settings-version": "absent" },
+            },
+            ...pdktMocks([], [OPEN_MAIL]).filter(
+              (mock) => mock.path !== "/api/v1/pdkt/settings",
+            ),
+          ]);
+          root = page.locator("main main");
+          if (surface !== "kotak masuk" && surface !== "buat email") {
+            if (width === 390)
+              await page
+                .getByRole("button", {
+                  name: new RegExp(OPEN_MAIL.list.subject),
+                })
+                .click();
+            await waitForMockedApi(audit, [
+              `/pdkt/mailbox/${OPEN_MAIL.list.id}`,
+            ]);
+          }
+          if (surface === "Tanggapi") {
+            await page.getByRole("button", { name: "Tulis balasan" }).click();
+            await expect(page.getByLabel("Balasan Anda")).toBeVisible();
+          } else if (surface === "buat email") {
+            await page
+              .getByRole("button", { name: "Email baru", exact: true })
+              .click();
+            root = page.getByRole("dialog", { name: "Buat email baru" });
+            await expect(root).toBeVisible();
+          } else if (surface === "lampiran") {
+            await page
+              .getByRole("button", { name: "Lampiran 1", exact: true })
+              .click();
+            root = page.getByRole("dialog");
+            await expect(root).toBeVisible();
+          } else if (surface === "kotak masuk") {
+            await capture();
+            await page.getByRole("button", { name: "Menu lainnya" }).click();
+            await expect(
+              page.getByRole("menuitem", { name: "Pilih beberapa" }),
+            ).toBeVisible();
+            expect(
+              await findTargetsBelow(page, page.getByRole("menu")),
+              `${width}px menu`,
+            ).toEqual([]);
+            await page
+              .getByRole("menuitem", { name: "Pilih beberapa" })
+              .click();
+            await expect(page.getByRole("checkbox")).toBeVisible();
+            await page.getByRole("checkbox").check();
+          }
+        }
+        if (surface === "landing" || surface === "skenario") await capture();
+        expect(
+          [...extraFindings, ...(await findTargetsBelow(page, root))],
+          `${width}px ${surface}`,
+        ).toEqual([]);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+          `${width}px overflow`,
+        ).toBe(true);
+        expectHermetic(audit);
+      }
+    });
+  }
 
   test("landing PDKT menampilkan hero, aksi, dan keadaan kosong", async ({
     page,

@@ -138,7 +138,7 @@ export function ReplyComposer({
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={!canSend}
-          className="min-h-11 gap-2 px-5 text-[13px] font-semibold"
+          className="min-h-[44px] gap-2 px-5 text-[13px] font-semibold"
         >
           {isLoading ? (
             <>
@@ -176,14 +176,14 @@ export function ReplyComposer({
               type="button"
               variant="outline"
               onClick={() => setConfirmOpen(false)}
-              className="min-h-11"
+              className="min-h-[44px]"
             >
               Periksa lagi
             </Button>
             <Button
               type="button"
               onClick={() => void send()}
-              className="min-h-11"
+              className="min-h-[44px]"
             >
               Kirim balasan
             </Button>

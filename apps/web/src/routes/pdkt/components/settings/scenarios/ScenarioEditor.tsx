@@ -126,7 +126,7 @@ export function ScenarioEditor({
           type="button"
           variant="ghost"
           onClick={onCancel}
-          className="-ml-2.5 min-h-11 gap-1.5 px-2.5 text-xs text-fg2"
+          className="-ml-2.5 min-h-[44px] gap-1.5 px-2.5 text-xs text-fg2"
         >
           <ChevronLeft data-icon="inline-start" />
           Semua skenario
@@ -207,7 +207,7 @@ export function ScenarioEditor({
                         onNewCategoryChange("");
                         onDraftChange({ category: "" });
                       }}
-                      className="min-h-11 px-3 text-xs"
+                      className="min-h-[44px] px-3 text-xs"
                     >
                       Batal
                     </Button>
@@ -215,6 +215,7 @@ export function ScenarioEditor({
                 ) : (
                   <SettingsSelect
                     id="scenario-category"
+                    className="min-h-[44px]"
                     required
                     value={draft.category || ""}
                     aria-invalid={Boolean(errors.category)}
@@ -343,7 +344,7 @@ export function ScenarioEditor({
             onToggle={(event) => onAdvancedOpenChange(event.currentTarget.open)}
             className="rounded-xl border border-border"
           >
-            <summary className="flex min-h-11 cursor-pointer items-center px-4 text-[13px] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <summary className="flex min-h-[44px] cursor-pointer items-center px-4 text-[13px] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               Opsi tambahan: identitas pengirim dan lampiran
             </summary>
             <div className="flex flex-col gap-6 border-t border-border p-4">
@@ -437,7 +438,7 @@ export function ScenarioEditor({
               type="button"
               variant="ghost"
               onClick={onDelete}
-              className="-ml-2.5 min-h-11 px-2.5 text-foreground max-sm:min-w-11"
+              className="-ml-2.5 min-h-[44px] px-2.5 text-foreground max-sm:min-w-[44px]"
             >
               {/* Merah hanya di ikon: --destructive belum 4.5:1 sebagai teks kecil. */}
               <Trash2 data-icon="inline-start" className="text-destructive" />
@@ -451,7 +452,7 @@ export function ScenarioEditor({
             type="button"
             variant="outline"
             onClick={onCancel}
-            className="min-h-11"
+            className="min-h-[44px]"
           >
             Batal
           </Button>
@@ -459,7 +460,7 @@ export function ScenarioEditor({
             type="button"
             onClick={onApply}
             disabled={attachments.pendingReads > 0}
-            className="min-h-11 px-4"
+            className="min-h-[44px] px-4"
           >
             {isNew ? "Tambahkan skenario" : "Terapkan perubahan"}
           </Button>

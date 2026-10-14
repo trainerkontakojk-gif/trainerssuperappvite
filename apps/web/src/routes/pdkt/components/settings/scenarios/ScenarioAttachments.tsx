@@ -64,7 +64,7 @@ export function ScenarioAttachments({
                   variant="ghost"
                   size="sm"
                   onClick={() => onRemove(index)}
-                  className="justify-start text-muted-foreground hover:text-destructive"
+                  className="min-h-[44px] justify-start text-muted-foreground hover:text-destructive"
                   aria-label={`Hapus lampiran ${index + 1}`}
                 >
                   <Trash2 data-icon="inline-start" />

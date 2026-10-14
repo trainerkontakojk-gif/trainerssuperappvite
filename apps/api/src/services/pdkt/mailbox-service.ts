@@ -38,7 +38,7 @@ function throwMappedMailboxRpcError(
     code === "401" ||
     normalized.includes("jwt expired")
   ) {
-    throw statusError(401, "Sesi Anda telah berakhir. Silakan login kembali.");
+    throw statusError(401, "Sesi Anda telah berakhir. Silakan masuk kembali.");
   }
   if (code === "42501") {
     throw statusError(
@@ -47,7 +47,7 @@ function throwMappedMailboxRpcError(
     );
   }
   if (code === "PGRST116") {
-    throw statusError(404, "Email mailbox tidak ditemukan.");
+    throw statusError(404, "Email tidak ditemukan.");
   }
   if (code === "23505") {
     throw statusError(409, "Data sudah ada, tidak dapat membuat duplikat.");
@@ -61,7 +61,7 @@ function throwMappedMailboxRpcError(
     throw statusError(
       409,
       normalized.includes("idempotency")
-        ? "Idempotency key digunakan untuk target berbeda."
+        ? "Permintaan ganda terdeteksi. Muat ulang halaman."
         : "Data sudah ada, tidak dapat membuat duplikat.",
     );
   }
@@ -88,13 +88,13 @@ function throwMappedMailboxRpcError(
     normalized.includes("mailbox item not found") ||
     normalized.includes("not_found")
   ) {
-    throw statusError(404, "Email mailbox tidak ditemukan.");
+    throw statusError(404, "Email tidak ditemukan.");
   }
   if (normalized.includes("cannot reply to a deleted")) {
     throw statusError(409, "Email yang sudah dihapus tidak dapat dibalas.");
   }
   if (normalized.includes("validation_error")) {
-    throw statusError(400, "Data mailbox tidak valid.");
+    throw statusError(400, "Data email tidak valid.");
   }
   console.error("[PDKT] Mailbox RPC failed:", error);
   throw statusError(500, fallbackMessage);

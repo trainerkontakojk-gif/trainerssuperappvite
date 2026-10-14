@@ -117,7 +117,9 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
     - *Langsung ke OJK* (`ojk`, `reply_to_ojk`): jawaban sesuai kasus dan standar jawaban.
     - Petunjuk konflik deterministik dan aturan prompt penilaian memakai `replyIntent`, bukan header. `ojkRequestInBody` dibuang dari proyeksi skenario untuk tampilan simulasi, sama seperti `expectedAnswer`.
   - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
-  - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper.
+  - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper. Copy PDKT memakai "Email tidak ditemukan.", "Sesi Anda telah berakhir. Silakan masuk kembali.", "Permintaan ganda terdeteksi. Muat ulang halaman.", dan "Data email tidak valid." tanpa mengubah status HTTP/kode error; mapper tetap mengenali pesan database lama.
+  - **Kegagalan telaah**: penulis `pdkt_history.evaluation_error` hanya menyimpan kode `ai_unavailable`, `ai_invalid_output`, atau `evaluation_failed` (atau `null` saat klaim), sesuai `PDKT_EVALUATION_ERROR_CODES`. Pesan asli hanya untuk log server; route evaluasi sinkron juga tidak mengirim pesan provider. Monitoring menerjemahkan kode menjadi kalimat pemulihan; nilai legacy/tidak dikenal tampil sebagai "Telaah gagal. Coba telaah ulang." tanpa backfill. UI PDKT mempertahankan copy kegagalannya.
+  - **Area sentuh PDKT**: kontrol landing, kotak masuk, Pahami/Tanggapi, dialog email/pengaturan, dan lampiran memakai minimum 44×44 CSS px, termasuk label checkbox/radio yang dapat diklik. Gunakan nilai px eksplisit, bukan `min-h-11` yang hanya 38,5px pada root 14px. Helper E2E `touchTarget.ts` memeriksa permukaan ini di viewport 390px dan 1280px.
   - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.
   - DUMMY_PROFILES pool 20 identitas dengan 25 kota acak untuk variasi identitas konsumen.
   - Usage delta setelah evaluasi async di-retry hingga 2x (2s delay) untuk akurasi.

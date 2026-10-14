@@ -448,7 +448,7 @@ describe("PDKT Mailbox Batch Route E2E", () => {
       const json = await res.json();
       expect(json.success).toBe(false);
       expect(json.error.message).toBe(
-        "Sesi Anda telah berakhir. Silakan login kembali.",
+        "Sesi Anda telah berakhir. Silakan masuk kembali.",
       );
     });
   });

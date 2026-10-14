@@ -36,6 +36,10 @@ export default defineConfig({
       testMatch: "telefun-schema-contract-api.spec.ts",
     },
     {
+      name: "pdkt-evaluation-errors-real-backend",
+      testMatch: "pdkt-evaluation-error-api.spec.ts",
+    },
+    {
       name: "pdkt-privacy-real-backend",
       testMatch: "pdkt-mailbox-privacy-api.spec.ts",
     },

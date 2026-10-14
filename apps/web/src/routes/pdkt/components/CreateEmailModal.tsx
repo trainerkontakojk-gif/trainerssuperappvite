@@ -74,6 +74,7 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                 variant="ghost"
                 size="icon-lg"
                 onClick={onClose}
+                className="min-h-[44px] min-w-[44px]"
                 aria-label="Tutup"
               >
                 <X data-icon="inline" />
@@ -140,7 +141,7 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
               type="button"
               variant="ghost"
               onClick={onClose}
-              className="min-h-11"
+              className="min-h-[44px]"
             >
               Batal
             </Button>

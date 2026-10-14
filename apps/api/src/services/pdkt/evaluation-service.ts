@@ -1,5 +1,6 @@
 import {
   PDKT_PROMPT_INPUT_LIMITS,
+  type PdktEvaluationErrorCode,
   PdktSessionConfig,
   EmailMessage,
   PdktEvaluationResult,
@@ -309,6 +310,13 @@ function applyRecipientConflictFailsafe(input: {
   };
 }
 
+class PdktEvaluationFailure extends Error {
+  constructor(message: string, readonly code: PdktEvaluationErrorCode) {
+    super(message);
+    this.name = "PdktEvaluationFailure";
+  }
+}
+
 class InvalidPdktEvaluationResponseError extends Error {
   constructor() {
     super("Respons evaluasi AI tidak sesuai format yang diharapkan.");
@@ -530,6 +538,7 @@ export async function evaluateAgentResponse(
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
   annotations?: PdktReplyAnnotation[];
   consumerPoints?: PdktConsumerPoint[];
+  errorCode?: PdktEvaluationErrorCode;
   error?: string;
 }> {
   const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
@@ -544,6 +553,7 @@ export async function evaluateAgentResponse(
   ) {
     return {
       success: false,
+      errorCode: "evaluation_failed",
       error:
         "Invalid email context for evaluation. Need exactly one consumer email and one agent reply.",
     };
@@ -710,6 +720,9 @@ export async function evaluateAgentResponse(
 
   return {
     success: false,
+    errorCode: lastError instanceof InvalidPdktEvaluationResponseError
+      ? "ai_invalid_output"
+      : "ai_unavailable",
     error:
       lastError instanceof Error
         ? lastError.message
@@ -816,7 +829,10 @@ export async function processPdktEvaluation(
     );
 
     if (!result.success) {
-      throw new Error(result.error || "Evaluation failed without message");
+      throw new PdktEvaluationFailure(
+        result.error || "Evaluation failed without message",
+        result.errorCode ?? "evaluation_failed",
+      );
     }
 
     const evaluationData: PdktEvaluationResult = {
@@ -864,11 +880,7 @@ export async function processPdktEvaluation(
       .update({
         evaluation_status: "failed",
         evaluation_error:
-          err instanceof Error
-            ? err.message
-            : typeof err === "string"
-              ? err
-              : String(err),
+          err instanceof PdktEvaluationFailure ? err.code : "evaluation_failed",
         evaluation_completed_at: new Date().toISOString(),
       })
       .eq("id", historyId)

@@ -76,7 +76,7 @@ function ConsumerRow({
           // Nama tetap; status pilihan diumumkan lewat `aria-pressed`.
           aria-label={`Pakai karakter ${title}`}
           onClick={onSelect}
-          className="min-h-11"
+          className="min-h-[44px]"
         >
           {selected && <Check data-icon="inline-start" />}
           {selected ? "Dipakai" : "Pilih"}
@@ -169,7 +169,7 @@ export function PdktConsumersTab({
             variant="ghost"
             size="sm"
             onClick={handleCancelConsumerForm}
-            className="min-h-11 text-muted-foreground hover:text-foreground"
+            className="min-h-[44px] text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft data-icon="inline-start" />
             Kembali ke daftar
@@ -191,6 +191,7 @@ export function PdktConsumersTab({
             <SettingsField label="Tingkat kesulitan" id="consumer-difficulty">
               <SettingsSelect
                 id="consumer-difficulty"
+                className="min-h-[44px]"
                 value={consumerForm.draft.difficulty || "Medium"}
                 onChange={(e) =>
                   consumerForm.setDraft({
@@ -244,7 +245,7 @@ export function PdktConsumersTab({
             type="button"
             variant="outline"
             onClick={handleCancelConsumerForm}
-            className="min-h-11"
+            className="min-h-[44px]"
           >
             Batal
           </Button>
@@ -254,7 +255,7 @@ export function PdktConsumersTab({
             disabled={
               !consumerForm.draft.name || !consumerForm.draft.description
             }
-            className="min-h-11"
+            className="min-h-[44px]"
           >
             Simpan
           </Button>
@@ -281,7 +282,7 @@ export function PdktConsumersTab({
         <Button
           type="button"
           onClick={() => consumerForm.openAdd()}
-          className="min-h-11 shrink-0"
+          className="min-h-[44px] shrink-0"
         >
           <Plus data-icon="inline-start" />
           Karakter baru
@@ -310,7 +311,7 @@ export function PdktConsumersTab({
                   variant="ghost"
                   onClick={() => consumerForm.openEdit(consumer)}
                   aria-label={`Ubah ${consumer.name}`}
-                  className="min-h-11"
+                  className="min-h-[44px]"
                 >
                   Ubah
                 </Button>
@@ -323,7 +324,7 @@ export function PdktConsumersTab({
                   }
                   aria-label={`Hapus ${consumer.name}`}
                   title="Hapus"
-                  className="text-muted-foreground hover:text-destructive"
+                  className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 data-icon="inline" />
                 </Button>

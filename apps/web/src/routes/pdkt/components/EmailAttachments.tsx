@@ -124,7 +124,7 @@ export function EmailAttachments({ attachments, size = "default" }: Props) {
             size="icon"
             onClick={() => setZoomedImage(null)}
             aria-label="Tutup pratinjau lampiran"
-            className="absolute top-6 right-6 min-h-11 min-w-11 text-white/80 hover:bg-white/10 hover:text-white"
+            className="absolute top-6 right-6 min-h-[44px] min-w-[44px] text-white/80 hover:bg-white/10 hover:text-white"
           >
             <X aria-hidden="true" className="size-8" />
           </Button>

@@ -22,7 +22,7 @@ export function PdktSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className="group flex size-11 shrink-0 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+      className="group flex size-[44px] shrink-0 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
     >
       <span
         aria-hidden="true"

@@ -1057,7 +1057,7 @@ export default function PdktSimulation({
             <Button
               type="button"
               onClick={refetch}
-              className="ml-auto min-h-11 gap-2 text-xs"
+              className="ml-auto min-h-[44px] gap-2 text-xs"
             >
               <RefreshCw aria-hidden="true" />
               Coba lagi
@@ -1267,7 +1267,7 @@ export default function PdktSimulation({
                   setPracticeSubject(null);
                   setIsNewModalOpen(true);
                 }}
-                className="min-h-11 text-xs"
+                className="min-h-[44px] text-xs"
               >
                 Buat email baru
               </Button>
@@ -1330,7 +1330,7 @@ export default function PdktSimulation({
               type="button"
               onClick={() => void handleRetryMailboxSave()}
               disabled={isRetryingMailboxSave}
-              className="min-h-11 gap-2 text-xs"
+              className="min-h-[44px] gap-2 text-xs"
             >
               <RefreshCw
                 aria-hidden="true"
@@ -1347,7 +1347,7 @@ export default function PdktSimulation({
               variant="outline"
               onClick={() => setPendingMailboxRetry(null)}
               disabled={isRetryingMailboxSave}
-              className="min-h-11 text-xs"
+              className="min-h-[44px] text-xs"
             >
               Tutup
             </Button>

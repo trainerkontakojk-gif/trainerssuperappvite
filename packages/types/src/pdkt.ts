@@ -4,6 +4,13 @@ import type { SimulationSubjectSnapshot } from "./simulation-subject";
 import { simulationSubjectSelectionSchema } from "./simulation-subject";
 
 // ── PDKT Types ────────────────────────────────────────
+export const PDKT_EVALUATION_ERROR_CODES = [
+  "ai_unavailable",
+  "ai_invalid_output",
+  "evaluation_failed",
+] as const;
+export type PdktEvaluationErrorCode =
+  (typeof PDKT_EVALUATION_ERROR_CODES)[number];
 export const PDKT_PROMPT_INPUT_LIMITS = {
   id: 200,
   timestamp: 100,

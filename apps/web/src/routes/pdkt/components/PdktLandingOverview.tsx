@@ -36,7 +36,7 @@ function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+    <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 gap-y-1">
       <div className="flex flex-col gap-0.5">
         <h2 id={id} className={headingClass}>
           {title}
@@ -63,7 +63,13 @@ function LoadProblem({
       className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-[13px] text-foreground"
     >
       {message}
-      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onRetry}
+        className="min-h-[44px]"
+      >
         Coba lagi
       </Button>
     </div>
@@ -128,7 +134,7 @@ export function PdktLandingOverview({
           <Button
             type="button"
             variant="outline"
-            className="min-h-11 px-4 text-[13px]"
+            className="min-h-[44px] px-4 text-[13px]"
             onClick={() => onOpenMailbox()}
           >
             Buka kotak masuk
@@ -203,7 +209,7 @@ export function PdktLandingOverview({
               <Button
                 type="button"
                 variant="link"
-                className="h-auto min-h-11 px-0 text-[13px]"
+                className="h-auto min-h-[44px] px-0 text-[13px]"
                 onClick={() => onOpenMailbox()}
               >
                 Buka kotak masuk
@@ -231,7 +237,7 @@ export function PdktLandingOverview({
                     <button
                       type="button"
                       onClick={() => onOpenMailbox(email.id)}
-                      className="flex min-h-11 w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+                      className="flex min-h-[44px] w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
                     >
                       <span
                         aria-hidden="true"
@@ -308,7 +314,7 @@ export function PdktLandingOverview({
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-11"
+                  className="min-h-[44px]"
                   onClick={() => onOpenSession(latestReviewed)}
                 >
                   Buka telaah terakhir
@@ -335,7 +341,7 @@ export function PdktLandingOverview({
             <Button
               type="button"
               variant="link"
-              className="h-auto min-h-11 px-0 text-[13px]"
+              className="h-auto min-h-[44px] px-0 text-[13px]"
               onClick={onOpenHistory}
             >
               Lihat semua riwayat
@@ -382,7 +388,7 @@ export function PdktLandingOverview({
                       <button
                         type="button"
                         onClick={() => onOpenSession(row.session)}
-                        className="min-h-11 max-w-[42ch] py-2 text-left font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="min-h-[44px] max-w-[42ch] py-2 text-left font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
                         <span className="line-clamp-2">{row.subject}</span>
                       </button>

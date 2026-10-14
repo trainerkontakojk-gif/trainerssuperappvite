@@ -72,14 +72,14 @@ export function ScenarioList({
             bisa dipilih saat membuat email.
           </p>
         </div>
-        <Button type="button" onClick={onAdd} className="min-h-11 shrink-0">
+        <Button type="button" onClick={onAdd} className="min-h-[44px] shrink-0">
           <Plus data-icon="inline-start" />
           Skenario baru
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex min-h-11 min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
+        <label className="flex min-h-[44px] min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
           <Search aria-hidden="true" className="size-4 shrink-0" />
           <input
             type="search"
@@ -105,7 +105,7 @@ export function ScenarioList({
                   aria-pressed={selected}
                   onClick={() => setCategory(item)}
                   className={cn(
-                    "min-h-[38px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    "min-h-[44px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                     selected
                       ? "bg-background text-foreground shadow-sm"
                       : "text-fg2 hover:text-foreground",
@@ -189,7 +189,7 @@ export function ScenarioList({
                   size="sm"
                   onClick={() => onEdit(scenario)}
                   aria-label={`Ubah ${scenario.title}`}
-                  className="min-h-11 shrink-0"
+                  className="min-h-[44px] shrink-0"
                 >
                   Ubah
                 </Button>
@@ -200,7 +200,7 @@ export function ScenarioList({
                   onClick={() => onDelete(scenario.id)}
                   aria-label={`Hapus ${scenario.title}`}
                   title="Hapus"
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  className="min-h-[44px] min-w-[44px] shrink-0 text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 data-icon="inline" />
                 </Button>
@@ -222,7 +222,7 @@ export function ScenarioList({
             size="sm"
             onClick={onSelectAll}
             disabled={allSelected}
-            className="min-h-11"
+            className="min-h-[44px]"
           >
             Aktifkan semua
           </Button>
@@ -232,7 +232,7 @@ export function ScenarioList({
             size="sm"
             onClick={onUnselectAll}
             disabled={noneSelected}
-            className="min-h-11"
+            className="min-h-[44px]"
           >
             Nonaktifkan semua
           </Button>

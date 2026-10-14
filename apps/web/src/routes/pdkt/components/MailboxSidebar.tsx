@@ -170,7 +170,7 @@ export function MailboxSidebar({
                   type="button"
                   variant="ghost"
                   onClick={onBulkDelete}
-                  className="min-h-11 gap-1.5 px-3 text-xs"
+                  className="min-h-[44px] gap-1.5 px-3 text-xs"
                 >
                   <Trash2 aria-hidden="true" className="text-destructive" />
                   Hapus {selectedBulkIds.size} email
@@ -180,7 +180,7 @@ export function MailboxSidebar({
                 type="button"
                 variant="outline"
                 onClick={onToggleBulkMode}
-                className="min-h-11 px-3 text-xs font-semibold"
+                className="min-h-[44px] px-3 text-xs font-semibold"
               >
                 Batal
               </Button>
@@ -190,7 +190,7 @@ export function MailboxSidebar({
               <Button
                 type="button"
                 onClick={onNew}
-                className="min-h-11 gap-1.5 px-3.5 text-xs font-semibold"
+                className="min-h-[44px] gap-1.5 px-3.5 text-xs font-semibold"
               >
                 <Plus aria-hidden="true" />
                 Email baru
@@ -203,7 +203,7 @@ export function MailboxSidebar({
                       variant="outline"
                       size="icon"
                       aria-label="Menu lainnya"
-                      className="min-h-11 min-w-11"
+                      className="min-h-[44px] min-w-[44px]"
                     />
                   }
                 >
@@ -214,15 +214,21 @@ export function MailboxSidebar({
                   className="w-44"
                   positionerClassName="z-[110]"
                 >
-                  <DropdownMenuItem onClick={onHistory} className="min-h-11">
+                  <DropdownMenuItem
+                    onClick={onHistory}
+                    className="min-h-[44px]"
+                  >
                     Riwayat
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onSettings} className="min-h-11">
+                  <DropdownMenuItem
+                    onClick={onSettings}
+                    className="min-h-[44px]"
+                  >
                     Pengaturan
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={onToggleBulkMode}
-                    className="min-h-11"
+                    className="min-h-[44px]"
                   >
                     Pilih beberapa
                   </DropdownMenuItem>
@@ -243,7 +249,7 @@ export function MailboxSidebar({
             placeholder="Cari pengirim atau subjek"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="min-h-11 rounded-lg bg-background pl-9 text-xs"
+            className="min-h-[44px] rounded-lg bg-background pl-9 text-xs"
           />
         </div>
 
@@ -259,7 +265,7 @@ export function MailboxSidebar({
               aria-pressed={filter === tab.id}
               onClick={() => onFilterChange(tab.id)}
               className={cn(
-                "min-h-11 flex-auto rounded-md px-2 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                "min-h-[44px] flex-auto rounded-md px-2 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                 filter === tab.id
                   ? "bg-background font-semibold text-foreground shadow-sm"
                   : "text-fg2 hover:text-foreground",
@@ -290,7 +296,7 @@ export function MailboxSidebar({
                 type="button"
                 variant="outline"
                 onClick={onNew}
-                className="mt-4 min-h-11 text-xs"
+                className="mt-4 min-h-[44px] text-xs"
               >
                 Buat email pertama
               </Button>

@@ -49,7 +49,7 @@ export function PdktStageDemo() {
             type="button"
             onClick={() => setPaused((value) => !value)}
             aria-label={paused ? "Putar animasi" : "Jeda animasi"}
-            className="flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+            className="flex size-[44px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
           >
             {paused ? (
               <Play aria-hidden="true" className="size-4" />

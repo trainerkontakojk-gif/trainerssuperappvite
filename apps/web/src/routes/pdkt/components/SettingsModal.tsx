@@ -169,6 +169,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   size="icon-lg"
                   onClick={requestClose}
                   disabled={isSaving}
+                  className="min-h-[44px] min-w-[44px]"
                   aria-label="Tutup pengaturan"
                 >
                   <X data-icon="inline" />
@@ -202,7 +203,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="min-h-11 shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
+                    className="min-h-[44px] shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
                   >
                     <span className="flex-1">{tab.label}</span>
                     {tab.count !== undefined && (
@@ -294,7 +295,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   variant="ghost"
                   onClick={() => setPendingConfirm("reset")}
                   disabled={isSaving}
-                  className="-ml-2.5 min-h-11 px-2.5 text-fg2"
+                  className="-ml-2.5 min-h-[44px] px-2.5 text-fg2"
                 >
                   Pulihkan bawaan
                 </Button>
@@ -316,7 +317,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     variant="outline"
                     onClick={requestClose}
                     disabled={isSaving}
-                    className="min-h-11"
+                    className="min-h-[44px]"
                   >
                     Tutup
                   </Button>
@@ -324,7 +325,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     type="button"
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="min-h-11 px-5"
+                    className="min-h-[44px] px-5"
                   >
                     {isSaving ? "Menyimpan…" : "Simpan"}
                   </Button>

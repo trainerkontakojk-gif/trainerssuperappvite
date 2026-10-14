@@ -146,7 +146,7 @@ export function ScenarioRecipientsField({
             type="button"
             variant="outline"
             onClick={handleAddEmail}
-            className="min-h-11 shrink-0"
+            className="min-h-[44px] shrink-0"
           >
             <Plus data-icon="inline-start" />
             Tambah email
@@ -195,7 +195,7 @@ export function ScenarioRecipientsField({
                     variant="ghost"
                     size="icon-lg"
                     onClick={() => handleRemoveEmail(index)}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-destructive"
                     aria-label={`Hapus email ${index + 1}`}
                   >
                     <Trash2 data-icon="inline" />

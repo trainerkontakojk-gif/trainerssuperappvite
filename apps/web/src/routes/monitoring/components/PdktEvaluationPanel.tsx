@@ -28,6 +28,17 @@ import {
 import { getSimulationSubjectMeta } from "../utils/formatting";
 import { ExpectedAnswerAlignmentCard } from "../../pdkt/components/ExpectedAnswerAlignmentCard";
 
+function pdktEvaluationErrorCopy(value: string | null): string {
+  switch (value) {
+    case "ai_unavailable":
+      return "AI belum bisa dihubungi saat menelaah. Coba telaah ulang beberapa saat lagi.";
+    case "ai_invalid_output":
+      return "Hasil telaah AI tidak lengkap. Coba telaah ulang.";
+    default:
+      return "Telaah gagal. Coba telaah ulang.";
+  }
+}
+
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -493,7 +504,7 @@ export function PdktEvaluationPanel({
             </p>
             {data?.evaluation_error && (
               <p className="text-xs text-destructive max-w-xs">
-                {data.evaluation_error}
+                {pdktEvaluationErrorCopy(data.evaluation_error)}
               </p>
             )}
           </div>
