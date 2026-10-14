@@ -1,0 +1,357 @@
+/*
+ * Ilustrasi tiga tahap PDKT (Pahami → Tanggapi → Telaah) di halaman awal.
+ * Satu siklus 12 detik. Siklus berulang, jadi tombol jeda wajib ada
+ * (WCAG 2.2.2). Saat dijeda atau `prefers-reduced-motion`, komponen memberi
+ * `data-static="true"` dan ilustrasi berhenti di tahap Telaah yang utuh, bukan
+ * di bingkai setengah jadi.
+ */
+.pdkt-demo {
+  --demo-accent: var(--module-pdkt);
+  --demo-track: var(--surface-sunken);
+}
+
+.pdkt-demo [data-anim] {
+  animation-duration: 12s;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Panggung: satu tahap tampil, lalu bergantian. */
+.pdkt-demo [data-anim="stage-a"] {
+  animation-name: pdkt-stage-a;
+}
+.pdkt-demo [data-anim="stage-b"] {
+  animation-name: pdkt-stage-b;
+}
+.pdkt-demo [data-anim="stage-c"] {
+  animation-name: pdkt-stage-c;
+}
+@keyframes pdkt-stage-a {
+  0%,
+  2% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  6%,
+  29% {
+    opacity: 1;
+    transform: none;
+  }
+  32%,
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes pdkt-stage-b {
+  0%,
+  32% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  35%,
+  58% {
+    opacity: 1;
+    transform: none;
+  }
+  61%,
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes pdkt-stage-c {
+  0%,
+  61% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  64%,
+  95% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Teks keterangan di kaki ilustrasi. */
+.pdkt-demo [data-anim="cap-a"] {
+  animation-name: pdkt-cap-a;
+}
+.pdkt-demo [data-anim="cap-b"] {
+  animation-name: pdkt-cap-b;
+}
+.pdkt-demo [data-anim="cap-c"] {
+  animation-name: pdkt-cap-c;
+}
+@keyframes pdkt-cap-a {
+  0%,
+  3% {
+    opacity: 0;
+  }
+  6%,
+  29% {
+    opacity: 1;
+  }
+  32%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pdkt-cap-b {
+  0%,
+  32% {
+    opacity: 0;
+  }
+  35%,
+  58% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pdkt-cap-c {
+  0%,
+  61% {
+    opacity: 0;
+  }
+  64%,
+  95% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Tab tahap dan garis penunjuknya. */
+.pdkt-demo [data-anim="tab-a"] {
+  animation-name: pdkt-tab-a;
+}
+.pdkt-demo [data-anim="tab-b"] {
+  animation-name: pdkt-tab-b;
+}
+.pdkt-demo [data-anim="tab-c"] {
+  animation-name: pdkt-tab-c;
+}
+@keyframes pdkt-tab-a {
+  0%,
+  31% {
+    color: var(--fg);
+  }
+  33%,
+  100% {
+    color: var(--fg3);
+  }
+}
+@keyframes pdkt-tab-b {
+  0%,
+  31% {
+    color: var(--fg3);
+  }
+  33%,
+  60% {
+    color: var(--fg);
+  }
+  62%,
+  100% {
+    color: var(--fg3);
+  }
+}
+@keyframes pdkt-tab-c {
+  0%,
+  60% {
+    color: var(--fg3);
+  }
+  62%,
+  97% {
+    color: var(--fg);
+  }
+  99%,
+  100% {
+    color: var(--fg3);
+  }
+}
+.pdkt-demo [data-anim="indicator"] {
+  animation-name: pdkt-indicator;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+@keyframes pdkt-indicator {
+  0%,
+  31% {
+    transform: translateX(0);
+  }
+  34%,
+  60% {
+    transform: translateX(100%);
+  }
+  63%,
+  97% {
+    transform: translateX(200%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Tahap Pahami: baris email muncul, lalu inti keluhan disorot. */
+.pdkt-demo [data-anim="line"] {
+  clip-path: inset(0 100% 0 0);
+  animation-name: pdkt-line;
+  animation-timing-function: ease-out;
+}
+@keyframes pdkt-line {
+  0%,
+  4% {
+    clip-path: inset(0 100% 0 0);
+  }
+  10%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.pdkt-demo [data-anim="highlight"] {
+  padding: 0 2px;
+  margin: 0 -2px;
+  border-radius: 3px;
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--demo-accent) 22%, transparent),
+    color-mix(in srgb, var(--demo-accent) 22%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  animation-name: pdkt-highlight;
+  animation-timing-function: ease-out;
+}
+@keyframes pdkt-highlight {
+  0%,
+  14% {
+    background-size: 0% 100%;
+  }
+  19%,
+  100% {
+    background-size: 100% 100%;
+  }
+}
+
+/* Tahap Tanggapi: balasan diketik baris demi baris. */
+.pdkt-demo [data-anim^="type-"] {
+  clip-path: inset(0 100% 0 0);
+  animation-timing-function: steps(30, end);
+}
+.pdkt-demo [data-anim="type-1"] {
+  animation-name: pdkt-type-1;
+}
+.pdkt-demo [data-anim="type-2"] {
+  animation-name: pdkt-type-2;
+}
+.pdkt-demo [data-anim="type-3"] {
+  animation-name: pdkt-type-3;
+}
+@keyframes pdkt-type-1 {
+  0%,
+  36% {
+    clip-path: inset(0 100% 0 0);
+  }
+  40%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes pdkt-type-2 {
+  0%,
+  40% {
+    clip-path: inset(0 100% 0 0);
+  }
+  47%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes pdkt-type-3 {
+  0%,
+  47% {
+    clip-path: inset(0 100% 0 0);
+  }
+  54%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Tahap Telaah: cincin skor dan batang aspek terisi. */
+.pdkt-demo [data-anim="ring"] {
+  stroke-dasharray: 263.9;
+  stroke-dashoffset: 263.9;
+  animation-name: pdkt-ring;
+}
+@keyframes pdkt-ring {
+  0%,
+  64% {
+    stroke-dashoffset: 263.9;
+  }
+  75%,
+  100% {
+    stroke-dashoffset: 47.5;
+  }
+}
+.pdkt-demo [data-anim="bar"] {
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation-name: pdkt-bar;
+}
+@keyframes pdkt-bar {
+  0%,
+  67% {
+    transform: scaleX(0);
+  }
+  77%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+.pdkt-demo [data-anim="tip"] {
+  animation-name: pdkt-tip;
+}
+@keyframes pdkt-tip {
+  0%,
+  78% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  82%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pdkt-demo[data-static="true"] [data-anim] {
+  animation: none;
+}
+.pdkt-demo[data-static="true"] [data-anim="stage-a"],
+.pdkt-demo[data-static="true"] [data-anim="stage-b"],
+.pdkt-demo[data-static="true"] [data-anim="cap-a"],
+.pdkt-demo[data-static="true"] [data-anim="cap-b"] {
+  opacity: 0;
+}
+.pdkt-demo[data-static="true"] [data-anim="tab-a"],
+.pdkt-demo[data-static="true"] [data-anim="tab-b"] {
+  color: var(--fg3);
+}
+.pdkt-demo[data-static="true"] [data-anim="indicator"] {
+  transform: translateX(200%);
+}
+.pdkt-demo[data-static="true"] [data-anim="ring"] {
+  stroke-dashoffset: 47.5;
+}
+.pdkt-demo[data-static="true"] [data-anim="bar"] {
+  transform: none;
+}

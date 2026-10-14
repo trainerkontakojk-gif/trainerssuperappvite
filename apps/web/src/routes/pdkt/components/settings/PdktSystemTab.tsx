@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Button } from "../../../../components/ui/button";
-import { TEXT_MODELS } from "../../pdktSettings";
+import { DEFAULT_PDKT_MODEL_ID, TEXT_MODELS } from "../../pdktSettings";
+import { PdktSwitch } from "./PdktSwitch";
 
 export interface PdktSystemTabProps {
   writingStyleMode: "realistic" | "training";
@@ -9,6 +10,8 @@ export interface PdktSystemTabProps {
   >;
   selectedModel: string;
   setSelectedModel: React.Dispatch<React.SetStateAction<string>>;
+  enableImageGeneration: boolean;
+  setEnableImageGeneration: (value: boolean) => void;
 }
 
 const writingStyles = [
@@ -16,13 +19,15 @@ const writingStyles = [
     id: "realistic" as const,
     label: "Realistis",
     description:
-      "Email mengandung typo, capslock, dan bahasa informal/kurang berpendidikan untuk simulasi yang lebih nyata.",
+      "Seperti email sungguhan: ada salah ketik, huruf kapital, dan bahasa tidak baku.",
+    sample: "sy udh LUNAS dr tgl 2 tp msh d tagih trs!!",
   },
   {
     id: "training" as const,
-    label: "Latihan",
+    label: "Rapi",
     description:
-      "Email menggunakan bahasa yang rapi, terstruktur, dan formal untuk tahap awal pelatihan.",
+      "Bahasa baku dan tertata. Cocok untuk peserta yang baru mulai.",
+    sample: "Saya sudah melunasi pinjaman sejak 2 September.",
   },
 ];
 
@@ -45,24 +50,30 @@ export function PdktSystemTab({
   setWritingStyleMode,
   selectedModel,
   setSelectedModel,
+  enableImageGeneration,
+  setEnableImageGeneration,
 }: PdktSystemTabProps) {
   return (
     <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-1">
+        <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+          Gaya &amp; AI
+        </h3>
+        <p className="text-[13px] leading-5 text-fg2">
+          Atur gaya tulisan konsumen dan AI yang membuat email konsumen dan
+          menelaah balasan.
+        </p>
+      </div>
+
       <section className="flex flex-col gap-3">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Mode penulisan
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Menentukan gaya bahasa email konsumen yang dihasilkan AI pada setiap
-            sesi simulasi.
-          </p>
-        </div>
+        <h4 className="text-[15px] font-semibold text-foreground">
+          Gaya tulisan konsumen
+        </h4>
 
         <div
           className="grid grid-cols-1 gap-3 md:grid-cols-2"
           role="radiogroup"
-          aria-label="Mode penulisan"
+          aria-label="Gaya tulisan konsumen"
         >
           {writingStyles.map((style) => {
             const isSelected = writingStyleMode === style.id;
@@ -87,8 +98,11 @@ export function PdktSystemTab({
                   </span>
                   <RadioIndicator isSelected={isSelected} />
                 </span>
-                <span className="text-xs leading-relaxed font-normal text-muted-foreground">
+                <span className="text-xs leading-relaxed font-normal text-fg2">
                   {style.description}
+                </span>
+                <span className="rounded-md bg-muted px-2.5 py-2 text-xs leading-relaxed font-normal italic text-fg2">
+                  {style.sample}
                 </span>
               </Button>
             );
@@ -98,11 +112,12 @@ export function PdktSystemTab({
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+          <h4 className="text-[15px] font-semibold text-foreground">
             Model AI
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Model yang dipakai untuk membuat email konsumen dan telaah balasan.
+          </h4>
+          <p className="mt-1 text-[13px] leading-5 text-fg2">
+            Model yang dipakai untuk membuat email konsumen dan menelaah
+            balasan.
           </p>
         </div>
 
@@ -128,24 +143,35 @@ export function PdktSystemTab({
                     : "border-border bg-card hover:bg-muted/40",
                 )}
               >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold tracking-tight text-foreground">
-                      {model.name}
-                    </span>
-                    <span className="shrink-0 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {model.provider === "gemini" ? "Gemini" : "OpenAI"}
-                    </span>
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                    {model.name}
                   </span>
-                  <span className="text-xs leading-relaxed font-normal text-muted-foreground">
-                    {model.description}
-                  </span>
+                  {model.id === DEFAULT_PDKT_MODEL_ID && (
+                    <span className="shrink-0 text-xs font-normal text-fg2">
+                      Bawaan
+                    </span>
+                  )}
                 </span>
                 <RadioIndicator isSelected={isSelected} />
               </Button>
             );
           })}
         </div>
+      </section>
+      <section className="flex items-center gap-3.5 rounded-xl border border-border p-4">
+        <span className="flex flex-1 flex-col gap-0.5">
+          <span className="font-semibold text-foreground">Gambar lampiran</span>
+          <span className="text-xs leading-[18px] text-muted-foreground">
+            AI membuat gambar pendukung, seperti bukti transfer, bila kasusnya
+            perlu. Biaya per sesi jadi lebih tinggi.
+          </span>
+        </span>
+        <PdktSwitch
+          label="Gambar lampiran"
+          checked={enableImageGeneration}
+          onCheckedChange={setEnableImageGeneration}
+        />
       </section>
     </div>
   );

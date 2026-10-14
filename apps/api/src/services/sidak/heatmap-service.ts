@@ -26,7 +26,11 @@ import {
   type SidakHeatmapResponse,
 } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
-import { isCountableFinding } from "./shared-constants";
+import {
+  countFindingTickets,
+  hasTicketNumber,
+  isCountableFinding,
+} from "./shared-constants";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SidakHeatmapMode, ServiceType } from "@trainers/types";
 
@@ -83,10 +87,6 @@ function isCountable(row: CountableRow): boolean {
     ketidaksesuaian: row.ketidaksesuaian,
     sebaiknya: row.sebaiknya,
   });
-}
-
-function hasTicketNumber(value: string | null | undefined): value is string {
-  return typeof value === "string" && value.trim().length > 0;
 }
 
 /** Terapkan batas agent + layanan secara konsisten ke setiap query. */
@@ -215,14 +215,9 @@ function countMissingByUnit(
   countBy: SidakHeatmapCountBy,
 ): number {
   const countable = rows.filter((row) => isCountable(row));
-  if (countBy === "parameter") return countable.length;
-  const tickets = new Set<string>();
-  let withoutTicket = 0;
-  for (const row of countable) {
-    if (hasTicketNumber(row.no_tiket)) tickets.add(row.no_tiket);
-    else withoutTicket += 1;
-  }
-  return tickets.size + withoutTicket;
+  return countBy === "parameter"
+    ? countable.length
+    : countFindingTickets(countable);
 }
 
 function emptyResponse(args: {

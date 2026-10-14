@@ -34,74 +34,58 @@ const CONSUMER_NAME_MENTION_PATTERNS = [
 
 export const DEFAULT_PDKT_MODEL_ID = "gemini-3.8-flash";
 
+/**
+ * Karakter konsumen cadangan bila katalog `/pdkt/consumer-types` belum
+ * termuat. Sumber utamanya tetap katalog backend.
+ */
+export const PDKT_FALLBACK_CONSUMER_TYPES: PdktConsumerType[] = [
+  {
+    id: "marah",
+    name: "Marah & Emosional",
+    description: "Sangat marah, emosional, tidak sabar.",
+    difficulty: "Hard",
+    tone: "Marah, menggunakan tanda seru.",
+  },
+  {
+    id: "bingung",
+    name: "Bingung dan kurang paham teknologi",
+    description: "Kebingungan, tidak paham teknologi.",
+    difficulty: "Medium",
+    tone: "Bingung, ragu-ragu.",
+  },
+  {
+    id: "kritis",
+    name: "Kritis & Detail",
+    description: "Kritis, menanyakan dasar hukum.",
+    difficulty: "Hard",
+    tone: "Kritis, logis, skeptis.",
+  },
+  {
+    id: "ramah",
+    name: "Ramah & Kooperatif",
+    description: "Ramah, sopan, kooperatif.",
+    difficulty: "Easy",
+    tone: "Ramah, sopan.",
+  },
+  {
+    id: "terburu-buru",
+    name: "Terburu-buru",
+    description: "Ingin jawaban singkat dan cepat.",
+    difficulty: "Medium",
+    tone: "Singkat, padat.",
+  },
+  {
+    id: "pasrah",
+    name: "Pasrah & Sedih",
+    description: "Putus asa, nada sedih.",
+    difficulty: "Medium",
+    tone: "Sedih, memohon bantuan.",
+  },
+];
+
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../lib/aiModels";
 export { TEXT_MODELS };
 
-const DUMMY_CITIES = [
-  "Jakarta Selatan", "Jakarta Pusat", "Jakarta Barat", "Jakarta Timur", "Jakarta Utara",
-  "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Tangerang",
-  "Depok", "Bekasi", "Bogor", "Yogyakarta", "Malang", "Denpasar", "Balikpapan",
-  "Samarinda", "Banjarmasin", "Pontianak", "Manado", "Padang", "Pekanbaru",
-  // ── Tambahan variasi (total 50) ──
-  "Bandar Lampung", "Batam", "Cirebon", "Solo", "Kediri", "Jember", "Mataram",
-  "Kupang", "Ambon", "Jayapura", "Sorong", "Banda Aceh", "Bengkulu", "Jambi",
-  "Cilegon", "Serang", "Purwokerto", "Magelang", "Palu", "Kendari",
-  "Gorontalo", "Ternate", "Mamuju", "Gianyar", "Lhokseumawe",
-];
-
-const DUMMY_PROFILES = [
-  { name: "Budi Santoso", email: "budi.santoso88@gmail.com" },
-  { name: "Siti Aminah", email: "siti.aminah_real@yahoo.com" },
-  { name: "Agus Setiawan", email: "agus.setiawan.work@gmail.com" },
-  { name: "Dewi Lestari", email: "dewi.lestari1990@outlook.com" },
-  { name: "Rudi Hartono", email: "rudi.hartono.bisnis@gmail.com" },
-  { name: "Ratna Sari", email: "ratna.sari.cantik@gmail.com" },
-  { name: "Eko Prasetyo", email: "eko.prasetyo77@yahoo.co.id" },
-  { name: "Sri Wahyuni", email: "sri.wahyuni.guru@gmail.com" },
-  { name: "Hendra Wijaya", email: "hendra.wijaya.store@gmail.com" },
-  { name: "Nurul Hidayah", email: "nurul.hidayah.family@gmail.com" },
-  { name: "Bambang Pamungkas", email: "bambang.pamungkas.bola@gmail.com" },
-  { name: "Lina Marlina", email: "lina.marlina.shop@gmail.com" },
-  { name: "Dedi Supriyadi", email: "dedi.supriyadi.teknik@gmail.com" },
-  { name: "Rina Wati", email: "rina.wati.kue@gmail.com" },
-  { name: "Fajar Nugroho", email: "fajar.nugroho.dev@gmail.com" },
-  { name: "Yanti Susanti", email: "yanti.susanti.salon@gmail.com" },
-  { name: "Iwan Fals", email: "iwan.fals.fans@gmail.com" },
-  { name: "Maya Putri", email: "maya.putri.travel@gmail.com" },
-  { name: "Reza Rahadian", email: "reza.rahadian.actor@gmail.com" },
-  { name: "Indah Permatasari", email: "indah.permatasari.model@gmail.com" },
-  // ── Tambahan variasi (total 50) — ragam suku & daerah ──
-  { name: "Lukman Hakim", email: "lukman.hakim96@gmail.com" },
-  { name: "Ayu Kartika", email: "ayu.kartika.ayu@yahoo.com" },
-  { name: "Slamet Riyadi", email: "slamet.riyadi.solo@gmail.com" },
-  { name: "Tuti Alawiyah", email: "tuti.alawiyah.jogja@gmail.com" },
-  { name: "Farhan Maulana", email: "farhan.maulana.lpg@gmail.com" },
-  { name: "Nabila Zahra", email: "nabila.zahra.palembang@outlook.com" },
-  { name: "Gilang Ramadhan", email: "gilang.ramadhan.malang@gmail.com" },
-  { name: "Citra Kirana", email: "citra.kirana.kediri@gmail.com" },
-  { name: "Bayu Anggara", email: "bayu.anggara.batam@gmail.com" },
-  { name: "Wulan Dari", email: "wulan.dari.jambi@yahoo.co.id" },
-  { name: "Teuku Fariz", email: "teuku.fariz.aceh@gmail.com" },
-  { name: "Cut Marlia", email: "cut.marlia.aceh@outlook.com" },
-  { name: "I Made Wirata", email: "i.made.wirata.bali@gmail.com" },
-  { name: "Ni Luh Ayu", email: "niluh.ayu.bali@yahoo.com" },
-  { name: "Ujang Komarudin", email: "ujang.komarudin.bdg@gmail.com" },
-  { name: "Eneng Suryani", email: "eneng.suryani.cirebon@gmail.com" },
-  { name: "La Ode Haris", email: "laode.haris.kendari@gmail.com" },
-  { name: "Wa Ode Sitti", email: "waode.sitti.kendari@yahoo.com" },
-  { name: "Johan Panjaitan", email: "johan.panjaitan.medan@gmail.com" },
-  { name: "Boruk Sihombing", email: "boruk.sihombing.medan@outlook.com" },
-  { name: "Daeng Makkawaru", email: "daeng.makkawaru.mks@gmail.com" },
-  { name: "Andi Tenri", email: "andi.tenri.parepare@yahoo.com" },
-  { name: "Yohanes Korwa", email: "yohanes.korwa.jayapura@gmail.com" },
-  { name: "Maria Matulessy", email: "maria.matulessy.ambon@gmail.com" },
-  { name: "Petrus Ola", email: "petrus.ola.kupang@gmail.com" },
-  { name: "Maria Florida", email: "maria.florida.kupang@yahoo.com" },
-  { name: "Jamaluddin Sulaiman", email: "jamaluddin.ternate@gmail.com" },
-  { name: "Norhalimah", email: "norhalimah.banjarmasin@gmail.com" },
-  { name: "Ahmad Rifai", email: "ahmad.rifai.balikpapan@gmail.com" },
-  { name: "Siti Masitah", email: "siti.masitah.samarinda@outlook.com" },
-];
 
 const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
 

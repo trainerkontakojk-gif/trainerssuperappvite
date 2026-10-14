@@ -1,5 +1,5 @@
 type WithoutExpectedAnswer<T> = T extends object
-  ? Omit<T, "expectedAnswer">
+  ? Omit<T, "expectedAnswer" | "ojkRequestInBody">
   : T;
 
 type SimulationConfig<T> = T extends { scenarios: Array<infer Scenario> }
@@ -17,8 +17,28 @@ export function toPdktSimulationScenario<T>(
   scenario: T,
 ): WithoutExpectedAnswer<T> {
   if (!isRecord(scenario)) return scenario as WithoutExpectedAnswer<T>;
-  const { expectedAnswer: _expectedAnswer, ...simulationScenario } = scenario;
+  const {
+    expectedAnswer: _expectedAnswer,
+    ojkRequestInBody: _ojkRequestInBody,
+    ...simulationScenario
+  } = scenario;
   return simulationScenario as WithoutExpectedAnswer<T>;
+}
+
+type SimulationEmail<T> = T extends object ? Omit<T, "recipientContext"> : T;
+
+/**
+ * Keep the reply direction a test: consumer emails shown in the simulation
+ * carry no recipient address or recipient context. Agent replies keep `to`,
+ * which is the consumer the participant answered.
+ */
+export function toPdktSimulationEmail<T>(email: T): SimulationEmail<T> {
+  if (!isRecord(email)) return email as SimulationEmail<T>;
+  const { recipientContext: _recipientContext, ...simulationEmail } = email;
+  if (simulationEmail.isAgent === true) {
+    return simulationEmail as SimulationEmail<T>;
+  }
+  return { ...simulationEmail, to: "" } as SimulationEmail<T>;
 }
 
 /** Keep evaluation-only references private when stored config snapshots are read by the UI. */

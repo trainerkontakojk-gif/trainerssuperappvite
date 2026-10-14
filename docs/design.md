@@ -43,8 +43,8 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 --surface: #f5f5f5;    /* Background untuk Card, Modal, Input */
 --border: #e5e5e5;     /* Warna garis pembatas (stroke) */
 --fg: #0a0a0a;         /* Teks utama (Heading, Judul) */
---fg2: #525252;        /* Teks sekunder (Deskripsi, Label) */
---fg3: #a3a3a3;        /* Teks tersier (Placeholder, Meta info) */
+--fg2: #404040;        /* Teks sekunder (Deskripsi, Label) */
+--fg3: #707070;        /* Teks tersier (Placeholder, Meta info) — ≥4.5:1 di bg/surface */
 --inv-bg: #0a0a0a;     /* Background kebalikan (Tombol Primary) */
 --inv-fg: #fafafa;     /* Teks kebalikan (Teks Tombol Primary) */
 
@@ -54,7 +54,7 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 --border: #262626;
 --fg: #fafafa;
 --fg2: #a3a3a3;
---fg3: #525252;
+--fg3: #8a8a8a;        /* ≥4.5:1 di bg/surface */
 --inv-bg: #fafafa;
 --inv-fg: #0a0a0a;
 ```
@@ -247,6 +247,35 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Loading state** — skeleton rows (bukan spinner doang).
 - **Empty state** — pesan jelas + CTA action.
 
+### Shell & navigasi
+
+Satu model navigasi, `buildNavModel(role)` di `components/layout/nav-config.ts`, menjadi sumber sidebar, drawer ponsel, tab bar, dan Beranda. Jangan membuat daftar modul lokal di komponen; modul dan sub-halaman tersaring capability `access.ts`.
+
+- **Sidebar (≥1024px)** 248px berlabel: tiap item berisi ikon, nama (`nav-name`, 13px), dan fungsi singkat (`nav-sub`, 12px, `aria-describedby`). Grup: Beranda · Latihan · Kualitas · Data · Administrasi. Item aktif memakai `aria-current="page"`; SIDAK memakai `Collapsible` dan terbuka otomatis di `/sidak/*`.
+- **Rail ciut** 64px, disimpan di `localStorage` (`trainers.sidebar.collapsed`). Label tetap ada untuk pembaca layar; nama tampil lewat Base UI Tooltip. Lebar sidebar tidak dianimasikan.
+- **Menu akun** di kaki sidebar dan drawer (Base UI Menu): Pengaturan akun, Ganti tema (menu tetap terbuka), Keluar. Teks "Keluar" memakai `--fg`; hanya ikonnya merah karena `--destructive` tidak mencapai 4.5:1 sebagai teks kecil.
+- **Ponsel (<1024px):** header dengan breadcrumb (root "Beranda") dan tombol menu; tab bar berisi 4 tab sesuai peran + "Lainnya"; drawer adalah Base UI Dialog berisi daftar navigasi yang sama.
+- **Fokus:** skip link "Lewati ke konten"; setelah navigasi fokus pindah ke `h1` halaman baru (atau region "Konten halaman") dan `document.title` mengikuti breadcrumb.
+- Target kontrol minimal 44px — karena root font 14px, pakai `h-[44px]`/`min-h-[44px]`, bukan `h-11`. Teks shell minimal 12px; `text-xs` di root 14px hanya 10,5px.
+
+### Beranda (`/dashboard`)
+
+- **Staff (admin/trainer/leader):** salam + tanggal (WIB) + periode QA terakhir, dan aksi utama sesuai peran → **Perlu tindakan** (`GET /api/v1/home/attention`, daftar berbaris dengan hitungan dan CTA) → kartu **Tren temuan QA** (bulan awal–akhir tahun berjalan, default Januari s.d. bulan ini/YTD; filter layanan; ringkasan angka; kurva halus monokrom dengan area tipis, bulan terakhir disorot beserta angkanya, dan proyeksi putus-putus yang hanya tampil bila rentang berakhir di bulan ini) di samping **Temuan per layanan** (jumlah atas rentang yang sama) → **Aktivitas terakhir** (hanya baca) + **Pintasan**. Dua baris terakhir memakai grid 2:1 yang sama, dan kepala section setinggi 44px supaya kolomnya sejajar.
+- **Proyeksi di Beranda hanya dibaca dari cache** (`POST /sidak/dashboard/forecast` dengan `cacheOnly`). Membuat atau memperbarui prediksi, serta filter tahun lain, ada di halaman SIDAK (`/sidak/forecast`, `/sidak`).
+- **Ponsel (≤560px):** aksi header selebar layar; CTA "Perlu tindakan" turun ke bawah teks; label sumbu X grafik dipendekkan/dijarangkan agar tidak bertumpuk.
+- **Agent:** aksi "Lanjutkan KETIK" → **Latihan** (modul yang diizinkan) → **Riwayat sesi** gabungan KETIK + PDKT.
+- Setiap section memuat datanya sendiri dengan state loading, kosong, dan error + "Coba lagi"; gagal satu section tidak mengosongkan section lain. Data tidak dikarang: kolom yang tidak ada di respons tidak ditampilkan.
+
+### Landing publik (`/`)
+
+Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti aturan produk di atas.
+
+- **Hero** hanya wordmark "Trainers SuperApp" pada papan split-flap 2 × 8 (`components/landing/SplitFlapBoard.tsx`). Intro melewati nama modul berwarna token `--module-*` lalu mendarat di wordmark (±4 detik); hover/ketuk mengocok ulang. Huruf maksimal ±4,4rem, tetap di bawah batas display 6rem.
+- **Papan split-flap** dekoratif dan `aria-hidden`; karakter dirender lewat `data-ch` + `::before`, teks yang dibaca pembaca layar berasal dari `sr-only` di sebelahnya. Status papan tersedia di `data-state` / `data-frame` untuk E2E.
+- **Modul** (`components/landing/ModuleStory.tsx`): papan kode modul yang mendarat saat terlihat, lalu langkah yang digulir menggerakkan panggung contoh sticky (data ilustrasi, `aria-hidden`). Di ≤900px panggung menempel di atas dan langkah aktif dihitung dari area di bawahnya.
+- **Pengecualian motion terbatas:** intro papan dan adegan panggung boleh lebih dari 0,6 detik, tetapi setiap animasi otomatis selesai atau berhenti dalam ±5 detik (WCAG 2.2.2), dan `prefers-reduced-motion: reduce` menampilkan keadaan akhir tanpa animasi.
+- Aksi masuk/akses tetap memakai `AuthContext` dari `LandingAuthClient`; tamu melihat `Masuk ke Platform` / `Ajukan Akses`, sesi aktif melihat `Buka Dashboard`.
+
 ---
 
 ## 6. Motion & Animation
@@ -261,6 +290,7 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Reduced motion WAJIB** — setiap animasi butuh `@media (prefers-reduced-motion: reduce)`.
 - **Stagger items** dalam satu list itu legitimate — yang jadi tell adalah uniform reflex (setiap section masuk dengan animasi identik).
 - **Reveal animations** harus enhance yang sudah visible — jangan gate content visibility di belakang class-triggered transition.
+- **Ilustrasi berulang di halaman modul** (mis. tiga tahap PDKT di `/pdkt`) boleh berputar lebih dari 5 detik hanya bila bersifat dekoratif (`aria-hidden`, penjelasan di `figcaption` `sr-only`), punya tombol jeda/putar yang terlihat (WCAG 2.2.2), dan saat dijeda atau `prefers-reduced-motion: reduce` menampilkan keadaan akhir yang utuh, bukan bingkai setengah jadi.
 
 ---
 

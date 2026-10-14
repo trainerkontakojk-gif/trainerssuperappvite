@@ -1,164 +1,195 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Send, X, Loader2, Reply } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Loader2, Send } from "lucide-react";
 import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
 import { Textarea } from "../../../components/ui/textarea";
+import { PDKT_NO_SUBJECT } from "../utils/emailDisplay";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../../components/ui/dialog";
 
 interface ReplyComposerProps {
   mailboxId: string;
   recipient: string;
   subject: string;
-  onSend: (text: string) => void;
-  onClose: () => void;
+  /** Mengirim balasan; `true` bila berhasil sehingga draf boleh dibuang. */
+  onSend: (text: string) => Promise<boolean> | void;
   isLoading: boolean;
 }
 
-export const ReplyComposer: React.FC<ReplyComposerProps> = ({
+function readDraft(key: string) {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(key: string, text: string) {
+  try {
+    if (text.trim()) {
+      localStorage.setItem(key, text);
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Penyimpanan penuh atau diblokir: draf hanya hilang dari perangkat ini.
+  }
+}
+
+/** Tahap Tanggapi: menulis balasan. Draf tersimpan per email di perangkat ini. */
+export function ReplyComposer({
   mailboxId,
   recipient,
   subject,
   onSend,
-  onClose,
   isLoading,
-}) => {
+}: ReplyComposerProps) {
   const draftKey = `pdkt_draft_${mailboxId}`;
-  const [replyText, setReplyText] = useState(() => {
-    try {
-      return localStorage.getItem(draftKey) || "";
-    } catch {
-      return "";
-    }
-  });
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const textareaId = useId();
+  const [replyText, setReplyText] = useState(() => readDraft(draftKey));
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  // Ruang kerja PDKT adalah lapisan `fixed z-[100]`; dialog dirender di
+  // dalamnya supaya tidak tertutup editor.
+  const [dialogContainer, setDialogContainer] =
+    useState<HTMLDivElement | null>(null);
+  const latestTextRef = useRef(replyText);
+  const sentRef = useRef(false);
 
   useEffect(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      try {
-        if (replyText.trim()) {
-          localStorage.setItem(draftKey, replyText);
-        } else {
-          localStorage.removeItem(draftKey);
-        }
-      } catch {
-        /* storage full */
-      }
-    }, 500);
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
+    latestTextRef.current = replyText;
+    const timer = setTimeout(() => writeDraft(draftKey, replyText), 500);
+    return () => clearTimeout(timer);
   }, [replyText, draftKey]);
 
-  const handleSend = () => {
-    if (!replyText.trim() || isLoading) return;
-    onSend(replyText);
-    setReplyText("");
+  // Kembali ke kotak masuk sebelum jeda simpan selesai tidak membuang ketikan terakhir.
+  useEffect(
+    () => () => {
+      if (!sentRef.current) writeDraft(draftKey, latestTextRef.current);
+    },
+    [draftKey],
+  );
+
+  const words = replyText.trim() ? replyText.trim().split(/\s+/).length : 0;
+  const canSend = replyText.trim().length > 0 && !isLoading;
+
+  const send = async () => {
+    setConfirmOpen(false);
+    sentRef.current = true;
+    const ok = await onSend(replyText);
+    if (ok === false) {
+      sentRef.current = false;
+      return;
+    }
     try {
       localStorage.removeItem(draftKey);
     } catch {
-      /* noop */
+      // noop
     }
-  };
-
-  const handleClose = () => {
-    try {
-      if (replyText.trim()) {
-        localStorage.setItem(draftKey, replyText);
-      } else {
-        localStorage.removeItem(draftKey);
-      }
-    } catch {
-      /* noop */
-    }
-    onClose();
+    setReplyText("");
   };
 
   return (
-    <Card
-      className="mx-3 mb-3 overflow-hidden rounded-lg border-border bg-card p-0"
-      role="region"
-      aria-label="Form balasan email"
+    <section
+      aria-label="Tulis balasan"
       aria-busy={isLoading}
+      className="flex min-h-0 flex-1 flex-col bg-surface-elevated"
     >
-      <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
-        <div className="flex items-center gap-2">
-          <Reply className="w-4 h-4 text-[var(--module-pdkt)]" />
-          <span className="text-xs font-semibold text-[var(--fg)]">Balas</span>
+      <dl className="flex shrink-0 flex-col gap-1.5 border-b border-border px-4 py-3 text-[12px] md:px-6">
+        <div className="flex gap-3">
+          <dt className="w-14 shrink-0 text-muted-foreground">Kepada</dt>
+          <dd className="truncate font-medium text-foreground">{recipient}</dd>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={handleClose}
-          className="min-h-11 min-w-11 text-muted-foreground"
-          aria-label="Tutup form balasan"
+        <div className="flex gap-3">
+          <dt className="w-14 shrink-0 text-muted-foreground">Subjek</dt>
+          <dd className="truncate font-medium text-foreground">
+            {subject || PDKT_NO_SUBJECT}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pt-4 md:px-6">
+        <label
+          htmlFor={textareaId}
+          className="text-xs font-semibold text-foreground"
         >
-          <X aria-hidden="true" />
-        </Button>
+          Balasan Anda
+        </label>
+        <Textarea
+          id={textareaId}
+          value={replyText}
+          onChange={(event) => setReplyText(event.target.value)}
+          readOnly={isLoading}
+          className="min-h-64 flex-1 resize-none bg-background p-4 text-[15px] leading-[26px]"
+          autoFocus
+        />
       </div>
 
-      <div className="px-4 md:px-6 py-2.5 space-y-2 border-b border-[var(--border)] text-xs">
-        <div className="flex items-center">
-          <span className="text-[var(--fg3)] w-14 shrink-0 font-medium">
-            Kepada
-          </span>
-          <span className="text-[var(--fg)] font-semibold truncate">
-            {recipient}
-          </span>
-        </div>
-        <div className="flex items-center">
-          <span className="text-[var(--fg3)] w-14 shrink-0 font-medium">
-            Cc
-          </span>
-          <span className="text-[var(--fg3)] truncate">-</span>
-        </div>
-        <div className="flex items-center">
-          <span className="text-[var(--fg3)] w-14 shrink-0 font-medium">
-            Subjek
-          </span>
-          <span
-            className={
-              subject
-                ? "text-[var(--fg)] font-semibold truncate"
-                : "text-[var(--fg3)] italic truncate"
-            }
-          >
-            {subject || "Tanpa Subjek"}
-          </span>
-        </div>
-      </div>
-
-      <Textarea
-        value={replyText}
-        onChange={(e) => setReplyText(e.target.value)}
-        className="min-h-32 resize-none rounded-none border-0 bg-card p-4 text-sm leading-relaxed focus-visible:ring-0 md:min-h-48"
-        placeholder="Tulis balasan Anda..."
-        aria-label="Isi balasan"
-        autoFocus
-      />
-
-      <div className="px-4 md:px-6 py-3 flex justify-end items-center border-t border-[var(--border)] bg-[var(--bg)]">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <span className="text-xs text-muted-foreground">
+          Draf disimpan di perangkat ini · {words} kata · {replyText.length}{" "}
+          karakter
+        </span>
         <Button
           type="button"
-          onClick={handleSend}
-          disabled={!replyText.trim() || isLoading}
-          className="min-h-11 px-5 text-xs"
+          onClick={() => setConfirmOpen(true)}
+          disabled={!canSend}
+          className="min-h-11 gap-2 px-5 text-[13px] font-semibold"
         >
           {isLoading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" />
-              <span>Mengirim...</span>
+              <Loader2
+                aria-hidden="true"
+                className="animate-spin motion-reduce:animate-none"
+              />
+              Mengirim…
             </>
           ) : (
             <>
-              <Send className="w-4 h-4" />
-              <span>Kirim</span>
+              <Send aria-hidden="true" />
+              Kirim balasan
             </>
           )}
         </Button>
       </div>
-    </Card>
+
+      <div ref={setDialogContainer} className="contents" />
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent
+          container={dialogContainer}
+          showCloseButton={false} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              Kirim balasan sekarang?
+            </DialogTitle>
+            <DialogDescription>
+              Setelah dikirim, balasan tidak bisa diubah dan langsung ditelaah
+              AI.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              className="min-h-11"
+            >
+              Periksa lagi
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void send()}
+              className="min-h-11"
+            >
+              Kirim balasan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
   );
-};
+}

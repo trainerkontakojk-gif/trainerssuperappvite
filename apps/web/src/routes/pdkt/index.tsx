@@ -1,34 +1,36 @@
 import { can } from "@trainers/types";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
 import { useAuthStore } from "../../store/authStore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Play, Settings, History, BarChart3 } from "lucide-react";
-import { Badge } from "../../components/ui/badge";
+import { ArrowRight, History, SlidersHorizontal } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { PdktStageDemo } from "./components/PdktStageDemo";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { Separator } from "../../components/ui/separator";
-import { PdktMotionFrame } from "./components/PdktMotionFrame";
+  PdktLandingOverview,
+  type PdktLoadState,
+} from "./components/PdktLandingOverview";
+import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
-import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
-import { UsageModal } from "../../components/UsageModal";
+import { mapHistoryRow, type SessionHistory } from "./utils/sessionHistory";
+import { UsagePopover } from "./components/UsagePopover";
 import { useApi } from "../../hooks/useApi";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
-import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
+import {
+  DEFAULT_PDKT_MODEL_ID,
+  PDKT_FALLBACK_CONSUMER_TYPES as defaultConsumerTypes,
+} from "./pdktSettings";
 import type {
+  PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
   SimulationSubjectSelection,
 } from "@trainers/types";
 import { notify } from "../../lib/toast";
+import { APP_MODULES } from "../../lib/app-config";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
@@ -38,53 +40,12 @@ import {
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { createSettingsVersionStore } from "../../lib/settings-contract";
 
-const accentClassName = "text-purple-500";
-const accentSoftClassName = "bg-purple-100";
+/** Kepanjangan PDKT dari metadata modul kanonik (`lib/app-config.ts`). */
+const PDKT_EXPANDED_TITLE =
+  APP_MODULES.find((module) => module.id === "pdkt")?.expandedTitle ??
+  "Paham Dulu Kasih Tanggapan";
 
-const defaultConsumerTypes: PdktConsumerType[] = [
-  {
-    id: "marah",
-    name: "Marah & Emosional",
-    description: "Sangat marah, emosional, tidak sabar.",
-    difficulty: "Hard",
-    tone: "Marah, menggunakan tanda seru.",
-  },
-  {
-    id: "bingung",
-    name: "Bingung & Gaptek",
-    description: "Kebingungan, tidak paham teknologi.",
-    difficulty: "Medium",
-    tone: "Bingung, ragu-ragu.",
-  },
-  {
-    id: "kritis",
-    name: "Kritis & Detail",
-    description: "Kritis, menanyakan dasar hukum.",
-    difficulty: "Hard",
-    tone: "Kritis, logis, skeptis.",
-  },
-  {
-    id: "ramah",
-    name: "Ramah & Kooperatif",
-    description: "Ramah, sopan, kooperatif.",
-    difficulty: "Easy",
-    tone: "Ramah, sopan.",
-  },
-  {
-    id: "terburu-buru",
-    name: "Terburu-buru",
-    description: "Ingin jawaban singkat dan cepat.",
-    difficulty: "Medium",
-    tone: "Singkat, padat.",
-  },
-  {
-    id: "pasrah",
-    name: "Pasrah & Sedih",
-    description: "Putus asa, nada sedih.",
-    difficulty: "Medium",
-    tone: "Sedih, memohon bantuan.",
-  },
-];
+const navButtonClass = "min-h-11 gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
 export default function PdktLanding() {
   const [view, setView] = useState<"home" | "mailbox">("home");
@@ -96,13 +57,15 @@ export default function PdktLanding() {
   const accountKey = session?.user?.id ?? null;
   const canPickParticipant = can(profile?.role, "simulation.subject.select");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isUsageOpen, setIsUsageOpen] = useState(false);
 
   const [settings, setSettings] = useState<PdktAppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
+  // Email yang dipilih dari landing ("Belum dibalas"), dibuka setelah pemilih peserta.
+  const [pendingMailboxId, setPendingMailboxId] = useState<string | null>(null);
+  const [initialMailboxId, setInitialMailboxId] = useState<string | null>(null);
 
   // Landing data is handed to the session view so it does not refetch it.
   const [settingsReady, setSettingsReady] = useState(false);
@@ -118,6 +81,12 @@ export default function PdktLanding() {
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
     "/pdkt/consumer-types",
   );
+  // Daftar ringan (tanpa snapshot) untuk ringkasan dan daftar "Belum dibalas".
+  const {
+    data: mailboxItems,
+    error: mailboxError,
+    refetch: refetchMailbox,
+  } = useApi<PdktMailboxListItem[]>("/pdkt/mailbox");
 
   const fetchSettings = async () => {
     try {
@@ -141,32 +110,18 @@ export default function PdktLanding() {
   };
 
   const fetchHistory = async () => {
+    setHistoryError(false);
     try {
       const res = (await unwrapResponse(
         await pdktClient.history.$get(),
       )) as any[];
       if (res) {
-        const mapped = res.map((item: any) => ({
-          id: item.id,
-          timestamp: item.timestamp,
-          user_id: item.user_id ?? null,
-          user_email: item.user_email ?? null,
-          user_role: item.user_role ?? null,
-          config: item.config,
-          emails: item.emails || [],
-          evaluation: item.evaluation,
-          evaluationStatus:
-            item.evaluation_status ||
-            (item.evaluation ? "completed" : "processing"),
-          evaluationError: item.evaluation_error,
-          timeTaken: item.time_taken,
-          simulationSubject: item.simulationSubject ?? null,
-        }));
-        setHistory(mapped);
+        setHistory(res.map(mapHistoryRow));
         setHistoryReady(true);
       }
     } catch (err) {
       console.error("[PDKT] Failed to load history:", err);
+      setHistoryError(true);
     } finally {
       setHistoryLoading(false);
     }
@@ -189,36 +144,37 @@ export default function PdktLanding() {
     await fetchHistory();
   };
 
-  const handleDeleteSession = async (historyId: string) => {
-    try {
-      await unwrapResponse(
-        await pdktClient.history[":id"].$delete({ param: { id: historyId } }),
-      );
-      setHistory((prev) => prev.filter((h) => h.id !== historyId));
-    } catch (err) {
-      console.error("[PDKT] Failed to delete session:", err);
-      notify.error("Gagal menghapus riwayat sesi.");
-    }
-  };
-
-  const handleClearHistory = async () => {
-    try {
-      await unwrapResponse(await pdktClient.history.$delete());
-      setHistory([]);
-    } catch (err) {
-      notify.error("Gagal membersihkan riwayat.");
-    }
-  };
-
   const [replaySession, setReplaySession] = useState<SessionHistory | null>(
     null,
   );
 
   const handleSelectSession = (session: SessionHistory) => {
     setReplaySession(session);
-    setIsHistoryOpen(false);
     setView("mailbox");
   };
+
+  // `/pdkt?sesi=<id>` dari halaman Riwayat: buka sesi itu setelah riwayat termuat.
+  const navigate = useNavigate();
+  const { sesi: requestedSessionId } = useSearch({ from: "/pdkt" });
+  useEffect(() => {
+    if (!requestedSessionId) return;
+    if (historyError) {
+      notify.error(
+        "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka.",
+      );
+    } else if (!historyReady) {
+      return;
+    } else {
+      const session = history.find((item) => item.id === requestedSessionId);
+      if (session) {
+        handleSelectSession(session);
+      } else {
+        notify.error("Sesi itu tidak ada lagi di riwayat Anda.");
+      }
+    }
+    void navigate({ to: "/pdkt", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedSessionId, historyReady, historyError, history]);
 
   const captureUsageBaseline = async () => {
     try {
@@ -231,8 +187,15 @@ export default function PdktLanding() {
     }
   };
 
-  const computeUsageDeltaNow = async () => {
-    if (!usageSnapshotRef.current) return;
+  // Baseline diambil ulang tepat sebelum setiap balasan, jadi selisihnya adalah
+  // pemakaian balasan terakhir (kirim + telaah). "Masih dihitung" hanya tampil
+  // selama `computeUsageDeltaNow` berjalan; balasan yang gagal terkirim tidak
+  // menyalakannya.
+  const computeUsageDeltaNow = async (reason: "reply" | "review") => {
+    if (!usageSnapshotRef.current) {
+      setSessionDeltaPending(false);
+      return;
+    }
     setSessionDeltaPending(true);
     try {
       const delta = await pollUsageDelta(
@@ -240,24 +203,33 @@ export default function PdktLanding() {
         usageSnapshotRef.current,
       );
       setSessionDelta(delta);
-      if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+      // Satu pemberitahuan per balasan: setelah telaah selesai, saat biaya
+      // pembuatan email dan telaah sudah tercatat.
+      if (
+        reason === "review" &&
+        delta &&
+        (delta.costIdr > 0 || delta.totalTokens > 0)
+      ) {
         const format = (v: number) =>
           v.toLocaleString("id-ID", {
             style: "currency",
             currency: "IDR",
             minimumFractionDigits: 0,
           });
-        const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+        const parts: string[] = [];
         const sim = delta.breakdown.simulation;
         const rev = delta.breakdown.review;
 
         if (sim.costIdr > 0 || sim.calls > 0) {
-          parts.push(`Simulasi ${format(sim.costIdr)}`);
+          parts.push(`Pembuatan email ${format(sim.costIdr)}`);
         }
         if (rev.costIdr > 0 || rev.calls > 0) {
-          parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+          parts.push(`Telaah balasan ${format(rev.costIdr)}`);
         }
-        notify.success(parts.join(" | "));
+        notify.info(
+          `Pemakaian AI: ${formatUsageDeltaLabel(delta)}`,
+          parts.length ? parts.join(" · ") : undefined,
+        );
       }
     } catch (err) {
       console.error("[PDKT] Failed to compute usage delta:", err);
@@ -271,22 +243,28 @@ export default function PdktLanding() {
     setShowSubjectPicker(false);
   }, [accountKey, canPickParticipant]);
 
-  const handleStartSimulation = async () => {
+  const handleStartSimulation = async (mailboxId: string | null = null) => {
+    setPendingMailboxId(mailboxId);
     if (!canPickParticipant) {
-      await handleConfirmSubject({ type: "self" });
+      await handleConfirmSubject({ type: "self" }, mailboxId);
       return;
     }
     setShowSubjectPicker(true);
   };
 
-  const handleConfirmSubject = async (sel: SimulationSubjectSelection) => {
+  const handleConfirmSubject = async (
+    sel: SimulationSubjectSelection,
+    mailboxId: string | null = pendingMailboxId,
+  ) => {
     setSimulationSubject(sel);
     setShowSubjectPicker(false);
+    setInitialMailboxId(mailboxId);
+    setPendingMailboxId(null);
     // Baseline usage is only needed for the delta notification; never block
     // opening the mailbox on it.
     void captureUsageBaseline();
     setSessionDelta(null);
-    setSessionDeltaPending(true);
+    setSessionDeltaPending(false);
     setReplaySession(null);
     setView("mailbox");
   };
@@ -312,14 +290,30 @@ export default function PdktLanding() {
     setIsSettingsOpen(true);
   };
 
-  const handleOpenHistory = async () => {
-    await fetchHistory();
-    setIsHistoryOpen(true);
+  const handleOpenHistory = () => {
+    void navigate({ to: "/pdkt/history" });
   };
 
-  const handleOpenUsage = () => {
-    setIsUsageOpen(true);
-  };
+  const hasSessionDelta = Boolean(
+    sessionDelta &&
+    (sessionDelta.costIdr > 0 ||
+      sessionDelta.totalTokens > 0 ||
+      sessionDelta.totalCalls > 0),
+  );
+  const historyState: PdktLoadState = historyLoading
+    ? "loading"
+    : historyError
+      ? "error"
+      : "ready";
+  const mailboxState: PdktLoadState = mailboxError
+    ? "error"
+    : mailboxItems
+      ? "ready"
+      : "loading";
+  const landingSummary = useMemo(
+    () => summarizePdktLanding(history, mailboxItems ?? []),
+    [history, mailboxItems],
+  );
 
   const currentSettings: PdktAppSettings = settings || {
     scenarios: defaultScenarios || [],
@@ -343,98 +337,109 @@ export default function PdktLanding() {
             transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className="relative z-10"
           >
-            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
-              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                {/* Kiri — HP inbox */}
-                <div className="flex flex-col">
-                  <div className="flex flex-1 flex-col">
-                    <PdktMotionFrame />
+            <section
+              aria-labelledby="pdkt-hero-title"
+              className="border-b border-border bg-surface-elevated"
+            >
+              <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-14 gap-y-10 px-6 pt-10 pb-14">
+                <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
+                  <div className="flex flex-col gap-5">
+                    <h1
+                      id="pdkt-hero-title"
+                      className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
+                    >
+                      Pahami keluhannya.{" "}
+                      <span className="block text-module-pdkt">
+                        Balas dengan tepat.
+                      </span>
+                    </h1>
+                    <p
+                      data-testid="pdkt-hero-intro"
+                      className="max-w-[52ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]"
+                    >
+                      PDKT (
+                      <span className="font-semibold text-foreground">
+                        {PDKT_EXPANDED_TITLE}
+                      </span>
+                      ) adalah latihan membalas email konsumen. Baca emailnya
+                      sampai paham, tulis balasan dengan kata-kata Anda sendiri,
+                      lalu AI menelaah balasan itu dan menunjukkan bagian yang
+                      perlu diperbaiki.
+                    </p>
                   </div>
-                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Daftar email masuk ke konsumen@ojk.go.id. Sesi singkat,
-                    telaah langsung tersedia.
-                  </p>
+
+                  {/* Aksi utama, lalu menu PDKT sebagai baris kedua yang lebih tenang. */}
+                  <div className="flex flex-col items-start gap-3">
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={() => handleStartSimulation()}
+                      className="min-h-11 gap-2.5 px-5 text-sm font-semibold"
+                    >
+                      Mulai simulasi
+                      <ArrowRight data-icon="inline-end" />
+                    </Button>
+                    <nav
+                      aria-label="Menu PDKT"
+                      className="flex flex-wrap gap-2"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleOpenHistory}
+                        className={navButtonClass}
+                      >
+                        <History data-icon="inline-start" />
+                        Riwayat
+                      </Button>
+                      <UsagePopover
+                        triggerClassName={navButtonClass}
+                        sessionDelta={sessionDelta}
+                        sessionDeltaPending={sessionDeltaPending}
+                        triggerBadge={
+                          hasSessionDelta &&
+                          sessionDelta && (
+                            <span className="rounded-full bg-module-pdkt/10 px-2 py-px text-xs font-semibold text-module-pdkt">
+                              <span className="sr-only">Balasan terakhir </span>
+                              {formatUsageDeltaLabel(sessionDelta)}
+                            </span>
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleOpenSettings}
+                        className={navButtonClass}
+                      >
+                        <SlidersHorizontal data-icon="inline-start" />
+                        Pengaturan
+                      </Button>
+                    </nav>
+                  </div>
                 </div>
 
-                {/* Kanan — 1 card */}
-                <Card className="flex min-w-0 flex-1 flex-col border-border bg-card py-0">
-                  <CardHeader className="gap-4 p-7 lg:p-8">
-                    <CardTitle className="max-w-xl text-3xl tracking-tight text-balance lg:text-4xl">
-                      Latih balasan email. Pahami dulu, baru tanggapi.
-                    </CardTitle>
-                    <CardDescription className="max-w-xl text-base leading-7">
-                      PDKT — singkatan dari{" "}
-                      <span className="font-semibold text-foreground">
-                        Paham Dulu, Kasih Tanggapan
-                      </span>{" "}
-                      — adalah simulasi balasan email berbasis AI untuk melatih
-                      pemahaman, analisa, dan ketepatan solusi. Pilih skenario,
-                      susun balasan, lalu tinjau telaah secara langsung.
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="flex flex-1 flex-col p-7 pt-0 lg:p-8 lg:pt-0">
-                    <Separator className="mt-2" />
-                    <div className="pt-6">
-                      <h3 className="text-sm font-medium text-foreground">
-                        Mulai latihan
-                      </h3>
-                      <div className="mt-4 space-y-3">
-                        <Button
-                          type="button"
-                          size="lg"
-                          onClick={handleStartSimulation}
-                          className="min-h-12 w-full justify-start gap-2.5 bg-module-pdkt px-3 text-sm font-semibold text-module-pdkt-foreground hover:bg-module-pdkt/90"
-                        >
-                          <Play data-icon="inline-start" fill="currentColor" />
-                          Mulai simulasi
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="outline"
-                          onClick={handleOpenSettings}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
-                        >
-                          <Settings data-icon="inline-start" />
-                          Pengaturan
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="outline"
-                          onClick={handleOpenHistory}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm"
-                        >
-                          <History data-icon="inline-start" />
-                          Riwayat
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          variant="ghost"
-                          onClick={handleOpenUsage}
-                          className="min-h-12 w-full justify-start gap-2.5 px-3 text-sm text-muted-foreground"
-                          aria-label="Buka pemakaian bulan ini"
-                        >
-                          <BarChart3 data-icon="inline-start" />
-                          Pemakaian bulan ini
-                          {sessionDelta &&
-                            (sessionDelta.costIdr > 0 ||
-                              sessionDelta.totalTokens > 0 ||
-                              sessionDelta.totalCalls > 0) && (
-                              <Badge variant="secondary" className="ml-auto">
-                                {formatUsageDeltaLabel(sessionDelta)} sesi
-                                terakhir
-                              </Badge>
-                            )}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="mx-auto flex min-w-0 max-w-[600px] flex-[1_1_480px]">
+                  <PdktStageDemo />
+                </div>
               </div>
-            </div>
+            </section>
+
+            <PdktLandingOverview
+              summary={landingSummary}
+              historyState={historyState}
+              mailboxState={mailboxState}
+              onRetryHistory={() => {
+                setHistoryLoading(true);
+                void fetchHistory();
+              }}
+              onRetryMailbox={() => void refetchMailbox()}
+              onOpenMailbox={(mailboxId) =>
+                void handleStartSimulation(mailboxId ?? null)
+              }
+              onOpenSession={handleSelectSession}
+              onOpenHistory={handleOpenHistory}
+            />
           </motion.div>
         ) : (
           <motion.div
@@ -451,9 +456,12 @@ export default function PdktLanding() {
                 onBack={() => {
                   setView("home");
                   setReplaySession(null);
+                  setInitialMailboxId(null);
+                  void refetchMailbox();
                 }}
                 onBeforeActivity={captureUsageBaseline}
-                onAfterActivity={computeUsageDeltaNow}
+                onAfterActivity={(reason) => void computeUsageDeltaNow(reason)}
+                initialSelectedMailboxId={initialMailboxId}
                 initialReplaySession={replaySession}
                 onConsumeReplaySession={() => setReplaySession(null)}
                 initialSettings={settingsReady ? settings : undefined}
@@ -476,7 +484,10 @@ export default function PdktLanding() {
           accountKey={accountKey}
           canPickParticipant={canPickParticipant}
           onConfirm={handleConfirmSubject}
-          onCancel={() => setShowSubjectPicker(false)}
+          onCancel={() => {
+            setShowSubjectPicker(false);
+            setPendingMailboxId(null);
+          }}
         />
       )}
       <SettingsModal
@@ -488,23 +499,6 @@ export default function PdktLanding() {
         defaultConsumerTypes={
           defaultConsumerTypesFromApi || defaultConsumerTypes
         }
-      />
-
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        onClearHistory={handleClearHistory}
-      />
-
-      <UsageModal
-        isOpen={isUsageOpen}
-        onClose={() => setIsUsageOpen(false)}
-        module="pdkt"
-        sessionDelta={sessionDelta}
-        sessionDeltaPending={sessionDeltaPending}
       />
     </div>
   );

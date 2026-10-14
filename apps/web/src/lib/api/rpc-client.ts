@@ -396,3 +396,5 @@ export const adminClient = (rpcClient as any).v1
 export const profilerClient = (rpcClient as any).v1.profiler;
 export const profilerSubjectClient = profilerClient as ProfilerSubjectClient;
 export const healthClient = hc<HealthRouteType>(HC_BASE_URL, clientOptions);
+// Router `home` dideklarasikan berantai, jadi skemanya tetap bertipe.
+export const homeClient = rpcClient.v1.home;

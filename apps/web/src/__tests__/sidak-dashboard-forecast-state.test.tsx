@@ -56,7 +56,7 @@ describe("SidakDashboardPage forecast state", () => {
     summary: {
       totalAgents: 10,
       totalDefects: 20,
-      avgDefectsPerAudit: 2,
+      totalTickets: 2,
       avgAgentScore: 80,
       complianceRate: 50,
       complianceCount: 5,

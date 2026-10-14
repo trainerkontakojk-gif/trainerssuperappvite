@@ -23,7 +23,17 @@ export type WritingStyleMode = "realistic" | "training";
 
 export type PdktPrimaryRecipientType = "ojk" | "reported_company";
 
-export type PdktReplyIntent = "reply_to_company_with_ojk_cc" | "reply_to_ojk";
+/**
+ * Arah balasan yang dinilai. `reply_to_ojk_request_in_company_email`: header
+ * Kepada perusahaan + Tembusan OJK, tetapi isi email meminta bantuan OJK, jadi
+ * OJK tetap lawan bicara utama yang harus menjawab sesuai kasus.
+ */
+export const pdktReplyIntentSchema = z.enum([
+  "reply_to_company_with_ojk_cc",
+  "reply_to_ojk",
+  "reply_to_ojk_request_in_company_email",
+]);
+export type PdktReplyIntent = z.infer<typeof pdktReplyIntentSchema>;
 
 export interface PdktRecipientContext {
   primaryRecipientType: PdktPrimaryRecipientType;
@@ -57,6 +67,15 @@ export type PdktDimensionKey =
   | "clarity"
   | "typo"
   | "template";
+
+/** Urutan tetap dimensi penilaian (dipakai untuk prioritas dan validasi). */
+export const PDKT_DIMENSION_KEYS = [
+  "recipientDirection",
+  "normative",
+  "clarity",
+  "typo",
+  "template",
+] as const satisfies readonly PdktDimensionKey[];
 
 /** Shape requested from the model — no priority field from AI. */
 export interface PdktActionItemAI {
@@ -124,6 +143,8 @@ export const pdktScenarioSchema = z.object({
     .max(PDKT_PROMPT_INPUT_LIMITS.longText)
     .optional(),
   primaryRecipientType: z.enum(["ojk", "reported_company"]).optional(),
+  /** Hanya berlaku untuk `reported_company`: isi email juga meminta bantuan OJK. */
+  ojkRequestInBody: z.boolean().optional(),
   recipientMode: z.enum(["single", "multiple"]).optional(),
   recipientEmails: z.array(z.string()).optional(),
   script: z.string().optional(),
@@ -157,7 +178,7 @@ export const pdktPromptRecipientContextSchema = z.object({
   ccRecipients: z
     .array(boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.emailAddress))
     .max(PDKT_PROMPT_INPUT_LIMITS.recipientCount),
-  replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+  replyIntent: pdktReplyIntentSchema,
 });
 
 export const pdktPromptConsumerTypeSchema = pdktConsumerTypeSchema.extend({
@@ -210,7 +231,7 @@ export const pdktSessionConfigSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+      replyIntent: pdktReplyIntentSchema,
     })
     .optional(),
   enableImageGeneration: z.boolean().default(true),
@@ -343,6 +364,31 @@ export const pdktEvaluationAiOutputSchema = z
   })
   .strict();
 
+export const PDKT_REPLY_ANNOTATION_LIMITS = {
+  count: 8,
+  quote: 300,
+} as const;
+
+/**
+ * Catatan AI yang menunjuk kalimat di balasan agent, sesudah dinormalkan backend.
+ * `start`/`end` adalah posisi (indeks karakter) di body balasan; `null` bila
+ * kutipan tidak ketemu atau bertumpuk, sehingga catatan tampil tanpa tanda.
+ */
+export const pdktReplyAnnotationSchema = z
+  .object({
+    quote: z.string().min(1).max(PDKT_REPLY_ANNOTATION_LIMITS.quote),
+    dimension: z.enum(PDKT_DIMENSION_KEYS),
+    note: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+    start: z.number().int().nonnegative().nullable(),
+    end: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+export type PdktReplyAnnotation = z.infer<typeof pdktReplyAnnotationSchema>;
+
+export const pdktStoredReplyAnnotationsSchema = z
+  .array(pdktReplyAnnotationSchema)
+  .max(PDKT_REPLY_ANNOTATION_LIMITS.count);
+
 export interface PdktEvaluationResult {
   score: number;
   feedback: string;
@@ -352,6 +398,7 @@ export interface PdktEvaluationResult {
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations?: PdktReplyAnnotation[];
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";
@@ -390,7 +437,7 @@ export const emailMessageSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
+      replyIntent: pdktReplyIntentSchema,
     })
     .optional(),
   attachments: z.array(z.string()).optional(),
@@ -439,6 +486,15 @@ export interface PdktMailboxItem {
   permissions?: PdktMailboxPermissions;
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
+
+/**
+ * Simulation-facing mailbox detail. Scenario/config snapshots and the email
+ * recipient stay server-side so the participant gets no hint beyond the email.
+ */
+export type PdktMailboxDetailItem = Omit<
+  PdktMailboxItem,
+  "scenario_snapshot" | "config_snapshot"
+>;
 
 export type PdktMailboxListItem = Omit<
   PdktMailboxItem,

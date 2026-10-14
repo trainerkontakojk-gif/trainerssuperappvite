@@ -1,0 +1,91 @@
+/* Split-flap board (landing). Characters render from data-ch via ::before. */
+.landing-wrapper .flapboard {
+  --cell: 40px;
+  --gap: 6px;
+  --tile-top: var(--flap-top);
+  --tile-bottom: var(--flap-bottom);
+  display: inline-grid;
+  gap: calc(var(--gap) * 1.5);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.landing-wrapper .flap-row {
+  display: flex;
+  gap: var(--gap);
+}
+.landing-wrapper .flap {
+  position: relative;
+  flex: none;
+  width: var(--cell);
+  height: calc(var(--cell) * 1.32);
+  font-size: calc(var(--cell) * 0.8);
+  line-height: 1;
+  perspective: calc(var(--cell) * 6);
+}
+.landing-wrapper .flap::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - 0.5px);
+  z-index: 2;
+  height: 1px;
+  background: var(--bg);
+}
+.landing-wrapper .flap > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  color: var(--fg);
+  backface-visibility: hidden;
+}
+.landing-wrapper .flap > span::before {
+  content: attr(data-ch);
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 200%;
+  display: grid;
+  place-items: center;
+}
+.landing-wrapper .flap .top,
+.landing-wrapper .flap .leaf-top {
+  top: 0;
+  border-radius: calc(var(--cell) * 0.12) calc(var(--cell) * 0.12) 0 0;
+  background: var(--tile-top);
+}
+.landing-wrapper .flap .bottom,
+.landing-wrapper .flap .leaf-bottom {
+  bottom: 0;
+  border-radius: 0 0 calc(var(--cell) * 0.12) calc(var(--cell) * 0.12);
+  background: var(--tile-bottom);
+}
+.landing-wrapper .flap .top::before,
+.landing-wrapper .flap .leaf-top::before {
+  top: 0;
+}
+.landing-wrapper .flap .bottom::before,
+.landing-wrapper .flap .leaf-bottom::before {
+  top: -100%;
+}
+.landing-wrapper .flap .leaf-top,
+.landing-wrapper .flap .leaf-bottom {
+  z-index: 1;
+  visibility: hidden;
+}
+.landing-wrapper .flap .leaf-top {
+  transform-origin: bottom;
+}
+.landing-wrapper .flap .leaf-bottom {
+  transform-origin: top;
+  transform: rotateX(90deg);
+}
+.landing-wrapper .flap.flipping .leaf-top,
+.landing-wrapper .flap.flipping .leaf-bottom {
+  visibility: visible;
+}

@@ -39,18 +39,22 @@ export function PdktIdentityTab({
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Identitas pengirim
+        <div className="flex flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Identitas konsumen
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Dipakai AI untuk menyapa dan menandatangani balasan simulasi. Field
-            kosong memakai identitas default sistem.
+          <p className="text-[13px] leading-5 text-fg2">
+            Nama dan alamat konsumen yang mengirim email konsumen. Biarkan kosong
+            agar sistem memakai identitas acak di setiap sesi.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <SettingsField label="Nama Pengirim (Header)" id="custom-sender-name">
+          <SettingsField
+            label="Nama lengkap"
+            id="custom-sender-name"
+            helperText="Tampil sebagai nama pengirim email."
+          >
             <SettingsInput
               id="custom-sender-name"
               type="text"
@@ -60,7 +64,11 @@ export function PdktIdentityTab({
             />
           </SettingsField>
 
-          <SettingsField label="Nama Panggilan (Body)" id="custom-body-name">
+          <SettingsField
+            label="Nama panggilan"
+            id="custom-body-name"
+            helperText="Dipakai konsumen saat menyebut dirinya."
+          >
             <SettingsInput
               id="custom-body-name"
               type="text"
@@ -70,17 +78,17 @@ export function PdktIdentityTab({
             />
           </SettingsField>
 
-          <SettingsField label="Email Kantor" id="custom-email">
+          <SettingsField label="Alamat email" id="custom-email">
             <SettingsInput
               id="custom-email"
               type="email"
-              placeholder="nama@ojk.go.id"
+              placeholder="nama@email.com"
               value={customEmail}
               onChange={(e) => setCustomEmail(e.target.value)}
             />
           </SettingsField>
 
-          <SettingsField label="Kota Tugas" id="custom-city">
+          <SettingsField label="Kota" id="custom-city">
             <SettingsInput
               id="custom-city"
               type="text"
@@ -94,16 +102,17 @@ export function PdktIdentityTab({
 
       <section className="flex flex-col gap-4">
         <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Penyebutan nama konsumen
-          </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Mengatur kapan nama konsumen boleh muncul pada email awal simulasi.
+          <h4 className="text-[15px] font-semibold text-foreground">
+            Penyebutan nama di email
+          </h4>
+          <p className="mt-1 text-[13px] leading-5 text-fg2">
+            Di bagian mana konsumen menyebut namanya. Pilih "Tidak disebut" untuk
+            melatih peserta mencari identitas dari konteks.
           </p>
         </div>
 
         <SettingsField
-          label="Pola Penyebutan Nama Konsumen"
+          label="Penyebutan nama"
           id="consumer-mention-pattern"
           className="md:max-w-md"
         >
@@ -120,7 +129,7 @@ export function PdktIdentityTab({
             <option value="upfront">Nama disebut di awal</option>
             <option value="middle">Nama disebut di tengah</option>
             <option value="late">Nama disebut di akhir</option>
-            <option value="none">Tidak menyebut nama</option>
+            <option value="none">Tidak disebut</option>
           </SettingsSelect>
         </SettingsField>
       </section>

@@ -6,6 +6,7 @@ import {
   type DashboardSparklinePoint,
 } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
+import { countFindingTickets } from "./shared-constants";
 import { getScoreRows } from "./dashboard-aggregation";
 
 export const MONTHS_SHORT = [
@@ -89,9 +90,9 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
       );
 
       const totalAudited = periodAgentKeys.length;
-      const totalFindings = periodRows.filter((r: any) =>
+      const periodFindingRows = periodRows.filter((r: any) =>
         params.isCountableFinding(r),
-      ).length;
+      );
 
       let zeroCount = 0;
       let complianceCount = 0;
@@ -114,8 +115,8 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
       return {
         periodId: period.id,
         label: `${MONTHS_SHORT[period.month - 1]} ${String(period.year).slice(-2)}`,
-        total: totalFindings,
-        avg: totalAudited > 0 ? roundTo(totalFindings / totalAudited, 1) : 0,
+        total: periodFindingRows.length,
+        totalTickets: countFindingTickets(periodFindingRows),
         zero:
           totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
         compliance: complianceCount,
@@ -180,9 +181,9 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         label: m.label,
         value: m.total,
       })),
-      "avg-defects": periodMetrics.map((m) => ({
+      "total-tickets": periodMetrics.map((m) => ({
         label: m.label,
-        value: m.avg,
+        value: m.totalTickets,
       })),
       "avg-score": periodMetrics.map((m) => ({
         label: m.label,

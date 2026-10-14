@@ -3,17 +3,14 @@ import { randomUUID } from "node:crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
   mapSimulationSubjectRowToSnapshot,
-  PdktMailboxItem,
+  type PdktMailboxDetailItem,
   type PdktMailboxListItem,
   PdktMailboxBatch,
   PdktMailboxReply,
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
-import {
-  toPdktSimulationConfig,
-  toPdktSimulationScenario,
-} from "./scenario-projections";
+import { toPdktSimulationEmail } from "./scenario-projections";
 
 type BulkDeleteResult = {
   successCount: number;
@@ -268,12 +265,18 @@ export async function fetchMailboxItems(
 /**
  * Fetch a single active mailbox item with its inline attachments and thread.
  * Used to keep the list payload small while the detail pane stays complete.
+ *
+ * Visibility is decided by the caller's JWT (RLS) on the scalar columns.
+ * Clients cannot SELECT the JSON snapshots (migration
+ * 20261013120000_pdkt_mailbox_hide_snapshot_columns), so the emails of an
+ * already-visible row are read server-side and projected for the simulation:
+ * no scenario/config snapshot and no recipient of the consumer email.
  */
 export async function fetchMailboxItemById(
   supabaseClient: SupabaseClient,
   actorOrId: string | { id: string; role: string },
   id: string,
-): Promise<PdktMailboxItem | null> {
+): Promise<PdktMailboxDetailItem | null> {
   const actor =
     typeof actorOrId === "string"
       ? { id: actorOrId, role: "agent" }
@@ -281,7 +284,7 @@ export async function fetchMailboxItemById(
 
   const { data, error } = await supabaseClient
     .from("pdkt_mailbox_items")
-    .select("*")
+    .select(MAILBOX_LIST_COLUMNS)
     .eq("id", id)
     .neq("status", "deleted")
     .or("is_shared_copy.eq.false,is_shared_copy.is.null")
@@ -294,14 +297,26 @@ export async function fetchMailboxItemById(
 
   if (!data) return null;
 
+  const { data: emails, error: emailsError } = await supabaseAdmin
+    .from("pdkt_mailbox_items")
+    .select("inbound_email, emails_thread")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (emailsError || !emails) {
+    console.error("[PDKT] Mailbox email fetch failed:", emailsError);
+    throw new Error("Gagal mengambil data email.");
+  }
+
   const [item] = await decorateMailboxRows([data], actor);
   if (!item) return null;
 
+  const thread = Array.isArray(emails.emails_thread) ? emails.emails_thread : [];
   return {
     ...item,
-    scenario_snapshot: toPdktSimulationScenario(item.scenario_snapshot),
-    config_snapshot: toPdktSimulationConfig(item.config_snapshot),
-  } as PdktMailboxItem;
+    inbound_email: toPdktSimulationEmail(emails.inbound_email),
+    emails_thread: thread.map(toPdktSimulationEmail),
+  } as PdktMailboxDetailItem;
 }
 
 /**

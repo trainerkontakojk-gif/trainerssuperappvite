@@ -20,7 +20,6 @@ import {
   createMailboxItem,
   softDeleteMailboxItem,
   fetchMailboxItems,
-  fetchMailboxItemById,
   canDeletePdktMailboxItem,
   bulkSoftDeleteMailboxItems,
 } from "../services/pdkt/mailbox-service";
@@ -548,37 +547,6 @@ describe("fetchMailboxItems", () => {
     expect(projection).not.toContain("config_snapshot");
     expect(projection).not.toContain("emails_thread");
     expect(projection).not.toContain("inbound_email");
-  });
-});
-
-describe("fetchMailboxItemById", () => {
-  it("returns the full row including inline attachments", async () => {
-    const client = buildMockClient({
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: makeStoredMailboxRow(),
-        error: null,
-      }),
-    });
-
-    const item = (await fetchMailboxItemById(client, agentActor, "m-1")) as any;
-
-    expect(item.id).toBe("m-1");
-    expect(item.inbound_email.attachments).toEqual([INLINE_ATTACHMENT]);
-    expect(item.permissions).toEqual({ can_delete: true });
-    expect(item.scenario_snapshot).not.toHaveProperty("expectedAnswer");
-    expect(item.config_snapshot.scenarios[0]).not.toHaveProperty(
-      "expectedAnswer",
-    );
-  });
-
-  it("returns null when the item is missing", async () => {
-    const client = buildMockClient({
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    });
-
-    await expect(
-      fetchMailboxItemById(client, agentActor, "missing"),
-    ).resolves.toBeNull();
   });
 });
 

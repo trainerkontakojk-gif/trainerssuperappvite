@@ -134,6 +134,16 @@ export function getRecipientDirectionInstruction(
     `;
   }
 
+  if (recipientContext.replyIntent === "reply_to_ojk_request_in_company_email") {
+    return `
+    ARAH PENERIMA EMAIL:
+    - PENERIMA UTAMA: perusahaan terlapor yang alamatnya tersedia di blok data konteks; OJK sebagai tembusan.
+    - Salam pembuka dan penutup tetap ditujukan kepada pihak perusahaan terlapor.
+    - WAJIB: di salah satu paragraf tengah, konsumen secara eksplisit meminta bantuan OJK (misalnya memohon OJK menengahi, memeriksa, atau membantu menyelesaikan masalah). Tulis permintaan itu dengan wajar di tengah cerita, bukan sebagai pembuka atau penutup.
+    - Jangan menandai atau menjelaskan bahwa permintaan itu penting; biarkan pembaca menemukannya sendiri.
+    `;
+  }
+
   return `
     ARAH PENERIMA EMAIL:
     - PENERIMA UTAMA: perusahaan terlapor yang alamatnya tersedia di blok data konteks.
@@ -641,6 +651,8 @@ export function renderPdktIdentityByMentionPattern(
 
 const COMPANY_PRIMARY_OJK_DIRECTION_VIOLATION =
   "Narasi email masih menjadikan OJK sebagai penerima utama, padahal penerima utama adalah perusahaan terlapor";
+const MISSING_MIDDLE_OJK_REQUEST_VIOLATION =
+  "Email belum memuat permintaan bantuan kepada OJK di paragraf tengah";
 
 function normalizeDirectionText(value: string): string {
   return value.toLowerCase().replace(/\s+/g, " ").trim();
@@ -660,6 +672,43 @@ function hasOjkMainAddresseeLanguage(value: string): boolean {
   ].some((pattern) => pattern.test(text));
 }
 
+function splitParagraphs(body: string): string[] {
+  return body
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Satu kalimat yang menyebut OJK (bukan sekadar alamat konsumen@ojk.go.id) dan
+ * memuat kata permintaan, misalnya "Saya memohon bantuan OJK ...".
+ */
+function hasOjkAssistanceRequest(value: string): boolean {
+  const text = normalizeDirectionText(value).replace(/\S+@\S+/g, " ");
+  return text
+    .split(/[.!?]+/)
+    .some(
+      (sentence) =>
+        /\bojk\b/.test(sentence) &&
+        /\b(?:mohon|memohon|minta|meminta|tolong|bantu|bantuan|membantu|menengahi)\b/.test(
+          sentence,
+        ),
+    );
+}
+
+/** Intent "minta bantuan OJK" wajib menyelipkan permintaan itu di paragraf tengah. */
+function isMissingMiddleOjkRequest(
+  body: string,
+  recipientContext?: PdktRecipientContext,
+): boolean {
+  if (
+    recipientContext?.replyIntent !== "reply_to_ojk_request_in_company_email"
+  ) {
+    return false;
+  }
+  return !splitParagraphs(body).slice(1, -1).some(hasOjkAssistanceRequest);
+}
+
 function hasCompanyPrimaryRecipientDirectionViolation(
   body: string,
   recipientContext?: PdktRecipientContext,
@@ -668,10 +717,7 @@ function hasCompanyPrimaryRecipientDirectionViolation(
     return false;
   }
 
-  const paragraphs = body
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+  const paragraphs = splitParagraphs(body);
   const openingSegment = paragraphs[0] || body.slice(0, 360);
   const closingSegment =
     paragraphs.length > 1
@@ -736,6 +782,13 @@ export function validatePdktEmailPolicyCompliance(
     )
   ) {
     violations.push(COMPANY_PRIMARY_OJK_DIRECTION_VIOLATION);
+  }
+
+  if (
+    policy.mode !== "reply" &&
+    isMissingMiddleOjkRequest(email.body, policy.recipientContext)
+  ) {
+    violations.push(MISSING_MIDDLE_OJK_REQUEST_VIOLATION);
   }
 
   // Check forbidden name leakage
@@ -848,6 +901,13 @@ export function validatePdktEmailPolicyCompliance(
   return violations;
 }
 
+function getRetryDirectionRule(recipientContext?: PdktRecipientContext): string {
+  if (recipientContext?.replyIntent === "reply_to_ojk_request_in_company_email") {
+    return "Ikuti ARAH PENERIMA EMAIL: sapaan dan penutup ditujukan ke perusahaan terlapor, dan di paragraf tengah konsumen wajib meminta bantuan OJK secara eksplisit.";
+  }
+  return "Ikuti ARAH PENERIMA EMAIL: jika penerima utama adalah perusahaan terlapor, sapaan, isi, dan penutup harus ditujukan ke perusahaan; OJK hanya boleh menjadi tembusan/referensi.";
+}
+
 export function buildPdktRetryHint(
   violations: string[],
   policy: PdktEmailPolicy,
@@ -860,7 +920,7 @@ export function buildPdktRetryHint(
     1. ${getConsumerNameMentionInstruction(policy.mentionPattern)}
     2. Jika nama harus muncul, sebutkan sebagai clue natural dalam konteks dokumen, tagihan, data klaim, data SLIK, administrasi, atau penagihan. Jangan memakai frasa "Perkenalkan, nama saya..." kecuali pattern awal secara eksplisit membutuhkan gaya formal.
     3. Jangan menulis bahasa meta seperti "sebagai AI", "simulasi ini", atau menjelaskan instruksi.
-    4. Ikuti ARAH PENERIMA EMAIL: jika penerima utama adalah perusahaan terlapor, sapaan, isi, dan penutup harus ditujukan ke perusahaan; OJK hanya boleh menjadi tembusan/referensi.
+    4. ${getRetryDirectionRule(policy.recipientContext)}
     5. Kembalikan HANYA format JSON valid tanpa penjelasan tambahan.
   `;
 }

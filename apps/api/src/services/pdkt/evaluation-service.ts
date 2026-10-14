@@ -9,6 +9,9 @@ import {
   PdktActionItemAI,
   PdktEvaluationEdu,
   PdktExpectedAnswerAlignment,
+  PdktReplyAnnotation,
+  PDKT_DIMENSION_KEYS,
+  PDKT_REPLY_ANNOTATION_LIMITS,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
@@ -16,7 +19,11 @@ import { parseJsonFromModelText } from "../../lib/ai-json";
 import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { callAI, isTransientAiError } from "./shared-utils";
-import { buildPdktRecipientConflictHints } from "./evaluation-context";
+import { readPdktReplyAnnotations } from "./reply-annotations";
+import {
+  buildPdktRecipientConflictHints,
+  getExpectedReplyParty,
+} from "./evaluation-context";
 import {
   PDKT_APPLICATION_PROMPT_BUDGET,
   assertPdktPromptBudget,
@@ -83,14 +90,18 @@ export function buildPdktEvaluationPrompt(input: {
     "Nilai balasan agent OJK 157 terhadap email konsumen dalam data evaluasi.",
     "",
     "KRITERIA PENILAIAN (lima dimensi berbobot setara):",
-    "1. recipient framing: apakah salam, sapaan, narasi tindakan, dan penutup menjaga primary recipient sebagai lawan bicara utama?",
+    "1. recipient framing: apakah salam, sapaan, narasi tindakan, dan penutup menjaga lawan bicara utama sesuai replyIntent?",
     "2. normative OJK response quality: apakah narasi OJK tetap benar, termasuk ucapan terima kasih, arahan kanal pelaporan, dan tindak lanjut yang sesuai?",
     "3. clarityScore: apakah jawaban mudah dimengerti dan terstruktur?",
     "4. typoScore: salah ketik, ejaan, atau format.",
     "5. templateComplianceScore: hanya compliance kecil, bukan penentu utama skor.",
     "",
     "ATURAN PENTING:",
-    "- Penyebutan OJK sebagai pihak yang memberi arahan, ucapan terima kasih, atau rujukan kanal pelaporan diperbolehkan saat primary recipient adalah perusahaan dan OJK hanya CC.",
+    "- replyIntent adalah patokan arah balasan yang benar; primaryRecipientType hanya menggambarkan header Kepada/Tembusan email konsumen.",
+    "- reply_to_company_with_ojk_cc: email ditujukan ke perusahaan dan OJK hanya tembusan. Penyebutan OJK sebagai pihak yang memberi arahan, ucapan terima kasih, atau rujukan kanal pelaporan diperbolehkan; jawaban yang diharapkan normatif.",
+    "- reply_to_ojk_request_in_company_email: header ditujukan ke perusahaan dengan OJK sebagai tembusan, tetapi di isi email konsumen meminta bantuan OJK, sehingga lawan bicara utama adalah OJK. Balasan harus menanggapi permintaan itu secara substantif sesuai kasus dan standar jawaban.",
+    "- Untuk reply_to_ojk_request_in_company_email, balasan yang hanya berisi ucapan terima kasih atau arahan normatif tembusan dinilai salah arah: beri recipientDirectionScore dan normativeResponseScore rendah, dan jelaskan di feedback bahwa permintaan bantuan kepada OJK di isi email terlewat.",
+    "- reply_to_ojk: email ditujukan langsung ke OJK; jawab sesuai kasus dan standar jawaban.",
     "- Yang dinilai salah adalah pergeseran lawan bicara utama, bukan sekadar penyebutan OJK.",
     "- Jika pembuka atau penutup membuat email tampak kembali dialamatkan ke OJK sebagai pihak utama, beri penalti besar pada recipient framing.",
     "- Jika recipientContext tidak tersedia, gunakan legacy fallback reply_to_ojk dan jangan menebak intent dari body terakhir.",
@@ -129,7 +140,9 @@ export function buildPdktEvaluationPrompt(input: {
     '    "improvementTips": string[],',
     '    "actionItems": [{ "dimension": string, "text": string, "example": string }],',
     '    "suggestedRewrite": { "subject": string, "body": string, "highlights": string[] }',
-    expectedAnswer ? "  }," : "  }",
+    "  },",
+    '  "annotations": [{ "quote": string, "dimension": string, "note": string }]' +
+      (expectedAnswer ? "," : ""),
     ...(expectedAnswer
       ? [
           '  "expectedAnswerAlignment": {',
@@ -144,8 +157,15 @@ export function buildPdktEvaluationPrompt(input: {
     '- Untuk tiap dimensi scoreBreakdown < 75 wajib ada tip pada "edu": "dimensionTips" (1 kalimat cara memperbaiki).',
     '- "improvementTips" berisi 3-5 langkah prioritas.',
     '- "actionItems" array {dimension,text,example} — JANGAN isi field prioritas; backend yang menentukan urutan.',
-    '- "suggestedRewrite": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga primaryRecipientType dari recipientContext.',
+    '- "suggestedRewrite": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga lawan bicara utama sesuai replyIntent dari recipientContext.',
     "- Semua teks edukasi dalam Bahasa Indonesia.",
+    "",
+    "ATURAN ANNOTATIONS:",
+    `- "annotations" berisi maksimal ${PDKT_REPLY_ANNOTATION_LIMITS.count} temuan paling penting yang menunjuk bagian tertentu dari balasan agent.`,
+    "- quote WAJIB disalin persis karakter demi karakter dari agentReplyBody (maksimal satu kalimat, tanpa tanda kutip tambahan). Jangan mengutip email konsumen atau referensi.",
+    `- dimension salah satu dari: ${PDKT_DIMENSION_KEYS.join(", ")}.`,
+    "- note: satu kalimat yang menjelaskan masalahnya dan cara memperbaikinya.",
+    "- Temuan yang tidak menunjuk bagian tertentu (misalnya informasi yang terlewat) cukup ditulis di contentGaps, bukan di annotations.",
   ].join("\n");
 
   const emptyDataBlock = buildPdktPromptDataBlock("evaluation_context", {});
@@ -334,6 +354,7 @@ function readExpectedAnswerAlignment(
 function normalizePdktEvaluationResponse(
   raw: unknown,
   expectedAnswer = "",
+  agentReplyBody = "",
 ): {
   score: number;
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
@@ -342,6 +363,7 @@ function normalizePdktEvaluationResponse(
   contentGaps: string[];
   feedback: string;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations: PdktReplyAnnotation[];
 } | null {
   if (!isPlainObject(raw)) return null;
 
@@ -361,6 +383,8 @@ function normalizePdktEvaluationResponse(
     : undefined;
   if (hasExpectedAnswer && !expectedAnswerAlignment) return null;
 
+  const annotations = readPdktReplyAnnotations(raw.annotations, agentReplyBody);
+
   const scoreBreakdown = readScoreBreakdown(raw.scoreBreakdown);
   if (scoreBreakdown) {
     return {
@@ -371,6 +395,7 @@ function normalizePdktEvaluationResponse(
       contentGaps,
       feedback,
       ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
+      annotations,
     };
   }
 
@@ -384,6 +409,7 @@ function normalizePdktEvaluationResponse(
     contentGaps,
     feedback,
     ...(expectedAnswerAlignment ? { expectedAnswerAlignment } : {}),
+    annotations,
   };
 }
 
@@ -435,13 +461,7 @@ class InvalidPdktEvaluationResponseError extends Error {
 
 // ── Evaluasi Edukatif: deterministic edu builder ─────────────────
 
-const PDKT_DIMENSION_ORDER: PdktDimensionKey[] = [
-  "recipientDirection",
-  "normative",
-  "clarity",
-  "typo",
-  "template",
-];
+const PDKT_DIMENSION_ORDER = PDKT_DIMENSION_KEYS;
 
 const PDKT_DIMENSION_SCORE_KEY: Record<
   PdktDimensionKey,
@@ -498,7 +518,12 @@ function readBounded(value: unknown, max: number): string | null {
 }
 
 /** Deterministic recipientDirection tip when the conflict failsafe applies. */
-function buildConflictRecipientTip(): string {
+function buildConflictRecipientTip(
+  recipientContext?: PdktRecipientContext,
+): string {
+  if (getExpectedReplyParty(recipientContext) === "ojk") {
+    return "Sapaan/penutup Anda bergeser ke perusahaan. Konsumen meminta jawaban dari OJK: sapa konsumen sebagai Kontak OJK 157 dan tanggapi permintaannya sesuai kasus.";
+  }
   return 'Sapaan/penutup Anda bergeser ke OJK. Ubah menjadi: "Yth. PT [Nama Perusahaan Terlapor] — tim Pengaduan Konsumen" lalu cukup CC kanal kontak OJK 157.';
 }
 
@@ -506,6 +531,7 @@ export function buildPdktEdu(
   rawEdu: unknown,
   scoreBreakdown: PdktEvaluationScoreBreakdown,
   conflictDetected: boolean,
+  recipientContext?: PdktRecipientContext,
 ): PdktEvaluationEdu {
   const raw = isPlainObject(rawEdu) ? rawEdu : {};
 
@@ -529,7 +555,7 @@ export function buildPdktEdu(
     }
   }
   if (conflictDetected && !dimensionTips.recipientDirection) {
-    dimensionTips.recipientDirection = buildConflictRecipientTip();
+    dimensionTips.recipientDirection = buildConflictRecipientTip(recipientContext);
   }
 
   // ── improvementTips (non-authoritative passthrough) ──
@@ -640,6 +666,7 @@ export async function evaluateAgentResponse(
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
   edu?: PdktEvaluationEdu;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
+  annotations?: PdktReplyAnnotation[];
   error?: string;
 }> {
   const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
@@ -726,6 +753,7 @@ export async function evaluateAgentResponse(
       const normalizedResult = normalizePdktEvaluationResponse(
         rawResult,
         expectedAnswer,
+        agentReplyBody,
       );
       if (!normalizedResult) {
         throw new InvalidPdktEvaluationResponseError();
@@ -749,6 +777,7 @@ export async function evaluateAgentResponse(
               : undefined,
             scored.scoreBreakdown,
             conflictAnalysis.conflictHints.length > 0,
+            recipientContext,
           )
         : undefined;
 
@@ -764,6 +793,9 @@ export async function evaluateAgentResponse(
                 expectedAnswerAlignment:
                   normalizedResult.expectedAnswerAlignment,
               }
+            : {}),
+          ...(normalizedResult.annotations.length > 0
+            ? { annotations: normalizedResult.annotations }
             : {}),
         },
         expectedAnswer,
@@ -886,6 +918,7 @@ export async function processPdktEvaluation(
       ...(result.expectedAnswerAlignment
         ? { expectedAnswerAlignment: result.expectedAnswerAlignment }
         : {}),
+      ...(result.annotations ? { annotations: result.annotations } : {}),
     };
 
     const { data: saved, error: updateEndError } = await adminClient

@@ -11,6 +11,7 @@ import {
 } from "../context/TelefunWarningContext";
 import { MaintenanceModal } from "../routes/telefun/components/MaintenanceModal";
 import { Sidebar, AppHeader, MobileTabBar, MobileDrawer } from "./layout/index";
+import { useRouteFocus } from "./layout/useRouteFocus";
 
 function DashboardLayoutContent() {
   const profile = useAuthStore((s) => s.profile);
@@ -27,6 +28,7 @@ function DashboardLayoutContent() {
     revokeTelefunAccess,
   } = useTelefunWarning();
   const prevPathnameRef = useRef(pathname);
+  const contentRef = useRef<HTMLElement>(null);
 
   // Auto-grant access to allowed roles immediately on profile load so they can bypass sidebar warning gates
   useEffect(() => {
@@ -73,8 +75,6 @@ function DashboardLayoutContent() {
     navigate,
   ]);
 
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
-  const [flyoutModule, setFlyoutModule] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const isPublicRoute = [
     "/",
@@ -83,23 +83,13 @@ function DashboardLayoutContent() {
     "/reset-password",
   ].includes(pathname);
   const isStandaloneRoute = ["/pdkt/simulation"].includes(pathname);
+  // Halaman publik dan standalone mengatur judul sendiri, tanpa shell.
+  useRouteFocus(pathname, contentRef, !(isPublicRoute || isStandaloneRoute));
 
   useEffect(() => {
     // Close mobile drawer on route change
     setMobileDrawerOpen(false);
   }, [pathname]);
-
-  // Prevent background scroll when mobile drawer is open
-  useEffect(() => {
-    if (mobileDrawerOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [mobileDrawerOpen]);
 
   if (isPublicRoute || isStandaloneRoute) {
     return (
@@ -126,6 +116,17 @@ function DashboardLayoutContent() {
 
   return (
     <div className="flex h-screen bg-background text-foreground transition-colors duration-300">
+      <a
+        href="#konten-halaman"
+        className="skip-link"
+        onClick={(event) => {
+          event.preventDefault();
+          contentRef.current?.focus();
+        }}
+      >
+        Lewati ke konten
+      </a>
+
       {/* Sidebar */}
       <Sidebar
         pathname={pathname}
@@ -136,10 +137,6 @@ function DashboardLayoutContent() {
         theme={theme}
         setTheme={setTheme}
         handleLogout={handleLogout}
-        flyoutOpen={flyoutOpen}
-        setFlyoutOpen={setFlyoutOpen}
-        flyoutModule={flyoutModule}
-        setFlyoutModule={setFlyoutModule}
       />
 
       {/* Main Content Area */}
@@ -151,6 +148,8 @@ function DashboardLayoutContent() {
 
         {/* Scrollable Workspace Content */}
         <section
+          ref={contentRef}
+          id="konten-halaman"
           role="region"
           aria-label="Konten halaman"
           tabIndex={0}

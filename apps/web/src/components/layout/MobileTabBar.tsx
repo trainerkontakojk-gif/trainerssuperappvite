@@ -1,25 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  Phone,
-  BarChart3,
-  Menu,
-} from "lucide-react";
-import { isCapabilityAllowed } from "../../lib/app-config";
-
-const PRIMARY_TABS = [
-  { id: "dashboard", href: "/dashboard", icon: LayoutDashboard, label: "Home" },
-  { id: "ketik", href: "/ketik", icon: MessageSquare, label: "Ketik" },
-  { id: "telefun", href: "/telefun", icon: Phone, label: "Telefun" },
-  {
-    id: "qa-analyzer",
-    href: "/sidak",
-    icon: BarChart3,
-    label: "SIDAK",
-    capability: "sidak.landing" as const,
-  },
-];
+import { Menu } from "lucide-react";
+import { buildNavModel } from "./nav-config";
 
 interface MobileTabBarProps {
   profile: { role?: string } | null;
@@ -36,9 +17,7 @@ export function MobileTabBar({
 }: MobileTabBarProps) {
   const { pathname } = useLocation();
 
-  const tabs = PRIMARY_TABS.filter((t) =>
-    isCapabilityAllowed(profile?.role, t.capability),
-  );
+  const tabs = buildNavModel(profile?.role).mobileTabs;
 
   return (
     <nav

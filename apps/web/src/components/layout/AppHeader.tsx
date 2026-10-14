@@ -27,7 +27,10 @@ export function AppHeader({ onOpenMobileMenu }: AppHeaderProps) {
         </button>
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1 text-[13px] font-medium min-w-0">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center gap-1 text-[13px] font-medium min-w-0"
+        >
           {crumbs.map((crumb, i) => (
             <span key={i} className="flex items-center gap-1 min-w-0">
               {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" style={{ color: "var(--fg3)" }} />}
@@ -39,7 +42,10 @@ export function AppHeader({ onOpenMobileMenu }: AppHeaderProps) {
                   {crumb.label}
                 </Link>
               ) : (
-                <span className="truncate text-foreground font-semibold">
+                <span
+                  aria-current="page"
+                  className="truncate text-foreground font-semibold"
+                >
                   {crumb.label}
                 </span>
               )}

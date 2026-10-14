@@ -18,8 +18,10 @@ import {
   type PdktMonitoringReview,
 } from "../../../lib/api";
 import type { PdktDimensionKey } from "@trainers/types";
+import { PDKT_DIMENSION_LABELS } from "../../../lib/pdkt-dimensions";
 import {
   PdktActionItemsCard,
+  PdktReplyAnnotationsCard,
   PdktDimensionTip,
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
@@ -152,27 +154,27 @@ export function PdktEvaluationPanel({
   }> = scoreBreakdown
     ? [
         {
-          label: "Arah Penerima",
+          label: PDKT_DIMENSION_LABELS.recipientDirection,
           value: scoreBreakdown.recipientDirectionScore,
           dimension: "recipientDirection" as const,
         },
         {
-          label: "Kualitas OJK",
+          label: PDKT_DIMENSION_LABELS.normative,
           value: scoreBreakdown.normativeResponseScore,
           dimension: "normative" as const,
         },
         {
-          label: "Kejelasan",
+          label: PDKT_DIMENSION_LABELS.clarity,
           value: scoreBreakdown.clarityScore,
           dimension: "clarity" as const,
         },
         {
-          label: "Typo",
+          label: PDKT_DIMENSION_LABELS.typo,
           value: scoreBreakdown.typoScore,
           dimension: "typo" as const,
         },
         {
-          label: "Template",
+          label: PDKT_DIMENSION_LABELS.template,
           value: scoreBreakdown.templateComplianceScore,
           dimension: "template" as const,
         },
@@ -456,6 +458,12 @@ export function PdktEvaluationPanel({
               </p>
             </div>
           </div>
+
+          <PdktReplyAnnotationsCard
+            annotations={evaluation.annotations}
+            replyBody={emails.find((email) => email.isAgent)?.body}
+            title="Catatan di balasan agent"
+          />
 
           {/* Evaluasi Edukatif */}
           <PdktActionItemsCard edu={edu} />

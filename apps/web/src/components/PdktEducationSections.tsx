@@ -1,7 +1,23 @@
-import { useState } from "react";
-import { ListChecks, FileEdit, Copy, Check } from "lucide-react";
-import type { PdktDimensionKey, PdktEvaluationEdu } from "@trainers/types";
+import { useId, useState } from "react";
+import {
+  ListChecks,
+  FileEdit,
+  Copy,
+  Check,
+  MessageSquareText,
+} from "lucide-react";
+import type {
+  PdktDimensionKey,
+  PdktEvaluationEdu,
+  PdktReplyAnnotation,
+} from "@trainers/types";
 import { Button } from "./ui/button";
+import { notify } from "../lib/toast";
+import { PDKT_DIMENSION_LABELS } from "../lib/pdkt-dimensions";
+import {
+  placeReplyAnnotations,
+  renderHighlights,
+} from "../lib/pdkt-reply-marks";
 
 /**
  * Evaluasi Edukatif PDKT — action items (priorityRank dari backend),
@@ -10,7 +26,7 @@ import { Button } from "./ui/button";
  * backfill); tanpa narasi AI (legacy) hanya item prioritas yang tampil.
  */
 
-function CopyInlineButton({ text }: { text: string }) {
+export function CopyInlineButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -23,13 +39,13 @@ function CopyInlineButton({ text }: { text: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          // clipboard unavailable
+          notify.error("Teks belum bisa disalin. Pilih teksnya lalu salin manual.");
         }
       }}
-      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-bold uppercase tracking-wider"
+      className="min-h-11 gap-1 rounded-md px-2.5 text-xs font-medium"
     >
       {copied ? (
-        <Check className="w-3 h-3 text-emerald-500" />
+        <Check className="w-3 h-3 text-chart-green" />
       ) : (
         <Copy className="w-3 h-3" />
       )}
@@ -101,7 +117,11 @@ export function PdktSuggestedRewriteCard({
         </p>
       )}
       <p className="text-xs text-[var(--fg)] leading-relaxed whitespace-pre-line">
-        {renderHighlights(rewrite.body, rewrite.highlights)}
+        {renderHighlights(
+          rewrite.body,
+          rewrite.highlights,
+          "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded px-0.5",
+        )}
       </p>
       <div className="mt-3">
         <CopyInlineButton
@@ -115,47 +135,6 @@ export function PdktSuggestedRewriteCard({
       </div>
     </div>
   );
-}
-
-function renderHighlights(
-  body: string,
-  highlights?: string[],
-): React.ReactNode[] {
-  if (!highlights || highlights.length === 0) return [body];
-
-  const parts: React.ReactNode[] = [];
-  let remaining = body;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    let earliest: { highlight: string; index: number } | null = null;
-    for (const highlight of highlights) {
-      const index = remaining.indexOf(highlight);
-      if (index !== -1 && (!earliest || index < earliest.index)) {
-        earliest = { highlight, index };
-      }
-    }
-    if (!earliest) {
-      parts.push(<span key={`txt-${key}`}>{remaining}</span>);
-      break;
-    }
-    if (earliest.index > 0) {
-      parts.push(
-        <span key={`txt-${key++}`}>{remaining.slice(0, earliest.index)}</span>,
-      );
-    }
-    parts.push(
-      <mark
-        key={`hl-${key++}`}
-        className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded px-0.5"
-      >
-        {earliest.highlight}
-      </mark>,
-    );
-    remaining = remaining.slice(earliest.index + earliest.highlight.length);
-  }
-
-  return parts;
 }
 
 /** Inline tip rendered below a breakdown row when value < 75. */
@@ -174,5 +153,79 @@ export function PdktDimensionTip({
     <p className="mt-1.5 text-xs leading-snug text-amber-600 dark:text-amber-500 font-medium border-t border-amber-500/20 pt-1.5 text-left">
       💡 {tip}
     </p>
+  );
+}
+
+/**
+ * Balasan agent dengan kalimat yang dikomentari AI ditandai dan diberi nomor.
+ * Posisi tanda dihitung backend; catatan tanpa posisi tetap tampil di daftar.
+ */
+export function PdktReplyAnnotationsCard({
+  annotations,
+  replyBody,
+  title = "Catatan di balasan Anda",
+}: {
+  annotations: PdktReplyAnnotation[] | null | undefined;
+  replyBody: string | null | undefined;
+  /** Peserta melihat "Anda"; panel review trainer memakai "agent". */
+  title?: string;
+}) {
+  const titleId = useId();
+  const body = replyBody ?? "";
+  if (!annotations?.length || !body) return null;
+
+  const { notes: ordered, segments } = placeReplyAnnotations(
+    annotations,
+    body,
+    (text, number) => (
+      <mark
+        key={number}
+        className="rounded-sm border-b-2 border-amber-500 bg-amber-500/15 px-0.5 text-[var(--fg)]"
+      >
+        {text}
+        <sup className="ml-0.5 text-[11px] font-bold">{number}</sup>
+      </mark>
+    ),
+  );
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]"
+    >
+      <h4
+        id={titleId}
+        className="flex items-center gap-2 text-xs font-bold text-[var(--fg)] mb-3"
+      >
+        <MessageSquareText className="w-4 h-4 text-amber-500" aria-hidden="true" />
+        {title}
+      </h4>
+      <p className="whitespace-pre-wrap text-xs leading-relaxed text-[var(--fg2)] font-medium">
+        {segments}
+      </p>
+      <ol className="mt-4 space-y-2 border-t border-[var(--border)] pt-3">
+        {ordered.map((annotation) => {
+          const isMarked = annotation.marked;
+          return (
+            <li key={annotation.number} className="flex gap-2.5 text-xs">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-[11px] font-bold text-[var(--fg)]">
+                {annotation.number}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-semibold text-[var(--fg)]">
+                  {annotation.note}
+                </span>
+                <span className="text-[var(--fg3)] font-medium">
+                  {PDKT_DIMENSION_LABELS[annotation.dimension] ?? annotation.dimension}
+                  {isMarked
+                    ? null
+                    : ` · Tidak ditandai di balasan: “${annotation.quote}”`}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
