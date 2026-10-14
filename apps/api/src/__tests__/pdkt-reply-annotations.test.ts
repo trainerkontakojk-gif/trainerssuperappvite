@@ -10,7 +10,10 @@ vi.mock("../services/pdkt/shared-utils", async (importOriginal) => ({
 }));
 
 import type { EmailMessage } from "@trainers/types";
-import { readPdktReplyAnnotations } from "../services/pdkt/reply-annotations";
+import {
+  readPdktReplyAnnotations,
+  readPdktConsumerPoints,
+} from "../services/pdkt/reply-annotations";
 import { normalizePdktEvaluation } from "../services/monitoring-history-service";
 import {
   buildPdktEvaluationPrompt,
@@ -94,8 +97,8 @@ describe("readPdktReplyAnnotations", () => {
     });
   });
 
-  it("membuang item tidak valid dan membatasi 8 catatan", () => {
-    const valid = Array.from({ length: 10 }, (_, i) =>
+  it("membuang item tidak valid dan membatasi 12 catatan", () => {
+    const valid = Array.from({ length: 14 }, (_, i) =>
       annotation(`kutipan ${i}`),
     );
     const results = readPdktReplyAnnotations(
@@ -108,12 +111,123 @@ describe("readPdktReplyAnnotations", () => {
       ],
       REPLY,
     );
-    expect(results).toHaveLength(8);
+    expect(results).toHaveLength(12);
     expect(results.map((item) => item.quote)).toEqual(
-      valid.slice(0, 8).map((item) => item.quote),
+      valid.slice(0, 12).map((item) => item.quote),
     );
     expect(readPdktReplyAnnotations("bukan array", REPLY)).toEqual([]);
     expect(readPdktReplyAnnotations(undefined, REPLY)).toEqual([]);
+  });
+});
+
+describe("readPdktConsumerPoints", () => {
+  const inbound = "Saldo terpotong. Kapan kembali?";
+  const point = (extra: Record<string, unknown> = {}) => ({
+    quote: "Saldo terpotong.",
+    summary: "Saldo terpotong",
+    status: "answered",
+    reason: null,
+    replyQuote: "pengecekkan",
+    ...extra,
+  });
+
+  it("menemukan kutipan di email konsumen dan jawaban di balasan", () => {
+    const [result] = readPdktConsumerPoints([point()], inbound, REPLY);
+    expect(result).toMatchObject({
+      start: 0,
+      end: "Saldo terpotong.".length,
+      replyEnd: REPLY.indexOf("pengecekkan") + "pengecekkan".length,
+    });
+    const [partial] = readPdktConsumerPoints(
+      [
+        point({
+          status: "partial",
+          reason: "Belum tuntas.",
+          replyQuote: "Hormat kami, Kontak OJK 157",
+        }),
+      ],
+      inbound,
+      REPLY,
+    );
+    expect(partial.replyEnd).toBe(REPLY.length);
+  });
+
+  it("mempertahankan poin tanpa posisi bila kutipan hilang atau bertumpuk", () => {
+    const results = readPdktConsumerPoints(
+      [
+        point(),
+        point(),
+        point({ quote: "Tidak ada", replyQuote: "Tidak ada" }),
+      ],
+      inbound,
+      REPLY,
+    );
+    expect(results[1]).toMatchObject({ start: null, end: null });
+    expect(results[2]).toMatchObject({
+      start: null,
+      end: null,
+      replyEnd: null,
+    });
+  });
+
+  it("membuang item rusak, alasan kosong, dan teks melewati batas", () => {
+    expect(
+      readPdktConsumerPoints(
+        [
+          null,
+          point({ status: "invalid" }),
+          point({ quote: " " }),
+          point({ summary: " " }),
+          point({ quote: "x".repeat(301) }),
+          point({ status: "partial", reason: " " }),
+          point({ status: "unanswered", reason: null }),
+        ],
+        inbound,
+        REPLY,
+      ),
+    ).toEqual([]);
+    expect(readPdktConsumerPoints(undefined, inbound, REPLY)).toEqual([]);
+  });
+
+  it("membatasi lima poin dan tidak menautkan jawaban untuk unanswered", () => {
+    const results = readPdktConsumerPoints(
+      Array.from({ length: 7 }, () =>
+        point({ status: "unanswered", reason: "Belum dijawab." }),
+      ),
+      inbound,
+      REPLY,
+    );
+    expect(results).toHaveLength(5);
+    expect(results[0]).toMatchObject({ replyQuote: null, replyEnd: null });
+  });
+});
+
+describe("kalimat penghubung", () => {
+  it("memaksa clarity dan membatasi contoh penghubung", () => {
+    const [transition, oversized, empty, plain] = readPdktReplyAnnotations(
+      [
+        annotation("pengecekkan", {
+          kind: "transition",
+          dimension: "typo",
+          example: "Selanjutnya, terkait tagihan,",
+        }),
+        annotation("Penagihan", {
+          kind: "transition",
+          example: "x".repeat(10000),
+        }),
+        annotation("Hormat", { kind: "transition", example: " " }),
+        annotation("kami", { example: "Contoh tanpa kind" }),
+      ],
+      REPLY,
+    );
+    expect(transition).toMatchObject({
+      kind: "transition",
+      dimension: "clarity",
+      example: "Selanjutnya, terkait tagihan,",
+    });
+    expect(oversized).not.toHaveProperty("example");
+    expect(empty).not.toHaveProperty("example");
+    expect(plain).toMatchObject({ example: "Contoh tanpa kind" });
   });
 });
 
@@ -146,6 +260,19 @@ describe("annotations di penilaian PDKT", () => {
     });
     expect(prompt).toContain('"annotations"');
     expect(prompt).toMatch(/quote[^\n]*persis[^\n]*agentReplyBody/);
+    const largeBody = "x".repeat(20_000);
+    const large = buildPdktEvaluationPrompt({
+      inboundEmailBody: largeBody,
+      agentReplyBody: largeBody,
+      expectedAnswer: "y".repeat(12_000),
+    });
+    const data = JSON.parse(
+      large.prompt
+        .split("<evaluation_context_data>\n")[1]
+        .split("\n</evaluation_context_data>")[0],
+    );
+    expect(data.inboundEmailBody).toBe(largeBody);
+    expect(data.agentReplyBody).toBe(largeBody);
   });
 
   it("menyimpan annotations berposisi tanpa membocorkan kunci jawaban", async () => {
@@ -208,6 +335,83 @@ describe("annotations di penilaian PDKT", () => {
     expect(JSON.stringify(result)).not.toContain(reference);
   });
 
+  it.each(["transition", "partial"])(
+    "meredaksi field baru tanpa merusak enum %s",
+    async (reference) => {
+      mockCallAI.mockResolvedValueOnce({
+        success: true,
+        text: JSON.stringify({
+          score: 80,
+          typos: [],
+          clarityIssues: [],
+          contentGaps: [],
+          feedback: "Baik.",
+          expectedAnswerAlignment: { category: "Sesuai", reason: "Relevan." },
+          annotations: [
+            annotation("pengecekkan", {
+              kind: "transition",
+              example: `Pengantar ${reference}`,
+            }),
+          ],
+          consumerPoints: [
+            {
+              quote: "Saya masih ditagih.",
+              summary: `Poin ${reference}`,
+              status: "partial",
+              reason: `Alasan ${reference}`,
+              replyQuote: "pengecekkan",
+            },
+          ],
+        }),
+      });
+      const result = await evaluateAgentResponse(
+        {
+          selectedModel: "gemini-3.1-flash-lite",
+          scenarios: [{ expectedAnswer: reference }],
+        } as never,
+        emails,
+      );
+      expect(result.success).toBe(true);
+      expect(result.consumerPoints?.[0]).toMatchObject({
+        status: "partial",
+        start: 0,
+        end: "Saya masih ditagih.".length,
+      });
+      expect(result.annotations?.[0].kind).toBe("transition");
+      for (const text of [
+        result.consumerPoints?.[0].summary,
+        result.consumerPoints?.[0].reason,
+        result.annotations?.[0].example,
+      ]) {
+        expect(text).not.toContain(reference);
+        expect(text).toContain("inti jawaban yang diharapkan");
+      }
+      expect(mockCallAI).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("consumerPoints bukan array tetap sukses tanpa retry", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        score: 90,
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        feedback: "Baik.",
+        annotations: [],
+        consumerPoints: {},
+      }),
+    });
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      emails,
+    );
+    expect(result.success).toBe(true);
+    expect(result.consumerPoints).toEqual([]);
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+  });
+
   // Tanpa `annotations` balasan tidak bisa ditandai: penilaian gagal (lalu
   // bisa dicoba lagi), bukan tersimpan seolah lengkap tanpa tanda.
   it("menolak jawaban AI tanpa annotations dan menyimpan annotations kosong", async () => {
@@ -239,6 +443,7 @@ describe("annotations di penilaian PDKT", () => {
     );
     expect(empty.success).toBe(true);
     expect(empty.annotations).toEqual([]);
+    expect(empty.consumerPoints).toEqual([]);
   });
 });
 
@@ -279,18 +484,44 @@ describe("annotations di review trainer (Monitoring)", () => {
     expect(result).not.toBeNull();
     expect(result?.score).toBe(70);
     expect(result?.annotations).toEqual(stored.annotations);
+    const consumerPoints = [
+      {
+        quote: "Saldo",
+        summary: "Saldo terpotong",
+        status: "answered",
+        reason: null,
+        start: 0,
+        end: 5,
+        replyQuote: "pengecekkan",
+        replyEnd: 21,
+      },
+    ];
+    expect(
+      normalizePdktEvaluation({ ...stored, consumerPoints })?.consumerPoints,
+    ).toEqual(consumerPoints);
+    expect(
+      normalizePdktEvaluation({ ...stored, consumerPoints: [{}] })?.score,
+    ).toBe(70);
+    expect(
+      normalizePdktEvaluation({ ...stored, consumerPoints: [{}] })
+        ?.consumerPoints,
+    ).toBeUndefined();
   });
 
   it("membedakan telaah tanpa temuan dari telaah lama tanpa annotations", () => {
     const { annotations: _annotations, ...legacy } = stored;
-    expect(normalizePdktEvaluation({ ...stored, annotations: [] })?.annotations).toEqual([]);
+    expect(
+      normalizePdktEvaluation({ ...stored, annotations: [] })?.annotations,
+    ).toEqual([]);
     expect(normalizePdktEvaluation(legacy)).not.toHaveProperty("annotations");
   });
 
   it("membuang annotations rusak tanpa menghilangkan penilaian", () => {
     const result = normalizePdktEvaluation({
       ...stored,
-      annotations: [{ quote: "x", dimension: "tone", note: "y", start: 0, end: 1 }],
+      annotations: [
+        { quote: "x", dimension: "tone", note: "y", start: 0, end: 1 },
+      ],
     });
     expect(result?.score).toBe(70);
     expect(result?.annotations).toBeUndefined();

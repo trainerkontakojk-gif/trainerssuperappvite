@@ -365,7 +365,7 @@ export const pdktEvaluationAiOutputSchema = z
   .strict();
 
 export const PDKT_REPLY_ANNOTATION_LIMITS = {
-  count: 8,
+  count: 12,
   quote: 300,
 } as const;
 
@@ -379,6 +379,8 @@ export const pdktReplyAnnotationSchema = z
     quote: z.string().min(1).max(PDKT_REPLY_ANNOTATION_LIMITS.quote),
     dimension: z.enum(PDKT_DIMENSION_KEYS),
     note: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+    kind: z.enum(["transition"]).optional(),
+    example: z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText).optional(),
     start: z.number().int().nonnegative().nullable(),
     end: z.number().int().nonnegative().nullable(),
   })
@@ -388,6 +390,29 @@ export type PdktReplyAnnotation = z.infer<typeof pdktReplyAnnotationSchema>;
 export const pdktStoredReplyAnnotationsSchema = z
   .array(pdktReplyAnnotationSchema)
   .max(PDKT_REPLY_ANNOTATION_LIMITS.count);
+
+export const PDKT_CONSUMER_POINT_LIMITS = { count: 5, quote: 300 } as const;
+export const PDKT_CONSUMER_POINT_STATUSES = [
+  "answered",
+  "partial",
+  "unanswered",
+] as const;
+export const pdktConsumerPointSchema = z
+  .object({
+    quote: z.string().min(1).max(PDKT_CONSUMER_POINT_LIMITS.quote),
+    summary: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+    status: z.enum(PDKT_CONSUMER_POINT_STATUSES),
+    reason: z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText).nullable(),
+    start: z.number().int().nonnegative().nullable(),
+    end: z.number().int().nonnegative().nullable(),
+    replyQuote: z.string().max(PDKT_CONSUMER_POINT_LIMITS.quote).nullable(),
+    replyEnd: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+export type PdktConsumerPoint = z.infer<typeof pdktConsumerPointSchema>;
+export const pdktStoredConsumerPointsSchema = z
+  .array(pdktConsumerPointSchema)
+  .max(PDKT_CONSUMER_POINT_LIMITS.count);
 
 export interface PdktEvaluationResult {
   score: number;
@@ -399,6 +424,7 @@ export interface PdktEvaluationResult {
   edu?: PdktEvaluationEdu;
   expectedAnswerAlignment?: PdktExpectedAnswerAlignment;
   annotations?: PdktReplyAnnotation[];
+  consumerPoints?: PdktConsumerPoint[];
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";

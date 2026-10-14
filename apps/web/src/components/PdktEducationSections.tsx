@@ -215,8 +215,16 @@ export function PdktReplyAnnotationsCard({
                 <span className="font-semibold text-[var(--fg)]">
                   {annotation.note}
                 </span>
+                {annotation.example && (
+                  <span className="text-xs text-foreground">
+                    Contoh: “{annotation.example}”
+                  </span>
+                )}
                 <span className="text-[var(--fg3)] font-medium">
-                  {PDKT_DIMENSION_LABELS[annotation.dimension] ?? annotation.dimension}
+                  {annotation.kind === "transition"
+                    ? "Kalimat penghubung"
+                    : (PDKT_DIMENSION_LABELS[annotation.dimension] ??
+                      annotation.dimension)}
                   {isMarked
                     ? null
                     : ` · Tidak ditandai di balasan: “${annotation.quote}”`}

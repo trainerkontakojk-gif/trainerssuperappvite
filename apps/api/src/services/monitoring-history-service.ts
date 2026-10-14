@@ -4,6 +4,7 @@ import {
   emailMessageSchema,
   pdktEvaluationAiOutputSchema,
   pdktStoredReplyAnnotationsSchema,
+  pdktStoredConsumerPointsSchema,
   pdktSessionConfigSchema,
   parseTelefunTranscript,
   parseVoiceQualityAssessment,
@@ -134,7 +135,11 @@ export function normalizePdktEvaluation(
 ): PdktEvaluationResult | null {
   // `annotations` disimpan sesudah dinormalkan backend (berisi posisi), jadi
   // divalidasi terpisah dari skema output AI yang strict.
-  const { annotations: rawAnnotations, ...raw } = object(value);
+  const {
+    annotations: rawAnnotations,
+    consumerPoints: rawConsumerPoints,
+    ...raw
+  } = object(value);
   const full = pdktEvaluationAiOutputSchema.safeParse(raw);
   const { scoreBreakdown: _scoreBreakdown, ...legacyInput } = raw;
   const legacy = pdktEvaluationAiOutputSchema
@@ -142,7 +147,10 @@ export function normalizePdktEvaluation(
     .safeParse(legacyInput);
   const parsed = full.success ? full.data : legacy.success ? legacy.data : null;
   if (!parsed) return null;
-  const annotations = pdktStoredReplyAnnotationsSchema.safeParse(rawAnnotations);
+  const annotations =
+    pdktStoredReplyAnnotationsSchema.safeParse(rawAnnotations);
+  const consumerPoints =
+    pdktStoredConsumerPointsSchema.safeParse(rawConsumerPoints);
   return {
     score: parsed.score,
     feedback: parsed.feedback,
@@ -154,6 +162,7 @@ export function normalizePdktEvaluation(
       ? { expectedAnswerAlignment: parsed.expectedAnswerAlignment }
       : {}),
     ...(annotations.success ? { annotations: annotations.data } : {}),
+    ...(consumerPoints.success ? { consumerPoints: consumerPoints.data } : {}),
     ...(parsed.edu
       ? {
           // Persisted edu was ranked by the backend builder before storage;

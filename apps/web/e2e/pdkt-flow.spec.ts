@@ -446,7 +446,10 @@ async function enterWorkspace(page: Page, marker?: Locator) {
 /** Buka /pdkt, klik Mulai simulasi, dan tunggu ruang kerja. */
 async function openWorkspace(page: Page, apiMocks: readonly ApiMock[]) {
   const audit = await openHermeticShell(page, { path: "/pdkt", apiMocks });
-  await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+  await page
+    .getByRole("button", { name: /^Mulai simulasi/ })
+    .first()
+    .click();
   await enterWorkspace(page);
   return audit;
 }
@@ -698,7 +701,9 @@ test.describe("PDKT (hermetic)", () => {
       .getByRole("group", { name: "Filter kategori" })
       .getByRole("button", { name: "Semua" })
       .click();
-    await dialog.getByRole("searchbox", { name: "Cari skenario" }).fill("lunas");
+    await dialog
+      .getByRole("searchbox", { name: "Cari skenario" })
+      .fill("lunas");
     await expect(ojkRow).toHaveCount(0);
     await expect(companyRow).toBeVisible();
 
@@ -1051,7 +1056,9 @@ test.describe("PDKT (hermetic)", () => {
       ],
     });
 
-    const row = page.getByRole("row").filter({ hasText: "Saldo belum kembali" });
+    const row = page
+      .getByRole("row")
+      .filter({ hasText: "Saldo belum kembali" });
     await row
       .getByRole("button", { name: "Hapus sesi Saldo belum kembali" })
       .click({ timeout: 20000 });
@@ -1199,9 +1206,7 @@ test.describe("PDKT (hermetic)", () => {
       path: "/pdkt",
       apiMocks: pdktMocks([]),
     });
-    const start = page
-      .getByRole("button", { name: /^Mulai simulasi/ })
-      .first();
+    const start = page.getByRole("button", { name: /^Mulai simulasi/ }).first();
     await expect(start).toBeVisible({ timeout: 20000 });
 
     for (const theme of ["light", "dark"] as const) {
@@ -1239,7 +1244,10 @@ test.describe("PDKT (hermetic)", () => {
       path: "/pdkt",
       apiMocks: pdktMocks([], [OPEN_MAIL]),
     });
-    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first()
+      .click();
     await enterWorkspace(page);
     await waitForMockedApi(audit, [`/pdkt/mailbox/${OPEN_MAIL.list.id}`]);
 
@@ -1323,7 +1331,10 @@ test.describe("PDKT (hermetic)", () => {
         ...pdktMocks([]),
       ],
     });
-    await page.getByRole("button", { name: /^Mulai simulasi/ }).first().click();
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first()
+      .click();
     const workspaceTitle = page.getByRole("heading", {
       level: 1,
       name: "Simulasi PDKT",
@@ -1518,7 +1529,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(dialog.getByText("Judul skenario wajib diisi.")).toBeVisible();
     await expect(dialog.getByLabel(/^Judul skenario/)).toBeFocused();
 
-    await dialog.getByLabel(/^Judul skenario/).fill("Klaim ditolak tanpa alasan");
+    await dialog
+      .getByLabel(/^Judul skenario/)
+      .fill("Klaim ditolak tanpa alasan");
     await dialog.getByLabel(/^Kategori/).selectOption("Asuransi");
     const mode = dialog.getByRole("radiogroup", {
       name: "Isi email dibuat oleh",
@@ -1743,15 +1756,70 @@ test.describe("PDKT (hermetic)", () => {
   test("tahap Telaah: skor, rincian, catatan bernomor, dan contoh balasan", async ({
     page,
   }) => {
+    const runtimeErrors: string[] = [];
+    page.on("pageerror", (error) => runtimeErrors.push(error.message));
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        !message.text().includes("net::ERR_FAILED")
+      )
+        runtimeErrors.push(message.text());
+    });
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const reply = "Terima kasih, kami cek transaksinya.";
     const matchedQuote = "kami cek transaksinya";
     const start = reply.indexOf(matchedQuote);
+    const inboundBody =
+      "Saldo terpotong tetapi transaksi gagal.\n\nKapan saldo kembali? Mohon nomor tiket.";
+    const consumerPoints = [
+      {
+        quote: "Kapan saldo kembali?",
+        summary: "Waktu pengembalian saldo",
+        status: "partial",
+        reason: "Belum ada batas waktu.",
+        start: inboundBody.indexOf("Kapan"),
+        end: inboundBody.indexOf("Kapan") + "Kapan saldo kembali?".length,
+        replyQuote: "kami",
+        replyEnd: start + 4,
+      },
+      {
+        quote: "Saldo terpotong tetapi transaksi gagal.",
+        summary: "Transaksi gagal",
+        status: "answered",
+        reason: null,
+        start: 0,
+        end: "Saldo terpotong tetapi transaksi gagal.".length,
+        replyQuote: "kami",
+        replyEnd: start + 4,
+      },
+      {
+        quote: "Mohon nomor tiket.",
+        summary: "Nomor tiket pengaduan",
+        status: "unanswered",
+        reason: "Nomor tiket belum diberikan.",
+        start: inboundBody.indexOf("Mohon"),
+        end: inboundBody.length,
+        replyQuote: null,
+        replyEnd: null,
+      },
+      {
+        quote: "Mohon status laporan.",
+        summary: "Status laporan",
+        status: "unanswered",
+        reason: "Status belum diberikan.",
+        start: null,
+        end: null,
+        replyQuote: null,
+        replyEnd: null,
+      },
+    ];
     const base = EVALUATED_HISTORY[0].evaluation as Record<string, unknown>;
     const history = [
       {
         ...EVALUATED_HISTORY[0],
         evaluation: {
           ...base,
+          consumerPoints,
           scoreBreakdown: {
             recipientDirectionScore: 90,
             normativeResponseScore: 70,
@@ -1787,7 +1855,9 @@ test.describe("PDKT (hermetic)", () => {
             {
               quote: matchedQuote,
               dimension: "normative",
-              note: "Sebutkan kapan konsumen akan menerima kabar.",
+              note: "Tambahkan pengantar sebelum masuk ke topik transaksi.",
+              kind: "transition",
+              example: "Selanjutnya, terkait transaksi Ibu, …",
               start,
               end: start + matchedQuote.length,
             },
@@ -1802,7 +1872,17 @@ test.describe("PDKT (hermetic)", () => {
         },
       },
     ] as unknown as SessionHistory[];
-    const audit = await openWorkspace(page, pdktMocks(history, [REPLIED_MAIL]));
+    const reviewedMail = {
+      ...REPLIED_MAIL,
+      detail: {
+        ...REPLIED_MAIL.detail,
+        inbound_email: {
+          ...REPLIED_MAIL.detail.inbound_email,
+          body: inboundBody,
+        },
+      },
+    };
+    const audit = await openWorkspace(page, pdktMocks(history, [reviewedMail]));
 
     await workspaceMarker(page).click();
     await page
@@ -1851,9 +1931,13 @@ test.describe("PDKT (hermetic)", () => {
     const notes = fixes.getByRole("listitem");
     await expect(notes).toHaveCount(2);
     await expect(notes.nth(0)).toContainText(
-      "Sebutkan kapan konsumen akan menerima kabar.",
+      "Tambahkan pengantar sebelum masuk ke topik transaksi.",
     );
     await expect(notes.nth(1)).toContainText("Tidak ditandai di balasan");
+    await expect(notes.nth(0)).toContainText("Kalimat penghubung");
+    await expect(notes.nth(0)).toContainText(
+      "Contoh: “Selanjutnya, terkait transaksi Ibu, …”",
+    );
 
     // Penanda dan catatan saling tertaut; pembaca layar mendengar "catatan 1",
     // bukan angka yang menempel di kata terakhir.
@@ -1861,7 +1945,9 @@ test.describe("PDKT (hermetic)", () => {
     await markLink.click();
     await expect(notes.nth(0)).toBeFocused();
     await expect(fixes.getByRole("link")).toHaveCount(1);
-    await fixes.getByRole("link", { name: "Kembali ke kalimat bertanda 1" }).click();
+    await fixes
+      .getByRole("link", { name: "Kembali ke kalimat bertanda 1" })
+      .click();
     await expect(markLink).toBeFocused();
 
     // Email konsumen dan balasan satu permukaan perbandingan; email konsumen
@@ -1882,6 +1968,116 @@ test.describe("PDKT (hermetic)", () => {
     await expect(consumer).toContainText(
       "Saldo terpotong tetapi transaksi gagal.",
     );
+    const points = page.getByRole("region", {
+      name: "Poin konsumen",
+      exact: true,
+    });
+    const pointRows = points.getByRole("listitem");
+    await expect(consumer.locator("mark")).toHaveCount(3);
+    await expect(pointRows).toHaveCount(4);
+    await expect(pointRows.nth(0)).toContainText("Terjawab");
+    await expect(pointRows.nth(1)).toContainText("Sebagian");
+    await expect(pointRows.nth(2)).toContainText("Belum terjawab");
+    await expect(pointRows.nth(3)).toContainText("Tidak ditandai di email");
+    await expect(
+      points.getByRole("heading", { name: "Poin konsumen", level: 4 }),
+    ).toBeVisible();
+    // Paragraf email tetap seperti sebelum ditelaah (EmailBody: satu <p> per
+    // paragraf, leading-6 = 21px pada root 14px); status tidak hanya
+    // dibedakan lewat warna.
+    await expect(consumer.locator("p")).toHaveCount(2);
+    await expect(consumer.locator("p").first()).toHaveCSS(
+      "line-height",
+      "21px",
+    );
+    expect(
+      await consumer
+        .locator("mark")
+        .evaluateAll((els) =>
+          els.map((el) => getComputedStyle(el).textDecorationStyle),
+        ),
+    ).toEqual(["solid", "dashed", "dotted"]);
+    const pointListSizes = await points.getByRole("link").evaluateAll((els) =>
+      els.map((el) => ({
+        width: (el as HTMLElement).offsetWidth,
+        height: (el as HTMLElement).offsetHeight,
+      })),
+    );
+    expect(pointListSizes.length).toBeGreaterThan(0);
+    expect(
+      pointListSizes.filter(({ width, height }) => width < 44 || height < 44),
+    ).toEqual([]);
+    // Label huruf di dalam teks tidak merenggangkan baris, tetapi area
+    // sentuhnya tetap 44px: keempat sudut kotak 44px mengenai link-nya.
+    for (const links of [
+      consumer.locator("mark a"),
+      answer.getByRole("link", { name: /^Lihat poin konsumen/ }),
+    ]) {
+      const count = await links.count();
+      expect(count).toBeGreaterThan(0);
+      for (let index = 0; index < count; index++) {
+        const link = links.nth(index);
+        await link.scrollIntoViewIfNeeded();
+        const fit = await link.evaluate((el) => {
+          const text = el.closest("p") as HTMLElement;
+          const box = el.getBoundingClientRect();
+          const cx = box.left + box.width / 2;
+          const cy = box.top + box.height / 2;
+          const centerHit = document.elementFromPoint(cx, cy);
+          // Target yang bersebelahan boleh berbagi area sentuh (pengecualian
+          // jarak WCAG 2.5.8); yang tidak boleh adalah sudut jatuh ke teks biasa.
+          const misses = [
+            [-21, -21],
+            [21, -21],
+            [-21, 21],
+            [21, 21],
+          ].filter(([dx, dy]) => {
+            const hit = document.elementFromPoint(cx + dx, cy + dy);
+            return !hit?.closest("a");
+          });
+          return {
+            height: box.height,
+            lineHeight: parseFloat(getComputedStyle(text).lineHeight),
+            centerOnSelf: Boolean(centerHit && el.contains(centerHit)),
+            misses: misses.length,
+          };
+        });
+        expect(fit.height).toBeLessThanOrEqual(fit.lineHeight);
+        expect(fit.centerOnSelf).toBe(true);
+        expect(fit.misses).toBe(0);
+      }
+    }
+
+    const pointMark = consumer.getByRole("link", {
+      name: "Lihat poin konsumen A, terjawab",
+      exact: true,
+    });
+    await expect(pointMark).toHaveText("A");
+    await pointMark.click();
+    await expect(pointRows.nth(0)).toBeFocused();
+    await points
+      .getByRole("link", {
+        name: "Kembali ke poin konsumen A di email",
+        exact: true,
+      })
+      .click();
+    await expect(pointMark).toBeFocused();
+    const replyPoint = answer.getByRole("link", {
+      name: "Lihat poin konsumen A, terjawab",
+      exact: true,
+    });
+    await expect(replyPoint).toHaveText("A");
+    await expect(
+      answer.getByRole("link", {
+        name: "Lihat poin konsumen B, sebagian",
+        exact: true,
+      }),
+    ).toHaveText("B");
+    // Titik sisip yang berada di dalam catatan dipindahkan ke akhir, tanpa mark baru.
+    await expect(answer.locator("mark a")).toHaveCount(1);
+    await expect(marks).toHaveCount(1);
+    await replyPoint.click();
+    await expect(pointRows.nth(0)).toBeFocused();
     expect(await consumer.evaluate((el) => getComputedStyle(el).position)).toBe(
       "sticky",
     );
@@ -1916,12 +2112,14 @@ test.describe("PDKT (hermetic)", () => {
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
+    await consumer.screenshot({ path: "/tmp/pdkt-telaah-mobile.png" });
     await page.setViewportSize({ width: 1280, height: 800 });
 
     const other = page.getByRole("region", { name: "Temuan lain" });
-    await expect(other).toContainText("Ejaan:");
-    await expect(other).toContainText("transkasi");
-    await expect(other).toContainText("Kalimat pembuka terlalu panjang");
+    await expect(other).not.toContainText("Ejaan:");
+    await expect(other).not.toContainText("transkasi");
+    await expect(other).not.toContainText("Kalimat pembuka terlalu panjang");
+    await expect(other).toContainText("Isi yang kurang:");
     await expect(other).toContainText("Belum menyebut kanal pengaduan resmi");
     await expect(
       page.getByRole("region", { name: "Catatan AI" }),
@@ -1930,15 +2128,33 @@ test.describe("PDKT (hermetic)", () => {
     // Teks abu di kotak oranye "Perbaiki ini dulu" dan label rincian tetap terbaca.
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      for (const region of [summary, breakdown]) {
+      for (const region of [
+        summary,
+        breakdown,
+        consumer,
+        points,
+        answer,
+        fixes,
+      ]) {
         const low = await findLowContrastText(region, {
-          selector: "span, p, dt, dd, q",
+          selector: "span, p, dt, dd, q, a, strong, mark",
           leafOnly: true,
         });
         expect(low, `${theme}: ${low.join("\n")}`).toEqual([]);
       }
+      // Mark berisi tautan anak; scan khusus ini turut mengukur teks kutipannya.
+      expect(
+        await findLowContrastText(consumer, {
+          selector: "mark",
+          leafOnly: false,
+        }),
+      ).toEqual([]);
+    }
+    for (const region of [consumer, points, answer, fixes]) {
+      expect(await findTextBelowFloor(region)).toEqual([]);
     }
     await setDocumentTheme(page, "light");
+    await comparison.screenshot({ path: "/tmp/pdkt-telaah-desktop.png" });
 
     const rewrite = page.getByText("Terima kasih, kami cek transaksi Ibu.");
     await expect(rewrite).toBeHidden();
@@ -1965,6 +2181,8 @@ test.describe("PDKT (hermetic)", () => {
     expect(heights.length).toBeGreaterThan(3);
     expect(heights.filter(([, h]) => (h as number) < 44)).toEqual([]);
 
+    expect(runtimeErrors).toEqual([]);
+
     // Kembali ke kotak masuk tidak membuka ulang email yang sama.
     await page.getByRole("button", { name: "Kembali ke kotak masuk" }).click();
     await expect(
@@ -1973,6 +2191,51 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("heading", { name: "Balasan untuk Rina" }),
     ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("telaah tanpa consumerPoints mempertahankan email lama dan menyembunyikan temuan kosong", async ({
+    page,
+  }) => {
+    const history = [
+      {
+        ...EVALUATED_HISTORY[0],
+        evaluation: {
+          ...EVALUATED_HISTORY[0].evaluation,
+          annotations: [],
+          contentGaps: [],
+        },
+      },
+    ];
+    const audit = await openWorkspace(page, pdktMocks(history, [REPLIED_MAIL]));
+    await workspaceMarker(page).click();
+    await page
+      .getByRole("button", { name: new RegExp(REPLIED_MAIL.list.subject) })
+      .click();
+    await waitForMockedApi(audit, [`/pdkt/mailbox/${REPLIED_MAIL.list.id}`]);
+    const consumer = page.getByRole("region", {
+      name: "Email konsumen",
+      exact: true,
+    });
+    await expect(consumer).toContainText(
+      REPLIED_MAIL.detail.inbound_email.body,
+    );
+    await expect(consumer.locator("mark")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Poin konsumen", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", {
+        name: "Telaah lama tanpa penanda",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Temuan lain", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Catatan AI", exact: true }),
+    ).toContainText("Jawaban relevan dan jelas.");
     expectHermetic(audit);
   });
 
@@ -2010,6 +2273,12 @@ test.describe("PDKT (hermetic)", () => {
     });
     await expect(notice).toBeVisible({ timeout: 20000 });
     await expect(notice).toContainText("belum menandai kalimat");
+    const legacyFindings = page.getByRole("region", { name: "Temuan lain" });
+    await expect(legacyFindings).toContainText("Ejaan:");
+    await expect(legacyFindings).toContainText("Kejelasan:");
+    await expect(
+      page.getByRole("region", { name: "Poin konsumen", exact: true }),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("region", { name: "Catatan pada balasan" }),
     ).toHaveCount(0);
@@ -2494,7 +2763,9 @@ test.describe("PDKT navigation acceptance", () => {
       /Tanggapi/,
     );
     if (process.env.PDKT_FLOW_CAPTURE === "1") {
-      await page.screenshot({ path: test.info().outputPath("pdkt-tanggapi-desktop.png") });
+      await page.screenshot({
+        path: test.info().outputPath("pdkt-tanggapi-desktop.png"),
+      });
     }
     await page.setViewportSize({ width: 390, height: 844 });
     const back = page
@@ -2508,7 +2779,9 @@ test.describe("PDKT navigation acceptance", () => {
       ),
     ).toBe(true);
     if (process.env.PDKT_FLOW_CAPTURE === "1") {
-      await page.screenshot({ path: test.info().outputPath("pdkt-tanggapi-mobile.png") });
+      await page.screenshot({
+        path: test.info().outputPath("pdkt-tanggapi-mobile.png"),
+      });
     }
     await page
       .locator("main header")
@@ -2627,7 +2900,6 @@ test.describe("PDKT navigation boundaries", () => {
     });
   }
 });
-
 
 const LEGACY_PRACTICE_SUBJECTS = [
   {

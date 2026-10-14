@@ -1,5 +1,8 @@
 import {
   PDKT_DIMENSION_KEYS,
+  PDKT_CONSUMER_POINT_LIMITS,
+  PDKT_CONSUMER_POINT_STATUSES,
+  type PdktConsumerPoint,
   PDKT_PROMPT_INPUT_LIMITS,
   PDKT_REPLY_ANNOTATION_LIMITS,
   type PdktDimensionKey,
@@ -60,7 +63,9 @@ export function readPdktReplyAnnotations(
   const annotations: PdktReplyAnnotation[] = [];
   for (const item of value) {
     if (annotations.length >= PDKT_REPLY_ANNOTATION_LIMITS.count) break;
-    if (!isPlainObject(item) || !isDimension(item.dimension)) continue;
+    if (!isPlainObject(item)) continue;
+    const dimension = item.kind === "transition" ? "clarity" : item.dimension;
+    if (!isDimension(dimension)) continue;
     const quote = readText(item.quote, PDKT_REPLY_ANNOTATION_LIMITS.quote);
     const note = readText(item.note, PDKT_PROMPT_INPUT_LIMITS.issueText);
     if (!quote || !note) continue;
@@ -68,13 +73,60 @@ export function readPdktReplyAnnotations(
     const range = locateQuote(agentReplyBody, quote);
     const placed = range && !overlaps(range, taken) ? range : null;
     if (placed) taken.push(placed);
+    const example = readText(item.example, PDKT_PROMPT_INPUT_LIMITS.issueText);
     annotations.push({
       quote,
-      dimension: item.dimension,
+      dimension,
+      ...(item.kind === "transition" ? { kind: "transition" as const } : {}),
+      ...(example ? { example } : {}),
       note,
       start: placed?.start ?? null,
       end: placed?.end ?? null,
     });
   }
   return annotations;
+}
+
+/** Poin konsumen dan tautan balasannya dinormalisasi terhadap body asli. */
+export function readPdktConsumerPoints(
+  value: unknown,
+  inboundEmailBody: string,
+  agentReplyBody: string,
+): PdktConsumerPoint[] {
+  if (!Array.isArray(value)) return [];
+  const taken: Range[] = [];
+  const points: PdktConsumerPoint[] = [];
+  for (const item of value) {
+    if (points.length >= PDKT_CONSUMER_POINT_LIMITS.count) break;
+    if (!isPlainObject(item)) continue;
+    const status = PDKT_CONSUMER_POINT_STATUSES.find(
+      (status) => status === item.status,
+    );
+    const quote = readText(item.quote, PDKT_CONSUMER_POINT_LIMITS.quote);
+    const summary = readText(item.summary, PDKT_PROMPT_INPUT_LIMITS.issueText);
+    const reason = readText(item.reason, PDKT_PROMPT_INPUT_LIMITS.issueText);
+    if (!status || !quote || !summary || (status !== "answered" && !reason))
+      continue;
+    const range = locateQuote(inboundEmailBody, quote);
+    const placed = range && !overlaps(range, taken) ? range : null;
+    if (placed) taken.push(placed);
+    const replyQuote =
+      status === "unanswered"
+        ? null
+        : readText(item.replyQuote, PDKT_CONSUMER_POINT_LIMITS.quote);
+    const replyRange = replyQuote
+      ? locateQuote(agentReplyBody, replyQuote)
+      : null;
+    points.push({
+      quote,
+      summary,
+      status,
+      reason: status === "answered" ? null : reason,
+      start: placed?.start ?? null,
+      end: placed?.end ?? null,
+      replyQuote,
+      replyEnd: replyRange?.end ?? null,
+    });
+  }
+  return points;
 }

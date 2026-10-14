@@ -12,6 +12,9 @@ import { CopyInlineButton } from "../../../components/PdktEducationSections";
 import { PDKT_DIMENSION_LABELS } from "../../../lib/pdkt-dimensions";
 import {
   placeReplyAnnotations,
+  placeConsumerPoints,
+  consumerPointReplyEnd,
+  type PlacedConsumerPoint,
   renderHighlights,
 } from "../../../lib/pdkt-reply-marks";
 import { EmailAttachments } from "./EmailAttachments";
@@ -48,25 +51,29 @@ const card = "rounded-xl border border-border bg-surface-elevated p-5";
 
 function Section({
   title,
+  level = 3,
   pane = false,
   className,
   children,
 }: {
   title: string;
+  /** Bagian yang bersarang di dalam `Section` lain memakai `<h4>`. */
+  level?: 3 | 4;
   /** Bagian dari permukaan bersama: tanpa bingkai kartu sendiri. */
   pane?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const id = useId();
+  const Heading = level === 4 ? "h4" : "h3";
   return (
     <section
       aria-labelledby={id}
       className={cn(pane ? "p-5" : card, "flex flex-col gap-4", className)}
     >
-      <h3 id={id} className="text-sm font-semibold text-foreground">
+      <Heading id={id} className="text-sm font-semibold text-foreground">
         {title}
-      </h3>
+      </Heading>
       {children}
     </section>
   );
@@ -251,17 +258,85 @@ const focusRing =
 const jumpTarget =
   "outline-none focus:ring-2 focus:ring-chart-orange focus:ring-offset-2 focus:ring-offset-surface-elevated";
 
+// Status dibedakan oleh warna dan gaya garis (utuh/putus/titik), tidak hanya
+// warna; label status di daftar memakai garis yang sama sebagai legenda.
+const consumerStatus = {
+  answered: {
+    label: "Terjawab",
+    line: "decoration-chart-green decoration-solid",
+    tint: "bg-chart-green/15",
+  },
+  partial: {
+    label: "Sebagian",
+    line: "decoration-chart-amber decoration-dashed",
+    tint: "bg-chart-amber/15",
+  },
+  unanswered: {
+    label: "Belum terjawab",
+    line: "decoration-chart-red decoration-dotted",
+    tint: "bg-chart-red/15",
+  },
+} as const;
+const statusLine = "underline decoration-2 underline-offset-4";
+const pointLinkLabel = (point: PlacedConsumerPoint) =>
+  `Lihat poin konsumen ${point.letter}, ${consumerStatus[point.status].label.toLowerCase()}`;
+const consumerNoteId = (base: string, letter: string) =>
+  `${base}-consumer-note-${letter}`;
+const consumerMarkId = (base: string, letter: string) =>
+  `${base}-consumer-mark-${letter}`;
+const pointLinkClass = cn(
+  "inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-xs font-bold text-foreground no-underline",
+  focusRing,
+  jumpTarget,
+);
+// Label huruf di dalam teks tetap kecil agar baris tidak merenggang; area
+// sentuhnya diperluas ke 44px lewat pseudo-elemen (z-10). Huruf yang terlihat
+// (z-20) selalu di atas area sentuh label tetangga.
+const pointInlineLinkClass = cn(
+  "relative rounded-sm px-0.5 text-xs leading-none font-bold text-foreground no-underline after:absolute after:z-10 after:top-1/2 after:left-1/2 after:size-[44px] after:-translate-x-1/2 after:-translate-y-1/2",
+  jumpTarget,
+);
+
 /** Balasan bertanda dan catatan bernomornya; penanda dan catatan saling tertaut. */
 function ReplyWithNotes({
   result,
   replyBody,
+  consumerPoints,
+  consumerIdBase,
 }: {
   result: PdktEvaluationResult;
   replyBody: string;
+  consumerPoints: PlacedConsumerPoint[];
+  consumerIdBase: string;
 }) {
   const idBase = useId();
   const markId = (number: number) => `${idBase}-mark-${number}`;
   const noteId = (number: number) => `${idBase}-note-${number}`;
+  const insertions = consumerPoints.flatMap((point) => {
+    const at = consumerPointReplyEnd(point, replyBody);
+    if (at === null) return [];
+    const target = consumerNoteId(consumerIdBase, point.letter);
+    return [
+      {
+        at,
+        node: (
+          <sup key={point.letter} className="ml-0.5">
+            <a
+              href={`#${target}`}
+              aria-label={pointLinkLabel(point)}
+              className={pointInlineLinkClass}
+              onClick={(event) => {
+                event.preventDefault();
+                jumpTo(target);
+              }}
+            >
+              <span className="relative z-20">{point.letter}</span>
+            </a>
+          </sup>
+        ),
+      },
+    ];
+  });
   const { notes, segments } = placeReplyAnnotations(
     result.annotations,
     replyBody,
@@ -280,8 +355,9 @@ function ReplyWithNotes({
               event.preventDefault();
               jumpTo(noteId(number));
             }}
+            // Di atas area sentuh label poin konsumen yang bisa bersebelahan.
             className={cn(
-              "rounded-sm text-foreground no-underline",
+              "relative z-20 rounded-sm text-foreground no-underline",
               jumpTarget,
             )}
           >
@@ -290,6 +366,7 @@ function ReplyWithNotes({
         </sup>
       </mark>
     ),
+    insertions,
   );
 
   return (
@@ -342,8 +419,16 @@ function ReplyWithNotes({
                   <strong className="font-semibold text-foreground">
                     {note.note}
                   </strong>
+                  {note.example && (
+                    <span className="text-sm text-foreground">
+                      Contoh: “{note.example}”
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
-                    {PDKT_DIMENSION_LABELS[note.dimension] ?? note.dimension}
+                    {note.kind === "transition"
+                      ? "Kalimat penghubung"
+                      : (PDKT_DIMENSION_LABELS[note.dimension] ??
+                        note.dimension)}
                     {note.marked
                       ? null
                       : ` · Tidak ditandai di balasan: “${note.quote}”`}
@@ -359,9 +444,15 @@ function ReplyWithNotes({
 }
 
 function OtherFindings({ result }: { result: PdktEvaluationResult }) {
+  // Telaah bertanda sudah menampilkan ejaan dan kejelasan di "Catatan pada
+  // balasan"; hanya telaah lama yang masih membutuhkannya di sini.
+  const notedInReply = Array.isArray(result.annotations);
   const otherFindings = [
-    ...(result.typos ?? []).map((text) => ({ kind: "Ejaan", text })),
-    ...(result.clarityIssues ?? []).map((text) => ({
+    ...(notedInReply ? [] : (result.typos ?? [])).map((text) => ({
+      kind: "Ejaan",
+      text,
+    })),
+    ...(notedInReply ? [] : (result.clarityIssues ?? [])).map((text) => ({
       kind: "Kejelasan",
       text,
     })),
@@ -399,21 +490,106 @@ function OtherFindings({ result }: { result: PdktEvaluationResult }) {
   );
 }
 
-function ConsumerEmail({ item }: { item: PdktMailboxDetailItem }) {
+function ConsumerEmail({
+  item,
+  marks,
+  idBase,
+}: {
+  item: PdktMailboxDetailItem;
+  marks: ReturnType<typeof placeConsumerPoints>;
+  idBase: string;
+}) {
   const inbound = readInboundEmail(item);
   return (
-    // Tetap terlihat saat balasan dan catatan yang panjang digulir; email
-    // yang lebih tinggi dari layar bergulir di panelnya sendiri.
     <Section
       pane
       title="Email konsumen"
       className="lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"
     >
-      <EmailBody
-        body={inbound.body}
-        className="flex flex-col gap-3 text-sm leading-6"
-      />
+      {marks.points.length > 0 ? (
+        <div className="flex flex-col gap-3 text-sm leading-6 break-words text-foreground">
+          {marks.paragraphs.map((parts, index) => (
+            <p key={index} className="whitespace-pre-wrap">
+              {parts}
+            </p>
+          ))}
+        </div>
+      ) : (
+        <EmailBody
+          body={inbound.body}
+          className="flex flex-col gap-3 text-sm leading-6"
+        />
+      )}
       <EmailAttachments attachments={inbound.attachments} size="compact" />
+      {marks.points.length > 0 && (
+        <Section
+          pane
+          level={4}
+          title="Poin konsumen"
+          className="border-t border-border px-0 pb-0"
+        >
+          <ol className="flex flex-col gap-3">
+            {marks.points.map((point) => {
+              // Lingkaran 24px berwarna status, senada dengan tandanya di email.
+              const chip = cn(
+                "flex size-6 items-center justify-center rounded-full",
+                consumerStatus[point.status].tint,
+              );
+              return (
+                <li
+                  key={point.letter}
+                  id={consumerNoteId(idBase, point.letter)}
+                  tabIndex={-1}
+                  className={cn("flex gap-2 rounded-sm text-sm", jumpTarget)}
+                >
+                  {point.marked ? (
+                    <a
+                      href={`#${consumerMarkId(idBase, point.letter)}`}
+                      aria-label={`Kembali ke poin konsumen ${point.letter} di email`}
+                      className={cn(pointLinkClass, "shrink-0 self-start")}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        jumpTo(consumerMarkId(idBase, point.letter));
+                      }}
+                    >
+                      <span className={chip}>{point.letter}</span>
+                    </a>
+                  ) : (
+                    <span className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center self-start text-xs font-bold">
+                      <span className={chip}>{point.letter}</span>
+                    </span>
+                  )}
+                  <span className="flex min-w-0 flex-col gap-1 break-words py-2">
+                    <strong className="font-semibold text-foreground">
+                      {point.summary}
+                    </strong>
+                    <span className="text-xs text-foreground">
+                      <span
+                        className={cn(
+                          statusLine,
+                          consumerStatus[point.status].line,
+                        )}
+                      >
+                        {consumerStatus[point.status].label}
+                      </span>
+                    </span>
+                    {point.reason && (
+                      <span className="text-sm text-foreground">
+                        {point.reason}
+                      </span>
+                    )}
+                    {!point.marked && (
+                      <span className="text-xs text-muted-foreground">
+                        Tidak ditandai di email: “{point.quote}”
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </Section>
+      )}
     </Section>
   );
 }
@@ -421,9 +597,13 @@ function ConsumerEmail({ item }: { item: PdktMailboxDetailItem }) {
 /** Email konsumen dan balasan dalam satu permukaan agar mudah dicocokkan. */
 function Comparison({
   item,
+  marks,
+  idBase,
   children,
 }: {
   item: PdktMailboxDetailItem;
+  marks: ReturnType<typeof placeConsumerPoints>;
+  idBase: string;
   children: ReactNode;
 }) {
   return (
@@ -431,7 +611,7 @@ function Comparison({
       aria-label="Perbandingan email"
       className="grid items-start rounded-xl border border-border bg-surface-elevated lg:grid-cols-2"
     >
-      <ConsumerEmail item={item} />
+      <ConsumerEmail item={item} marks={marks} idBase={idBase} />
       <div className="border-t border-border lg:border-t-0 lg:border-l">
         {children}
       </div>
@@ -550,6 +730,43 @@ export function PdktReviewStage({
   const replyBody = readAgentReply(item);
   const completed = status === "completed" && result;
   const rewrite = completed ? result.edu?.suggestedRewrite : null;
+  const consumerIdBase = useId();
+  const consumerMarks = placeConsumerPoints(
+    completed ? result.consumerPoints : undefined,
+    readInboundEmail(item).body,
+    (text, point, withLabel) => {
+      const target = consumerNoteId(consumerIdBase, point.letter);
+      return (
+        <mark
+          key={point.letter}
+          className={cn(
+            "text-foreground [box-decoration-break:clone]",
+            statusLine,
+            consumerStatus[point.status].line,
+            consumerStatus[point.status].tint,
+          )}
+        >
+          {text}
+          {withLabel && (
+            <sup className="ml-0.5">
+              <a
+                id={consumerMarkId(consumerIdBase, point.letter)}
+                href={`#${target}`}
+                aria-label={pointLinkLabel(point)}
+                className={pointInlineLinkClass}
+                onClick={(event) => {
+                  event.preventDefault();
+                  jumpTo(target);
+                }}
+              >
+                <span className="relative z-20">{point.letter}</span>
+              </a>
+            </sup>
+          )}
+        </mark>
+      );
+    },
+  );
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -575,9 +792,14 @@ export function PdktReviewStage({
           <ReviewPending status={status} onRetry={onRetry} />
         )}
 
-        <Comparison item={item}>
+        <Comparison item={item} marks={consumerMarks} idBase={consumerIdBase}>
           {completed ? (
-            <ReplyWithNotes result={result} replyBody={replyBody} />
+            <ReplyWithNotes
+              result={result}
+              replyBody={replyBody}
+              consumerPoints={consumerMarks.points}
+              consumerIdBase={consumerIdBase}
+            />
           ) : (
             replyBody && (
               <Section pane title="Balasan Anda">
