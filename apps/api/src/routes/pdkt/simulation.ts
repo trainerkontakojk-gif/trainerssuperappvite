@@ -62,13 +62,10 @@ simulation.post(
     try {
       configInfo = pdktService.resolvePdktGenerationConfig(body);
     } catch (err: unknown) {
+      console.error("[PDKT] Generation config error:", err);
       return jsonNotFound(
         c,
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-            ? err
-            : "Scenario atau consumer type tidak ditemukan.",
+        "Skenario atau karakter konsumen tidak ditemukan.",
       );
     }
     const { scenario, config } = configInfo;
@@ -81,7 +78,7 @@ simulation.post(
     );
 
     if (!result.success) {
-      return jsonAiError(c, result.error || "Gagal generate template.");
+      return jsonAiError(c, result.error || pdktService.PDKT_TEMPLATE_AI_ERROR);
     }
 
     return c.json({
@@ -130,13 +127,10 @@ simulation.post(
     try {
       configInfo = pdktService.resolvePdktGenerationConfig(body);
     } catch (err: unknown) {
+      console.error("[PDKT] Generation config error:", err);
       return jsonNotFound(
         c,
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-            ? err
-            : "Scenario atau consumer type tidak ditemukan.",
+        "Skenario atau karakter konsumen tidak ditemukan.",
       );
     }
     const { scenario, config } = configInfo;
@@ -148,11 +142,11 @@ simulation.post(
     );
 
     if (!result.success) {
-      return jsonAiError(c, result.error || "Gagal inisialisasi sesi email.");
+      return jsonAiError(c, result.error || pdktService.PDKT_SESSION_AI_ERROR);
     }
 
     if (!result.message) {
-      return jsonAiError(c, "Gagal inisialisasi sesi email.");
+      return jsonAiError(c, pdktService.PDKT_SESSION_AI_ERROR);
     }
     const initMessage: EmailMessage = result.message;
     const retryBatch: PdktMailboxBatch = {
@@ -233,7 +227,10 @@ simulation.post(
 
     if (!result.success) {
       if (result.code === "AI_ERROR") {
-        return jsonAiError(c, result.error || "Gagal membuat sesi mailbox.");
+        return jsonAiError(
+          c,
+          result.error || pdktService.PDKT_SESSION_AI_ERROR,
+        );
       }
       const status = pdktErrorStatus(result, 503);
       const retryBatch = result.retryDraft?.batch;

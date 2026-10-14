@@ -145,6 +145,8 @@ export function pdktErrorMessage(err: unknown): string {
   }
 
   const msg = original.toLowerCase();
+  if (msg === "skenario atau karakter konsumen tidak ditemukan.")
+    return "Skenario atau karakter konsumen tidak ditemukan.";
   if (msg.includes("duplicate key") || msg.includes("unique constraint"))
     return "Data sudah ada, tidak dapat membuat duplikat.";
   if (

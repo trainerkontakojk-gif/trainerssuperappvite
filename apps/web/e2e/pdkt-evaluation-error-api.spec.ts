@@ -22,6 +22,38 @@ let trainer: Identity;
 let app: Hono;
 const mailboxIds: string[] = [];
 const historyIds: string[] = [];
+const generationRequestIds: string[] = [];
+
+function generationPayload() {
+  const clientRequestId = `e2e-generation-${randomUUID()}`;
+  generationRequestIds.push(clientRequestId);
+  return {
+    client_request_id: clientRequestId,
+    scenarioDraft: {
+      id: `scenario-${ns}`,
+      category: "Pinjaman",
+      title: "Tagihan setelah lunas",
+      description: "Konsumen sudah melunasi pinjaman tetapi masih ditagih.",
+      isActive: true,
+    },
+    consumerTypeId: "calm",
+    consumerTypeDraft: {
+      id: "calm",
+      name: "Tenang",
+      description: "Tenang",
+      difficulty: "Easy" as const,
+      tone: "Tenang",
+    },
+    identity: {
+      name: "Budi",
+      email: `konsumen-${ns}@mail.test`,
+      city: "Bandung",
+      bodyName: "Budi",
+    },
+    enableImageGeneration: false,
+    selectedModel: "gemini-3.8-flash",
+  };
+}
 
 async function api(path: string, token: string, body?: unknown) {
   return tnaApiRequest(app, `http://localhost/api/v1${path}`, {
@@ -54,6 +86,13 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   const admin = createAdmin(env);
+  if (generationRequestIds.length) {
+    const cleanup = await admin
+      .from("pdkt_mailbox_items")
+      .delete()
+      .in("client_request_id", generationRequestIds);
+    expect(cleanup.error).toBeNull();
+  }
   if (historyIds.length)
     await admin.from("pdkt_history").delete().in("id", historyIds);
   if (mailboxIds.length)
@@ -204,6 +243,98 @@ test("missing email returns the new copy without changing status or code", async
     code: "NOT_FOUND",
     message: "Email tidak ditemukan.",
   });
+});
+
+test("simulation creation errors hide provider details and persist no email", async () => {
+  test.setTimeout(120000);
+  for (const [path, token, message] of [
+    [
+      "/pdkt/generate-template",
+      trainer.token,
+      "AI belum bisa membuat template. Coba lagi beberapa saat lagi.",
+    ],
+    [
+      "/pdkt/session/init",
+      owner.token,
+      "AI belum bisa membuat email konsumen. Coba lagi beberapa saat lagi.",
+    ],
+    [
+      "/pdkt/session/create",
+      owner.token,
+      "AI belum bisa membuat email konsumen. Coba lagi beberapa saat lagi.",
+    ],
+  ]) {
+    await test.step(path, async () => {
+      const payload = generationPayload();
+      const response = await api(path, token, payload);
+      expect(response.status).toBe(502);
+      const body = await response.json();
+      // Query before copy assertions: prove failed generation never saved email.
+      const persisted = await createAdmin(env)
+        .from("pdkt_mailbox_items")
+        .select("id")
+        .eq("client_request_id", payload.client_request_id);
+      expect(persisted.error).toBeNull();
+      expect(persisted.data).toEqual([]);
+      expect.soft(body.error).toEqual({ code: "AI_ERROR", message });
+      expect
+        .soft(JSON.stringify(body))
+        .not.toMatch(/http|fetch|egress|e2e-only|gemini|gpt/i);
+    });
+  }
+});
+
+test("simulation config errors keep a fixed not-found message on all routes", async () => {
+  for (const path of [
+    "/pdkt/generate-template",
+    "/pdkt/session/init",
+    "/pdkt/session/create",
+  ]) {
+    const response = await api(
+      path,
+      path.endsWith("generate-template") ? trainer.token : owner.token,
+      {
+        ...generationPayload(),
+        scenarioDraft: undefined,
+        scenarioId: `missing-${ns}`,
+      },
+    );
+    expect(response.status).toBe(404);
+    expect.soft((await response.json()).error).toEqual({
+      code: "NOT_FOUND",
+      message: "Skenario atau karakter konsumen tidak ditemukan.",
+    });
+  }
+});
+
+test("curated placeholder errors survive on template and session routes", async () => {
+  for (const path of [
+    "/pdkt/generate-template",
+    "/pdkt/session/init",
+    "/pdkt/session/create",
+  ]) {
+    const payload = generationPayload();
+    const response = await api(
+      path,
+      path.endsWith("generate-template") ? trainer.token : owner.token,
+      {
+        ...payload,
+        scenarioDraft: {
+          ...payload.scenarioDraft,
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Mohon bantuan",
+            body: "Mohon periksa nomor laporan [nomor_tiket].",
+          },
+        },
+      },
+    );
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toEqual({
+      code: "AI_ERROR",
+      message: "Template masih mengandung placeholder: [nomor_tiket]",
+    });
+  }
 });
 
 test("invalid JWT is rejected by auth before the PDKT copy mapper", async () => {

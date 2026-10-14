@@ -13,6 +13,7 @@ import {
 import {
   initializeEmailSession,
   resolvePdktGenerationConfig,
+  PDKT_SESSION_AI_ERROR,
 } from "../pdkt-service";
 import { createMailboxItem } from "./mailbox-service";
 import { createPdktMailboxRetryDraft } from "./mailbox-retry";
@@ -61,16 +62,12 @@ export async function createMailboxSession(
   try {
     configInfo = resolvePdktGenerationConfig(payload);
   } catch (err: unknown) {
+    console.error("[PDKT] Generation config error:", err);
     return {
       success: false,
       code: "NOT_FOUND",
       status: 404,
-      error:
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-            ? err
-            : "Scenario atau consumer type tidak ditemukan.",
+      error: "Skenario atau karakter konsumen tidak ditemukan.",
     };
   }
 
@@ -81,7 +78,7 @@ export async function createMailboxSession(
       success: false,
       code: "AI_ERROR",
       status: 502,
-      error: sessionResult.error || "Gagal inisialisasi sesi email.",
+      error: sessionResult.error || PDKT_SESSION_AI_ERROR,
     };
   }
 

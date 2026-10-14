@@ -32,6 +32,11 @@ import {
   resolvePdktRecipientContext,
 } from "./recipient-targets";
 
+export const PDKT_TEMPLATE_AI_ERROR =
+  "AI belum bisa membuat template. Coba lagi beberapa saat lagi.";
+export const PDKT_SESSION_AI_ERROR =
+  "AI belum bisa membuat email konsumen. Coba lagi beberapa saat lagi.";
+
 function getContentStats(body: string) {
   return {
     wordCount: body.split(/\s+/).filter(Boolean).length,
@@ -223,12 +228,7 @@ export async function generateScenarioEmailTemplate(
     console.error("[PDKT] Template error:", error);
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Gagal generate template.",
+      error: PDKT_TEMPLATE_AI_ERROR,
     };
   }
 }
@@ -451,14 +451,10 @@ export async function initializeEmailSession(
       },
     };
   } catch (error: unknown) {
+    console.error("[PDKT] Session init error:", error);
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Gagal memulai sesi email.",
+      error: PDKT_SESSION_AI_ERROR,
     };
   }
 }
@@ -490,7 +486,7 @@ export function resolvePdktGenerationConfig(body: {
     : consumerTypes.find((ct) => ct.id === body.consumerTypeId);
 
   if (!selectedScenario || !consumerType) {
-    throw new Error("Scenario atau consumer type tidak ditemukan.");
+    throw new Error("Skenario atau karakter konsumen tidak ditemukan.");
   }
 
   const scenario: PdktScenario = { ...selectedScenario };
