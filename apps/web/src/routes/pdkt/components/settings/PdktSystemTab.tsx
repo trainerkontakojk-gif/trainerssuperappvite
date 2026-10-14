@@ -1,7 +1,8 @@
 import { cn } from "cn";
 import { Button } from "../../../../components/ui/button";
 import { DEFAULT_PDKT_MODEL_ID, TEXT_MODELS } from "../../pdktSettings";
-import { PdktSwitch } from "./PdktSwitch";
+import { SettingsRadioIndicator } from "../../../../components/settings/SettingsChoices";
+import { SettingsSwitch } from "../../../../components/settings/SettingsSwitch";
 
 export interface PdktSystemTabProps {
   writingStyleMode: "realistic" | "training";
@@ -30,20 +31,6 @@ const writingStyles = [
     sample: "Saya sudah melunasi pinjaman sejak 2 September.",
   },
 ];
-
-function RadioIndicator({ isSelected }: { isSelected: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-full border",
-        isSelected ? "border-primary" : "border-border",
-      )}
-    >
-      {isSelected && <span className="size-2.5 rounded-full bg-primary" />}
-    </span>
-  );
-}
 
 export function PdktSystemTab({
   writingStyleMode,
@@ -96,7 +83,7 @@ export function PdktSystemTab({
                   <span className="text-sm font-semibold tracking-tight text-foreground">
                     {style.label}
                   </span>
-                  <RadioIndicator isSelected={isSelected} />
+                  <SettingsRadioIndicator isSelected={isSelected} />
                 </span>
                 <span className="text-xs leading-relaxed font-normal text-fg2">
                   {style.description}
@@ -153,7 +140,7 @@ export function PdktSystemTab({
                     </span>
                   )}
                 </span>
-                <RadioIndicator isSelected={isSelected} />
+                <SettingsRadioIndicator isSelected={isSelected} />
               </Button>
             );
           })}
@@ -167,7 +154,7 @@ export function PdktSystemTab({
             perlu. Biaya per sesi jadi lebih tinggi.
           </span>
         </span>
-        <PdktSwitch
+        <SettingsSwitch
           label="Gambar lampiran"
           checked={enableImageGeneration}
           onCheckedChange={setEnableImageGeneration}

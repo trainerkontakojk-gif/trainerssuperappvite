@@ -3,7 +3,7 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "cn";
 import type { PdktScenario } from "@trainers/types";
 import { Button } from "../../../../../components/ui/button";
-import { PdktSwitch } from "../PdktSwitch";
+import { SettingsSwitch } from "../../../../../components/settings/SettingsSwitch";
 import { REPLY_DIRECTIONS, getReplyDirection } from "./replyDirections";
 
 interface ScenarioListProps {
@@ -136,7 +136,7 @@ export function ScenarioList({
                 key={scenario.id}
                 className="flex items-center gap-2 py-2 pr-2 pl-1.5 transition-colors hover:bg-muted/40"
               >
-                <PdktSwitch
+                <SettingsSwitch
                   label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} ${scenario.title}`}
                   checked={scenario.isActive}
                   onCheckedChange={() => onToggleScenario(scenario.id)}

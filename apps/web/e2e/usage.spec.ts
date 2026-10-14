@@ -11,9 +11,9 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { emptyUsageBreakdown } from "../src/lib/usage-snapshot";
 
 /**
- * UsageModal — rincian simulasi vs penilaian AI (hermetic).
+ * Popover Pemakaian AI — rincian simulasi vs penilaian AI (hermetic).
  *
- * Modal dipakai bersama KETIK/PDKT/Telefun; spec ini membukanya dari landing
+ * Popover dipakai bersama KETIK dan PDKT; spec ini membukanya dari landing
  * KETIK dan membuktikan rincian biaya per kategori dirender.
  *
  * Bentuk respons mengikuti `fetchUsageSummary` di `src/lib/usage-summary.ts`, dan
@@ -75,7 +75,7 @@ const USAGE_MOCKS: readonly ApiMock[] = [
   },
 ];
 
-test.describe("UsageModal (hermetic)", () => {
+test.describe("Pemakaian AI KETIK (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
@@ -86,33 +86,26 @@ test.describe("UsageModal (hermetic)", () => {
     const audit = await openHermeticShell(page, {
       path: "/ketik",
       apiMocks: USAGE_MOCKS,
-      expectedThirdPartyHosts: ["ojk.go.id"],
     });
     console.log("[audit]", formatAudit(audit));
 
     await page
-      .getByRole("button", { name: /^Pemakaian bulan ini/ })
-      .first()
-      .click();
+      .getByRole("navigation", { name: "Menu KETIK" })
+      .getByRole("button", { name: /^Pemakaian AI/ })
+      .click({ timeout: 20000 });
 
-    // Scope ke dialog usage: modal pengaturan juga ada di DOM dan memuat teks
-    // "+ Tambah Kategori Lainnya", yang akan cocok dengan `getByText("Lainnya")`
-    // karena `getByText` dengan string mencocokkan SUBSTRING.
-    const usageDialog = page
-      .getByRole("dialog")
-      .filter({ hasText: "Penilaian AI" });
-    await expect(usageDialog).toBeVisible({ timeout: 20000 });
+    const usage = page.getByRole("dialog").filter({ hasText: "Penilaian AI" });
+    await expect(usage).toBeVisible({ timeout: 20000 });
+    await expect(usage).toContainText("Mei 2026");
 
     // Baris per kategori, bukan hanya angka total.
-    await expect(usageDialog.getByText("Simulasi").first()).toBeVisible();
-    await expect(usageDialog.getByText("Penilaian AI").first()).toBeVisible();
+    await expect(usage.getByText("Simulasi chat")).toBeVisible();
+    await expect(usage.getByText("Penilaian AI")).toBeVisible();
     // Biaya per kategori berasal dari `breakdown`, bukan dari total.
-    await expect(usageDialog.getByText(/Rp\s?30\.000/).first()).toBeVisible();
-    await expect(usageDialog.getByText(/Rp\s?20\.000/).first()).toBeVisible();
+    await expect(usage.getByText(/Rp\s?30\.000/).first()).toBeVisible();
+    await expect(usage.getByText(/Rp\s?20\.000/).first()).toBeVisible();
     // Kategori bernilai nol disembunyikan: `uncategorized` kosong di fixture.
-    await expect(usageDialog.getByText("Lainnya", { exact: true })).toHaveCount(
-      0,
-    );
+    await expect(usage.getByText("Lainnya", { exact: true })).toHaveCount(0);
 
     await waitForMockedApi(audit, ["/ai/usage/summary"]);
     expectHermetic(audit);

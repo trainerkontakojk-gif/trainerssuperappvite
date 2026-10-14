@@ -16,7 +16,7 @@ import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { mapHistoryRow, type SessionHistory } from "./utils/sessionHistory";
-import { UsagePopover } from "./components/UsagePopover";
+import { UsagePopover } from "../../components/simulation/UsagePopover";
 import { useApi } from "../../hooks/useApi";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
@@ -407,6 +407,7 @@ export default function PdktLanding() {
                         Riwayat
                       </Button>
                       <UsagePopover
+                        module="pdkt"
                         triggerClassName={navButtonClass}
                         sessionDelta={sessionDelta}
                         sessionDeltaPending={sessionDeltaPending}

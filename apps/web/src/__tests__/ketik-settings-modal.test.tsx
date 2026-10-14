@@ -91,8 +91,7 @@ describe(
     const onSaveMock = vi.fn().mockResolvedValue(undefined);
     render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
 
-    // Click on System Tab (Sistem)
-    const systemTabButton = screen.getByText("Sistem");
+    const systemTabButton = screen.getByRole("tab", { name: /^Sesi & AI/ });
     await user.click(systemTabButton);
 
     const expectedModels = [
@@ -107,15 +106,12 @@ describe(
     });
     expect(screen.queryByText(/OpenRouter/i)).toBeNull();
     expect(screen.queryByText(/DeepSeek/i)).toBeNull();
-    expect(screen.getAllByText("Gemini").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
 
     const gemini35Card = screen.getByText("Gemini 3.5 Flash Lite");
     await user.click(gemini35Card);
 
-    // Click Save Changes (Simpan Perubahan)
     const saveButton = screen.getByRole("button", {
-      name: /simpan perubahan/i,
+      name: /^Simpan$/,
     });
     await user.click(saveButton);
 
@@ -130,12 +126,16 @@ describe(
     render(<SettingsModal {...defaultProps} />);
 
     expect(screen.getByRole("tablist")).toBeDefined();
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Masalah",
-      "Karakter",
-      "Identitas",
-      "Template",
-      "Sistem",
+    expect(
+      screen
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent?.replace(/[\d/]+$/, "")),
+    ).toEqual([
+      "Skenario",
+      "Karakter konsumen",
+      "Identitas konsumen",
+      "Template cepat",
+      "Sesi & AI",
     ]);
   });
 
@@ -152,12 +152,11 @@ describe(
     };
     render(<SettingsModal {...customProps} />);
 
-    // Click on System Tab (Sistem)
-    const systemTabButton = screen.getByText("Sistem");
+    const systemTabButton = screen.getByRole("tab", { name: /^Sesi & AI/ });
     await user.click(systemTabButton);
 
     // Click Kustom button to trigger population of customInputValue with "12"
-    const kustomButton = screen.getByText("Kustom");
+    const kustomButton = screen.getByRole("radio", { name: "Kustom" });
     await user.click(kustomButton);
 
     // Edit input - value is now "12"
@@ -166,9 +165,8 @@ describe(
     await user.type(input, "20");
     await user.tab(); // Blur trigger validation
 
-    // Click Simpan Perubahan
     const saveButton = screen.getByRole("button", {
-      name: /simpan perubahan/i,
+      name: /^Simpan$/,
     });
     await user.click(saveButton);
 
@@ -184,8 +182,8 @@ describe(
     const onSaveMock = vi.fn().mockResolvedValue(undefined);
     render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
 
-    await user.click(screen.getByText("Sistem"));
-    await user.click(screen.getByRole("button", { name: "Kustom" }));
+    await user.click(screen.getByRole("tab", { name: /^Sesi & AI/ }));
+    await user.click(screen.getByRole("radio", { name: "Kustom" }));
 
     const input = screen.getByDisplayValue("5") as HTMLInputElement;
     expect(input).toBe(document.activeElement);
@@ -194,7 +192,7 @@ describe(
     await user.type(input, "20");
     await user.tab();
 
-    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+    await user.click(screen.getByRole("button", { name: /^Simpan$/ }));
 
     expect(onSaveMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -212,7 +210,7 @@ describe(
       />,
     );
 
-    await user.click(screen.getByText("Sistem"));
+    await user.click(screen.getByRole("tab", { name: /^Sesi & AI/ }));
 
     expect(screen.getByDisplayValue("20")).toBeDefined();
   });
@@ -221,9 +219,9 @@ describe(
     const user = userEvent.setup();
     render(<SettingsModal {...defaultProps} />);
 
-    await user.click(screen.getByRole("tab", { name: "Karakter" }));
+    await user.click(screen.getByRole("tab", { name: /^Karakter konsumen/ }));
 
-    const randomChoice = screen.getByRole("button", { name: "Dipakai" });
+    const randomChoice = screen.getByRole("button", { name: "Pakai karakter Acak" });
     expect(randomChoice).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -231,9 +229,9 @@ describe(
     const user = userEvent.setup();
     const { container } = render(<SettingsModal {...defaultProps} />);
 
-    await user.click(screen.getByText("Masalah"));
+    await user.click(screen.getByRole("tab", { name: /^Skenario/ }));
     await user.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
+      screen.getByRole("button", { name: /^Skenario baru$/i }),
     );
 
     const description = container.querySelector(
@@ -246,7 +244,7 @@ describe(
       "ketik-scenario-description-counter",
     );
     expect(description).toHaveAttribute("id", "ketik-scenario-description");
-    expect(screen.getByLabelText(/Deskripsi Masalah/)).toBe(description);
+    expect(screen.getByLabelText(/Deskripsi skenario/)).toBe(description);
 
     fireEvent.change(description, { target: { value: "Deskripsi baru" } });
     expect(screen.getByText("14 / 12.000")).toBeDefined();
@@ -272,11 +270,12 @@ describe(
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByText("Masalah"));
-    const scenarioCard = screen
-      .getByText(initialSettings.scenarios[0].title)
-      .closest("div.flex.items-start");
-    await user.click(scenarioCard!.querySelectorAll("button")[1]);
+    await user.click(screen.getByRole("tab", { name: /^Skenario/ }));
+    await user.click(
+      screen.getByRole("button", {
+        name: `Ubah ${initialSettings.scenarios[0].title}`,
+      }),
+    );
 
     const description = container.querySelector(
       "textarea",
@@ -287,11 +286,11 @@ describe(
 
   it("closes and reopens with fresh settings from props", () => {
     const { rerender } = render(<SettingsModal {...defaultProps} />);
-    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+    expect(screen.getByText("Pengaturan KETIK")).toBeDefined();
 
     // Rerender with isOpen = false
     rerender(<SettingsModal {...defaultProps} isOpen={false} />);
-    expect(screen.queryByText("Pengaturan Simulasi")).toBeNull();
+    expect(screen.queryByText("Pengaturan KETIK")).toBeNull();
   });
 
   it("accumulates out-of-order image reads and blocks save until reads finish", async () => {
@@ -317,7 +316,7 @@ describe(
       const onSave = vi.fn().mockResolvedValue(undefined);
       render(<SettingsModal {...defaultProps} onSave={onSave} />);
       await user.click(
-        screen.getByRole("button", { name: /tambah skenario baru/i }),
+        screen.getByRole("button", { name: /^Skenario baru$/i }),
       );
       await user.selectOptions(screen.getByRole("combobox"), "Kepatuhan");
       await user.type(
@@ -325,7 +324,7 @@ describe(
         "Lampiran",
       );
       await user.type(
-        screen.getByLabelText(/Deskripsi Masalah/),
+        screen.getByLabelText(/Deskripsi skenario/),
         "Deskripsi",
       );
 
@@ -341,17 +340,17 @@ describe(
         },
       });
       expect(ControlledFileReader.instances).toHaveLength(2);
-      const localSave = screen.getByRole("button", { name: /^Simpan$/ });
+      const localSave = screen.getByRole("button", { name: "Terapkan" });
       expect(localSave).toBeDisabled();
       await user.click(localSave);
-      expect(screen.getByRole("button", { name: /^Simpan$/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Terapkan" })).toBeDisabled();
 
       ControlledFileReader.instances[1].complete("data:image/png;base64,two");
       ControlledFileReader.instances[0].complete("data:image/png;base64,one");
       await waitFor(() => expect(localSave).not.toBeDisabled());
-      await user.click(screen.getByRole("button", { name: /^Simpan$/ }));
+      await user.click(screen.getByRole("button", { name: "Terapkan" }));
       await user.click(
-        screen.getByRole("button", { name: /simpan perubahan/i }),
+        screen.getByRole("button", { name: /^Simpan$/ }),
       );
 
       expect(onSave).toHaveBeenCalledWith(
@@ -396,7 +395,7 @@ describe(
       const user = userEvent.setup();
       render(<SettingsModal {...defaultProps} />);
       await user.click(
-        screen.getByRole("button", { name: /tambah skenario baru/i }),
+        screen.getByRole("button", { name: /^Skenario baru$/i }),
       );
       await user.selectOptions(screen.getByRole("combobox"), "Kepatuhan");
       await user.type(
@@ -404,7 +403,7 @@ describe(
         "Lampiran",
       );
       await user.type(
-        screen.getByLabelText(/Deskripsi Masalah/),
+        screen.getByLabelText(/Deskripsi skenario/),
         "Deskripsi",
       );
 
@@ -434,7 +433,7 @@ describe(
     render(<SettingsModal {...defaultProps} onSave={onSave} />);
 
     const saveButton = screen.getByRole("button", {
-      name: /simpan perubahan/i,
+      name: /^Simpan$/,
     });
     await user.click(saveButton);
     expect(saveButton).toBeDisabled();
@@ -443,7 +442,7 @@ describe(
 
     rejectSave(new Error("network failure"));
     await waitFor(() => expect(saveButton).not.toBeDisabled());
-    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+    expect(screen.getByText("Pengaturan KETIK")).toBeDefined();
   });
 
   it("shows changed-elsewhere guidance for a settings conflict and retains the modal", async () => {
@@ -453,13 +452,13 @@ describe(
       .mockRejectedValue(new ApiError("SETTINGS_CONFLICT", "stale settings"));
     render(<SettingsModal {...defaultProps} onSave={onSave} />);
 
-    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+    await user.click(screen.getByRole("button", { name: /^Simpan$/ }));
     await waitFor(() =>
       expect(notify.error).toHaveBeenCalledWith(
         expect.stringContaining("diubah di tempat lain"),
       ),
     );
-    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+    expect(screen.getByText("Pengaturan KETIK")).toBeDefined();
   });
 
   it(
@@ -471,30 +470,30 @@ describe(
       render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
 
       // Click Template Tab (Template)
-      const templateTabButton = screen.getByText("Template");
+      const templateTabButton = screen.getByRole("tab", { name: /^Template cepat/ });
       await user.click(templateTabButton);
 
       // Click "Tambah Template"
         const addTemplateBtn = screen.getByRole("button", {
-          name: /tambah template standar/i,
+          name: /template standar baru/i,
         });
       await user.click(addTemplateBtn);
 
       // Fill form
       const keywordInput = screen.getByPlaceholderText("contoh: salam");
       const contentInput = screen.getByPlaceholderText(
-        "Masukkan isi pesan yang akan muncul saat shortcut dipanggil...",
+        "Pesan yang muncul saat kata kunci dipanggil",
       );
       await user.type(keywordInput, "terima-kasih");
       await user.type(contentInput, "Terima kasih banyak atas bantuan Anda!");
 
       // Save Template (form level button)
-      const saveTemplateBtn = screen.getByRole("button", { name: "Simpan" });
+      const saveTemplateBtn = screen.getByRole("button", { name: "Terapkan" });
       await user.click(saveTemplateBtn);
 
       // Save Settings (modal level button)
       const saveSettingsButton = screen.getByRole("button", {
-        name: /simpan perubahan/i,
+        name: /^Simpan$/,
       });
       await user.click(saveSettingsButton);
 
@@ -516,16 +515,16 @@ describe(
       const user = userEvent.setup();
       render(<SettingsModal {...defaultProps} canManageTemplates={false} />);
 
-      await user.click(screen.getByText("Template"));
+      await user.click(screen.getByRole("tab", { name: /^Template cepat/ }));
 
       expect(
-        screen.getByText(/dikelola admin dan berlaku untuk semua user/i),
+        screen.getByText(/Template standar dikelola admin/i),
       ).toBeDefined();
       expect(screen.getByText("/salam")).toBeDefined();
       expect(
-        screen.getByRole("button", { name: /tambah template pribadi/i }),
+        screen.getByRole("button", { name: /template pribadi baru/i }),
       ).toBeDefined();
-      expect(screen.queryByText(/tambah template standar/i)).toBeNull();
+      expect(screen.queryByText(/template standar baru/i)).toBeNull();
 });
 
     it("saves a non-admin personal template without calling the global callback", async () => {
@@ -541,9 +540,9 @@ describe(
         />,
       );
 
-      await user.click(screen.getByText("Template"));
+      await user.click(screen.getByRole("tab", { name: /^Template cepat/ }));
       await user.click(
-        screen.getByRole("button", { name: /tambah template pribadi/i }),
+        screen.getByRole("button", { name: /template pribadi baru/i }),
       );
       await user.type(
         screen.getByPlaceholderText("contoh: salam"),
@@ -551,13 +550,13 @@ describe(
       );
       await user.type(
         screen.getByPlaceholderText(
-          "Masukkan isi pesan yang akan muncul saat shortcut dipanggil...",
+          "Pesan yang muncul saat kata kunci dipanggil",
         ),
         "Saya bantu cek kembali ya.",
       );
-      await user.click(screen.getByRole("button", { name: "Simpan" }));
+      await user.click(screen.getByRole("button", { name: "Terapkan" }));
       await user.click(
-        screen.getByRole("button", { name: /simpan perubahan/i }),
+        screen.getByRole("button", { name: /^Simpan$/ }),
       );
 
       expect(onSaveTemplates).not.toHaveBeenCalled();
@@ -585,9 +584,9 @@ describe(
         />,
       );
 
-      await user.click(screen.getByText("Template"));
+      await user.click(screen.getByRole("tab", { name: /^Template cepat/ }));
       await user.click(
-        screen.getByRole("button", { name: /tambah template standar/i }),
+        screen.getByRole("button", { name: /template standar baru/i }),
       );
       await user.type(
         screen.getByPlaceholderText("contoh: salam"),
@@ -595,13 +594,13 @@ describe(
       );
       await user.type(
         screen.getByPlaceholderText(
-          "Masukkan isi pesan yang akan muncul saat shortcut dipanggil...",
+          "Pesan yang muncul saat kata kunci dipanggil",
         ),
         "Pesan standar untuk semua user.",
       );
-      await user.click(screen.getByRole("button", { name: "Simpan" }));
+      await user.click(screen.getByRole("button", { name: "Terapkan" }));
       await user.click(
-        screen.getByRole("button", { name: /simpan perubahan/i }),
+        screen.getByRole("button", { name: /^Simpan$/ }),
       );
 
       expect(onSaveTemplates).toHaveBeenCalledWith(
@@ -618,30 +617,29 @@ describe(
     it("keeps standard templates when a non-admin resets personal settings", async () => {
       const user = userEvent.setup();
       const onSave = vi.fn().mockResolvedValue(undefined);
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      render(
+        <SettingsModal
+          {...defaultProps}
+          canManageTemplates={false}
+          onSave={onSave}
+        />,
+      );
 
-      try {
-        render(
-          <SettingsModal
-            {...defaultProps}
-            canManageTemplates={false}
-            onSave={onSave}
-          />,
-        );
+      await user.click(
+        screen.getByRole("button", { name: "Pulihkan bawaan" }),
+      );
+      // Konfirmasi lewat dialog aplikasi; tombol kedua ada di dialog itu.
+      const confirmButtons = screen.getAllByRole("button", {
+        name: "Pulihkan bawaan",
+      });
+      await user.click(confirmButtons[confirmButtons.length - 1]);
 
-        await user.click(
-          screen.getByRole("button", { name: /reset default/i }),
-        );
-
-        await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
-        expect(onSave).toHaveBeenCalledWith(
-          expect.objectContaining({
-            quickTemplates: initialSettings.quickTemplates,
-          }),
-        );
-      } finally {
-        confirm.mockRestore();
-      }
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quickTemplates: initialSettings.quickTemplates,
+        }),
+      );
     });
   },
 );

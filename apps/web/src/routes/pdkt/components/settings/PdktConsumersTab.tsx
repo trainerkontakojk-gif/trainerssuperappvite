@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Check, Trash2, Plus, ArrowLeft } from "lucide-react";
-import { cn } from "cn";
+import { Trash2, Plus, ArrowLeft } from "lucide-react";
 import { Button } from "../../../../components/ui/button";
 import { ConfirmDialog } from "../../../../components/ConfirmDialog";
 import { PdktConsumerType } from "@trainers/types";
@@ -13,6 +12,7 @@ import {
   SettingsSelect,
   SettingsTextarea,
 } from "@/components/settings/SettingsPrimitives";
+import { SettingsChoiceRow } from "@/components/settings/SettingsChoices";
 
 interface PdktConsumersTabProps {
   /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
@@ -33,57 +33,6 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 
 function difficultyLabel(difficulty: string | undefined): string {
   return DIFFICULTY_LABELS[difficulty || "Medium"] ?? DIFFICULTY_LABELS.Medium;
-}
-
-/** Baris pilihan karakter: tombol Pilih/Dipakai, keterangan, dan aksi. */
-function ConsumerRow({
-  title,
-  meta,
-  description,
-  selected,
-  onSelect,
-  actions,
-}: {
-  title: string;
-  meta?: string;
-  description: string;
-  selected: boolean;
-  onSelect: () => void;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <li
-      className={cn(
-        "flex flex-wrap items-start gap-3 px-4 py-3 transition-colors sm:flex-nowrap",
-        selected ? "bg-muted/60" : "hover:bg-muted/40",
-      )}
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-semibold text-foreground">{title}</span>
-          {meta && <span className="text-xs text-fg2">{meta}</span>}
-        </span>
-        <span className="text-xs leading-relaxed text-muted-foreground">
-          {description}
-        </span>
-      </span>
-      <span className="flex shrink-0 flex-wrap items-center gap-1">
-        {actions}
-        <Button
-          type="button"
-          variant={selected ? "secondary" : "outline"}
-          aria-pressed={selected}
-          // Nama tetap; status pilihan diumumkan lewat `aria-pressed`.
-          aria-label={`Pakai karakter ${title}`}
-          onClick={onSelect}
-          className="min-h-[44px]"
-        >
-          {selected && <Check data-icon="inline-start" />}
-          {selected ? "Dipakai" : "Pilih"}
-        </Button>
-      </span>
-    </li>
-  );
 }
 
 export function PdktConsumersTab({
@@ -290,14 +239,14 @@ export function PdktConsumersTab({
       </div>
 
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
-        <ConsumerRow
+        <SettingsChoiceRow
           title="Acak"
           description="Karakter dipilih acak di setiap sesi."
           selected={globalConsumerTypeId === "random"}
           onSelect={() => setGlobalConsumerTypeId("random")}
         />
         {consumerTypes.map((consumer) => (
-          <ConsumerRow
+          <SettingsChoiceRow
             key={consumer.id}
             title={consumer.name}
             meta={difficultyLabel(consumer.difficulty)}

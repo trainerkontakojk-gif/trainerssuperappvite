@@ -28,6 +28,19 @@ export interface UseKetikSettingsDraftProps {
   onClose: () => void;
 }
 
+/** Bentuk draft dialog dari pengaturan tersimpan; juga dasar penanda "Belum disimpan". */
+function toKetikDraft(settings: KetikAppSettings): KetikAppSettings {
+  const layers = getKetikTemplateLayers(settings);
+  const personal = settings.personalQuickTemplates || [];
+  return {
+    ...settings,
+    selectedModel: coerceKetikModelId(settings.selectedModel),
+    globalQuickTemplates: layers.global,
+    quickTemplates: mergeKetikQuickTemplates(layers.global, personal),
+    personalQuickTemplates: personal,
+  };
+}
+
 const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
 
 export function coerceKetikModelId(modelId?: string | null): string {
@@ -150,8 +163,6 @@ export function useKetikSettingsDraft({
   onSaveTemplates,
   onClose,
 }: UseKetikSettingsDraftProps) {
-  const initialTemplateLayers = getKetikTemplateLayers(settings);
-  const initialStoredPersonalTemplates = settings.personalQuickTemplates || [];
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system" | "template"
   >("scenarios");
@@ -160,16 +171,9 @@ export function useKetikSettingsDraft({
   const [templateScope, setTemplateScope] = useState<"global" | "personal">(
     "global",
   );
-  const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() => ({
-    ...settings,
-    selectedModel: coerceKetikModelId(settings.selectedModel),
-    globalQuickTemplates: initialTemplateLayers.global,
-    quickTemplates: mergeKetikQuickTemplates(
-      initialTemplateLayers.global,
-      initialStoredPersonalTemplates,
-    ),
-    personalQuickTemplates: initialStoredPersonalTemplates,
-  }));
+  const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() =>
+    toKetikDraft(settings),
+  );
 
   const [customInputValue, setCustomInputValue] = useState("");
   const [durationMode, setDurationMode] = useState<DurationMode>(() =>
@@ -289,33 +293,41 @@ export function useKetikSettingsDraft({
 
   useEffect(() => {
     if (isOpen) {
-      const nextTemplateLayers = getKetikTemplateLayers(settings);
-      setLocalSettings({
-        ...settings,
-        selectedModel: coerceKetikModelId(settings.selectedModel),
-        globalQuickTemplates: nextTemplateLayers.global,
-        quickTemplates: mergeKetikQuickTemplates(
-          nextTemplateLayers.global,
-          settings.personalQuickTemplates || [],
-        ),
-        personalQuickTemplates: settings.personalQuickTemplates || [],
-      });
-      const nextDurationMode = classifyDurationMode(
-        settings.simulationDuration,
-      );
-      setDurationMode(nextDurationMode);
-      setCustomInputValue(
-        nextDurationMode === "custom"
-          ? durationToInputValue(settings.simulationDuration)
-          : "",
-      );
-      setDurationValidationError(null);
-      scenarioForm.close();
-      consumerForm.close();
-      templateForm.close();
-      setTemplateScope("global");
+      resetDraft();
     }
   }, [isOpen, settings]);
+
+  function resetDraft() {
+    setLocalSettings(toKetikDraft(settings));
+    const nextDurationMode = classifyDurationMode(settings.simulationDuration);
+    setDurationMode(nextDurationMode);
+    setCustomInputValue(
+      nextDurationMode === "custom"
+        ? durationToInputValue(settings.simulationDuration)
+        : "",
+    );
+    setDurationValidationError(null);
+    scenarioForm.close();
+    consumerForm.close();
+    templateForm.close();
+    setTemplateScope("global");
+  }
+
+  /** Ada perubahan draft (termasuk form yang sedang terbuka) yang belum disimpan. */
+  const hasUnsavedChanges = () => {
+    const templateLayers = getKetikTemplateLayers(localSettings);
+    return (
+      JSON.stringify(localSettings) !==
+        JSON.stringify(toKetikDraft(settings)) ||
+      scenarioForm.isDirty(localSettings.scenarios) ||
+      consumerForm.isDirty(localSettings.consumerTypes) ||
+      templateForm.isDirty(
+        templateScope === "global"
+          ? templateLayers.global
+          : templateLayers.personal,
+      )
+    );
+  };
 
   const handleSave = async () => {
     if (saveInFlightRef.current) return;
@@ -438,43 +450,37 @@ export function useKetikSettingsDraft({
     }
   };
 
+  /** Pulihkan bawaan dan langsung simpan; konfirmasi ada di pemanggil. */
   const handleResetDefaults = async () => {
     if (saveInFlightRef.current) return;
-    if (
-      window.confirm(
-        "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
-      )
-    ) {
-      saveInFlightRef.current = true;
-      setIsSaving(true);
-      try {
-        const resetTemplateLayers = getKetikTemplateLayers(localSettings);
-        const resetPersonalTemplates =
-          localSettings.personalQuickTemplates || [];
-        const resetSettings: KetikAppSettings = {
-          ...DEFAULT_KETIK_SETTINGS,
-          globalQuickTemplates: resetTemplateLayers.global,
-          quickTemplates: mergeKetikQuickTemplates(
-            resetTemplateLayers.global,
-            resetPersonalTemplates,
-          ),
-          personalQuickTemplates: resetPersonalTemplates,
-        };
-        await onSave(resetSettings);
-        setLocalSettings(resetSettings);
-        scenarioForm.close();
-        consumerForm.close();
-        templateForm.close();
-        onClose();
-      } catch (e) {
-        console.error(e);
-        notify.error(
-          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
-        );
-      } finally {
-        saveInFlightRef.current = false;
-        setIsSaving(false);
-      }
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    try {
+      const resetTemplateLayers = getKetikTemplateLayers(localSettings);
+      const resetPersonalTemplates = localSettings.personalQuickTemplates || [];
+      const resetSettings: KetikAppSettings = {
+        ...DEFAULT_KETIK_SETTINGS,
+        globalQuickTemplates: resetTemplateLayers.global,
+        quickTemplates: mergeKetikQuickTemplates(
+          resetTemplateLayers.global,
+          resetPersonalTemplates,
+        ),
+        personalQuickTemplates: resetPersonalTemplates,
+      };
+      await onSave(resetSettings);
+      setLocalSettings(resetSettings);
+      scenarioForm.close();
+      consumerForm.close();
+      templateForm.close();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      notify.error(
+        getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
+      );
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   };
 
@@ -500,6 +506,8 @@ export function useKetikSettingsDraft({
     handleIdentityChange,
     handleSave,
     handleResetDefaults,
+    hasUnsavedChanges,
+    discardUnsavedChanges: resetDraft,
     isSaving,
   };
 }

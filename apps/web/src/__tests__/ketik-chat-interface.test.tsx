@@ -1,11 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type {
-  ChatMessage,
-  KetikScenario,
-  KetikSessionConfig,
-  SimulationSubjectSnapshot,
-} from "@trainers/types";
+import type { KetikScenario, KetikSessionConfig } from "@trainers/types";
 
 const { mockGenerate } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
@@ -44,23 +39,6 @@ const config: KetikSessionConfig = {
   selectedModel: "gemini-3.1-flash-lite",
   simulationDuration: 1,
   responsePacingMode: "training_fast",
-};
-
-const initialMessages: ChatMessage[] = [
-  {
-    id: "message-1",
-    sender: "consumer",
-    text: 'Pengaduan kartu kredit – nasabah José #1, "urgent"\nBaris 2',
-    timestamp: "2026-07-11T00:00:00.000Z",
-  },
-];
-
-const participantSubject: SimulationSubjectSnapshot = {
-  type: "participant",
-  participantId: "123e4567-e89b-12d3-a456-426614174000",
-  displayName: "Andi",
-  batchName: "Batch 12",
-  team: "Tim Alpha",
 };
 
 function renderChat(
@@ -107,7 +85,7 @@ describe("KETIK ChatInterface session clock", () => {
       }
     });
 
-    fireEvent.change(screen.getByLabelText("Tulis pesan KETIK"), {
+    fireEvent.change(screen.getByLabelText("Tulis balasan"), {
       target: { value: "Saya bantu cek dulu." },
     });
     await act(async () => {
@@ -149,93 +127,11 @@ describe("KETIK ChatInterface session clock", () => {
         "Maaf, saya harus lanjut aktivitas dulu. Nanti saya hubungi lagi ya. Terima kasih.",
       ),
     ).toBeDefined();
-    expect(screen.getByText("1:00")).toBeDefined();
     expect(
       screen.getAllByText(
         "Maaf, saya harus lanjut aktivitas dulu. Nanti saya hubungi lagi ya. Terima kasih.",
       ),
     ).toHaveLength(1);
-  });
-
-  it("keeps elapsed time running during the expired grace phase", () => {
-    const intervalRegistrations: Array<{ handler: () => void; delay: number }> =
-      [];
-    vi.spyOn(globalThis, "setInterval").mockImplementation(((
-      handler: () => void,
-      delay: number,
-    ) => {
-      intervalRegistrations.push({ handler, delay });
-      return intervalRegistrations.length;
-    }) as typeof setInterval);
-
-    renderChat();
-    expect(intervalRegistrations).toHaveLength(1);
-
-    act(() => {
-      for (let second = 0; second < 60; second += 1) {
-        intervalRegistrations[0].handler();
-      }
-    });
-
-    expect(intervalRegistrations).toHaveLength(2);
-
-    act(() => {
-      for (let second = 0; second < 5; second += 1) {
-        intervalRegistrations[1].handler();
-      }
-    });
-
-    expect(screen.getByText("1:05")).toBeDefined();
-  });
-});
-
-describe("KETIK ChatInterface CSV export", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
-
-  it("exports a UTF-8 BOM Blob and revokes its object URL", async () => {
-    let capturedBlob: Blob | undefined;
-    const createObjectURL = vi.fn((blob: Blob) => {
-      capturedBlob = blob;
-      return "blob:ketik-review";
-    });
-    const revokeObjectURL = vi.fn();
-    let downloadedFileName = "";
-    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(function (this: HTMLAnchorElement) {
-        downloadedFileName = this.download;
-      });
-
-    renderChat({
-      isReviewMode: true,
-      initialMessages,
-      simulationSubject: participantSubject,
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Download transcript CSV" }),
-    );
-
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:ketik-review");
-    expect(click).toHaveBeenCalledTimes(1);
-    expect(downloadedFileName).toMatch(/^chat_review_\d+\.csv$/);
-    expect(capturedBlob).toBeDefined();
-    expect(capturedBlob?.type).toBe("text/csv;charset=utf-8");
-
-    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
-    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
-    const csv = new TextDecoder().decode(bytes.slice(3));
-    expect(csv.startsWith("Pengirim,Pesan,Waktu")).toBe(true);
-    expect(csv).toContain("Target");
-    expect(csv).toContain("Andi");
-    expect(csv).toContain("Batch 12");
-    expect(csv).toContain(
-      '"Konsumen","Pengaduan kartu kredit – nasabah José #1, ""urgent""\nBaris 2"',
-    );
   });
 });
 
@@ -249,7 +145,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
   it("keeps composer text at the same readable scale as chat bubbles", () => {
     renderChat();
 
-    expect(screen.getByLabelText("Tulis pesan KETIK")).toHaveClass(
+    expect(screen.getByLabelText("Tulis balasan")).toHaveClass(
       "text-lg",
       "md:text-lg",
     );
@@ -261,7 +157,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
 
     renderChat();
 
-    const input = screen.getByLabelText("Tulis pesan KETIK");
+    const input = screen.getByLabelText("Tulis balasan");
     expect(input).not.toBeDisabled();
 
     // Type a message and send it — this triggers setIsLoading(true)
@@ -280,7 +176,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     mockGenerate.mockReturnValue(new Promise<{ text: string }>(() => {}));
 
     renderChat();
-    const input = screen.getByLabelText("Tulis pesan KETIK");
+    const input = screen.getByLabelText("Tulis balasan");
 
     // Send a message to trigger isLoading
     fireEvent.change(input, { target: { value: "First message" } });
@@ -299,7 +195,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     mockGenerate.mockReturnValue(new Promise<{ text: string }>(() => {}));
 
     renderChat();
-    const input = screen.getByLabelText("Tulis pesan KETIK");
+    const input = screen.getByLabelText("Tulis balasan");
     const sendButton = screen.getByRole("button", { name: "Kirim pesan" });
 
     // Send first message to trigger isLoading
@@ -327,7 +223,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     });
 
     renderChat();
-    const input = screen.getByLabelText("Tulis pesan KETIK");
+    const input = screen.getByLabelText("Tulis balasan");
 
     // Send first message — it triggers generate() which stays pending
     fireEvent.change(input, { target: { value: "First message" } });
@@ -360,7 +256,7 @@ describe("KETIK ChatInterface input/Send UX during loading", () => {
     mockGenerate.mockReturnValue(new Promise<{ text: string }>(() => {}));
 
     renderChat();
-    const input = screen.getByLabelText("Tulis pesan KETIK");
+    const input = screen.getByLabelText("Tulis balasan");
 
     // Send first message
     fireEvent.change(input, { target: { value: "First" } });

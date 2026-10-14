@@ -43,6 +43,7 @@ const SidakAgents = lazy(() => import("./routes/sidak/agents"));
 const SidakAgentDetail = lazy(() => import("./routes/sidak/agents.$id"));
 const SidakReportsData = lazy(() => import("./routes/sidak/reports-data"));
 const KetikLanding = lazy(() => import("./routes/ketik/index"));
+const KetikHistory = lazy(() => import("./routes/ketik/history"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
@@ -354,6 +355,14 @@ const ketikRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ketik",
   component: KetikLanding,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { sesi?: string; tahap?: "telaah" } => ({
+    ...(typeof search.sesi === "string" && search.sesi
+      ? { sesi: search.sesi }
+      : {}),
+    ...(search.tahap === "telaah" ? { tahap: "telaah" } : {}),
+  }),
   beforeLoad: requireAuth(),
 });
 
@@ -361,16 +370,15 @@ const ketikSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ketik/simulation",
   beforeLoad: () => {
-    throw redirect({ to: "/ketik" });
+    throw redirect({ to: "/ketik", search: {}, replace: true });
   },
 });
 
 const ketikHistoryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ketik/history",
-  beforeLoad: () => {
-    throw redirect({ to: "/ketik" });
-  },
+  component: KetikHistory,
+  beforeLoad: requireAuth(),
 });
 
 const pdktRoute = createRoute({

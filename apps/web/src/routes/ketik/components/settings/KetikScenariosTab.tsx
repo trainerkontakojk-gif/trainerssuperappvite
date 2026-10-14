@@ -1,22 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Check,
-  Edit2,
   Trash2,
   Plus,
   ArrowLeft,
   Image as ImageIcon,
+  Search,
   X,
 } from "lucide-react";
-import { Badge } from "../../../../components/ui/badge";
+import { cn } from "cn";
+import { ConfirmDialog } from "../../../../components/ConfirmDialog";
+import { SettingsSwitch } from "../../../../components/settings/SettingsSwitch";
 import { Button } from "../../../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "../../../../components/ui/card";
 import { Label } from "../../../../components/ui/label";
 import {
   SettingsField,
@@ -34,12 +28,17 @@ import { notify } from "../../../../lib/toast";
 import { normalizeKetikScenarioDraft } from "./ketikDraftNormalizers";
 
 interface KetikScenariosTabProps {
+  /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
+  confirmContainer?: HTMLElement | null;
   scenarios: KetikScenario[];
   scenarioForm: ReturnType<typeof useCrudForm<KetikScenario>>;
   setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
 }
 
+const ALL_CATEGORIES = "";
+
 export function KetikScenariosTab({
+  confirmContainer,
   scenarios,
   scenarioForm,
   setLocalSettings,
@@ -48,6 +47,11 @@ export function KetikScenariosTab({
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
   const [pendingImageReads, setPendingImageReads] = useState(0);
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: "discard" } | { kind: "delete"; id: string } | null
+  >(null);
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const editorGenerationRef = useRef(0);
   const pendingImageReadsRef = useRef(0);
 
@@ -90,15 +94,51 @@ export function KetikScenariosTab({
       ),
     }));
 
-  const handleDeleteScenario = (id: string) => {
-    if (window.confirm("Hapus skenario ini?"))
-      setLocalSettings((prev) => ({
-        ...prev,
-        scenarios: prev.scenarios.filter((s) => s.id !== id),
-      }));
+  const deleteScenario = (id: string) =>
+    setLocalSettings((prev) => ({
+      ...prev,
+      scenarios: prev.scenarios.filter((s) => s.id !== id),
+    }));
+
+  const cancelEditor = () => {
+    if (scenarioForm.isDirty(scenarios)) {
+      setPendingConfirm({ kind: "discard" });
+      return;
+    }
+    closeEditor();
   };
 
-  const categories = Array.from(new Set(scenarios.map((s) => s.category)));
+  const confirmPending = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === "delete") deleteScenario(pendingConfirm.id);
+    else closeEditor();
+    setPendingConfirm(null);
+  };
+
+  const confirmDialog = (
+    <ConfirmDialog
+      open={pendingConfirm !== null}
+      container={confirmContainer}
+      {...(pendingConfirm?.kind === "discard"
+        ? {
+            title: "Buang perubahan skenario?",
+            description: "Perubahan yang belum diterapkan akan hilang.",
+            cancelLabel: "Lanjut mengubah",
+            confirmLabel: "Buang perubahan",
+          }
+        : {
+            title: "Hapus skenario ini?",
+            description: "Perubahan berlaku setelah Anda memilih Simpan.",
+            confirmLabel: "Hapus skenario",
+          })}
+      onConfirm={confirmPending}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
+
+  const categories = Array.from(
+    new Set(scenarios.map((s) => s.category).filter(Boolean)),
+  );
   const activeCount = scenarios.filter((s) => s.isActive).length;
   const totalScenarios = scenarios.length;
   const allSelected = totalScenarios > 0 && activeCount === totalScenarios;
@@ -235,378 +275,422 @@ export function KetikScenariosTab({
 
   if (scenarioForm.isOpen) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="border-b border-border pb-4">
+      <div id="scenario-form" className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            {scenarioForm.editingId ? "Ubah skenario" : "Skenario baru"}
+          </h3>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={closeEditor}
-            className="-ml-2 text-muted-foreground hover:text-foreground"
+            onClick={cancelEditor}
+            className="min-h-[44px] text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft data-icon="inline-start" />
-            Kembali ke Daftar Skenario
+            Kembali ke daftar
           </Button>
         </div>
-        <Card>
-          <CardHeader className="border-b bg-muted/20 px-6 py-4">
-            <CardTitle className="text-base tracking-tight">
-              {scenarioForm.editingId
-                ? "Edit Skenario"
-                : "Tambah Skenario Baru"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6 p-6">
-            <SettingsField
-              label="Kategori"
-              id="ketik-scenario-category"
-              required
-            >
-              {!isNewCategoryInput ? (
-                <SettingsSelect
-                  id="ketik-scenario-category"
-                  value={scenarioForm.draft.category || ""}
-                  onChange={(event) => {
-                    if (event.target.value === "NEW") {
-                      setIsNewCategoryInput(true);
-                      setNewScenarioCategory("");
-                      scenarioForm.setDraft({ category: "" });
-                    } else {
-                      setNewScenarioCategory(event.target.value);
-                      scenarioForm.setDraft({ category: event.target.value });
-                    }
-                  }}
-                >
-                  <option value="">Pilih Kategori</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                  <option value="NEW">+ Tambah Kategori Lainnya</option>
-                </SettingsSelect>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  <SettingsInput
-                    id="ketik-scenario-category"
-                    type="text"
-                    className="min-w-48 flex-1"
-                    placeholder="Kategori Baru"
-                    value={newScenarioCategory}
-                    onChange={(e) => {
-                      setNewScenarioCategory(e.target.value);
-                      scenarioForm.setDraft({ category: e.target.value });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsNewCategoryInput(false)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    Batal
-                  </Button>
-                </div>
-              )}
-            </SettingsField>
-            <SettingsField
-              label="Judul Masalah"
-              id="ketik-scenario-title"
-              required
-            >
-              <SettingsInput
-                id="ketik-scenario-title"
-                type="text"
-                placeholder="Contoh: Gagal Transfer"
-                value={scenarioForm.draft.title || ""}
-                onChange={(e) =>
-                  scenarioForm.setDraft({ title: e.target.value })
-                }
-              />
-            </SettingsField>
-            <SettingsField
-              label="Deskripsi Masalah"
-              id="ketik-scenario-description"
-              required
-            >
-              <SettingsTextarea
-                id="ketik-scenario-description"
-                className="min-h-20 resize-none"
-                rows={3}
-                value={scenarioDescription}
-                maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
-                aria-describedby="ketik-scenario-description-counter"
-                onChange={(e) =>
-                  scenarioForm.setDraft({ description: e.target.value })
-                }
-              />
-              <p
-                id="ketik-scenario-description-counter"
-                className="mt-2 text-xs text-muted-foreground"
+        <div className="flex flex-col gap-6">
+          <SettingsField label="Kategori" id="ketik-scenario-category" required>
+            {!isNewCategoryInput ? (
+              <SettingsSelect
+                id="ketik-scenario-category"
+                value={scenarioForm.draft.category || ""}
+                onChange={(event) => {
+                  if (event.target.value === "NEW") {
+                    setIsNewCategoryInput(true);
+                    setNewScenarioCategory("");
+                    scenarioForm.setDraft({ category: "" });
+                  } else {
+                    setNewScenarioCategory(event.target.value);
+                    scenarioForm.setDraft({ category: event.target.value });
+                  }
+                }}
               >
-                {scenarioDescription.length.toLocaleString("id-ID")} /{" "}
-                {formattedScenarioDescriptionLimit}
-              </p>
-            </SettingsField>
-            <SettingsField label="Skrip Percakapan" id="ketik-scenario-script">
-              <div className="flex items-center justify-between gap-4">
+                <option value="">Pilih kategori</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+                <option value="NEW">+ Kategori baru</option>
+              </SettingsSelect>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <SettingsInput
+                  id="ketik-scenario-category"
+                  type="text"
+                  className="min-w-48 flex-1"
+                  placeholder="Nama kategori baru"
+                  value={newScenarioCategory}
+                  onChange={(e) => {
+                    setNewScenarioCategory(e.target.value);
+                    scenarioForm.setDraft({ category: e.target.value });
+                  }}
+                />
                 <Button
                   type="button"
-                  variant={isScenarioScriptEnabled ? "secondary" : "outline"}
-                  size="sm"
-                  aria-pressed={isScenarioScriptEnabled}
-                  onClick={() => {
-                    setIsScenarioScriptEnabled((prev) => {
-                      if (prev) {
-                        scenarioForm.setDraft({ script: "" });
-                      }
-                      return !prev;
-                    });
-                  }}
-                  className="text-xs"
+                  variant="outline"
+                  onClick={() => setIsNewCategoryInput(false)}
+                  className="text-destructive hover:text-destructive"
                 >
-                  <Check data-icon="inline-start" />
-                  {isScenarioScriptEnabled ? "Ikuti Skrip" : "Sangat Kreatif"}
+                  Batal
                 </Button>
               </div>
-              <SettingsTextarea
-                id="ketik-scenario-script"
-                className="min-h-40 resize-y disabled:cursor-not-allowed"
-                rows={8}
-                value={scenarioForm.draft.script || ""}
-                onChange={(e) =>
-                  scenarioForm.setDraft({ script: e.target.value })
-                }
-                disabled={!isScenarioScriptEnabled}
-                placeholder={`Contoh format 1 - Dialog:\nAgent: Selamat pagi, ada yang bisa saya bantu?\nKonsumen: Mas saya ada masalah transaksi.\n\nContoh format 2 - Alur:\nAwal:\n- Konsumen membuka chat dengan nada panik.`}
-              />
-              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Checklist{" "}
-                <span className="font-semibold text-foreground">
-                  Ikuti Skrip
-                </span>{" "}
-                untuk mengaktifkan kolom ini. Saat tidak dicentang, konsumen
-                akan dibiarkan lebih bebas dan kreatif mengikuti konteks
-                skenario.
-              </p>
-            </SettingsField>
-            <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground">
-                Lampiran Gambar
-              </Label>
-              <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-muted/30">
-                <div className="flex flex-col items-center justify-center py-4">
-                  <ImageIcon className="mb-2 size-5 text-muted-foreground" />
-                  <p className="text-xs font-medium text-foreground">
-                    Pilih gambar untuk dilampirkan
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    PNG, JPG (Maksimal 500KB)
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-              {pendingImageReads > 0 && (
-                <p role="status" className="mt-3 text-xs text-muted-foreground">
-                  Membaca lampiran...
-                </p>
-              )}
-              {scenarioForm.draft.images &&
-                scenarioForm.draft.images.length > 0 && (
-                  <div className="mt-2 flex gap-3 overflow-x-auto pb-2">
-                    {scenarioForm.draft.images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="flex w-28 shrink-0 flex-col gap-1.5"
-                      >
-                        <div className="group relative h-20 w-28">
-                          <img
-                            src={img}
-                            alt={
-                              scenarioForm.draft.imageAlts?.[idx] ||
-                              `Preview ${idx + 1}`
-                            }
-                            className="h-full w-full rounded-md border border-border object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon-sm"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="absolute -top-2 -right-2 rounded-full shadow"
-                            aria-label={`Hapus gambar ${idx + 1}`}
-                          >
-                            <X data-icon="inline" />
-                          </Button>
-                          <Badge className="absolute bottom-1 left-1 bg-foreground/75 text-xs text-background hover:bg-foreground/75">
-                            #{idx}
-                          </Badge>
-                        </div>
-                        <SettingsInput
-                          type="text"
-                          value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
-                          onChange={(e) => handleAltChange(idx, e.target.value)}
-                          placeholder="Keterangan gambar..."
-                          maxLength={KETIK_PROMPT_LIMITS.imageAlt}
-                          aria-label={`Keterangan gambar ${idx + 1}`}
-                          className="h-8 min-h-8 bg-background px-2 text-xs"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-            </div>
-          </CardContent>
-          <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-0 py-4">
-            <Button type="button" variant="outline" onClick={closeEditor}>
-              Batal
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveScenario}
-              disabled={
-                pendingImageReads > 0 ||
-                !scenarioForm.draft.title ||
-                !scenarioForm.draft.description
+            )}
+          </SettingsField>
+          <SettingsField
+            label="Judul skenario"
+            id="ketik-scenario-title"
+            required
+          >
+            <SettingsInput
+              id="ketik-scenario-title"
+              type="text"
+              placeholder="Contoh: Gagal Transfer"
+              value={scenarioForm.draft.title || ""}
+              onChange={(e) => scenarioForm.setDraft({ title: e.target.value })}
+            />
+          </SettingsField>
+          <SettingsField
+            label="Deskripsi skenario"
+            id="ketik-scenario-description"
+            required
+          >
+            <SettingsTextarea
+              id="ketik-scenario-description"
+              className="min-h-20 resize-none"
+              rows={3}
+              value={scenarioDescription}
+              maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
+              aria-describedby="ketik-scenario-description-counter"
+              onChange={(e) =>
+                scenarioForm.setDraft({ description: e.target.value })
               }
+            />
+            <p
+              id="ketik-scenario-description-counter"
+              className="mt-2 text-xs text-muted-foreground"
             >
-              Simpan
-            </Button>
-          </CardFooter>
-        </Card>
+              {scenarioDescription.length.toLocaleString("id-ID")} /{" "}
+              {formattedScenarioDescriptionLimit}
+            </p>
+          </SettingsField>
+          <SettingsField label="Alur chat" id="ketik-scenario-script">
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="flex flex-1 flex-col gap-0.5">
+                <span className="text-sm font-semibold text-foreground">
+                  Ikuti skrip
+                </span>
+                <span className="text-xs leading-relaxed text-muted-foreground">
+                  Aktifkan bila konsumen harus mengikuti alur yang Anda tulis.
+                  Bila mati, konsumen bebas menanggapi sesuai konteks skenario.
+                </span>
+              </span>
+              <SettingsSwitch
+                label="Ikuti skrip"
+                checked={isScenarioScriptEnabled}
+                onCheckedChange={(checked) => {
+                  if (!checked) scenarioForm.setDraft({ script: "" });
+                  setIsScenarioScriptEnabled(checked);
+                }}
+              />
+            </div>
+            <SettingsTextarea
+              id="ketik-scenario-script"
+              className={cn(
+                "min-h-40 resize-y disabled:cursor-not-allowed",
+                !isScenarioScriptEnabled && "hidden",
+              )}
+              rows={8}
+              value={scenarioForm.draft.script || ""}
+              onChange={(e) =>
+                scenarioForm.setDraft({ script: e.target.value })
+              }
+              disabled={!isScenarioScriptEnabled}
+              placeholder={`Contoh format 1 - Dialog:\nAgent: Selamat pagi, ada yang bisa saya bantu?\nKonsumen: Mas saya ada masalah transaksi.\n\nContoh format 2 - Alur:\nAwal:\n- Konsumen membuka chat dengan nada panik.`}
+            />
+          </SettingsField>
+          <div className="flex flex-col gap-2">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Lampiran gambar
+            </Label>
+            <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-muted/30">
+              <div className="flex flex-col items-center justify-center py-4">
+                <ImageIcon className="mb-2 size-5 text-muted-foreground" />
+                <p className="text-xs font-medium text-foreground">
+                  Pilih gambar untuk dilampirkan
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  PNG atau JPG, maksimal 500 KB
+                </p>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+            {pendingImageReads > 0 && (
+              <p role="status" className="mt-3 text-xs text-muted-foreground">
+                Membaca lampiran...
+              </p>
+            )}
+            {scenarioForm.draft.images &&
+              scenarioForm.draft.images.length > 0 && (
+                <div className="mt-2 flex gap-3 overflow-x-auto pb-2">
+                  {scenarioForm.draft.images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="flex w-28 shrink-0 flex-col gap-1.5"
+                    >
+                      <div className="group relative h-20 w-28">
+                        <img
+                          src={img}
+                          alt={
+                            scenarioForm.draft.imageAlts?.[idx] ||
+                            `Preview ${idx + 1}`
+                          }
+                          className="h-full w-full rounded-md border border-border object-cover"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon-sm"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute -top-2 -right-2 rounded-full shadow"
+                          aria-label={`Hapus gambar ${idx + 1}`}
+                        >
+                          <X data-icon="inline" />
+                        </Button>
+                        <span className="absolute bottom-1 left-1 rounded-md bg-foreground/75 px-1.5 text-xs font-medium text-background">
+                          #{idx}
+                        </span>
+                      </div>
+                      <SettingsInput
+                        type="text"
+                        value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
+                        onChange={(e) => handleAltChange(idx, e.target.value)}
+                        placeholder="Keterangan gambar..."
+                        maxLength={KETIK_PROMPT_LIMITS.imageAlt}
+                        aria-label={`Keterangan gambar ${idx + 1}`}
+                        className="h-8 min-h-8 bg-background px-2 text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={cancelEditor}
+            className="min-h-[44px]"
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSaveScenario}
+            disabled={
+              pendingImageReads > 0 ||
+              !scenarioForm.draft.title ||
+              !scenarioForm.draft.description
+            }
+            className="min-h-[44px]"
+          >
+            Terapkan
+          </Button>
+        </div>
+        {confirmDialog}
       </div>
     );
   }
 
+  const activeCategory = categories.includes(categoryFilter)
+    ? categoryFilter
+    : ALL_CATEGORIES;
+  const needle = query.trim().toLowerCase();
+  const visible = scenarios.filter(
+    (scenario) =>
+      (!activeCategory || scenario.category === activeCategory) &&
+      (!needle ||
+        `${scenario.title} ${scenario.description}`
+          .toLowerCase()
+          .includes(needle)),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Daftar Skenario
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Skenario
           </h3>
-          <p className="text-xs text-muted-foreground">
-            {activeCount} / {totalScenarios} AKTIF
+          <p className="text-[13px] leading-5 text-fg2">
+            Setiap sesi mengambil satu skenario aktif secara acak. Nama skenario
+            baru terlihat oleh peserta di Telaah, setelah chat selesai.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          onClick={handleAddClick}
+          className="min-h-[44px] shrink-0"
+        >
+          <Plus data-icon="inline-start" />
+          Skenario baru
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-h-[44px] min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
+          <Search aria-hidden="true" className="size-4 shrink-0" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cari skenario"
+            aria-label="Cari skenario"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        {categories.length > 1 && (
+          <div
+            role="group"
+            aria-label="Filter kategori"
+            className="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-muted p-[3px] text-xs font-medium"
+          >
+            {[ALL_CATEGORIES, ...categories].map((item) => {
+              const selected = item === activeCategory;
+              return (
+                <button
+                  key={item || "semua"}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setCategoryFilter(item)}
+                  className={cn(
+                    "min-h-[44px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    selected
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-fg2 hover:text-foreground",
+                  )}
+                >
+                  {item || "Semua"}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+          {scenarios.length === 0
+            ? "Belum ada skenario. Tambahkan skenario baru untuk mulai."
+            : "Tidak ada skenario yang cocok dengan pencarian."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+          {visible.map((scenario) => (
+            <li
+              key={scenario.id}
+              className="flex items-center gap-2 py-2 pr-2 pl-1.5 transition-colors hover:bg-muted/40"
+            >
+              <SettingsSwitch
+                label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} ${scenario.title}`}
+                checked={scenario.isActive}
+                onCheckedChange={() => handleToggleScenario(scenario.id)}
+              />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span
+                  className={cn(
+                    "line-clamp-2 font-semibold",
+                    scenario.isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {scenario.title}
+                </span>
+                {/* Tanpa pemisah "·": di layar sempit butir turun ke baris baru tanpa titik menggantung. */}
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {scenario.category && (
+                    <span className="whitespace-nowrap">
+                      {scenario.category}
+                    </span>
+                  )}
+                  <span className="whitespace-nowrap text-fg2">
+                    {scenario.script?.trim() ? "Ikuti skrip" : "Bebas"}
+                  </span>
+                  {scenario.images && scenario.images.length > 0 && (
+                    <span className="whitespace-nowrap">
+                      {scenario.images.length} lampiran
+                    </span>
+                  )}
+                </span>
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleEditClick(scenario)}
+                aria-label={`Ubah ${scenario.title}`}
+                className="min-h-[44px] shrink-0"
+              >
+                Ubah
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                onClick={() =>
+                  setPendingConfirm({ kind: "delete", id: scenario.id })
+                }
+                aria-label={`Hapus ${scenario.title}`}
+                title="Hapus"
+                className="min-h-[44px] min-w-[44px] shrink-0 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 data-icon="inline" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>
+          {activeCount} dari {totalScenarios} skenario aktif. Skenario nonaktif
+          tetap tersimpan.
+        </p>
+        <div className="flex gap-1">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleSelectAll}
             disabled={allSelected}
+            className="min-h-[44px]"
           >
-            Pilih Semua
+            Aktifkan semua
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleUnselectAll}
             disabled={noneSelected}
-            className="text-destructive hover:text-destructive"
+            className="min-h-[44px]"
           >
-            Hapus Semua
+            Nonaktifkan semua
           </Button>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 gap-3">
-        {scenarios.map((scenario) => (
-          <Card
-            key={scenario.id}
-            className={`transition-colors ${
-              scenario.isActive
-                ? "border-border/80 bg-card"
-                : "border-border/30 bg-card/40 opacity-60 hover:opacity-100"
-            }`}
-          >
-            <CardContent className="flex items-start gap-3 p-4">
-              <div className="pt-0.5">
-                <Button
-                  type="button"
-                  variant={scenario.isActive ? "default" : "outline"}
-                  size="icon-lg"
-                  aria-label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} skenario ${scenario.title}`}
-                  aria-pressed={scenario.isActive}
-                  onClick={() => handleToggleScenario(scenario.id)}
-                  className="size-11 shrink-0 rounded-md"
-                >
-                  {scenario.isActive ? (
-                    <Check data-icon="inline" />
-                  ) : (
-                    <span aria-hidden="true" className="size-4" />
-                  )}
-                </Button>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="border-primary/20 bg-primary/10 text-xs text-primary"
-                  >
-                    {scenario.category}
-                  </Badge>
-                  <h4 className="truncate text-sm font-semibold text-foreground">
-                    {scenario.title}
-                  </h4>
-                </div>
-                <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                  {scenario.description}
-                </p>
-                {scenario.images && scenario.images.length > 0 && (
-                  <Badge
-                    variant="outline"
-                    className="mt-2.5 gap-1.5 text-xs"
-                  >
-                    <ImageIcon data-icon="inline-start" />
-                    {scenario.images.length} Lampiran
-                  </Badge>
-                )}
-              </div>
-              <div className="ml-3 flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label={`Edit skenario ${scenario.title}`}
-                  onClick={() => handleEditClick(scenario)}
-                >
-                  <Edit2 data-icon="inline" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  className="text-muted-foreground hover:text-destructive"
-                  aria-label={`Hapus skenario ${scenario.title}`}
-                  onClick={() => handleDeleteScenario(scenario.id)}
-                >
-                  <Trash2 data-icon="inline" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        onClick={handleAddClick}
-        className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
-      >
-        <Plus data-icon="inline" />
-        <span className="text-sm font-medium">Tambah Skenario Baru</span>
-      </Button>
+      {confirmDialog}
     </div>
   );
 }

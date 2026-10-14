@@ -1,0 +1,276 @@
+/*
+ * Ilustrasi alur KETIK (Chat → Telaah) di halaman awal. Satu siklus 14 detik.
+ * Gaya dasar setiap elemen adalah keadaan akhir yang utuh; animasi hanya
+ * dipasang selama demo berjalan. Saat dijeda atau `prefers-reduced-motion`,
+ * komponen memberi `data-static="true"` sehingga demo berhenti di tahap Telaah
+ * yang lengkap, bukan di bingkai setengah jadi (WCAG 2.2.2).
+ */
+.ketik-demo .ketik-demo-typing {
+  display: none;
+  padding-block: 10px;
+}
+
+.ketik-demo .ketik-demo-mark {
+  border-bottom: 2px solid var(--chart-orange);
+  background: color-mix(in srgb, var(--chart-orange) 30%, transparent);
+  border-radius: 2px;
+  padding-inline: 1px;
+}
+
+.ketik-demo [data-anim="label-chat"] {
+  opacity: 0;
+}
+
+.ketik-demo:not([data-static="true"]) [data-anim] {
+  animation-duration: 14s;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ketik-demo:not([data-static="true"]) .ketik-demo-typing {
+  display: block;
+}
+
+.ketik-demo:not([data-static="true"]) [data-anim="c1"] {
+  animation-name: ketik-c1;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="t1"] {
+  animation-name: ketik-t1;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="a1"] {
+  animation-name: ketik-a1;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="t2"] {
+  animation-name: ketik-t2;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="c2"] {
+  animation-name: ketik-c2;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="a2"] {
+  animation-name: ketik-a2;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="end"] {
+  animation-name: ketik-end;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="review"] {
+  animation-name: ketik-review;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="bar"] {
+  animation-name: ketik-bar;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="mark"] {
+  animation-name: ketik-mark;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="label-chat"] {
+  animation-name: ketik-label-chat;
+}
+.ketik-demo:not([data-static="true"]) [data-anim="label-telaah"] {
+  animation-name: ketik-label-telaah;
+}
+
+@keyframes ketik-c1 {
+  0%,
+  3% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  6%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ketik-t1 {
+  0%,
+  7% {
+    opacity: 0;
+    height: 0;
+    padding-block: 0;
+    border-width: 0;
+  }
+  8%,
+  15% {
+    opacity: 1;
+    height: 28px;
+    padding-block: 10px;
+    border-width: 1px;
+  }
+  16%,
+  100% {
+    opacity: 0;
+    height: 0;
+    padding-block: 0;
+    border-width: 0;
+  }
+}
+@keyframes ketik-a1 {
+  0%,
+  15% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  18%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ketik-t2 {
+  0%,
+  22% {
+    opacity: 0;
+    height: 0;
+    padding-block: 0;
+    border-width: 0;
+  }
+  23%,
+  30% {
+    opacity: 1;
+    height: 28px;
+    padding-block: 10px;
+    border-width: 1px;
+  }
+  31%,
+  100% {
+    opacity: 0;
+    height: 0;
+    padding-block: 0;
+    border-width: 0;
+  }
+}
+@keyframes ketik-c2 {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  33%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ketik-a2 {
+  0%,
+  41% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  44%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ketik-end {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  53%,
+  93% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ketik-review {
+  0%,
+  55% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  61%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+@keyframes ketik-bar {
+  0%,
+  61% {
+    transform: scaleX(0);
+  }
+  69%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes ketik-mark {
+  0%,
+  66% {
+    background: transparent;
+    border-bottom-color: transparent;
+  }
+  69%,
+  93% {
+    background: color-mix(in srgb, var(--chart-orange) 30%, transparent);
+    border-bottom-color: var(--chart-orange);
+  }
+  98%,
+  100% {
+    background: transparent;
+    border-bottom-color: transparent;
+  }
+}
+@keyframes ketik-label-chat {
+  0%,
+  57% {
+    opacity: 1;
+  }
+  59%,
+  96% {
+    opacity: 0;
+  }
+  99%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes ketik-label-telaah {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  59%,
+  96% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ketik-demo [data-anim] {
+    animation: none !important;
+  }
+  .ketik-demo .ketik-demo-typing {
+    display: none !important;
+  }
+}

@@ -1,6 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { expect, test, type Page } from "@playwright/test";
 import {
   DEFAULT_KETIK_SETTINGS,
+  type KetikAppSettings,
   type KetikSessionHistoryItem,
 } from "@trainers/types";
 import {
@@ -15,89 +17,128 @@ import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 
 /**
- * KETIK — landing + modal workspace (hermetic).
- *
- * Modul ini sebelumnya tidak punya spec E2E sama sekali (plan 025 Wave 2, spec
- * #9). Semua `/api` dimock; mutasi data nyata tetap milik spec backend loopback.
+ * KETIK — landing berbasis data, ruang chat, tahap Telaah, dan halaman Riwayat
+ * (hermetic). Semua `/api` dimock; mutasi data nyata tetap milik spec backend.
  *
  * Fixture settings memakai `DEFAULT_KETIK_SETTINGS` dari `@trainers/types`,
- * bukan salinan yang ditulis tangan, supaya spec gagal ketika UI menyimpang dari
- * kontrak bersama dan tidak basi saat default berubah.
+ * supaya spec gagal ketika UI menyimpang dari kontrak bersama.
  */
 
-/** Riwayat dengan peserta yang record-nya sudah tidak ada (`participantId` null). */
-const HISTORY_UNAVAILABLE_PARTICIPANT: readonly KetikSessionHistoryItem[] = [
-  {
-    id: "ketik-history-1",
-    date: "2026-09-10T00:00:00.000Z",
-    scenarioTitle: "Skenario Chat",
-    consumerName: "Andi",
-    messages: [],
-    simulationSubject: {
-      type: "participant",
-      participantId: null,
-      displayName: "Andi",
-      batchName: "Batch 12",
-      team: "Tim Alpha",
-    },
-  },
-];
+/** Tanggal relatif ke hari ini, supaya "sesi bulan ini" tidak basi. */
+function daysAgo(days: number, hour = 3): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  date.setUTCHours(hour, 0, 0, 0);
+  return date.toISOString();
+}
 
-/** Sesi yang sudah direview dan punya pesan, supaya replay bisa diputar. */
-const REPLAY_SESSION: KetikSessionHistoryItem = {
-  id: "ketik-history-reviewed",
-  date: "2026-09-11T03:00:00.000Z",
-  scenarioTitle: "Skenario Replay",
-  consumerName: "Budi",
-  reviewStatus: "completed",
-  finalScore: 82,
-  messages: [
-    {
-      id: "msg-1",
-      sender: "consumer",
-      text: "Halo, saya mau tanya soal tagihan.",
-      timestamp: "2026-09-11T03:00:00.000Z",
-    },
-    {
-      id: "msg-2",
-      sender: "agent",
-      text: "Baik Bapak Budi, saya bantu cek tagihannya.",
-      timestamp: "2026-09-11T03:00:30.000Z",
-    },
-  ],
-};
-
-/** Sesi selesai dengan review lengkap (termasuk edukasi), untuk scan ukuran teks. */
-const REVIEWED_AT = "2026-09-12T08:00:00.000Z";
+const REVIEWED_AT = daysAgo(0);
 const REVIEWED_SESSION: KetikSessionHistoryItem = {
   id: "ketik-reviewed-1",
   date: REVIEWED_AT,
   scenarioTitle: "Tagihan Kartu Kredit",
   consumerName: "Bu Rina",
   consumerCity: "Bandung",
-  simulationDuration: 300,
+  consumerPhone: "0812-1111-2222",
+  simulationDuration: 5,
   finalScore: 82,
   empathyScore: 80,
-  probingScore: 75,
+  probingScore: 64,
   resolutionScore: 78,
   typoScore: 90,
   complianceScore: 85,
   reviewStatus: "completed",
+  simulationSubject: {
+    type: "participant",
+    participantId: "p-1",
+    displayName: "Sinta",
+    batchName: "Batch 7",
+    team: "Tim B",
+  },
   messages: [
     { id: "m1", sender: "consumer", text: "Tagihan saya dobel.", timestamp: REVIEWED_AT },
     { id: "m2", sender: "agent", text: "Baik Bu, saya cek tagihn Ibu.", timestamp: REVIEWED_AT },
+    { id: "m3", sender: "consumer", text: "Tolong cepat ya.", timestamp: REVIEWED_AT },
   ],
 };
+
+/** Sesi lebih lama yang sudah ditelaah: dasar perbandingan skor. */
+const OLDER_REVIEWED: KetikSessionHistoryItem = {
+  id: "ketik-reviewed-0",
+  date: daysAgo(2),
+  scenarioTitle: "Pinjol Ilegal",
+  consumerName: "Pak Budi",
+  finalScore: 76,
+  empathyScore: 82,
+  probingScore: 70,
+  resolutionScore: 74,
+  typoScore: 80,
+  complianceScore: 74,
+  reviewStatus: "completed",
+  simulationSubject: {
+    type: "self",
+    participantId: null,
+    displayName: "Trainer E2E",
+    batchName: null,
+    team: null,
+  },
+  messages: [
+    { id: "o1", sender: "consumer", text: "Saya diteror penagih.", timestamp: daysAgo(2) },
+    { id: "o2", sender: "agent", text: "Mohon maaf, saya bantu cek.", timestamp: daysAgo(2) },
+  ],
+};
+
+const PENDING_SESSION: KetikSessionHistoryItem = {
+  id: "ketik-pending-1",
+  date: daysAgo(1),
+  scenarioTitle: "Pengecekan SLIK",
+  consumerName: "Pak Dimas",
+  consumerCity: "Surabaya",
+  reviewStatus: "pending",
+  messages: [
+    { id: "p1", sender: "consumer", text: "Mau cek SLIK.", timestamp: daysAgo(1) },
+    { id: "p2", sender: "agent", text: "Baik Pak, saya jelaskan caranya.", timestamp: daysAgo(1) },
+  ],
+};
+
+const FAILED_SESSION: KetikSessionHistoryItem = {
+  id: "ketik-failed-1",
+  date: daysAgo(1, 5),
+  scenarioTitle: "Klaim Asuransi Ditolak",
+  consumerName: "Ibu Ratna",
+  consumerCity: "Medan",
+  reviewStatus: "failed",
+  simulationSubject: {
+    type: "participant",
+    participantId: null,
+    displayName: "Andi",
+    batchName: "Batch 12",
+    team: "Tim Alpha",
+  },
+  messages: [
+    { id: "f1", sender: "consumer", text: "Klaim saya ditolak.", timestamp: daysAgo(1, 5) },
+    { id: "f2", sender: "agent", text: "Saya bantu periksa, Bu.", timestamp: daysAgo(1, 5) },
+  ],
+};
+
+const FULL_HISTORY: readonly KetikSessionHistoryItem[] = [
+  REVIEWED_SESSION,
+  FAILED_SESSION,
+  PENDING_SESSION,
+  OLDER_REVIEWED,
+];
+
 const DIMENSIONS = [
-  ["empathy", "Empati & Komunikasi", 80, "Baik"],
-  ["probing", "Probing", 75, "Cukup"],
-  ["resolution", "Resolusi", 78, "Baik"],
-  ["typo", "Tata Tulis", 90, "Sangat Baik"],
-  ["compliance", "Kepatuhan", 85, "Baik"],
+  ["probing", "Probing", 64, "Cukup", 1],
+  ["resolution", "Resolusi", 78, "Baik", 2],
+  ["empathy", "Empati & Komunikasi", 80, "Baik", 3],
+  ["compliance", "Kepatuhan", 85, "Baik", 4],
+  ["typo", "Tata Tulis", 90, "Sangat Baik", 5],
 ] as const;
+
 const REVIEW_DETAIL = {
   sessionId: REVIEWED_SESSION.id,
-  scores: { final: 82, empathy: 80, probing: 75, resolution: 78, typo: 90, compliance: 85 },
+  scores: { final: 82, empathy: 80, probing: 64, resolution: 78, typo: 90, compliance: 85 },
   review: {
     id: "review-1",
     sessionId: REVIEWED_SESSION.id,
@@ -107,12 +148,12 @@ const REVIEW_DETAIL = {
     coachingFocus: ["Verifikasi identitas di awal"],
     createdAt: REVIEWED_AT,
     education: {
-      dimensionGuidance: DIMENSIONS.map(([key, label, score, verdict], index) => ({
+      dimensionGuidance: DIMENSIONS.map(([key, label, score, verdict, rank]) => ({
         key,
         label,
         score,
         verdict,
-        priorityRank: index + 1,
+        priorityRank: rank,
         diagnosis: `Diagnosis ${label}.`,
         howToFix: `Cara memperbaiki ${label}.`,
         exampleRewrite: `Contoh kalimat ${label}.`,
@@ -142,19 +183,26 @@ const REVIEW_DETAIL = {
   ],
 };
 
+/** Tempo cepat supaya balasan konsumen di spec chat tidak menunggu lama. */
+const FAST_SETTINGS: KetikAppSettings = {
+  ...DEFAULT_KETIK_SETTINGS,
+  responsePacingMode: "training_fast",
+};
+
 function ketikMocks(
   history: readonly KetikSessionHistoryItem[],
-): readonly ApiMock[] {
+  settings: KetikAppSettings = DEFAULT_KETIK_SETTINGS,
+): ApiMock[] {
   return [
     {
       method: "GET",
       path: "/api/v1/ketik/settings",
-      body: { success: true, data: DEFAULT_KETIK_SETTINGS },
+      body: { success: true, data: settings },
       // `ketikApi` menyimpan versi dari header ini; tanpanya jalur simpan
       // kehilangan prasyaratnya.
       headers: {
-        "x-settings-version": "v1",
-        "x-ketik-templates-version": "t1",
+        "x-settings-version": "2026-10-14T05:00:00.000Z",
+        "x-ketik-templates-version": "2026-10-14T05:00:00.000Z",
       },
     },
     {
@@ -165,229 +213,719 @@ function ketikMocks(
   ];
 }
 
-/** Landing KETIK merujuk logo OJK dari host eksternal. */
-const KETIK_EXPECTED_ASSET_HOSTS = ["ojk.go.id"];
+const reviewDetailMock: ApiMock = {
+  method: "GET",
+  path: `/api/v1/ketik/review/${REVIEWED_SESSION.id}`,
+  body: { success: true, data: REVIEW_DETAIL },
+};
 
-const ACTIVE_SCENARIOS = DEFAULT_KETIK_SETTINGS.scenarios.filter(
-  (scenario) => scenario.isActive,
-).length;
+function telaahPath(id: string) {
+  return `/ketik?sesi=${id}&tahap=telaah`;
+}
 
-test.describe("KETIK (hermetic)", () => {
+/** Foto konsumen di ruang chat berasal dari host aset eksternal (`ketik-avatar.ts`). */
+const KETIK_EXPECTED_ASSET_HOSTS = ["randomuser.me"];
+
+async function open(page: Page, path: string, apiMocks: ApiMock[], role?: string) {
+  const audit = await openHermeticShell(page, {
+    path,
+    apiMocks,
+    expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
+    waitForUrl: /\/ketik/,
+    ...(role ? { auth: { role } } : {}),
+  });
+  console.log("[audit]", formatAudit(audit));
+  return audit;
+}
+
+test.describe("KETIK landing (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("landing KETIK dirender tanpa menyentuh backend", async ({ page }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: ketikMocks([]),
-      // Tetap di-abort (tidak ada egress); hanya tidak dihitung sebagai temuan,
-      // karena aset dekoratif yang sudah diketahui bukan traffic aplikasi.
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
-    });
-    console.log("[audit]", formatAudit(audit));
+  test("hero memberi satu aksi utama, menu kecil, dan demo yang bisa dijeda", async ({
+    page,
+  }) => {
+    const audit = await open(page, "/ketik", ketikMocks(FULL_HISTORY));
 
     await expect(
       page.getByRole("heading", {
-        name: /Latih percakapan chat\. Balas lebih tepat dan empatik\./,
+        level: 1,
+        name: /Pahami konsumennya\.\s*Balas chat dengan tepat\./,
       }),
     ).toBeVisible({ timeout: 20000 });
-
-    // Jumlah skenario aktif berasal dari settings, bukan angka tetap.
+    await expect(page.getByText(/Kelas Etika & Trik Komunikasi/)).toBeVisible();
     await expect(
-      page.getByText(`${ACTIVE_SCENARIOS} skenario aktif`),
+      page.getByRole("button", { name: /^Mulai simulasi/ }),
     ).toBeVisible();
 
-    for (const label of ["Mulai simulasi", "Pengaturan", "Riwayat"]) {
+    const menu = page.getByRole("navigation", { name: "Menu KETIK" });
+    for (const label of ["Riwayat", "Pemakaian AI", "Pengaturan"]) {
       await expect(
-        page.getByRole("button", { name: new RegExp(`^${label}`) }).first(),
-        `tombol "${label}" tidak tampil`,
+        menu.getByRole("button", { name: new RegExp(`^${label}`) }),
+        `menu "${label}" tidak tampil`,
       ).toBeVisible();
     }
 
-    // Copy pengantar landing: bagian dari kontrak "intro" yang sama.
-    await expect(page.getByText(/Ketik — singkatan dari/)).toBeVisible();
-    await expect(page.getByText(/Pemakaian bulan ini/i).first()).toBeVisible();
+    // Demo berjalan sendiri dan punya tombol jeda (WCAG 2.2.2).
+    const pause = page.getByRole("button", { name: "Jeda animasi" });
+    await expect(pause).toBeVisible();
+    await pause.click();
+    await expect(page.getByRole("button", { name: "Putar animasi" })).toBeVisible();
 
     await waitForMockedApi(audit, ["/ketik/settings", "/ketik/history"]);
     expectHermetic(audit);
   });
 
-  test("kartu riwayat menampilkan target dan penanda peserta tidak tersedia", async ({
+  test("bagian data dihitung dari riwayat: progres, tindak lanjut, fokus, hasil terbaru", async ({
     page,
   }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: ketikMocks(HISTORY_UNAVAILABLE_PARTICIPANT),
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
-    });
-    console.log("[audit]", formatAudit(audit));
+    const audit = await open(page, "/ketik", ketikMocks(FULL_HISTORY));
 
-    await page
-      .getByRole("button", { name: /^Riwayat/ })
-      .first()
-      .click();
+    const progress = page.getByTestId("ketik-progress-summary");
+    // 4 sesi dalam 3 hari terakhir: semuanya masuk bulan ini kecuali bila
+    // hari ini tanggal 1-2; hitungan bulan diuji lewat angka rata-rata saja.
+    await expect(progress).toContainText("79", { timeout: 20000 });
+    await expect(progress).toContainText("rata-rata skor dari 2 sesi terakhir");
+    await expect(progress).toContainText("sesi bulan ini");
 
-    await expect(page.getByText(/Target: Peserta: Andi/)).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(
-      page.getByText(/record peserta tidak lagi tersedia/),
-    ).toBeVisible();
+    const followUp = page.getByRole("region", { name: "Perlu tindak lanjut" });
+    await expect(followUp.getByText("Klaim Asuransi Ditolak")).toBeVisible();
+    await expect(followUp.getByText(/Telaah gagal/)).toBeVisible();
+    await expect(followUp.getByText("Pengecekan SLIK")).toBeVisible();
+    await expect(followUp.getByText(/Belum ditelaah/)).toBeVisible();
 
+    const focus = page.getByRole("region", { name: "Fokus berikutnya" });
+    await expect(focus).toContainText("Probing");
+    await expect(focus).toContainText("67");
+
+    const recent = page.getByRole("region", { name: "Hasil telaah terbaru" });
+    const firstRow = recent.getByRole("row").nth(1);
+    await expect(firstRow).toContainText("Tagihan Kartu Kredit");
+    await expect(firstRow).toContainText("Probing");
+    await expect(firstRow).toContainText("82");
+
+    // Baris membuka tahap Telaah lewat URL.
+    await recent.getByRole("button", { name: "Tagihan Kartu Kredit" }).click();
+    await expect(page).toHaveURL(/sesi=ketik-reviewed-1/);
+    await expect(page).toHaveURL(/tahap=telaah/);
     expectHermetic(audit);
   });
 
-  test("tombol Mulai simulasi dan label aksen KETIK memenuhi kontras 4.5:1 di tema terang dan gelap", async ({
+  test("pengguna baru melihat ajakan, bukan angka kosong", async ({ page }) => {
+    const audit = await open(page, "/ketik", ketikMocks([]));
+    await expect(
+      page.getByRole("heading", { name: "Belum ada latihan" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId("ketik-progress-summary")).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("riwayat yang gagal dimuat bisa dicoba lagi", async ({ page }) => {
+    const audit = await open(page, "/ketik", [
+      ketikMocks([])[0],
+      {
+        method: "GET",
+        path: "/api/v1/ketik/history",
+        status: 500,
+        body: { success: false, error: { code: "INTERNAL_ERROR", message: "x" } },
+      },
+    ]);
+    await expect(
+      page.getByRole("region", { name: "Hasil telaah terbaru" }).getByRole("alert"),
+    ).toContainText("Riwayat belum bisa dimuat", { timeout: 20000 });
+    await expect(
+      page.getByRole("button", { name: "Coba lagi" }).first(),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("tombol Mulai simulasi dan aksen KETIK memenuhi kontras WCAG di tema terang dan gelap", async ({
     page,
   }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: ketikMocks([]),
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
-    });
-    const start = page
-      .getByRole("button", { name: /^Mulai simulasi/ })
-      .first();
+    const audit = await open(page, "/ketik", ketikMocks(FULL_HISTORY));
+    const start = page.getByRole("button", { name: /^Mulai simulasi/ });
     await expect(start).toBeVisible({ timeout: 20000 });
     await waitForMockedApi(audit, ["/ketik/settings", "/ketik/history"]);
 
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      const buttons = await findLowContrastText(start.locator(".."), {
+      const buttons = await findLowContrastText(start.locator("../.."), {
         selector: "button",
       });
       expect(buttons, `${theme}: ${buttons.join("\n")}`).toEqual([]);
+      const main = page.locator("main").first();
+      const accent = await findLowContrastText(main, {
+        selector: ".text-module-ketik:not(h1 *)",
+      });
+      expect(accent, `${theme}: ${accent.join("\n")}`).toEqual([]);
+      // Aksen judul hero adalah teks besar (≥18px tebal): batas WCAG 3:1.
+      const hero = await findLowContrastText(main, {
+        selector: "h1 .text-module-ketik",
+        minRatio: 3,
+      });
+      expect(hero, `${theme}: ${hero.join("\n")}`).toEqual([]);
     }
-
-    // Teks beraksen modul (token text-module-ketik) di atas latar terang.
-    await setDocumentTheme(page, "light");
-    const accent = await findLowContrastText(
-      page.locator('[data-testid="ketik-motion-frame"]'),
-      { selector: "p.text-module-ketik" },
-    );
-    expect(accent, accent.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
 
   test(`teks landing KETIK minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: ketikMocks([]),
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
-    });
-    await expect(page.getByText(/Ketik — singkatan dari/)).toBeVisible({
+    const audit = await open(page, "/ketik", ketikMocks(FULL_HISTORY));
+    await expect(page.getByTestId("ketik-progress-summary")).toBeVisible({
       timeout: 20000,
     });
-    await waitForMockedApi(audit, ["/ketik/settings", "/ketik/history"]);
 
-    // Mockup chat ponsel (aria-hidden) meniru layar ponsel pada skala kecil,
-    // termasuk jam pesan; ia ilustrasi, bukan teks UI yang dibaca.
+    // Demo chat (aria-hidden) meniru layar chat pada skala kecil.
     const offenders = await findTextBelowFloor(page.locator("main").first(), {
-      exclude: '[data-testid="ketik-motion-frame"]',
+      exclude: '[data-testid="ketik-stage-demo"]',
     });
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
+});
 
-  test(`teks riwayat, review, dan replay KETIK minimal ${MIN_TEXT_PX}px`, async ({
+test.describe("KETIK Telaah (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("skor akhir tampil pertama, lima aspek, dan temuan menunjuk nomor pesan", async ({
     page,
   }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: [
-        ...ketikMocks([REVIEWED_SESSION]),
-        {
-          method: "GET",
-          path: `/api/v1/ketik/review/${REVIEWED_SESSION.id}`,
-          body: { success: true, data: REVIEW_DETAIL },
-        },
-      ],
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
-    });
-    await page.getByRole("button", { name: /^Riwayat/ }).first().click();
-    const history = page.getByRole("dialog");
-    await expect(history.getByText("Tagihan Kartu Kredit").first()).toBeVisible({
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      reviewDetailMock,
+    ]);
+
+    const stage = page.getByRole("navigation", { name: "Tahap latihan" });
+    await expect(stage.getByText("Telaah")).toHaveAttribute("aria-current", "step", {
       timeout: 20000,
     });
-    const offenders = (await findTextBelowFloor(history)).map((o) => `[riwayat] ${o}`);
 
-    await history.getByRole("button", { name: "Replay sesi" }).first().click();
-    const replay = page.getByRole("dialog", { name: "Tagihan Kartu Kredit" });
-    await expect(replay.getByText("Tagihan saya dobel.").first()).toBeVisible();
-    offenders.push(...(await findTextBelowFloor(replay)).map((o) => `[replay] ${o}`));
-    await replay.getByRole("button", { name: "Tutup replay" }).click();
-    await expect(replay).toHaveCount(0);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    await expect(result).toContainText("Baik");
+    // Naik 6 dari sesi sebelumnya yang ditelaah (76).
+    await expect(result).toContainText("naik 6 dari sesi sebelumnya");
 
-    await history
-      .getByRole("button", { name: "Lihat sesi Tagihan Kartu Kredit" })
-      .click();
+    const aspects = result.getByRole("list", { name: "Skor per aspek" });
+    await expect(aspects.getByRole("listitem")).toHaveCount(5);
+    await expect(aspects).toContainText("Probing");
+
+    // Tab pertama: aspek yang perlu diperbaiki (skor < 75).
+    await expect(result.getByRole("tab", { name: /Perbaiki dulu/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(result.getByText("Cara memperbaiki Probing.")).toBeVisible();
+
+    // Ejaan: menyebut nomor pesan, tingkat dalam bahasa Indonesia.
+    await result.getByRole("tab", { name: /Ejaan/ }).click();
+    const finding = result.getByRole("button", { name: /Pesan 2/ });
+    await expect(finding).toContainText("tagihn");
+    await expect(finding).toContainText("tagihan");
+    await expect(finding).toContainText("Ringan");
+    await expect(result.getByText("minor", { exact: true })).toHaveCount(0);
+
+    // Typo digarisbawahi di kalimatnya, dan klik temuan menyorot pesannya.
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    await expect(transcript.locator("mark", { hasText: "tagihn" })).toBeVisible();
+    await finding.click();
+    await expect(transcript.getByTestId("ketik-message-2")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+
+    await result.getByRole("tab", { name: "Ringkasan" }).click();
+    await expect(result.getByText(/verifikasi data terlambat/)).toBeVisible();
+
     await waitForMockedApi(audit, [`/ketik/review/${REVIEWED_SESSION.id}`]);
-    const review = page.getByRole("dialog").last();
-    await expect(review.getByText(/verifikasi data terlambat/).first()).toBeVisible({
+    expectHermetic(audit);
+  });
+
+  test("sesi belum ditelaah: agen melihat penjelasan akses, tanpa tombol mulai", async ({
+    page,
+  }) => {
+    const audit = await open(
+      page,
+      telaahPath(PENDING_SESSION.id),
+      ketikMocks(FULL_HISTORY),
+      "agent",
+    );
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByText("Belum ditelaah")).toBeVisible({ timeout: 20000 });
+    await expect(result).toContainText(
+      "Hanya admin, trainer, dan QA yang dapat menjalankan telaah AI",
+    );
+    await expect(result.getByRole("button", { name: /Mulai telaah/ })).toHaveCount(0);
+    // Transkrip tetap bisa dibaca.
+    await expect(
+      page.getByRole("region", { name: "Percakapan" }).getByText("Mau cek SLIK."),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("telaah yang gagal dilaporkan jujur dan bisa diulang tanpa mengulang chat", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(PENDING_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      {
+        method: "POST",
+        path: "/api/v1/ketik/review",
+        body: { success: true, data: { status: "failed", error: "AI_TIMEOUT" } },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result.getByRole("button", { name: "Mulai telaah" }).click({ timeout: 20000 });
+
+    const failure = result.getByRole("alert");
+    await expect(failure).toContainText("Telaah belum berhasil");
+    await expect(failure).toContainText("Percakapan Anda tetap tersimpan");
+    await expect(failure).not.toContainText("AI_TIMEOUT");
+    await expect(failure.getByRole("button", { name: "Coba telaah lagi" })).toBeVisible();
+    // Tidak ada persen palsu.
+    await expect(result.getByText(/\d+%/)).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("telaah yang berhasil langsung menampilkan hasil", async ({ page }) => {
+    const pendingReviewed = { ...REVIEWED_SESSION, reviewStatus: "pending" as const };
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks([pendingReviewed, OLDER_REVIEWED]),
+      {
+        method: "POST",
+        path: "/api/v1/ketik/review",
+        body: { success: true, data: { status: "completed", scores: REVIEW_DETAIL.scores } },
+      },
+      reviewDetailMock,
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result.getByRole("button", { name: "Mulai telaah" }).click({ timeout: 20000 });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    await waitForMockedApi(audit, ["POST /api/v1/ketik/review"]);
+    expectHermetic(audit);
+  });
+
+  test("unduh transkrip memberi CSV ber-BOM yang aman dari formula", async ({
+    page,
+  }) => {
+    const csvSession: KetikSessionHistoryItem = {
+      ...FAILED_SESSION,
+      id: "ketik-csv-1",
+      messages: [
+        {
+          id: "c1",
+          sender: "consumer",
+          text: 'Tagihan José #1, "urgent"\nBaris 2',
+          timestamp: daysAgo(1),
+        },
+        { id: "c2", sender: "agent", text: "=HYPERLINK(1)", timestamp: daysAgo(1) },
+      ],
+    };
+    const audit = await open(
+      page,
+      telaahPath(csvSession.id),
+      ketikMocks([csvSession]),
+      "agent",
+    );
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Unduh transkrip" }).click({ timeout: 20000 }),
+    ]);
+    expect(download.suggestedFilename()).toBe("ketik_transkrip_ketik-csv-1.csv");
+    const bytes = await readFile((await download.path())!);
+    expect(Array.from(bytes.subarray(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    const csv = bytes.subarray(3).toString("utf8");
+    expect(csv.startsWith("\"Pengirim\",\"Pesan\",\"Waktu\"")).toBe(true);
+    expect(csv).toContain('"Konsumen","Tagihan José #1, ""urgent""\nBaris 2"');
+    // Sel yang diawali "=" diberi apostrof supaya tidak dieksekusi spreadsheet.
+    expect(csv).toContain(`"Agen","'=HYPERLINK(1)"`);
+    expect(csv).toContain("Andi");
+    expect(csv).toContain("Tidak lagi tersedia");
+    expectHermetic(audit);
+  });
+
+  test("sesi yang tidak ada lagi kembali ke landing dengan pesan", async ({ page }) => {
+    const audit = await open(page, telaahPath("hilang"), ketikMocks(FULL_HISTORY));
+    await expect(page.getByText("Sesi itu tidak ada lagi di riwayat Anda.")).toBeVisible({
       timeout: 20000,
     });
-    offenders.push(...(await findTextBelowFloor(review)).map((o) => `[review] ${o}`));
+    await expect(page).not.toHaveURL(/sesi=/);
+    expectHermetic(audit);
+  });
 
+  test(`teks tahap Telaah minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      reviewDetailMock,
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
+      timeout: 20000,
+    });
+    const offenders: string[] = [];
+    for (const tab of ["Perbaiki dulu", "Sudah baik", "Ejaan", "Ringkasan"]) {
+      await result.getByRole("tab", { name: new RegExp(tab) }).click();
+      offenders.push(...(await findTextBelowFloor(page.locator("body"))));
+    }
     const unique = [...new Set(offenders)];
     expect(unique, unique.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+});
+
+test.describe("KETIK ruang chat (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("chat tanpa petunjuk sesi, akhiri dengan konfirmasi, lalu masuk tahap Telaah", async ({
+    page,
+  }) => {
+    const savedAt = new Date().toISOString();
+    const audit = await open(
+      page,
+      "/ketik",
+      [
+        ...ketikMocks([], FAST_SETTINGS),
+        {
+          method: "GET",
+          path: "/api/v1/ai/usage/summary",
+          body: { success: true, data: null },
+        },
+        {
+          method: "POST",
+          path: "/api/v1/ketik/generate",
+          body: { success: true, data: { text: "Iya, tagihan saya muncul dua kali." } },
+        },
+        {
+          method: "POST",
+          path: "/api/v1/ketik/history",
+          body: {
+            success: true,
+            data: {
+              id: "ketik-new-1",
+              date: savedAt,
+              scenarioTitle: "Skenario Baru",
+              consumerName: "Konsumen",
+              messages: [
+                { id: "n1", sender: "agent", text: "Selamat pagi, ada yang bisa dibantu?", timestamp: savedAt },
+                { id: "n2", sender: "consumer", text: "Iya, tagihan saya muncul dua kali.", timestamp: savedAt },
+              ],
+              reviewStatus: "pending",
+            },
+          },
+        },
+      ],
+      "agent",
+    );
+
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).click({ timeout: 20000 });
+
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    const input = room.getByRole("textbox", { name: "Tulis balasan" });
+    await expect(input).toBeVisible();
+
+    // Tidak ada stopwatch, badge "Online", atau nama skenario di layar.
+    await expect(room.getByText("Online", { exact: true })).toHaveCount(0);
+    await expect(room.getByText(/^\d+:\d{2}$/)).toHaveCount(0);
+
+    await input.fill("Selamat pagi, ada yang bisa dibantu?");
+    await input.press("Enter");
+    await expect(room.getByText("Iya, tagihan saya muncul dua kali.")).toBeVisible({
+      timeout: 15000,
+    });
+
+    // "Akhiri chat" netral dan meminta konfirmasi aplikasi.
+    await room.getByRole("button", { name: "Akhiri chat" }).click();
+    const confirm = page.getByRole("dialog", { name: "Akhiri chat sekarang?" });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: "Lanjutkan chat" }).click();
+    await expect(confirm).toBeHidden();
+    await expect(input).toBeVisible();
+
+    await room.getByRole("button", { name: "Akhiri chat" }).click();
+    await page
+      .getByRole("dialog", { name: "Akhiri chat sekarang?" })
+      .getByRole("button", { name: "Akhiri chat" })
+      .click();
+
+    await expect(page).toHaveURL(/sesi=ketik-new-1/);
+    await expect(page).toHaveURL(/tahap=telaah/);
+    await expect(
+      page.getByRole("region", { name: "Hasil telaah" }).getByText("Belum ditelaah"),
+    ).toBeVisible();
+    await waitForMockedApi(audit, ["POST /api/v1/ketik/history"]);
+    expectHermetic(audit);
+  });
+});
+
+test.describe("KETIK Riwayat (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("halaman Riwayat berupa tabel dengan filter status dan penanda peserta", async ({
+    page,
+  }) => {
+    const audit = await open(page, "/ketik/history", ketikMocks(FULL_HISTORY));
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Riwayat latihan" }),
+    ).toBeVisible({ timeout: 20000 });
+
+    const table = page.getByRole("table", { name: "Daftar sesi KETIK" });
+    await expect(table.getByRole("row")).toHaveCount(5);
+    await expect(table).toContainText("data peserta sudah dihapus");
+
+    await page.getByRole("button", { name: /^Gagal/ }).click();
+    await expect(table.getByRole("row")).toHaveCount(2);
+    await expect(table).toContainText("Klaim Asuransi Ditolak");
+
+    await page.getByRole("button", { name: /^Semua/ }).click();
+    await page.getByRole("searchbox", { name: "Cari sesi" }).fill("slik");
+    await expect(table.getByRole("row")).toHaveCount(2);
+
+    await waitForMockedApi(audit, ["/ketik/history"]);
+    expectHermetic(audit);
+  });
+
+  test("hapus sesi memakai dialog konfirmasi aplikasi", async ({ page }) => {
+    const audit = await open(page, "/ketik/history", [
+      ...ketikMocks(FULL_HISTORY),
+      {
+        method: "DELETE",
+        path: `/api/v1/ketik/history/${PENDING_SESSION.id}`,
+        body: { success: true, message: "ok" },
+      },
+    ]);
+    let nativeDialog = false;
+    page.on("dialog", (dialog) => {
+      nativeDialog = true;
+      void dialog.dismiss();
+    });
+
+    const table = page.getByRole("table", { name: "Daftar sesi KETIK" });
+    await table
+      .getByRole("button", { name: "Hapus sesi Pengecekan SLIK" })
+      .click({ timeout: 20000 });
+    const confirm = page.getByRole("dialog", { name: "Hapus sesi ini?" });
+    await confirm.getByRole("button", { name: "Hapus sesi" }).click();
+    await expect(table).not.toContainText("Pengecekan SLIK");
+    expect(nativeDialog).toBe(false);
     expectHermetic(audit);
   });
 
   test("replay sesi adalah dialog modal: berlabel, Escape menutup, fokus kembali", async ({
     page,
   }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/ketik",
-      apiMocks: ketikMocks([REPLAY_SESSION]),
-      expectedThirdPartyHosts: KETIK_EXPECTED_ASSET_HOSTS,
+    const audit = await open(page, "/ketik/history", ketikMocks(FULL_HISTORY));
+    const table = page.getByRole("table", { name: "Daftar sesi KETIK" });
+    const replayTrigger = table.getByRole("button", {
+      name: "Putar ulang Pinjol Ilegal",
     });
-    console.log("[audit]", formatAudit(audit));
+    await replayTrigger.click({ timeout: 20000 });
 
-    await page
-      .getByRole("button", { name: /^Riwayat/ })
-      .first()
-      .click();
-    const history = page.getByRole("dialog", { name: /Riwayat/ });
-    await expect(history).toBeVisible({ timeout: 20000 });
-
-    const replayTrigger = history.getByRole("button", { name: "Replay sesi" });
-    await replayTrigger.click();
-
-    const replay = page.getByRole("dialog", { name: "Skenario Replay" });
+    const replay = page.getByRole("dialog", { name: "Pinjol Ilegal" });
     await expect(replay).toBeVisible();
     await expect(replay).toHaveAttribute("aria-modal", "true");
-    await expect(replay.getByText("Replay", { exact: true })).toBeVisible();
-    await expect(replay.getByText("Budi")).toBeVisible();
-
-    // Fokus terperangkap di dalam dialog replay.
     await expect
-      .poll(() =>
-        replay.evaluate((el) => el.contains(document.activeElement)),
-      )
+      .poll(() => replay.evaluate((el) => el.contains(document.activeElement)))
       .toBe(true);
 
-    // Kontrol playback tetap berjalan.
     await expect(replay.getByText("1 / 2")).toBeVisible();
     await replay.getByTitle("Next").click();
     await expect(replay.getByText("2 / 2")).toBeVisible();
-    await expect(
-      replay.getByText("Baik Bapak Budi, saya bantu cek tagihannya."),
-    ).toBeVisible();
+    await expect(replay.getByText("Mohon maaf, saya bantu cek.")).toBeVisible();
 
-    // Escape menutup replay saja; Riwayat tetap terbuka dan fokus kembali.
     await page.keyboard.press("Escape");
     await expect(replay).toBeHidden();
-    await expect(history).toBeVisible();
     await expect(replayTrigger).toBeFocused();
 
-    // Tombol tutup ikon punya nama aksesibel dan menutup replay.
     await replayTrigger.click();
-    await expect(replay).toBeVisible();
     await replay.getByRole("button", { name: "Tutup replay" }).click();
     await expect(replay).toBeHidden();
-    await expect(history).toBeVisible();
+    expectHermetic(audit);
+  });
 
+  test(`teks Riwayat dan replay KETIK minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+    const audit = await open(page, "/ketik/history", ketikMocks(FULL_HISTORY));
+    const table = page.getByRole("table", { name: "Daftar sesi KETIK" });
+    await expect(table).toBeVisible({ timeout: 20000 });
+    const offenders = (await findTextBelowFloor(page.locator("main").first())).map(
+      (o) => `[riwayat] ${o}`,
+    );
+    await table.getByRole("button", { name: "Putar ulang Tagihan Kartu Kredit" }).click();
+    const replay = page.getByRole("dialog", { name: "Tagihan Kartu Kredit" });
+    await expect(replay.getByText("Tagihan saya dobel.").first()).toBeVisible();
+    offenders.push(...(await findTextBelowFloor(replay)).map((o) => `[replay] ${o}`));
+    const unique = [...new Set(offenders)];
+    expect(unique, unique.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+});
+
+/** Satu skenario berskrip dan satu nonaktif, supaya baris daftar bisa dibedakan. */
+const SETTINGS_FOR_DIALOG: KetikAppSettings = {
+  ...DEFAULT_KETIK_SETTINGS,
+  scenarios: DEFAULT_KETIK_SETTINGS.scenarios.map((scenario, index) =>
+    index === 0
+      ? { ...scenario, script: "Konsumen membuka chat dengan nada panik." }
+      : index === 1
+        ? { ...scenario, isActive: false }
+        : scenario,
+  ),
+};
+const [SCRIPTED_SCENARIO, INACTIVE_SCENARIO] = SETTINGS_FOR_DIALOG.scenarios;
+
+async function openKetikSettings(page: Page) {
+  const audit = await open(page, "/ketik", [
+    ...ketikMocks([], SETTINGS_FOR_DIALOG),
+    {
+      method: "PUT",
+      path: "/api/v1/ketik/settings",
+      body: { success: true, data: null },
+      headers: { "x-settings-version": "2026-10-15T05:00:00.000Z" },
+    },
+  ]);
+  await waitForMockedApi(audit, ["/ketik/settings"]);
+  await page
+    .getByRole("navigation", { name: "Menu KETIK" })
+    .getByRole("button", { name: /^Pengaturan/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Pengaturan KETIK" });
+  await expect(dialog).toBeVisible({ timeout: 20000 });
+  return { audit, dialog };
+}
+
+test.describe("KETIK Pengaturan (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("kategori berlabel jelas, daftar skenario bisa dicari dan disaring", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openKetikSettings(page);
+    page.on("dialog", () => {
+      throw new Error("window.confirm tidak boleh dipakai");
+    });
+
+    await expect(
+      dialog.getByText("Berlaku untuk sesi yang Anda mulai berikutnya."),
+    ).toBeVisible();
+    await expect(dialog.getByRole("tab", { name: /^Skenario\s*5\/6$/ })).toBeVisible();
+    for (const tab of [
+      /^Karakter konsumen/,
+      /^Identitas konsumen/,
+      /^Template cepat/,
+      /^Sesi & AI/,
+    ]) {
+      await expect(dialog.getByRole("tab", { name: tab })).toBeVisible();
+    }
+
+    const scriptedRow = dialog
+      .getByRole("listitem")
+      .filter({ hasText: SCRIPTED_SCENARIO.title });
+    await expect(scriptedRow).toContainText(SCRIPTED_SCENARIO.category);
+    await expect(scriptedRow).toContainText("Ikuti skrip");
+    const inactiveRow = dialog
+      .getByRole("listitem")
+      .filter({ hasText: INACTIVE_SCENARIO.title });
+    await expect(inactiveRow).toContainText("Bebas");
+    await expect(
+      inactiveRow.getByRole("switch", { name: `Aktifkan ${INACTIVE_SCENARIO.title}` }),
+    ).toHaveAttribute("aria-checked", "false");
+
+    await dialog
+      .getByRole("group", { name: "Filter kategori" })
+      .getByRole("button", { name: INACTIVE_SCENARIO.category })
+      .click();
+    await expect(scriptedRow).toHaveCount(0);
+    await expect(inactiveRow).toBeVisible();
+    await dialog
+      .getByRole("group", { name: "Filter kategori" })
+      .getByRole("button", { name: "Semua" })
+      .click();
+    await dialog.getByRole("searchbox", { name: "Cari skenario" }).fill("zzz-tidak-ada");
+    await expect(dialog.getByText("Tidak ada skenario yang cocok")).toBeVisible();
+    await dialog.getByRole("searchbox", { name: "Cari skenario" }).fill("");
+
+    // Hapus skenario lewat dialog aplikasi.
+    await scriptedRow.getByRole("button", { name: `Hapus ${SCRIPTED_SCENARIO.title}` }).click();
+    const confirmDelete = page.getByRole("dialog", { name: "Hapus skenario ini?" });
+    await expect(confirmDelete).toBeVisible();
+    await confirmDelete.getByRole("button", { name: "Batal" }).click();
+    await expect(scriptedRow).toBeVisible();
+
+    // Karakter konsumen: baris dengan pilihan "Acak".
+    await dialog.getByRole("tab", { name: /^Karakter konsumen/ }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Pakai karakter Acak" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(dialog.getByRole("button", { name: "Karakter baru" })).toBeVisible();
+
+    // Template cepat: baris kata kunci, standar dari admin tidak bisa diubah agen.
+    await dialog.getByRole("tab", { name: /^Template cepat/ }).click();
+    await expect(dialog.getByText("/selesai")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Template pribadi baru" })).toBeVisible();
+
+    // Sesi & AI: durasi dan tempo sebagai pilihan radio; durasi tidak tampil ke peserta.
+    await dialog.getByRole("tab", { name: /^Sesi & AI/ }).click();
+    await expect(
+      dialog.getByRole("radiogroup", { name: "Durasi sesi" }).getByRole("radio", { name: "5 menit", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(dialog.getByText(/Peserta tidak melihat durasi/)).toBeVisible();
+    await expect(
+      dialog.getByRole("radiogroup", { name: "Tempo balasan konsumen" }).getByRole("radio", { name: /^Realistis/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(dialog.getByRole("radiogroup", { name: "Model AI" })).toBeVisible();
+
+    const offenders = await findTextBelowFloor(dialog);
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("perubahan ditandai, tutup meminta konfirmasi aplikasi, Simpan mengirim pengaturan", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openKetikSettings(page);
+    page.on("dialog", () => {
+      throw new Error("window.confirm tidak boleh dipakai");
+    });
+
+    await expect(dialog.getByText("Belum disimpan")).toHaveCount(0);
+    const row = dialog.getByRole("listitem").filter({ hasText: SCRIPTED_SCENARIO.title });
+    await row
+      .getByRole("switch", { name: `Nonaktifkan ${SCRIPTED_SCENARIO.title}` })
+      .click();
+    await expect(dialog.getByText("Belum disimpan")).toBeVisible();
+    await expect(dialog.getByRole("tab", { name: /^Skenario\s*4\/6$/ })).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Tutup", exact: true }).click();
+    const discard = page.getByRole("dialog", { name: "Tutup tanpa menyimpan?" });
+    await expect(discard).toBeVisible();
+    await discard.getByRole("button", { name: "Lanjut mengubah" }).click();
+    await expect(discard).toHaveCount(0);
+
+    // Pulihkan bawaan juga memakai dialog aplikasi.
+    await dialog.getByRole("button", { name: "Pulihkan bawaan" }).click();
+    const reset = page.getByRole("dialog", { name: "Pulihkan pengaturan bawaan?" });
+    await expect(reset).toBeVisible();
+    await reset.getByRole("button", { name: "Batal" }).click();
+    await expect(reset).toHaveCount(0);
+
+    const saveRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" &&
+        new URL(request.url()).pathname === "/api/v1/ketik/settings",
+    );
+    await dialog.getByRole("button", { name: "Simpan", exact: true }).click();
+    const saved = (await saveRequest).postDataJSON() as KetikAppSettings;
+    expect(
+      saved.scenarios.find((item) => item.id === SCRIPTED_SCENARIO.id)?.isActive,
+    ).toBe(false);
+    await expect(page.getByRole("dialog", { name: "Pengaturan KETIK" })).toHaveCount(0);
     expectHermetic(audit);
   });
 });

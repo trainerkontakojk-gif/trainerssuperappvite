@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Phone, MapPin, X, ArrowLeft, Download } from "lucide-react";
+import { Send } from "lucide-react";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "../../../components/ui/avatar";
-import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Textarea } from "../../../components/ui/textarea";
 import type {
@@ -16,13 +15,12 @@ import type {
   KetikScenario,
   KetikQuickTemplate,
   PacingMeta,
-  SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { KETIK_PROMPT_LIMITS } from "@trainers/types";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { ketikApi } from "../ketikApi";
 import { getKetikConsumerAvatarUrl } from "../lib/ketik-avatar";
 import { shouldLogKetikGenerationError } from "../lib/ketik-error";
-import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import {
   IMAGE_TAG_PATTERN,
   IMAGE_TAG_PATTERN_GLOBAL,
@@ -54,57 +52,37 @@ interface ChatInterfaceProps {
   config: KetikSessionConfig;
   scenario: KetikScenario;
   onEndSession: (messages: ChatMessage[]) => void;
-  isReviewMode?: boolean;
-  initialMessages?: ChatMessage[];
   isEnding?: boolean;
-  authReady?: boolean;
-  currentUserId?: string;
   templates?: KetikQuickTemplate[];
-  simulationSubject?: SimulationSubjectSnapshot | null;
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value ?? "");
-  const safeText = /^\s*[=+\-@]/.test(text) ? `'${text}` : text;
-  return `"${safeText.replace(/"/g, '""')}"`;
 }
 
 export function ChatInterface({
   config,
   scenario,
   onEndSession,
-  isReviewMode = false,
-  initialMessages = [],
   isEnding = false,
-  authReady = true,
-  currentUserId,
   templates = [],
-  simulationSubject = null,
 }: ChatInterfaceProps) {
   const durationMinutes = config.simulationDuration || 5;
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    normalizeMessagesForDisplay(initialMessages),
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(
-    isReviewMode ? "closed" : "active",
-  );
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("active");
   const totalDurationSeconds = durationMinutes * 60;
+  // Waktu sesi tetap dihitung untuk penutupan oleh konsumen, tetapi tidak
+  // ditampilkan: peserta melayani seperti chat sungguhan, tanpa jam hitung.
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [layer, setLayer] = useState<HTMLElement | null>(null);
   const timeLeft = Math.max(0, totalDurationSeconds - elapsedSeconds);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const pendingTimeoutsRef = useRef<number[]>([]);
-  const sessionPhaseRef = useRef<SessionPhase>(
-    isReviewMode ? "closed" : "active",
-  );
+  const sessionPhaseRef = useRef<SessionPhase>("active");
   const timeoutFinalizedRef = useRef(false);
   const closingMessageSentRef = useRef(false);
-  const messagesRef = useRef<ChatMessage[]>(
-    normalizeMessagesForDisplay(initialMessages),
-  );
+  const messagesRef = useRef<ChatMessage[]>([]);
   const isMountedRef = useRef(true);
   const consumerTurnCountRef = useRef(0);
   const totalSlowCountRef = useRef(0);
@@ -157,22 +135,18 @@ export function ChatInterface({
   }, [sessionPhase]);
 
   useEffect(() => {
-    if (!isReviewMode && sessionPhase === "active") {
+    if (sessionPhase === "active") {
       textareaRef.current?.focus();
     }
-  }, [isReviewMode, sessionPhase]);
+  }, [sessionPhase]);
 
   useEffect(() => {
-    if (
-      isReviewMode ||
-      (sessionPhase !== "active" && sessionPhase !== "expired")
-    )
-      return;
+    if (sessionPhase !== "active" && sessionPhase !== "expired") return;
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [isReviewMode, sessionPhase]);
+  }, [sessionPhase]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -267,18 +241,21 @@ export function ChatInterface({
   }, [clearPendingTimeouts]);
 
   useEffect(() => {
-    if (isReviewMode || sessionPhase !== "active" || timeLeft > 0) return;
+    if (sessionPhase !== "active" || timeLeft > 0) return;
     handleSessionTimeout();
-  }, [isReviewMode, sessionPhase, timeLeft, handleSessionTimeout]);
+  }, [sessionPhase, timeLeft, handleSessionTimeout]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  // Chat hanya ada di memori: peringatkan sebelum tab ditutup atau dimuat ulang.
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
 
   useEffect(() => {
-    if (!isReviewMode && messages.length === 0) {
+    if (messages.length === 0) {
       setMessages([
         {
           id: Date.now().toString(),
@@ -288,7 +265,7 @@ export function ChatInterface({
         },
       ]);
     }
-  }, [isReviewMode, messages.length, config.identity.name]);
+  }, [messages.length, config.identity.name]);
 
   const handleSend = async () => {
     clearPendingTimeouts();
@@ -516,209 +493,61 @@ export function ChatInterface({
     }
   };
 
-  return (
-    <div
-      data-module="ketik"
-      className="module-clean-app flex flex-col h-full w-full bg-background overflow-hidden relative"
-    >
-      {/* Header */}
-      <div className="module-clean-toolbar relative z-50 flex w-full shrink-0 items-center justify-between gap-3 border-b px-3 py-3 sm:px-4 md:px-6 md:py-4">
-        <div className="flex w-auto shrink-0 items-center gap-3 md:w-1/4">
-          {isReviewMode && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="lg"
-              onClick={() => onEndSession(messages)}
-              className="group gap-2 px-2 text-muted-foreground hover:text-foreground"
-              aria-label="Kembali dari mode review"
-            >
-              <ArrowLeft data-icon="inline-start" />
-              <span className="hidden text-sm font-semibold sm:inline">
-                Kembali
-              </span>
-            </Button>
-          )}
-          {!isReviewMode && (
-            <Avatar
-              size="lg"
-              className="!size-14 !rounded-xl md:!size-16 after:!rounded-xl"
-            >
-              <AvatarImage
-                src={getKetikConsumerAvatarUrl(config.identity)}
-                alt={`Foto profil ${config.identity.name}`}
-                className="!rounded-xl"
-                referrerPolicy="no-referrer"
-              />
-              <AvatarFallback className="!rounded-xl bg-module-ketik/15 text-base font-bold text-module-ketik md:text-lg">
-                {config.identity.name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          )}
-        </div>
+  const endChat = () => {
+    setConfirmEnd(false);
+    clearPendingTimeouts();
+    if (!isLoading && !isEnding) onEndSession(messages);
+  };
 
-        <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-1 md:w-2/4">
-          <h1 className="max-w-full truncate text-center text-lg font-semibold text-foreground md:text-xl">
+  return (
+    <section
+      ref={setLayer}
+      aria-label="Ruang chat"
+      data-module="ketik"
+      className="module-clean-app relative flex h-full w-full flex-col overflow-hidden bg-background"
+    >
+      <header className="module-clean-toolbar relative z-50 flex w-full shrink-0 items-center gap-3 border-b px-3 py-2 sm:px-5">
+        <Avatar size="lg" className="!size-10 !rounded-lg after:!rounded-lg">
+          <AvatarImage
+            src={getKetikConsumerAvatarUrl(config.identity)}
+            alt=""
+            className="!rounded-lg"
+            referrerPolicy="no-referrer"
+          />
+          <AvatarFallback className="!rounded-lg bg-module-ketik/15 text-sm font-bold text-module-ketik">
+            {config.identity.name.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h1 className="truncate text-[15px] font-semibold text-foreground">
             {config.identity.name}
           </h1>
-          <div className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-1.5 md:gap-2">
-            <Badge
-              variant="outline"
-              className="h-7 shrink-0 gap-1.5 px-2.5 md:px-3"
-            >
-              <Phone data-icon="inline-start" className="text-module-ketik" />
-              <span className="text-[13px] font-medium text-muted-foreground">
-                {config.identity.phone}
-              </span>
-            </Badge>
-            <Badge
-              variant="outline"
-              className="h-7 min-w-0 gap-1.5 px-2.5 md:px-3"
-            >
-              <MapPin
-                data-icon="inline-start"
-                className="shrink-0 text-module-ketik"
+          <p className="truncate text-[13px] text-muted-foreground">
+            {[config.identity.city, config.identity.phone]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setConfirmEnd(true)}
+          disabled={isLoading || isEnding}
+          className="min-h-[44px] shrink-0 px-4 text-[13px] font-medium"
+        >
+          {isEnding ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current motion-reduce:animate-none"
               />
-              <span className="truncate text-[13px] font-medium text-muted-foreground">
-                {config.identity.city}
-              </span>
-            </Badge>
-          </div>
-          {!isReviewMode ? (
-            <Badge
-              variant="secondary"
-              className="mt-1 h-6 gap-2 bg-module-ketik/10 text-module-ketik"
-            >
-              <span className="text-[13px] font-semibold">Online</span>
-              <span className="text-[13px] font-medium tabular-nums text-muted-foreground">
-                {formatTime(elapsedSeconds)}
-              </span>
-              <span className="size-1.5 rounded-full bg-module-ketik" />
-            </Badge>
+              Menyimpan…
+            </>
           ) : (
-            <Badge
-              variant="outline"
-              className="mt-1 h-6 gap-2 border-chart-orange/30 text-chart-orange"
-            >
-              <X data-icon="inline-start" />
-              <span className="text-[13px] font-semibold">Review Mode</span>
-            </Badge>
+            "Akhiri chat"
           )}
-        </div>
-
-        <div className="flex w-auto shrink-0 items-center justify-end gap-2 md:w-1/4">
-          {isReviewMode ? (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={() => {
-                  const subject = simulationSubject;
-                  const targetLabel = formatSimulationSubjectLabel(subject);
-                  const unavailableRecord =
-                    subject?.type === "participant" && !subject.participantId
-                      ? "Tidak lagi tersedia"
-                      : "Tersedia";
-                  const csvContent = [
-                    [
-                      "Pengirim",
-                      "Pesan",
-                      "Waktu",
-                      "Target",
-                      "Batch",
-                      "Tim",
-                      "Pelaksana",
-                      "Record Peserta",
-                    ].join(","),
-                    ...messages.map((message) => {
-                      const sender =
-                        message.sender === "agent"
-                          ? "Agen"
-                          : message.sender === "consumer"
-                            ? "Konsumen"
-                            : "Sistem";
-                      const time = new Date(message.timestamp).toLocaleString();
-
-                      return [
-                        sender,
-                        message.text,
-                        time,
-                        targetLabel,
-                        subject?.type === "participant"
-                          ? subject.batchName || ""
-                          : "",
-                        subject?.type === "participant"
-                          ? subject.team || ""
-                          : "",
-                        currentUserId || "Akun pemilik sesi",
-                        unavailableRecord,
-                      ]
-                        .map(csvCell)
-                        .join(",");
-                    }),
-                  ].join("\r\n");
-                  const blob = new Blob(["\uFEFF", csvContent], {
-                    type: "text/csv;charset=utf-8",
-                  });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement("a");
-
-                  try {
-                    link.href = url;
-                    link.download = `chat_review_${Date.now()}.csv`;
-                    document.body.appendChild(link);
-                    link.click();
-                  } finally {
-                    link.remove();
-                    URL.revokeObjectURL(url);
-                  }
-                }}
-                className="text-muted-foreground hover:text-foreground"
-                title="Download CSV"
-                aria-label="Download transcript CSV"
-              >
-                <Download data-icon="inline" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={() => onEndSession([])}
-                className="text-muted-foreground hover:text-destructive"
-                title="Tutup Review"
-                aria-label="Tutup mode review"
-              >
-                <X data-icon="inline" />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              variant="destructive"
-              size="lg"
-              onClick={() => {
-                clearPendingTimeouts();
-                if (!isLoading && !isEnding && authReady) {
-                  onEndSession(messages);
-                }
-              }}
-              disabled={isLoading || isEnding || !authReady}
-              className="min-h-11 rounded-xl px-4 text-[15px] font-semibold md:px-5"
-              aria-label="Akhiri sesi KETIK"
-            >
-              {isEnding || !authReady ? (
-                <>
-                  <div className="size-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-                  <span>Memproses...</span>
-                </>
-              ) : (
-                "Selesai"
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
+        </Button>
+      </header>
 
       {/* Messages Area */}
       <div className="module-clean-stage custom-scrollbar z-10 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scroll-smooth px-3 py-4 sm:px-4 md:px-6">
@@ -809,18 +638,13 @@ export function ChatInterface({
       </div>
 
       {/* Input Area */}
-      {!isReviewMode &&
-      (sessionPhase === "active" || sessionPhase === "expired") ? (
+      {sessionPhase === "active" || sessionPhase === "expired" ? (
         <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
-          <div className="absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
 
           <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
             <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
-              <label
-                htmlFor="ketik-message-input"
-                className="mb-1 ml-1 select-none text-[14px] font-semibold text-muted-foreground"
-              >
-                Pesan Baru
+              <label htmlFor="ketik-message-input" className="sr-only">
+                Tulis balasan
               </label>
               <Textarea
                 id="ketik-message-input"
@@ -828,10 +652,9 @@ export function ChatInterface({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Tulis pesan Anda..."
+                placeholder="Tulis balasan… ketik / untuk template"
                 className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-lg font-medium text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 md:text-lg"
                 rows={1}
-                aria-label="Tulis pesan KETIK"
                 aria-describedby="ketik-char-counter"
                 aria-invalid={isOverLimit}
               />
@@ -948,17 +771,10 @@ export function ChatInterface({
             </Button>
           </div>
         </div>
-      ) : !isReviewMode ? (
-        <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
-          <span className="text-[15px] font-semibold text-muted-foreground">
-            Sesi Telah Berakhir
-          </span>
-        </div>
       ) : (
         <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
-          <X className="h-4 w-4 text-orange-500/70" />
           <span className="text-[15px] font-semibold text-muted-foreground">
-            Mode Review &bull; Hanya Baca
+            Chat telah berakhir
           </span>
         </div>
       )}
@@ -967,6 +783,17 @@ export function ChatInterface({
         src={selectedImage}
         onClose={() => setSelectedImage(null)}
       />
-    </div>
+      <ConfirmDialog
+        open={confirmEnd}
+        title="Akhiri chat sekarang?"
+        description="Percakapan disimpan, lalu Anda masuk ke tahap Telaah. Chat yang sudah diakhiri tidak bisa dilanjutkan."
+        confirmLabel="Akhiri chat"
+        cancelLabel="Lanjutkan chat"
+        confirmVariant="default"
+        container={layer}
+        onConfirm={endChat}
+        onCancel={() => setConfirmEnd(false)}
+      />
+    </section>
   );
 }

@@ -247,6 +247,14 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Loading state** — skeleton rows (bukan spinner doang).
 - **Empty state** — pesan jelas + CTA action.
 
+### KETIK (`/ketik`)
+
+- **Landing** mengikuti pola PDKT: hero dengan satu aksi utama "Mulai simulasi", menu kecil (Riwayat, Pemakaian AI, Pengaturan), dan demo chat → telaah (`KetikStageDemo`, `aria-hidden`, tombol jeda, keadaan akhir utuh saat dijeda/reduced motion). Di bawahnya: Progres latihan, Perlu tindak lanjut (sesi belum/gagal ditelaah), Fokus berikutnya (aspek terendah dari 5 sesi terakhir), dan Hasil telaah terbaru dengan kolom aspek terendah. Angka hanya dihitung dari riwayat; tiap bagian punya state loading/error + "Coba lagi".
+- **Ruang chat** menyerupai aplikasi chat layanan: nama, kota · telepon, percakapan, dan kotak balasan. Tanpa stopwatch, badge "Online", nama skenario, atau penanda tahap. "Akhiri chat" bertombol netral dengan dialog konfirmasi; merah hanya untuk aksi yang menghapus data.
+- **Telaah** adalah tahap layar penuh (`?sesi=<id>&tahap=telaah`), bukan popup: transkrip bernomor di kiri dengan typo digarisbawahi di kalimatnya, hasil di kanan (skor akhir dulu, lima aspek sebagai satu daftar bar, lalu tab). Warna bar: oranye untuk skor < 75, hijau untuk ≥ 85, netral di antaranya. Di bawah 1024px hasil ditumpuk di atas transkrip. Tingkat typo memakai bahasa Indonesia (Berat/Sedang/Ringan).
+- **Riwayat** (`/ketik/history`) adalah tabel, bukan kartu, dengan pola yang sama seperti `/pdkt/history`.
+- **Pengaturan** mengikuti dialog Pengaturan PDKT: kategori Skenario (aktif/total), Karakter konsumen, Identitas konsumen, Template cepat, dan Sesi & AI. Skenario berupa daftar baris dengan sakelar aktif, pencarian, dan filter kategori; durasi, tempo, dan model AI adalah grup radio. Footer menandai "Belum disimpan"; tutup dengan perubahan, hapus, dan "Pulihkan bawaan" memakai `ConfirmDialog`, tidak pernah `window.confirm`. Sakelar dan baris pilihan karakter dipakai bersama lewat `components/settings/SettingsSwitch.tsx` dan `SettingsChoices.tsx`.
+
 ### Shell & navigasi
 
 Satu model navigasi, `buildNavModel(role)` di `components/layout/nav-config.ts`, menjadi sumber sidebar, drawer ponsel, tab bar, dan Beranda. Jangan membuat daftar modul lokal di komponen; modul dan sub-halaman tersaring capability `access.ts`.

@@ -1,6 +1,6 @@
 import { cn } from "cn";
 
-interface PdktSwitchProps {
+interface SettingsSwitchProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   label: string;
@@ -8,12 +8,12 @@ interface PdktSwitchProps {
 }
 
 /** Sakelar on/off dengan area sentuh 44px; jalurnya 36×22 seperti mockup. */
-export function PdktSwitch({
+export function SettingsSwitch({
   checked,
   onCheckedChange,
   label,
   disabled,
-}: PdktSwitchProps) {
+}: SettingsSwitchProps) {
   return (
     <button
       type="button"

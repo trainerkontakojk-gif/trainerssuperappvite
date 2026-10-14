@@ -25,6 +25,8 @@ interface SessionReplayModalProps {
   typos?: KetikTypoFinding[];
   scenarioTitle?: string;
   consumerName?: string;
+  /** Wajib diisi bila dibuka dari lapisan `fixed z-[100]` (tahap Telaah). */
+  container?: HTMLElement | null;
 }
 
 export function SessionReplayModal({
@@ -34,6 +36,7 @@ export function SessionReplayModal({
   typos = [],
   scenarioTitle = "Session Replay",
   consumerName = "Consumer",
+  container,
 }: SessionReplayModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -84,6 +87,13 @@ export function SessionReplayModal({
     return parts;
   };
 
+  // Satu modal dipakai untuk banyak sesi: setiap kali dibuka, mulai dari awal.
+  useEffect(() => {
+    if (!isOpen) return;
+    setCurrentIndex(0);
+    setIsPlaying(false);
+  }, [isOpen, messages]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isPlaying && currentIndex < messages.length - 1) {
@@ -116,6 +126,7 @@ export function SessionReplayModal({
     >
       <DialogContent
         showCloseButton={false}
+        container={container}
         aria-modal="true"
         className="z-[200] w-[calc(100%-1.5rem)] max-w-2xl gap-0 p-0 rounded-[2rem] overflow-hidden flex flex-col h-[86vh] max-h-[86vh] shadow-2xl shadow-black/10 bg-card text-base text-foreground ring-0 border border-border/50 sm:max-w-2xl"
       >

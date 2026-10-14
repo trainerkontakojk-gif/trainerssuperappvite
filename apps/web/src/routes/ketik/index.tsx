@@ -1,426 +1,155 @@
 import { can, normalizeRole } from "@trainers/types";
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Settings, History, Play, BarChart3 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { ArrowRight, History, SlidersHorizontal } from "lucide-react";
 import type {
   KetikAppSettings,
   KetikSessionHistoryItem,
   KetikSessionConfig,
   KetikScenario,
   ChatMessage,
-  KetikSessionReview,
-  KetikTypoFinding,
-  KetikReviewDetail,
   KetikQuickTemplate,
+  SimulationSubjectSelection,
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import { ketikApi } from "./ketikApi";
-import { KetikMotionFrame } from "./components/KetikMotionFrame";
+import { KetikStageDemo } from "./components/KetikStageDemo";
+import {
+  KetikLandingOverview,
+  type KetikLoadState,
+} from "./components/KetikLandingOverview";
+import { KetikReviewStage } from "./components/KetikReviewStage";
 import { ChatInterface } from "./components/ChatInterface";
 import { SettingsModal } from "./components/SettingsModal";
-import { HistoryModal } from "./components/HistoryModal";
-import { UsageModal } from "../../components/UsageModal";
-import { SessionReviewModal } from "./components/SessionReviewModal";
-import { useAuthStore } from "../../store/authStore";
+import { summarizeKetikLanding } from "./utils/landingSummary";
+import { UsagePopover } from "../../components/simulation/UsagePopover";
 import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
-import type { SimulationSubjectSelection } from "@trainers/types";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { useAuthStore } from "../../store/authStore";
+import { APP_MODULES } from "../../lib/app-config";
 import { notify } from "../../lib/toast";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
   type UsageDelta,
+  type UsageSnapshot,
 } from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import { resolveKetikSessionIdentity } from "./ketikIdentity";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Card } from "../../components/ui/card";
+
+/** Kepanjangan KETIK dari metadata modul kanonik (`lib/app-config.ts`). */
+const KETIK_EXPANDED_TITLE =
+  APP_MODULES.find((module) => module.id === "ketik")?.expandedTitle ??
+  "Kelas Etika & Trik Komunikasi";
+
+const navButtonClass =
+  "min-h-[44px] gap-2 bg-surface-elevated px-3.5 text-[13px]";
+
+interface ActiveChat {
+  config: KetikSessionConfig;
+  scenario: KetikScenario;
+  subject: SimulationSubjectSelection;
+}
+
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
 
 export default function KetikLanding() {
+  const navigate = useNavigate();
+  const { sesi: requestedSessionId } = useSearch({ from: "/ketik" });
   const session = useAuthStore((s) => s.session);
   const userId = session?.user?.id;
   const profile = useAuthStore((s) => s.profile);
-  const normalizedRole = profile?.role?.trim().toLowerCase() || "";
-  const canManageTemplates = normalizedRole === "admin";
-  const canStartReview = can(normalizeRole(normalizedRole), "ketik.review");
-  const accountKey = userId ?? null;
-  const canPickParticipant = can(
-    normalizeRole(normalizedRole),
-    "simulation.subject.select",
+  const normalizedRole = normalizeRole(
+    profile?.role?.trim().toLowerCase() || "",
   );
-  const [view, setView] = useState<"home" | "chat">("home");
+  const canManageTemplates = normalizedRole === "admin";
+  const canStartReview = can(normalizedRole, "ketik.review");
+  const canPickParticipant = can(normalizedRole, "simulation.subject.select");
+  const accountKey = userId ?? null;
+  const shouldReduceMotion = useReducedMotion();
+
   const [settings, setSettings] = useState<KetikAppSettings>(
     DEFAULT_KETIK_SETTINGS,
   );
   const [history, setHistory] = useState<KetikSessionHistoryItem[]>([]);
+  const [historyState, setHistoryState] = useState<KetikLoadState>("loading");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isUsageOpen, setIsUsageOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentConfig, setCurrentConfig] = useState<KetikSessionConfig | null>(
-    null,
-  );
-  const [currentScenario, setCurrentScenario] = useState<KetikScenario | null>(
-    null,
-  );
-  const [reviewMessages, setReviewMessages] = useState<ChatMessage[]>([]);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+  const usageBaselineRef = useRef<UsageSnapshot | null>(null);
 
-  const [selectedReview, setSelectedReview] =
-    useState<KetikSessionReview | null>(null);
-  const [selectedTypos, setSelectedTypos] = useState<KetikTypoFinding[]>([]);
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [selectedSessionForReview, setSelectedSessionForReview] =
-    useState<KetikSessionHistoryItem | null>(null);
-
-  const [reviewProgress, setReviewProgress] = useState<{
-    status:
-      | "idle"
-      | "starting"
-      | "processing"
-      | "delayed"
-      | "loading-result"
-      | "ready"
-      | "failed";
-    percent: number;
-    etaSeconds: number;
-  }>({ status: "idle", percent: 0, etaSeconds: 0 });
-
-  const sessionBaselineRef = useRef<any>(null);
-  const sessionRunIdRef = useRef(0);
-  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
-  const frozenSubjectRef = useRef<SimulationSubjectSelection>({ type: "self" });
-  const reviewStartedAtRef = useRef<number>(0);
+  const loadHistory = useCallback(async () => {
+    setHistoryState("loading");
+    try {
+      setHistory(await ketikApi.getHistory());
+      setHistoryState("ready");
+    } catch (error) {
+      console.warn("[Ketik] Failed to load history", error);
+      setHistoryState("error");
+    }
+  }, []);
 
   useEffect(() => {
-    const init = async () => {
+    void (async () => {
       try {
-        const s = await ketikApi.getSettings(userId);
-        setSettings(s);
-      } catch (e) {
+        setSettings(await ketikApi.getSettings(userId));
+      } catch {
         console.warn("[Ketik] Failed to load settings, using defaults");
       }
-      try {
-        const h = await ketikApi.getHistory();
-        setHistory(h);
-      } catch (e) {
-        console.warn("[Ketik] Failed to load history");
-      }
-    };
-    init();
-  }, [userId]);
-
-  const handleSaveSettings = async (newSettings: KetikAppSettings) => {
-    try {
-      await ketikApi.saveSettings(newSettings, userId);
-      setSettings(newSettings);
-    } catch (e) {
-      console.error("[Ketik] Failed to save settings:", e);
-      throw e;
-    }
-  };
-
-  const handleSaveTemplates = async (templates: KetikQuickTemplate[]) => {
-    await ketikApi.saveTemplates(templates);
-  };
-
-  const handleClearHistory = async () => {
-    try {
-      await ketikApi.clearHistory();
-      setHistory([]);
-    } catch (e) {
-      console.error("[Ketik] Failed to clear history:", e);
-      notify.error("Gagal menghapus riwayat.");
-    }
-  };
-
-  const handleDeleteSession = async (id: string) => {
-    try {
-      await ketikApi.deleteSession(id);
-      setHistory((prev) => prev.filter((s) => s.id !== id));
-    } catch (e) {
-      console.error("[Ketik] Failed to delete session:", e);
-      notify.error("Gagal menghapus sesi.");
-    }
-  };
-
-  const POLLING_TIMEOUT_SECONDS = 120;
-
-  const handleStartManualReview = async (sessionId: string) => {
-    reviewStartedAtRef.current = (() => Date.now())();
-    setReviewProgress({ status: "starting", percent: 0, etaSeconds: 35 });
-
-    // Auto-transition: starting → processing after 2 detik agar UI tidak terasa stuck
-    const transitionTimer = setTimeout(() => {
-      setReviewProgress((prev) =>
-        prev.status === "starting"
-          ? { ...prev, status: "processing", percent: 10, etaSeconds: 25 }
-          : prev,
-      );
-    }, 2000);
-
-    try {
-      const result = await ketikApi.startReview(sessionId);
-      clearTimeout(transitionTimer);
-
-      if (
-        selectedSessionForReview &&
-        selectedSessionForReview.id === sessionId
-      ) {
-        const returnedStatus = result?.status;
-        if (returnedStatus === "completed") {
-          // Map scores from API response to session object
-          const sessionWithScores = result?.scores
-            ? {
-                ...selectedSessionForReview,
-                reviewStatus: "completed" as const,
-                finalScore: result.scores.final,
-                empathyScore: result.scores.empathy,
-                probingScore: result.scores.probing,
-                resolutionScore: result.scores.resolution,
-                typoScore: result.scores.typo,
-                complianceScore: result.scores.compliance,
-              }
-            : {
-                ...selectedSessionForReview,
-                reviewStatus: "completed" as const,
-              };
-
-          setSelectedSessionForReview(sessionWithScores);
-          setHistory((prev) =>
-            prev.map((item) =>
-              item.id === sessionId ? sessionWithScores : item,
-            ),
-          );
-          setReviewProgress({
-            status: "loading-result",
-            percent: 90,
-            etaSeconds: 3,
-          });
-          handleViewReview(sessionWithScores);
-          handleReviewComplete();
-          return;
-        }
-
-        if (returnedStatus === "failed") {
-          setReviewProgress((prev) => ({ ...prev, status: "failed" }));
-          notify.error(
-            result?.error || "Analisis AI gagal. Silakan coba lagi.",
-          );
-          const failedSession = {
-            ...selectedSessionForReview,
-            reviewStatus: "failed" as const,
-          };
-          setSelectedSessionForReview(failedSession);
-          setHistory((prev) =>
-            prev.map((item) => (item.id === sessionId ? failedSession : item)),
-          );
-          return;
-        }
-
-        const updatedSession = {
-          ...selectedSessionForReview,
-          reviewStatus: "processing" as const,
-        };
-        setSelectedSessionForReview(updatedSession);
-        setHistory((prev) =>
-          prev.map((item) => (item.id === sessionId ? updatedSession : item)),
-        );
-        setReviewProgress({
-          status: "processing",
-          percent: 15,
-          etaSeconds: 25,
-        });
-      }
-    } catch (error) {
-      clearTimeout(transitionTimer);
-      console.error("[Ketik] Error starting manual review:", error);
-      setReviewProgress((prev) => ({ ...prev, status: "failed" }));
-      notify.error("Gagal memulai analisis AI. Silakan coba lagi.");
-    }
-  };
+    })();
+    void loadHistory();
+  }, [userId, loadHistory]);
 
   useEffect(() => {
-    frozenSubjectRef.current = { type: "self" };
     setShowSubjectPicker(false);
   }, [accountKey, canPickParticipant]);
 
-  const requestStartSimulation = () => {
-    if (!canPickParticipant) {
-      void startSimulation({ type: "self" });
+  const reviewSession = requestedSessionId
+    ? (history.find((item) => item.id === requestedSessionId) ?? null)
+    : null;
+
+  // Tautan valid tetap di URL. Hanya sesi hilang/gagal dimuat yang kembali ke landing.
+  useEffect(() => {
+    if (!requestedSessionId || historyState === "loading" || reviewSession) {
       return;
     }
-    setShowSubjectPicker(true);
+    notify.error(
+      historyState === "error"
+        ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
+        : "Sesi itu tidak ada lagi di riwayat Anda.",
+    );
+    void navigate({ to: "/ketik", search: {}, replace: true });
+  }, [requestedSessionId, historyState, reviewSession, navigate]);
+
+  const openSession = (item: KetikSessionHistoryItem) => {
+    void navigate({ to: "/ketik", search: { sesi: item.id, tahap: "telaah" } });
   };
 
-  const startSimulation = async (selection?: SimulationSubjectSelection) => {
-    if (!session?.access_token) {
-      notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
-      return;
-    }
+  const openHistory = () => {
+    void navigate({ to: "/ketik/history" });
+  };
 
-    const activeScenarios = settings.scenarios.filter((s) => s.isActive);
-    if (activeScenarios.length === 0) {
-      notify.warning("Pilih minimal satu skenario di Pengaturan.");
-      setIsSettingsOpen(true);
-      return;
-    }
-    const scenario =
-      activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
-
-    const availableConsumerTypes = Array.isArray(settings.consumerTypes)
-      ? settings.consumerTypes
-      : [];
-
-    if (availableConsumerTypes.length === 0) {
-      notify.warning(
-        "Tambahkan minimal satu karakter pelanggan di Pengaturan.",
-      );
-      setIsSettingsOpen(true);
-      return;
-    }
-
-    const consumerType =
-      settings.activeConsumerTypeId === "random"
-        ? availableConsumerTypes[
-            Math.floor(Math.random() * availableConsumerTypes.length)
-          ]
-        : (availableConsumerTypes.find(
-            (item) => item.id === settings.activeConsumerTypeId,
-          ) ?? availableConsumerTypes[0]);
-
-    const identity = resolveKetikSessionIdentity(settings.identitySettings);
-
-    const config: KetikSessionConfig = {
-      scenarios: activeScenarios,
-      consumerType,
-      identity,
-      selectedModel: settings.selectedModel,
-      simulationDuration: settings.simulationDuration || 5,
-      responsePacingMode: settings.responsePacingMode || "realistic",
-    };
-
-    setCurrentConfig(config);
-    setCurrentScenario(scenario);
-    setReviewMessages([]);
-    setSessionDelta(null);
-    sessionBaselineRef.current = null;
-    if (selection) frozenSubjectRef.current = selection;
-    setShowSubjectPicker(false);
-    const runId = ++sessionRunIdRef.current;
-    setIsLoading(true);
-
+  const captureUsageBaseline = async () => {
     try {
-      const usage = await fetchUsageSummary("ketik");
-      if (usage && runId === sessionRunIdRef.current) {
-        sessionBaselineRef.current = usage;
-      }
-    } catch (e) {
-      console.warn("[Ketik] Failed to fetch usage baseline");
+      usageBaselineRef.current = await fetchUsageSummary("ketik");
+    } catch {
+      usageBaselineRef.current = null;
     }
-    setIsLoading(false);
-    setView("chat");
   };
 
-  const endSession = async (messages: ChatMessage[]) => {
-    if (
-      currentConfig &&
-      currentScenario &&
-      messages.length > 0 &&
-      currentScenario.id !== "review"
-    ) {
-      setIsLoading(true);
-      try {
-        const session = await ketikApi.persistSession({
-          scenarioTitle: currentScenario.title,
-          consumerName: currentConfig.identity.name,
-          consumerPhone: currentConfig.identity.phone,
-          consumerCity: currentConfig.identity.city,
-          messages,
-          simulationDuration: currentConfig.simulationDuration,
-          simulationSubject: frozenSubjectRef.current,
-        });
-
-        const newSession: KetikSessionHistoryItem = {
-          id: session.id,
-          date: session.date,
-          scenarioTitle: session.scenarioTitle,
-          consumerName: session.consumerName,
-          consumerPhone: session.consumerPhone,
-          consumerCity: session.consumerCity,
-          messages: session.messages,
-          simulationDuration: session.simulationDuration,
-          reviewStatus: session.reviewStatus ?? "pending",
-          simulationSubject: session.simulationSubject ?? null,
-        };
-
-        setHistory((prev) => [newSession, ...prev]);
-        setSelectedSessionForReview(newSession);
-        setIsReviewOpen(true);
-        setSelectedReview(null);
-        setSelectedTypos([]);
-      } catch (error) {
-        console.error("Error ending session:", error);
-        setIsLoading(false);
-        notify.error(
-          "Gagal menyimpan sesi. Transkrip dipertahankan, coba lagi tanpa mengubah target.",
-        );
-        return;
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    const runId = sessionRunIdRef.current;
-    const baseline = sessionBaselineRef.current;
-    setSessionDeltaPending(true);
-
-    // Poll for usage delta (covers /ketik/generate calls)
-    if (baseline && runId === sessionRunIdRef.current) {
-      pollUsageDelta(() => fetchUsageSummary("ketik"), baseline)
-        .then((delta) => {
-          if (runId === sessionRunIdRef.current) {
-            setSessionDelta(delta);
-            if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
-              const format = (v: number) =>
-                v.toLocaleString("id-ID", {
-                  style: "currency",
-                  currency: "IDR",
-                  minimumFractionDigits: 0,
-                });
-              const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
-              const sim = delta.breakdown.simulation;
-              const rev = delta.breakdown.review;
-
-              if (sim.costIdr > 0 || sim.calls > 0) {
-                parts.push(`Simulasi ${format(sim.costIdr)}`);
-              }
-              if (rev.costIdr > 0 || rev.calls > 0) {
-                parts.push(`Penilaian AI ${format(rev.costIdr)}`);
-              }
-              notify.success(parts.join(" | "));
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (runId === sessionRunIdRef.current) {
-            setSessionDeltaPending(false);
-          }
-        });
-    } else {
-      setSessionDeltaPending(false);
-    }
-
-    setView("home");
-    setCurrentConfig(null);
-    setCurrentScenario(null);
-    setReviewMessages([]);
-  };
-
-  const handleReviewComplete = async () => {
-    const baseline = sessionBaselineRef.current;
+  /**
+   * Selisih pemakaian sejak chat dimulai (simulasi + telaah). Pemberitahuan
+   * hanya muncul setelah telaah selesai, saat kedua biaya sudah tercatat.
+   */
+  const computeUsageDelta = async (notifyUser: boolean) => {
+    const baseline = usageBaselineRef.current;
     if (!baseline) return;
     setSessionDeltaPending(true);
     try {
@@ -429,432 +158,302 @@ export default function KetikLanding() {
         baseline,
       );
       setSessionDelta(delta);
-      if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
-        const format = (v: number) =>
-          v.toLocaleString("id-ID", {
-            style: "currency",
-            currency: "IDR",
-            minimumFractionDigits: 0,
-          });
-        const parts = [`Biaya penilaian: ${formatUsageDeltaLabel(delta)}`];
-        const rev = delta.breakdown.review;
-
-        if (rev.costIdr > 0 || rev.calls > 0) {
-          parts.push(`Penilaian AI ${format(rev.costIdr)}`);
-        }
-        notify.success(parts.join(" | "));
+      if (notifyUser && delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+        notify.info(`Pemakaian AI sesi ini: ${formatUsageDeltaLabel(delta)}`);
+        usageBaselineRef.current = null;
       }
-    } catch (e) {
-      console.warn("[Ketik] Failed to recompute delta after review:", e);
+    } catch (error) {
+      console.warn("[Ketik] Failed to compute usage delta:", error);
     } finally {
       setSessionDeltaPending(false);
-      sessionBaselineRef.current = null;
     }
   };
 
-  const handleReviewHistory = (session: KetikSessionHistoryItem) => {
-    const matchingScenario = settings.scenarios.find(
-      (s) => s.title === session.scenarioTitle,
-    );
-
-    const newConfig: KetikSessionConfig = currentConfig || {
-      identity: {
-        name: session.consumerName,
-        city: session.consumerCity || "",
-        phone: session.consumerPhone || "",
-      },
-      consumerType: settings.consumerTypes[0],
-      responsePacingMode: settings.responsePacingMode || "realistic",
-      simulationDuration: settings.simulationDuration || 5,
-      selectedModel: settings.selectedModel || "openai",
-      scenarios: settings.scenarios,
-    };
-
-    setCurrentConfig({
-      ...newConfig,
-      identity: {
-        name: session.consumerName,
-        city: session.consumerCity || "",
-        phone: session.consumerPhone || "",
-      },
-    });
-    setCurrentScenario(
-      matchingScenario
-        ? { ...matchingScenario, id: "review" }
-        : {
-            id: "review",
-            title: session.scenarioTitle,
-            description: "",
-            category: "Review",
-            isActive: true,
-          },
-    );
-    setReviewMessages(session.messages);
-    setIsHistoryOpen(false);
-    setIsReviewOpen(false);
-    setView("chat");
-  };
-
-  const handleViewReview = async (session: KetikSessionHistoryItem) => {
-    const isSameSession = selectedSessionForReview?.id === session.id;
-    if (!isSameSession) {
-      setSelectedSessionForReview(session);
-      setSelectedReview(null);
-      setSelectedTypos([]);
-    }
-
-    if (
-      session.reviewStatus === "pending" ||
-      session.reviewStatus === "failed" ||
-      !session.reviewStatus
-    ) {
-      setIsReviewOpen(true);
+  const startSimulation = async (subject: SimulationSubjectSelection) => {
+    setShowSubjectPicker(false);
+    if (!session?.access_token) {
+      notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
       return;
     }
+    const activeScenarios = settings.scenarios.filter((s) => s.isActive);
+    if (activeScenarios.length === 0) {
+      notify.warning("Aktifkan minimal satu skenario di Pengaturan.");
+      setIsSettingsOpen(true);
+      return;
+    }
+    const consumerTypes = Array.isArray(settings.consumerTypes)
+      ? settings.consumerTypes
+      : [];
+    if (consumerTypes.length === 0) {
+      notify.warning("Tambahkan minimal satu karakter konsumen di Pengaturan.");
+      setIsSettingsOpen(true);
+      return;
+    }
+    const consumerType =
+      settings.activeConsumerTypeId === "random"
+        ? pickRandom(consumerTypes)
+        : (consumerTypes.find(
+            (item) => item.id === settings.activeConsumerTypeId,
+          ) ?? consumerTypes[0]);
 
-    if (session.reviewStatus === "completed") {
-      setIsReviewOpen(true);
-      if (isSameSession && selectedReview) {
-        setReviewProgress({ status: "ready", percent: 100, etaSeconds: 0 });
-        return;
-      }
+    await captureUsageBaseline();
+    setSessionDelta(null);
+    setActiveChat({
+      scenario: pickRandom(activeScenarios),
+      subject,
+      config: {
+        scenarios: activeScenarios,
+        consumerType,
+        identity: resolveKetikSessionIdentity(settings.identitySettings),
+        selectedModel: settings.selectedModel,
+        simulationDuration: settings.simulationDuration || 5,
+        responsePacingMode: settings.responsePacingMode || "realistic",
+      },
+    });
+  };
 
-      setReviewProgress((prev) => ({
-        ...prev,
-        status: "loading-result",
-        percent: Math.max(prev.percent, 92),
-      }));
-
-      try {
-        const detail = await ketikApi.getReviewDetail(session.id);
-        if (detail) {
-          // Map scores from detail ke session object (defense-in-depth)
-          const sessionWithScores = {
-            ...session,
-            finalScore: detail.scores.final,
-            empathyScore: detail.scores.empathy,
-            probingScore: detail.scores.probing,
-            resolutionScore: detail.scores.resolution,
-            typoScore: detail.scores.typo,
-            complianceScore: detail.scores.compliance,
-          };
-          setSelectedSessionForReview(sessionWithScores);
-          setHistory((prev) =>
-            prev.map((item) =>
-              item.id === session.id ? sessionWithScores : item,
-            ),
-          );
-          setSelectedReview(detail.review);
-          setSelectedTypos(detail.typos);
-          setReviewProgress({ status: "ready", percent: 100, etaSeconds: 0 });
-        } else {
-          console.warn("[Ketik] Review marked completed but data missing");
-          notify.error("Data review tidak ditemukan.");
-          const failedSession = { ...session, reviewStatus: "failed" as const };
-          setSelectedSessionForReview(failedSession);
-          setHistory((prev) =>
-            prev.map((item) => (item.id === session.id ? failedSession : item)),
-          );
-          setReviewProgress({ status: "failed", percent: 0, etaSeconds: 0 });
-        }
-      } catch (err) {
-        console.error("[Ketik] Error fetching review details:", err);
-        setReviewProgress({ status: "failed", percent: 0, etaSeconds: 0 });
-      }
+  const requestStartSimulation = () => {
+    if (canPickParticipant) {
+      setShowSubjectPicker(true);
+    } else {
+      void startSimulation({ type: "self" });
     }
   };
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    let progressInterval: ReturnType<typeof setInterval>;
-
-    const currentSessionId = selectedSessionForReview?.id;
-    if (!currentSessionId) return;
-
-    const shouldPoll =
-      selectedSessionForReview &&
-      (selectedSessionForReview.reviewStatus === "processing" ||
-        (selectedSessionForReview.reviewStatus === "pending" &&
-          reviewProgress.status !== "idle"));
-
-    if (shouldPoll) {
-      progressInterval = setInterval(() => {
-        setReviewProgress((prev) => {
-          if (
-            prev.status === "ready" ||
-            prev.status === "failed" ||
-            prev.status === "idle"
-          )
-            return prev;
-          let increment: number;
-          if (prev.percent < 10) increment = 2;
-          else if (prev.percent < 40) increment = 1.2;
-          else if (prev.percent < 70) increment = 0.6;
-          else if (prev.percent < 90) increment = 0.2;
-          else increment = 0.05;
-
-          const nextPercent = Math.min(
-            prev.percent + increment,
-            prev.status === "delayed"
-              ? 92
-              : prev.status === "loading-result"
-                ? 98
-                : 95,
-          );
-          const nextEta = Math.max(0, prev.etaSeconds - 1);
-          let nextStatus = prev.status;
-          if (nextPercent >= 92 && prev.status === "processing") {
-            nextStatus = "delayed";
-          }
-          return {
-            ...prev,
-            percent: nextPercent,
-            etaSeconds: nextEta,
-            status: nextStatus,
-          };
-        });
-      }, 1000);
-
-      const poll = async () => {
-        try {
-          // Polling timeout guard
-          if (
-            reviewStartedAtRef.current > 0 &&
-            Date.now() - reviewStartedAtRef.current >
-              POLLING_TIMEOUT_SECONDS * 1000
-          ) {
-            console.warn(
-              `[Ketik] Polling timeout after ${POLLING_TIMEOUT_SECONDS}s for session ${currentSessionId}`,
-            );
-            setReviewProgress((prev) => ({ ...prev, status: "failed" }));
-            const staleSession = {
-              ...selectedSessionForReview,
-              reviewStatus: "failed" as const,
-            };
-            setSelectedSessionForReview(staleSession);
-            setHistory(
-              (prev) =>
-                prev.map((item) =>
-                  item.id === staleSession.id ? staleSession : item,
-                ) as KetikSessionHistoryItem[],
-            );
-            notify.warning(
-              "Analisis AI melebihi batas waktu. Silakan coba lagi.",
-            );
-            return;
-          }
-
-          const data = await ketikApi.getReviewStatus(currentSessionId);
-          if (selectedSessionForReview?.id !== currentSessionId) return;
-
-          // A completed job can briefly precede the persisted review result.
-          // Keep polling instead of transitioning the local session too early.
-          if (data.status === "completed" && !data.resultReady) return;
-
-          const updatedStatus = data.status;
-          if (updatedStatus !== selectedSessionForReview.reviewStatus) {
-            let updatedSession = {
-              ...selectedSessionForReview,
-              reviewStatus: updatedStatus,
-            };
-            if (updatedStatus === "completed" && data.scores) {
-              updatedSession = {
-                ...updatedSession,
-                finalScore: data.scores.final,
-                empathyScore: data.scores.empathy,
-                probingScore: data.scores.probing,
-                resolutionScore: data.scores.resolution,
-                typoScore: data.scores.typo,
-                complianceScore: data.scores.compliance,
-              };
-            }
-            setSelectedSessionForReview(updatedSession);
-            setHistory((prev) =>
-              prev.map((item) =>
-                item.id === updatedSession.id ? updatedSession : item,
-              ),
-            );
-
-            if (updatedStatus === "completed" && data.resultReady) {
-              handleViewReview(updatedSession);
-              handleReviewComplete();
-            } else if (updatedStatus === "failed") {
-              setReviewProgress((prev) => ({ ...prev, status: "failed" }));
-              notify.error(
-                data.errorMessage ||
-                  "Analisis AI gagal diproses. Silakan jalankan ulang.",
-              );
-            }
-          }
-        } catch (e) {
-          console.error("[Ketik] Polling error:", e);
-        }
-      };
-      interval = setInterval(poll, 3000);
-      poll();
+  const endSession = async (messages: ChatMessage[]) => {
+    if (!activeChat) return;
+    // Chat tanpa balasan agen tidak punya apa pun untuk ditelaah.
+    if (!messages.some((message) => message.sender === "agent")) {
+      setActiveChat(null);
+      return;
     }
+    setIsSaving(true);
+    try {
+      const saved = await ketikApi.persistSession({
+        scenarioTitle: activeChat.scenario.title,
+        consumerName: activeChat.config.identity.name,
+        consumerPhone: activeChat.config.identity.phone,
+        consumerCity: activeChat.config.identity.city,
+        messages,
+        simulationDuration: activeChat.config.simulationDuration,
+        simulationSubject: activeChat.subject,
+      });
+      const item: KetikSessionHistoryItem = {
+        ...saved,
+        reviewStatus: saved.reviewStatus ?? "pending",
+        simulationSubject: saved.simulationSubject ?? null,
+      };
+      setHistory((prev) => [item, ...prev.filter((s) => s.id !== item.id)]);
+      setHistoryState("ready");
+      setActiveChat(null);
+      void computeUsageDelta(false);
+      void navigate({
+        to: "/ketik",
+        search: { sesi: item.id, tahap: "telaah" },
+      });
+    } catch (error) {
+      console.error("[Ketik] Failed to save session:", error);
+      notify.error(
+        "Percakapan belum tersimpan. Chat tetap terbuka, coba akhiri lagi.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    return () => {
-      if (interval) clearInterval(interval);
-      if (progressInterval) clearInterval(progressInterval);
-    };
-  }, [
-    selectedSessionForReview?.id,
-    selectedSessionForReview?.reviewStatus,
-    !!selectedReview,
-    reviewProgress.status,
-  ]);
+  const historyRef = useRef(history);
+  const computeUsageDeltaRef = useRef(computeUsageDelta);
+  useEffect(() => {
+    historyRef.current = history;
+    computeUsageDeltaRef.current = computeUsageDelta;
+  });
+
+  const handleSessionChange = useCallback(
+    (updated: KetikSessionHistoryItem) => {
+      const previous = historyRef.current.find((item) => item.id === updated.id);
+      if (
+        updated.reviewStatus === "completed" &&
+        previous?.reviewStatus !== "completed"
+      ) {
+        void computeUsageDeltaRef.current(true);
+      }
+      setHistory((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+    },
+    [],
+  );
+
+  const handleSaveSettings = async (newSettings: KetikAppSettings) => {
+    await ketikApi.saveSettings(newSettings, userId);
+    setSettings(newSettings);
+  };
+
+  const handleSaveTemplates = async (templates: KetikQuickTemplate[]) => {
+    await ketikApi.saveTemplates(templates);
+  };
+
+  const summary = useMemo(() => summarizeKetikLanding(history), [history]);
+  const hasSessionDelta = Boolean(
+    sessionDelta &&
+    (sessionDelta.costIdr > 0 ||
+      sessionDelta.totalTokens > 0 ||
+      sessionDelta.totalCalls > 0),
+  );
+
+  const view = activeChat ? "chat" : requestedSessionId ? "telaah" : "home";
 
   return (
-    <div className="min-h-screen transition-colors duration-500 font-sans">
+    <div className="min-h-screen font-sans">
       <AnimatePresence mode="wait">
-        {view === "home" ? (
+        {view === "home" && (
           <motion.div
             key="home"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className="relative z-10"
           >
-            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
-              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                <div className="flex min-w-0 flex-col">
-                  <div className="flex flex-1 flex-col">
-                    <KetikMotionFrame />
-                  </div>
-                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah,
-                    dan skor langsung tersedia.
-                  </p>
-                </div>
-
-                <Card className="flex min-w-0 flex-1 flex-col rounded-xl border-border bg-card p-7 py-7 lg:p-8">
-                  <div className="space-y-4">
-                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-                      Latih percakapan chat. Balas lebih tepat dan empatik.
+            <section
+              aria-labelledby="ketik-hero-title"
+              className="border-b border-border bg-surface-elevated"
+            >
+              <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-14 gap-y-10 px-6 pt-10 pb-14">
+                <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
+                  <div className="flex flex-col gap-5">
+                    <h1
+                      id="ketik-hero-title"
+                      className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
+                    >
+                      Pahami konsumennya.{" "}
+                      <span className="block text-module-ketik">
+                        Balas chat dengan tepat.
+                      </span>
                     </h1>
-                    <p className="max-w-xl text-[16px] leading-7 text-muted-foreground">
-                      Ketik — singkatan dari{" "}
+                    <p className="max-w-[52ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]">
+                      KETIK (
                       <span className="font-semibold text-foreground">
-                        Kelas Etika &amp; Trik Komunikasi
-                      </span>{" "}
-                      — adalah simulasi percakapan chat berbasis AI untuk
-                      melatih ketepatan, empati, dan kepatuhan prosedur. Pilih
-                      skenario, jalankan simulasi, lalu tinjau hasilnya.
+                        {KETIK_EXPANDED_TITLE}
+                      </span>
+                      ) adalah latihan membalas chat konsumen. Chat berjalan
+                      seperti percakapan nyata, lalu AI menelaah setiap balasan
+                      Anda dan menunjukkan kalimat yang perlu diperbaiki.
                     </p>
                   </div>
 
-                  <div className="mt-8 border-t border-border/40 pt-6">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                        Mulai latihan
-                      </p>
-                      <span className="text-[13px] font-medium text-muted-foreground">
-                        {
-                          settings.scenarios.filter(
-                            (scenario) => scenario.isActive,
-                          ).length
-                        }{" "}
-                        skenario aktif
-                      </span>
-                    </div>
-
-                    <div className="mt-5 flex flex-col gap-3">
+                  {/* Aksi utama, lalu menu KETIK sebagai baris kedua yang lebih tenang. */}
+                  <div className="flex flex-col items-start gap-3">
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={requestStartSimulation}
+                      className="min-h-[44px] gap-2.5 px-5 text-sm font-semibold"
+                    >
+                      Mulai simulasi
+                      <ArrowRight data-icon="inline-end" />
+                    </Button>
+                    <nav
+                      aria-label="Menu KETIK"
+                      className="flex flex-wrap gap-2"
+                    >
                       <Button
                         type="button"
-                        size="lg"
-                        onClick={requestStartSimulation}
-                        disabled={isLoading}
-                        className="min-h-12 w-full justify-start bg-module-ketik px-3 text-[15px] text-module-ketik-foreground hover:bg-module-ketik/90"
-                      >
-                        {isLoading ? (
-                          <span
-                            className="size-4 animate-spin rounded-full border-2 border-module-ketik-foreground/30 border-t-module-ketik-foreground"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <Play data-icon="inline-start" fill="currentColor" />
-                        )}
-                        {isLoading ? "Memulai..." : "Mulai simulasi"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="lg"
                         variant="outline"
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="min-h-11 w-full justify-start px-3 text-[15px]"
-                      >
-                        <Settings data-icon="inline-start" />
-                        Pengaturan
-                      </Button>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        onClick={() => setIsHistoryOpen(true)}
-                        className="min-h-11 w-full justify-start px-3 text-[15px]"
+                        onClick={openHistory}
+                        className={navButtonClass}
                       >
                         <History data-icon="inline-start" />
                         Riwayat
-                        {history.length > 0 ? (
-                          <Badge variant="secondary" className="ml-auto">
-                            {history.length}
-                          </Badge>
-                        ) : null}
                       </Button>
+                      <UsagePopover
+                        module="ketik"
+                        triggerClassName={navButtonClass}
+                        sessionDelta={sessionDelta}
+                        sessionDeltaPending={sessionDeltaPending}
+                        triggerBadge={
+                          hasSessionDelta &&
+                          sessionDelta && (
+                            <span className="rounded-full bg-module-ketik/10 px-2 py-px text-xs font-semibold text-module-ketik">
+                              <span className="sr-only">Sesi terakhir </span>
+                              {formatUsageDeltaLabel(sessionDelta)}
+                            </span>
+                          )
+                        }
+                      />
                       <Button
                         type="button"
-                        size="lg"
-                        variant="ghost"
-                        onClick={() => setIsUsageOpen(true)}
-                        className="min-h-11 w-full justify-start px-3 text-[15px] text-muted-foreground"
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(true)}
+                        className={navButtonClass}
                       >
-                        <BarChart3 data-icon="inline-start" />
-                        Pemakaian bulan ini
-                        {sessionDelta &&
-                          (sessionDelta.costIdr > 0 ||
-                            sessionDelta.totalTokens > 0 ||
-                            sessionDelta.totalCalls > 0) && (
-                            <Badge variant="secondary" className="ml-auto">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi
-                              terakhir
-                            </Badge>
-                          )}
+                        <SlidersHorizontal data-icon="inline-start" />
+                        Pengaturan
                       </Button>
-                    </div>
+                    </nav>
                   </div>
-                </Card>
+                </div>
+
+                <div className="mx-auto flex w-full min-w-0 max-w-[440px] flex-[1_1_360px]">
+                  <KetikStageDemo />
+                </div>
               </div>
-            </div>
+            </section>
+
+            <KetikLandingOverview
+              summary={summary}
+              historyState={historyState}
+              onRetryHistory={() => void loadHistory()}
+              onOpenSession={openSession}
+              onOpenHistory={openHistory}
+            />
           </motion.div>
-        ) : (
+        )}
+
+        {view === "chat" && activeChat && (
           <motion.div
             key="chat"
-            initial={{ opacity: 0 }}
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-colors duration-500 bg-background"
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden bg-background p-2 sm:p-4 md:p-6"
           >
             <Card className="h-full w-full max-w-5xl overflow-hidden border-border bg-card p-0 md:max-h-[92vh] md:rounded-xl">
-              {currentConfig && currentScenario && (
-                <ChatInterface
-                  config={currentConfig}
-                  scenario={currentScenario}
-                  onEndSession={endSession}
-                  isReviewMode={currentScenario.id === "review"}
-                  initialMessages={reviewMessages}
-                  isEnding={isLoading}
-                  authReady={true}
-                  currentUserId=""
-                  templates={settings.quickTemplates}
-                  simulationSubject={
-                    selectedSessionForReview?.simulationSubject
-                  }
-                />
-              )}
+              <ChatInterface
+                config={activeChat.config}
+                scenario={activeChat.scenario}
+                onEndSession={(messages) => void endSession(messages)}
+                isEnding={isSaving}
+                templates={settings.quickTemplates}
+              />
             </Card>
           </motion.div>
         )}
+
+        {view === "telaah" &&
+          (reviewSession ? (
+            <KetikReviewStage
+              key={reviewSession.id}
+              session={reviewSession}
+              history={history}
+              canStartReview={canStartReview}
+              onSessionChange={handleSessionChange}
+              onBack={() => void navigate({ to: "/ketik", search: {} })}
+              onPracticeAgain={() => {
+                void navigate({ to: "/ketik", search: {} });
+                requestStartSimulation();
+              }}
+            />
+          ) : (
+            <div
+              key="telaah-loading"
+              role="status"
+              className="mx-auto max-w-6xl px-6 py-10 text-sm text-muted-foreground"
+            >
+              Memuat sesi latihan…
+            </div>
+          ))}
       </AnimatePresence>
 
       <SettingsModal
@@ -865,46 +464,12 @@ export default function KetikLanding() {
         canManageTemplates={canManageTemplates}
         onSaveTemplates={handleSaveTemplates}
       />
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onClear={handleClearHistory}
-        onDelete={handleDeleteSession}
-        onReview={handleViewReview}
-      />
-      <UsageModal
-        isOpen={isUsageOpen}
-        onClose={() => setIsUsageOpen(false)}
-        module="ketik"
-        sessionDelta={sessionDelta}
-        sessionDeltaPending={sessionDeltaPending}
-      />
-
       {showSubjectPicker && (
         <SimulationSubjectPicker
           accountKey={accountKey}
           canPickParticipant={canPickParticipant}
-          onConfirm={(sel) => startSimulation(sel)}
+          onConfirm={(selection) => void startSimulation(selection)}
           onCancel={() => setShowSubjectPicker(false)}
-        />
-      )}
-      {selectedSessionForReview && (
-        <SessionReviewModal
-          isOpen={isReviewOpen}
-          onClose={() => setIsReviewOpen(false)}
-          session={selectedSessionForReview}
-          review={selectedReview || undefined}
-          typos={selectedTypos}
-          onReplay={() => handleReviewHistory(selectedSessionForReview)}
-          onStartReview={handleStartManualReview}
-          progress={reviewProgress}
-          canStartReview={canStartReview}
-          reviewAccessMessage={
-            !canStartReview
-              ? "Hanya admin, trainer, dan QA yang dapat menjalankan analisis AI."
-              : undefined
-          }
         />
       )}
     </div>

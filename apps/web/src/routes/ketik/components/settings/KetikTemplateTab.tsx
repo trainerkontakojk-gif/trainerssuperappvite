@@ -1,19 +1,12 @@
-import { ArrowLeft, Edit2, Trash2, Plus } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+import { ArrowLeft, Trash2, Plus } from "lucide-react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   KetikAppSettings,
   KetikQuickTemplate,
   mergeKetikQuickTemplates,
 } from "@trainers/types";
-import { Badge } from "../../../../components/ui/badge";
+import { ConfirmDialog } from "../../../../components/ConfirmDialog";
 import { Button } from "../../../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "../../../../components/ui/card";
 import {
   SettingsField,
   SettingsInput,
@@ -27,7 +20,11 @@ import {
   getKetikTemplateLayers,
 } from "./useKetikSettingsDraft";
 
+type TemplateScope = "global" | "personal";
+
 interface KetikTemplateTabProps {
+  /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
+  confirmContainer?: HTMLElement | null;
   globalTemplates: KetikQuickTemplate[];
   personalTemplates: KetikQuickTemplate[];
   templateForm: ReturnType<typeof useCrudForm<KetikQuickTemplate>>;
@@ -38,6 +35,7 @@ interface KetikTemplateTabProps {
 }
 
 export function KetikTemplateTab({
+  confirmContainer,
   globalTemplates,
   personalTemplates,
   templateForm,
@@ -46,43 +44,48 @@ export function KetikTemplateTab({
   setLocalSettings,
   canManageTemplates = false,
 }: KetikTemplateTabProps) {
-  const handleDeleteTemplate = (scope: "global" | "personal", id: string) => {
+  const [pendingConfirm, setPendingConfirm] = useState<
+    | { kind: "discard" }
+    | { kind: "delete"; scope: TemplateScope; id: string }
+    | null
+  >(null);
+
+  const deleteTemplate = (scope: TemplateScope, id: string) => {
     if (scope === "global" && !canManageTemplates) return;
-    if (window.confirm("Hapus template ini?"))
-      setLocalSettings((prev) => {
-        const currentLayers = getKetikTemplateLayers(prev);
-        const currentPersonal = prev.personalQuickTemplates || [];
-        const hiddenPersonal = getKetikHiddenPersonalTemplates(prev);
-        const nextGlobal =
-          scope === "global"
-            ? currentLayers.global.filter((template) => template.id !== id)
-            : currentLayers.global;
-        const nextPersonal =
-          scope === "personal"
-            ? [
-                ...hiddenPersonal,
-                ...currentLayers.personal.filter(
-                  (template) => template.id !== id,
-                ),
-              ]
-            : currentPersonal;
-        return {
-          ...prev,
-          globalQuickTemplates: nextGlobal,
-          quickTemplates: mergeKetikQuickTemplates(nextGlobal, nextPersonal),
-          personalQuickTemplates: nextPersonal,
-        };
-      });
+    setLocalSettings((prev) => {
+      const currentLayers = getKetikTemplateLayers(prev);
+      const currentPersonal = prev.personalQuickTemplates || [];
+      const hiddenPersonal = getKetikHiddenPersonalTemplates(prev);
+      const nextGlobal =
+        scope === "global"
+          ? currentLayers.global.filter((template) => template.id !== id)
+          : currentLayers.global;
+      const nextPersonal =
+        scope === "personal"
+          ? [
+              ...hiddenPersonal,
+              ...currentLayers.personal.filter(
+                (template) => template.id !== id,
+              ),
+            ]
+          : currentPersonal;
+      return {
+        ...prev,
+        globalQuickTemplates: nextGlobal,
+        quickTemplates: mergeKetikQuickTemplates(nextGlobal, nextPersonal),
+        personalQuickTemplates: nextPersonal,
+      };
+    });
   };
 
-  const handleAddClick = (scope: "global" | "personal") => {
+  const handleAddClick = (scope: TemplateScope) => {
     if (scope === "global" && !canManageTemplates) return;
     setTemplateScope(scope);
     templateForm.openAdd();
   };
 
   const handleEditClick = (
-    scope: "global" | "personal",
+    scope: TemplateScope,
     template: KetikQuickTemplate,
   ) => {
     if (scope === "global" && !canManageTemplates) return;
@@ -142,217 +145,257 @@ export function KetikTemplateTab({
     const templates =
       templateScope === "global" ? globalTemplates : personalTemplates;
     if (templateForm.isDirty(templates)) {
-      if (!window.confirm("Template belum disimpan. Buang perubahan?")) return;
+      setPendingConfirm({ kind: "discard" });
+      return;
     }
     templateForm.close();
   };
 
+  const confirmPending = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === "delete") {
+      deleteTemplate(pendingConfirm.scope, pendingConfirm.id);
+    } else {
+      templateForm.close();
+    }
+    setPendingConfirm(null);
+  };
+
+  const confirmDialog = (
+    <ConfirmDialog
+      open={pendingConfirm !== null}
+      container={confirmContainer}
+      {...(pendingConfirm?.kind === "discard"
+        ? {
+            title: "Buang perubahan template?",
+            description: "Perubahan yang belum diterapkan akan hilang.",
+            cancelLabel: "Lanjut mengubah",
+            confirmLabel: "Buang perubahan",
+          }
+        : {
+            title: "Hapus template ini?",
+            description: "Perubahan berlaku setelah Anda memilih Simpan.",
+            confirmLabel: "Hapus template",
+          })}
+      onConfirm={confirmPending}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
+
   if (templateForm.isOpen) {
+    const editorTitle = templateForm.editingId
+      ? templateScope === "global"
+        ? "Ubah template standar"
+        : "Ubah template pribadi"
+      : templateScope === "global"
+        ? "Template standar baru"
+        : "Template pribadi baru";
     return (
-      <div className="flex flex-col gap-6">
-        <div className="border-b border-border pb-4">
+      <div id="template-form" className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            {editorTitle}
+          </h3>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleCancelTemplateForm}
-            className="-ml-2 text-muted-foreground hover:text-foreground"
+            className="min-h-[44px] text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft data-icon="inline-start" />
-            Kembali ke Daftar Template
+            Kembali ke daftar
           </Button>
         </div>
-        <Card>
-          <CardHeader className="border-b bg-muted/20 px-6 py-4">
-            <CardTitle className="text-base tracking-tight">
-              {templateForm.editingId
-                ? templateScope === "global"
-                  ? "Edit Template Standar"
-                  : "Edit Template Pribadi"
-                : templateScope === "global"
-                  ? "Tambah Template Standar"
-                  : "Tambah Template Pribadi"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-5 p-6">
-            <SettingsField
-              label="Shortcut Keyword (Tanpa Spasi)"
-              id="ketik-template-keyword"
-            >
-              <div className="relative">
-                <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
-                  /
-                </span>
-                <SettingsInput
-                  id="ketik-template-keyword"
-                  className="bg-background pl-7"
-                  value={templateForm.draft.keyword || ""}
-                  onChange={(e) =>
-                    templateForm.setDraft({
-                      keyword: e.target.value
-                        .toLowerCase()
-                        .replace(/\s+/g, "-"),
-                    })
-                  }
-                  placeholder="contoh: salam"
-                />
-              </div>
-            </SettingsField>
-            <SettingsField label="Isi Template" id="ketik-template-content">
-              <SettingsTextarea
-                id="ketik-template-content"
-                className="min-h-32 bg-background leading-relaxed"
-                rows={5}
-                value={templateForm.draft.content || ""}
+        <div className="flex flex-col gap-4">
+          <SettingsField
+            label="Kata kunci"
+            helperText="Ketik / lalu kata kunci ini di kotak chat. Tanpa spasi."
+            id="ketik-template-keyword"
+          >
+            <div className="relative">
+              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+                /
+              </span>
+              <SettingsInput
+                id="ketik-template-keyword"
+                className="bg-background pl-7"
+                value={templateForm.draft.keyword || ""}
                 onChange={(e) =>
-                  templateForm.setDraft({ content: e.target.value })
+                  templateForm.setDraft({
+                    keyword: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                  })
                 }
-                placeholder="Masukkan isi pesan yang akan muncul saat shortcut dipanggil..."
+                placeholder="contoh: salam"
               />
-            </SettingsField>
-          </CardContent>
-          <CardFooter className="justify-end gap-2.5 border-t bg-muted/20 px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelTemplateForm}
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveTemplate}
-              disabled={
-                !templateForm.draft.keyword || !templateForm.draft.content
+            </div>
+          </SettingsField>
+          <SettingsField label="Isi template" id="ketik-template-content">
+            <SettingsTextarea
+              id="ketik-template-content"
+              className="min-h-32 bg-background leading-relaxed"
+              rows={5}
+              value={templateForm.draft.content || ""}
+              onChange={(e) =>
+                templateForm.setDraft({ content: e.target.value })
               }
-            >
-              Simpan
-            </Button>
-          </CardFooter>
-        </Card>
+              placeholder="Pesan yang muncul saat kata kunci dipanggil"
+            />
+          </SettingsField>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancelTemplateForm}
+            className="min-h-[44px]"
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSaveTemplate}
+            disabled={
+              !templateForm.draft.keyword || !templateForm.draft.content
+            }
+            className="min-h-[44px]"
+          >
+            Terapkan
+          </Button>
+        </div>
+        {confirmDialog}
       </div>
     );
   }
 
-  const renderTemplateCard = (
+  const renderTemplateRow = (
     template: KetikQuickTemplate,
-    scope: "global" | "personal",
+    scope: TemplateScope,
   ) => {
     const canEdit = scope === "personal" || canManageTemplates;
     return (
-      <Card
+      <li
         key={`${scope}-${template.id}`}
-        className="group transition-colors hover:bg-muted/30"
+        className="flex items-center gap-3 py-2 pr-2 pl-4 transition-colors hover:bg-muted/40"
       >
-        <CardContent className="flex items-start justify-between gap-4 p-4">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="border-primary/20 bg-primary/10 text-xs text-primary"
-              >
-                /{template.keyword}
-              </Badge>
-            </div>
-            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-              {template.content}
-            </p>
-          </div>
-          {canEdit && (
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                onClick={() => handleEditClick(scope, template)}
-                aria-label={`Edit template ${template.keyword}`}
-              >
-                <Edit2 data-icon="inline" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => handleDeleteTemplate(scope, template.id)}
-                aria-label={`Hapus template ${template.keyword}`}
-              >
-                <Trash2 data-icon="inline" />
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <span className="w-28 shrink-0 truncate font-mono text-[13px] font-medium text-foreground sm:w-36">
+          /{template.keyword}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[13px] text-fg2">
+          {template.content}
+        </span>
+        {canEdit && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditClick(scope, template)}
+              aria-label={`Ubah template ${template.keyword}`}
+              className="min-h-[44px] shrink-0"
+            >
+              Ubah
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              onClick={() =>
+                setPendingConfirm({ kind: "delete", scope, id: template.id })
+              }
+              aria-label={`Hapus template ${template.keyword}`}
+              title="Hapus"
+              className="min-h-[44px] min-w-[44px] shrink-0 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 data-icon="inline" />
+            </Button>
+          </>
+        )}
+      </li>
     );
   };
 
+  const templateList = (
+    templates: KetikQuickTemplate[],
+    scope: TemplateScope,
+    empty: string,
+  ) =>
+    templates.length === 0 ? (
+      <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+        {empty}
+      </p>
+    ) : (
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+        {templates.map((template) => renderTemplateRow(template, scope))}
+      </ul>
+    );
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2 border-b border-border pb-4">
-        <h3 className="text-sm font-semibold tracking-tight text-foreground">
-          Template Cepat
+      <div className="flex max-w-[60ch] flex-col gap-1">
+        <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+          Template cepat
         </h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Template standar dikelola admin dan berlaku untuk semua user. Template
-          pribadi hanya tersedia untuk akun Anda.
+        <p className="text-[13px] leading-5 text-fg2">
+          Balasan cepat yang muncul saat peserta mengetik / di kotak chat.
+          Template standar dikelola admin; template pribadi hanya untuk akun
+          Anda.
         </p>
       </div>
 
       <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h4 className="text-sm font-semibold text-foreground">
-            Template Standar
-          </h4>
-          <p className="text-xs text-muted-foreground">
-            {canManageTemplates
-              ? "Template ini digunakan oleh seluruh user KETIK."
-              : "Template ini dapat digunakan, tetapi tidak dapat diubah dari akun Anda."}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          {globalTemplates.map((template) =>
-            renderTemplateCard(template, "global"),
-          )}
-        </div>
-        {canManageTemplates && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <h4 className="text-[15px] font-semibold text-foreground">
+              Template pribadi
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Hanya muncul di kotak chat Anda.
+            </p>
+          </div>
           <Button
             type="button"
-            variant="outline"
-            size="lg"
-            onClick={() => handleAddClick("global")}
-            className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
+            onClick={() => handleAddClick("personal")}
+            className="min-h-[44px] shrink-0"
           >
-            <Plus data-icon="inline" />
-            <span className="text-sm font-medium">Tambah Template Standar</span>
+            <Plus data-icon="inline-start" />
+            Template pribadi baru
           </Button>
+        </div>
+        {templateList(
+          personalTemplates,
+          "personal",
+          "Belum ada template pribadi.",
         )}
       </section>
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">
-        <div className="flex flex-col gap-1">
-          <h4 className="text-sm font-semibold text-foreground">
-            Template Pribadi
-          </h4>
-          <p className="text-xs text-muted-foreground">
-            Tambahkan shortcut yang hanya ingin Anda gunakan sendiri.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          {personalTemplates.map((template) =>
-            renderTemplateCard(template, "personal"),
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <h4 className="text-[15px] font-semibold text-foreground">
+              Template standar
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {canManageTemplates
+                ? "Dipakai oleh seluruh pengguna KETIK."
+                : "Bisa dipakai, tetapi tidak bisa diubah dari akun Anda."}
+            </p>
+          </div>
+          {canManageTemplates && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleAddClick("global")}
+              className="min-h-[44px] shrink-0"
+            >
+              <Plus data-icon="inline-start" />
+              Template standar baru
+            </Button>
           )}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          onClick={() => handleAddClick("personal")}
-          className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
-        >
-          <Plus data-icon="inline" />
-          <span className="text-sm font-medium">Tambah Template Pribadi</span>
-        </Button>
+        {templateList(globalTemplates, "global", "Belum ada template standar.")}
       </section>
+      {confirmDialog}
     </div>
   );
 }

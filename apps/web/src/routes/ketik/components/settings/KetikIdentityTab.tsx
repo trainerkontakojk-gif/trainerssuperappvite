@@ -19,19 +19,20 @@ export function KetikIdentityTab({
 }: KetikIdentityTabProps) {
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Identitas &amp; Greeting
+      <section className="flex flex-col gap-6">
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Identitas konsumen
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Konfigurasi profil konsumen dan identitas agen untuk salam pembuka
-            yang lebih personal.
+          <p className="text-[13px] leading-5 text-fg2">
+            Nama, nomor, dan kota konsumen di chat, serta nama agen di salam
+            pembuka. Kosongkan nama, nomor, atau kota agar dibuat acak di setiap
+            sesi.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <SettingsField label="Nama Konsumen" id="ketik-identity-display-name">
+          <SettingsField label="Nama konsumen" id="ketik-identity-display-name">
             <SettingsInput
               id="ketik-identity-display-name"
               placeholder="Contoh: Agus Setiawan"
@@ -43,7 +44,7 @@ export function KetikIdentityTab({
           </SettingsField>
 
           <SettingsField
-            label="Nama Agen (Greeting)"
+            label="Nama agen di salam pembuka"
             id="ketik-identity-signature-name"
           >
             <SettingsInput
@@ -56,7 +57,7 @@ export function KetikIdentityTab({
             />
           </SettingsField>
 
-          <SettingsField label="Nomor Telepon" id="ketik-identity-phone">
+          <SettingsField label="Nomor telepon" id="ketik-identity-phone">
             <SettingsInput
               id="ketik-identity-phone"
               placeholder="Contoh: 0812..."
@@ -67,7 +68,7 @@ export function KetikIdentityTab({
             />
           </SettingsField>
 
-          <SettingsField label="Kota Asal" id="ketik-identity-city">
+          <SettingsField label="Kota asal" id="ketik-identity-city">
             <SettingsInput
               id="ketik-identity-city"
               placeholder="Contoh: Jakarta"

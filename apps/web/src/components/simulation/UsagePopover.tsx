@@ -1,32 +1,61 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { BarChart3, RotateCcw } from "lucide-react";
-import { Button } from "../../../components/ui/button";
+import { cn } from "cn";
+import { Button } from "../ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTitle,
   PopoverTrigger,
-} from "../../../components/ui/popover";
-import { Skeleton } from "../../../components/ui/skeleton";
-import { fetchUsageSummary } from "../../../lib/usage-summary";
+} from "../ui/popover";
+import { Skeleton } from "../ui/skeleton";
+import { fetchUsageSummary } from "../../lib/usage-summary";
 import {
   type UsageBreakdown,
   type UsageDelta,
   type UsageSnapshot,
-} from "../../../lib/usage-snapshot";
+} from "../../lib/usage-snapshot";
 
-/** Nama jenis permintaan AI PDKT dalam bahasa peserta; kunci dari `ai-usage-categories`. */
-const PDKT_ITEM_LABELS: Record<string, string> = {
-  pdkt_create_email: "Membuat email konsumen",
-  pdkt_template: "Menyiapkan email skenario",
-  pdkt_image_generation: "Membuat lampiran",
-  pdkt_review: "Menelaah balasan",
-};
+export type UsagePopoverModule = "pdkt" | "ketik";
 
-const CATEGORY_LABELS: Record<keyof UsageBreakdown, string> = {
-  simulation: "Pembuatan email",
-  review: "Telaah balasan",
-  uncategorized: "Lainnya",
+interface ModuleCopy {
+  /** Nama jenis permintaan AI dalam bahasa peserta; kunci dari `ai-usage-categories`. */
+  items: Record<string, string>;
+  categories: Record<keyof UsageBreakdown, string>;
+  /** Unit kegiatan yang biayanya dilaporkan, mis. "Balasan terakhir". */
+  latest: string;
+  bar: string;
+}
+
+const MODULE_COPY: Record<UsagePopoverModule, ModuleCopy> = {
+  pdkt: {
+    items: {
+      pdkt_create_email: "Membuat email konsumen",
+      pdkt_template: "Menyiapkan email skenario",
+      pdkt_image_generation: "Membuat lampiran",
+      pdkt_review: "Menelaah balasan",
+    },
+    categories: {
+      simulation: "Pembuatan email",
+      review: "Telaah balasan",
+      uncategorized: "Lainnya",
+    },
+    latest: "Balasan terakhir",
+    bar: "bg-module-pdkt",
+  },
+  ketik: {
+    items: {
+      ketik_consumer_response: "Simulasi chat",
+      ketik_review: "Penilaian AI",
+    },
+    categories: {
+      simulation: "Simulasi chat",
+      review: "Penilaian AI",
+      uncategorized: "Lainnya",
+    },
+    latest: "Sesi terakhir",
+    bar: "bg-module-ketik",
+  },
 };
 
 interface UsageRow {
@@ -50,17 +79,17 @@ function formatIdr(value: number): string {
   }).format(value);
 }
 
-function toRows(usage: UsageSnapshot): UsageRow[] {
+function toRows(usage: UsageSnapshot, copy: ModuleCopy): UsageRow[] {
   const items = usage.breakdownItems?.length
     ? usage.breakdownItems.map((item) => ({
         key: item.key,
-        label: PDKT_ITEM_LABELS[item.key] ?? item.label,
+        label: copy.items[item.key] ?? item.label,
         calls: item.calls,
         costIdr: item.costIdr,
       }))
-    : (Object.keys(CATEGORY_LABELS) as (keyof UsageBreakdown)[]).map((key) => ({
+    : (Object.keys(copy.categories) as (keyof UsageBreakdown)[]).map((key) => ({
         key,
-        label: CATEGORY_LABELS[key],
+        label: copy.categories[key],
         calls: usage.breakdown?.[key]?.calls ?? 0,
         costIdr: usage.breakdown?.[key]?.costIdr ?? 0,
       }));
@@ -77,6 +106,7 @@ function hasDelta(delta: UsageDelta | null | undefined): delta is UsageDelta {
 }
 
 interface UsagePopoverProps {
+  module: UsagePopoverModule;
   triggerClassName?: string;
   /** Isi tambahan di tombol pemicu, mis. lencana kenaikan sesi terakhir. */
   triggerBadge?: ReactNode;
@@ -84,7 +114,9 @@ interface UsagePopoverProps {
   sessionDeltaPending?: boolean;
 }
 
+/** Ringkasan pemakaian AI bulan ini untuk satu modul latihan. */
 export function UsagePopover({
+  module,
   triggerClassName,
   triggerBadge,
   sessionDelta,
@@ -92,14 +124,15 @@ export function UsagePopover({
 }: UsagePopoverProps) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const requestRef = useRef(0);
+  const copy = MODULE_COPY[module];
 
   const load = useCallback(async () => {
     const request = ++requestRef.current;
     setState({ status: "loading" });
-    const usage = await fetchUsageSummary("pdkt");
+    const usage = await fetchUsageSummary(module);
     if (request !== requestRef.current) return;
     setState(usage ? { status: "ready", usage } : { status: "error" });
-  }, []);
+  }, [module]);
 
   return (
     <Popover
@@ -168,21 +201,23 @@ export function UsagePopover({
             </div>
           )}
 
-          {state.status === "ready" && <UsageRows usage={state.usage} />}
+          {state.status === "ready" && (
+            <UsageRows usage={state.usage} copy={copy} />
+          )}
         </div>
 
         {(sessionDeltaPending || hasDelta(sessionDelta)) && (
           <p className="rounded-lg bg-muted px-3 py-2.5 text-xs text-fg2">
             {hasDelta(sessionDelta) ? (
               <>
-                Balasan terakhir memakai{" "}
+                {copy.latest} memakai{" "}
                 <strong className="font-semibold text-foreground">
                   {formatIdr(sessionDelta.costIdr)}
                 </strong>{" "}
                 ({sessionDelta.totalCalls} permintaan AI).
               </>
             ) : (
-              "Pemakaian balasan terakhir masih dihitung…"
+              `Pemakaian ${copy.latest.toLowerCase()} masih dihitung…`
             )}
           </p>
         )}
@@ -195,8 +230,14 @@ export function UsagePopover({
   );
 }
 
-function UsageRows({ usage }: { usage: UsageSnapshot }) {
-  const rows = toRows(usage);
+function UsageRows({
+  usage,
+  copy,
+}: {
+  usage: UsageSnapshot;
+  copy: ModuleCopy;
+}) {
+  const rows = toRows(usage, copy);
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -220,7 +261,7 @@ function UsageRows({ usage }: { usage: UsageSnapshot }) {
             </span>
             <span aria-hidden="true" className="h-1.5 rounded-full bg-muted">
               <span
-                className="block h-1.5 rounded-full bg-module-pdkt"
+                className={cn("block h-1.5 rounded-full", copy.bar)}
                 style={{ width: `${share}%` }}
               />
             </span>
