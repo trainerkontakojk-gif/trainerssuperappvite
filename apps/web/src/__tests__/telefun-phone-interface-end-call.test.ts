@@ -73,6 +73,12 @@ const config = {
   maxCallDuration: 0,
 } as unknown as TelefunAppSettings;
 
+/** Tombol "Akhiri" membuka konfirmasi aplikasi; aksi ini mengonfirmasinya. */
+function confirmEndCall() {
+  fireEvent.click(screen.getByRole("button", { name: "Akhiri" }));
+  fireEvent.click(screen.getByRole("button", { name: "Akhiri panggilan" }));
+}
+
 describe("PhoneInterface end-call finalization", () => {
   beforeEach(() => {
     liveSessionState.instances.length = 0;
@@ -95,7 +101,7 @@ describe("PhoneInterface end-call finalization", () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Akhiri panggilan" }));
+    confirmEndCall();
     expect(onEndSession).toHaveBeenCalledOnce();
     expect(liveSessionState.instances).toHaveLength(0);
 
@@ -123,21 +129,19 @@ describe("PhoneInterface end-call finalization", () => {
     expect(session.connect).toHaveBeenCalledWith("test-access-token");
     session.disconnect.mockReturnValue(finalization.promise);
 
+    confirmEndCall();
     const endButton = screen.getByRole("button", {
-      name: "Akhiri panggilan",
+      name: "Mengakhiri panggilan",
     });
-    fireEvent.click(endButton);
     fireEvent.click(endButton);
 
     expect(session.disconnect).toHaveBeenCalledTimes(1);
     expect(onEndSession).not.toHaveBeenCalled();
     expect(endButton).toBeDisabled();
-    expect(screen.getByText("Mengakhiri...")).not.toHaveClass("hidden");
-    expect(screen.getByText("Mengakhiri panggilan...")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Aktifkan hold" }),
-    ).toBeDisabled();
-    expect(screen.getByTitle("Mute Microphone")).toBeDisabled();
+    expect(screen.getByText("Mengakhiri…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Menyimpan rekaman…");
+    expect(screen.getByRole("button", { name: "Tahan" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bisukan" })).toBeDisabled();
 
     await act(async () => {
       finalization.resolve();
@@ -147,7 +151,7 @@ describe("PhoneInterface end-call finalization", () => {
     expect(onEndSession).toHaveBeenCalledTimes(1);
   });
 
-  it("menampilkan label Hangup pada mobile saat panggilan aktif", async () => {
+  it("menampilkan label Akhiri di bawah tombol saat panggilan aktif", async () => {
     render(
       React.createElement(PhoneInterface, {
         config,
@@ -159,7 +163,7 @@ describe("PhoneInterface end-call finalization", () => {
 
     await waitFor(() => expect(liveSessionState.instances).toHaveLength(1));
 
-    expect(screen.getByText("Hangup")).not.toHaveClass("hidden");
+    expect(screen.getByText("Akhiri")).not.toHaveClass("hidden");
   });
 
   it("timeout dan klik user tetap memakai satu disconnect", async () => {
@@ -198,7 +202,7 @@ describe("PhoneInterface end-call finalization", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Mengakhiri panggilan, harap tunggu",
+        name: "Mengakhiri panggilan",
       }),
     );
     expect(session.disconnect).toHaveBeenCalledTimes(1);

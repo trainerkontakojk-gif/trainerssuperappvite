@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSimulationSubject } from "./useSimulationSubject";
 import type { SimulationSubjectSelection } from "@trainers/types";
 
@@ -7,11 +7,23 @@ export function SimulationSubjectPicker({
   canPickParticipant,
   onConfirm,
   onCancel,
+  title = "Mulai Simulasi",
+  description = "Pilih peserta latihan. Batal tidak membuat sesi atau memicu AI.",
+  confirmLabel = "Mulai",
+  confirmDisabled = false,
+  children,
 }: {
   accountKey: string | null;
   canPickParticipant: boolean;
   onConfirm: (selection: SimulationSubjectSelection) => void | Promise<void>;
   onCancel: () => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  /** Syarat tambahan modul, mis. mikrofon Telefun belum siap. */
+  confirmDisabled?: boolean;
+  /** Baris tambahan di bawah pilihan peserta, mis. cek mikrofon. */
+  children?: ReactNode;
 }) {
   const subject = useSimulationSubject(accountKey);
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +96,9 @@ export function SimulationSubjectPicker({
   }, []);
 
   const confirm = () => {
-    if (!subject.canConfirm || submittingRef.current) return;
+    if (!subject.canConfirm || confirmDisabled || submittingRef.current) {
+      return;
+    }
     submittingRef.current = true;
     setSubmitting(true);
     try {
@@ -123,13 +137,13 @@ export function SimulationSubjectPicker({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="sim-subject-title" className="text-base font-semibold">
-          Mulai Simulasi
+          {title}
         </h2>
         <p
           id="sim-subject-description"
           className="mt-1 text-sm text-[var(--fg2)]"
         >
-          Pilih peserta latihan. Batal tidak membuat sesi atau memicu AI.
+          {description}
         </p>
 
         <div
@@ -270,6 +284,8 @@ export function SimulationSubjectPicker({
           </div>
         )}
 
+        {children && <div className="mt-4">{children}</div>}
+
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -282,11 +298,11 @@ export function SimulationSubjectPicker({
           <button
             type="button"
             onClick={confirm}
-            disabled={!subject.canConfirm || submitting}
+            disabled={!subject.canConfirm || confirmDisabled || submitting}
             className="min-h-11 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
             style={{ background: "var(--inv-bg)", color: "var(--inv-fg)" }}
           >
-            {submitting ? "Memulai…" : "Mulai"}
+            {submitting ? "Memulai…" : confirmLabel}
           </button>
         </div>
       </div>

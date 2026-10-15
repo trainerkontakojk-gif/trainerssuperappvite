@@ -1,5 +1,5 @@
 import { can, normalizeRole } from "@trainers/types";
-import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Outlet, useLocation } from "@tanstack/react-router";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
@@ -17,7 +17,6 @@ function DashboardLayoutContent() {
   const profile = useAuthStore((s) => s.profile);
   const session = useAuthStore((s) => s.session);
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const { theme, setTheme } = useThemeMode();
 
   const {
@@ -46,8 +45,8 @@ function DashboardLayoutContent() {
       const normalizedRole = profile.role?.toLowerCase().trim();
       const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
       if (isAllowedRole) {
+        // Tetap di alamat yang dibuka (mis. tahap Telaah atau Riwayat).
         grantTelefunAccess();
-        navigate({ to: "/telefun" });
       } else {
         openMaintenance();
       }
@@ -72,7 +71,6 @@ function DashboardLayoutContent() {
     grantTelefunAccess,
     revokeTelefunAccess,
     profile,
-    navigate,
   ]);
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);

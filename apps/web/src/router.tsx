@@ -48,6 +48,7 @@ const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
+const TelefunHistory = lazy(() => import("./routes/telefun/history"));
 const AccountPage = lazy(() => import("./routes/account"));
 const AuthCallbackPage = lazy(() => import("./routes/auth-callback"));
 const NotFoundPage = lazy(() => import("./routes/not-found"));
@@ -433,14 +434,35 @@ const telefunRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun",
   component: TelefunLanding,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { sesi?: string; tahap?: "telaah" } => ({
+    ...(typeof search.sesi === "string" && search.sesi
+      ? { sesi: search.sesi }
+      : {}),
+    ...(search.tahap === "telaah" ? { tahap: "telaah" } : {}),
+  }),
   beforeLoad: requireAuth(),
 });
 
+const telefunHistoryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/telefun/history",
+  component: TelefunHistory,
+  beforeLoad: requireAuth(),
+});
+
+// Halaman replay lama digabung ke tahap Telaah; tautan lama tetap berfungsi.
 const telefunReplayRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun/replay/$id",
-  component: lazy(() => import("./routes/telefun/replay")),
-  beforeLoad: requireAuth(),
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/telefun",
+      search: { sesi: params.id, tahap: "telaah" },
+      replace: true,
+    });
+  },
 });
 
 const accountRoute = createRoute({
@@ -674,6 +696,7 @@ const routeTree = rootRoute.addChildren([
   pdktSimulationRoute,
   pdktHistoryRoute,
   telefunRoute,
+  telefunHistoryRoute,
   telefunReplayRoute,
   monitoringRoute,
   accountRoute,

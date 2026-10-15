@@ -41,6 +41,8 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 
 ## Module behavior plans
 
+- [KETIK — Integritas, Ketahanan, dan Riwayat](markdown/ketik-integrity-resilience.md) — DRAFT; plan perbaikan audit pada `309facd`. Urutan A (RLS) → C (error/settings/model) → B (sesi server) → D (riwayat) → E (worker). B/E menunggu keputusan produk/operasional; belum ada implementasi.
+
 - [PDKT Navigation Flow](markdown/pdkt-navigation-flow.md) — Lane C; IMPLEMENTED lokal: PDKT 50/50, root typecheck/lint/build lulus; suite default tertahan assertion copy Monitoring yang stale. Tanpa commit, push, atau PR.
 
 - [PDKT Practice Again — Legacy Subject](markdown/pdkt-practice-again-legacy-subject.md) — IMPLEMENTED lokal; E2E PDKT 64/64, root typecheck/lint dan diff check lulus. Lanjutan dari PDKT Navigation Flow.

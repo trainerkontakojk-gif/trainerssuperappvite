@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Edit2, Plus, Trash2 } from "lucide-react";
 import {
   TelefunAppSettings as AppSettings,
   TelefunConsumerType as ConsumerType,
   ConsumerDifficulty,
 } from "../../telefunSettings";
+import { ConfirmDialog } from "../../../../components/ConfirmDialog";
 import { Button } from "../../../../components/ui/button";
 import {
   SettingsCardOption,
@@ -17,11 +18,12 @@ import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { normalizeTelefunConsumerDraft } from "./telefunDraftNormalizers";
 
 interface TelefunConsumersTabProps {
+  /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
+  confirmContainer?: HTMLElement | null;
   consumerTypes: ConsumerType[];
   preferredConsumerTypeId: string;
   consumerForm: ReturnType<typeof useCrudForm<ConsumerType>>;
   handleSelectConsumerType: (id: string) => void;
-  handleDeleteConsumer: (id: string) => void;
   setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
@@ -37,13 +39,56 @@ function difficultyBadgeClass(difficulty: string | undefined): string {
 }
 
 export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
+  confirmContainer,
   consumerTypes,
   preferredConsumerTypeId,
   consumerForm,
   handleSelectConsumerType,
-  handleDeleteConsumer,
   setLocalSettings,
 }) => {
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: "discard" } | { kind: "delete"; id: string } | null
+  >(null);
+
+  const confirmPending = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === "delete") {
+      const { id } = pendingConfirm;
+      setLocalSettings((prev) => ({
+        ...prev,
+        consumerTypes: prev.consumerTypes.filter((c) => c.id !== id),
+        preferredConsumerTypeId:
+          prev.preferredConsumerTypeId === id
+            ? "random"
+            : prev.preferredConsumerTypeId,
+      }));
+    } else {
+      consumerForm.close();
+    }
+    setPendingConfirm(null);
+  };
+
+  const confirmDialog = (
+    <ConfirmDialog
+      open={pendingConfirm !== null}
+      container={confirmContainer}
+      {...(pendingConfirm?.kind === "discard"
+        ? {
+            title: "Buang perubahan karakter?",
+            description: "Perubahan yang belum diterapkan akan hilang.",
+            cancelLabel: "Lanjut mengubah",
+            confirmLabel: "Buang perubahan",
+          }
+        : {
+            title: "Hapus karakter ini?",
+            description: "Perubahan berlaku setelah Anda memilih Simpan.",
+            confirmLabel: "Hapus karakter",
+          })}
+      onConfirm={confirmPending}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
+
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
@@ -60,7 +105,8 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
 
   const handleCancelConsumerForm = () => {
     if (consumerForm.isDirty(consumerTypes)) {
-      if (!window.confirm("Karakter belum disimpan. Buang perubahan?")) return;
+      setPendingConfirm({ kind: "discard" });
+      return;
     }
     consumerForm.close();
   };
@@ -156,6 +202,7 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
             Simpan
           </Button>
         </div>
+        {confirmDialog}
       </div>
     );
   }
@@ -215,7 +262,9 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteConsumer(consumer.id)}
+                      onClick={() =>
+                        setPendingConfirm({ kind: "delete", id: consumer.id })
+                      }
                       className="text-muted-foreground hover:text-destructive"
                       aria-label={`Hapus ${consumer.name}`}
                     >
@@ -239,8 +288,9 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
         className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
       >
         <Plus data-icon="inline" />
-        <span className="text-sm font-medium">Buat Karakteristik Baru</span>
+        <span className="text-sm font-medium">Karakter baru</span>
       </Button>
+      {confirmDialog}
     </div>
   );
 };

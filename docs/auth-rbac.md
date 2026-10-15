@@ -272,7 +272,8 @@ Gate induk Telefun: `apps/api/src/routes/telefun.ts:15`, capability usulan `tele
 | `/pdkt/history`              | `pdkt.use`                     | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:409` |
 | `/monitoring`                | `monitoring.read`              | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:416` |
 | `/telefun`                   | `telefun.landing`              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:423` |
-| `/telefun/replay/$id`        | `telefun.landing`              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:430` |
+| `/telefun/history`           | `telefun.landing`              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx`     |
+| `/telefun/replay/$id`        | `redirect → /telefun?sesi=$id&tahap=telaah` | — | — | —  | —     | —                              | `apps/web/src/router.tsx`     |
 | `/account`                   | `account.read`                 | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:437` |
 | `/waiting-approval`          | `guardWaitingApproval`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:472` |
 | `/reset-password`            | `guardResetPassword`           | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:479` |
@@ -287,7 +288,7 @@ Gate induk Telefun: `apps/api/src/routes/telefun.ts:15`, capability usulan `tele
 
 Perbedaan UI/API yang wajib dipertahankan atau diputuskan eksplisit:
 
-- `/telefun` dan `/telefun/replay/$id` hanya `requireAuth()`; nav, Layout warning dan API membatasi admin/trainer. Gunakan capability landing empat role terpisah dari `telefun.use`, atau minta keputusan untuk mengubah redirect/UX.
+- `/telefun` dan `/telefun/history` hanya `requireAuth()` (`/telefun/replay/$id` dialihkan ke tahap Telaah); nav, Layout warning dan API membatasi admin/trainer. Gunakan capability landing empat role terpisah dari `telefun.use`, atau minta keputusan untuk mengubah redirect/UX.
 - `/profiler/add`, `/profiler/import`, `/profiler/teams` menerima leader setelah approval di beforeLoad; API tulis tetap admin/trainer. Menggantinya dengan `profiler.write` akan mempersempit route web leader.
 - Halaman dan nav Laporan Data SIDAK hanya admin/trainer (`sidak.reports.view`); `POST /v1/sidak/reports/data` tetap menerima admin/trainer/leader (`sidak.reports.generate`) dengan scope peserta yang sama. `/sidak/reports` dan `/sidak/reports-ai` hanya redirect; guard berada pada tujuan `/sidak/reports-data`. Seluruh endpoint AI (`generate`, `export-docx`, `export-html`, `export-pdf`, `chart-data`, `save`) dan arsip (`GET` list/detail, `DELETE` detail) sudah dihapus dan mengembalikan 404 untuk setiap role. Capability `sidak.archives.read/delete/manageAll` dihapus; tabel `report_archives` beserta RLS dan nilai `UsageContext` historis tetap tidak berubah.
 - SIDAK dashboard API menerima agent (peserta sendiri), sedangkan router web `/sidak/dashboard` menolak agent. `sidak.dashboard.read` berbeda dari `sidak.view`.

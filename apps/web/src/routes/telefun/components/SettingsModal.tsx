@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { FileText, Save, Settings, User, Users, X } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../../components/ui/tabs";
-import { TelefunAppSettings as AppSettings } from "../telefunSettings";
+import type { TelefunAppSettings as AppSettings } from "../telefunSettings";
 import { useTelefunSettingsDraft } from "./settings/useTelefunSettingsDraft";
 import { TelefunScenariosTab } from "./settings/TelefunScenariosTab";
 import { TelefunConsumersTab } from "./settings/TelefunConsumersTab";
@@ -32,18 +33,24 @@ interface SettingsModalProps {
   onSave: (newSettings: AppSettings) => Promise<void>;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
+export function SettingsModal({
   isOpen,
   onClose,
   settings,
   onSave,
-}) => {
+}: SettingsModalProps) {
   const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
     null,
   );
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<
+    "close" | "reset" | null
+  >(null);
   const providerReadiness = useTelefunProviderReadiness(isOpen);
   const webRtcCapabilityState = useTelefunWebRtcCapability(isOpen);
+  const webRtcCapability =
+    webRtcCapabilityState.status === "ready"
+      ? webRtcCapabilityState.capability
+      : null;
   const {
     activeTab,
     setActiveTab,
@@ -55,88 +62,88 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setSelectedTelefunTransport,
     scenarioForm,
     consumerForm,
-    handleSelectAll,
-    handleUnselectAll,
-    handleToggleScenario,
-    handleDeleteScenario,
     handleSelectConsumerType,
-    handleDeleteConsumer,
     isSaving,
+    saveError,
     handleSave,
-    handleClose,
+    hasUnsavedChanges,
+    resetToDefaults,
   } = useTelefunSettingsDraft({
     settings,
     isOpen,
     onSave,
     onClose,
     providerReadiness,
-    webRtcCapability:
-      webRtcCapabilityState.status === "ready"
-        ? webRtcCapabilityState.capability
-        : null,
+    webRtcCapability,
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const requestClose = () => {
+    if (isSaving) return;
+    if (hasUnsavedChanges()) {
+      setPendingConfirm("close");
+      return;
+    }
+    onClose();
+  };
 
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const focusFrame = requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => {
-      cancelAnimationFrame(focusFrame);
-      previouslyFocused?.focus();
-    };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
+  const activeScenarioCount = localSettings.scenarios.filter(
+    (scenario) => scenario.isActive,
+  ).length;
   const tabs = [
-    { id: "scenarios" as const, label: "Masalah", icon: FileText },
-    { id: "consumers" as const, label: "Karakter", icon: Users },
-    { id: "identity" as const, label: "Identitas", icon: User },
-    { id: "system" as const, label: "Sistem", icon: Settings },
+    {
+      id: "scenarios" as const,
+      label: "Skenario",
+      count: `${activeScenarioCount}/${localSettings.scenarios.length}`,
+    },
+    {
+      id: "consumers" as const,
+      label: "Karakter konsumen",
+      count: String(localSettings.consumerTypes.length),
+    },
+    { id: "identity" as const, label: "Identitas konsumen" },
+    { id: "system" as const, label: "Sesi & AI" },
   ];
+  const isDirty = isOpen && hasUnsavedChanges();
+  // Editor skenario/karakter punya tombol Simpan/Batal sendiri.
+  const editorOpen = scenarioForm.isOpen || consumerForm.isOpen;
 
   return (
     <div ref={setDialogContainer} className="contents">
       <Dialog
         open={isOpen}
         onOpenChange={(open) => {
-          if (!open) handleClose();
+          if (!open) requestClose();
         }}
       >
         <DialogContent
-          ref={dialogRef}
           container={dialogContainer}
           showCloseButton={false}
           data-module="telefun"
           aria-busy={isSaving}
-          aria-modal="true"
           aria-labelledby="telefun-settings-title"
           className="w-[calc(100vw-2rem)] max-w-5xl sm:max-w-5xl flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden bg-card p-0"
         >
           <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 sm:px-6">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <DialogTitle
                   id="telefun-settings-title"
-                  className="text-lg tracking-tight sm:text-xl"
+                  className="font-display text-lg font-bold tracking-tight sm:text-xl"
                 >
-                  Pengaturan Simulasi
+                  Pengaturan Telefun
                 </DialogTitle>
-                <DialogDescription className="mt-1 text-sm">
-                  Module Telefun
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Berlaku untuk panggilan yang Anda mulai berikutnya.
                 </DialogDescription>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-lg"
-                onClick={handleClose}
+                onClick={requestClose}
                 disabled={isSaving}
-                aria-label="Tutup pengaturan simulasi"
+                className="min-h-[44px] min-w-[44px]"
+                aria-label="Tutup pengaturan"
               >
                 <X data-icon="inline" />
               </Button>
@@ -152,44 +159,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             inert={isSaving ? true : undefined}
             className="min-h-0 flex-1 flex-col md:flex-row"
           >
-            <TabsList
-              variant="line"
-              className="w-full shrink-0 justify-start overflow-x-auto rounded-none border-b bg-muted/20 p-2 md:w-52 md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:p-3"
-            >
-              {tabs.map((tab) => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="min-h-11 flex-none shrink-0 justify-start px-3 py-2.5 text-left"
-                >
-                  <tab.icon aria-hidden="true" className="size-4 shrink-0" />
-                  <span>{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="flex shrink-0 flex-col border-b bg-muted/20 md:w-60 md:border-r md:border-b-0">
+              <TabsList
+                variant="line"
+                aria-label="Bagian pengaturan"
+                className="w-full shrink-0 justify-start overflow-x-auto rounded-none p-2 max-md:flex-row! md:overflow-x-visible md:overflow-y-auto md:p-3"
+              >
+                {tabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="min-h-[44px] shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
+                  >
+                    <span className="flex-1">{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className="font-mono text-xs font-medium text-muted-foreground tabular-nums">
+                        {tab.count}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
             <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
               <TabsContent value="scenarios">
                 <TelefunScenariosTab
+                  confirmContainer={dialogContainer}
                   scenarios={localSettings.scenarios}
                   scenarioForm={scenarioForm}
-                  handleSelectAll={handleSelectAll}
-                  handleUnselectAll={handleUnselectAll}
-                  handleToggleScenario={handleToggleScenario}
-                  handleDeleteScenario={handleDeleteScenario}
                   setLocalSettings={setLocalSettings}
                 />
               </TabsContent>
 
               <TabsContent value="consumers">
                 <TelefunConsumersTab
+                  confirmContainer={dialogContainer}
                   consumerTypes={localSettings.consumerTypes}
                   preferredConsumerTypeId={
                     localSettings.preferredConsumerTypeId
                   }
                   consumerForm={consumerForm}
                   handleSelectConsumerType={handleSelectConsumerType}
-                  handleDeleteConsumer={handleDeleteConsumer}
                   setLocalSettings={setLocalSettings}
                 />
               </TabsContent>
@@ -211,35 +222,91 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   setSelectedTelefunModel={setSelectedTelefunModel}
                   setSelectedTelefunTransport={setSelectedTelefunTransport}
                   providerReadiness={providerReadiness}
-                  webRtcCapability={
-                    webRtcCapabilityState.status === "ready"
-                      ? webRtcCapabilityState.capability
-                      : null
-                  }
+                  webRtcCapability={webRtcCapability}
                 />
               </TabsContent>
             </div>
           </Tabs>
 
           <Separator />
-          <DialogFooter className="!mx-0 !mb-0 shrink-0 flex-row items-center justify-end rounded-none border-0 bg-card px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-2">
+          <DialogFooter className="mx-0 mb-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none border-0 bg-muted/20 px-5 py-3 sm:justify-between sm:px-6">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPendingConfirm("reset")}
+              disabled={isSaving}
+              className="-ml-2.5 min-h-[44px] px-2.5 text-fg2"
+            >
+              Pulihkan bawaan
+            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              {saveError ? (
+                <span role="alert" className="max-w-[40ch] text-xs text-fg2">
+                  {saveError}
+                </span>
+              ) : (
+                isDirty &&
+                !isSaving && (
+                  <span
+                    role="status"
+                    className="inline-flex items-center gap-1.5 text-xs text-fg2"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full bg-chart-orange"
+                    />
+                    Belum disimpan
+                  </span>
+                )
+              )}
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClose}
+                onClick={requestClose}
                 disabled={isSaving}
+                className="min-h-[44px]"
               >
-                Batal
+                Tutup
               </Button>
-              <Button type="button" onClick={handleSave} disabled={isSaving}>
-                <Save data-icon="inline-start" />
-                {isSaving ? "Menyimpan…" : "Simpan Perubahan"}
+              <Button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={isSaving || editorOpen}
+                className="min-h-[44px] px-5"
+              >
+                {isSaving ? "Menyimpan…" : "Simpan"}
               </Button>
             </div>
           </DialogFooter>
+
+          <ConfirmDialog
+            open={pendingConfirm === "close"}
+            container={dialogContainer}
+            title="Tutup tanpa menyimpan?"
+            description="Perubahan yang belum disimpan akan hilang."
+            cancelLabel="Lanjut mengubah"
+            confirmLabel="Buang perubahan"
+            onConfirm={() => {
+              setPendingConfirm(null);
+              onClose();
+            }}
+            onCancel={() => setPendingConfirm(null)}
+          />
+          <ConfirmDialog
+            open={pendingConfirm === "reset"}
+            container={dialogContainer}
+            title="Pulihkan pengaturan bawaan?"
+            description="Skenario, karakter konsumen, identitas konsumen, durasi, tempo, dan model AI kembali ke bawaan. Skenario dan karakter buatan Anda akan hilang setelah Anda memilih Simpan."
+            confirmLabel="Pulihkan bawaan"
+            confirmVariant="default"
+            onConfirm={() => {
+              resetToDefaults();
+              setPendingConfirm(null);
+            }}
+            onCancel={() => setPendingConfirm(null)}
+          />
         </DialogContent>
       </Dialog>
     </div>
   );
-};
+}

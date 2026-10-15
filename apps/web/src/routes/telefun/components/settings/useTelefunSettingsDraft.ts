@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import {
+  DEFAULT_TELEFUN_SETTINGS,
   TelefunAppSettings as AppSettings,
   TelefunScenario as Scenario,
   TelefunConsumerType as ConsumerType,
@@ -88,6 +89,7 @@ export function useTelefunSettingsDraft({
     "scenarios" | "consumers" | "identity" | "system"
   >("scenarios");
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const saveInFlightRef = useRef(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
@@ -149,6 +151,7 @@ export function useTelefunSettingsDraft({
       });
       scenarioForm.close();
       consumerForm.close();
+      setSaveError(null);
     }
   }, [isOpen, settings]);
 
@@ -177,44 +180,6 @@ export function useTelefunSettingsDraft({
     });
   };
 
-  const handleSelectAll = () => {
-    setLocalSettings((prev: AppSettings) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) => ({
-        ...s,
-        isActive: true,
-      })),
-    }));
-  };
-
-  const handleUnselectAll = () => {
-    setLocalSettings((prev: AppSettings) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) => ({
-        ...s,
-        isActive: false,
-      })),
-    }));
-  };
-
-  const handleToggleScenario = (id: string) => {
-    setLocalSettings((prev: AppSettings) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) =>
-        s.id === id ? { ...s, isActive: !s.isActive } : s,
-      ),
-    }));
-  };
-
-  const handleDeleteScenario = (id: string) => {
-    if (window.confirm("Hapus skenario ini?")) {
-      setLocalSettings((prev: AppSettings) => ({
-        ...prev,
-        scenarios: prev.scenarios.filter((s: Scenario) => s.id !== id),
-      }));
-    }
-  };
-
   const handleSelectConsumerType = (id: string) => {
     setLocalSettings((prev: AppSettings) => ({
       ...prev,
@@ -222,22 +187,12 @@ export function useTelefunSettingsDraft({
     }));
   };
 
-  const handleDeleteConsumer = (id: string) => {
-    if (window.confirm("Hapus karakteristik ini?")) {
-      setLocalSettings((prev: AppSettings) => {
-        const newTypes = prev.consumerTypes.filter(
-          (c: ConsumerType) => c.id !== id,
-        );
-        return {
-          ...prev,
-          consumerTypes: newTypes,
-          preferredConsumerTypeId:
-            prev.preferredConsumerTypeId === id
-              ? "random"
-              : prev.preferredConsumerTypeId,
-        };
-      });
-    }
+  /** Kembalikan draf ke bawaan; baru berlaku setelah Simpan. */
+  const resetToDefaults = () => {
+    scenarioForm.close();
+    consumerForm.close();
+    setSaveError(null);
+    setLocalSettings(DEFAULT_TELEFUN_SETTINGS);
   };
 
   const hasUnsavedChanges = () => {
@@ -272,26 +227,16 @@ export function useTelefunSettingsDraft({
 
     if (scenarioDirty && !scenarioForm.isValid()) {
       setActiveTab("scenarios");
-      setTimeout(() => {
-        document
-          .getElementById("scenario-form")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-      alert(
-        "Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.",
+      setSaveError(
+        "Skenario yang sedang dibuat belum lengkap. Isi kategori, judul, dan deskripsi, atau batalkan dulu.",
       );
       return;
     }
 
     if (consumerDirty && !consumerForm.isValid()) {
       setActiveTab("consumers");
-      setTimeout(() => {
-        document
-          .getElementById("consumer-form")
-          ?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-      alert(
-        "Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.",
+      setSaveError(
+        "Karakter yang sedang dibuat belum lengkap. Isi nama dan deskripsi, atau batalkan dulu.",
       );
       return;
     }
@@ -312,6 +257,7 @@ export function useTelefunSettingsDraft({
     });
 
     saveInFlightRef.current = true;
+    setSaveError(null);
     setIsSaving(true);
     try {
       await onSave(settingsToSave);
@@ -319,20 +265,12 @@ export function useTelefunSettingsDraft({
       if (consumerDirty) consumerForm.close();
       onClose();
     } catch {
-      // The parent reports the save error. Keep this draft open for retry.
+      // Induk sudah melaporkan galatnya; draf tetap terbuka untuk dicoba lagi.
+      setSaveError("Pengaturan belum tersimpan. Coba Simpan lagi.");
     } finally {
       saveInFlightRef.current = false;
       setIsSaving(false);
     }
-  };
-
-  const handleClose = () => {
-    if (saveInFlightRef.current) return;
-    if (hasUnsavedChanges()) {
-      if (!window.confirm("Perubahan belum disimpan. Yakin ingin keluar?"))
-        return;
-    }
-    onClose();
   };
 
   return {
@@ -346,14 +284,11 @@ export function useTelefunSettingsDraft({
     setSelectedTelefunTransport,
     scenarioForm,
     consumerForm,
-    handleSelectAll,
-    handleUnselectAll,
-    handleToggleScenario,
-    handleDeleteScenario,
     handleSelectConsumerType,
-    handleDeleteConsumer,
     isSaving,
+    saveError,
     handleSave,
-    handleClose,
+    hasUnsavedChanges,
+    resetToDefaults,
   };
 }

@@ -1,18 +1,17 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import {
-  Clock3,
-  Mic,
-  MicOff,
-  Pause,
-  PhoneOff,
-  Play,
-  Volume2,
-} from "lucide-react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
+import { Mic, MicOff, Pause, PhoneOff, Play, Volume2 } from "lucide-react";
 import type { SessionMetrics } from "@trainers/types";
 import {
   TELEFUN_FIRST_HOLD_LIMIT_MS,
   TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
 } from "@trainers/types";
+import { cn } from "cn";
 import type { TelefunAppSettings } from "../telefunSettings";
 import {
   createTelefunTransport,
@@ -23,21 +22,10 @@ import {
   getTelefunTimeCueThreshold,
   type TelefunTimeCue,
 } from "../services/timingGuards";
-import {
-  MicrophoneActivityWaveform,
-  type MicrophoneWaveformTone,
-} from "./MicrophoneActivityWaveform";
 import { useMicrophoneActivity } from "./useMicrophoneActivity";
 import { HoldStatusDisplay } from "./HoldStatusDisplay";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "../../../components/ui/avatar";
-import { Badge } from "../../../components/ui/badge";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
-import { Card, CardContent } from "../../../components/ui/card";
-import { getKetikConsumerAvatarUrl } from "../../ketik/lib/ketik-avatar";
 
 type TelefunEndSessionReason = "completed" | "failed" | "timeout";
 
@@ -54,6 +42,8 @@ interface PhoneInterfaceProps {
     metrics: SessionMetrics,
   ) => void | Promise<void>;
   onSessionCreated?: (sessionId: string) => void;
+  /** Nama peserta bila trainer menjalankan panggilan untuk peserta. */
+  participantLabel?: string | null;
 }
 
 interface ActiveHoldUi {
@@ -62,6 +52,9 @@ interface ActiveHoldUi {
   limitMs: number;
 }
 
+/** Level di bawah ini dianggap senyap (skala 0–100). */
+const SILENT_VOLUME = 6;
+const SILENCE_NOTICE_MS = 6000;
 const CLEANUP_PENDING_MESSAGE =
   "Panggilan belum tersimpan. Coba lagi untuk mengakhiri.";
 function getInitials(name: string): string {
@@ -79,6 +72,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   onEndSession,
   onRecordingReady,
   onSessionCreated,
+  participantLabel = null,
 }) => {
   const [connectionState, setConnectionState] = useState("Memanggil...");
   const [callDuration, setCallDuration] = useState(0);
@@ -94,6 +88,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
   const [terminalFailure, setTerminalFailure] = useState(false);
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  // Dialog konfirmasi dirender di dalam lapisan panggilan (`fixed z-[100]`).
+  const [layer, setLayer] = useState<HTMLElement | null>(null);
 
   const sentTimeCues = useRef<Set<TelefunTimeCue>>(new Set());
   const holdSequenceRef = useRef(0);
@@ -476,7 +473,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}.${secs.toString().padStart(2, "0")}`;
   };
 
   const handleEndCall = useCallback(
@@ -549,42 +546,6 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     }
   }, [callDuration, config.maxCallDuration, connectionState]);
 
-  const getVolumeStatus = (volume: number) => {
-    if (volume <= 0)
-      return {
-        color: "bg-muted-foreground/30",
-        textColor: "text-muted-foreground",
-        label: "Senyap",
-        width: "2%",
-      };
-    if (volume < 10)
-      return {
-        color: "bg-muted-foreground/60",
-        textColor: "text-muted-foreground",
-        label: "Senyap",
-        width: "5%",
-      };
-    if (volume < 35)
-      return {
-        color: "bg-module-telefun",
-        textColor: "text-module-telefun",
-        label: "Tenang/Netral",
-        width: `${Math.max(10, volume)}%`,
-      };
-    if (volume < 65)
-      return {
-        color: "bg-chart-amber",
-        textColor: "text-chart-amber",
-        label: "Tegas/Peringatan",
-        width: `${volume}%`,
-      };
-    return {
-      color: "bg-destructive",
-      textColor: "text-destructive",
-      label: "Tinggi/Urgensi",
-      width: `${Math.min(100, volume)}%`,
-    };
-  };
 
   const micActivity = useMicrophoneActivity({
     active: connectionState === "Tersambung" && !isOnHold,
@@ -592,237 +553,176 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     stream: localStream,
   });
   const displayVolume = isMuted ? 0 : Math.max(agentVolume, micActivity.level);
-  const volStatus = getVolumeStatus(displayVolume);
-  const volumeTone: MicrophoneWaveformTone =
-    isMuted || displayVolume < 10
-      ? "silent"
-      : displayVolume < 35
-        ? "normal"
-        : displayVolume < 65
-          ? "warning"
-          : "danger";
+  const isConnected =
+    connectionState === "Tersambung" && !terminalFailure && !error;
+
+  // "Suara Anda tidak terdeteksi" hanya setelah beberapa detik benar-benar
+  // senyap saat giliran agen; jeda bicara biasa tidak memicunya.
+  const lastHeardAtRef = useRef(0);
+  const [micSilent, setMicSilent] = useState(false);
+  const listening = isConnected && !isOnHold && !isMuted && !isAiSpeaking;
+  useEffect(() => {
+    if (displayVolume >= SILENT_VOLUME) lastHeardAtRef.current = Date.now();
+  }, [displayVolume]);
+  useEffect(() => {
+    lastHeardAtRef.current = Date.now();
+    if (!listening) {
+      setMicSilent(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      setMicSilent(Date.now() - lastHeardAtRef.current > SILENCE_NOTICE_MS);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [listening]);
+
   const displayName = config.resolvedIdentity?.name || config.consumerName;
   const displayPhone = config.resolvedIdentity?.phone || "08123456789";
   const displayCity = config.resolvedIdentity?.city || "Jakarta";
   const initials = getInitials(displayName);
-  const avatarUrl = getKetikConsumerAvatarUrl({
-    name: displayName,
-    phone: displayPhone,
-    city: displayCity,
-    gender: config.resolvedIdentity?.gender,
-  });
-
-  // Status card per-state
-  let statusText = "Menghubungkan...";
-  let statusBg = "bg-card";
-  let statusTextColor = "text-muted-foreground";
-  let statusBorder = "border-border";
-  let statusIsSpeaking = false;
-
+  // Satu baris status netral, seperti layar softphone.
+  let statusText = "Menghubungkan…";
+  let statusTone: "neutral" | "failure" = "neutral";
   if (isDisconnecting) {
-    statusText = "Mengakhiri panggilan...";
-    statusBg = "bg-destructive/10";
-    statusTextColor = "text-destructive";
-    statusBorder = "border-destructive/30";
+    statusText = "Menyimpan rekaman…";
   } else if (isOnHold) {
-    statusText = "Panggilan di-HOLD";
-    statusBg = "bg-chart-amber/10";
-    statusTextColor = "text-chart-amber";
-    statusBorder = "border-chart-amber/30";
+    statusText = "Ditahan · konsumen mendengar musik tunggu";
   } else if (isRinging) {
-    statusText = "Memanggil...";
-    statusBg = "bg-module-telefun/10";
-    statusTextColor = "text-module-telefun";
-    statusBorder = "border-module-telefun/30";
-  } else if (connectionState === "Tersambung" && !terminalFailure && !error) {
-    if (isAiSpeaking) {
-      statusText = "Konsumen sedang berbicara...";
-      statusBg = "bg-module-telefun/10";
-      statusTextColor = "text-module-telefun";
-      statusBorder = "border-module-telefun/30";
-      statusIsSpeaking = true;
-    } else {
-      statusText = "Konsumen sedang menunggu respon dari anda";
-      statusBg = "bg-muted";
-      statusTextColor = "text-foreground";
-      statusBorder = "border-border";
-    }
+    statusText = "Memanggil…";
+  } else if (isConnected) {
+    statusText = isAiSpeaking ? "Konsumen berbicara" : "Giliran Anda";
   } else if (connectionState === "Selesai") {
-    statusText = "Selesai";
-    statusBg = "bg-muted";
-    statusTextColor = "text-foreground";
-    statusBorder = "border-border";
+    statusText = "Panggilan selesai";
   } else if (terminalFailure || connectionState === "Gagal" || error) {
-    statusText = error || connectionState || "Gagal";
-    statusBg = "bg-destructive/10";
-    statusTextColor = "text-destructive";
-    statusBorder = "border-destructive/30";
+    statusText = error || "Panggilan terputus";
+    statusTone = "failure";
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background text-foreground md:flex-row">
-      <div className="relative flex h-full w-full flex-1 flex-col">
-        {/* Timer */}
-        <div className="relative flex shrink-0 items-center justify-between border-b border-border px-4 py-3 md:px-8">
-          <Badge
-            variant="outline"
-            className="h-9 gap-2 rounded-lg px-3 text-sm"
-          >
-            <span
-              className={`size-2 rounded-full ${
-                connectionState === "Tersambung"
-                  ? "bg-module-telefun motion-safe:animate-pulse motion-reduce:animate-none"
-                  : "bg-destructive"
-              }`}
-            />
-            <Clock3 className="size-4 text-muted-foreground" />
-            <span className="font-mono font-semibold tabular-nums text-foreground">
-              {formatTime(callDuration)}
-            </span>
-          </Badge>
+    <section
+      ref={setLayer}
+      aria-label="Panggilan"
+      className="relative flex h-full w-full flex-col bg-background text-foreground"
+    >
+      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-elevated px-4 py-2.5 sm:px-6">
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-module-telefun/10 font-display text-sm font-bold text-foreground"
+        >
+          {initials}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-foreground">
+            {displayName}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {displayPhone} · {displayCity}
+            {participantLabel && ` · Peserta: ${participantLabel}`}
+          </p>
         </div>
+        <span className="shrink-0 font-mono text-sm font-bold text-foreground tabular-nums">
+          <span className="sr-only">Lama panggilan </span>
+          {formatTime(callDuration)}
+        </span>
+      </header>
 
-        {/* Center Content */}
-        <div className="relative mx-auto flex w-full flex-1 overflow-y-auto px-4 pb-8 md:px-12">
-          <div className="flex min-h-full w-full flex-col items-center justify-center py-8">
-            {/* Avatar */}
-            <div className="relative mb-6">
-              {isRinging && (
-                <div className="absolute inset-0 rounded-full border border-module-telefun/30 motion-safe:animate-ping motion-reduce:animate-none" />
-              )}
+      {activeHold && (
+        <HoldStatusDisplay
+          active
+          sequence={activeHold.sequence}
+          startedAtEpochMs={activeHold.startedAtEpochMs}
+          limitMs={activeHold.limitMs}
+        />
+      )}
 
-              {activeHold && (
-                <div className="absolute inset-0 z-20">
-                  <HoldStatusDisplay
-                    active
-                    sequence={activeHold.sequence}
-                    startedAtEpochMs={activeHold.startedAtEpochMs}
-                    limitMs={activeHold.limitMs}
-                  />
-                </div>
-              )}
-
-              <div
-                className={`absolute inset-0 scale-110 rounded-full bg-module-telefun/15 transition-[opacity] duration-200 motion-reduce:transition-none ${
-                  isAiSpeaking && !isOnHold
-                    ? "opacity-100 motion-safe:animate-pulse motion-reduce:animate-none"
-                    : "opacity-0"
-                }`}
-              />
-
-              <Avatar
-                size="lg"
-                className={`relative z-10 !size-40 border border-border bg-muted after:!rounded-full sm:!size-48 md:!size-56 ${
-                  isOnHold
-                    ? "grayscale opacity-60"
-                    : "transition-[filter,opacity] duration-200"
-                }`}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "flex size-24 items-center justify-center rounded-full bg-module-telefun/10 font-display text-3xl font-bold text-foreground ring-8 ring-module-telefun/10 transition-opacity duration-200 motion-reduce:transition-none",
+            isOnHold && "opacity-50 ring-0",
+            isRinging && "motion-safe:animate-pulse",
+          )}
+        >
+          {initials}
+        </span>
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={cn(
+            "inline-flex min-h-8 max-w-md items-center gap-2 rounded-full border px-3.5 text-[13px]",
+            statusTone === "failure"
+              ? "border-destructive bg-destructive/10 text-foreground"
+              : "border-border bg-surface-elevated text-foreground",
+          )}
+        >
+          {statusText}
+        </p>
+        {isOnHold && (
+          <p className="max-w-[34ch] text-xs text-muted-foreground">
+            Kembali sebelum batas, lalu ucapkan terima kasih sudah menunggu.
+          </p>
+        )}
+        {isConnected && !isOnHold && (
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+              <span>{isMuted ? "Mikrofon dibisukan" : "Mikrofon"}</span>
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-40 overflow-hidden rounded-full bg-surface-sunken"
               >
-                <AvatarImage
-                  src={avatarUrl}
-                  alt={`Foto profil ${displayName}`}
-                  referrerPolicy="no-referrer"
+                <span
+                  className="block h-full rounded-full bg-chart-green transition-[width] duration-100 ease-out motion-reduce:transition-none"
+                  style={{ width: `${isMuted ? 0 : Math.min(100, displayVolume)}%` }}
                 />
-                <AvatarFallback className="!rounded-full bg-module-telefun/10 text-4xl font-semibold text-module-telefun md:text-5xl">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              </span>
             </div>
-
-            {/* Consumer Info */}
-            <h1 className="mb-1 max-w-full truncate text-center text-2xl font-semibold text-foreground md:text-4xl">
-              {displayName}
-            </h1>
-            <p className="mb-6 max-w-full truncate text-center text-sm text-muted-foreground md:text-base">
-              {displayPhone} <span aria-hidden="true">·</span> {displayCity}
-            </p>
-
-            {/* Volume Indicator */}
-            {!isOnHold && connectionState === "Tersambung" && (
-              <div className="mb-6 flex w-full max-w-sm flex-col gap-2 md:max-w-md">
-                <div className="flex items-center justify-between gap-3 text-sm font-medium text-muted-foreground">
-                  <span>Indikator Input Suara Anda</span>
-                  <span className={volStatus.textColor}>
-                    {isMuted ? "Mic Mute" : volStatus.label}
-                  </span>
-                </div>
-                <div className="relative h-2 overflow-hidden rounded-full border border-border bg-muted">
-                  <div className="absolute bottom-0 left-[33%] top-0 w-px bg-border" />
-                  <div className="absolute bottom-0 left-[66%] top-0 w-px bg-border" />
-                  <div
-                    className={`h-full rounded-full transition-[width] duration-100 ease-out motion-reduce:transition-none ${volStatus.color}`}
-                    style={{
-                      width: isMuted ? "5%" : volStatus.width,
-                    }}
-                  />
-                </div>
-                <MicrophoneActivityWaveform
-                  active={micActivity.isListening && !isMuted}
-                  bars={isMuted ? [] : micActivity.bars}
-                  tone={volumeTone}
-                />
-              </div>
+            {micSilent && (
+              <p className="text-xs text-fg2">
+                Suara Anda tidak terdeteksi. Periksa mikrofon atau bicara lebih
+                dekat.
+              </p>
             )}
-
-            {/* Status Card */}
-            <Card
-              className={`w-full max-w-xl border py-0 transition-colors duration-200 ${statusBg} ${statusBorder}`}
-            >
-              <CardContent className="flex flex-col items-center gap-3 px-5 py-4 text-center md:px-6 md:py-5">
-                <p
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  className={`text-sm font-semibold md:text-base ${statusTextColor} ${statusIsSpeaking ? "motion-safe:animate-pulse motion-reduce:animate-none" : ""}`}
-                >
-                  {statusText}
-                </p>
-                {playbackBlocked && !isDisconnecting && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void retryAudioPlayback()}
-                  >
-                    <Volume2 data-icon="inline-start" />
-                    Aktifkan audio
-                  </Button>
-                )}
-                {cleanupRetryable && (
-                  <Button
-                    ref={cleanupRetryButtonRef}
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    onClick={() => void handleEndCall()}
-                    disabled={isDisconnecting}
-                    aria-busy={isDisconnecting}
-                  >
-                    Coba lagi mengakhiri panggilan
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Hold warnings are handled by HoldStatusDisplay phase */}
           </div>
-        </div>
-      </div>
-
-      {/* Control Bar */}
-      <div className="z-20 flex shrink-0 flex-row items-center justify-center gap-6 border-t border-border bg-card px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:w-28 md:flex-col md:gap-7 md:border-l md:border-t-0 md:px-4 md:py-6 md:pb-6">
-        {/* Hold Button */}
-        <div className="flex flex-col items-center gap-2">
+        )}
+        {playbackBlocked && !isDisconnecting && (
           <Button
             type="button"
-            variant={isOnHold ? "secondary" : "outline"}
+            variant="outline"
+            onClick={() => void retryAudioPlayback()}
+            className="min-h-[44px] gap-2"
+          >
+            <Volume2 data-icon="inline-start" />
+            Aktifkan audio
+          </Button>
+        )}
+        {cleanupRetryable && (
+          <Button
+            ref={cleanupRetryButtonRef}
+            type="button"
+            variant="outline"
+            onClick={() => void handleEndCall()}
+            disabled={isDisconnecting}
+            aria-busy={isDisconnecting}
+            className="min-h-[44px]"
+          >
+            Coba lagi mengakhiri panggilan
+          </Button>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-start justify-center gap-7 border-t border-border bg-surface-elevated px-6 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+        <CallControl label={isOnHold ? "Lanjutkan" : "Tahan"}>
+          <Button
+            type="button"
+            variant={isOnHold ? "default" : "outline"}
             size="icon-lg"
             onClick={toggleHold}
             disabled={isRinging || isDisconnecting}
-            title={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
-            aria-label={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
+            aria-label={isOnHold ? "Lanjutkan" : "Tahan"}
             aria-pressed={isOnHold}
-            className="size-14 rounded-full border-foreground/20 text-foreground hover:border-foreground/40 disabled:opacity-80 md:size-16"
+            className="size-14 rounded-full"
           >
             {isOnHold ? (
               <Play data-icon="inline" className="fill-current" />
@@ -830,66 +730,69 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               <Pause data-icon="inline" />
             )}
           </Button>
-          <span className="hidden text-sm font-medium text-foreground md:block">
-            {isOnHold ? "Kembali" : "Hold"}
-          </span>
-        </div>
-
-        {/* Mic Button */}
-        <div className="flex flex-col items-center gap-2">
+        </CallControl>
+        <CallControl label={isMuted ? "Bunyikan" : "Bisukan"}>
           <Button
             type="button"
-            variant={isMuted ? "secondary" : "outline"}
+            variant={isMuted ? "default" : "outline"}
             size="icon-lg"
             onClick={() => {
-              if (!isDisconnectingRef.current) {
-                setIsMuted((muted) => !muted);
-              }
+              if (!isDisconnectingRef.current) setIsMuted((muted) => !muted);
             }}
             disabled={isOnHold || isRinging || isDisconnecting}
-            title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
-            aria-label={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+            aria-label={isMuted ? "Bunyikan" : "Bisukan"}
             aria-pressed={isMuted}
-            className="size-14 rounded-full border-foreground/20 text-foreground hover:border-foreground/40 disabled:opacity-80 md:size-16"
+            className="size-14 rounded-full"
           >
-            {isMuted ? (
-              <MicOff data-icon="inline" />
-            ) : (
-              <Mic data-icon="inline" />
-            )}
+            {isMuted ? <MicOff data-icon="inline" /> : <Mic data-icon="inline" />}
           </Button>
-          <span className="hidden text-sm font-medium text-foreground md:block">
-            Mic
-          </span>
-        </div>
-
-        {/* End Call Button */}
-        <div className="flex flex-col items-center gap-2">
+        </CallControl>
+        <CallControl label={isDisconnecting ? "Mengakhiri…" : "Akhiri"}>
           <Button
             type="button"
             variant="destructive"
             size="icon-lg"
-            onClick={() => !isDisconnecting && handleEndCall()}
+            onClick={() => setConfirmEndOpen(true)}
             disabled={isDisconnecting}
-            title={isDisconnecting ? "Mengakhiri panggilan..." : "End Call"}
-            aria-label={
-              isDisconnecting
-                ? "Mengakhiri panggilan, harap tunggu"
-                : "Akhiri panggilan"
-            }
-            className="size-16 rounded-full disabled:opacity-80 md:size-[4.5rem]"
+            aria-label={isDisconnecting ? "Mengakhiri panggilan" : "Akhiri"}
+            className="size-16 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             <PhoneOff data-icon="inline" />
           </Button>
-          <span
-            className={`block text-sm font-medium ${
-              isDisconnecting ? "text-fg2" : "text-destructive"
-            }`}
-          >
-            {isDisconnecting ? "Mengakhiri..." : "Hangup"}
-          </span>
-        </div>
+        </CallControl>
       </div>
-    </div>
+
+      <ConfirmDialog
+        // Panggilan yang berakhir sendiri (durasi habis) menutup konfirmasi.
+        open={confirmEndOpen && !isDisconnecting}
+        title="Akhiri panggilan?"
+        description="Rekaman disimpan lalu AI menilai suara Anda. Panggilan yang sudah diakhiri tidak bisa dilanjutkan."
+        cancelLabel="Lanjutkan panggilan"
+        confirmLabel="Akhiri panggilan"
+        container={layer}
+        onCancel={() => setConfirmEndOpen(false)}
+        onConfirm={() => {
+          setConfirmEndOpen(false);
+          void handleEndCall();
+        }}
+      />
+    </section>
   );
 };
+
+function CallControl({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {children}
+      <span aria-hidden="true" className="text-xs font-medium text-foreground">
+        {label}
+      </span>
+    </div>
+  );
+}

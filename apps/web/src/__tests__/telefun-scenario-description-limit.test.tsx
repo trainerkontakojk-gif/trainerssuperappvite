@@ -35,14 +35,14 @@ describe("Telefun scenario description characterization", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Masalah" }));
-    await user.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
-    );
+    // Kategori Skenario terbuka saat dialog dibuka.
+    await user.click(screen.getByRole("button", { name: /skenario baru/i }));
 
     const descriptionLabel = screen.getByText("Deskripsi Masalah");
     const descriptionField = descriptionLabel.parentElement;
-    const description = descriptionField?.querySelector("textarea") as HTMLTextAreaElement;
+    const description = descriptionField?.querySelector(
+      "textarea",
+    ) as HTMLTextAreaElement;
 
     expect(description).toBeInTheDocument();
     expect(description).not.toHaveAttribute("maxLength");

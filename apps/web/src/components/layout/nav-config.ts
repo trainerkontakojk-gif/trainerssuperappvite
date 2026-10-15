@@ -318,8 +318,8 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   }
   if (pathname.startsWith("/telefun")) {
     crumbs.push({ label: "Telefun", href: "/telefun" });
-    if (pathname.startsWith("/telefun/replay")) {
-      crumbs.push({ label: "Replay" });
+    if (pathname === "/telefun/history") {
+      crumbs.push({ label: "Riwayat" });
       return crumbs;
     }
     return crumbs.map((c, i) =>

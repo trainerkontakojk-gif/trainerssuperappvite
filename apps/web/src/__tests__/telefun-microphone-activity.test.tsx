@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, renderHook, waitFor } from "@testing-library/react";
-import { MicrophoneActivityWaveform } from "../routes/telefun/components/MicrophoneActivityWaveform";
+import { renderHook, waitFor } from "@testing-library/react";
 import { useMicrophoneActivity } from "../routes/telefun/components/useMicrophoneActivity";
 
 class MockAnalyserNode {
@@ -34,66 +33,6 @@ function setupWebAudioMock() {
 
   return { mockAnalyser, mockSource, mockAudioContext };
 }
-
-describe("MicrophoneActivityWaveform", () => {
-  it("renders a compact waveform from bar levels", () => {
-    render(
-      <MicrophoneActivityWaveform
-        bars={[0, 20, 60, 100]}
-        active={true}
-        tone="normal"
-      />,
-    );
-
-    expect(screen.getByTestId("telefun-mic-waveform")).toBeTruthy();
-    expect(screen.getAllByTestId("telefun-mic-waveform-bar")).toHaveLength(4);
-  });
-
-  it("renders quiet bars when inactive", () => {
-    render(
-      <MicrophoneActivityWaveform bars={[]} active={false} tone="silent" />,
-    );
-
-    expect(screen.getByTestId("telefun-mic-waveform")).toHaveAttribute(
-      "aria-hidden",
-      "true",
-    );
-  });
-
-  it("renders fallback quiet bars when bars array is empty", () => {
-    render(
-      <MicrophoneActivityWaveform bars={[]} active={true} tone="silent" />,
-    );
-
-    const bars = screen.getAllByTestId("telefun-mic-waveform-bar");
-    expect(bars.length).toBeGreaterThan(0);
-  });
-
-  it("applies silent tone styling", () => {
-    render(
-      <MicrophoneActivityWaveform
-        bars={[10, 20, 30]}
-        active={true}
-        tone="silent"
-      />,
-    );
-
-    const bars = screen.getAllByTestId("telefun-mic-waveform-bar");
-    expect(bars.length).toBe(3);
-  });
-
-  it("applies danger tone styling", () => {
-    render(
-      <MicrophoneActivityWaveform
-        bars={[80, 90, 100]}
-        active={true}
-        tone="danger"
-      />,
-    );
-
-    expect(screen.getByTestId("telefun-mic-waveform")).toBeTruthy();
-  });
-});
 
 function createMockMediaDevices(
   stream: { getTracks: () => { stop: () => void }[] } | null,

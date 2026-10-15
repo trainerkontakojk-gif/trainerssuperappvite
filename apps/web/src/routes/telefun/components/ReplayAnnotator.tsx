@@ -1,18 +1,7 @@
 import React, { useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Bot,
-  Clock,
-  Lightbulb,
-  Loader2,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  Sparkles,
-  Trash2,
-  User,
-} from "lucide-react";
-import { motion } from "framer-motion";
+import { Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { cn } from "cn";
+import { Button } from "../../../components/ui/button";
 
 export type ReplayAnnotationCategory =
   | "strength"
@@ -60,52 +49,37 @@ export interface ReplayAnnotatorProps {
 
 const CATEGORY_LABELS: Record<ReplayAnnotationCategory, string> = {
   strength: "Kekuatan",
-  improvement_area: "Area Perbaikan",
-  critical_moment: "Momen Kritis",
-  technique_used: "Teknik Digunakan",
+  improvement_area: "Perlu diperbaiki",
+  critical_moment: "Momen kritis",
+  technique_used: "Teknik dipakai",
 };
 
-const CATEGORY_STYLES: Record<
-  ReplayAnnotationCategory,
-  { bg: string; text: string; border: string }
-> = {
-  strength: {
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-700 dark:text-emerald-400",
-    border: "border-emerald-200 dark:border-emerald-800",
-  },
-  improvement_area: {
-    bg: "bg-amber-500/10",
-    text: "text-amber-700 dark:text-amber-400",
-    border: "border-amber-200 dark:border-amber-800",
-  },
-  critical_moment: {
-    bg: "bg-red-500/10",
-    text: "text-red-700 dark:text-red-400",
-    border: "border-red-200 dark:border-red-800",
-  },
-  technique_used: {
-    bg: "bg-blue-500/10",
-    text: "text-blue-700 dark:text-blue-400",
-    border: "border-blue-200 dark:border-blue-800",
-  },
+/** Titik kategori; label teks selalu menyertai warnanya. */
+const CATEGORY_DOT: Record<ReplayAnnotationCategory, string> = {
+  strength: "bg-chart-green",
+  improvement_area: "bg-chart-orange",
+  critical_moment: "bg-destructive",
+  technique_used: "bg-module-telefun",
 };
 
 const MOMENT_LABELS: Record<AnnotationMoment, string> = {
-  missed_empathy: "Empati Terlewat",
-  good_de_escalation: "De-eskalasi Baik",
-  long_pause: "Jeda Panjang",
+  missed_empathy: "Empati terlewat",
+  good_de_escalation: "De-eskalasi baik",
+  long_pause: "Jeda panjang",
   interruption: "Interupsi",
-  technique_usage: "Penggunaan Teknik",
+  technique_usage: "Penggunaan teknik",
 };
 
 const MAX_CHAR_COUNT = 500;
+
+const fieldLabel = "text-[13px] font-semibold text-foreground";
+const sectionTitle = "text-[13px] font-semibold text-foreground";
 
 function formatTimestamp(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  return `${minutes.toString().padStart(2, "0")}.${seconds.toString().padStart(2, "0")}`;
 }
 
 function RecommendationList({
@@ -119,107 +93,73 @@ function RecommendationList({
     [recommendations],
   );
 
-  if (sorted.length === 0) {
-    return null;
-  }
+  if (sorted.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-slate-950/5 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="rounded-lg bg-amber-500/10 p-1.5">
-          <Lightbulb
-            className="h-4 w-4 text-amber-600 dark:text-amber-400"
-            aria-hidden="true"
-          />
-        </div>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-          Rekomendasi Coaching
-        </h3>
-      </div>
-      <ol className="space-y-2">
+    <section className="flex flex-col gap-2">
+      <h3 className={sectionTitle}>Rekomendasi coaching</h3>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[13px] leading-6 text-fg2 marker:text-muted-foreground">
         {sorted.map((rec, idx) => (
-          <li
-            key={`${rec.priority}-${idx}`}
-            className="flex items-start gap-2 rounded-lg bg-slate-950/[0.02] p-2.5 dark:bg-white/5"
-          >
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-700 dark:text-amber-400">
-              {idx + 1}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm text-slate-700 dark:text-white/70">
-                {rec.text}
-              </p>
-              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                Prioritas {rec.priority}
-              </p>
-            </div>
-          </li>
+          <li key={`${rec.priority}-${idx}`}>{rec.text}</li>
         ))}
       </ol>
     </section>
   );
 }
 
-function AnnotationCard({
+function AnnotationItem({
   annotation,
+  number,
   onDelete,
 }: {
   annotation: ReplayAnnotationItem;
+  number: number;
   onDelete?: (annotationId: string) => Promise<void>;
 }) {
-  const categoryColor = CATEGORY_STYLES[annotation.category];
-
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      className={`group relative rounded-lg border p-3 ${categoryColor.border} bg-white dark:bg-slate-900`}
-      role="article"
-      aria-label={`Anotasi pada ${formatTimestamp(annotation.timestampMs)}: ${annotation.text}`}
+    <li
+      className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3"
+      aria-label={`Catatan ${number} pada ${formatTimestamp(annotation.timestampMs)}`}
     >
-      <div className="mb-2 flex items-center gap-2">
-        <span className="flex items-center gap-1 text-xs font-mono text-slate-500 dark:text-white/50">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {formatTimestamp(annotation.timestampMs)}
-        </span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${categoryColor.bg} ${categoryColor.text}`}
-        >
-          {CATEGORY_LABELS[annotation.category]}
-        </span>
-        <span className="text-xs text-slate-400 dark:text-white/35">
-          {annotation.moment}
-        </span>
-        <span className="ml-auto flex items-center gap-1">
-          {annotation.isManual ? (
-            <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-white/50">
-              <User className="h-3 w-3" aria-hidden="true" />
-              Manual
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
-              <Bot className="h-3 w-3" aria-hidden="true" />
-              AI
-            </span>
-          )}
-        </span>
+      <span
+        aria-hidden="true"
+        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground font-mono text-xs font-bold text-background"
+      >
+        {number}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          <span className="font-mono font-medium text-module-telefun tabular-nums">
+            {formatTimestamp(annotation.timestampMs)}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-fg2">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "size-2 rounded-full",
+                CATEGORY_DOT[annotation.category],
+              )}
+            />
+            {CATEGORY_LABELS[annotation.category]}
+          </span>
+          {annotation.moment && <span>{annotation.moment}</span>}
+          <span>{annotation.isManual ? "Trainer" : "AI"}</span>
+        </p>
+        <p className="text-sm leading-6 text-foreground">{annotation.text}</p>
       </div>
-
-      <p className="text-sm leading-relaxed text-slate-700 dark:text-white/70">
-        {annotation.text}
-      </p>
-
       {annotation.isManual && onDelete && (
-        <button
+        <Button
           type="button"
-          onClick={() => onDelete(annotation.id)}
-          className="absolute right-2 top-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Hapus anotasi"
+          variant="ghost"
+          size="icon"
+          onClick={() => void onDelete(annotation.id)}
+          aria-label={`Hapus catatan ${number}`}
+          className="-my-1.5 size-[44px] shrink-0 text-muted-foreground hover:text-destructive"
         >
-          <Trash2 className="h-3 w-3" aria-hidden="true" />
-        </button>
+          <Trash2 data-icon="inline" />
+        </Button>
       )}
-    </motion.div>
+    </li>
   );
 }
 
@@ -277,131 +217,109 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-slate-950/5 bg-white p-6 dark:border-white/10 dark:bg-slate-900">
-        <Loader2 className="h-6 w-6 animate-spin text-module-telefun" />
-      </div>
+      <p role="status" className="text-[13px] text-muted-foreground">
+        Memuat catatan…
+      </p>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/30 dark:bg-red-950/20">
-        <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-red-500" />
-        <p className="mb-4 text-sm text-red-700 dark:text-red-300">{error}</p>
-        <button
+      <div
+        role="alert"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 text-[13px] text-foreground"
+      >
+        {error}
+        <Button
           type="button"
+          variant="outline"
           onClick={onRetry}
-          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700"
+          className="min-h-[44px] gap-2 px-3 text-[13px]"
         >
-          <RefreshCw className="h-4 w-4" />
-          Coba Lagi
-        </button>
+          <RefreshCw data-icon="inline-start" />
+          Coba lagi
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-6">
       <RecommendationList recommendations={recommendations} />
 
-      <div className="rounded-2xl border border-slate-950/10 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-              Timeline Anotasi
-            </h3>
-            <p className="text-xs text-slate-400 dark:text-white/35">
-              {sortedAnnotations.length} anotasi tersimpan
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {onGenerateAi && (
-              <button
-                type="button"
-                onClick={onGenerateAi}
-                disabled={isGenerating}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {isGenerating ? "Menganalisis..." : "Analisis AI"}
-              </button>
-            )}
-            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-white/35">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>{formatTimestamp(timestampMs)}</span>
-            </div>
-          </div>
-        </div>
-
-        {sortedAnnotations.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-950/10 bg-slate-950/5 p-6 text-center dark:border-white/10 dark:bg-white/5">
-            <MessageSquare className="mx-auto mb-2 h-6 w-6 text-slate-400 dark:text-white/30" />
-            <p className="text-sm text-slate-500 dark:text-white/50">
-              Belum ada anotasi untuk sesi ini.
-            </p>
-          </div>
-        ) : (
-          <div className="relative space-y-3">
-            <div
-              className="absolute left-[18px] top-0 bottom-0 w-px bg-slate-200 dark:bg-white/10"
-              aria-hidden="true"
-            />
-            {sortedAnnotations.map((annotation) => (
-              <div key={annotation.id} className="relative flex gap-3">
-                <div
-                  className={`relative z-10 mt-3 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white dark:ring-slate-900 ${
-                    annotation.isManual
-                      ? "bg-slate-400 dark:bg-white/40"
-                      : "bg-violet-500 dark:bg-violet-400"
-                  }`}
-                  aria-hidden="true"
-                  style={{ marginLeft: "12px" }}
-                />
-                <div className="flex-1">
-                  <AnnotationCard
-                    annotation={annotation}
-                    onDelete={onDeleteAnnotation}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-950/10 bg-white p-4 dark:border-white/10 dark:bg-slate-900">
-        <div className="mb-3 flex items-center gap-2">
-          <Plus className="h-4 w-4 text-module-telefun" />
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-            Tambah Anotasi Manual
-          </h3>
-        </div>
-
-        <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-white/45">
-              Waktu
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className={sectionTitle}>
+            Catatan di rekaman{" "}
+            <span className="font-normal text-muted-foreground">
+              ({sortedAnnotations.length})
             </span>
-            <input
-              type="range"
-              min={0}
-              max={maxTimestampMs}
-              step={1000}
-              value={timestampMs}
-              onChange={(e) => setTimestampMs(Number(e.target.value))}
-              className="w-full accent-module-telefun"
-            />
-            <div className="mt-1 flex items-center justify-between text-xs text-slate-400 dark:text-white/35">
-              <span>00:00</span>
-              <span>{formatTimestamp(maxTimestampMs)}</span>
-            </div>
-          </label>
+          </h3>
+          {onGenerateAi && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onGenerateAi}
+              disabled={isGenerating}
+              className="min-h-[44px] gap-2 px-3 text-[13px]"
+            >
+              {isGenerating ? (
+                <Loader2 data-icon="inline-start" className="animate-spin" />
+              ) : (
+                <Sparkles data-icon="inline-start" />
+              )}
+              {isGenerating ? "Menganalisis…" : "Analisis AI"}
+            </Button>
+          )}
+        </div>
+        {sortedAnnotations.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground">
+            Belum ada catatan untuk panggilan ini.
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {sortedAnnotations.map((annotation, index) => (
+              <AnnotationItem
+                key={annotation.id}
+                annotation={annotation}
+                number={index + 1}
+                onDelete={onDeleteAnnotation}
+              />
+            ))}
+          </ol>
+        )}
+      </section>
 
-          <div className="flex gap-2 flex-wrap">
+      <section className="flex flex-col gap-4 border-t border-border pt-5">
+        <h3 className={sectionTitle}>Tambah catatan</h3>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="flex justify-between">
+            <span className={fieldLabel}>Waktu di rekaman</span>
+            <span className="font-mono text-xs text-fg2 tabular-nums">
+              {formatTimestamp(timestampMs)}
+            </span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={maxTimestampMs}
+            step={1000}
+            value={timestampMs}
+            onChange={(e) => setTimestampMs(Number(e.target.value))}
+            className="min-h-[44px] w-full accent-foreground"
+          />
+        </label>
+
+        <div className="flex flex-col gap-1.5">
+          <span id="annotation-category-label" className={fieldLabel}>
+            Jenis catatan
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby="annotation-category-label"
+            className="flex flex-wrap gap-1.5"
+          >
             {(
               [
                 "strength",
@@ -410,80 +328,76 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 "technique_used",
               ] as const
             ).map((item) => (
-              <button
+              <Button
                 key={item}
                 type="button"
+                role="radio"
+                aria-checked={category === item}
+                variant={category === item ? "secondary" : "ghost"}
                 onClick={() => setCategory(item)}
-                className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
-                  category === item
-                    ? "bg-module-telefun text-module-telefun-foreground shadow-sm"
-                    : "bg-slate-950/5 text-slate-500 hover:bg-slate-950/10 dark:bg-white/5 dark:text-white/55 dark:hover:bg-white/10"
-                }`}
+                className="min-h-[44px] gap-2 px-3 text-[13px] aria-checked:font-semibold"
               >
+                <span
+                  aria-hidden="true"
+                  className={cn("size-2 rounded-full", CATEGORY_DOT[item])}
+                />
                 {CATEGORY_LABELS[item]}
-              </button>
+              </Button>
             ))}
           </div>
-
-          <div>
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-white/45">
-              Tipe Momen
-            </span>
-            <select
-              value={moment}
-              onChange={(e) => setMoment(e.target.value as AnnotationMoment)}
-              className="w-full rounded-xl border border-slate-950/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-module-telefun dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
-            >
-              {(
-                Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
-              ).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <textarea
-              value={text.slice(0, MAX_CHAR_COUNT)}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Tulis catatan singkat untuk momen ini..."
-              className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-module-telefun dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
-            />
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span
-                className={
-                  charCount > MAX_CHAR_COUNT * 0.9
-                    ? "font-bold text-red-500"
-                    : "text-slate-400 dark:text-white/35"
-                }
-              >
-                {charCount}/{MAX_CHAR_COUNT} karakter
-              </span>
-              {charLimitReached && (
-                <span className="font-bold text-red-500">
-                  Maksimal {MAX_CHAR_COUNT} karakter
-                </span>
-              )}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || !text.trim() || charLimitReached}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-module-telefun px-4 py-2.5 text-sm font-bold text-module-telefun-foreground transition hover:bg-module-telefun/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            Simpan Anotasi
-          </button>
         </div>
-      </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabel}>Momen</span>
+          <select
+            value={moment}
+            onChange={(e) => setMoment(e.target.value as AnnotationMoment)}
+            className="min-h-[44px] w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            {(
+              Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
+            ).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabel}>Catatan</span>
+          <textarea
+            value={text.slice(0, MAX_CHAR_COUNT)}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Tulis catatan singkat untuk momen ini"
+            className="h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+          <span
+            className={cn(
+              "text-xs tabular-nums",
+              charCount > MAX_CHAR_COUNT * 0.9
+                ? "font-semibold text-foreground"
+                : "text-muted-foreground",
+            )}
+          >
+            {charCount}/{MAX_CHAR_COUNT} karakter
+          </span>
+        </label>
+
+        <Button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={isSubmitting || !text.trim() || charLimitReached}
+          className="min-h-[44px] gap-2 self-start px-4 text-[13px] font-semibold"
+        >
+          {isSubmitting ? (
+            <Loader2 data-icon="inline-start" className="animate-spin" />
+          ) : (
+            <Plus data-icon="inline-start" />
+          )}
+          Simpan catatan
+        </Button>
+      </section>
     </div>
   );
 };

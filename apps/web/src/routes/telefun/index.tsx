@@ -1,134 +1,96 @@
 import { can } from "@trainers/types";
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  lazy,
-  Suspense,
-} from "react";
-import { BarChart3, History, LoaderCircle, Play, Settings } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
-import { Separator } from "../../components/ui/separator";
-import type { TelefunAppSettings } from "./telefunSettings";
-import {
-  DEFAULT_TELEFUN_SETTINGS,
-  resolveFinalIdentity,
-  parseTelefunSettings,
-  normalizeTelefunBrowserSelection,
-} from "./telefunSettings";
-import { SettingsModal } from "./components/SettingsModal";
-import { TelefunMotionFrame } from "./components/TelefunMotionFrame";
-import { PhoneInterface } from "./components/PhoneInterface";
-import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
-import { useAuthStore } from "../../store/authStore";
-import { HistoryModal } from "./components/HistoryModal";
-import { UsageModal } from "../../components/UsageModal";
-import { notify } from "../../lib/toast";
-import { ApiError } from "../../lib/api";
-import type { CallRecord } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, History, SlidersHorizontal } from "lucide-react";
 import type {
+  SessionMetrics,
   SimulationSubjectSelection,
   SimulationSubjectSnapshot,
 } from "@trainers/types";
+import { Button } from "../../components/ui/button";
+import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
+import { UsagePopover } from "../../components/simulation/UsagePopover";
+import { ApiError } from "../../lib/api";
+import { formatSimulationSubjectLabel } from "../../lib/simulation-subject-display";
+import { notify } from "../../lib/toast";
 import {
-  canOverwriteTelefunLocalHistory,
-  parseTelefunLocalHistory,
-  shouldPersistTelefunLocalHistory,
-} from "./telefunLocalHistory";
-import {
-  saveTelefunSession,
-  scoreTelefunSession,
-  type SavedTelefunSession,
-} from "./sessionFinalizer";
-import {
-  pollUsageDelta,
   formatUsageDeltaLabel,
+  pollUsageDelta,
   type UsageDelta,
   type UsageSnapshot,
 } from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
-import {
-  getTelefunSettings,
-  saveTelefunSettings,
-  getTelefunSessions,
-  getTelefunSession,
-  createTelefunSession,
-  deleteTelefunSession,
-  clearTelefunHistory,
-  mapTelefunSessionRow,
-  upsertTelefunSessionRecord,
-} from "./telefunApi";
+import { useAuthStore } from "../../store/authStore";
+import { MicCheck, type MicCheckStatus } from "./components/MicCheck";
+import { PhoneInterface } from "./components/PhoneInterface";
+import { SettingsModal } from "./components/SettingsModal";
+import { TelefunLandingOverview } from "./components/TelefunLandingOverview";
+import { TelefunReviewStage } from "./components/TelefunReviewStage";
+import { TelefunStageDemo } from "./components/TelefunStageDemo";
+import { useTelefunHistory } from "./hooks/useTelefunHistory";
+import { saveTelefunSession, scoreTelefunSession } from "./sessionFinalizer";
 import {
   createTelefunSessionReconciler,
   type TelefunSessionReconciler,
 } from "./sessionReconciler";
-import { createRetainedObjectUrlOwner } from "./services/openaiWebRtc/cleanup";
 import {
   installTelefunRecordingReconciliation,
   reconcileTelefunRecordingQueue,
 } from "./services/telefun-recording-reconciliation";
+import {
+  createTelefunSession,
+  getTelefunSession,
+  getTelefunSettings,
+  mapTelefunSessionRow,
+  saveTelefunSettings,
+} from "./telefunApi";
+import type { TelefunAppSettings } from "./telefunSettings";
+import {
+  DEFAULT_TELEFUN_SETTINGS,
+  normalizeTelefunBrowserSelection,
+  parseTelefunSettings,
+  resolveFinalIdentity,
+} from "./telefunSettings";
+import type { CallRecord } from "./types";
+import { summarizeTelefunLanding } from "./utils/landingSummary";
 
-const ReviewModal = lazy(() =>
-  import("./components/ReviewModal").then((m) => ({ default: m.ReviewModal })),
-);
+const navButtonClass =
+  "min-h-[44px] gap-2 bg-surface-elevated px-3.5 text-[13px]";
 
-function TelefunReviewModalFallback() {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-      <Card className="w-full max-w-sm border-border py-0">
-        <CardContent className="px-5 py-4 text-sm font-semibold text-muted-foreground">
-          Memuat review...
-        </CardContent>
-      </Card>
-    </div>
-  );
+type ActiveTelefunSessionConfig = TelefunAppSettings & {
+  simulationSubject?: SimulationSubjectSnapshot | null;
+  simulationSubjectSelection?: SimulationSubjectSelection;
+};
+
+interface ActiveCall {
+  config: ActiveTelefunSessionConfig;
+  accessToken: string;
+  sessionId: string;
+  scenarioTitle: string;
 }
 
 function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+async function fetchDetail(sessionId: string): Promise<CallRecord | null> {
+  try {
+    return mapTelefunSessionRow(await getTelefunSession(sessionId));
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "NOT_FOUND") return null;
+    throw error;
+  }
+}
+
 export default function TelefunLanding() {
-  const [view, setView] = useState<"home" | "chat">("home");
-  const [settings, setSettings] = useState<TelefunAppSettings>(
-    DEFAULT_TELEFUN_SETTINGS,
-  );
-  const [settingsLoading, setSettingsLoading] = useState(true);
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [isUsageOpen, setIsUsageOpen] = useState(false);
-  const [reviewRecord, setReviewRecord] = useState<CallRecord | null>(null);
-
-  type ActiveTelefunSessionConfig = TelefunAppSettings & {
-    simulationSubject?: SimulationSubjectSnapshot | null;
-    simulationSubjectSelection?: SimulationSubjectSelection;
-  };
-  const [activeSessionConfig, setActiveSessionConfig] =
-    useState<ActiveTelefunSessionConfig | null>(null);
-  const [activeAccessToken, setActiveAccessToken] = useState<string | null>(
-    null,
-  );
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [activeScenario, setActiveScenario] = useState<{
-    title: string;
-    instruction: string;
-  } | null>(null);
-  const [history, setHistory] = useState<CallRecord[]>([]);
-
-  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
-  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+  const navigate = useNavigate();
+  const { sesi: requestedSessionId } = useSearch({ from: "/telefun" });
+  const shouldReduceMotion = useReducedMotion();
   const authSession = useAuthStore((st) => st.session);
   const authProfile = useAuthStore((st) => st.profile);
   const accountKey = authSession?.user?.id ?? null;
@@ -136,57 +98,63 @@ export default function TelefunLanding() {
     authProfile?.role,
     "simulation.subject.select",
   );
+
+  const [settings, setSettings] = useState<TelefunAppSettings>(
+    DEFAULT_TELEFUN_SETTINGS,
+  );
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const [micStatus, setMicStatus] = useState<MicCheckStatus>("asking");
+  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
+  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+  const telefunHistory = useTelefunHistory();
+  const { history, state: historyState, upsert } = telefunHistory;
+
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const startCallInFlightRef = useRef(false);
-  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
-  const frozenSubjectRef = useRef<SimulationSubjectSelection>({ type: "self" });
-  const optimisticRecordIdRef = useRef<string | null>(null);
-  const [retainedObjectUrlOwner] = useState(() =>
-    createRetainedObjectUrlOwner(),
-  );
-  const pageMountedRef = useRef(true);
-  const localHistoryIsCorruptRef = useRef(false);
-  const historyRef = useRef<CallRecord[]>([]);
-  const reviewRecordRef = useRef<CallRecord | null>(null);
-  const reviewOpenRef = useRef(false);
-  const historyOpenRef = useRef(false);
+  // Panggilan aktif dibaca lewat ref: callback rekaman bisa selesai setelah render berikutnya.
+  const activeCallRef = useRef<ActiveCall | null>(null);
+  // ID sesi yang dikonfirmasi server suara; bisa berbeda dari ID awal.
+  const callSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+    callSessionIdRef.current = activeCall?.sessionId ?? null;
+  }, [activeCall]);
 
-  const releaseRetainedObjectUrl = useCallback(
-    () => retainedObjectUrlOwner.release(),
-    [retainedObjectUrlOwner],
-  );
+  useEffect(() => installTelefunRecordingReconciliation(), []);
 
   useEffect(() => {
-    historyRef.current = history;
-  }, [history]);
-  useEffect(() => {
-    reviewRecordRef.current = reviewRecord;
-  }, [reviewRecord]);
-  useEffect(() => {
-    reviewOpenRef.current = isReviewOpen;
-  }, [isReviewOpen]);
+    setShowSubjectPicker(false);
+  }, [accountKey, canPickParticipant]);
 
-  const applyAuthoritativeRecord = useCallback((record: CallRecord) => {
-    const result = upsertTelefunSessionRecord({
-      record,
-      history: historyRef.current,
-      reviewRecord: reviewOpenRef.current ? reviewRecordRef.current : null,
-      canOverwriteLocalHistory: canOverwriteTelefunLocalHistory(
-        localHistoryIsCorruptRef.current,
-      ),
-    });
-    historyRef.current = result.history;
-    setHistory(result.history);
-    if (reviewOpenRef.current) {
-      reviewRecordRef.current = result.reviewRecord;
-      setReviewRecord(result.reviewRecord);
-    }
-    if (result.localHistory !== undefined) {
-      localStorage.setItem("telefun_history", result.localHistory);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await getTelefunSettings();
+        if (!cancelled) {
+          setSettings(
+            data ? parseTelefunSettings(data) : DEFAULT_TELEFUN_SETTINGS,
+          );
+        }
+      } catch {
+        if (!cancelled) setSettings(DEFAULT_TELEFUN_SETTINGS);
+      } finally {
+        if (!cancelled) {
+          setSettingsLoading(false);
+          void reconcileTelefunRecordingQueue();
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Pemantau status analisis: memperbarui sesi di riwayat sampai skor ada.
   const sessionReconcilerRef = useRef<TelefunSessionReconciler | null>(null);
   useEffect(() => {
     const reconciler = createTelefunSessionReconciler({
@@ -200,178 +168,78 @@ export default function TelefunLanding() {
           throw error;
         }
       },
-      onRow: (row) => applyAuthoritativeRecord(mapTelefunSessionRow(row)),
+      onRow: (row) => upsert(mapTelefunSessionRow(row)),
     });
     sessionReconcilerRef.current = reconciler;
     return () => {
       reconciler.dispose();
       sessionReconcilerRef.current = null;
     };
-  }, [applyAuthoritativeRecord]);
+  }, [upsert]);
 
-  useEffect(() => {
-    frozenSubjectRef.current = { type: "self" };
-    setShowSubjectPicker(false);
-  }, [accountKey, canPickParticipant]);
-
-  useEffect(() => {
-    pageMountedRef.current = true;
-    return () => {
-      pageMountedRef.current = false;
-      releaseRetainedObjectUrl();
-    };
-  }, [releaseRetainedObjectUrl]);
-
-  useEffect(() => installTelefunRecordingReconciliation(), []);
-
-  // Auto-sync reviewRecord when history updates
-  useEffect(() => {
-    if (reviewRecord) {
-      const updated = history.find((r) => r.id === reviewRecord.id);
-      if (updated && updated !== reviewRecord) {
-        setReviewRecord(updated);
-      }
-    }
-  }, [history, reviewRecord]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadSettings = async () => {
-      try {
-        const data = await getTelefunSettings();
-        if (cancelled) return;
-
-        if (data) {
-          setSettings(parseTelefunSettings(data));
-        } else {
-          setSettings(DEFAULT_TELEFUN_SETTINGS);
-        }
-      } catch {
-        if (!cancelled) {
-          setSettings(DEFAULT_TELEFUN_SETTINGS);
-        }
-      } finally {
-        if (!cancelled) {
-          setSettingsLoading(false);
-          void reconcileTelefunRecordingQueue();
-        }
-      }
-    };
-
-    const loadHistory = async () => {
-      const savedHistory = localStorage.getItem("telefun_history");
-      const { records: localRecords, isCorrupt: localHistoryIsCorrupt } =
-        parseTelefunLocalHistory(savedHistory, notify.warning);
-      localHistoryIsCorruptRef.current = localHistoryIsCorrupt;
-
-      try {
-        const rows = await getTelefunSessions();
-        if (cancelled) return;
-
-        const dbRecords = rows.map(mapTelefunSessionRow);
-        const dbRecordIds = new Set(dbRecords.map((r) => r.id));
-
-        const merged = [
-          ...dbRecords,
-          ...localRecords.filter((lr) => !dbRecordIds.has(lr.id)),
-        ].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        );
-
-        setHistory(merged);
-        if (shouldPersistTelefunLocalHistory(merged, localHistoryIsCorrupt)) {
-          localStorage.setItem("telefun_history", JSON.stringify(merged));
-        }
-        void reconcileTelefunRecordingQueue();
-      } catch {
-        // ignore
-      }
-    };
-
-    loadSettings();
-    loadHistory();
-
-    return () => {
-      cancelled = true;
-    };
+  const watchScoring = useCallback((sessionId: string) => {
+    sessionReconcilerRef.current?.watch(sessionId);
   }, []);
 
-  // Reopening the History modal triggers one authoritative list refetch.
+  const reviewRecord = requestedSessionId
+    ? (history.find((record) => record.id === requestedSessionId) ?? null)
+    : null;
+
+  // Tautan valid tetap di URL. Hanya sesi hilang/gagal dimuat yang kembali ke landing.
   useEffect(() => {
-    if (!isHistoryOpen) {
-      historyOpenRef.current = false;
+    if (!requestedSessionId || historyState === "loading" || reviewRecord) {
       return;
     }
-    if (historyOpenRef.current) return;
-    historyOpenRef.current = true;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const rows = await getTelefunSessions();
-        if (cancelled) return;
-        const dbRecords = rows.map(mapTelefunSessionRow);
-        const dbRecordIds = new Set(dbRecords.map((r) => r.id));
-        const merged = [
-          ...dbRecords,
-          ...historyRef.current.filter((r) => !dbRecordIds.has(r.id)),
-        ].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-        );
-        setHistory(merged);
-        if (
-          shouldPersistTelefunLocalHistory(
-            merged,
-            localHistoryIsCorruptRef.current,
-          )
-        ) {
-          localStorage.setItem("telefun_history", JSON.stringify(merged));
-        }
-      } catch {
-        // ignore transient reopen failures; the modal still shows local state
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isHistoryOpen]);
+    notify.error(
+      historyState === "error"
+        ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
+        : "Sesi itu tidak ada lagi di riwayat Anda.",
+    );
+    void navigate({ to: "/telefun", search: {}, replace: true });
+  }, [requestedSessionId, historyState, reviewRecord, navigate]);
+
+  const openSession = (record: CallRecord) => {
+    void navigate({
+      to: "/telefun",
+      search: { sesi: record.id, tahap: "telaah" },
+    });
+  };
+
+  const openHistory = () => {
+    void navigate({ to: "/telefun/history" });
+  };
 
   const handleSaveSettings = async (newSettings: TelefunAppSettings) => {
     try {
       await saveTelefunSettings(newSettings);
       setSettings(newSettings);
-      notify.success("Pengaturan Telefun berhasil disimpan");
+      notify.success("Pengaturan Telefun tersimpan.");
     } catch (error) {
-      notify.error("Gagal menyimpan pengaturan");
+      notify.error("Pengaturan belum tersimpan. Coba lagi.");
       throw error;
     }
   };
 
-  const startCallOnce = async () => {
+  const startCallOnce = async (selection: SimulationSubjectSelection) => {
     const token = getToken();
     if (!token) {
-      notify.error("Token tidak ditemukan. Silakan login terlebih dahulu.");
+      notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
       return;
     }
 
     const activeScenarios = settings.scenarios.filter((s) => s.isActive);
     if (activeScenarios.length === 0) {
-      notify.error("Pilih minimal satu skenario di Pengaturan.");
+      notify.warning("Aktifkan minimal satu skenario di Pengaturan.");
       setIsSettingsOpen(true);
       return;
     }
-
-    const randomScenario =
-      activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
-
+    const scenario = pickRandom(activeScenarios);
     const consumerType =
       settings.preferredConsumerTypeId === "random"
-        ? settings.consumerTypes[
-            Math.floor(Math.random() * settings.consumerTypes.length)
-          ]
-        : settings.consumerTypes.find(
+        ? pickRandom(settings.consumerTypes)
+        : (settings.consumerTypes.find(
             (ct) => ct.id === settings.preferredConsumerTypeId,
-          ) || settings.consumerTypes[0];
+          ) ?? settings.consumerTypes[0]);
 
     const normalizedSelection = normalizeTelefunBrowserSelection(
       settings.telefunModelId,
@@ -381,24 +249,24 @@ export default function TelefunLanding() {
       settings.identitySettings,
       normalizedSelection.model.id,
     );
-    const voiceName = identity.voiceName || settings.voiceName;
 
-    const sessionConfig: ActiveTelefunSessionConfig = {
+    const config: ActiveTelefunSessionConfig = {
       ...settings,
       telefunModelId: normalizedSelection.model.id,
       telefunTransport: "gemini-live",
-      activeScenario: randomScenario,
+      activeScenario: scenario,
       activeConsumerType: consumerType,
-      scenarioTitle: randomScenario.title,
+      scenarioTitle: scenario.title,
       consumerName: identity.name,
       consumerGender: identity.gender,
-      voiceName,
+      voiceName: identity.voiceName || settings.voiceName,
       resolvedIdentity: identity,
     };
 
+    let sessionId: string;
     try {
       const res = await createTelefunSession({
-        scenario_title: randomScenario.title,
+        scenario_title: scenario.title,
         consumer_name: identity.name,
         consumer_gender: identity.gender,
         consumer_phone: identity.phone,
@@ -409,26 +277,20 @@ export default function TelefunLanding() {
         disruption_config: settings.simulationChallengeTypes,
         configured_duration: settings.maxCallDuration * 60,
         response_pacing_mode: settings.responsePacingMode,
-        telefun_model_id: sessionConfig.telefunModelId,
-        telefun_transport: sessionConfig.telefunTransport,
-        simulationSubject: frozenSubjectRef.current,
+        telefun_model_id: config.telefunModelId,
+        telefun_transport: config.telefunTransport,
+        simulationSubject: selection,
       });
-      if (!res.id) {
-        notify.error("Gagal membuat sesi panggilan. Silakan coba lagi.");
-        return;
-      }
-
-      setActiveSessionId(res.id);
-      sessionConfig.sessionId = res.id;
-      sessionConfig.simulationSubject = res.simulationSubject ?? null;
-      sessionConfig.simulationSubjectSelection = frozenSubjectRef.current;
+      if (!res.id) throw new Error("missing session id");
+      sessionId = res.id;
+      config.sessionId = res.id;
+      config.simulationSubject = res.simulationSubject ?? null;
+      config.simulationSubjectSelection = selection;
     } catch {
-      console.warn("Failed to create session upfront");
       notify.error("Gagal membuat sesi panggilan. Silakan coba lagi.");
       return;
     }
 
-    setActiveScenario(randomScenario);
     const runId = ++sessionRunIdRef.current;
     setSessionDelta(null);
     sessionBaselineRef.current = null;
@@ -440,9 +302,23 @@ export default function TelefunLanding() {
       })
       .catch(() => {});
 
-    setActiveSessionConfig(sessionConfig);
-    setActiveAccessToken(token);
-    setView("chat");
+    setActiveCall({
+      config,
+      accessToken: token,
+      sessionId,
+      scenarioTitle: scenario.title,
+    });
+  };
+
+  const startCall = async (selection: SimulationSubjectSelection) => {
+    if (startCallInFlightRef.current) return;
+    startCallInFlightRef.current = true;
+    try {
+      await startCallOnce(selection);
+    } finally {
+      startCallInFlightRef.current = false;
+      setShowSubjectPicker(false);
+    }
   };
 
   const requestStartCall = () => {
@@ -450,30 +326,29 @@ export default function TelefunLanding() {
       void startCall({ type: "self" });
       return;
     }
+    setMicStatus("asking");
     setShowSubjectPicker(true);
   };
 
-  const startCall = async (selection?: SimulationSubjectSelection) => {
-    if (selection) frozenSubjectRef.current = selection;
-    setShowSubjectPicker(false);
-    if (startCallInFlightRef.current) return;
-    startCallInFlightRef.current = true;
-    try {
-      await startCallOnce();
-    } finally {
-      startCallInFlightRef.current = false;
-    }
-  };
+  const handleEndCall = () => setActiveCall(null);
 
-  const handleEndCall = () => {
-    // A timed-out callback may settle after navigation. Retire its URL so the
-    // late callback cannot reclaim media that parent navigation abandoned.
-    retainedObjectUrlOwner.releaseIfNotTransferredToReview();
-    setView("home");
-    setActiveSessionId(null);
-    setActiveScenario(null);
-    setActiveSessionConfig(null);
-    setActiveAccessToken(null);
+  const startUsagePolling = (runId: number, baseline: UsageSnapshot | null) => {
+    if (!baseline || runId !== sessionRunIdRef.current) return;
+    setSessionDeltaPending(true);
+    pollUsageDelta(() => fetchUsageSummary("telefun"), baseline)
+      .then((delta) => {
+        if (runId !== sessionRunIdRef.current) return;
+        setSessionDelta(delta);
+        if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+          notify.info(
+            `Pemakaian AI panggilan ini: ${formatUsageDeltaLabel(delta)}`,
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (runId === sessionRunIdRef.current) setSessionDeltaPending(false);
+      });
   };
 
   const handleRecordingReady = async (
@@ -482,483 +357,288 @@ export default function TelefunLanding() {
     duration: number,
     fullBlob: Blob | null,
     agentBlob: Blob | null,
-    metrics: any,
-    captureStatus?: "ready" | "failed",
+    metrics: SessionMetrics,
   ) => {
-    let sessionId = activeSessionId;
-    const finalScenario = activeScenario;
-    const sessionConfig = activeSessionConfig;
-    if (!sessionId) {
-      console.warn(
-        "No activeSessionId found during finalization. Attempting fallback session creation.",
-      );
-      try {
-        const res = await createTelefunSession({
-          scenario_title:
-            finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
-          consumer_name:
-            sessionConfig?.consumerName || consumerName || "Konsumen",
-          consumer_gender: sessionConfig?.consumerGender || "female",
-          consumer_phone:
-            sessionConfig?.resolvedIdentity?.phone || "08123456789",
-          consumer_city: sessionConfig?.resolvedIdentity?.city || "Jakarta",
-          simulationSubject:
-            sessionConfig?.simulationSubjectSelection ??
-            frozenSubjectRef.current,
-          persona_config: {
-            consumerType:
-              sessionConfig?.activeConsumerType?.name ||
-              sessionConfig?.activeConsumerType?.id,
-          },
-          disruption_config: sessionConfig?.simulationChallengeTypes || [],
-          configured_duration: (sessionConfig?.maxCallDuration || 0) * 60,
-          response_pacing_mode: sessionConfig?.responsePacingMode,
-          telefun_model_id: sessionConfig?.telefunModelId,
-          telefun_transport: sessionConfig?.telefunTransport,
-        });
-        if (res?.id) {
-          sessionId = res.id;
-        }
-      } catch (err) {
-        console.error("Failed to create fallback session:", err);
-      }
-    }
+    const call = activeCallRef.current;
+    if (!call) return;
+    const { config, scenarioTitle } = call;
+    const sessionId = callSessionIdRef.current ?? call.sessionId;
+    const usageRunId = sessionRunIdRef.current;
+    const usageBaseline = sessionBaselineRef.current;
 
-    const finalSessionId = sessionId || `offline-${Date.now()}`;
-    const optimisticId = optimisticRecordIdRef.current || finalSessionId;
-    optimisticRecordIdRef.current = optimisticId;
-    let savedSession: SavedTelefunSession | null = null;
-
+    let saved: Awaited<ReturnType<typeof saveTelefunSession>> | null = null;
     try {
-      savedSession = await saveTelefunSession({
-        sessionId: finalSessionId,
+      saved = await saveTelefunSession({
+        sessionId,
         fullBlob,
         agentBlob,
         duration,
         metrics,
-        captureStatus,
         localUrl: url,
-        sessionConfig,
-        scenarioTitle: finalScenario?.title || "Custom",
+        sessionConfig: config,
+        scenarioTitle,
         consumerName,
       });
+    } catch (error) {
+      console.error("[Telefun] Failed to finalize session", error);
+    }
 
-      const { record, saveFailed, uploadFailed } = savedSession;
-
-      if (saveFailed) {
-        notify.error(
-          "Gagal menyimpan sesi. Coba ulangi dari riwayat atau hubungi admin.",
+    if (saved && !saved.saveFailed) {
+      if (saved.uploadFailed) {
+        notify.warning(
+          "Rekaman gagal diunggah, tetapi panggilan tetap tersimpan.",
         );
-        throw new Error("Save session failed");
       }
-
-      if (uploadFailed) {
-        notify.warning("Rekaman gagal diunggah, tetapi sesi tetap tersimpan.");
-      }
-
-      setHistory((prev) => {
-        const withoutOptimistic = prev.filter((r) => r.id !== optimisticId);
-        const alreadyExists = withoutOptimistic.some(
-          (r) => r.id === finalSessionId,
-        );
-        const merged = alreadyExists
-          ? withoutOptimistic
-          : [record, ...withoutOptimistic];
-        if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
-          localStorage.setItem("telefun_history", JSON.stringify(merged));
-        }
-        return merged;
-      });
-
-      setReviewRecord(record);
-      setIsReviewOpen(true);
-    } catch (e) {
-      console.error("Failed to finalize session", e);
-      if (e instanceof Error && e.message === "Save session failed") {
-        // Already handled by toast above
-      } else {
-        notify.error("Gagal menyimpan sesi");
-      }
-
-      const fallbackRecord: CallRecord = {
-        id: optimisticId,
+      upsert({ ...saved.record, consumerCity: config.resolvedIdentity?.city });
+    } else {
+      notify.error(
+        "Panggilan belum tersimpan di server. Rekaman hanya ada di perangkat ini.",
+      );
+      upsert({
+        id: sessionId,
         date: new Date().toISOString(),
-        url: url || "",
-        consumerName: sessionConfig?.consumerName || consumerName,
-        scenarioTitle:
-          finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
+        url: url ?? "",
+        consumerName: config.consumerName || consumerName,
+        consumerCity: config.resolvedIdentity?.city,
+        scenarioTitle,
         duration,
-        simulationSubject: sessionConfig?.simulationSubject ?? null,
+        sessionMetrics: metrics,
+        simulationSubject: config.simulationSubject ?? null,
         syncStatus: "unsynced",
-      };
-
-      setReviewRecord(fallbackRecord);
-      setIsReviewOpen(true);
-    } finally {
-      setActiveSessionId(null);
-      setActiveScenario(null);
-      setView("home");
-      setActiveSessionConfig(null);
-      setActiveAccessToken(null);
-    }
-
-    // Snapshot the completed run before background scoring yields. A new call may
-    // replace these refs before the older scoring request finishes.
-    const usageRunIdAtEndCall = sessionRunIdRef.current;
-    const usageBaselineAtEndCall = sessionBaselineRef.current;
-
-    const startUsagePolling = () => {
-      const runId = usageRunIdAtEndCall;
-      const baseline = usageBaselineAtEndCall;
-
-      if (baseline && runId === sessionRunIdRef.current) {
-        setSessionDeltaPending(true);
-        pollUsageDelta(() => fetchUsageSummary("telefun"), baseline)
-          .then((delta) => {
-            if (runId === sessionRunIdRef.current) {
-              setSessionDelta(delta);
-              if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
-                const format = (v: number) =>
-                  v.toLocaleString("id-ID", {
-                    style: "currency",
-                    currency: "IDR",
-                    minimumFractionDigits: 0,
-                  });
-                const parts = [
-                  `Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`,
-                ];
-                const sim = delta.breakdown.simulation;
-                const rev = delta.breakdown.review;
-
-                if (sim.costIdr > 0 || sim.calls > 0) {
-                  parts.push(`Simulasi ${format(sim.costIdr)}`);
-                }
-                if (rev.costIdr > 0 || rev.calls > 0) {
-                  parts.push(`Penilaian AI ${format(rev.costIdr)}`);
-                }
-                notify.success(parts.join(" | "));
-              }
-            }
-          })
-          .catch(() => {})
-          .finally(() => {
-            if (runId === sessionRunIdRef.current) {
-              setSessionDeltaPending(false);
-            }
-          });
-      }
-    };
-
-    const savedSessionForScoring =
-      savedSession && !savedSession.saveFailed ? savedSession : null;
-    const scoringTask = savedSessionForScoring?.agentRecordingPath
-      ? scoreTelefunSession({
-          sessionId: finalSessionId,
-          agentRecordingPath: savedSessionForScoring.agentRecordingPath,
-          transport: sessionConfig?.telefunTransport,
-        })
-          .then((scoring) => {
-            if (scoring.scoringStatus === "failed") {
-              notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
-              return;
-            }
-            if (scoring.scoringStatus !== "succeeded") return;
-
-            const scoredRecord: CallRecord = {
-              ...savedSessionForScoring.record,
-              // A missing score must stay undefined ("—") — never force it to 0.
-              score: scoring.score ?? undefined,
-              feedback: scoring.feedback,
-              voiceAssessment: scoring.voiceAssessment,
-            };
-            setHistory((prev) => {
-              const updated = prev.map((record) =>
-                record.id === finalSessionId || record.id === optimisticId
-                  ? scoredRecord
-                  : record,
-              );
-              if (
-                canOverwriteTelefunLocalHistory(
-                  localHistoryIsCorruptRef.current,
-                )
-              ) {
-                localStorage.setItem(
-                  "telefun_history",
-                  JSON.stringify(updated),
-                );
-              }
-              return updated;
-            });
-            setReviewRecord((previous) =>
-              previous?.id === finalSessionId || previous?.id === optimisticId
-                ? scoredRecord
-                : previous,
-            );
-          })
-          .catch((err) => {
-            console.error("Background Telefun scoring failed:", err);
-            notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
-          })
-      : Promise.resolve();
-
-    void scoringTask.finally(startUsagePolling).catch(() => {});
-  };
-
-  const handleDeleteSession = async (id: string) => {
-    if (reviewRecord?.id === id) {
-      releaseRetainedObjectUrl();
-    }
-    sessionReconcilerRef.current?.stop(id);
-    try {
-      await deleteTelefunSession(id);
-      setHistory((prev) => {
-        const updated = prev.filter((h) => h.id !== id);
-        if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
-          localStorage.setItem("telefun_history", JSON.stringify(updated));
-        }
-        return updated;
       });
-      notify.success("Sesi dihapus");
-    } catch {
-      notify.error("Gagal menghapus sesi");
     }
-  };
 
-  const handleClearHistory = async () => {
-    try {
-      await clearTelefunHistory();
-      setHistory([]);
-      localStorage.removeItem("telefun_history");
-      localHistoryIsCorruptRef.current = false;
-      notify.success("Riwayat dibersihkan");
-    } catch {
-      notify.error("Gagal membersihkan riwayat");
-    }
-  };
-
-  const handleReviewSession = (record: CallRecord) => {
-    if (reviewRecord?.id !== record.id) releaseRetainedObjectUrl();
-    setReviewRecord(record);
-    setIsReviewOpen(true);
-  };
-
-  const handleAssessmentComplete = (sessionId: string, assessment: any) => {
-    setHistory((prev) => {
-      const updated = prev.map((r) =>
-        r.id === sessionId ? { ...r, voiceAssessment: assessment } : r,
-      );
-      if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
-        localStorage.setItem("telefun_history", JSON.stringify(updated));
-      }
-      return updated;
+    setActiveCall(null);
+    void navigate({
+      to: "/telefun",
+      search: { sesi: sessionId, tahap: "telaah" },
     });
-    if (reviewRecord?.id === sessionId) {
-      setReviewRecord((prev) =>
-        prev ? { ...prev, voiceAssessment: assessment } : null,
-      );
-    }
-    // Manual scoring success: refetch the authoritative detail so score,
-    // feedback, voiceAssessment, and scoringStatus change together. The
-    // session reconciler stops polling — the authoritative row is fetched now.
-    sessionReconcilerRef.current?.stop(sessionId);
-    void getTelefunSession(sessionId)
-      .then((row) => applyAuthoritativeRecord(mapTelefunSessionRow(row)))
-      .catch(() => {
-        // The local assessment stays visible; History/Review remain truthful.
-      });
+
+    const savedForScoring = saved && !saved.saveFailed ? saved : null;
+    const scoring = savedForScoring?.agentRecordingPath
+      ? scoreTelefunSession({
+          sessionId,
+          agentRecordingPath: savedForScoring.agentRecordingPath,
+          transport: config.telefunTransport,
+        }).then((result) => {
+          if (result.scoringStatus === "succeeded") {
+            upsert({
+              ...savedForScoring.record,
+              consumerCity: config.resolvedIdentity?.city,
+              // Skor yang tidak ada tetap kosong ("–"), tidak dipaksa 0.
+              score: result.score ?? undefined,
+              feedback: result.feedback,
+              voiceAssessment: result.voiceAssessment,
+              scoringStatus: "completed",
+            });
+          } else {
+            // Antrean penilaian di server tetap berjalan; pantau statusnya.
+            watchScoring(sessionId);
+          }
+        })
+      : Promise.resolve();
+    void scoring
+      .catch((error) => {
+        console.error("[Telefun] Background scoring failed:", error);
+        watchScoring(sessionId);
+      })
+      .finally(() => startUsagePolling(usageRunId, usageBaseline));
   };
+
+  const summary = useMemo(() => summarizeTelefunLanding(history), [history]);
+  const hasSessionDelta = Boolean(
+    sessionDelta &&
+    (sessionDelta.costIdr > 0 ||
+      sessionDelta.totalTokens > 0 ||
+      sessionDelta.totalCalls > 0),
+  );
+
+  const view = activeCall ? "call" : requestedSessionId ? "telaah" : "home";
 
   return (
-    <>
-      {showSubjectPicker && (
-        <SimulationSubjectPicker
-          accountKey={accountKey}
-          canPickParticipant={canPickParticipant}
-          onConfirm={(sel: SimulationSubjectSelection) => startCall(sel)}
-          onCancel={() => setShowSubjectPicker(false)}
-        />
-      )}
+    <div className="min-h-screen font-sans">
+      <AnimatePresence mode="wait">
+        {view === "home" && (
+          <motion.div
+            key="home"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
+            className="relative z-10"
+          >
+            <section
+              aria-labelledby="telefun-hero-title"
+              className="border-b border-border bg-surface-elevated"
+            >
+              <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-14 gap-y-10 px-6 pt-10 pb-14">
+                <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-7">
+                  <div className="flex flex-col gap-5">
+                    <h1
+                      id="telefun-hero-title"
+                      className="font-display text-4xl leading-[1.08] font-extrabold tracking-[-0.04em] text-balance text-foreground sm:text-5xl lg:text-[3.5rem]"
+                    >
+                      Dengarkan konsumennya.{" "}
+                      <span className="block text-module-telefun">
+                        Jawab dengan suara yang tenang.
+                      </span>
+                    </h1>
+                    <p className="max-w-[52ch] text-base leading-7 text-pretty text-fg2 sm:text-[17px]">
+                      Telefun adalah latihan menerima telepon konsumen. Konsumen
+                      virtual berbicara seperti penelepon sungguhan, panggilan
+                      direkam, lalu AI menilai cara Anda berbicara: kecepatan,
+                      intonasi, artikulasi, kata pengisi, nada, dan penggunaan
+                      hold.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-start gap-3">
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={requestStartCall}
+                      disabled={settingsLoading}
+                      className="min-h-[44px] gap-2.5 px-5 text-sm font-semibold"
+                    >
+                      {settingsLoading ? "Menyiapkan…" : "Mulai simulasi"}
+                      <ArrowRight data-icon="inline-end" />
+                    </Button>
+                    <nav
+                      aria-label="Menu Telefun"
+                      className="flex flex-wrap gap-2"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={openHistory}
+                        className={navButtonClass}
+                      >
+                        <History data-icon="inline-start" />
+                        Riwayat
+                      </Button>
+                      <UsagePopover
+                        module="telefun"
+                        triggerClassName={navButtonClass}
+                        sessionDelta={sessionDelta}
+                        sessionDeltaPending={sessionDeltaPending}
+                        triggerBadge={
+                          hasSessionDelta &&
+                          sessionDelta && (
+                            <span className="rounded-full bg-module-telefun/10 px-2 py-px text-xs font-semibold text-module-telefun">
+                              <span className="sr-only">
+                                Panggilan terakhir{" "}
+                              </span>
+                              {formatUsageDeltaLabel(sessionDelta)}
+                            </span>
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsSettingsOpen(true)}
+                        disabled={settingsLoading}
+                        className={navButtonClass}
+                      >
+                        <SlidersHorizontal data-icon="inline-start" />
+                        Pengaturan
+                      </Button>
+                    </nav>
+                  </div>
+                </div>
+
+                <div className="mx-auto flex w-full max-w-[440px] min-w-0 flex-[1_1_360px]">
+                  <TelefunStageDemo />
+                </div>
+              </div>
+            </section>
+
+            <TelefunLandingOverview
+              summary={summary}
+              historyState={historyState}
+              onRetryHistory={() => void telefunHistory.load()}
+              onOpenSession={openSession}
+              onOpenHistory={openHistory}
+            />
+          </motion.div>
+        )}
+
+        {view === "call" && activeCall && (
+          <motion.div
+            key="call"
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
+            className="fixed inset-0 z-[100] bg-background"
+          >
+            <PhoneInterface
+              config={activeCall.config}
+              accessToken={activeCall.accessToken}
+              onEndSession={handleEndCall}
+              onRecordingReady={handleRecordingReady}
+              participantLabel={
+                activeCall.config.simulationSubject?.type === "participant"
+                  ? formatSimulationSubjectLabel(
+                      activeCall.config.simulationSubject,
+                      { includeParticipantDetails: false },
+                    )
+                  : null
+              }
+              onSessionCreated={(id) => {
+                // Disimpan di ref supaya PhoneInterface tidak dipasang ulang.
+                callSessionIdRef.current = id;
+              }}
+            />
+          </motion.div>
+        )}
+
+        {view === "telaah" &&
+          (reviewRecord ? (
+            <TelefunReviewStage
+              key={reviewRecord.id}
+              record={reviewRecord}
+              history={history}
+              onBack={() => void navigate({ to: "/telefun", search: {} })}
+              onPracticeAgain={() => {
+                void navigate({ to: "/telefun", search: {} });
+                requestStartCall();
+              }}
+              onRecordChange={upsert}
+              onWatchScoring={watchScoring}
+              fetchDetail={fetchDetail}
+            />
+          ) : (
+            <div
+              key="telaah-loading"
+              role="status"
+              className="mx-auto max-w-6xl px-6 py-10 text-sm text-muted-foreground"
+            >
+              Memuat panggilan…
+            </div>
+          ))}
+      </AnimatePresence>
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSave={handleSaveSettings}
       />
-
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        history={history}
-        onDeleteSession={handleDeleteSession}
-        onClearHistory={handleClearHistory}
-        onReviewSession={handleReviewSession}
-      />
-
-      <Suspense fallback={isReviewOpen ? <TelefunReviewModalFallback /> : null}>
-        <ReviewModal
-          isOpen={isReviewOpen}
-          onClose={() => {
-            setIsReviewOpen(false);
-            releaseRetainedObjectUrl();
-          }}
-          record={reviewRecord}
-          onAssessmentComplete={handleAssessmentComplete}
-          onRequestScoringRefresh={(sessionId) => {
-            sessionReconcilerRef.current?.watch(sessionId);
-          }}
-        />
-      </Suspense>
-
-      <UsageModal
-        isOpen={isUsageOpen}
-        onClose={() => setIsUsageOpen(false)}
-        module="telefun"
-        sessionDelta={sessionDelta}
-        sessionDeltaPending={sessionDeltaPending}
-      />
-
-      <AnimatePresence mode="wait">
-        {view === "home" && (
-          <motion.div
-            key="home"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="relative"
-          >
-            <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-8 lg:grid-cols-2 lg:items-stretch lg:px-8 lg:py-10">
-              <div className="flex min-w-0 flex-col">
-                <div className="flex flex-1 flex-col">
-                  <TelefunMotionFrame />
-                </div>
-                <p className="mt-4 text-center text-sm leading-6 text-muted-foreground">
-                  Lihat alur panggilan sebelum memilih skenario latihan.
-                </p>
-              </div>
-
-              <Card className="flex min-w-0 flex-1 flex-col border-border bg-card py-0">
-                <CardHeader className="gap-4 px-7 pt-7 lg:px-8 lg:pt-8">
-                  <CardTitle className="max-w-xl text-3xl font-semibold tracking-tight text-balance">
-                    Latih percakapan telepon. Tanggapi lebih tenang dan terarah.
-                  </CardTitle>
-                  <CardDescription className="max-w-xl text-base leading-7">
-                    Pilih skenario, lakukan panggilan dengan konsumen virtual,
-                    lalu tinjau hasilnya.
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="flex flex-1 flex-col px-7 pb-7 lg:px-8 lg:pb-8">
-                  <Separator className="mt-8" />
-                  <div className="pt-6">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                      <h2 className="text-sm font-semibold text-foreground">
-                        Mulai latihan
-                      </h2>
-                      <span className="text-sm text-muted-foreground">
-                        {
-                          settings.scenarios.filter(
-                            (scenario) => scenario.isActive,
-                          ).length
-                        }{" "}
-                        skenario aktif
-                      </span>
-                    </div>
-
-                    <div className="mt-5 flex flex-col gap-3">
-                      <Button
-                        type="button"
-                        size="lg"
-                        onClick={requestStartCall}
-                        disabled={settingsLoading}
-                        className="h-12 w-full justify-start gap-2 bg-module-telefun px-3 text-base font-semibold text-module-telefun-foreground hover:bg-module-telefun/90"
-                      >
-                        {settingsLoading ? (
-                          <LoaderCircle
-                            data-icon="inline-start"
-                            className="motion-safe:animate-spin motion-reduce:animate-none"
-                          />
-                        ) : (
-                          <Play data-icon="inline-start" fill="currentColor" />
-                        )}
-                        {settingsLoading ? "Memulai..." : "Mulai simulasi"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        onClick={() => setIsSettingsOpen(true)}
-                        disabled={settingsLoading}
-                        className="h-12 w-full justify-start gap-2 px-3 text-base"
-                      >
-                        <Settings data-icon="inline-start" />
-                        Pengaturan
-                      </Button>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="outline"
-                        onClick={() => setIsHistoryOpen(true)}
-                        className="h-12 w-full justify-start gap-2 px-3 text-base"
-                      >
-                        <History data-icon="inline-start" />
-                        Riwayat
-                        {history.length > 0 ? (
-                          <Badge variant="secondary" className="ml-auto">
-                            {history.length}
-                          </Badge>
-                        ) : null}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="lg"
-                        variant="ghost"
-                        onClick={() => setIsUsageOpen(true)}
-                        className="h-12 w-full justify-start gap-2 px-3 text-base text-foreground"
-                        aria-label="Buka pemakaian bulan ini"
-                      >
-                        <BarChart3 data-icon="inline-start" />
-                        Pemakaian bulan ini
-                        {sessionDelta &&
-                          (sessionDelta.costIdr > 0 ||
-                            sessionDelta.totalTokens > 0 ||
-                            sessionDelta.totalCalls > 0) && (
-                            <Badge variant="secondary" className="ml-auto">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi
-                              terakhir
-                            </Badge>
-                          )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </motion.div>
-        )}
-
-        {view === "chat" && activeSessionConfig && activeAccessToken && (
-          <motion.div
-            key="chat"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-background"
-          >
-            <PhoneInterface
-              config={activeSessionConfig}
-              accessToken={activeAccessToken}
-              onEndSession={handleEndCall}
-              onRecordingReady={handleRecordingReady}
-              onSessionCreated={(id) => {
-                setActiveSessionId(id);
-                // Jangan update activeSessionConfig di sini — bikin object reference baru
-                // yang trigger parent re-render → PhoneInterface unmount/remount
-                // sessionId udah disimpen di activeSessionId state terpisah
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+      {showSubjectPicker && (
+        <SimulationSubjectPicker
+          accountKey={accountKey}
+          canPickParticipant={canPickParticipant}
+          title="Siapa yang berlatih?"
+          description="Pilih peserta latihan dan pastikan mikrofon siap. Batal tidak membuat sesi atau memicu AI."
+          confirmLabel="Mulai panggilan"
+          confirmDisabled={micStatus !== "ready"}
+          onConfirm={(selection) => startCall(selection)}
+          onCancel={() => setShowSubjectPicker(false)}
+        >
+          <MicCheck onStatusChange={setMicStatus} />
+        </SimulationSubjectPicker>
+      )}
+    </div>
   );
 }

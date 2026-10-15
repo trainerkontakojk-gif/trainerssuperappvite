@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { ArrowLeft, Check, Edit2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react";
+import { cn } from "cn";
+import { ConfirmDialog } from "../../../../components/ConfirmDialog";
+import { SettingsSwitch } from "../../../../components/settings/SettingsSwitch";
 import {
   TelefunAppSettings as AppSettings,
   TelefunScenario as Scenario,
@@ -15,24 +18,23 @@ import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { normalizeTelefunScenarioDraft } from "./telefunDraftNormalizers";
 
 interface TelefunScenariosTabProps {
+  /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
+  confirmContainer?: HTMLElement | null;
   scenarios: Scenario[];
   scenarioForm: ReturnType<typeof useCrudForm<Scenario>>;
-  handleSelectAll: () => void;
-  handleUnselectAll: () => void;
-  handleToggleScenario: (id: string) => void;
-  handleDeleteScenario: (id: string) => void;
   setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
+  confirmContainer,
   scenarios,
   scenarioForm,
-  handleSelectAll,
-  handleUnselectAll,
-  handleToggleScenario,
-  handleDeleteScenario,
   setLocalSettings,
 }) => {
+  const [query, setQuery] = useState("");
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: "discard" } | { kind: "delete"; id: string } | null
+  >(null);
   const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
@@ -44,6 +46,66 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
   const totalScenarios = scenarios.length;
   const allSelected = totalScenarios > 0 && activeCount === totalScenarios;
   const noneSelected = activeCount === 0;
+
+  const setAllActive = (isActive: boolean) =>
+    setLocalSettings((prev) => ({
+      ...prev,
+      scenarios: prev.scenarios.map((scenario) => ({ ...scenario, isActive })),
+    }));
+
+  const toggleScenario = (id: string) =>
+    setLocalSettings((prev) => ({
+      ...prev,
+      scenarios: prev.scenarios.map((scenario) =>
+        scenario.id === id
+          ? { ...scenario, isActive: !scenario.isActive }
+          : scenario,
+      ),
+    }));
+
+  const confirmPending = () => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === "delete") {
+      const { id } = pendingConfirm;
+      setLocalSettings((prev) => ({
+        ...prev,
+        scenarios: prev.scenarios.filter((scenario) => scenario.id !== id),
+      }));
+    } else {
+      scenarioForm.close();
+    }
+    setPendingConfirm(null);
+  };
+
+  const confirmDialog = (
+    <ConfirmDialog
+      open={pendingConfirm !== null}
+      container={confirmContainer}
+      {...(pendingConfirm?.kind === "discard"
+        ? {
+            title: "Buang perubahan skenario?",
+            description: "Perubahan yang belum diterapkan akan hilang.",
+            cancelLabel: "Lanjut mengubah",
+            confirmLabel: "Buang perubahan",
+          }
+        : {
+            title: "Hapus skenario ini?",
+            description: "Perubahan berlaku setelah Anda memilih Simpan.",
+            confirmLabel: "Hapus skenario",
+          })}
+      onConfirm={confirmPending}
+      onCancel={() => setPendingConfirm(null)}
+    />
+  );
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const visible = normalizedQuery
+    ? scenarios.filter((scenario) =>
+        [scenario.title, scenario.category].some((text) =>
+          (text || "").toLowerCase().includes(normalizedQuery),
+        ),
+      )
+    : scenarios;
 
   const handleAddClick = () => {
     scenarioForm.openAdd();
@@ -84,7 +146,8 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
   const handleCancelScenarioForm = () => {
     if (scenarioForm.isDirty(scenarios)) {
-      if (!window.confirm("Skenario belum disimpan. Buang perubahan?")) return;
+      setPendingConfirm({ kind: "discard" });
+      return;
     }
     scenarioForm.close();
   };
@@ -237,113 +300,132 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             Simpan
           </Button>
         </div>
+        {confirmDialog}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 border-b border-border pb-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Daftar Skenario
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {activeCount} / {totalScenarios} AKTIF
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleSelectAll}
-            disabled={allSelected}
-          >
-            Pilih Semua
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleUnselectAll}
-            disabled={noneSelected}
-          >
-            Hapus Semua
-          </Button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-h-[44px] min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
+          <Search aria-hidden="true" className="size-4 shrink-0" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cari skenario"
+            aria-label="Cari skenario"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <Button
+          type="button"
+          onClick={handleAddClick}
+          className="min-h-[44px] shrink-0"
+        >
+          <Plus data-icon="inline-start" />
+          Skenario baru
+        </Button>
       </div>
 
-      <ul className="flex flex-col gap-3">
-        {scenarios.map((scenario) => (
-          <li
-            key={scenario.id}
-            className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20"
-          >
-            <Button
-              type="button"
-              variant={scenario.isActive ? "default" : "outline"}
-              size="icon-lg"
-              aria-pressed={scenario.isActive}
-              aria-label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} skenario ${scenario.title}`}
-              onClick={() => handleToggleScenario(scenario.id)}
-              className={scenario.isActive ? "" : "text-muted-foreground"}
+      {visible.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+          {scenarios.length === 0
+            ? "Belum ada skenario. Tambahkan skenario baru untuk mulai."
+            : "Tidak ada skenario yang cocok dengan pencarian."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+          {visible.map((scenario) => (
+            <li
+              key={scenario.id}
+              className="flex items-center gap-2 py-2 pr-2 pl-1.5 transition-colors hover:bg-muted/40"
             >
-              {scenario.isActive ? (
-                <Check data-icon="inline" />
-              ) : (
-                <span aria-hidden="true" className="size-4" />
-              )}
-            </Button>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                  {scenario.category}
-                </span>
-                <h4 className="truncate text-sm font-medium text-foreground">
+              <SettingsSwitch
+                label={`${scenario.isActive ? "Nonaktifkan" : "Aktifkan"} ${scenario.title}`}
+                checked={scenario.isActive}
+                onCheckedChange={() => toggleScenario(scenario.id)}
+              />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span
+                  className={cn(
+                    "line-clamp-2 font-semibold",
+                    scenario.isActive
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
                   {scenario.title}
-                </h4>
-              </div>
-              <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                {scenario.instruction}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-1.5">
+                </span>
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {scenario.category && (
+                    <span className="whitespace-nowrap">
+                      {scenario.category}
+                    </span>
+                  )}
+                  <span className="whitespace-nowrap text-fg2">
+                    {scenario.script?.trim() ? "Ikuti skrip" : "Bebas"}
+                  </span>
+                </span>
+              </span>
               <Button
                 type="button"
-                variant="ghost"
-                size="icon-lg"
+                variant="outline"
+                size="sm"
                 onClick={() => handleEditClick(scenario)}
-                aria-label={`Edit ${scenario.title}`}
-                className="text-muted-foreground hover:text-foreground"
+                aria-label={`Ubah ${scenario.title}`}
+                className="min-h-[44px] shrink-0"
               >
-                <Edit2 data-icon="inline" />
+                Ubah
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-lg"
-                onClick={() => handleDeleteScenario(scenario.id)}
+                onClick={() =>
+                  setPendingConfirm({ kind: "delete", id: scenario.id })
+                }
                 aria-label={`Hapus ${scenario.title}`}
-                className="text-muted-foreground hover:text-destructive"
+                title="Hapus"
+                className="min-h-[44px] min-w-[44px] shrink-0 text-muted-foreground hover:text-destructive"
               >
                 <Trash2 data-icon="inline" />
               </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <Button
-        type="button"
-        variant="outline"
-        onClick={handleAddClick}
-        className="min-h-24 w-full flex-col gap-2 border-dashed text-muted-foreground hover:text-foreground"
-      >
-        <Plus data-icon="inline" />
-        <span className="text-sm font-medium">Tambah Skenario Baru</span>
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>
+          {activeCount} dari {totalScenarios} skenario aktif. Satu skenario
+          aktif dipilih acak setiap panggilan.
+        </p>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAllActive(true)}
+            disabled={allSelected}
+            className="min-h-[44px]"
+          >
+            Aktifkan semua
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAllActive(false)}
+            disabled={noneSelected}
+            className="min-h-[44px]"
+          >
+            Nonaktifkan semua
+          </Button>
+        </div>
+      </div>
+      {confirmDialog}
     </div>
   );
 };

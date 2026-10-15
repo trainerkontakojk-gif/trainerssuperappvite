@@ -110,4 +110,40 @@ test.describe("Pemakaian AI KETIK (hermetic)", () => {
     await waitForMockedApi(audit, ["/ai/usage/summary"]);
     expectHermetic(audit);
   });
+
+  test("popover yang sama di landing Telefun memakai nama kegiatan Telefun", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/telefun/settings",
+          body: { success: true, data: {} },
+        },
+        {
+          method: "GET",
+          path: "/api/v1/telefun/sessions",
+          body: { success: true, data: [] },
+        },
+        USAGE_MOCKS[2],
+      ],
+    });
+
+    await page
+      .getByRole("navigation", { name: "Menu Telefun" })
+      .getByRole("button", { name: /^Pemakaian AI/ })
+      .click({ timeout: 20000 });
+
+    const usage = page
+      .getByRole("dialog")
+      .filter({ hasText: "Penilaian suara" });
+    await expect(usage).toBeVisible({ timeout: 20000 });
+    await expect(usage.getByText("Panggilan suara")).toBeVisible();
+    await expect(usage.getByText(/Rp\s?30\.000/).first()).toBeVisible();
+
+    await waitForMockedApi(audit, ["/ai/usage/summary"]);
+    expectHermetic(audit);
+  });
 });

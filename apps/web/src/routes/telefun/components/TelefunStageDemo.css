@@ -1,0 +1,227 @@
+/*
+ * Ilustrasi alur Telefun (Panggilan → Telaah) di halaman awal. Satu siklus 14
+ * detik. Gaya dasar setiap elemen adalah keadaan akhir yang utuh; animasi hanya
+ * dipasang selama demo berjalan. Saat dijeda atau `prefers-reduced-motion`,
+ * komponen memberi `data-static="true"` sehingga demo berhenti di tahap Telaah
+ * yang lengkap, bukan di bingkai setengah jadi (WCAG 2.2.2).
+ */
+.telefun-demo .telefun-demo-mark {
+  border-bottom: 2px solid var(--chart-orange);
+  background: color-mix(in srgb, var(--chart-orange) 30%, transparent);
+  border-radius: 2px;
+  padding-inline: 1px;
+}
+
+.telefun-demo [data-anim="label-call"] {
+  opacity: 0;
+}
+
+/* Keadaan akhir: panggilan sudah selesai, gelombang suara meredup. */
+.telefun-demo [data-anim="wave"] {
+  opacity: 0.25;
+}
+
+.telefun-demo:not([data-static="true"]) [data-anim] {
+  animation-duration: 14s;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.telefun-demo:not([data-static="true"]) .telefun-demo-bar {
+  animation: telefun-wave 1.1s ease-in-out infinite alternate;
+}
+
+.telefun-demo:not([data-static="true"]) [data-anim="l1"] {
+  animation-name: telefun-l1;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="l2"] {
+  animation-name: telefun-l2;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="l3"] {
+  animation-name: telefun-l3;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="wave"] {
+  animation-name: telefun-wave-fade;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="end"] {
+  animation-name: telefun-end;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="review"] {
+  animation-name: telefun-review;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="bar"] {
+  animation-name: telefun-bar;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="mark"] {
+  animation-name: telefun-mark;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="label-call"] {
+  animation-name: telefun-label-call;
+}
+.telefun-demo:not([data-static="true"]) [data-anim="label-telaah"] {
+  animation-name: telefun-label-telaah;
+}
+
+@keyframes telefun-wave {
+  from {
+    transform: scaleY(0.4);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes telefun-l1 {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  9%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes telefun-l2 {
+  0%,
+  20% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  23%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes telefun-l3 {
+  0%,
+  34% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  37%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes telefun-wave-fade {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  52%,
+  96% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes telefun-end {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  53%,
+  93% {
+    opacity: 1;
+  }
+  98%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes telefun-review {
+  0%,
+  55% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  61%,
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  98%,
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+@keyframes telefun-bar {
+  0%,
+  61% {
+    transform: scaleX(0);
+  }
+  69%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes telefun-mark {
+  0%,
+  66% {
+    background: transparent;
+    border-bottom-color: transparent;
+  }
+  69%,
+  93% {
+    background: color-mix(in srgb, var(--chart-orange) 30%, transparent);
+    border-bottom-color: var(--chart-orange);
+  }
+  98%,
+  100% {
+    background: transparent;
+    border-bottom-color: transparent;
+  }
+}
+@keyframes telefun-label-call {
+  0%,
+  57% {
+    opacity: 1;
+  }
+  59%,
+  96% {
+    opacity: 0;
+  }
+  99%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes telefun-label-telaah {
+  0%,
+  57% {
+    opacity: 0;
+  }
+  59%,
+  96% {
+    opacity: 1;
+  }
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .telefun-demo [data-anim],
+  .telefun-demo .telefun-demo-bar {
+    animation: none !important;
+  }
+}

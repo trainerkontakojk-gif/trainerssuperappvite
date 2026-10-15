@@ -16,7 +16,7 @@ import {
   type UsageSnapshot,
 } from "../../lib/usage-snapshot";
 
-export type UsagePopoverModule = "pdkt" | "ketik";
+export type UsagePopoverModule = "pdkt" | "ketik" | "telefun";
 
 interface ModuleCopy {
   /** Nama jenis permintaan AI dalam bahasa peserta; kunci dari `ai-usage-categories`. */
@@ -55,6 +55,19 @@ const MODULE_COPY: Record<UsagePopoverModule, ModuleCopy> = {
     },
     latest: "Sesi terakhir",
     bar: "bg-module-ketik",
+  },
+  telefun: {
+    items: {
+      telefun_live: "Panggilan suara",
+      telefun_assessment: "Penilaian suara",
+    },
+    categories: {
+      simulation: "Panggilan suara",
+      review: "Penilaian suara",
+      uncategorized: "Lainnya",
+    },
+    latest: "Panggilan terakhir",
+    bar: "bg-module-telefun",
   },
 };
 

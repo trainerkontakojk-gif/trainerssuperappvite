@@ -257,6 +257,15 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **Riwayat** (`/ketik/history`) adalah tabel, bukan kartu, dengan pola yang sama seperti `/pdkt/history`.
 - **Pengaturan** mengikuti dialog Pengaturan PDKT: kategori Skenario (aktif/total), Karakter konsumen, Identitas konsumen, Template cepat, dan Sesi & AI. Skenario berupa daftar baris dengan sakelar aktif, pencarian, dan filter kategori; durasi, tempo, dan model AI adalah grup radio. Footer menandai "Belum disimpan"; tutup dengan perubahan, hapus, dan "Pulihkan bawaan" memakai `ConfirmDialog`, tidak pernah `window.confirm`. Sakelar dan baris pilihan karakter dipakai bersama lewat `components/settings/SettingsSwitch.tsx` dan `SettingsChoices.tsx`.
 
+### Telefun (`/telefun`)
+
+- **Landing** memakai pola KETIK: hero "Dengarkan konsumennya. Jawab dengan suara yang tenang.", satu aksi utama, menu kecil (Riwayat, Pemakaian AI, Pengaturan), dan demo panggilan → telaah (`TelefunStageDemo`, `aria-hidden`, tombol jeda, keadaan akhir utuh saat dijeda/reduced motion). Bagian data di bawahnya sama dengan KETIK, dengan skor 0–10 satu desimal ("7,6").
+- **Layar panggilan** meniru softphone: kepala ringkas dengan inisial (bukan foto besar), satu baris status netral, meter mikrofon tipis, pita hold di bawah kepala, dan tiga tombol berlabel Indonesia di bawah dalam jangkauan ibu jari. "Akhiri" tetap merah (konvensi telepon) dan selalu lewat `ConfirmDialog`. Lama panggilan tampil kecil dan tidak pernah berupa hitung mundur.
+- **Telaah** adalah tahap layar penuh (`?sesi=<id>&tahap=telaah`): pemutar + transkrip bertanda waktu di kiri, hasil di kanan; di bawah 1024px hasil ditumpuk di atas. Garis waktu hanya memuat data nyata (posisi, hold, catatan trainer), tidak ada gelombang suara karangan. Kata pengisi ditandai dengan garis bawah oranye + latar tipis, hanya di kalimat agen. Warna bar: oranye < 7, hijau ≥ 8,5, netral di antaranya.
+- **Status analisis** selalu teks + titik warna (tidak bergantung warna saja), tanpa persen palsu.
+- **Riwayat** (`/telefun/history`) adalah tabel dengan pola yang sama seperti `/ketik/history`; aksi baris sekunder ada di menu "⋯".
+- **Pengaturan** mengikuti dialog KETIK: Skenario (aktif/total), Karakter konsumen, Identitas konsumen, Sesi & AI; baris skenario bersakelar; "Belum disimpan"; semua konfirmasi lewat `ConfirmDialog`.
+
 ### Shell & navigasi
 
 Satu model navigasi, `buildNavModel(role)` di `components/layout/nav-config.ts`, menjadi sumber sidebar, drawer ponsel, tab bar, dan Beranda. Jangan membuat daftar modul lokal di komponen; modul dan sub-halaman tersaring capability `access.ts`.
