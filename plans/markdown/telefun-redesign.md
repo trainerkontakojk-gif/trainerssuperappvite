@@ -203,3 +203,9 @@ annotations (`10a9711`) and Telaah ulang (`309facd`) in Telefun.
       502 previousKept on failure or throw, 409 for non-completed, 403, 404).
       15 passed; a mutation of the restore filter and of the speaker check
       made 3 tests fail.
+- [x] Real-AI check: not run by the agent. Local `.env` points at the
+      production Supabase project and no local Supabase was running, so a real
+      scoring call would have read and written production. Fajar chose
+      (2026-10-15) to check it himself after deploy: open an older Telefun
+      session in Telaah, press Telaah ulang, and review "Pertanyaan konsumen"
+      and "Kalimat agen".
