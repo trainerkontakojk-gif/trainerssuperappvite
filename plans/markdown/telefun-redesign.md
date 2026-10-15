@@ -242,3 +242,35 @@ reads better than "kata pengisi".
 - [x] GREEN, docs, gates, commit. RED: 3 E2E + 3 API cases failed first;
       GREEN: API test 19/19, E2E (telefun-flow, -call, -history, monitoring,
       ketik-flow) 71/71.
+
+## Radar → "Target vs hasil" (2026-10-15)
+
+Fajar chose option A in both places (Telaah "Profil" tab and the Monitoring
+Telefun panel). The radar used English labels, a 0–100 scale next to 0–10
+scores, mixed reading rules (filler inverted), and repeated the aspect list.
+
+### Design
+
+- `TelefunTargetList` (from `TelefunCommunicationProfile`): one row per metric
+  with the Indonesian label, value in the user's unit, target, status word
+  (Baik/Cukup/Kurang, from `metric.status`, not color alone), and an
+  `aria-hidden` strip with the target band and a marker:
+  kecepatan bicara in kata/menit on 80–200 with band 130–150; filler as a
+  count on 0–15 with band 0–3; intonasi/artikulasi/nada on 0–10 with band
+  target ± 1,0 (the same rule as `getMetricStatus`). No scoring change.
+- Telaah: "Profil" tab = summary + list. Monitoring: the radar button and
+  zoom modal are replaced by the list; "Metrik Suara" cards stay.
+- Remove `VoiceRadarChart`, `VoiceRadarChartInner`,
+  `CommunicationProfileZoomModal`, the radar/zoom parts of
+  `telefun-communication-profile.test.tsx` (keep its `VoiceMetricCards`
+  cases) and the radar mocks in two monitoring unit tests — only after the
+  E2E below passes.
+
+### Tasklist
+
+- [x] RED: telefun-flow "Profil" tab and monitoring Telefun detail show
+      "Target vs hasil" with real units and no radar (2 failed first).
+- [x] GREEN, removals, docs (`design.md`, `modules.md`,
+      `TELEFUN_ASSESSMENT_CONTRACT.md`), gates, commit. The edited unit
+      tests were not run (no approval asked for this change); web typecheck
+      and lint cover their imports.

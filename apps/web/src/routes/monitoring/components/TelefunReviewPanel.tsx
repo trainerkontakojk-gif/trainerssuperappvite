@@ -17,7 +17,6 @@ import {
   XCircle,
   TrendingUp,
   TrendingDown,
-  Maximize2,
   AlertCircle,
 } from "lucide-react";
 import {
@@ -30,8 +29,7 @@ import {
   validateAssessment,
   getCommunicationProfileFromAssessment,
 } from "../../../lib/voiceAssessmentUtils";
-import { VoiceRadarChart } from "../../telefun/components/VoiceRadarChart";
-import { CommunicationProfileZoomModal } from "../../telefun/components/CommunicationProfileZoomModal";
+import { TelefunTargetList } from "../../telefun/components/TelefunTargetList";
 import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
 import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
 import { parseTelefunTranscript } from "@trainers/types";
@@ -59,7 +57,6 @@ export function TelefunReviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioError, setAudioError] = useState(false);
-  const [zoomOpen, setZoomOpen] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
   const va = useMemo(() => {
@@ -373,7 +370,7 @@ export function TelefunReviewPanel({
                   Profil Komunikasi
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Semakin sesuai dengan area target, semakin baik
+                  Hasil dibanding target QA, dalam satuan aslinya
                 </p>
               </div>
               <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-chart-green">
@@ -383,27 +380,7 @@ export function TelefunReviewPanel({
             </div>
 
             {communicationProfile ? (
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label="Perbesar diagram profil komunikasi"
-                onClick={() => setZoomOpen(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setZoomOpen(true);
-                  }
-                }}
-                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-muted/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
-              >
-                <VoiceRadarChart profile={communicationProfile} compact />
-                <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-xs font-bold text-foreground shadow-sm">
-                    <Maximize2 className="h-3 w-3" />
-                    Klik untuk memperbesar
-                  </div>
-                </div>
-              </div>
+              <TelefunTargetList profile={communicationProfile} />
             ) : (
               <div className="flex items-center justify-center h-[240px] rounded-xl border border-border bg-muted/20">
                 <div className="text-center">
@@ -749,13 +726,6 @@ export function TelefunReviewPanel({
         </section>
       )}
 
-      {communicationProfile && (
-        <CommunicationProfileZoomModal
-          isOpen={zoomOpen}
-          onClose={() => setZoomOpen(false)}
-          profile={communicationProfile}
-        />
-      )}
     </div>
   );
 }

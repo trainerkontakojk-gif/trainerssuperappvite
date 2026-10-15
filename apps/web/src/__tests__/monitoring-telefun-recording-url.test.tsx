@@ -17,13 +17,7 @@ vi.mock("../lib/api", () => ({
   unwrapResponse: mocks.unwrapResponse,
 }));
 
-vi.mock("../routes/telefun/components/VoiceRadarChart", () => ({
-  VoiceRadarChart: () => <div data-testid="voice-radar-chart" />,
-}));
 
-vi.mock("../routes/telefun/components/CommunicationProfileZoomModal", () => ({
-  CommunicationProfileZoomModal: () => null,
-}));
 
 vi.mock("../routes/telefun/components/VoiceMetricCards", () => ({
   VoiceMetricCards: () => <div data-testid="voice-metric-cards" />,

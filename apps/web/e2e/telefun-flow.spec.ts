@@ -308,6 +308,35 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("tab Profil membandingkan hasil dengan target dalam satuan asli, tanpa radar", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, REVIEWED_ROW);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result
+      .getByRole("tab", { name: "Profil" })
+      .click({ timeout: 20000 });
+    const targets = result.getByRole("list", { name: "Target vs hasil" });
+    const rows = targets.getByRole("listitem");
+    await expect(rows).toHaveCount(5);
+    const rate = rows.filter({ hasText: "Kecepatan bicara" });
+    await expect(rate).toContainText("158 kata/menit");
+    await expect(rate).toContainText("ideal 130–150");
+    const filler = rows.filter({ hasText: "Filler" });
+    await expect(filler).toContainText("7 filler");
+    await expect(filler).toContainText("maks 3");
+    await expect(filler).toContainText("Kurang");
+    const articulation = rows.filter({ hasText: "Artikulasi" });
+    await expect(articulation).toContainText("8,8 / 10");
+    await expect(articulation).toContainText("target 8,0–10,0");
+    await expect(articulation).toContainText("Baik");
+    await expect(rows.filter({ hasText: "Nada emosi" })).toContainText("tenang");
+    // Tidak ada radar berbahasa Inggris lagi.
+    await expect(result.locator(".recharts-wrapper")).toHaveCount(0);
+    await expect(result.getByText("Speaking Rate")).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
   test("menunggu analisis: status jujur, Periksa status memuat hasil", async ({
     page,
   }) => {

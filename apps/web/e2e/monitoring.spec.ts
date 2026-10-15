@@ -371,6 +371,35 @@ test.describe("Monitoring (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("detail Telefun membandingkan hasil dengan target, bukan radar", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/monitoring",
+      apiMocks: POPULATED_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/ai/monitoring/history"]);
+    const telefunIndex = HISTORY_ENTRIES.findIndex(
+      (entry) => entry.module === "telefun",
+    );
+    await page
+      .getByRole("button", { name: "Lihat Detail" })
+      .nth(telefunIndex)
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog");
+    const targets = dialog.getByRole("list", { name: "Target vs hasil" });
+    await expect(targets.getByRole("listitem")).toHaveCount(5, {
+      timeout: 20000,
+    });
+    await expect(targets).toContainText("142 kata/menit");
+    await expect(targets).toContainText("3 filler");
+    await expect(
+      dialog.getByRole("button", { name: "Perbesar diagram profil komunikasi" }),
+    ).toHaveCount(0);
+    await expect(dialog.locator(".recharts-wrapper")).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
   test("detail review PDKT menandai kalimat balasan yang dikomentari AI", async ({
     page,
   }) => {

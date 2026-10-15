@@ -124,29 +124,24 @@ Profile yang hilang, stale, atau menggunakan rumus lama otomatis dibangun
 ulang secara deterministik melalui
 `enrichAssessmentWithCommunicationProfile()`.
 
-## Radar Chart
+## Tampilan "Target vs hasil"
 
-Radar chart membandingkan **Hasil Anda** (biru) dengan **Target QA** (hijau)
-pada skala 0–100.
+Sejak 2026-10-15 radar tidak lagi digambar (Telaah dan Monitoring). Profil
+tampil sebagai daftar `TelefunTargetList`: satu baris per metrik dalam satuan
+aslinya, pita target, penanda hasil, dan status (Baik/Cukup/Kurang dari
+`metric.status`). `displayScore`, target, dan status di atas tetap kontrak
+data; hanya cara tampilnya yang berubah.
 
-- **Non-Fillers**: skor biru mendekati target hijau = semakin baik. Terlalu
-  rendah maupun terlalu tinggi kurang baik — deviasi absolut terhadap target
-  yang dinilai.
-- **Fillers (↓)**: skor biru di bawah guide hijau (20) = baik. Semakin
-  rendah semakin baik.
-- **Luas polygon bukan ukuran kualitas universal** — nilai absolut tiap
-  sumbu memiliki arti yang berbeda tergantung metriknya. Dua profil belum
-  tentu setara meskipun luas poligonnya sama.
+| Metrik           | Nilai yang tampil          | Pita target                      |
+| ---------------- | -------------------------- | -------------------------------- |
+| Kecepatan bicara | kata/menit (`rawValue`)    | 130–150 kata/menit               |
+| Intonasi         | skor AI 0–10               | target ± 1,0 (7,0–9,0)           |
+| Artikulasi       | skor AI 0–10               | target ± 1,0 (8,0–10,0)          |
+| Nada emosi       | skor AI 0–10 + nada dominan | target ± 1,0 (7,5–9,5)          |
+| Filler           | jumlah (`rawValue`)        | 0–3 (`FILLER_TARGET_COUNT`)      |
 
-Arti tiap sumbu radar:
-
-| Sumbu           | Nilai pengguna (biru)               | Target (hijau) |
-| --------------- | ----------------------------------- | -------------- |
-| Speaking Rate   | Skor ternormalisasi dari WPM        | 70             |
-| Intonation      | Skor AI (×10)                       | 80             |
-| Articulation    | Skor AI (×10)                       | 90             |
-| Tone            | Skor AI (×10)                       | 85             |
-| Fillers (↓)     | Radar burden dari raw count         | 20             |
+Pita ± 1,0 sama dengan aturan `getMetricStatus` (selisih ≤ 10 pada skala
+0–100 = Baik).
 
 ## Hold Management
 

@@ -24,12 +24,6 @@ vi.mock("../lib/api", () => ({
   unwrapResponse: mocks.unwrapResponse,
 }));
 
-vi.mock("../routes/telefun/components/VoiceRadarChart", () => ({
-  VoiceRadarChart: () => <div>Profil diagram</div>,
-}));
-vi.mock("../routes/telefun/components/CommunicationProfileZoomModal", () => ({
-  CommunicationProfileZoomModal: () => null,
-}));
 vi.mock("../routes/telefun/components/VoiceMetricCards", () => ({
   VoiceMetricCards: () => <div>Metrik suara lengkap</div>,
 }));
@@ -279,7 +273,9 @@ describe("monitoring completeness regressions", () => {
 
     await waitFor(() => expect(screen.getByText(/Riwayat Telefun lama/i)).toBeInTheDocument());
     expect(screen.getByText(/Penilaian dan coaching mungkin tidak tersedia/i)).toBeInTheDocument();
-    expect(screen.queryByText("Profil diagram")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Target vs hasil" }),
+    ).not.toBeInTheDocument();
   });
 
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type {
   CommunicationMetric,
@@ -27,6 +27,7 @@ import {
   type TelefunAspect,
 } from "../utils/reviewDisplay";
 import { TelefunAnalysisWait } from "./TelefunAnalysisWait";
+import { TelefunTargetList } from "./TelefunTargetList";
 import {
   AgentNoteList,
   ConsumerPointList,
@@ -34,12 +35,6 @@ import {
 } from "./TelefunContentReview";
 
 /** Panel hasil Telaah Telefun: skor, aspek, inti kasus, dan tab rincian. */
-
-const VoiceRadarChart = lazy(() =>
-  import("./VoiceRadarChart").then((module) => ({
-    default: module.VoiceRadarChart,
-  })),
-);
 
 /** Metrik profil komunikasi yang sepadan dengan aspek suara. */
 const PROFILE_KEY: Partial<
@@ -439,15 +434,7 @@ export function ReviewResult({
               <p className="max-w-[65ch] text-[13px] leading-6 text-fg2">
                 {profile.overallSummary}
               </p>
-              <Suspense
-                fallback={
-                  <p className="text-[13px] text-muted-foreground">
-                    Memuat diagram…
-                  </p>
-                }
-              >
-                <VoiceRadarChart profile={profile} compact />
-              </Suspense>
+              <TelefunTargetList profile={profile} />
             </>
           ) : (
             <Empty>Profil komunikasi belum tersedia untuk panggilan ini.</Empty>
