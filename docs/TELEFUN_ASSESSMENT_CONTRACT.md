@@ -130,9 +130,9 @@ Sejak 2026-10-15 (sore) profil tampil sebagai diagram spider
 `TelefunProfileRadar` di Telaah dan Monitoring, menggantikan daftar
 `TelefunTargetList`. Semua sumbu memakai `metric.score` (skor aspek AI 0–10,
 makin tinggi makin baik), bukan `displayScore` 0–100, sehingga tidak ada lagi
-sumbu terbalik untuk filler. Zona hijau adalah batas "Sudah baik"
-(`TELEFUN_FIX_THRESHOLD`, 7,0 ke atas), sama dengan pembagian tab Perbaiki
-dulu/Sudah baik. `displayScore`, target, dan status di atas tetap kontrak data;
+sumbu terbalik untuk filler. Cincin skala 2–10 diberi angka; zona hijau
+"Sudah baik" dihapus karena batasnya sulit dibaca. Pembagian Perbaiki
+dulu/Sudah baik (`TELEFUN_FIX_THRESHOLD`, 7,0) tetap di tab dan warna bar. `displayScore`, target, dan status di atas tetap kontrak data;
 hanya tampilannya yang berubah.
 
 ## Hold Management

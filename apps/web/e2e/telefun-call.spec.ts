@@ -148,6 +148,15 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await expect(call.getByRole("status")).toHaveText("Giliran Anda", {
       timeout: 20000,
     });
+    // Nama dan nomor penelepon besar di tengah layar, seperti layar telepon.
+    const caller = call.getByRole("group", { name: "Data penelepon" });
+    await expect(caller.getByRole("heading", { level: 2 })).not.toBeEmpty();
+    await expect(caller.getByText("Nomor telepon")).toBeVisible();
+    const phone = caller.getByText(/^0[\d-]{9,15}$/);
+    await expect(phone).toBeVisible();
+    expect(
+      await phone.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+    ).toBeGreaterThanOrEqual(20);
     for (const name of ["Tahan", "Bisukan", "Akhiri"]) {
       await expect(call.getByRole("button", { name })).toBeVisible();
     }

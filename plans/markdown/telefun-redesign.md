@@ -294,7 +294,7 @@ a waveform instead of a long bar.
   there.
 - Cause of (3): `TranscriptCollector` stamps a line when its transcription
   arrives (after the speaker talks) relative to the WebSocket connection, which
-  opens before recording starts. Fix (browser only, works for old sessions):
+  opens shortly after recording starts. Fix (browser only, works for old sessions):
   `useRecordingAnalysis` decodes the full and `agent_only` recordings to a 20 ms
   loudness envelope; `speechOnsets` takes agent speech from the agent track and
   consumer speech from the full track while the agent is silent, and gives each
@@ -309,4 +309,29 @@ a waveform instead of a long bar.
 - [x] RED: 4 E2E (spider in Telaah and Monitoring, clickable markers, onset +
       waveform) failed first. E2E recording route now answers `Range` (206),
       like storage, so the player can seek after the audio loads.
+- [x] GREEN, docs, gates, commit.
+
+## Follow-up 2026-10-15 (malam): onset per giliran, data penelepon, spider polos
+
+Fajar's feedback after deploy: (1) clicking an annotation/line time still
+lands in the middle or end of the speech, (2) the consumer name and phone on
+the call screen are hard to see and should differ from KETIK, (3) the spider's
+green zone makes the boundaries unclear.
+
+- Cause of (1): spans were merged only across pauses < 500 ms, so an AI
+  consumer turn with a sentence pause became several spans. A line took one
+  span, and its leftover spans were then taken by the next line of that speaker,
+  so the next line played from the middle of the previous turn (E2E reproduced
+  this exactly: expected 00.19, got 00.04). Fix: `speechOnsets` groups spans
+  into speaker turns (all spans of one speaker until the other speaks), each
+  line takes the latest turn of its speaker that starts before stamp + 2,5 s
+  (WS clock starts after recording), and a follow-up line of the same speaker
+  takes the next part inside that turn. No fitting turn → stamped time.
+- (2) Thin header ("Panggilan masuk", participant, duration); caller data in
+  the centre: initials, name as an h2, phone (mono, ≥20px) and city in a `dl`.
+- (3) No green zone, single-colour dots, ring labels 2–10 on the bisector
+  between the first two axes; caption "Skala 0–10 · makin ke luar makin baik".
+
+- [x] RED: onset test (00.24 → expected 00.19, got 00.04), call-screen caller
+      group, spider ring labels without zone; all three failed first.
 - [x] GREEN, docs, gates, commit.

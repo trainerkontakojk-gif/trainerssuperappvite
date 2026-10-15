@@ -365,14 +365,9 @@ export function TelefunReviewPanel({
           {/* Profil Komunikasi Card */}
           <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Profil Komunikasi
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Skor 0–10 per aspek; makin ke luar makin baik
-                </p>
-              </div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Profil Komunikasi
+              </h3>
               <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-chart-green">
                 <Sparkles className="h-3 w-3" aria-hidden="true" />
                 <span>{va.overallScore}/10</span>

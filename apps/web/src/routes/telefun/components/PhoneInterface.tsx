@@ -605,20 +605,15 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       className="relative flex h-full w-full flex-col bg-background text-foreground"
     >
       <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-elevated px-4 py-2.5 sm:px-6">
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-module-telefun/10 font-display text-sm font-bold text-foreground"
-        >
-          {initials}
-        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">
-            {displayName}
+            Panggilan masuk
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {displayPhone} · {displayCity}
-            {participantLabel && ` · Peserta: ${participantLabel}`}
-          </p>
+          {participantLabel && (
+            <p className="truncate text-xs text-muted-foreground">
+              Peserta: {participantLabel}
+            </p>
+          )}
         </div>
         <span className="shrink-0 font-mono text-sm font-bold text-foreground tabular-nums">
           <span className="sr-only">Lama panggilan </span>
@@ -636,16 +631,39 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       )}
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center">
-        <span
-          aria-hidden="true"
-          className={cn(
-            "flex size-24 items-center justify-center rounded-full bg-module-telefun/10 font-display text-3xl font-bold text-foreground ring-8 ring-module-telefun/10 transition-opacity duration-200 motion-reduce:transition-none",
-            isOnHold && "opacity-50 ring-0",
-            isRinging && "motion-safe:animate-pulse",
-          )}
+        <div
+          role="group"
+          aria-label="Data penelepon"
+          className="flex flex-col items-center gap-4"
         >
-          {initials}
-        </span>
+          <span
+            aria-hidden="true"
+            className={cn(
+              "flex size-20 items-center justify-center rounded-full bg-module-telefun/10 font-display text-2xl font-bold text-foreground ring-8 ring-module-telefun/10 transition-opacity duration-200 motion-reduce:transition-none",
+              isOnHold && "opacity-50 ring-0",
+              isRinging && "motion-safe:animate-pulse",
+            )}
+          >
+            {initials}
+          </span>
+          <h2 className="max-w-full font-display text-2xl font-bold tracking-tight break-words text-foreground sm:text-3xl">
+            {displayName}
+          </h2>
+          <dl className="flex flex-wrap items-start justify-center gap-x-8 gap-y-3 rounded-2xl border border-border bg-surface-elevated px-6 py-3.5">
+            <div className="flex flex-col items-center gap-0.5">
+              <dt className="text-xs text-fg2">Nomor telepon</dt>
+              <dd className="font-mono text-xl font-semibold tracking-wide text-foreground tabular-nums sm:text-2xl">
+                {displayPhone}
+              </dd>
+            </div>
+            <div className="flex flex-col items-center gap-0.5">
+              <dt className="text-xs text-fg2">Kota</dt>
+              <dd className="text-xl font-semibold text-foreground sm:text-2xl">
+                {displayCity}
+              </dd>
+            </div>
+          </dl>
+        </div>
         <p
           role="status"
           aria-live="polite"

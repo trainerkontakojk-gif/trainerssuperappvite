@@ -14,8 +14,11 @@ const MERGE_GAP_MS = 500;
 const MIN_SPEECH_MS = 200;
 /** Waktu baris tercatat paling lambat sekian setelah ucapannya mulai. */
 const MAX_LAG_MS = 20_000;
-/** Ucapan yang mulai sedikit setelah waktu tercatat masih milik baris itu. */
-const MAX_LEAD_MS = 1_000;
+/**
+ * Ucapan yang mulai sedikit setelah waktu tercatat masih milik baris itu:
+ * jam server mulai saat soket tersambung, sesudah perekaman dimulai.
+ */
+const MAX_LEAD_MS = 2_500;
 /** Putar sedikit sebelum ucapan supaya kata pertama tidak terpotong. */
 const PRE_ROLL_MS = 200;
 
@@ -92,12 +95,36 @@ function spans(active: readonly boolean[]): Span[] {
   return merged.filter((span) => span.endMs - span.startMs >= MIN_SPEECH_MS);
 }
 
+type Speaker = TelefunTranscriptEntry["speaker"];
+
+/** Satu giliran bicara: potongan ucapan satu pembicara tanpa sela pembicara lain. */
+interface Turn {
+  speaker: Speaker;
+  parts: Span[];
+}
+
+function turns(agent: Span[], consumer: Span[]): Turn[] {
+  const tagged = [
+    ...agent.map((span) => ({ speaker: "agent" as const, span })),
+    ...consumer.map((span) => ({ speaker: "consumer" as const, span })),
+  ].sort((a, b) => a.span.startMs - b.span.startMs);
+  const result: Turn[] = [];
+  for (const { speaker, span } of tagged) {
+    const last = result.at(-1);
+    if (last?.speaker === speaker) last.parts.push(span);
+    else result.push({ speaker, parts: [span] });
+  }
+  return result;
+}
+
 /**
  * Awal ucapan tiap baris transkrip (kunci: `startMs` tercatat). Ucapan agen
  * dibaca dari rekaman agen saja; ucapan konsumen adalah bunyi rekaman gabungan
- * saat agen diam. Tiap baris mengambil ucapan pertama pembicaranya yang belum
- * dipakai dan mulai sebelum waktu tercatat; bila tidak ada, waktu tercatat
- * dipakai apa adanya.
+ * saat agen diam. Ucapan dikelompokkan per giliran (jeda di tengah kalimat
+ * tidak memecah giliran), lalu tiap baris mengambil giliran terakhir
+ * pembicaranya yang mulai sebelum waktu tercatat. Baris lanjutan pembicara
+ * yang sama mengambil potongan berikutnya di giliran itu. Tanpa giliran yang
+ * cocok, waktu tercatat dipakai apa adanya.
  */
 export function speechOnsets(
   transcript: readonly TelefunTranscriptEntry[],
@@ -113,28 +140,44 @@ export function speechOnsets(
   const pad = Math.round(100 / FRAME_MS);
   const agentNear = (index: number) =>
     agentActive.slice(Math.max(0, index - pad), index + pad + 1).some(Boolean);
-  const bySpeaker = {
-    agent: spans(agentActive),
-    consumer: spans(fullActive.map((on, index) => on && !agentNear(index))),
-  };
-  const cursor = { agent: 0, consumer: 0 };
+  const all = turns(
+    spans(agentActive),
+    spans(fullActive.map((on, index) => on && !agentNear(index))),
+  );
+
+  // Giliran berikutnya yang boleh dipakai, dan potongan terakhir yang dipakai.
+  let nextTurn = 0;
+  let last: { turn: Turn; part: number } | null = null;
+  const fits = (span: Span, stampMs: number) =>
+    span.startMs <= stampMs + MAX_LEAD_MS && span.endMs >= stampMs - MAX_LAG_MS;
 
   for (const entry of transcript) {
     if (onsets.has(entry.startMs)) continue;
-    const list = bySpeaker[entry.speaker];
-    let index = cursor[entry.speaker];
-    while (
-      index < list.length &&
-      list[index].endMs < entry.startMs - MAX_LAG_MS
-    )
-      index += 1;
-    const span = list[index];
-    if (!span || span.startMs > entry.startMs + MAX_LEAD_MS) continue;
+    let picked: { turn: Turn; part: number; index: number } | null = null;
+    for (let index = nextTurn; index < all.length; index += 1) {
+      const turn = all[index];
+      if (turn.parts[0].startMs > entry.startMs + MAX_LEAD_MS) break;
+      const whole = {
+        startMs: turn.parts[0].startMs,
+        endMs: turn.parts[turn.parts.length - 1].endMs,
+      };
+      if (turn.speaker === entry.speaker && fits(whole, entry.startMs))
+        picked = { turn, part: 0, index };
+    }
+    if (picked) {
+      nextTurn = picked.index + 1;
+      last = picked;
+    } else if (last?.turn.speaker === entry.speaker) {
+      // Baris lanjutan di giliran yang sama: potongan terakhir sebelum waktu tercatat.
+      const turn: Turn = last.turn;
+      let part = -1;
+      for (let index = last.part + 1; index < turn.parts.length; index += 1)
+        if (fits(turn.parts[index], entry.startMs)) part = index;
+      if (part < 0) continue;
+      last = { turn, part };
+    } else continue;
+    const span = last.turn.parts[last.part];
     onsets.set(entry.startMs, Math.max(0, span.startMs - PRE_ROLL_MS));
-    index += 1;
-    while (index < list.length && list[index].startMs <= entry.startMs)
-      index += 1;
-    cursor[entry.speaker] = index;
   }
   return onsets;
 }

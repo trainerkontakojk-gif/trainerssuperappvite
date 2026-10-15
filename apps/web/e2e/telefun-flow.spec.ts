@@ -310,7 +310,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("tab Profil berupa diagram spider: lima aspek berbahasa Indonesia, skor 0–10, zona sudah baik", async ({
+  test("tab Profil berupa diagram spider: lima aspek berbahasa Indonesia, skala 0–10 berlabel, tanpa zona hijau", async ({
     page,
   }) => {
     const audit = await openTelaah(page, REVIEWED_ROW);
@@ -330,7 +330,11 @@ test.describe("Telefun Telaah (hermetic)", () => {
       await expect(radar.getByText(label, { exact: true })).toBeVisible();
     }
     await expect(radar).toHaveAccessibleName(/Artikulasi 8,8/);
-    await expect(result.getByText("Zona sudah baik (7,0 ke atas)")).toBeVisible();
+    // Skala cincin berlabel; tidak ada zona hijau yang batasnya membingungkan.
+    for (const ring of ["2", "4", "6", "8", "10"]) {
+      await expect(radar.getByText(ring, { exact: true })).toBeVisible();
+    }
+    await expect(result.getByText(/Zona sudah baik/)).toHaveCount(0);
     await expect(result.getByText("Speaking Rate")).toHaveCount(0);
     await expect(
       result.getByRole("list", { name: "Target vs hasil" }),
@@ -400,7 +404,8 @@ test.describe("Telefun Telaah (hermetic)", () => {
     page,
   }) => {
     // Waktu baris tercatat saat transkrip tiba, sesudah orangnya bicara.
-    // Rekaman: konsumen 2–6 dtk dan 20–23 dtk, agen 8,5–10,5 dtk dan 30–35 dtk.
+    // Rekaman: konsumen 2–3,5 dtk + 4,5–6 dtk (satu giliran berjeda) dan
+    // 20–23 dtk, agen 8,5–10,5 dtk dan 30–35 dtk.
     const audit = await open(page, telaahPath(REVIEWED_ROW.id), [
       ...telefunMocks(FULL_HISTORY),
       agentRecordingMock(REVIEWED_ROW.id),
@@ -408,7 +413,8 @@ test.describe("Telefun Telaah (hermetic)", () => {
     ]);
     await serveSpeechRecordings(page, {
       full: [
-        [2, 6],
+        [2, 3.5],
+        [4.5, 6],
         [8.5, 10.5],
         [20, 23],
         [30, 35],
@@ -443,6 +449,12 @@ test.describe("Telefun Telaah (hermetic)", () => {
         .getByTestId("telefun-line-00.11")
         .getByRole("button", { name: /^Putar dari/ }),
     ).toHaveText("00.08");
+    // Jeda di tengah giliran konsumen tidak menggeser baris konsumen berikutnya.
+    await expect(
+      transcript
+        .getByTestId("telefun-line-00.24")
+        .getByRole("button", { name: /^Putar dari/ }),
+    ).toHaveText("00.19");
     // Tanpa bunyi di dekatnya, waktu tercatat dipakai apa adanya.
     await expect(
       transcript

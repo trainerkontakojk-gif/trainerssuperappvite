@@ -3,15 +3,12 @@ import type {
   TelefunCommunicationProfile,
 } from "@trainers/types";
 import { cn } from "cn";
-import {
-  formatTelefunScore,
-  TELEFUN_FIX_THRESHOLD,
-} from "../utils/reviewDisplay";
+import { formatTelefunScore } from "../utils/reviewDisplay";
 
 /**
  * Profil komunikasi sebagai diagram spider. Semua sumbu memakai skor aspek
- * 0–10 yang sama dengan bar skor per aspek (makin ke luar makin baik); zona
- * hijau adalah batas "Sudah baik" (7,0 ke atas).
+ * 0–10 yang sama dengan bar skor per aspek (makin ke luar makin baik). Cincin
+ * skala diberi angka supaya batasnya terbaca; tidak ada zona berwarna.
  */
 
 const AXES: readonly { key: CommunicationMetric["key"]; label: string }[] = [
@@ -50,13 +47,6 @@ function ringPath(score: number): string {
   return `M${points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L")}Z`;
 }
 
-/** Sama dengan warna bar skor per aspek. */
-function dotClass(score: number): string {
-  if (score < TELEFUN_FIX_THRESHOLD) return "fill-chart-orange";
-  if (score >= 8.5) return "fill-chart-green";
-  return "fill-foreground";
-}
-
 function labelAnchor(x: number): "start" | "middle" | "end" {
   if (x > CX + 4) return "start";
   if (x < CX - 4) return "end";
@@ -88,18 +78,13 @@ export function TelefunProfileRadar({
         height={HEIGHT}
         className="h-auto max-w-full overflow-visible"
       >
-        <path
-          d={`${ringPath(10)}${ringPath(TELEFUN_FIX_THRESHOLD)}`}
-          fillRule="evenodd"
-          className="fill-chart-green/8"
-        />
         {RINGS.map((ring) => (
           <path
             key={ring}
             d={ringPath(ring)}
             className={cn(
-              "fill-none stroke-border",
-              ring === 10 && "stroke-muted-foreground/40",
+              "fill-none",
+              ring === 10 ? "stroke-muted-foreground/60" : "stroke-border",
             )}
           />
         ))}
@@ -116,11 +101,6 @@ export function TelefunProfileRadar({
             />
           );
         })}
-        <path
-          d={ringPath(TELEFUN_FIX_THRESHOLD)}
-          strokeDasharray="4 3"
-          className="fill-none stroke-chart-green"
-        />
         <polygon
           points={polygon(scores)}
           className="fill-module-telefun/20 stroke-module-telefun"
@@ -135,9 +115,27 @@ export function TelefunProfileRadar({
               cx={x}
               cy={y}
               r={4.5}
-              className={cn("stroke-background", dotClass(axis.score))}
+              className="fill-module-telefun stroke-background"
               strokeWidth={1.5}
             />
+          );
+        })}
+        {RINGS.map((ring) => {
+          // Di garis bagi antara dua sumbu pertama, di tepi cincin, supaya
+          // angka skala tidak menimpa label sumbu atau titik hasil.
+          const angle = -Math.PI / 2 + Math.PI / AXES.length;
+          const r = (ring / 10) * RADIUS * Math.cos(Math.PI / AXES.length);
+          return (
+            <text
+              key={ring}
+              x={CX + r * Math.cos(angle) + 3}
+              y={CY + r * Math.sin(angle) - 2}
+              className="fill-fg2 stroke-background font-mono text-xs tabular-nums"
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
+              {ring}
+            </text>
           );
         })}
         {axes.map((axis, index) => {
@@ -165,21 +163,8 @@ export function TelefunProfileRadar({
           );
         })}
       </svg>
-      <figcaption className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-fg2">
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden="true"
-            className="size-2.5 rounded-sm border-2 border-module-telefun bg-module-telefun/20"
-          />
-          Hasil panggilan ini
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden="true"
-            className="size-2.5 rounded-sm border border-dashed border-chart-green bg-chart-green/10"
-          />
-          Zona sudah baik ({formatTelefunScore(TELEFUN_FIX_THRESHOLD)} ke atas)
-        </span>
+      <figcaption className="text-xs text-fg2">
+        Skala 0–10 · makin ke luar makin baik
       </figcaption>
     </figure>
   );
