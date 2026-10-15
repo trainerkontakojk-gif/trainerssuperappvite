@@ -73,8 +73,8 @@ describe("PhoneInterface retired provider compatibility", () => {
     render(<PhoneInterface config={config} accessToken="token" onEndSession={vi.fn()} />);
     await act(async () => vi.advanceTimersByTimeAsync(2_500));
     expect(activeSession.connect).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Akhiri" }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Akhiri" }));
       fireEvent.click(screen.getByRole("button", { name: "Akhiri panggilan" }));
     });
     expect(screen.getByRole("button", { name: "Coba lagi mengakhiri panggilan" })).toBeInTheDocument();
