@@ -206,6 +206,6 @@ annotations (`10a9711`) and Telaah ulang (`309facd`) in Telefun.
 - [x] Real-AI check: not run by the agent. Local `.env` points at the
       production Supabase project and no local Supabase was running, so a real
       scoring call would have read and written production. Fajar chose
-      (2026-10-15) to check it himself after deploy: open an older Telefun
+      (2026-10-15) to check it after deploy: open an older Telefun
       session in Telaah, press Telaah ulang, and review "Pertanyaan konsumen"
       and "Kalimat agen".
