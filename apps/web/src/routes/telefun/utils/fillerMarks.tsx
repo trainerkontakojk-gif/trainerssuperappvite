@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+import { escapeRegExp } from "../../../components/simulation/quoteMarks";
 
 /**
  * Pola kata pengisi utuh (bukan potongan kata lain), mis. "eee" tidak cocok

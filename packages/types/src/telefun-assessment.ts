@@ -119,6 +119,54 @@ export const NOT_USED_HOLD_ASSESSMENT: TelefunHoldAssessment = {
   exceededCount: 0,
 };
 
+export const TELEFUN_CONSUMER_POINT_STATUSES = [
+  "answered",
+  "partial",
+  "unanswered",
+] as const;
+export const TELEFUN_AGENT_NOTE_VERDICTS = ["good", "fix"] as const;
+
+const transcriptTimeSchema = finiteNumber.nonnegative();
+
+/** Pertanyaan/permintaan konsumen dan apakah agen sudah menjawabnya. */
+export const telefunConsumerPointSchema = z.object({
+  /** `startMs` baris konsumen yang memuat `quote`. */
+  startMs: transcriptTimeSchema,
+  quote: z.string(),
+  summary: z.string(),
+  status: z.enum(TELEFUN_CONSUMER_POINT_STATUSES),
+  reason: z.string().nullable(),
+  /** Baris agen yang menjawab; `null` bila belum ada. */
+  answerStartMs: transcriptTimeSchema.nullable(),
+  answerQuote: z.string().nullable(),
+});
+
+/** Kalimat agen yang dinilai, dengan kalimat yang lebih tepat bila perlu. */
+export const telefunAgentNoteSchema = z.object({
+  startMs: transcriptTimeSchema,
+  quote: z.string(),
+  verdict: z.enum(TELEFUN_AGENT_NOTE_VERDICTS),
+  note: z.string(),
+  /** Kalimat pengganti; hanya untuk `verdict: "fix"`. */
+  example: z.string().nullable(),
+});
+
+/**
+ * Anotasi isi percakapan dari transkrip dua arah. Kutipan sudah diperiksa
+ * backend terhadap baris pembicara yang benar.
+ */
+export const telefunContentReviewSchema = z.object({
+  caseCore: z.string().nullable(),
+  consumerPoints: z.array(telefunConsumerPointSchema).max(5),
+  agentNotes: z.array(telefunAgentNoteSchema).max(8),
+});
+
+export type TelefunConsumerPointStatus =
+  (typeof TELEFUN_CONSUMER_POINT_STATUSES)[number];
+export type TelefunConsumerPoint = z.infer<typeof telefunConsumerPointSchema>;
+export type TelefunAgentNote = z.infer<typeof telefunAgentNoteSchema>;
+export type TelefunContentReview = z.infer<typeof telefunContentReviewSchema>;
+
 export const voiceQualityAssessmentInputSchema = z.object({
   overallScore: scoreSchema,
   speakingRate: voiceAspectScoreSchema.extend({
@@ -140,6 +188,12 @@ export const voiceQualityAssessmentInputSchema = z.object({
     .catch(NOT_USED_HOLD_ASSESSMENT)
     .optional(),
   communicationProfile: z.unknown().optional(),
+  // `undefined`: hasil lama sebelum anotasi isi ada. `null`: tidak ada
+  // transkrip dua arah untuk ditelaah. Bentuk rusak diperlakukan sebagai lama.
+  contentReview: telefunContentReviewSchema
+    .nullable()
+    .optional()
+    .catch(undefined),
 });
 
 export const telefunScoreEnvelopeSchema = z.object({

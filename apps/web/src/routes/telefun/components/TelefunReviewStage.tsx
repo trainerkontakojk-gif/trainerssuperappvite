@@ -7,49 +7,34 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import { ArrowLeft, Download } from "lucide-react";
 import type {
-  CommunicationMetric,
   TelefunCoachingSummary,
   TelefunReplayAnnotation,
   TelefunTranscriptEntry,
-  VoiceQualityAssessment,
 } from "@trainers/types";
 import { cn } from "cn";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { withQuoteMarks } from "../../../components/simulation/quoteMarks";
 import { Button } from "../../../components/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../../../components/ui/tabs";
 import { useApi } from "../../../hooks/useApi";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { notify } from "../../../lib/toast";
-import {
-  getCommunicationProfileFromAssessment,
-  parseTelefunScoreResult,
-} from "../../../lib/voiceAssessmentUtils";
+import { parseTelefunScoreResult } from "../../../lib/voiceAssessmentUtils";
 import { useTelefunRecordingUrl } from "../hooks/useTelefunRecordingUrl";
 import type { CallRecord } from "../types";
 import { isTelefunRecordScored } from "../types";
+import { buildTelefunQuoteMarks } from "../utils/contentMarks";
 import { buildFillerPattern, withFillerMarks } from "../utils/fillerMarks";
 import {
-  TELEFUN_FIX_THRESHOLD,
-  firstFillerLine,
   formatCallDuration,
   formatClock,
-  formatTelefunScore,
   holdIntervals,
-  readTelefunAspects,
   readTelefunScore,
   sortTelefunNewestFirst,
   telefunAnalysisState,
-  telefunScoreVerdict,
-  type TelefunAspect,
 } from "../utils/reviewDisplay";
 import type {
   CoachingRecommendationItem,
@@ -59,17 +44,13 @@ import {
   TelefunCallPlayer,
   type TelefunCallPlayerHandle,
 } from "./TelefunCallPlayer";
+import { ReviewResult, ScoreOnly } from "./TelefunReviewResult";
 import { TelefunReviewStatus } from "./TelefunReviewStatus";
 import { TelefunStageNav } from "./TelefunStageNav";
 
 const ReplayAnnotator = lazy(() =>
   import("./ReplayAnnotator").then((module) => ({
     default: module.ReplayAnnotator,
-  })),
-);
-const VoiceRadarChart = lazy(() =>
-  import("./VoiceRadarChart").then((module) => ({
-    default: module.VoiceRadarChart,
   })),
 );
 
@@ -88,33 +69,6 @@ interface TelefunReviewStageProps {
 
 const sectionTitle =
   "font-display text-lg leading-7 font-bold tracking-tight text-foreground";
-
-/** Metrik profil komunikasi yang sepadan dengan aspek suara. */
-const PROFILE_KEY: Partial<
-  Record<TelefunAspect["key"], CommunicationMetric["key"]>
-> = {
-  speakingRate: "speakingRate",
-  intonation: "intonation",
-  articulation: "articulation",
-  fillerWords: "fillers",
-  emotionalTone: "tone",
-};
-
-function barColor(score: number): string {
-  if (score < TELEFUN_FIX_THRESHOLD) return "bg-chart-orange";
-  if (score >= 8.5) return "bg-chart-green";
-  return "bg-fg2";
-}
-
-function scoreChange(score: number, previous: number | null): string | null {
-  if (previous === null) return null;
-  const delta = Math.round((score - previous) * 10) / 10;
-  if (delta > 0)
-    return `naik ${formatTelefunScore(delta)} dari panggilan sebelumnya`;
-  if (delta < 0)
-    return `turun ${formatTelefunScore(-delta)} dari panggilan sebelumnya`;
-  return "sama dengan panggilan sebelumnya";
-}
 
 function previousScore(
   record: CallRecord,
@@ -181,7 +135,17 @@ export function TelefunReviewStage({
   const [highlighted, setHighlighted] = useState<number | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [tab, setTab] = useState("fix");
+  const [rerunOpen, setRerunOpen] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
+  const [rerunFailed, setRerunFailed] = useState(false);
+  // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null);
+  // Ada pertanyaan konsumen: tab itu dibuka lebih dulu.
+  const [tab, setTab] = useState(() =>
+    record.voiceAssessment?.contentReview?.consumerPoints.length
+      ? "questions"
+      : "fix",
+  );
   const recording = useTelefunRecordingUrl(record);
   const state = telefunAnalysisState(record);
   const transcript = useMemo(
@@ -192,6 +156,10 @@ export function TelefunReviewStage({
   const assessment = state === "scored" ? record.voiceAssessment : null;
   const fillerPattern = useMemo(
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
+    [assessment],
+  );
+  const quoteMarks = useMemo(
+    () => buildTelefunQuoteMarks(assessment?.contentReview),
     [assessment],
   );
 
@@ -302,6 +270,35 @@ export function TelefunReviewStage({
     }
   };
 
+  const rerun = async () => {
+    setRerunning(true);
+    setRerunFailed(false);
+    try {
+      const response = await unwrapResponse(
+        await telefunClient.score[":id"].rerun.$post({
+          param: { id: record.id },
+        }),
+      );
+      const result = parseTelefunScoreResult(response);
+      if (result) {
+        onRecordChange({
+          ...record,
+          score: result.score,
+          feedback: result.feedback,
+          voiceAssessment: result.assessment,
+          scoringStatus: "completed",
+        });
+      }
+      // Hasil sudah tersimpan di server; baris server dipakai bila sudah dinilai.
+      const fresh = await fetchDetail(record.id).catch(() => null);
+      if (fresh && isTelefunRecordScored(fresh)) onRecordChange(fresh);
+    } catch {
+      setRerunFailed(true);
+    } finally {
+      setRerunning(false);
+    }
+  };
+
   const addAnnotation = async (
     annotation: Omit<ReplayAnnotationItem, "id" | "isManual" | "createdBy">,
   ) => {
@@ -355,6 +352,7 @@ export function TelefunReviewStage({
 
   return (
     <div
+      ref={setLayer}
       data-module="telefun"
       className="fixed inset-0 z-[100] flex flex-col bg-background"
     >
@@ -474,9 +472,13 @@ export function TelefunReviewStage({
                           isAgent ? "text-foreground" : "text-fg2",
                         )}
                       >
-                        {isAgent
-                          ? withFillerMarks(entry.text, fillerPattern)
-                          : entry.text}
+                        {withQuoteMarks(
+                          entry.text,
+                          quoteMarks.get(entry.startMs) ?? [],
+                          isAgent
+                            ? (part) => withFillerMarks(part, fillerPattern)
+                            : undefined,
+                        )}
                       </span>
                     </li>
                     {holdsAfter.map((hold) => (
@@ -515,6 +517,9 @@ export function TelefunReviewStage({
               tab={tab}
               onTabChange={setTab}
               onShowLine={showLine}
+              rerunning={rerunning}
+              rerunFailed={rerunFailed}
+              onRerun={() => setRerunOpen(true)}
               notes={
                 <Suspense
                   fallback={
@@ -558,326 +563,20 @@ export function TelefunReviewStage({
           )}
         </section>
       </div>
-    </div>
-  );
-}
 
-/** Sesi lama yang punya skor tetapi tanpa rincian penilaian. */
-function ScoreOnly({ record }: { record: CallRecord }) {
-  const score = readTelefunScore(record) ?? 0;
-  return (
-    <div className="flex flex-col gap-3">
-      <ScoreBlock score={score} change={null} />
-      <p className="max-w-[60ch] text-[15px] leading-6 text-fg2">
-        Rincian per aspek tidak tersimpan untuk panggilan lama ini.
-      </p>
-      {record.feedback && (
-        <p className="max-w-[65ch] text-[15px] leading-6 whitespace-pre-wrap text-fg2">
-          {record.feedback}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ScoreBlock({
-  score,
-  change,
-}: {
-  score: number;
-  change: string | null;
-}) {
-  return (
-    <div className="flex flex-wrap items-end gap-x-5 gap-y-2 border-b border-border pb-5">
-      <div className="flex flex-col">
-        <span className="text-[13px] text-muted-foreground">Skor suara</span>
-        <span className="flex items-baseline gap-1.5">
-          <span
-            data-testid="telefun-voice-score"
-            className="font-mono text-5xl leading-none font-extrabold tracking-[-0.04em] text-foreground tabular-nums"
-          >
-            {formatTelefunScore(score)}
-          </span>
-          <span className="font-mono text-lg font-medium text-muted-foreground">
-            / 10
-          </span>
-        </span>
-      </div>
-      <p className="flex flex-col pb-1">
-        <strong className="font-semibold text-foreground">
-          {telefunScoreVerdict(score)}
-        </strong>
-        {change && (
-          <span className="text-[13px] text-muted-foreground">{change}</span>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function ReviewResult({
-  record,
-  assessment,
-  previous,
-  transcript,
-  tab,
-  onTabChange,
-  onShowLine,
-  notes,
-}: {
-  record: CallRecord;
-  assessment: VoiceQualityAssessment;
-  previous: number | null;
-  transcript: readonly TelefunTranscriptEntry[];
-  tab: string;
-  onTabChange: (tab: string) => void;
-  onShowLine: (startMs: number) => void;
-  notes: ReactNode;
-}) {
-  const score = readTelefunScore(record) ?? assessment.overallScore;
-  const aspects = readTelefunAspects(assessment);
-  const profile = getCommunicationProfileFromAssessment(assessment);
-  const scored = aspects.filter(
-    (aspect): aspect is TelefunAspect & { score: number } =>
-      aspect.score !== null,
-  );
-  const toFix = scored
-    .filter((aspect) => aspect.score < TELEFUN_FIX_THRESHOLD)
-    .sort((a, b) => a.score - b.score);
-  const good = scored.filter((aspect) => aspect.score >= TELEFUN_FIX_THRESHOLD);
-  const fillerLine = firstFillerLine(
-    transcript,
-    assessment.fillerWords.examples,
-  );
-  const metricOf = (aspect: TelefunAspect) => {
-    const key = PROFILE_KEY[aspect.key];
-    return key
-      ? profile?.metrics.find((metric) => metric.key === key)
-      : undefined;
-  };
-  const nextSteps = assessment.overallNextSteps ?? [];
-
-  return (
-    <>
-      <ScoreBlock score={score} change={scoreChange(score, previous)} />
-
-      <ul aria-label="Skor per aspek" className="flex flex-col gap-3">
-        {aspects.map((aspect) => (
-          <li
-            key={aspect.key}
-            className="grid grid-cols-[minmax(0,9.5rem)_1fr_2.5rem] items-center gap-x-3 gap-y-0.5 text-[13px]"
-          >
-            <span className="text-fg2">{aspect.label}</span>
-            <span
-              aria-hidden="true"
-              className="h-1.5 overflow-hidden rounded-full bg-surface-sunken"
-            >
-              {aspect.score !== null && (
-                <span
-                  className={cn(
-                    "block h-full rounded-full",
-                    barColor(aspect.score),
-                  )}
-                  style={{
-                    width: `${Math.max(0, Math.min(100, aspect.score * 10))}%`,
-                  }}
-                />
-              )}
-            </span>
-            <span className="text-right font-mono font-bold text-foreground tabular-nums">
-              {aspect.score !== null ? formatTelefunScore(aspect.score) : "–"}
-            </span>
-            {aspect.raw && (
-              <span className="col-start-2 col-end-4 text-xs text-muted-foreground">
-                {aspect.raw}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          if (typeof value === "string") onTabChange(value);
+      <ConfirmDialog
+        open={rerunOpen}
+        title="Telaah ulang panggilan ini?"
+        description="AI menilai suara dan isi panggilan ini sekali lagi, lalu hasil sekarang diganti dengan yang baru. Bila telaah ulang gagal, hasil sekarang tetap dipakai."
+        confirmLabel="Telaah ulang"
+        confirmVariant="default"
+        container={layer}
+        onCancel={() => setRerunOpen(false)}
+        onConfirm={() => {
+          setRerunOpen(false);
+          void rerun();
         }}
-        className="gap-4"
-      >
-        <TabsList
-          variant="line"
-          aria-label="Rincian telaah"
-          className="relative w-full justify-start overflow-x-auto border-b border-border"
-        >
-          <TabsTrigger
-            value="fix"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Perbaiki dulu ({toFix.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="good"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Sudah baik ({good.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="notes"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Catatan trainer
-          </TabsTrigger>
-          <TabsTrigger
-            value="profile"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Profil
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="fix" className="flex flex-col gap-3">
-          {toFix.length === 0 ? (
-            <Empty>
-              Tidak ada aspek dengan skor di bawah{" "}
-              {formatTelefunScore(TELEFUN_FIX_THRESHOLD)}.
-            </Empty>
-          ) : (
-            <ol className="flex flex-col gap-3">
-              {toFix.map((aspect) => {
-                const metric = metricOf(aspect);
-                const line = aspect.key === "fillerWords" ? fillerLine : null;
-                const tip =
-                  metric?.improvementTip ??
-                  metric?.drill ??
-                  (aspect.key === "holdManagement"
-                    ? assessment.holdManagement?.drill
-                    : undefined);
-                return (
-                  <li
-                    key={aspect.key}
-                    className="flex flex-col gap-1.5 rounded-xl border border-border bg-background px-4 py-3"
-                  >
-                    {line ? (
-                      <button
-                        type="button"
-                        onClick={() => onShowLine(line.startMs)}
-                        className="-my-2 min-h-[44px] self-start text-left font-mono text-xs font-medium text-module-telefun hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        {formatClock(line.startMs)} · {aspect.label}
-                      </button>
-                    ) : (
-                      <span className="font-mono text-xs font-medium text-module-telefun">
-                        {aspect.label}
-                      </span>
-                    )}
-                    <p className="text-sm text-foreground">{aspect.feedback}</p>
-                    {tip && (
-                      <p className="rounded-lg bg-muted px-3 py-2 text-[13px] leading-6 text-foreground">
-                        <span className="font-semibold">Latihan: </span>
-                        {tip}
-                      </p>
-                    )}
-                    {metric?.examplePhrase && (
-                      <p className="text-[13px] leading-6 text-fg2">
-                        Contoh: “{metric.examplePhrase}”
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          {nextSteps.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Langkah latihan berikutnya
-              </h4>
-              <PlainList items={nextSteps.slice(0, 3)} ordered />
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="good" className="flex flex-col gap-3">
-          {good.map((aspect) => (
-            <article
-              key={aspect.key}
-              className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3"
-            >
-              <h4 className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-semibold text-foreground">
-                {aspect.label}
-                <span className="font-mono text-xs font-medium text-muted-foreground">
-                  {formatTelefunScore(aspect.score)} · {aspect.verdict}
-                </span>
-              </h4>
-              <p className="text-[13px] leading-6 text-fg2">
-                {aspect.feedback}
-              </p>
-            </article>
-          ))}
-          {assessment.strengths.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Kekuatan
-              </h4>
-              <PlainList items={assessment.strengths} />
-            </div>
-          )}
-          {good.length === 0 && assessment.strengths.length === 0 && (
-            <Empty>
-              Belum ada aspek dengan skor{" "}
-              {formatTelefunScore(TELEFUN_FIX_THRESHOLD)} ke atas.
-            </Empty>
-          )}
-        </TabsContent>
-
-        <TabsContent value="notes">{notes}</TabsContent>
-
-        <TabsContent value="profile" className="flex flex-col gap-3">
-          {profile ? (
-            <>
-              <p className="max-w-[65ch] text-[13px] leading-6 text-fg2">
-                {profile.overallSummary}
-              </p>
-              <Suspense
-                fallback={
-                  <p className="text-[13px] text-muted-foreground">
-                    Memuat diagram…
-                  </p>
-                }
-              >
-                <VoiceRadarChart profile={profile} compact />
-              </Suspense>
-            </>
-          ) : (
-            <Empty>Profil komunikasi belum tersedia untuk panggilan ini.</Empty>
-          )}
-        </TabsContent>
-      </Tabs>
-    </>
+      />
+    </div>
   );
-}
-
-function PlainList({
-  items,
-  ordered = false,
-}: {
-  items: readonly string[];
-  ordered?: boolean;
-}) {
-  const List = ordered ? "ol" : "ul";
-  return (
-    <List
-      className={cn(
-        "flex flex-col gap-1.5 pl-5 text-[13px] leading-6 text-fg2 marker:text-muted-foreground",
-        ordered ? "list-decimal" : "list-disc",
-      )}
-    >
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
-      ))}
-    </List>
-  );
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return <p className="text-[13px] text-muted-foreground">{children}</p>;
 }

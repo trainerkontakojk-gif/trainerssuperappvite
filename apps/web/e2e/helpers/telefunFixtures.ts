@@ -179,6 +179,62 @@ export const REVIEWED_ROW: TelefunRow = {
   ],
 };
 
+/** Anotasi isi dari AI; kutipan disalin dari `REVIEWED_ROW.messages`. */
+export const CONTENT_REVIEW = {
+  caseCore:
+    "Klaim asuransi konsumen ditolak; ia ingin tahu alasannya dan langkah berikutnya.",
+  consumerPoints: [
+    {
+      startMs: 4000,
+      quote: "kok klaim asuransi saya ditolak",
+      summary: "Alasan klaim ditolak",
+      status: "partial",
+      reason:
+        "Agen menyebut kewajiban penjelasan tertulis, tetapi belum menjelaskan alasannya.",
+      answerStartMs: 78000,
+      answerQuote:
+        "perusahaan wajib menjelaskan dasar penolakannya secara tertulis",
+    },
+    {
+      startMs: 150000,
+      quote: "Terus saya harus ngapain sekarang?",
+      summary: "Langkah berikutnya",
+      status: "unanswered",
+      reason: "Panggilan berakhir sebelum agen memberi langkah.",
+      answerStartMs: null,
+      answerQuote: null,
+    },
+  ],
+  agentNotes: [
+    {
+      startMs: 11000,
+      quote: "Boleh saya catat nama perusahaannya?",
+      verdict: "good",
+      note: "Menggali data perusahaan sebelum menjawab.",
+      example: null,
+    },
+    {
+      startMs: 36000,
+      quote: "saya cek dulu ya aturannya",
+      verdict: "fix",
+      note: "Konsumen tidak tahu berapa lama harus menunggu.",
+      example: "Mohon izin, saya cek aturannya sekitar satu menit ya, Bu.",
+    },
+  ],
+};
+
+/** Penilaian suara yang sudah memuat anotasi isi. */
+export function annotatedAssessment(
+  overrides: Partial<Record<string, number>> = {},
+) {
+  return { ...voiceAssessment(overrides), contentReview: CONTENT_REVIEW };
+}
+
+export const ANNOTATED_ROW: TelefunRow = {
+  ...REVIEWED_ROW,
+  voice_assessment: annotatedAssessment(),
+};
+
 /** Telaah lebih lama: dasar rata-rata dan fokus. */
 export const OLDER_REVIEWED_ROW: TelefunRow = {
   ...REVIEWED_ROW,

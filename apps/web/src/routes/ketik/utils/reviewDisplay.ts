@@ -180,26 +180,3 @@ export function formatKetikDate(value: string): string {
   const time = toTime(value);
   return time ? WIB_DATE_TIME.format(time) : "-";
 }
-
-export function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * Posisi kutipan anotasi di teks pesan yang ditampilkan. Huruf besar/kecil dan
- * jumlah spasi diabaikan, sama seperti pencocokan di backend; `null` bila tidak
- * ketemu (catatan tetap tampil di panel hasil).
- */
-export function findQuoteRange(
-  text: string,
-  quote: string,
-): { start: number; end: number } | null {
-  const words = quote.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return null;
-  const match = new RegExp(words.map(escapeRegExp).join("\\s+"), "i").exec(
-    text,
-  );
-  return match
-    ? { start: match.index, end: match.index + match[0].length }
-    : null;
-}

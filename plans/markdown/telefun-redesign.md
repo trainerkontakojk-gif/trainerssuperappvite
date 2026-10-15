@@ -135,3 +135,62 @@ only); content assessment (did the agent answer) is a separate backend PR.
 - `pnpm typecheck`, `pnpm lint` (0 errors), `pnpm build`, `git diff --check`, `graphify update .` → exit 0.
 - Not run (needs Fajar's approval for unit tests): updated `telefun-phone-interface-end-call`, `telefun-phone-interface-openai-webrtc`, `telefun-scenario-description-limit`, `telefun-microphone-activity`.
 - Also fixed: `Layout.tsx` redirected to `/telefun` on first access grant, dropping Telefun deep links.
+
+## Anotasi isi dan Telaah ulang (added 2026-10-15)
+
+Lane C (backend + API contract + UI). Fajar asked for the KETIK Telaah
+annotations (`10a9711`) and Telaah ulang (`309facd`) in Telefun.
+
+### Requirement
+
+1. **Anotasi isi.** The AI scoring call also reads the stored two-way
+   transcript (`telefun_history.messages`) and returns: case core (1–2
+   sentences), up to 5 consumer questions with Terjawab/Sebagian/Belum terjawab
+   and the agent line that answered, and up to 8 assessed agent lines with a
+   better sentence for "Perlu diperbaiki". Only quotes really present in a line
+   of the right speaker are kept. The Telaah stage shows "Inti kasus" above
+   the tabs, tabs "Pertanyaan konsumen" (default when there are points) and
+   "Kalimat agen", quote marks in the transcript (filler marks stay inside),
+   and buttons that jump to the line's time. Older results show "Belum
+   tersedia" and point to Telaah ulang; a call without a transcript says so.
+2. **Telaah ulang.** A scored session can be analysed again from the Telaah
+   stage: outline button next to the score, always behind `ConfirmDialog`.
+   While it runs the current result stays visible with a status line. If it
+   fails the previous result is kept and a `role="alert"` notice says so,
+   without raw codes.
+
+### Design
+
+- Types: `telefunContentReviewSchema` (`caseCore`, `consumerPoints`
+  {startMs, quote, summary, status, reason, answerStartMs, answerQuote},
+  `agentNotes` {startMs, quote, verdict, note, example}) as optional
+  `contentReview` inside the voice assessment JSONB. `undefined` = legacy
+  result, `null` = no transcript to read. No migration.
+- API `lib/telefun-content-review.ts`: prompt section with numbered lines,
+  extra AI response properties (the shared voice JSON schema used by the
+  retired OpenAI path is not changed), and `normalizeTelefunContentReview`
+  (line + speaker check, quote search fallback, length limits,
+  `sanitizeAiResponse`). `analyzeVoiceQuality` reads `messages`, adds the
+  section, and takes `{ fresh: true }` to skip the cached result.
+- API `POST /telefun/score/:id/rerun` in `routes/telefun/rerun.ts` (owner only, `aiRateLimitMiddleware`):
+  conditional update `scoring_status completed → processing` with a fresh
+  claim token (busy → 409 `SCORING_IN_PROGRESS`), fresh analysis, then the
+  fenced `complete_telefun_scoring` RPC. On failure the token-fenced row is
+  put back to `completed`; the old score/assessment were never cleared
+  (502 `RERUN_FAILED`, `details.previousKept`). If the restore itself fails,
+  the stale-claim worker later completes the row from the cached old result.
+- Web: shared quote-mark helpers move to `components/simulation/quoteMarks.tsx`
+  (KETIK keeps its behavior); `TelefunContentReview.tsx` renders the tabs'
+  items; the result panel moves to `TelefunReviewResult.tsx` (keeps both
+  files under ~1,000 lines); the stage gets the dialog and rerun state.
+
+### Tasklist
+
+- [x] RED: `telefun-flow.spec.ts` — annotated result (inti kasus, default tab,
+      status by line style + text, jump to line, marks in transcript with
+      filler marks kept), legacy "Belum tersedia", rerun success (cancel sends
+      nothing; new result replaces old), rerun failure keeps old result.
+- [x] GREEN: types, API helper + analysis + route, web.
+- [x] Docs: `docs/design.md`, `docs/telefun.md`, `docs/auth-rbac.md`.
+- [x] Gates: focused E2E (telefun-flow, ketik-flow for the shared helper),
+      typecheck web/api/telefun, lint, build, `git diff --check`.

@@ -1,6 +1,7 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
 import {
+  parseTelefunTranscript,
   parseVoiceQualityAssessment,
   TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
 } from "@trainers/types";
@@ -15,6 +16,12 @@ import {
 import {
   TELEFUN_OPENAI_SCORING_DISABLED_REASON,
 } from "./telefun-openai-assessment";
+import {
+  buildTelefunContentReviewPrompt,
+  canReviewTelefunContent,
+  normalizeTelefunContentReview,
+  TELEFUN_CONTENT_REVIEW_AI_PROPERTIES,
+} from "./telefun-content-review";
 
 export type { VoiceQualityAssessment };
 
@@ -58,6 +65,8 @@ export async function analyzeVoiceQuality(
   sessionId: string,
   userId: string,
   signal?: AbortSignal,
+  /** `fresh`: abaikan hasil tersimpan (Telaah ulang). */
+  options: { fresh?: boolean } = {},
 ): Promise<{
   success: boolean;
   assessment?: VoiceQualityAssessment;
@@ -65,11 +74,11 @@ export async function analyzeVoiceQuality(
 }> {
   const adminClient = createAdminClient();
 
-  // 1. Fetch paths and session_metrics
+  // 1. Fetch paths, session_metrics, and the two-way transcript
   const { data: row, error: fetchError } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, status, scenario_title, agent_recording_path, voice_assessment, session_metrics, telefun_model_id, telefun_transport, scoring_ready_at",
+      "id, user_id, status, scenario_title, agent_recording_path, voice_assessment, session_metrics, messages, telefun_model_id, telefun_transport, scoring_ready_at",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -92,7 +101,9 @@ export async function analyzeVoiceQuality(
   const holdAssessment = evaluateTelefunHoldAssessment(holdMetrics);
 
   // 2. Return cached if exists, valid, and LENGKAP sesuai 5 indikator (tidak singkat)
-  const parsedCached = parseVoiceQualityAssessment(row.voice_assessment);
+  const parsedCached = options.fresh
+    ? null
+    : parseVoiceQualityAssessment(row.voice_assessment);
   if (parsedCached && isTelefunAssessmentDetailed(parsedCached)) {
     let assessment = parsedCached;
 
@@ -179,8 +190,11 @@ export async function analyzeVoiceQuality(
 
   if (signal?.aborted) return { success: false, error: "Scoring aborted" };
 
+  const transcript = parseTelefunTranscript(row.messages);
+  const reviewContent = canReviewTelefunContent(transcript);
+
   // 4. Call Gemini — penilaian lengkap sesuai 5 indikator wajib, tidak boleh singkat
-  const prompt = `
+  const voicePrompt = `
     TUGAS: Analisis REKAMAN AUDIO AGEN saja (abaikan suara konsumen/AI) untuk simulasi telemarketing/customer service OJK 157.
     Skenario: ${row.scenario_title}
 
@@ -233,6 +247,18 @@ export async function analyzeVoiceQuality(
     8. Jangan mengarang target radar — target QA dihitung sistem.
     9. JANGAN berikan jawaban singkat, template, atau generik. Setiap kalimat harus membawa informasi baru yang spesifik dan dapat ditindaklanjuti.
   `;
+  const prompt = reviewContent
+    ? voicePrompt + buildTelefunContentReviewPrompt(transcript)
+    : voicePrompt;
+  const responseSchema = reviewContent
+    ? {
+        ...TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
+        properties: {
+          ...TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA.properties,
+          ...TELEFUN_CONTENT_REVIEW_AI_PROPERTIES,
+        },
+      }
+    : TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA;
 
   // Keep this check immediately adjacent to the provider boundary. Once the
   // provider request has started, its logging/cost contract is unchanged.
@@ -251,7 +277,7 @@ export async function analyzeVoiceQuality(
       },
     ],
     responseMimeType: "application/json",
-    responseSchema: TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA as any,
+    responseSchema: responseSchema as any,
     usageContext: { module: "telefun", action: "voice_assessment" },
     userId,
   });
@@ -267,6 +293,10 @@ export async function analyzeVoiceQuality(
 
       const assessment = parseVoiceQualityAssessment({
         ...parsed,
+        // Anotasi isi tidak memengaruhi skor; tanpa transkrip dua arah `null`.
+        contentReview: reviewContent
+          ? normalizeTelefunContentReview(rawJson, transcript)
+          : null,
         holdManagement: holdAssessment,
         overallScore: applyHoldAssessmentToOverallScore(
           parsed.overallScore,

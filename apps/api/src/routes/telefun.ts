@@ -7,6 +7,7 @@ import { telefunRecordings } from "./telefun/recordings";
 import { telefunSettings } from "./telefun/settings";
 import { telefunAnnotations } from "./telefun/annotations";
 import { telefunRemuxRecording } from "./telefun/remux-recording";
+import { telefunRerun } from "./telefun/rerun";
 
 type Variables = { user: User; profile: any };
 const telefun = new Hono<{ Variables: Variables }>();
@@ -20,6 +21,7 @@ telefun.route("/", telefunRecordings);
 telefun.route("/", telefunSettings);
 telefun.route("/", telefunAnnotations);
 telefun.route("/", telefunRemuxRecording);
+telefun.route("/", telefunRerun);
 
 export { telefun };
 

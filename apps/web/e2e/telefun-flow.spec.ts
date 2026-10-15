@@ -10,6 +10,7 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import {
+  ANNOTATED_ROW,
   FAILED_ROW,
   FULL_HISTORY,
   NO_RECORDING_ROW,
@@ -19,6 +20,7 @@ import {
   serveRecording,
   telefunMocks,
   voiceAssessment,
+  annotatedAssessment,
   type TelefunRow,
 } from "./helpers/telefunFixtures";
 
@@ -362,6 +364,172 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await expect(result.getByTestId("telefun-voice-score")).toHaveText("8,1");
     await waitForMockedApi(audit, [
       `POST /api/v1/telefun/score/${FAILED_ROW.id}`,
+    ]);
+    expectHermetic(audit);
+  });
+
+  test("anotasi isi: inti kasus, pertanyaan konsumen berstatus, kalimat agen, dan tanda di transkrip", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, ANNOTATED_ROW, [], [
+      ANNOTATED_ROW,
+      ...FULL_HISTORY.filter((row) => row.id !== ANNOTATED_ROW.id),
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(result.getByRole("region", { name: "Inti kasus" })).toContainText(
+      "Klaim asuransi konsumen ditolak",
+      { timeout: 20000 },
+    );
+
+    // Ada poin konsumen: tab Pertanyaan konsumen terbuka lebih dulu.
+    await expect(
+      result.getByRole("tab", { name: "Pertanyaan konsumen (2)" }),
+    ).toHaveAttribute("aria-selected", "true");
+    const points = result.getByRole("list", { name: "Pertanyaan konsumen" });
+    const first = points.getByRole("listitem").nth(0);
+    await expect(first).toContainText("A");
+    await expect(first).toContainText("Alasan klaim ditolak");
+    await expect(first).toContainText("Sebagian");
+    await expect(first).toContainText("belum menjelaskan alasannya");
+    await expect(first.getByRole("button", { name: /Dijawab di 01\.18/ })).toBeVisible();
+    const second = points.getByRole("listitem").nth(1);
+    await expect(second).toContainText("Belum terjawab");
+    await expect(second).toContainText("Belum ada jawaban agen untuk pertanyaan ini.");
+
+    // Tombol kutipan menuju baris transkrip.
+    await first.getByRole("button", { name: /Konsumen 00\.04/ }).click();
+    await expect(transcript.getByTestId("telefun-line-00.04")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+
+    // Kutipan ditandai di transkrip; kata pengisi tetap bertanda.
+    const consumerMark = transcript
+      .getByTestId("telefun-line-00.04")
+      .locator("mark", { hasText: "kok klaim asuransi saya ditolak" });
+    await expect(consumerMark).toContainText("A");
+    const agentLine = transcript.getByTestId("telefun-line-00.36");
+    await expect(
+      agentLine.locator("mark", { hasText: "saya cek dulu ya aturannya" }),
+    ).toContainText("2");
+    await expect(agentLine.locator("mark", { hasText: /^Eee$/ })).toHaveCount(1);
+
+    await result.getByRole("tab", { name: "Kalimat agen (2)" }).click();
+    const notes = result.getByRole("list", { name: "Kalimat agen" });
+    await expect(notes.getByRole("listitem").nth(0)).toContainText("Sudah tepat");
+    const fix = notes.getByRole("listitem").nth(1);
+    await expect(fix).toContainText("Perlu diperbaiki");
+    await expect(fix).toContainText(
+      "Kalimat yang lebih tepat: Mohon izin, saya cek aturannya sekitar satu menit ya, Bu.",
+    );
+    await fix.getByRole("button", { name: /Agen 00\.36/ }).click();
+    await expect(agentLine).toHaveAttribute("data-highlighted", "true");
+    expectHermetic(audit);
+  });
+
+  test("hasil lama tanpa anotasi menulis Belum tersedia dan menunjuk Telaah ulang", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, REVIEWED_ROW);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("7,6", {
+      timeout: 20000,
+    });
+    await expect(result.getByRole("region", { name: "Inti kasus" })).toHaveCount(0);
+    await expect(result.getByRole("tab", { name: /^Perbaiki dulu/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await result.getByRole("tab", { name: "Pertanyaan konsumen" }).click();
+    await expect(result.getByText(/Belum tersedia untuk hasil ini/)).toContainText(
+      "Telaah ulang",
+    );
+    expectHermetic(audit);
+  });
+
+  test("telaah ulang: konfirmasi, batal tidak mengirim, hasil baru menggantikan yang lama", async ({
+    page,
+  }) => {
+    const fresh = annotatedAssessment({ overall: 8.3 });
+    const audit = await openTelaah(page, REVIEWED_ROW, [
+      {
+        method: "POST",
+        path: `/api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
+        body: {
+          success: true,
+          data: { score: 8.3, feedback: "Baik", assessment: fresh },
+        },
+      },
+      {
+        method: "GET",
+        path: `/api/v1/telefun/history/${REVIEWED_ROW.id}`,
+        body: {
+          success: true,
+          data: { ...REVIEWED_ROW, score: 8.3, voice_assessment: fresh },
+        },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("7,6", {
+      timeout: 20000,
+    });
+
+    await result.getByRole("button", { name: "Telaah ulang" }).click();
+    const dialog = page.getByRole("dialog", { name: "Telaah ulang panggilan ini?" });
+    await expect(dialog).toContainText("hasil sekarang tetap dipakai");
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(audit.mockedApi.filter((entry) => entry.includes("/rerun"))).toEqual([]);
+
+    await result.getByRole("button", { name: "Telaah ulang" }).click();
+    await page
+      .getByRole("dialog", { name: "Telaah ulang panggilan ini?" })
+      .getByRole("button", { name: "Telaah ulang" })
+      .click();
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("8,3");
+    await expect(result.getByRole("region", { name: "Inti kasus" })).toBeVisible();
+    await waitForMockedApi(audit, [
+      `POST /api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
+    ]);
+    expectHermetic(audit);
+  });
+
+  test("telaah ulang yang gagal melapor jujur dan hasil lama tetap tampil", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, REVIEWED_ROW, [
+      {
+        method: "POST",
+        path: `/api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
+        status: 502,
+        body: {
+          success: false,
+          error: {
+            code: "RERUN_FAILED",
+            message: "Telaah ulang belum berhasil.",
+            details: { previousKept: true },
+          },
+        },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result
+      .getByRole("button", { name: "Telaah ulang" })
+      .click({ timeout: 20000 });
+    await page
+      .getByRole("dialog", { name: "Telaah ulang panggilan ini?" })
+      .getByRole("button", { name: "Telaah ulang" })
+      .click();
+    const notice = result.getByRole("alert");
+    await expect(notice).toContainText("Telaah ulang belum berhasil");
+    await expect(notice).toContainText("Hasil sebelumnya tetap ditampilkan");
+    await expect(notice).not.toContainText("RERUN_FAILED");
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("7,6");
+    await waitForMockedApi(audit, [
+      `POST /api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
     ]);
     expectHermetic(audit);
   });

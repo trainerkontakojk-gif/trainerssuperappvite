@@ -97,6 +97,20 @@ historis tidak berubah.
   tercapai dan lease database menjadi recovery backstop tanpa retry kedua.
   Embedded mode tidak membuka health server kedua. Startup dan transisi error /
   recovery hanya mencatat field bounded (interval, batch, lease, kelas error).
+- Bila transkrip dua arah (`telefun_history.messages`) memuat konsumen dan
+  agen, panggilan scoring yang sama juga meminta anotasi isi. Backend
+  (`lib/telefun-content-review.ts`) hanya menyimpan kutipan yang ada di baris
+  pembicara yang tepat dan menaruhnya di `voice_assessment.contentReview`
+  (`undefined` = hasil lama, `null` = tidak ada transkrip). Skor tidak
+  dipengaruhi.
+- **Telaah ulang** `POST /v1/telefun/score/:id/rerun` (pemilik sesi,
+  `aiRateLimitMiddleware`): `completed` → `processing` bersyarat dengan klaim
+  bertoken baru (sedang berjalan → 409 `SCORING_IN_PROGRESS`), analisis baru
+  tanpa cache, lalu RPC completion yang sama. Bila gagal, baris yang masih
+  dipegang token itu dikembalikan ke `completed` dengan hasil lama (502
+  `RERUN_FAILED`, `details.previousKept`). Bila pemulihan pun gagal, worker
+  mengambil klaim basi setelah lease dan menyelesaikannya dari hasil lama yang
+  tersimpan.
 - `GET /api/health` hanya membuktikan liveness API. Kesehatan polling worker
   perlu dibuktikan lewat log runtime bounded dan queue readback.
 

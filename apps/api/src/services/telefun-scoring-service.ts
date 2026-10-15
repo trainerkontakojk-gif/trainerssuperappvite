@@ -575,3 +575,59 @@ export async function fetchPendingJobs(
       userId: row.user_id,
     }));
 }
+
+export const TELEFUN_SCORING_CLAIM_OWNER_RERUN = "api-route-rerun";
+
+/**
+ * Membuka hasil yang sudah selesai untuk Telaah ulang: `completed` →
+ * `processing` dengan klaim bertoken baru, bersyarat pada status supaya dua
+ * permintaan bersamaan tidak sama-sama jalan. Skor dan penilaian lama tidak
+ * dihapus; RPC `complete_telefun_scoring` menggantinya bila AI berhasil.
+ * Mengembalikan hash klaim, atau `null` bila sesi tidak dalam keadaan selesai.
+ */
+export async function claimCompletedScoringForRerun(
+  sessionId: string,
+): Promise<string | null> {
+  const adminClient = createAdminClient();
+  const { claimTokenHash } = newScoringClaim();
+  const { data, error } = await adminClient
+    .from("telefun_history")
+    .update({
+      scoring_status: "processing",
+      scoring_claimed_at: new Date().toISOString(),
+      scoring_claim_token_hash: claimTokenHash,
+      scoring_claim_owner: TELEFUN_SCORING_CLAIM_OWNER_RERUN,
+      scoring_last_error: null,
+      scoring_next_attempt_at: null,
+    })
+    .eq("id", sessionId)
+    .eq("scoring_status", "completed")
+    .select("id");
+  if (error) throw error;
+  return data && data.length > 0 ? claimTokenHash : null;
+}
+
+/**
+ * Telaah ulang gagal: sesi kembali `completed` dengan hasil lama, hanya bila
+ * klaim ini masih pemiliknya. Bila pemulihan gagal, pekerja scoring mengambil
+ * klaim basi itu dan menyelesaikannya dari hasil lama yang tersimpan.
+ */
+export async function restoreScoringAfterFailedRerun(
+  sessionId: string,
+  claimTokenHash: string,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
+    .from("telefun_history")
+    .update({
+      scoring_status: "completed",
+      scoring_claim_token_hash: null,
+      scoring_claim_owner: null,
+    })
+    .eq("id", sessionId)
+    .eq("scoring_status", "processing")
+    .eq("scoring_claim_token_hash", claimTokenHash)
+    .select("id");
+  if (error) return false;
+  return Boolean(data && data.length > 0);
+}
