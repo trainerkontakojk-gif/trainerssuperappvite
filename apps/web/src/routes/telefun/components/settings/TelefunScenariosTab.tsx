@@ -17,6 +17,8 @@ import {
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { normalizeTelefunScenarioDraft } from "./telefunDraftNormalizers";
 
+const ALL_CATEGORIES = "";
+
 interface TelefunScenariosTabProps {
   /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
   confirmContainer?: HTMLElement | null;
@@ -32,6 +34,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
   setLocalSettings,
 }) => {
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
   const [pendingConfirm, setPendingConfirm] = useState<
     { kind: "discard" } | { kind: "delete"; id: string } | null
   >(null);
@@ -40,7 +43,11 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
 
   const categories = Array.from(
-    new Set(scenarios.map((scenario) => scenario.category)),
+    new Set(
+      scenarios.flatMap((scenario) =>
+        scenario.category ? [scenario.category] : [],
+      ),
+    ),
   );
   const activeCount = scenarios.filter((scenario) => scenario.isActive).length;
   const totalScenarios = scenarios.length;
@@ -98,14 +105,19 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
     />
   );
 
+  // Kategori yang hilang (skenario terakhirnya dihapus) kembali ke "Semua".
+  const activeCategory = categories.includes(categoryFilter)
+    ? categoryFilter
+    : ALL_CATEGORIES;
   const normalizedQuery = query.trim().toLowerCase();
-  const visible = normalizedQuery
-    ? scenarios.filter((scenario) =>
+  const visible = scenarios.filter(
+    (scenario) =>
+      (!activeCategory || scenario.category === activeCategory) &&
+      (!normalizedQuery ||
         [scenario.title, scenario.category].some((text) =>
           (text || "").toLowerCase().includes(normalizedQuery),
-        ),
-      )
-    : scenarios;
+        )),
+  );
 
   const handleAddClick = () => {
     scenarioForm.openAdd();
@@ -117,7 +129,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
   const handleEditClick = (scenario: Scenario) => {
     scenarioForm.openEdit(scenario);
     setNewScenarioCategory(scenario.category || "");
-    setIsNewCategoryInput(!categories.includes(scenario.category));
+    setIsNewCategoryInput(false);
     setIsScenarioScriptEnabled(Boolean(scenario.script?.trim()));
   };
 
@@ -154,25 +166,29 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
   if (scenarioForm.isOpen) {
     return (
-      <div className="flex flex-col gap-6">
+      <div id="scenario-form" className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            {scenarioForm.editingId ? "Edit Skenario" : "Tambah Skenario Baru"}
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            {scenarioForm.editingId ? "Ubah skenario" : "Skenario baru"}
           </h3>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleCancelScenarioForm}
-            className="text-muted-foreground hover:text-foreground"
+            className="min-h-[44px] text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft data-icon="inline-start" />
             Kembali ke daftar
           </Button>
         </div>
 
-        <div id="scenario-form" className="flex flex-col gap-4">
-          <SettingsField label="Kategori" id="telefun-scenario-category">
+        <div className="flex flex-col gap-6">
+          <SettingsField
+            label="Kategori"
+            id="telefun-scenario-category"
+            required
+          >
             {!isNewCategoryInput ? (
               <SettingsSelect
                 id="telefun-scenario-category"
@@ -188,13 +204,13 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                   }
                 }}
               >
-                <option value="">Pilih Kategori</option>
+                <option value="">Pilih kategori</option>
                 {categories.map((category) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
                 ))}
-                <option value="NEW">+ Tambah Kategori Lainnya</option>
+                <option value="NEW">+ Kategori baru</option>
               </SettingsSelect>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -205,13 +221,14 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                     setNewScenarioCategory(event.target.value);
                     scenarioForm.setDraft({ category: event.target.value });
                   }}
-                  placeholder="Kategori Baru"
+                  placeholder="Nama kategori baru"
                   className="min-w-48 flex-1"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setIsNewCategoryInput(false)}
+                  className="min-h-[44px]"
                 >
                   Batal
                 </Button>
@@ -219,7 +236,11 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             )}
           </SettingsField>
 
-          <SettingsField label="Judul Masalah" id="telefun-scenario-title">
+          <SettingsField
+            label="Judul skenario"
+            id="telefun-scenario-title"
+            required
+          >
             <SettingsInput
               id="telefun-scenario-title"
               placeholder="Contoh: Gagal Transfer"
@@ -231,13 +252,15 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
           </SettingsField>
 
           <SettingsField
-            label="Deskripsi Masalah"
+            label="Deskripsi skenario"
             id="telefun-scenario-instruction"
+            required
           >
             <SettingsTextarea
               id="telefun-scenario-instruction"
               rows={3}
-              placeholder="Jelaskan konteks masalah..."
+              className="min-h-20 resize-none"
+              placeholder="Jelaskan masalah konsumen dan apa yang ia butuhkan."
               value={scenarioForm.draft.instruction || ""}
               onChange={(event) =>
                 scenarioForm.setDraft({ instruction: event.target.value })
@@ -245,28 +268,32 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             />
           </SettingsField>
 
-          <SettingsField
-            label="Skrip Percakapan"
-            id="telefun-scenario-script"
-            helperText='Centang "Ikuti Skrip" agar AI menggunakan draf dialog/alur yang Anda tentukan di bawah.'
-          >
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <Button
-                type="button"
-                variant={isScenarioScriptEnabled ? "secondary" : "outline"}
-                aria-pressed={isScenarioScriptEnabled}
-                onClick={() => {
-                  setIsScenarioScriptEnabled((previous) => {
-                    if (previous) scenarioForm.setDraft({ script: "" });
-                    return !previous;
-                  });
+          <SettingsField label="Alur panggilan" id="telefun-scenario-script">
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <span className="flex flex-1 flex-col gap-0.5">
+                <span className="text-sm font-semibold text-foreground">
+                  Ikuti skrip
+                </span>
+                <span className="text-xs leading-relaxed text-muted-foreground">
+                  Aktifkan bila konsumen harus mengikuti alur yang Anda tulis.
+                  Bila mati, konsumen bebas menanggapi sesuai konteks skenario.
+                </span>
+              </span>
+              <SettingsSwitch
+                label="Ikuti skrip"
+                checked={isScenarioScriptEnabled}
+                onCheckedChange={(checked) => {
+                  if (!checked) scenarioForm.setDraft({ script: "" });
+                  setIsScenarioScriptEnabled(checked);
                 }}
-              >
-                {isScenarioScriptEnabled ? "Ikuti Skrip" : "Sangat Kreatif"}
-              </Button>
+              />
             </div>
             <SettingsTextarea
               id="telefun-scenario-script"
+              className={cn(
+                "min-h-40 resize-y disabled:cursor-not-allowed",
+                !isScenarioScriptEnabled && "hidden",
+              )}
               rows={8}
               value={scenarioForm.draft.script || ""}
               onChange={(event) =>
@@ -283,12 +310,14 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             type="button"
             variant="outline"
             onClick={handleCancelScenarioForm}
+            className="min-h-[44px]"
           >
             Batal
           </Button>
           <Button
             type="button"
             onClick={handleSaveScenario}
+            className="min-h-[44px]"
             disabled={
               !scenarioForm.draft.title ||
               !scenarioForm.draft.instruction ||
@@ -297,7 +326,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                 : scenarioForm.draft.category)
             }
           >
-            Simpan
+            Terapkan
           </Button>
         </div>
         {confirmDialog}
@@ -306,7 +335,28 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Skenario
+          </h3>
+          <p className="text-[13px] leading-5 text-fg2">
+            Setiap panggilan mengambil satu skenario aktif secara acak. Nama
+            skenario baru terlihat oleh peserta di Telaah, setelah panggilan
+            selesai.
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={handleAddClick}
+          className="min-h-[44px] shrink-0"
+        >
+          <Plus data-icon="inline-start" />
+          Skenario baru
+        </Button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-h-[44px] min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-border px-3 text-muted-foreground focus-within:border-foreground">
           <Search aria-hidden="true" className="size-4 shrink-0" />
@@ -319,21 +369,40 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
           />
         </label>
-        <Button
-          type="button"
-          onClick={handleAddClick}
-          className="min-h-[44px] shrink-0"
-        >
-          <Plus data-icon="inline-start" />
-          Skenario baru
-        </Button>
+        {categories.length > 1 && (
+          <div
+            role="group"
+            aria-label="Filter kategori"
+            className="flex max-w-full gap-0.5 overflow-x-auto rounded-lg bg-muted p-[3px] text-xs font-medium"
+          >
+            {[ALL_CATEGORIES, ...categories].map((item) => {
+              const selected = item === activeCategory;
+              return (
+                <button
+                  key={item || "semua"}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setCategoryFilter(item)}
+                  className={cn(
+                    "min-h-[44px] shrink-0 rounded-md px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    selected
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-fg2 hover:text-foreground",
+                  )}
+                >
+                  {item || "Semua"}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
           {scenarios.length === 0
             ? "Belum ada skenario. Tambahkan skenario baru untuk mulai."
-            : "Tidak ada skenario yang cocok dengan pencarian."}
+            : "Tidak ada skenario yang cocok dengan pencarian atau filter."}
         </p>
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
@@ -399,8 +468,8 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <p>
-          {activeCount} dari {totalScenarios} skenario aktif. Satu skenario
-          aktif dipilih acak setiap panggilan.
+          {activeCount} dari {totalScenarios} skenario aktif. Skenario nonaktif
+          tetap tersimpan.
         </p>
         <div className="flex gap-1">
           <Button

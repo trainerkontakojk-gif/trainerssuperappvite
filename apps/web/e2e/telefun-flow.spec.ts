@@ -807,4 +807,102 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
     expect(nativeDialog).toBe(false);
     expectHermetic(audit);
   });
+
+  test("isi tiap kategori mengikuti KETIK: judul, filter, baris karakter, grup radio, tantangan", async ({
+    page,
+  }) => {
+    const audit = await open(page, "/telefun", telefunMocks([]));
+    await page
+      .getByRole("navigation", { name: "Menu Telefun" })
+      .getByRole("button", { name: /^Pengaturan/ })
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog", { name: "Pengaturan Telefun" });
+    await expect(dialog).toBeVisible();
+
+    // Skenario: judul, filter kategori, dan editor dengan sakelar Ikuti skrip.
+    await expect(
+      dialog.getByRole("heading", { name: "Skenario", exact: true }),
+    ).toBeVisible();
+    const filter = dialog.getByRole("group", { name: "Filter kategori" });
+    await filter.getByRole("button", { name: "Pinjol", exact: true }).click();
+    await expect(
+      filter.getByRole("button", { name: "Pinjol", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const rows = dialog.getByRole("list").first().getByRole("listitem");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      await expect(rows.nth(index)).toContainText("Pinjol");
+    }
+    await filter.getByRole("button", { name: "Semua", exact: true }).click();
+
+    await dialog.getByRole("button", { name: "Skenario baru" }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "Skenario baru", exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByRole("switch", { name: "Ikuti skrip" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await expect(dialog.getByRole("button", { name: "Terapkan" })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Kembali ke daftar" }).click();
+
+    // Karakter konsumen: baris pilihan, kesulitan dalam bahasa Indonesia.
+    await dialog.getByRole("tab", { name: /^Karakter konsumen/ }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "Karakter konsumen", exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Pakai karakter Marah & Emosional" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      dialog.getByRole("button", { name: "Pakai karakter Acak" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      dialog.getByRole("listitem").filter({ hasText: "Marah & Emosional" }),
+    ).toContainText("Sulit");
+    await expect(
+      dialog.getByRole("button", { name: "Karakter baru" }),
+    ).toBeVisible();
+
+    // Identitas konsumen: judul yang sama dengan nama kategori.
+    await dialog.getByRole("tab", { name: /^Identitas konsumen/ }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "Identitas konsumen", exact: true }),
+    ).toBeVisible();
+
+    // Sesi & AI: durasi, tempo, model sebagai grup radio; tantangan maks 3.
+    await dialog.getByRole("tab", { name: /^Sesi & AI/ }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "Sesi & AI", exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog
+        .getByRole("radiogroup", { name: "Durasi panggilan" })
+        .getByRole("radio", { name: "5 menit", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(
+      dialog
+        .getByRole("radiogroup", { name: "Tempo bicara konsumen" })
+        .getByRole("radio", { name: /^Natural/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(
+      dialog
+        .getByRole("radiogroup", { name: "Model AI" })
+        .getByRole("radio", { checked: true }),
+    ).toHaveCount(1);
+
+    const challenges = dialog.getByRole("group", {
+      name: "Tantangan percakapan",
+    });
+    const boxes = challenges.getByRole("checkbox");
+    for (let index = 0; index < 3; index += 1) await boxes.nth(index).click();
+    await expect(boxes.nth(0)).toHaveAttribute("aria-checked", "true");
+    await expect(boxes.nth(3)).toBeDisabled();
+    await expect(dialog.getByText("3 dari 3 dipilih")).toBeVisible();
+
+    const offenders = await findTextBelowFloor(dialog);
+    expect(offenders, offenders.join("\n")).toEqual([]);
+    expectHermetic(audit);
+  });
 });

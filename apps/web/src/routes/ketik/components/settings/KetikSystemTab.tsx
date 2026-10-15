@@ -1,9 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import type { KetikAppSettings } from "@trainers/types";
-import { cn } from "cn";
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels"; // Shared model registry
-import { SettingsRadioIndicator } from "../../../../components/settings/SettingsChoices";
-import { Button } from "../../../../components/ui/button";
+import { SettingsRadioOption as RadioOption } from "../../../../components/settings/SettingsChoices";
 import { Input } from "../../../../components/ui/input";
 
 export interface KetikSystemTabProps {
@@ -35,39 +33,6 @@ const PACING_MODES = [
     description: "Konsumen membalas lebih cepat, cocok untuk latihan singkat.",
   },
 ];
-
-/** Tombol pilihan `role="radio"` dengan lingkaran indikator di kanan. */
-function RadioOption({
-  selected,
-  onSelect,
-  className,
-  children,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      className={cn(
-        "h-auto min-h-[44px] w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal",
-        selected
-          ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
-          : "border-border bg-card hover:bg-muted/40",
-        className,
-      )}
-    >
-      {children}
-      <SettingsRadioIndicator isSelected={selected} />
-    </Button>
-  );
-}
 
 export function KetikSystemTab({
   localSettings,

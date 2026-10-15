@@ -22,6 +22,39 @@ export function SettingsRadioIndicator({
   );
 }
 
+/** Tombol pilihan `role="radio"` dengan lingkaran indikator di kanan. */
+export function SettingsRadioOption({
+  selected,
+  onSelect,
+  className,
+  children,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        "h-auto min-h-[44px] w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal",
+        selected
+          ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
+          : "border-border bg-card hover:bg-muted/40",
+        className,
+      )}
+    >
+      {children}
+      <SettingsRadioIndicator isSelected={selected} />
+    </Button>
+  );
+}
+
 /** Baris pilihan karakter konsumen: tombol Pilih/Dipakai, keterangan, dan aksi. */
 export function SettingsChoiceRow({
   title,
@@ -45,7 +78,8 @@ export function SettingsChoiceRow({
         selected ? "bg-muted/60" : "hover:bg-muted/40",
       )}
     >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      {/* Di layar sempit tombol turun ke baris sendiri agar teks tidak terjepit. */}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 max-sm:basis-full">
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-semibold text-foreground">{title}</span>
           {meta && <span className="text-xs text-fg2">{meta}</span>}

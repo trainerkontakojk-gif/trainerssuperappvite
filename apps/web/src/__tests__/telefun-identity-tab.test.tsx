@@ -49,7 +49,7 @@ describe("TelefunIdentityTab provider-aware voices", () => {
     expect(
       Array.from(voiceSelect.options).map((option) => option.value),
     ).toEqual([""]);
-    expect(voiceSelect.options[0].textContent).toBe("Acak (Sesuai Gender)");
+    expect(voiceSelect.options[0].textContent).toBe("Acak sesuai jenis kelamin");
   });
 
   it("shows only male Gemini Live voices for a male persona", () => {

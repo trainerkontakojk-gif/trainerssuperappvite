@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "../../../components/ui/button";
+import React, { useEffect, useRef, useState } from "react";
+import { SettingsRadioOption } from "../../../components/settings/SettingsChoices";
 import { Input } from "../../../components/ui/input";
 import {
   classifyDurationMode,
   filterDurationInput,
+  MAX_DURATION,
+  MIN_DURATION,
   normalizeDurationDisplay,
   validateDuration,
   PRESET_DURATIONS,
@@ -13,12 +14,16 @@ import {
 export interface DurationSelectorProps {
   value: number;
   onChange: (value: number) => void;
+  /** `id` judul yang menamai grup radio. */
+  labelledBy: string;
   presets?: readonly number[];
 }
 
+/** Durasi panggilan sebagai grup radio: pilihan cepat atau Kustom 1–60 menit. */
 export const DurationSelector: React.FC<DurationSelectorProps> = ({
   value,
   onChange,
+  labelledBy,
   presets = PRESET_DURATIONS,
 }) => {
   const initialClass = classifyDurationMode(value);
@@ -28,169 +33,120 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
   );
   const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Nilai yang baru dikirim dari sini (mis. "10" diketik di Kustom) tidak
+  // mengubah mode; nilai dari luar (Pulihkan bawaan) menentukan mode lagi.
+  const emittedRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (emittedRef.current === value) return;
     const cls = classifyDurationMode(value);
     setMode(cls.mode);
-    if (cls.mode === "custom") {
-      setCustomInputValue(cls.value.toString());
-      setValidationError(null);
-    } else {
-      setCustomInputValue("");
-      setValidationError(null);
-    }
+    setCustomInputValue(cls.mode === "custom" ? cls.value.toString() : "");
+    setValidationError(null);
   }, [value]);
+
+  const emit = (next: number) => {
+    emittedRef.current = next;
+    onChange(next);
+  };
+
+  useEffect(() => {
+    if (mode !== "custom") return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [mode]);
 
   const handlePresetClick = (presetValue: number) => {
     setMode("preset");
     setCustomInputValue("");
     setValidationError(null);
-    onChange(presetValue);
+    emit(presetValue);
   };
 
   const handleCustomClick = () => {
     setMode("custom");
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 50);
     const validated = validateDuration(customInputValue);
-    if (!validated.valid) {
-      setValidationError(validated.error);
-    }
+    if (!validated.valid) setValidationError(validated.error);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filtered = filterDurationInput(e.target.value);
-    setCustomInputValue(filtered);
-
-    const validated = validateDuration(filtered);
+  const applyInput = (input: string) => {
+    setCustomInputValue(input);
+    const validated = validateDuration(input);
     if (validated.valid) {
       setValidationError(null);
-      onChange(validated.value);
-    } else {
-      setValidationError(validated.error);
-    }
-  };
-
-  const handleBlur = () => {
-    const normalized = normalizeDurationDisplay(customInputValue);
-    setCustomInputValue(normalized);
-    const validated = validateDuration(normalized);
-    if (validated.valid) {
-      setValidationError(null);
-      onChange(validated.value);
+      emit(validated.value);
     } else {
       setValidationError(validated.error);
     }
   };
 
   return (
-    <div className="w-full space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {presets.map((duration) => {
-          const isSelected = mode === "preset" && value === duration;
-          return (
-            <Button
-              key={duration}
-              type="button"
-              variant="outline"
-              aria-pressed={isSelected}
-              onClick={() => handlePresetClick(duration)}
-              className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal ${
-                isSelected
-                  ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
-                  : "border-border bg-card hover:bg-muted/40"
-              }`}
-            >
-              <span className="text-sm font-medium text-foreground">
-                {duration} Menit
-              </span>
-              <span
-                aria-hidden="true"
-                className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-                  isSelected ? "border-primary" : "border-border"
-                }`}
-              >
-                {isSelected && (
-                  <span className="size-2.5 rounded-full bg-primary" />
-                )}
-              </span>
-            </Button>
-          );
-        })}
-
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={mode === "custom"}
-          onClick={handleCustomClick}
-          className={`h-auto min-h-11 w-full justify-between gap-3 rounded-xl px-4 py-3 text-left whitespace-normal ${
-            mode === "custom"
-              ? "border-primary/50 bg-primary/5 hover:bg-primary/5"
-              : "border-border bg-card hover:bg-muted/40"
-          }`}
+    <div className="flex flex-col gap-3">
+      <div
+        role="radiogroup"
+        aria-labelledby={labelledBy}
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+      >
+        {presets.map((duration) => (
+          <SettingsRadioOption
+            key={duration}
+            selected={mode === "preset" && value === duration}
+            onSelect={() => handlePresetClick(duration)}
+          >
+            <span className="text-sm font-medium text-foreground">
+              {duration} menit
+            </span>
+          </SettingsRadioOption>
+        ))}
+        <SettingsRadioOption
+          selected={mode === "custom"}
+          onSelect={handleCustomClick}
         >
           <span className="text-sm font-medium text-foreground">Kustom</span>
-          <span
-            aria-hidden="true"
-            className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-              mode === "custom" ? "border-primary" : "border-border"
-            }`}
-          >
-            {mode === "custom" && (
-              <span className="size-2.5 rounded-full bg-primary" />
-            )}
-          </span>
-        </Button>
+        </SettingsRadioOption>
       </div>
-
-      <AnimatePresence>
-        {mode === "custom" && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -10 }}
-            animate={{ opacity: 1, height: "auto", y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -10 }}
-            className="overflow-hidden"
+      {mode === "custom" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label
+            htmlFor="telefun-custom-duration"
+            className="text-[13px] text-fg2"
           >
-            <div className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center">
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-foreground">
-                  Masukkan Durasi Kustom
-                </label>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Tentukan durasi simulasi antara 1 hingga 60 menit.
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <div className="relative w-36">
-                  <Input
-                    ref={inputRef}
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="5"
-                    value={customInputValue}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    className="bg-background pr-12 text-right font-medium"
-                  />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                    Min
-                  </span>
-                </div>
-                {validationError && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-xs font-medium text-destructive"
-                  >
-                    {validationError}
-                  </motion.span>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Durasi kustom ({MIN_DURATION}–{MAX_DURATION} menit)
+          </label>
+          <div className="relative w-36">
+            <Input
+              id="telefun-custom-duration"
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              placeholder="5"
+              value={customInputValue}
+              onChange={(event) =>
+                applyInput(filterDurationInput(event.target.value))
+              }
+              onBlur={() =>
+                applyInput(normalizeDurationDisplay(customInputValue))
+              }
+              aria-invalid={Boolean(validationError)}
+              aria-describedby={
+                validationError ? "telefun-custom-duration-error" : undefined
+              }
+              className="min-h-[44px] bg-background pr-14 text-right"
+            />
+            <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              menit
+            </span>
+          </div>
+          {validationError && (
+            <span
+              id="telefun-custom-duration-error"
+              className="text-xs font-medium text-destructive"
+            >
+              {validationError}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

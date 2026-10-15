@@ -44,6 +44,6 @@ describe("TelefunSystemTab Gemini-only UI", () => {
         providerReadiness={RETIRED_READINESS}
       />,
     );
-    expect(screen.getByText("Model AI untuk Telefun")).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Model AI" })).toBeInTheDocument();
   });
 });

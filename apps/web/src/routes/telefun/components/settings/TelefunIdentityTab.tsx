@@ -48,20 +48,20 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">
-            Atur Identitas Simulasi
+      <section className="flex flex-col gap-6">
+        <div className="flex max-w-[60ch] flex-col gap-1">
+          <h3 className="font-display text-xl font-bold tracking-tight text-foreground">
+            Identitas konsumen
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Konfigurasi identitas persona dan suara untuk model Telefun yang
-            dipilih.
+          <p className="text-[13px] leading-5 text-fg2">
+            Nama, nomor, kota, dan suara konsumen di telepon. Kosongkan nama,
+            nomor, atau kota agar dibuat acak di setiap panggilan.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <SettingsField
-            label="Nama Konsumen (Lengkap)"
+            label="Nama konsumen"
             id="telefun-identity-display-name"
           >
             <SettingsInput
@@ -74,7 +74,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             />
           </SettingsField>
 
-          <SettingsField label="Jenis Kelamin" id="telefun-identity-gender">
+          <SettingsField label="Jenis kelamin" id="telefun-identity-gender">
             <SettingsSelect
               id="telefun-identity-gender"
               value={selectedGender}
@@ -92,11 +92,11 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
           </SettingsField>
 
           <SettingsField
-            label="Pilihan Suara"
+            label="Suara"
             id="telefun-identity-voice"
             helperText={
               voiceSelectionDisabled
-                ? "Suara akan diacak otomatis sesuai hasil penentuan gender saat simulasi."
+                ? "Pilih jenis kelamin untuk memilih suara. Bila Acak, suara diacak sesuai jenis kelamin yang terpilih."
                 : undefined
             }
           >
@@ -108,7 +108,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
               }
               disabled={voiceSelectionDisabled}
             >
-              <option value="">Acak (Sesuai Gender)</option>
+              <option value="">Acak sesuai jenis kelamin</option>
               {voiceOptions.map((voice) => (
                 <option key={voice} value={voice}>
                   {voice}
@@ -118,7 +118,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
           </SettingsField>
 
           <SettingsField
-            label="Nomor Telepon Konsumen"
+            label="Nomor telepon"
             id="telefun-identity-phone"
           >
             <SettingsInput
@@ -131,7 +131,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
             />
           </SettingsField>
 
-          <SettingsField label="Kota Konsumen" id="telefun-identity-city">
+          <SettingsField label="Kota asal" id="telefun-identity-city">
             <SettingsInput
               id="telefun-identity-city"
               placeholder="Contoh: Jakarta"
