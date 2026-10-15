@@ -11,6 +11,7 @@ import {
   normalizeKetikReviewScores,
 } from "./review-policy";
 import { serializeKetikPromptData } from "./prompt-policy";
+import { normalizeKetikAnnotations } from "./review-annotations";
 
 async function generateKetikReviewAiResponse(options: {
   systemInstruction: string;
@@ -102,6 +103,17 @@ function sanitizeKetikEducation(education: ReturnType<typeof buildKetikEducation
     education.overallNextSteps = education.overallNextSteps.map((step) =>
       typeof step === "string" ? sanitizeAiResponse(step) : step,
     );
+  }
+  if (education.caseCore) {
+    education.caseCore = sanitizeAiResponse(education.caseCore);
+  }
+  for (const point of education.consumerPoints ?? []) {
+    point.summary = sanitizeAiResponse(point.summary);
+    if (point.reason) point.reason = sanitizeAiResponse(point.reason);
+  }
+  for (const note of education.agentNotes ?? []) {
+    note.note = sanitizeAiResponse(note.note);
+    if (note.example) note.example = sanitizeAiResponse(note.example);
   }
   if (education.typosEnriched) {
     for (const typo of education.typosEnriched) {
@@ -209,6 +221,11 @@ export async function processKetikReviewJob(
   if (Array.isArray(reviewResult.overallNextSteps)) {
     education.overallNextSteps = reviewResult.overallNextSteps;
   }
+  // Kutipan tidak disanitasi: harus tetap sama dengan teks transkrip.
+  Object.assign(
+    education,
+    normalizeKetikAnnotations(reviewResult, session.messages),
+  );
   sanitizeKetikEducation(education);
 
   if (leaseOwner) {

@@ -183,6 +183,58 @@ const REVIEW_DETAIL = {
   ],
 };
 
+/** Telaah baru: inti kasus, pertanyaan konsumen, dan kalimat agen yang dinilai. */
+const ANNOTATED_REVIEW_DETAIL = {
+  ...REVIEW_DETAIL,
+  review: {
+    ...REVIEW_DETAIL.review,
+    education: {
+      ...REVIEW_DETAIL.review.education,
+      caseCore:
+        "Tagihan kartu kredit konsumen tertagih dua kali dan ia minta segera dibereskan.",
+      consumerPoints: [
+        {
+          messageId: "m1",
+          quote: "Tagihan saya dobel",
+          summary: "Kenapa tagihan tertagih dua kali",
+          status: "partial",
+          reason: "Agen baru berjanji mengecek, belum menjelaskan penyebabnya.",
+          answerMessageId: "m2",
+          answerQuote: "saya cek tagihn Ibu",
+        },
+        {
+          messageId: "m3",
+          quote: "Tolong cepat ya",
+          summary: "Minta penanganan cepat",
+          status: "unanswered",
+          reason: "Tidak ada estimasi waktu penyelesaian.",
+          answerMessageId: null,
+          answerQuote: null,
+        },
+      ],
+      agentNotes: [
+        {
+          messageId: "m2",
+          quote: "saya cek tagihn Ibu",
+          dimension: "resolution",
+          verdict: "fix",
+          note: "Belum ada langkah atau estimasi waktu.",
+          example:
+            "Saya cek transaksi ganda Ibu sekarang, hasilnya saya kabari dalam 10 menit di chat ini.",
+        },
+        {
+          messageId: "m2",
+          quote: "Baik Bu",
+          dimension: "empathy",
+          verdict: "good",
+          note: "Sapaan sopan dan menyebut panggilan konsumen.",
+          example: null,
+        },
+      ],
+    },
+  },
+};
+
 /** Tempo cepat supaya balasan konsumen di spec chat tidak menunggu lama. */
 const FAST_SETTINGS: KetikAppSettings = {
   ...DEFAULT_KETIK_SETTINGS,
@@ -443,6 +495,131 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("anotasi: inti kasus, pertanyaan konsumen terjawab, dan kalimat agen yang dinilai", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      { ...reviewDetailMock, body: { success: true, data: ANNOTATED_REVIEW_DETAIL } },
+    ]);
+
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
+      timeout: 20000,
+    });
+
+    // Inti kasus tampil sebelum rincian.
+    const caseCore = result.getByRole("region", { name: "Inti kasus" });
+    await expect(caseCore).toContainText("tertagih dua kali dan ia minta segera");
+
+    // Tab bawaan: pertanyaan konsumen, dengan status yang tertulis.
+    const questionsTab = result.getByRole("tab", { name: /Pertanyaan konsumen \(2\)/ });
+    await expect(questionsTab).toHaveAttribute("aria-selected", "true");
+    // Enam tab tidak muat; tab aktif tetap terlihat utuh, tidak tergeser keluar.
+    const tabList = await result.getByRole("tablist", { name: "Rincian telaah" }).boundingBox();
+    const activeTab = await questionsTab.boundingBox();
+    expect(activeTab!.x).toBeGreaterThanOrEqual(tabList!.x);
+    expect(activeTab!.x + activeTab!.width).toBeLessThanOrEqual(tabList!.x + tabList!.width);
+    const points = result.getByRole("list", { name: "Pertanyaan konsumen" });
+    await expect(points.getByRole("listitem")).toHaveCount(2);
+    const pointA = points.getByRole("listitem").nth(0);
+    await expect(pointA).toContainText("A");
+    await expect(pointA).toContainText("Sebagian");
+    await expect(pointA).toContainText("Kenapa tagihan tertagih dua kali");
+    await expect(pointA).toContainText("belum menjelaskan penyebabnya");
+    await expect(pointA.getByRole("button", { name: /Dijawab di pesan 2/ })).toBeVisible();
+    const pointB = points.getByRole("listitem").nth(1);
+    await expect(pointB).toContainText("Belum terjawab");
+    await expect(pointB).toContainText("Belum ada balasan agen untuk poin ini.");
+
+    // Kutipan konsumen ditandai di transkrip; tombol pesan menyorot pesannya.
+    await expect(
+      transcript.getByTestId("ketik-message-1").locator("mark", { hasText: "Tagihan saya dobel" }),
+    ).toBeVisible();
+    await expect(
+      transcript.getByTestId("ketik-message-3").locator("mark", { hasText: "Tolong cepat ya" }),
+    ).toBeVisible();
+    await pointB.getByRole("button", { name: /Pesan 3/ }).click();
+    await expect(transcript.getByTestId("ketik-message-3")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+
+    // Kalimat agen: catatan, aspek, dan kalimat yang lebih tepat.
+    await result.getByRole("tab", { name: /Kalimat agen \(2\)/ }).click();
+    const notes = result.getByRole("list", { name: "Kalimat agen yang dinilai" });
+    await expect(notes.getByRole("listitem")).toHaveCount(2);
+    const fix = notes.getByRole("listitem").nth(0);
+    await expect(fix).toContainText("Resolusi");
+    await expect(fix).toContainText("Perlu diperbaiki");
+    await expect(fix).toContainText("Belum ada langkah atau estimasi waktu.");
+    await expect(fix).toContainText(
+      "Kalimat yang lebih tepat: Saya cek transaksi ganda Ibu sekarang",
+    );
+    const good = notes.getByRole("listitem").nth(1);
+    await expect(good).toContainText("Sudah tepat");
+    await expect(good).not.toContainText("Kalimat yang lebih tepat");
+
+    // Kalimat agen ditandai; typo di dalamnya tetap digarisbawahi.
+    const agentMessage = transcript.getByTestId("ketik-message-2");
+    await expect(agentMessage.locator("mark", { hasText: "saya cek tagihn Ibu" })).toBeVisible();
+    await expect(agentMessage.locator("mark mark", { hasText: "tagihn" })).toBeVisible();
+    await fix.getByRole("button", { name: /Pesan 2/ }).click();
+    await expect(agentMessage).toHaveAttribute("data-highlighted", "true");
+
+    expectHermetic(audit);
+  });
+
+  test("telaah lama tanpa anotasi: ditandai belum tersedia, tab bawaan tetap Perbaiki dulu", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      reviewDetailMock,
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByRole("tab", { name: /Perbaiki dulu/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+      { timeout: 20000 },
+    );
+    await expect(result.getByRole("region", { name: "Inti kasus" })).toHaveCount(0);
+    await result.getByRole("tab", { name: /Pertanyaan konsumen/ }).click();
+    await expect(result).toContainText("Belum tersedia untuk telaah ini");
+    await result.getByRole("tab", { name: /Kalimat agen/ }).click();
+    await expect(result).toContainText("Belum tersedia untuk telaah ini");
+    expectHermetic(audit);
+  });
+
+  test("tanda anotasi dan panel hasil memenuhi kontras di tema terang dan gelap", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      { ...reviewDetailMock, body: { success: true, data: ANNOTATED_REVIEW_DETAIL } },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
+      timeout: 20000,
+    });
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      const marks = await findLowContrastText(transcript, { selector: "mark, mark *, li p span" });
+      expect(marks, `${theme}: ${marks.join("\n")}`).toEqual([]);
+      for (const tab of ["Pertanyaan konsumen", "Kalimat agen"]) {
+        await result.getByRole("tab", { name: new RegExp(tab) }).click();
+        const panel = await findLowContrastText(result, {
+          selector: "[role=tabpanel] *",
+          leafOnly: true,
+        });
+        expect(panel, `${theme} ${tab}: ${panel.join("\n")}`).toEqual([]);
+      }
+    }
+    expectHermetic(audit);
+  });
+
   test("sesi belum ditelaah: agen melihat penjelasan akses, tanpa tombol mulai", async ({
     page,
   }) => {
@@ -558,14 +735,21 @@ test.describe("KETIK Telaah (hermetic)", () => {
   test(`teks tahap Telaah minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
     const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
       ...ketikMocks(FULL_HISTORY),
-      reviewDetailMock,
+      { ...reviewDetailMock, body: { success: true, data: ANNOTATED_REVIEW_DETAIL } },
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
     const offenders: string[] = [];
-    for (const tab of ["Perbaiki dulu", "Sudah baik", "Ejaan", "Ringkasan"]) {
+    for (const tab of [
+      "Pertanyaan konsumen",
+      "Kalimat agen",
+      "Perbaiki dulu",
+      "Sudah baik",
+      "Ejaan",
+      "Ringkasan",
+    ]) {
       await result.getByRole("tab", { name: new RegExp(tab) }).click();
       offenders.push(...(await findTextBelowFloor(page.locator("body"))));
     }

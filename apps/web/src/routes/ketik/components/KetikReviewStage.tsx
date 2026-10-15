@@ -42,6 +42,16 @@ import {
   typoSeverityLabel,
 } from "../utils/reviewDisplay";
 import { downloadKetikTranscript } from "../utils/transcript";
+import {
+  buildQuoteMarks,
+  pointLetter,
+  withQuoteMarks,
+} from "../utils/quoteMarks";
+import {
+  AgentNoteItem,
+  ConsumerPointItem,
+  NotAvailable,
+} from "./KetikReviewAnnotations";
 import { KetikStageNav } from "./KetikStageNav";
 import { SessionReplayModal } from "./SessionReplayModal";
 
@@ -57,35 +67,12 @@ interface KetikReviewStageProps {
 const sectionTitle =
   "font-display text-lg leading-7 font-bold tracking-tight text-foreground";
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** Teks pesan untuk transkrip: tag sistem dibuang, gambar diberi keterangan. */
 function displayText(message: ChatMessage): string {
   const text = stripSystemTags(message.text)
     .replace(IMAGE_TAG_PATTERN_GLOBAL, "(gambar)")
     .trim();
   return text || "(gambar)";
-}
-
-/** Garis bawahi kata yang salah eja langsung di kalimatnya. */
-function withTypoMarks(text: string, words: readonly string[]): ReactNode {
-  const unique = [...new Set(words.map((word) => word.trim()).filter(Boolean))];
-  if (unique.length === 0) return text;
-  const pattern = new RegExp(`(${unique.map(escapeRegExp).join("|")})`, "gi");
-  return text.split(pattern).map((part, index) =>
-    index % 2 === 1 ? (
-      <mark
-        key={index}
-        className="rounded-sm border-b-2 border-chart-orange bg-chart-orange/25 px-px text-inherit"
-      >
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
 }
 
 function scoreChange(score: number, previous: number | null): string | null {
@@ -133,6 +120,27 @@ export function KetikReviewStage({
     }
     return map;
   }, [review.typos]);
+  const education = review.phase === "ready" ? review.review?.education : null;
+  const quoteMarks = useMemo(
+    () =>
+      buildQuoteMarks(
+        education?.consumerPoints ?? [],
+        education?.agentNotes ?? [],
+      ),
+    [education],
+  );
+  // Huruf poin konsumen yang dijawab oleh tiap pesan agen.
+  const answersByMessage = useMemo(() => {
+    const map = new Map<string, string[]>();
+    (education?.consumerPoints ?? []).forEach((point, index) => {
+      if (!point.answerMessageId) return;
+      map.set(point.answerMessageId, [
+        ...(map.get(point.answerMessageId) ?? []),
+        pointLetter(index),
+      ]);
+    });
+    return map;
+  }, [education]);
 
   const showMessage = (messageId: string) => {
     const element = messageRefs.current.get(messageId);
@@ -214,6 +222,7 @@ export function KetikReviewStage({
               const number = numbers.get(message.id);
               const isAgent = message.sender === "agent";
               const flagged = typosByMessage.has(message.id);
+              const answers = answersByMessage.get(message.id);
               return (
                 <li
                   key={message.id}
@@ -247,9 +256,15 @@ export function KetikReviewStage({
                     <span className="sr-only">
                       {isAgent ? "Agen: " : "Konsumen: "}
                     </span>
-                    {withTypoMarks(
+                    {withQuoteMarks(
                       displayText(message),
+                      quoteMarks.get(message.id) ?? [],
                       typosByMessage.get(message.id) ?? [],
+                    )}
+                    {answers && (
+                      <span className="mt-1 block text-xs font-medium">
+                        Menjawab poin {answers.join(", ")}
+                      </span>
                     )}
                   </p>
                 </li>
@@ -483,6 +498,10 @@ function ReviewResult({
   const toFix = guidance.filter((item) => item.score < KETIK_FIX_THRESHOLD);
   const good = guidance.filter((item) => item.score >= KETIK_FIX_THRESHOLD);
   const enriched = review.education?.typosEnriched ?? [];
+  // Telaah lama tidak punya field anotasi sama sekali.
+  const points = review.education?.consumerPoints;
+  const notes = review.education?.agentNotes;
+  const caseCore = review.education?.caseCore;
 
   return (
     <>
@@ -534,12 +553,44 @@ function ReviewResult({
         ))}
       </ul>
 
-      <Tabs defaultValue="fix" className="gap-4">
+      {caseCore && (
+        <section
+          aria-labelledby="ketik-case-core-title"
+          className="flex flex-col gap-1"
+        >
+          <h3
+            id="ketik-case-core-title"
+            className="text-[13px] font-semibold text-foreground"
+          >
+            Inti kasus
+          </h3>
+          <p className="max-w-[65ch] text-[15px] leading-6 text-fg2">
+            {caseCore}
+          </p>
+        </section>
+      )}
+
+      <Tabs
+        defaultValue={points && points.length > 0 ? "questions" : "fix"}
+        className="gap-4"
+      >
         <TabsList
           variant="line"
           aria-label="Rincian telaah"
-          className="w-full justify-start overflow-x-auto border-b border-border"
+          className="relative w-full justify-start overflow-x-auto border-b border-border"
         >
+          <TabsTrigger
+            value="questions"
+            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
+          >
+            Pertanyaan konsumen{points ? ` (${points.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger
+            value="notes"
+            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
+          >
+            Kalimat agen{notes ? ` (${notes.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger
             value="fix"
             className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
@@ -565,6 +616,49 @@ function ReviewResult({
             Ringkasan
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="questions" className="flex flex-col gap-3">
+          {!points ? (
+            <NotAvailable />
+          ) : points.length === 0 ? (
+            <Empty>AI tidak menemukan pertanyaan konsumen di percakapan ini.</Empty>
+          ) : (
+            <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
+              {points.map((point, index) => (
+                <ConsumerPointItem
+                  key={`${point.messageId}-${index}`}
+                  point={point}
+                  letter={pointLetter(index)}
+                  numbers={numbers}
+                  onShowMessage={onShowMessage}
+                />
+              ))}
+            </ol>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notes" className="flex flex-col gap-3">
+          {!notes ? (
+            <NotAvailable />
+          ) : notes.length === 0 ? (
+            <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
+          ) : (
+            <ol
+              aria-label="Kalimat agen yang dinilai"
+              className="flex flex-col gap-3"
+            >
+              {notes.map((note, index) => (
+                <AgentNoteItem
+                  key={`${note.messageId}-${index}`}
+                  note={note}
+                  number={index + 1}
+                  numbers={numbers}
+                  onShowMessage={onShowMessage}
+                />
+              ))}
+            </ol>
+          )}
+        </TabsContent>
 
         <TabsContent value="fix" className="flex flex-col gap-3">
           {toFix.length > 0 ? (

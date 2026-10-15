@@ -1,3 +1,4 @@
+import type { KetikAgentNote, KetikConsumerPoint } from "@trainers/types";
 import { Type } from "@google/genai";
 
 // ── Evaluasi Edukatif (deterministic education layer) ──
@@ -94,6 +95,42 @@ export const KETIK_REVIEW_RESPONSE_SCHEMA = {
       },
     },
     overallNextSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+    // Anotasi Telaah; backend membuang kutipan yang tidak ada di transkrip.
+    caseCore: { type: Type.STRING },
+    consumerPoints: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          messageId: { type: Type.STRING },
+          quote: { type: Type.STRING },
+          summary: { type: Type.STRING },
+          status: {
+            type: Type.STRING,
+            enum: ["answered", "partial", "unanswered"],
+          },
+          reason: { type: Type.STRING, nullable: true },
+          answerMessageId: { type: Type.STRING, nullable: true },
+          answerQuote: { type: Type.STRING, nullable: true },
+        },
+        required: ["messageId", "quote", "summary", "status"],
+      },
+    },
+    agentNotes: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          messageId: { type: Type.STRING },
+          quote: { type: Type.STRING },
+          dimension: { type: Type.STRING, enum: KETIK_DIMENSION_ORDER },
+          verdict: { type: Type.STRING, enum: ["good", "fix"] },
+          note: { type: Type.STRING },
+          example: { type: Type.STRING, nullable: true },
+        },
+        required: ["messageId", "quote", "dimension", "verdict", "note"],
+      },
+    },
   },
   required: [
     "summary",
@@ -135,7 +172,13 @@ Evaluasi Edukatif:
 - Untuk setiap dari 5 kategori (empathy/probing/resolution/typo/compliance), berikan "dimensionGuidance" berisi HANYA "key", "diagnosis" (1-2 kalimat, kutip 3-6 kata dari transkrip tanpa nama/PII), "howToFix" (langkah konkret 1-2 kalimat), dan "exampleRewrite" (contoh sebelum → sesudah, maks 500 karakter).
 - JANGAN menentukan score/label/verdict/priority — backend akan menentukannya dari skor kanonik.
 - "overallNextSteps" opsional sebagai catatan tambahan; prioritas perbaikan di UI diambil dari ranking backend, bukan dari field ini.
-- Semua teks edukasi WAJIB dalam Bahasa Indonesia.`;
+- Semua teks edukasi WAJIB dalam Bahasa Indonesia.
+
+Anotasi Telaah (setiap pesan di transkrip punya "id"):
+- "caseCore": 1-2 kalimat inti kasus — apa masalah konsumen dan apa yang ia butuhkan. Tanpa nama/PII.
+- "consumerPoints": maksimal 5 pertanyaan atau permintaan konsumen, urut sesuai kemunculan. Setiap poin: "messageId" (id pesan konsumen), "quote" (salinan PERSIS 3-15 kata dari pesan itu), "summary" (inti pertanyaan, maks 12 kata), "status" ("answered" bila dijawab tuntas, "partial" bila baru sebagian, "unanswered" bila tidak dijawab), "reason" (1 kalimat alasan status, atau null), "answerMessageId" dan "answerQuote" (id pesan agen yang menjawab dan salinan PERSIS kalimatnya, atau null bila tidak ada).
+- "agentNotes": maksimal 8 kalimat agen yang paling menentukan nilai, baik maupun buruk. Setiap catatan: "messageId" (id pesan agen), "quote" (salinan PERSIS kalimat agen), "dimension" (empathy/probing/resolution/typo/compliance), "verdict" ("good" bila sudah tepat, "fix" bila perlu diperbaiki), "note" (1 kalimat alasannya), "example" (kalimat utuh yang sebaiknya dipakai agen untuk verdict "fix"; null untuk "good").
+- Kutipan WAJIB disalin persis dari transkrip. Kutipan yang tidak ada di transkrip akan dibuang.`;
 }
 
 function clampScore(value: unknown): number {
@@ -336,6 +379,9 @@ export interface KetikDimensionGuidanceResult {
 
 export interface KetikEducationResult {
   dimensionGuidance: KetikDimensionGuidanceResult[];
+  caseCore?: string | null;
+  consumerPoints?: KetikConsumerPoint[];
+  agentNotes?: KetikAgentNote[];
   overallNextSteps?: string[];
   typosEnriched?: Array<{
     messageId: string;

@@ -333,10 +333,49 @@ export interface KetikTypoEnriched {
   whyWrong?: string;
 }
 
+export const KETIK_CONSUMER_POINT_STATUSES = [
+  "answered",
+  "partial",
+  "unanswered",
+] as const;
+export type KetikConsumerPointStatus =
+  (typeof KETIK_CONSUMER_POINT_STATUSES)[number];
+
+/** Pertanyaan/permintaan konsumen dan apakah agen sudah menjawabnya. */
+export interface KetikConsumerPoint {
+  /** Pesan konsumen yang memuat `quote`. */
+  messageId: string;
+  quote: string;
+  summary: string;
+  status: KetikConsumerPointStatus;
+  reason: string | null;
+  /** Pesan agen yang menjawab; `null` bila belum ada. */
+  answerMessageId: string | null;
+  answerQuote: string | null;
+}
+
+export const KETIK_AGENT_NOTE_VERDICTS = ["good", "fix"] as const;
+export type KetikAgentNoteVerdict = (typeof KETIK_AGENT_NOTE_VERDICTS)[number];
+
+/** Kalimat agen yang dinilai, dengan kalimat yang lebih tepat bila perlu. */
+export interface KetikAgentNote {
+  messageId: string;
+  quote: string;
+  dimension: KetikDimensionKey;
+  verdict: KetikAgentNoteVerdict;
+  note: string;
+  /** Kalimat pengganti; hanya untuk `verdict: "fix"`. */
+  example: string | null;
+}
+
 export interface KetikEducation {
   dimensionGuidance: KetikDimensionGuidance[]; // length 5, sorted by priorityRank
   overallNextSteps?: string[];
   typosEnriched?: KetikTypoEnriched[];
+  // Anotasi Telaah; tidak ada di telaah yang dibuat sebelum fitur ini.
+  caseCore?: string | null;
+  consumerPoints?: KetikConsumerPoint[];
+  agentNotes?: KetikAgentNote[];
 }
 
 export interface KetikSessionReview {

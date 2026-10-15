@@ -109,3 +109,52 @@ agent access to scenarios stays unchanged until the permission decision above.
       draft dirty tracking, shared switch and choice row.
 - [x] Settings E2E run (RED on HEAD files, GREEN), PDKT regression, visual
       check, gates.
+
+## Telaah annotations (added 2026-10-15)
+
+### Requirement
+
+Fajar: Telaah must show (1) the core of the case, (2) which consumer
+questions were answered, and (3) which agent sentences were assessed and what
+sentence the agent could have used instead.
+
+Acceptance:
+
+- A new review stores `caseCore`, up to 5 `consumerPoints` (consumer quote,
+  summary, status Terjawab/Sebagian/Belum terjawab, reason, the agent message
+  that answers it), and up to 8 `agentNotes` (agent quote, aspect, Sudah
+  tepat/Perlu diperbaiki, note, better sentence).
+- The backend keeps only annotations whose quote is really in a message from
+  the right sender. A wrong `messageId` is repaired by searching for the quote,
+  and anything else is dropped. Strings pass `sanitizeAiResponse`.
+- The Telaah stage shows "Inti kasus", a "Pertanyaan konsumen" tab (the
+  default when points exist), and a "Kalimat agen" tab. Quotes are marked in
+  the transcript, and every item jumps to its message.
+- Old reviews (no fields) say "Belum tersedia" and keep "Perbaiki dulu" as
+  the default tab. Completed sessions cannot be re-reviewed (unchanged).
+
+### Design
+
+- Contract: optional `caseCore`, `consumerPoints`, `agentNotes` on
+  `KetikEducation` (`packages/types/src/ketik.ts`). Storage is the existing
+  `ketik_session_reviews.education` JSONB, so there is no migration.
+  `getReviewDetail` already passes `education` through.
+- AI: `KETIK_REVIEW_RESPONSE_SCHEMA` and the system instruction ask for the
+  three fields. `services/ketik/review-annotations.ts` normalizes them against
+  `ketik_history.messages`. Scores and the rest of the review are unchanged.
+- UI: `KetikReviewStage` adds the case core, two tabs, inline transcript marks
+  (consumer status via line style + tint + letter, agent notes via number),
+  and jump buttons. Typo marks still render inside annotated spans.
+- Tests: E2E `KETIK Telaah` (annotated and legacy review mocks). Approved
+  exception: extra cases in `apps/api/src/__tests__/ketik-review-edukatif.test.ts`
+  for backend normalization, run as a single file.
+
+### Tasklist
+
+- [x] RED: E2E annotated + legacy Telaah tests; run and confirm failures.
+- [x] RED: unit cases for normalization (quote not in message, wrong sender,
+      repaired id, invalid answer reference, limits, invalid enum, sanitize).
+- [x] GREEN: types, prompt/schema, normalizer, processor wiring.
+- [x] GREEN: Telaah UI (`KetikReviewAnnotations.tsx`, `utils/quoteMarks.tsx`),
+      tab list `relative` so the active tab is not scrolled out of view.
+- [x] thermo-nuclear review, gates, `docs/design.md` note.
