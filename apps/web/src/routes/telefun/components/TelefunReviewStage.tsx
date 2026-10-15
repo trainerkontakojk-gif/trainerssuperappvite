@@ -133,10 +133,12 @@ export function TelefunReviewStage({
   const lineRefs = useRef(new Map<number, HTMLLIElement>());
   const [currentMs, setCurrentMs] = useState(0);
   const [highlighted, setHighlighted] = useState<number | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [checking, setChecking] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
-  const [rerunning, setRerunning] = useState(false);
+  const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
+  const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(
+    null,
+  );
   const [rerunFailed, setRerunFailed] = useState(false);
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
@@ -231,7 +233,7 @@ export function TelefunReviewStage({
   };
 
   const analyze = async () => {
-    setAnalyzing(true);
+    setAnalyzeStartedAt(Date.now());
     try {
       const response = await unwrapResponse(
         await telefunClient.score[":id"].$post({
@@ -266,12 +268,12 @@ export function TelefunReviewStage({
         notify.error("Analisis belum berhasil. Coba lagi beberapa saat lagi.");
       }
     } finally {
-      setAnalyzing(false);
+      setAnalyzeStartedAt(null);
     }
   };
 
   const rerun = async () => {
-    setRerunning(true);
+    setRerunStartedAt(Date.now());
     setRerunFailed(false);
     try {
       const response = await unwrapResponse(
@@ -295,7 +297,7 @@ export function TelefunReviewStage({
     } catch {
       setRerunFailed(true);
     } finally {
-      setRerunning(false);
+      setRerunStartedAt(null);
     }
   };
 
@@ -517,7 +519,7 @@ export function TelefunReviewStage({
               tab={tab}
               onTabChange={setTab}
               onShowLine={showLine}
-              rerunning={rerunning}
+              rerunStartedAt={rerunStartedAt}
               rerunFailed={rerunFailed}
               onRerun={() => setRerunOpen(true)}
               notes={
@@ -555,7 +557,7 @@ export function TelefunReviewStage({
             <TelefunReviewStatus
               record={record}
               state={state}
-              analyzing={analyzing}
+              analyzeStartedAt={analyzeStartedAt}
               checking={checking}
               onAnalyze={() => void analyze()}
               onCheckStatus={() => void checkStatus()}

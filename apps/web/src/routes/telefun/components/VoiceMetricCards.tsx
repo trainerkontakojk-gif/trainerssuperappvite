@@ -37,7 +37,7 @@ function formatRawMetric(metric: CommunicationMetric): string {
           ? Number(count)
           : NaN;
     if (Number.isFinite(countNum)) {
-      return `${countNum} kata pengisi${countNum === 1 ? "" : ""}`;
+      return `${countNum} filler`;
     }
     return `${metric.rawValue} filler words`;
   }

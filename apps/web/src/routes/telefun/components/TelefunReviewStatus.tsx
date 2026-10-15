@@ -2,6 +2,7 @@ import { RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import type { CallRecord } from "../types";
 import type { TelefunAnalysisState } from "../utils/reviewDisplay";
+import { TelefunAnalysisWait } from "./TelefunAnalysisWait";
 
 const sectionTitle =
   "font-display text-lg leading-7 font-bold tracking-tight text-foreground";
@@ -10,8 +11,8 @@ const bodyText = "max-w-[60ch] text-[15px] leading-6 text-fg2";
 interface TelefunReviewStatusProps {
   record: CallRecord;
   state: Exclude<TelefunAnalysisState, "scored">;
-  /** Analisis manual sedang berjalan di halaman ini. */
-  analyzing: boolean;
+  /** Saat analisis manual dimulai di halaman ini; `null` bila tidak berjalan. */
+  analyzeStartedAt: number | null;
   checking: boolean;
   onAnalyze: () => void;
   onCheckStatus: () => void;
@@ -25,12 +26,13 @@ interface TelefunReviewStatusProps {
 export function TelefunReviewStatus({
   record,
   state,
-  analyzing,
+  analyzeStartedAt,
   checking,
   onAnalyze,
   onCheckStatus,
 }: TelefunReviewStatusProps) {
   const canAnalyze = Boolean(record.agentRecordingPath);
+  const analyzing = analyzeStartedAt !== null;
 
   if (analyzing || state === "processing" || state === "pending") {
     return (
@@ -44,11 +46,15 @@ export function TelefunReviewStatus({
             ? "Menunggu analisis"
             : "Sedang dianalisis"}
         </h3>
-        <p className={bodyText}>
-          AI mendengarkan rekaman suara Anda. Biasanya selesai dalam 1–2 menit.
-          Anda boleh meninggalkan halaman; hasilnya muncul di halaman awal
-          Telefun.
-        </p>
+        {analyzeStartedAt !== null ? (
+          <TelefunAnalysisWait startedAt={analyzeStartedAt} />
+        ) : (
+          <p className={bodyText}>
+            AI mendengarkan rekaman suara Anda. Biasanya selesai dalam 1–2
+            menit. Anda boleh meninggalkan halaman; hasilnya muncul di halaman
+            awal Telefun.
+          </p>
+        )}
         {!analyzing && (
           <CheckButton checking={checking} onClick={onCheckStatus} />
         )}
@@ -116,7 +122,7 @@ export function TelefunReviewStatus({
         <>
           <p className={bodyText}>
             Jalankan analisis AI untuk menilai kecepatan bicara, intonasi,
-            artikulasi, kata pengisi, nada, dan penggunaan hold.
+            artikulasi, filler, nada, dan penggunaan hold.
           </p>
           <Button
             type="button"

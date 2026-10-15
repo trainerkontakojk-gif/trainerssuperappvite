@@ -19,8 +19,9 @@ import {
 import {
   buildTelefunContentReviewPrompt,
   canReviewTelefunContent,
+  logTelefunContentReview,
   normalizeTelefunContentReview,
-  TELEFUN_CONTENT_REVIEW_AI_PROPERTIES,
+  telefunContentReviewResponseSchema,
 } from "./telefun-content-review";
 
 export type { VoiceQualityAssessment };
@@ -251,13 +252,7 @@ export async function analyzeVoiceQuality(
     ? voicePrompt + buildTelefunContentReviewPrompt(transcript)
     : voicePrompt;
   const responseSchema = reviewContent
-    ? {
-        ...TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
-        properties: {
-          ...TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA.properties,
-          ...TELEFUN_CONTENT_REVIEW_AI_PROPERTIES,
-        },
-      }
+    ? telefunContentReviewResponseSchema(TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA)
     : TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA;
 
   // Keep this check immediately adjacent to the provider boundary. Once the
@@ -295,7 +290,11 @@ export async function analyzeVoiceQuality(
         ...parsed,
         // Anotasi isi tidak memengaruhi skor; tanpa transkrip dua arah `null`.
         contentReview: reviewContent
-          ? normalizeTelefunContentReview(rawJson, transcript)
+          ? logTelefunContentReview(
+              sessionId,
+              rawJson,
+              normalizeTelefunContentReview(rawJson, transcript),
+            )
           : null,
         holdManagement: holdAssessment,
         overallScore: applyHoldAssessmentToOverallScore(

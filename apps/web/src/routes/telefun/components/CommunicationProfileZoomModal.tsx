@@ -229,9 +229,9 @@ export const CommunicationProfileZoomModal: React.FC<
                   <TrendingDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-foreground">Fillers:</strong> angka
-                    rendah = sedikit kata pengisi (baik). Biru di bawah hijau =
-                    sesuai target. Jumlah dan contoh kata pengisi dapat dilihat
-                    pada kartu di bawah.
+                    rendah = sedikit filler (baik). Biru di bawah hijau = sesuai
+                    target. Jumlah dan contoh filler dapat dilihat pada kartu di
+                    bawah.
                   </span>
                 </div>
               </div>

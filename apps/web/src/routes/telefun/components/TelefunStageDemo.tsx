@@ -5,14 +5,14 @@ import "./TelefunStageDemo.css";
 
 const ASPECTS = [
   { label: "Artikulasi", value: 8.8, color: "bg-chart-green" },
-  { label: "Kata pengisi", value: 5.2, color: "bg-chart-orange" },
+  { label: "Filler", value: 5.2, color: "bg-chart-orange" },
 ] as const;
 
 const WAVE_BARS = [30, 60, 85, 45, 60, 30, 85, 60, 45, 30, 60, 85, 45, 60];
 
 /**
  * Ilustrasi alur Telefun di halaman awal: konsumen bicara, transkrip muncul,
- * panggilan diakhiri, lalu hasil telaah suara naik dari bawah dan kata pengisi
+ * panggilan diakhiri, lalu hasil telaah suara naik dari bawah dan filler
  * tersorot. Isinya contoh (`aria-hidden`); yang dibaca pembaca layar adalah
  * `figcaption`. Animasi berulang, jadi ada tombol jeda.
  */
@@ -29,7 +29,7 @@ export function TelefunStageDemo() {
     >
       <figcaption className="sr-only">
         Contoh latihan Telefun: konsumen menelepon, agen menjawab, panggilan
-        diakhiri, lalu hasil telaah suara muncul dan kata pengisi disorot.
+        diakhiri, lalu hasil telaah suara muncul dan filler disorot.
       </figcaption>
       <div className="relative flex h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-background">
         <div className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-surface-elevated pr-1 pl-4">
@@ -167,8 +167,8 @@ export function TelefunStageDemo() {
             </span>
           ))}
           <span className="text-xs text-foreground">
-            7 kata pengisi, terbanyak &ldquo;eee&rdquo;. Coba jeda singkat
-            sebelum menjawab.
+            7 filler, terbanyak &ldquo;eee&rdquo;. Coba jeda singkat sebelum
+            menjawab.
           </span>
         </div>
       </div>

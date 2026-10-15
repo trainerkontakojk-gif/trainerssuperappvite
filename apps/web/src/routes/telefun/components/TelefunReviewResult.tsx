@@ -26,6 +26,7 @@ import {
   telefunScoreVerdict,
   type TelefunAspect,
 } from "../utils/reviewDisplay";
+import { TelefunAnalysisWait } from "./TelefunAnalysisWait";
 import {
   AgentNoteList,
   ConsumerPointList,
@@ -131,7 +132,7 @@ export function ReviewResult({
   tab,
   onTabChange,
   onShowLine,
-  rerunning,
+  rerunStartedAt,
   rerunFailed,
   onRerun,
   notes,
@@ -143,7 +144,8 @@ export function ReviewResult({
   tab: string;
   onTabChange: (tab: string) => void;
   onShowLine: (startMs: number) => void;
-  rerunning: boolean;
+  /** Saat Telaah ulang dimulai; `null` bila tidak berjalan. */
+  rerunStartedAt: number | null;
   rerunFailed: boolean;
   onRerun: () => void;
   notes: ReactNode;
@@ -182,21 +184,22 @@ export function ReviewResult({
           <Button
             type="button"
             variant="outline"
-            disabled={rerunning}
+            disabled={rerunStartedAt !== null}
             onClick={onRerun}
             className="ml-auto min-h-[44px] gap-2 px-3 text-[13px]"
           >
             <RotateCcw data-icon="inline-start" />
-            {rerunning ? "Menelaah ulang…" : "Telaah ulang"}
+            {rerunStartedAt !== null ? "Menelaah ulang…" : "Telaah ulang"}
           </Button>
         }
       />
 
-      {rerunning && (
-        <p role="status" className="text-[13px] leading-5 text-fg2">
-          AI sedang menelaah ulang panggilan ini. Hasil sekarang tetap tampil
-          sampai hasil baru siap.
-        </p>
+      {rerunStartedAt !== null && (
+        <TelefunAnalysisWait
+          startedAt={rerunStartedAt}
+          label="Telaah ulang berjalan"
+          keepsPrevious
+        />
       )}
       {rerunFailed && (
         <p role="alert" className="text-[13px] leading-5 text-fg2">

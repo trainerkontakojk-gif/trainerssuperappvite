@@ -209,3 +209,36 @@ annotations (`10a9711`) and Telaah ulang (`309facd`) in Telefun.
       (2026-10-15) to check it after deploy: open an older Telefun
       session in Telaah, press Telaah ulang, and review "Pertanyaan konsumen"
       and "Kalimat agen".
+
+## Feedback after the real-AI check (2026-10-15)
+
+Fajar ran Telaah ulang after deploy: it works, but (1) it takes long with no
+sign of progress or how long to wait, (2) "Pertanyaan konsumen" and "Kalimat
+agen" stayed empty, (3) asked for advice on the radar chart, (4) "filler"
+reads better than "kata pengisi".
+
+### Design
+
+1. Rerun no longer awaits the coaching summary (a second Gemini call with its
+   own 3-minute limit); it runs after the response. The stage shows a wait
+   panel with an elapsed clock (mm.ss), an indeterminate bar (static under
+   reduced motion), "Biasanya 1–2 menit, paling lama sekitar 3 menit", and a
+   "lebih lama dari biasanya" line after 3 minutes. No percentage. Same panel
+   for a manual "Mulai analisis"/"Analisis ulang".
+2. Annotation fields become `required` in the AI schema when a two-way
+   transcript exists, and the prompt marks them mandatory. Quote matching
+   ignores case, spacing, and punctuation, and stores the transcript's exact
+   substring so the web mark always lands. The API logs counts per category
+   (AI vs kept), no text, to diagnose an empty result.
+3. Radar: advice only, no change in this pass.
+4. Label "Filler" instead of "Kata pengisi" in Telefun UI copy.
+
+### Tasklist
+
+- [x] RED: E2E rerun wait panel (elapsed clock, hint, no %), label "Filler";
+      approved API test file extended for punctuation-tolerant matching and
+      exact-substring quotes, required schema fields, rerun not awaiting the
+      coaching summary.
+- [x] GREEN, docs, gates, commit. RED: 3 E2E + 3 API cases failed first;
+      GREEN: API test 19/19, E2E (telefun-flow, -call, -history, monitoring,
+      ketik-flow) 71/71.

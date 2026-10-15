@@ -102,7 +102,10 @@ historis tidak berubah.
   (`lib/telefun-content-review.ts`) hanya menyimpan kutipan yang ada di baris
   pembicara yang tepat dan menaruhnya di `voice_assessment.contentReview`
   (`undefined` = hasil lama, `null` = tidak ada transkrip). Skor tidak
-  dipengaruhi.
+  dipengaruhi. Field anotasi `required` di skema respons (Gemini melewati
+  properti opsional); kutipan dicocokkan tanpa peduli huruf besar, spasi, dan
+  tanda baca, lalu disimpan persis seperti potongan transkrip. Log
+  `[Telefun ContentReview]` mencatat jumlah dari AI/tersimpan, tanpa teks.
 - **Telaah ulang** `POST /v1/telefun/score/:id/rerun` (pemilik sesi,
   `aiRateLimitMiddleware`): `completed` → `processing` bersyarat dengan klaim
   bertoken baru (sedang berjalan → 409 `SCORING_IN_PROGRESS`), analisis baru
@@ -111,6 +114,8 @@ historis tidak berubah.
   `RERUN_FAILED`, `details.previousKept`). Bila pemulihan pun gagal, worker
   mengambil klaim basi setelah lease dan menyelesaikannya dari hasil lama yang
   tersimpan.
+  Ringkasan coaching (panggilan AI kedua) berjalan setelah respons, tidak
+  ditunggu.
 - `GET /api/health` hanya membuktikan liveness API. Kesehatan polling worker
   perlu dibuktikan lewat log runtime bounded dan queue readback.
 

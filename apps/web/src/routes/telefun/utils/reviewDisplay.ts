@@ -123,7 +123,7 @@ export function readTelefunAspects(
     },
     {
       key: "fillerWords",
-      label: "Kata pengisi",
+      label: "Filler",
       score: assessment.fillerWords.score,
       verdict: assessment.fillerWords.verdict,
       feedback: assessment.fillerWords.feedback,
@@ -259,7 +259,7 @@ export function readTelefunScore(record: CallRecord): number | null {
     : null;
 }
 
-/** Baris transkrip agen pertama yang memuat salah satu contoh kata pengisi. */
+/** Baris transkrip agen pertama yang memuat salah satu contoh filler. */
 export function firstFillerLine(
   transcript: readonly TelefunTranscriptEntry[],
   examples: readonly string[],

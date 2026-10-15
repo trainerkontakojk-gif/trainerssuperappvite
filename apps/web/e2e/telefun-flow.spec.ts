@@ -103,13 +103,14 @@ test.describe("Telefun landing (hermetic)", () => {
     await expect(followUp.getByText(/Rekaman tidak tersimpan/)).toBeVisible();
 
     const focus = page.getByRole("region", { name: "Fokus berikutnya" });
-    await expect(focus).toContainText("Kata pengisi");
+    await expect(focus).toContainText("Filler");
+    await expect(focus).not.toContainText("Kata pengisi");
     await expect(focus).toContainText("5,8");
 
     const recent = page.getByRole("region", { name: "Hasil telaah terbaru" });
     const firstRow = recent.getByRole("row").nth(1);
     await expect(firstRow).toContainText("Klaim Asuransi Ditolak");
-    await expect(firstRow).toContainText("Kata pengisi");
+    await expect(firstRow).toContainText("Filler");
     await expect(firstRow).toContainText("7,6");
 
     await recent
@@ -292,7 +293,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
 
     // Temuan menunjuk waktu di transkrip.
     await result.getByRole("tab", { name: /^Perbaiki dulu/ }).click();
-    await result.getByRole("button", { name: /00\.36 · Kata pengisi/ }).click();
+    await result.getByRole("button", { name: /00\.36 · Filler/ }).click();
     await expect(agentLine).toHaveAttribute("data-highlighted", "true");
 
     await result.getByRole("tab", { name: /^Catatan trainer/ }).click();
@@ -494,6 +495,66 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await waitForMockedApi(audit, [
       `POST /api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
     ]);
+    expectHermetic(audit);
+  });
+
+  test("telaah ulang yang berjalan menampilkan waktu berjalan dan perkiraan, tanpa persen", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    const fresh = annotatedAssessment({ overall: 8.3 });
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const audit = await openTelaah(page, REVIEWED_ROW, [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/history/${REVIEWED_ROW.id}`,
+        body: {
+          success: true,
+          data: { ...REVIEWED_ROW, score: 8.3, voice_assessment: fresh },
+        },
+      },
+    ]);
+    // Route ditambahkan setelah shell: Playwright mendahulukan yang terakhir.
+    await page.route(
+      `**/api/v1/telefun/score/${REVIEWED_ROW.id}/rerun`,
+      async (route) => {
+        await held;
+        await route.fulfill({
+          json: {
+            success: true,
+            data: { score: 8.3, feedback: "Baik", assessment: fresh },
+          },
+        });
+      },
+    );
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result
+      .getByRole("button", { name: "Telaah ulang" })
+      .click({ timeout: 20000 });
+    await page
+      .getByRole("dialog", { name: "Telaah ulang panggilan ini?" })
+      .getByRole("button", { name: "Telaah ulang" })
+      .click();
+
+    const wait = result.getByRole("status", { name: "Telaah ulang berjalan" });
+    await expect(wait).toContainText("Biasanya 1–2 menit");
+    await expect(wait).toContainText("paling lama sekitar 3 menit");
+    await expect(wait.getByTestId("telefun-wait-elapsed")).toHaveText("00.00");
+    await page.clock.fastForward(65_000);
+    await expect(wait.getByTestId("telefun-wait-elapsed")).toHaveText("01.05");
+    await expect(wait).not.toContainText("%");
+    // Hasil lama tetap tampil selama menunggu.
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("7,6");
+
+    await page.clock.fastForward(130_000);
+    await expect(wait).toContainText("Lebih lama dari biasanya");
+
+    release();
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("8,3");
+    await expect(wait).toHaveCount(0);
     expectHermetic(audit);
   });
 

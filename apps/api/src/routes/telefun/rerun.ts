@@ -141,8 +141,10 @@ telefunRerun.post("/score/:id/rerun", aiRateLimitMiddleware, async (c) => {
       result.assessment &&
       (await completeScoringAssessment(id, result.assessment, claimTokenHash))
     ) {
-      // Hasil baru sudah tersimpan; ringkasan coaching hanya pelengkap.
-      await generateCoachingSummary(id, user.id).catch(() => null);
+      // Hasil baru sudah tersimpan. Ringkasan coaching adalah panggilan AI
+      // kedua (batas 3 menit); dijalankan setelah respons supaya pengguna
+      // tidak ikut menunggunya.
+      void generateCoachingSummary(id, user.id).catch(() => null);
       return c.json({
         success: true,
         data: {

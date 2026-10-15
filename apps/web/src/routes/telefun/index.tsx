@@ -487,8 +487,7 @@ export default function TelefunLanding() {
                       Telefun adalah latihan menerima telepon konsumen. Konsumen
                       virtual berbicara seperti penelepon sungguhan, panggilan
                       direkam, lalu AI menilai cara Anda berbicara: kecepatan,
-                      intonasi, artikulasi, kata pengisi, nada, dan penggunaan
-                      hold.
+                      intonasi, artikulasi, filler, nada, dan penggunaan hold.
                     </p>
                   </div>
 

@@ -53,7 +53,7 @@ export function buildVoiceRadarData(
     evaluationMode: metric.evaluationMode,
     rawLabel:
       metric.key === "fillers" && metric.rawValue !== undefined
-        ? `${metric.rawValue} kata pengisi`
+        ? `${metric.rawValue} filler`
         : undefined,
     direction:
       metric.key === "fillers" ? "lower_better" : "higher_better",

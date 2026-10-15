@@ -156,13 +156,12 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
           </p>
           <p>
             Empat aspek (Speaking Rate, Intonation, Articulation, Tone): skor
-            biru <strong>mendekati</strong> target hijau = semakin baik
-            (terlalu rendah maupun terlalu tinggi kurang baik — deviasi absolut
-            terhadap target yang dinilai). Khusus Fillers
-            (↓): skor biru{" "}
-            <strong>di bawah</strong> hijau = baik (semakin sedikit kata
-            pengisi semakin baik). Angka pada sumbu hanya koordinat visual,
-            bukan skor akhir.
+            biru <strong>mendekati</strong> target hijau = semakin baik (terlalu
+            rendah maupun terlalu tinggi kurang baik — deviasi absolut terhadap
+            target yang dinilai). Khusus Fillers (↓): skor biru{" "}
+            <strong>di bawah</strong> hijau = baik (semakin sedikit filler
+            semakin baik). Angka pada sumbu hanya koordinat visual, bukan skor
+            akhir.
           </p>
         </div>
       )}

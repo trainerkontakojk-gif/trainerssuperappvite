@@ -27,7 +27,10 @@ vi.mock("../lib/telefun-analysis", () => ({
   generateCoachingSummary: mocks.generateCoachingSummary,
 }));
 
-import { normalizeTelefunContentReview } from "../lib/telefun-content-review";
+import {
+  normalizeTelefunContentReview,
+  telefunContentReviewResponseSchema,
+} from "../lib/telefun-content-review";
 import { telefunRerun } from "../routes/telefun/rerun";
 
 const USER_ID = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
@@ -86,7 +89,8 @@ describe("normalizeTelefunContentReview", () => {
         status: "partial",
         reason: null,
         answerStartMs: 36000,
-        answerQuote: "wajib menjelaskan dasar penolakannya",
+        // Disimpan persis seperti di transkrip, termasuk spasi gandanya.
+        answerQuote: "wajib menjelaskan  dasar penolakannya",
       },
     ]);
   });
@@ -206,6 +210,69 @@ describe("normalizeTelefunContentReview", () => {
     );
     expect(review.consumerPoints).toHaveLength(5);
     expect(review.agentNotes).toHaveLength(8);
+  });
+
+  it("kutipan cocok walau huruf besar dan tanda baca berbeda; disimpan persis seperti di transkrip", () => {
+    const review = normalizeTelefunContentReview(
+      {
+        consumerPoints: [
+          {
+            line: 1,
+            quote: "kok, klaim asuransi saya ditolak",
+            summary: "Alasan penolakan",
+            status: "unanswered",
+          },
+        ],
+        agentNotes: [
+          {
+            line: 4,
+            quote: "perusahaan wajib menjelaskan dasar penolakannya secara tertulis",
+            verdict: "fix",
+            note: "Belum memberi langkah.",
+            example: "Ibu bisa meminta surat penolakan.",
+          },
+        ],
+      },
+      TRANSCRIPT,
+    );
+    expect(review.consumerPoints[0]?.quote).toBe(
+      "Kok klaim asuransi saya ditolak",
+    );
+    expect(review.agentNotes[0]?.quote).toBe(
+      "Perusahaan wajib menjelaskan  dasar penolakannya secara tertulis",
+    );
+  });
+
+  it("kutipan yang hanya tanda baca dibuang", () => {
+    const review = normalizeTelefunContentReview(
+      {
+        consumerPoints: [
+          { line: 1, quote: "?!", summary: "x", status: "answered" },
+        ],
+      },
+      TRANSCRIPT,
+    );
+    expect(review.consumerPoints).toEqual([]);
+  });
+
+  it("skema respons AI mewajibkan field anotasi bila transkrip ada", () => {
+    const schema = telefunContentReviewResponseSchema({
+      type: "object",
+      properties: { overallScore: { type: "number" } },
+      required: ["overallScore"],
+    });
+    expect(schema.required).toEqual([
+      "overallScore",
+      "caseCore",
+      "consumerPoints",
+      "agentNotes",
+    ]);
+    expect(Object.keys(schema.properties)).toEqual([
+      "overallScore",
+      "caseCore",
+      "consumerPoints",
+      "agentNotes",
+    ]);
   });
 
   it("respons rusak tetap menghasilkan ketiga field kosong", () => {
@@ -357,6 +424,25 @@ describe("POST /score/:id/rerun", () => {
     expect(db.row.score).toBe(8.3);
     expect(body.data.score).toBe(8.3);
     expect(body.data.assessment.contentReview.caseCore).toBe("Klaim ditolak.");
+  });
+
+  it("tidak menunggu ringkasan coaching sebelum menjawab", async () => {
+    const db = fakeDatabase(completedRow());
+    mocks.createAdminClient.mockReturnValue(db.client);
+    mocks.analyzeVoiceQuality.mockResolvedValue({
+      success: true,
+      assessment: freshAssessment(),
+    });
+    // Panggilan Gemini kedua yang tidak pernah selesai.
+    mocks.generateCoachingSummary.mockReturnValue(new Promise(() => {}));
+
+    const response = await rerun();
+
+    expect(response.status).toBe(200);
+    expect(mocks.generateCoachingSummary).toHaveBeenCalledWith(
+      SESSION_ID,
+      USER_ID,
+    );
   });
 
   it("AI gagal: baris kembali completed dengan hasil lama, 502 previousKept", async () => {
