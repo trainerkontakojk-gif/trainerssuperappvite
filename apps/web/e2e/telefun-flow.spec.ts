@@ -16,8 +16,10 @@ import {
   NO_RECORDING_ROW,
   PENDING_ROW,
   REVIEWED_ROW,
+  agentRecordingMock,
   recordingMock,
   serveRecording,
+  serveSpeechRecordings,
   telefunMocks,
   voiceAssessment,
   annotatedAssessment,
@@ -308,7 +310,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("tab Profil membandingkan hasil dengan target dalam satuan asli, tanpa radar", async ({
+  test("tab Profil berupa diagram spider: lima aspek berbahasa Indonesia, skor 0–10, zona sudah baik", async ({
     page,
   }) => {
     const audit = await openTelaah(page, REVIEWED_ROW);
@@ -316,24 +318,137 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await result
       .getByRole("tab", { name: "Profil" })
       .click({ timeout: 20000 });
-    const targets = result.getByRole("list", { name: "Target vs hasil" });
-    const rows = targets.getByRole("listitem");
-    await expect(rows).toHaveCount(5);
-    const rate = rows.filter({ hasText: "Kecepatan bicara" });
-    await expect(rate).toContainText("158 kata/menit");
-    await expect(rate).toContainText("ideal 130–150");
-    const filler = rows.filter({ hasText: "Filler" });
-    await expect(filler).toContainText("7 filler");
-    await expect(filler).toContainText("maks 3");
-    await expect(filler).toContainText("Kurang");
-    const articulation = rows.filter({ hasText: "Artikulasi" });
-    await expect(articulation).toContainText("8,8 / 10");
-    await expect(articulation).toContainText("target 8,0–10,0");
-    await expect(articulation).toContainText("Baik");
-    await expect(rows.filter({ hasText: "Nada emosi" })).toContainText("tenang");
-    // Tidak ada radar berbahasa Inggris lagi.
-    await expect(result.locator(".recharts-wrapper")).toHaveCount(0);
+    const radar = result.getByRole("img", { name: /^Diagram profil komunikasi/ });
+    await expect(radar).toBeVisible();
+    for (const label of [
+      "Kecepatan bicara",
+      "Intonasi",
+      "Artikulasi",
+      "Filler",
+      "Nada emosi",
+    ]) {
+      await expect(radar.getByText(label, { exact: true })).toBeVisible();
+    }
+    await expect(radar).toHaveAccessibleName(/Artikulasi 8,8/);
+    await expect(result.getByText("Zona sudah baik (7,0 ke atas)")).toBeVisible();
     await expect(result.getByText("Speaking Rate")).toHaveCount(0);
+    await expect(
+      result.getByRole("list", { name: "Target vs hasil" }),
+    ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("penanda di transkrip dan garis waktu bisa diklik menuju poinnya", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, ANNOTATED_ROW, ANNOTATIONS_MOCKS, [
+      ANNOTATED_ROW,
+      ...FULL_HISTORY.filter((row) => row.id !== ANNOTATED_ROW.id),
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+
+    // Huruf pertanyaan konsumen di transkrip membuka poinnya.
+    await result
+      .getByRole("tab", { name: /^Perbaiki dulu/ })
+      .click({ timeout: 20000 });
+    await transcript
+      .getByRole("button", { name: "Lihat pertanyaan konsumen A" })
+      .click();
+    await expect(
+      result.getByRole("tab", { name: "Pertanyaan konsumen (2)" }),
+    ).toHaveAttribute("aria-selected", "true");
+    const points = result.getByRole("list", { name: "Pertanyaan konsumen" });
+    await expect(points.getByRole("listitem").nth(0)).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+
+    // Nomor kalimat agen membuka catatannya.
+    await transcript
+      .getByRole("button", { name: "Lihat kalimat agen 2" })
+      .click();
+    await expect(
+      result.getByRole("tab", { name: "Kalimat agen (2)" }),
+    ).toHaveAttribute("aria-selected", "true");
+    const lines = result.getByRole("list", { name: "Kalimat agen" });
+    await expect(lines.getByRole("listitem").nth(1)).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+    await expect(lines.getByRole("listitem").nth(0)).not.toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+
+    // Nomor catatan trainer di garis waktu menunjuk catatannya dan memutar dari sana.
+    await result.getByRole("tab", { name: /^Catatan trainer/ }).click();
+    await expect(result.getByText("Ganti eee dengan kalimat jeda.")).toBeVisible();
+    await transcript
+      .getByRole("button", { name: "Catatan trainer 1 di 00.36" })
+      .click();
+    await expect(page.getByTestId("telefun-player-time")).toHaveText("00.36");
+    await expect(
+      result.getByRole("listitem", { name: "Catatan 1 pada 00.36" }),
+    ).toHaveAttribute("data-highlighted", "true");
+    expectHermetic(audit);
+  });
+
+  test("klik waktu memutar dari awal ucapan, bukan ujungnya; rekaman tampil sebagai gelombang", async ({
+    page,
+  }) => {
+    // Waktu baris tercatat saat transkrip tiba, sesudah orangnya bicara.
+    // Rekaman: konsumen 2–6 dtk dan 20–23 dtk, agen 8,5–10,5 dtk dan 30–35 dtk.
+    const audit = await open(page, telaahPath(REVIEWED_ROW.id), [
+      ...telefunMocks(FULL_HISTORY),
+      agentRecordingMock(REVIEWED_ROW.id),
+      recordingMock(REVIEWED_ROW.id),
+    ]);
+    await serveSpeechRecordings(page, {
+      full: [
+        [2, 6],
+        [8.5, 10.5],
+        [20, 23],
+        [30, 35],
+      ],
+      agent: [
+        [8.5, 10.5],
+        [30, 35],
+      ],
+    });
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    const waveform = transcript.getByTestId("telefun-waveform");
+    await expect(waveform).toHaveAttribute("data-state", "ready", {
+      timeout: 20000,
+    });
+
+    const agentLine = transcript.getByTestId("telefun-line-00.36");
+    await expect(
+      agentLine.getByRole("button", { name: /^Putar dari/ }),
+    ).toHaveText("00.29");
+    await agentLine.getByRole("button", { name: /^Putar dari/ }).click();
+    await expect(page.getByTestId("telefun-player-time")).toHaveText("00.29");
+
+    await expect(
+      transcript
+        .getByTestId("telefun-line-00.04")
+        .getByRole("button", { name: /^Putar dari/ }),
+    ).toHaveText("00.01");
+    await expect(
+      transcript
+        .getByTestId("telefun-line-00.11")
+        .getByRole("button", { name: /^Putar dari/ }),
+    ).toHaveText("00.08");
+    // Tanpa bunyi di dekatnya, waktu tercatat dipakai apa adanya.
+    await expect(
+      transcript
+        .getByTestId("telefun-line-01.18")
+        .getByRole("button", { name: /^Putar dari/ }),
+    ).toHaveText("01.18");
     expectHermetic(audit);
   });
 

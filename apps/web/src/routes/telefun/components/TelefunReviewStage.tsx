@@ -23,10 +23,15 @@ import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { notify } from "../../../lib/toast";
 import { parseTelefunScoreResult } from "../../../lib/voiceAssessmentUtils";
+import { useRecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import { useTelefunRecordingUrl } from "../hooks/useTelefunRecordingUrl";
 import type { CallRecord } from "../types";
 import { isTelefunRecordScored } from "../types";
-import { buildTelefunQuoteMarks } from "../utils/contentMarks";
+import {
+  annotationItemId,
+  buildTelefunQuoteMarks,
+  contentItemId,
+} from "../utils/contentMarks";
 import { buildFillerPattern, withFillerMarks } from "../utils/fillerMarks";
 import {
   formatCallDuration,
@@ -99,10 +104,11 @@ function mapAnnotation(row: TelefunReplayAnnotation): ReplayAnnotationItem {
 function downloadTranscript(
   record: CallRecord,
   transcript: readonly TelefunTranscriptEntry[],
+  clockOf: (startMs: number) => string,
 ) {
   const lines = transcript.map(
     (entry) =>
-      `${formatClock(entry.startMs)}  ${entry.speaker === "agent" ? "Agen" : "Konsumen"}: ${entry.text}`,
+      `${clockOf(entry.startMs)}  ${entry.speaker === "agent" ? "Agen" : "Konsumen"}: ${entry.text}`,
   );
   const text = [
     `${record.scenarioTitle} · ${record.consumerName}`,
@@ -133,6 +139,8 @@ export function TelefunReviewStage({
   const lineRefs = useRef(new Map<number, HTMLLIElement>());
   const [currentMs, setCurrentMs] = useState(0);
   const [highlighted, setHighlighted] = useState<number | null>(null);
+  // Butir panel hasil yang ditunjuk dari penanda di transkrip/garis waktu.
+  const [pointed, setPointed] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
   const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
@@ -154,16 +162,50 @@ export function TelefunReviewStage({
     () => record.transcript ?? [],
     [record.transcript],
   );
+  // Waktu baris tercatat saat transkrip tiba (sesudah orangnya bicara);
+  // awal ucapan dibaca dari rekaman bila bisa.
+  const { analysis, onsets } = useRecordingAnalysis(
+    record,
+    recording.source,
+    transcript,
+  );
+  const lineStart = useCallback(
+    (startMs: number) => onsets.get(startMs) ?? startMs,
+    [onsets],
+  );
+  const clockOf = useCallback(
+    (startMs: number) => formatClock(lineStart(startMs)),
+    [lineStart],
+  );
   const holds = holdIntervals(record);
   const assessment = state === "scored" ? record.voiceAssessment : null;
   const fillerPattern = useMemo(
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
     [assessment],
   );
+  const pointTo = useCallback((tabValue: string, id: string) => {
+    setTab(tabValue);
+    setPointed(id);
+  }, [setTab]);
   const quoteMarks = useMemo(
-    () => buildTelefunQuoteMarks(assessment?.contentReview),
-    [assessment],
+    () =>
+      buildTelefunQuoteMarks(assessment?.contentReview, (target) =>
+        pointTo(target.tab, contentItemId(target)),
+      ),
+    [assessment, pointTo],
   );
+
+  // Butir yang ditunjuk baru ada setelah tabnya terbuka.
+  useEffect(() => {
+    if (!pointed) return;
+    const frame = window.requestAnimationFrame(() => {
+      const element = document.getElementById(pointed);
+      if (!element) return;
+      element.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      element.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pointed, tab]);
 
   // Sesi yang belum dinilai diperiksa sekali saat dibuka; pemantau berhenti
   // sendiri pada status akhir atau batas waktu.
@@ -216,7 +258,7 @@ export function TelefunReviewStage({
 
   const playFrom = (startMs: number) => {
     setHighlighted(null);
-    playerRef.current?.playFrom(startMs);
+    playerRef.current?.playFrom(lineStart(startMs));
   };
 
   const checkStatus = async () => {
@@ -342,8 +384,9 @@ export function TelefunReviewStage({
   // Baris yang sedang diputar: baris terakhir yang dimulai sebelum posisi putar.
   const nowStartMs =
     currentMs > 0
-      ? (transcript.filter((entry) => entry.startMs <= currentMs).at(-1)
-          ?.startMs ?? null)
+      ? (transcript
+          .filter((entry) => lineStart(entry.startMs) <= currentMs)
+          .at(-1)?.startMs ?? null)
       : null;
   const participant =
     record.simulationSubject?.type === "participant"
@@ -374,7 +417,7 @@ export function TelefunReviewStage({
             type="button"
             variant="outline"
             disabled={transcript.length === 0}
-            onClick={() => downloadTranscript(record, transcript)}
+            onClick={() => downloadTranscript(record, transcript, clockOf)}
             className="min-h-[44px] gap-2 px-3 text-[13px]"
           >
             <Download data-icon="inline-start" />
@@ -414,12 +457,14 @@ export function TelefunReviewStage({
             <TelefunCallPlayer
               ref={playerRef}
               source={recording.source}
+              analysis={analysis}
               onRetry={recording.retry}
               fallbackDurationMs={record.duration * 1000}
               holds={holds}
               notes={notes}
               downloadName={`Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`}
               onTimeChange={setCurrentMs}
+              onSelectNote={(id) => pointTo("notes", annotationItemId(id))}
             />
           </div>
 
@@ -430,7 +475,7 @@ export function TelefunReviewStage({
           ) : (
             <ol className="flex flex-col gap-1 p-4 sm:px-6">
               {transcript.map((entry, index) => {
-                const clock = formatClock(entry.startMs);
+                const clock = clockOf(entry.startMs);
                 const isAgent = entry.speaker === "agent";
                 const nextStart =
                   transcript[index + 1]?.startMs ?? Number.POSITIVE_INFINITY;
@@ -448,7 +493,7 @@ export function TelefunReviewStage({
                         else lineRefs.current.delete(entry.startMs);
                       }}
                       tabIndex={-1}
-                      data-testid={`telefun-line-${clock}`}
+                      data-testid={`telefun-line-${formatClock(entry.startMs)}`}
                       data-highlighted={highlighted === entry.startMs}
                       className={cn(
                         "grid grid-cols-[3.25rem_4.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg px-2 py-1.5 text-sm outline-none",
@@ -519,6 +564,8 @@ export function TelefunReviewStage({
               tab={tab}
               onTabChange={setTab}
               onShowLine={showLine}
+              highlightedId={pointed}
+              clockOf={clockOf}
               rerunStartedAt={rerunStartedAt}
               rerunFailed={rerunFailed}
               onRerun={() => setRerunOpen(true)}
@@ -547,6 +594,8 @@ export function TelefunReviewStage({
                     onAddAnnotation={addAnnotation}
                     onDeleteAnnotation={deleteAnnotation}
                     sessionDurationMs={record.duration * 1000}
+                    highlightedId={pointed}
+                    onPlayFrom={(ms) => playerRef.current?.playFrom(ms)}
                   />
                 </Suspense>
               }

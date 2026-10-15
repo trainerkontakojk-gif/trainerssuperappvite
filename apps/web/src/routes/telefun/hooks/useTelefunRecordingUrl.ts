@@ -11,9 +11,13 @@ export type TelefunRecordingSource =
 /** Tautan bertanda tangan untuk rekaman yang tersimpan di server. */
 export async function fetchTelefunRecordingUrl(
   sessionId: string,
+  type?: "agent_only",
 ): Promise<string | null> {
   const json = (await unwrapResponse(
-    await telefunClient.recording[":id"].$get({ param: { id: sessionId } }),
+    await telefunClient.recording[":id"].$get({
+      param: { id: sessionId },
+      ...(type ? { query: { type } } : {}),
+    }),
   )) as { url?: unknown } | null;
   return typeof json?.url === "string" && json.url ? json.url : null;
 }

@@ -371,7 +371,7 @@ test.describe("Monitoring (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("detail Telefun membandingkan hasil dengan target, bukan radar", async ({
+  test("detail Telefun menampilkan profil komunikasi sebagai diagram spider berbahasa Indonesia", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -387,16 +387,16 @@ test.describe("Monitoring (hermetic)", () => {
       .nth(telefunIndex)
       .click({ timeout: 20000 });
     const dialog = page.getByRole("dialog");
-    const targets = dialog.getByRole("list", { name: "Target vs hasil" });
-    await expect(targets.getByRole("listitem")).toHaveCount(5, {
-      timeout: 20000,
+    const radar = dialog.getByRole("img", {
+      name: /^Diagram profil komunikasi/,
     });
-    await expect(targets).toContainText("142 kata/menit");
-    await expect(targets).toContainText("3 filler");
+    await expect(radar).toBeVisible({ timeout: 20000 });
+    await expect(radar.getByText("Kecepatan bicara", { exact: true })).toBeVisible();
+    await expect(radar.getByText("Nada emosi", { exact: true })).toBeVisible();
+    await expect(radar.getByText("Speaking Rate")).toHaveCount(0);
     await expect(
-      dialog.getByRole("button", { name: "Perbesar diagram profil komunikasi" }),
+      dialog.getByRole("list", { name: "Target vs hasil" }),
     ).toHaveCount(0);
-    await expect(dialog.locator(".recharts-wrapper")).toHaveCount(0);
     expectHermetic(audit);
   });
 

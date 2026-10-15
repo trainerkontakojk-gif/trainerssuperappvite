@@ -29,7 +29,7 @@ import {
   validateAssessment,
   getCommunicationProfileFromAssessment,
 } from "../../../lib/voiceAssessmentUtils";
-import { TelefunTargetList } from "../../telefun/components/TelefunTargetList";
+import { TelefunProfileRadar } from "../../telefun/components/TelefunProfileRadar";
 import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
 import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
 import { parseTelefunTranscript } from "@trainers/types";
@@ -370,7 +370,7 @@ export function TelefunReviewPanel({
                   Profil Komunikasi
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Hasil dibanding target QA, dalam satuan aslinya
+                  Skor 0–10 per aspek; makin ke luar makin baik
                 </p>
               </div>
               <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-chart-green">
@@ -380,7 +380,7 @@ export function TelefunReviewPanel({
             </div>
 
             {communicationProfile ? (
-              <TelefunTargetList profile={communicationProfile} />
+              <TelefunProfileRadar profile={communicationProfile} />
             ) : (
               <div className="flex items-center justify-center h-[240px] rounded-xl border border-border bg-muted/20">
                 <div className="text-center">

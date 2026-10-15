@@ -274,3 +274,39 @@ scores, mixed reading rules (filler inverted), and repeated the aspect list.
       `TELEFUN_ASSESSMENT_CONTRACT.md`), gates, commit. The edited unit
       tests were not run (no approval asked for this change); web typecheck
       and lint cover their imports.
+
+## Spider diagram, clickable markers, line onsets, waveform (2026-10-15)
+
+Fajar's feedback: (1) prefers a spider diagram for Profil, (2) annotation
+markers cannot be clicked to find their point, (3) clicking a time often lands
+at the end of the line instead of its start, (4) wants the recording drawn as
+a waveform instead of a long bar.
+
+### Design
+
+- `TelefunProfileRadar` replaces `TelefunTargetList` (Telaah + Monitoring):
+  custom SVG, axes = `metric.score` 0–10, Indonesian labels with the score,
+  green "sudah baik" zone at 7,0+, dot colors match the aspect bars.
+- Quote mark labels in the transcript become buttons ("Lihat pertanyaan
+  konsumen A", "Lihat kalimat agen 2") that open the tab and highlight the item
+  (`data-highlighted`). Trainer-note numbers on the timeline become buttons
+  that seek to the note and highlight it; the note time in the list plays from
+  there.
+- Cause of (3): `TranscriptCollector` stamps a line when its transcription
+  arrives (after the speaker talks) relative to the WebSocket connection, which
+  opens before recording starts. Fix (browser only, works for old sessions):
+  `useRecordingAnalysis` decodes the full and `agent_only` recordings to a 20 ms
+  loudness envelope; `speechOnsets` takes agent speech from the agent track and
+  consumer speech from the full track while the agent is silent, and gives each
+  line the first unused span of its speaker that starts at most 20 s before /
+  1 s after the stamped time (−200 ms pre-roll). No span → stamped time. Shown
+  and played times both use the onset.
+- The same envelope draws the waveform (`waveformBars`); flat bars while
+  loading or when decoding fails.
+
+### Tasklist
+
+- [x] RED: 4 E2E (spider in Telaah and Monitoring, clickable markers, onset +
+      waveform) failed first. E2E recording route now answers `Range` (206),
+      like storage, so the player can seek after the audio loads.
+- [x] GREEN, docs, gates, commit.

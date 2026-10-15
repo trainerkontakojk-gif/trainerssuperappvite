@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
+import { annotationItemId } from "../utils/contentMarks";
 
 export type ReplayAnnotationCategory =
   | "strength"
@@ -45,6 +46,10 @@ export interface ReplayAnnotatorProps {
   onGenerateAi?: () => void;
   isGenerating?: boolean;
   sessionDurationMs?: number;
+  /** Catatan yang ditunjuk dari garis waktu pemutar. */
+  highlightedId?: string | null;
+  /** Putar rekaman dari waktu catatan. */
+  onPlayFrom?: (ms: number) => void;
 }
 
 const CATEGORY_LABELS: Record<ReplayAnnotationCategory, string> = {
@@ -110,15 +115,22 @@ function RecommendationList({
 function AnnotationItem({
   annotation,
   number,
+  highlighted,
   onDelete,
+  onPlayFrom,
 }: {
   annotation: ReplayAnnotationItem;
   number: number;
+  highlighted: boolean;
   onDelete?: (annotationId: string) => Promise<void>;
+  onPlayFrom?: (ms: number) => void;
 }) {
   return (
     <li
-      className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3"
+      id={annotationItemId(annotation.id)}
+      tabIndex={-1}
+      data-highlighted={highlighted}
+      className="flex scroll-mt-4 items-start gap-3 rounded-xl border border-border bg-background px-4 py-3 outline-none data-[highlighted=true]:border-foreground data-[highlighted=true]:ring-1 data-[highlighted=true]:ring-foreground"
       aria-label={`Catatan ${number} pada ${formatTimestamp(annotation.timestampMs)}`}
     >
       <span
@@ -129,9 +141,20 @@ function AnnotationItem({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-          <span className="font-mono font-medium text-module-telefun tabular-nums">
-            {formatTimestamp(annotation.timestampMs)}
-          </span>
+          {onPlayFrom ? (
+            <button
+              type="button"
+              onClick={() => onPlayFrom(annotation.timestampMs)}
+              aria-label={`Putar catatan ${number} dari ${formatTimestamp(annotation.timestampMs)}`}
+              className="-my-3 min-h-[44px] font-mono font-medium text-module-telefun tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {formatTimestamp(annotation.timestampMs)}
+            </button>
+          ) : (
+            <span className="font-mono font-medium text-module-telefun tabular-nums">
+              {formatTimestamp(annotation.timestampMs)}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1.5 text-fg2">
             <span
               aria-hidden="true"
@@ -175,6 +198,8 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
   onGenerateAi,
   isGenerating,
   sessionDurationMs,
+  highlightedId = null,
+  onPlayFrom,
 }) => {
   const [text, setText] = useState("");
   const [category, setCategory] =
@@ -283,7 +308,9 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
                 key={annotation.id}
                 annotation={annotation}
                 number={index + 1}
+                highlighted={highlightedId === annotationItemId(annotation.id)}
                 onDelete={onDeleteAnnotation}
+                onPlayFrom={onPlayFrom}
               />
             ))}
           </ol>

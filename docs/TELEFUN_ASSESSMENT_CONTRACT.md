@@ -124,24 +124,16 @@ Profile yang hilang, stale, atau menggunakan rumus lama otomatis dibangun
 ulang secara deterministik melalui
 `enrichAssessmentWithCommunicationProfile()`.
 
-## Tampilan "Target vs hasil"
+## Tampilan profil (diagram spider)
 
-Sejak 2026-10-15 radar tidak lagi digambar (Telaah dan Monitoring). Profil
-tampil sebagai daftar `TelefunTargetList`: satu baris per metrik dalam satuan
-aslinya, pita target, penanda hasil, dan status (Baik/Cukup/Kurang dari
-`metric.status`). `displayScore`, target, dan status di atas tetap kontrak
-data; hanya cara tampilnya yang berubah.
-
-| Metrik           | Nilai yang tampil          | Pita target                      |
-| ---------------- | -------------------------- | -------------------------------- |
-| Kecepatan bicara | kata/menit (`rawValue`)    | 130–150 kata/menit               |
-| Intonasi         | skor AI 0–10               | target ± 1,0 (7,0–9,0)           |
-| Artikulasi       | skor AI 0–10               | target ± 1,0 (8,0–10,0)          |
-| Nada emosi       | skor AI 0–10 + nada dominan | target ± 1,0 (7,5–9,5)          |
-| Filler           | jumlah (`rawValue`)        | 0–3 (`FILLER_TARGET_COUNT`)      |
-
-Pita ± 1,0 sama dengan aturan `getMetricStatus` (selisih ≤ 10 pada skala
-0–100 = Baik).
+Sejak 2026-10-15 (sore) profil tampil sebagai diagram spider
+`TelefunProfileRadar` di Telaah dan Monitoring, menggantikan daftar
+`TelefunTargetList`. Semua sumbu memakai `metric.score` (skor aspek AI 0–10,
+makin tinggi makin baik), bukan `displayScore` 0–100, sehingga tidak ada lagi
+sumbu terbalik untuk filler. Zona hijau adalah batas "Sudah baik"
+(`TELEFUN_FIX_THRESHOLD`, 7,0 ke atas), sama dengan pembagian tab Perbaiki
+dulu/Sudah baik. `displayScore`, target, dan status di atas tetap kontrak data;
+hanya tampilannya yang berubah.
 
 ## Hold Management
 

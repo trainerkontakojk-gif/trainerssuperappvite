@@ -366,14 +366,86 @@ function silentWav(seconds: number, sampleRate = 4000): Buffer {
 }
 
 /**
+ * Jawab permintaan rekaman seperti storage sungguhan: dukung `Range`, karena
+ * pemutar Chromium tidak bisa menggeser rekaman tanpa respons 206.
+ */
+function fulfillAudio(route: Route, body: Buffer) {
+  const range = /bytes=(\d+)-(\d*)/.exec(
+    route.request().headers()["range"] ?? "",
+  );
+  if (!range) {
+    return route.fulfill({
+      status: 200,
+      contentType: "audio/wav",
+      headers: { "Accept-Ranges": "bytes" },
+      body,
+    });
+  }
+  const start = Number(range[1]);
+  const end = range[2] ? Number(range[2]) : body.length - 1;
+  return route.fulfill({
+    status: 206,
+    contentType: "audio/wav",
+    headers: {
+      "Accept-Ranges": "bytes",
+      "Content-Range": `bytes ${start}-${end}/${body.length}`,
+    },
+    body: body.subarray(start, end + 1),
+  });
+}
+
+/** Rekaman suara agen saja (`?type=agent_only`). */
+export const AGENT_RECORDING_URL = `${APP_ORIGIN}/e2e-telefun-agent.wav`;
+
+/** Didaftarkan sebelum `recordingMock` supaya permintaan `agent_only` cocok di sini. */
+export function agentRecordingMock(id: string): ApiMock {
+  return {
+    method: "GET",
+    path: new RegExp(`^/api/v1/telefun/recording/${id}\\?type=agent_only$`),
+    body: { success: true, data: { url: AGENT_RECORDING_URL } },
+  };
+}
+
+/** Rentang bunyi dalam detik, `[mulai, selesai)`. */
+export type SoundSpan = readonly [number, number];
+
+/** WAV 8-bit mono: senyap, kecuali nada 400 Hz di tiap rentang `spans`. */
+export function speechWav(
+  seconds: number,
+  spans: readonly SoundSpan[],
+  sampleRate = 4000,
+): Buffer {
+  const buffer = silentWav(seconds, sampleRate);
+  for (const [from, to] of spans) {
+    for (let i = from * sampleRate; i < to * sampleRate; i += 1) {
+      const phase = Math.floor((i * 400 * 2) / sampleRate) % 2;
+      buffer[44 + i] = phase ? 0xc0 : 0x40;
+    }
+  }
+  return buffer;
+}
+
+/** Layani rekaman gabungan dan rekaman agen dengan bunyi pada rentang tertentu. */
+export async function serveSpeechRecordings(
+  page: Page,
+  spans: { full: readonly SoundSpan[]; agent: readonly SoundSpan[] },
+  seconds = 252,
+) {
+  const full = speechWav(seconds, spans.full);
+  const agent = speechWav(seconds, spans.agent);
+  await page.route(RECORDING_URL, (route: Route) => fulfillAudio(route, full));
+  await page.route(AGENT_RECORDING_URL, (route: Route) =>
+    fulfillAudio(route, agent),
+  );
+}
+
+/**
  * Layani rekaman WAV dari route khusus. Didaftarkan SETELAH
  * `openHermeticShell`, sehingga route ini didahulukan untuk URL rekaman saja.
  */
 export async function serveRecording(page: Page, seconds = 252) {
   const body = silentWav(seconds);
-  await page.route(RECORDING_URL, (route: Route) =>
-    route.fulfill({ status: 200, contentType: "audio/wav", body }),
-  );
+  await page.route(RECORDING_URL, (route: Route) => fulfillAudio(route, body));
 }
 
 /**

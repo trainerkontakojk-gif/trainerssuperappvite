@@ -62,6 +62,10 @@ export interface QuoteMark {
   quote: string;
   label: string;
   className: string;
+  /** Label tanda menjadi tombol menuju poinnya di panel hasil. */
+  onSelect?: () => void;
+  /** Nama tombol untuk pembaca layar, mis. "Lihat pertanyaan konsumen A". */
+  selectLabel?: string;
 }
 
 /** Kelas tanda untuk kutipan konsumen dengan status jawabannya. */
@@ -117,7 +121,18 @@ export function withQuoteMarks(
         className={cn("px-0.5 [box-decoration-break:clone]", mark.className)}
       >
         {renderInner(text.slice(start, end))}
-        <sup className="ml-0.5 font-mono text-xs font-bold">{mark.label}</sup>
+        {mark.onSelect ? (
+          <button
+            type="button"
+            onClick={mark.onSelect}
+            aria-label={mark.selectLabel ?? mark.label}
+            className="relative -top-1.5 ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-md border border-border bg-background px-1 align-baseline font-mono text-xs leading-none font-bold text-foreground no-underline transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+          >
+            {mark.label}
+          </button>
+        ) : (
+          <sup className="ml-0.5 font-mono text-xs font-bold">{mark.label}</sup>
+        )}
       </mark>,
     );
     cursor = end;

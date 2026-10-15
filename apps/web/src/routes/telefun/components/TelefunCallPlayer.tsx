@@ -1,8 +1,18 @@
-import { useImperativeHandle, useRef, useState, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import type { TelefunHoldInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
+import { cn } from "cn";
+import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
+import { waveformBars } from "../utils/recordingAudio";
 import { formatClock } from "../utils/reviewDisplay";
 
 export interface TelefunCallPlayerHandle {
@@ -19,6 +29,8 @@ export interface TelefunPlayerNote {
 interface TelefunCallPlayerProps {
   ref?: Ref<TelefunCallPlayerHandle>;
   source: TelefunRecordingSource;
+  /** Selubung rekaman untuk gelombang; batang datar selama belum siap. */
+  analysis: RecordingAnalysis;
   onRetry: () => void;
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
@@ -26,9 +38,76 @@ interface TelefunCallPlayerProps {
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
   onTimeChange?: (ms: number) => void;
+  /** Nomor catatan di garis waktu diklik. */
+  onSelectNote?: (id: string) => void;
 }
 
 const SPEEDS = [1, 1.25, 1.5, 2] as const;
+/** Lebar batang gelombang + celah, dalam px. */
+const BAR_STEP = 3;
+const WAVE_HEIGHT = 40;
+
+/** Gelombang rekaman dari selubung kekerasan suara; bagian terputar berwarna. */
+function Waveform({
+  analysis,
+  progress,
+}: {
+  analysis: RecordingAnalysis;
+  progress: number;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    setWidth(element.clientWidth);
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(entry.contentRect.width),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const count = Math.floor(width / BAR_STEP);
+  const bars = useMemo(
+    () =>
+      analysis.status === "ready"
+        ? waveformBars(analysis.envelope, count)
+        : Array.from({ length: count }, () => 0),
+    [analysis, count],
+  );
+  const played = Math.round(progress * bars.length);
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      data-testid="telefun-waveform"
+      data-state={analysis.status}
+      className="absolute inset-0"
+    >
+      <svg width={width} height={WAVE_HEIGHT} className="block">
+        {bars.map((value, index) => {
+          const height = Math.max(2, value * (WAVE_HEIGHT - 4));
+          return (
+            <rect
+              key={index}
+              x={index * BAR_STEP}
+              y={(WAVE_HEIGHT - height) / 2}
+              width={BAR_STEP - 1}
+              height={height}
+              rx={1}
+              className={cn(
+                index < played
+                  ? "fill-module-telefun"
+                  : "fill-muted-foreground/45",
+                analysis.status === "loading" && "motion-safe:animate-pulse",
+              )}
+            />
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
 
 function percent(ms: number, total: number): string {
   if (total <= 0) return "0%";
@@ -36,18 +115,21 @@ function percent(ms: number, total: number): string {
 }
 
 /**
- * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: posisi
- * putar, jeda hold dari metrik sesi, dan catatan trainer.
+ * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: gelombang
+ * dari rekaman itu sendiri, posisi putar, jeda hold dari metrik sesi, dan
+ * catatan trainer.
  */
 export function TelefunCallPlayer({
   ref,
   source,
+  analysis,
   onRetry,
   fallbackDurationMs,
   holds,
   notes,
   downloadName,
   onTimeChange,
+  onSelectNote,
 }: TelefunCallPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pendingSeekRef = useRef<number | null>(null);
@@ -158,11 +240,10 @@ export function TelefunCallPlayer({
         >
           {formatClock(currentMs)}
         </span>
-        <div className="relative h-7 min-w-0 flex-1 rounded-md bg-surface-sunken">
-          <span
-            aria-hidden="true"
-            className="absolute inset-y-0 left-0 rounded-l-md border-r-2 border-module-telefun bg-module-telefun/10"
-            style={{ width: percent(currentMs, totalMs) }}
+        <div className="relative h-10 min-w-0 flex-1">
+          <Waveform
+            analysis={analysis}
+            progress={totalMs > 0 ? Math.min(1, currentMs / totalMs) : 0}
           />
           {holds.map((hold) => (
             <span
@@ -174,16 +255,6 @@ export function TelefunCallPlayer({
                 width: percent(hold.durationMs, totalMs),
               }}
             />
-          ))}
-          {notes.map((note) => (
-            <span
-              key={note.id}
-              aria-hidden="true"
-              className="absolute -top-2.5 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-foreground font-mono text-xs font-bold text-background"
-              style={{ left: percent(note.timestampMs, totalMs) }}
-            >
-              {note.number}
-            </span>
           ))}
           <input
             type="range"
@@ -197,6 +268,21 @@ export function TelefunCallPlayer({
             onChange={(event) => seek(Number(event.target.value))}
             className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-default"
           />
+          {notes.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              onClick={() => {
+                seek(note.timestampMs);
+                onSelectNote?.(note.id);
+              }}
+              aria-label={`Catatan trainer ${note.number} di ${formatClock(note.timestampMs)}`}
+              className="absolute -top-3 z-10 flex size-6 -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface-elevated bg-foreground font-mono text-xs font-bold text-background transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              style={{ left: percent(note.timestampMs, totalMs) }}
+            >
+              {note.number}
+            </button>
+          ))}
         </div>
         <span className="w-11 shrink-0 text-right font-mono text-xs text-muted-foreground tabular-nums">
           {formatClock(totalMs)}

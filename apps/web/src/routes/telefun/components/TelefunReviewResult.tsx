@@ -27,10 +27,11 @@ import {
   type TelefunAspect,
 } from "../utils/reviewDisplay";
 import { TelefunAnalysisWait } from "./TelefunAnalysisWait";
-import { TelefunTargetList } from "./TelefunTargetList";
+import { TelefunProfileRadar } from "./TelefunProfileRadar";
 import {
   AgentNoteList,
   ConsumerPointList,
+  type LineClock,
   ContentNotAvailable,
 } from "./TelefunContentReview";
 
@@ -131,6 +132,8 @@ export function ReviewResult({
   rerunFailed,
   onRerun,
   notes,
+  highlightedId = null,
+  clockOf = formatClock,
 }: {
   record: CallRecord;
   assessment: VoiceQualityAssessment;
@@ -144,6 +147,9 @@ export function ReviewResult({
   rerunFailed: boolean;
   onRerun: () => void;
   notes: ReactNode;
+  /** `id` butir anotasi isi yang ditunjuk dari transkrip. */
+  highlightedId?: string | null;
+  clockOf?: LineClock;
 }) {
   const content: TelefunContentReview | null | undefined =
     assessment.contentReview;
@@ -334,7 +340,7 @@ export function ReviewResult({
                         onClick={() => onShowLine(line.startMs)}
                         className="-my-2 min-h-[44px] self-start text-left font-mono text-xs font-medium text-module-telefun hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
-                        {formatClock(line.startMs)} · {aspect.label}
+                        {clockOf(line.startMs)} · {aspect.label}
                       </button>
                     ) : (
                       <span className="font-mono text-xs font-medium text-module-telefun">
@@ -412,6 +418,8 @@ export function ReviewResult({
             <ConsumerPointList
               points={content.consumerPoints}
               onShowLine={onShowLine}
+              highlightedId={highlightedId}
+              clockOf={clockOf}
             />
           )}
         </TabsContent>
@@ -422,7 +430,12 @@ export function ReviewResult({
           ) : content.agentNotes.length === 0 ? (
             <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
           ) : (
-            <AgentNoteList notes={content.agentNotes} onShowLine={onShowLine} />
+            <AgentNoteList
+              notes={content.agentNotes}
+              onShowLine={onShowLine}
+              highlightedId={highlightedId}
+              clockOf={clockOf}
+            />
           )}
         </TabsContent>
 
@@ -434,7 +447,7 @@ export function ReviewResult({
               <p className="max-w-[65ch] text-[13px] leading-6 text-fg2">
                 {profile.overallSummary}
               </p>
-              <TelefunTargetList profile={profile} />
+              <TelefunProfileRadar profile={profile} />
             </>
           ) : (
             <Empty>Profil komunikasi belum tersedia untuk panggilan ini.</Empty>

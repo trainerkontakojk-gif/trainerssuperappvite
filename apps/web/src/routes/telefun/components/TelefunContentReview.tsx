@@ -6,9 +6,16 @@ import {
   pointStatus,
   statusLine,
 } from "../../../components/simulation/quoteMarks";
+import { contentItemId } from "../utils/contentMarks";
 import { formatClock } from "../utils/reviewDisplay";
 
 /** Anotasi isi Telaah Telefun: pertanyaan konsumen dan kalimat agen. */
+
+/** Waktu baris transkrip yang ditampilkan (awal ucapan bila sudah diketahui). */
+export type LineClock = (startMs: number) => string;
+
+const itemClass =
+  "flex scroll-mt-4 flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 outline-none data-[highlighted=true]:border-foreground data-[highlighted=true]:ring-1 data-[highlighted=true]:ring-foreground";
 
 /** Tombol menuju baris transkrip, dengan kutipannya. */
 function QuoteButton({
@@ -16,11 +23,13 @@ function QuoteButton({
   startMs,
   quote,
   onShowLine,
+  clockOf,
 }: {
   label: string;
   startMs: number;
   quote: string;
   onShowLine: (startMs: number) => void;
+  clockOf: LineClock;
 }) {
   return (
     <button
@@ -29,7 +38,7 @@ function QuoteButton({
       className="flex min-h-[44px] w-full flex-col gap-0.5 rounded-lg bg-muted/60 px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <span className="font-mono text-xs text-module-telefun">
-        {label} {formatClock(startMs)}
+        {label} {clockOf(startMs)}
       </span>
       <span className="text-[13px] leading-5 text-foreground">“{quote}”</span>
     </button>
@@ -39,15 +48,26 @@ function QuoteButton({
 function ConsumerPointItem({
   point,
   letter,
+  id,
+  highlighted,
   onShowLine,
+  clockOf,
 }: {
   point: TelefunConsumerPoint;
   letter: string;
+  id: string;
+  highlighted: boolean;
   onShowLine: (startMs: number) => void;
+  clockOf: LineClock;
 }) {
   const status = pointStatus[point.status];
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3">
+    <li
+      id={id}
+      tabIndex={-1}
+      data-highlighted={highlighted}
+      className={itemClass}
+    >
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-mono text-xs font-bold text-foreground">
           {letter}
@@ -73,6 +93,7 @@ function ConsumerPointItem({
         startMs={point.startMs}
         quote={point.quote}
         onShowLine={onShowLine}
+        clockOf={clockOf}
       />
       {point.answerStartMs !== null && point.answerQuote ? (
         <QuoteButton
@@ -80,6 +101,7 @@ function ConsumerPointItem({
           startMs={point.answerStartMs}
           quote={point.answerQuote}
           onShowLine={onShowLine}
+          clockOf={clockOf}
         />
       ) : (
         <p className="text-[13px] text-muted-foreground">
@@ -93,15 +115,26 @@ function ConsumerPointItem({
 function AgentNoteItem({
   note,
   number,
+  id,
+  highlighted,
   onShowLine,
+  clockOf,
 }: {
   note: TelefunAgentNote;
   number: number;
+  id: string;
+  highlighted: boolean;
   onShowLine: (startMs: number) => void;
+  clockOf: LineClock;
 }) {
   const isFix = note.verdict === "fix";
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3">
+    <li
+      id={id}
+      tabIndex={-1}
+      data-highlighted={highlighted}
+      className={itemClass}
+    >
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-mono text-xs font-bold text-foreground">
           {number}
@@ -123,6 +156,7 @@ function AgentNoteItem({
         startMs={note.startMs}
         quote={note.quote}
         onShowLine={onShowLine}
+        clockOf={clockOf}
       />
       <p className="text-[13px] leading-6 text-fg2">{note.note}</p>
       {isFix && note.example && (
@@ -135,13 +169,19 @@ function AgentNoteItem({
   );
 }
 
+interface ContentListProps {
+  onShowLine: (startMs: number) => void;
+  /** `id` butir yang sedang ditunjuk dari transkrip. */
+  highlightedId?: string | null;
+  clockOf?: LineClock;
+}
+
 export function ConsumerPointList({
   points,
   onShowLine,
-}: {
-  points: readonly TelefunConsumerPoint[];
-  onShowLine: (startMs: number) => void;
-}) {
+  highlightedId = null,
+  clockOf = formatClock,
+}: ContentListProps & { points: readonly TelefunConsumerPoint[] }) {
   return (
     <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
       {points.map((point, index) => (
@@ -149,7 +189,12 @@ export function ConsumerPointList({
           key={`${point.startMs}-${index}`}
           point={point}
           letter={pointLetter(index)}
+          id={contentItemId({ tab: "questions", index })}
+          highlighted={
+            highlightedId === contentItemId({ tab: "questions", index })
+          }
           onShowLine={onShowLine}
+          clockOf={clockOf}
         />
       ))}
     </ol>
@@ -159,10 +204,9 @@ export function ConsumerPointList({
 export function AgentNoteList({
   notes,
   onShowLine,
-}: {
-  notes: readonly TelefunAgentNote[];
-  onShowLine: (startMs: number) => void;
-}) {
+  highlightedId = null,
+  clockOf = formatClock,
+}: ContentListProps & { notes: readonly TelefunAgentNote[] }) {
   return (
     <ol aria-label="Kalimat agen" className="flex flex-col gap-3">
       {notes.map((note, index) => (
@@ -170,7 +214,10 @@ export function AgentNoteList({
           key={`${note.startMs}-${index}`}
           note={note}
           number={index + 1}
+          id={contentItemId({ tab: "lines", index })}
+          highlighted={highlightedId === contentItemId({ tab: "lines", index })}
           onShowLine={onShowLine}
+          clockOf={clockOf}
         />
       ))}
     </ol>
