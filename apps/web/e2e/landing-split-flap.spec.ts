@@ -88,7 +88,9 @@ test.describe("Landing publik — split-flap", () => {
       "Trainers SuperApp",
     );
     const hero = page.locator(".hero");
-    await expect(hero.locator("p, h2, button, a")).toHaveCount(0);
+    await expect(hero.locator("p, h2, button, a:not(.hero-cue)")).toHaveCount(
+      0,
+    );
     const board = hero.locator(".flapboard");
     await expect(board.locator(".flap")).toHaveCount(16);
     await expect(board).toHaveAttribute("data-state", "idle", {
@@ -214,6 +216,47 @@ test.describe("Landing publik — split-flap", () => {
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(page).toHaveURL(/#modul$/);
     await activateStep(page, "telefun");
+    expectHermetic(audit);
+  });
+
+  test("hero menyisakan judul Modul di layar pertama; tautan Scroll di bawah tengah menuju modul", async ({
+    page,
+  }) => {
+    const audit = await openGuestLanding(page, "reduce");
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1280, height: 720 },
+      { width: 390, height: 844 },
+      { width: 320, height: 568 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
+      const label = `${viewport.width}×${viewport.height}`;
+
+      const heading = await page
+        .locator("#modules-title")
+        .evaluate((element) => element.getBoundingClientRect().top);
+      expect(heading, `judul Modul mengintip di ${label}`).toBeLessThan(
+        viewport.height - 24,
+      );
+
+      const cue = page.locator(".hero").getByRole("link", { name: /Scroll/ });
+      await expect(cue).toHaveText("Scroll");
+      const box = (await cue.boundingBox())!;
+      expect(
+        Math.abs(box.x + box.width / 2 - viewport.width / 2),
+        `Scroll di tengah horizontal ${label}`,
+      ).toBeLessThan(2);
+      expect(box.y, `Scroll di bagian bawah hero ${label}`).toBeGreaterThan(
+        viewport.height * 0.5,
+      );
+      expect(box.y + box.height).toBeLessThan(heading);
+    }
+
+    await page.locator(".hero-cue").click();
+    await expect(page).toHaveURL(/#modul$/);
+    await expect(page.locator("#modules-title")).toBeInViewport();
     expectHermetic(audit);
   });
 

@@ -419,9 +419,9 @@ function LandingContent() {
               interactive
             />
           </h1>
-          <span className="hero-cue" aria-hidden="true">
-            Gulir
-          </span>
+          <a className="hero-cue" href="#modul">
+            Scroll
+          </a>
         </section>
         <ModuleStory />
         <WorkflowCycle />
