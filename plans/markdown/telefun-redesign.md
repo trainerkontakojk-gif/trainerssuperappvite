@@ -194,3 +194,12 @@ annotations (`10a9711`) and Telaah ulang (`309facd`) in Telefun.
 - [x] Docs: `docs/design.md`, `docs/telefun.md`, `docs/auth-rbac.md`.
 - [x] Gates: focused E2E (telefun-flow, ketik-flow for the shared helper),
       typecheck web/api/telefun, lint, build, `git diff --check`.
+- [x] Approved by Fajar (2026-10-15): one API unit test,
+      `apps/api/src/__tests__/telefun-content-review-rerun.test.ts` (not in
+      test-core/test-fast), for what hermetic E2E cannot reach: quote
+      validation (fabricated quote, wrong speaker, wrong line repaired, invalid
+      answer → null, example only for fix, 5/8 limits, malformed response) and
+      the rerun route (fresh analysis + same claim token on success, restore +
+      502 previousKept on failure or throw, 409 for non-completed, 403, 404).
+      15 passed; a mutation of the restore filter and of the speaker check
+      made 3 tests fail.
