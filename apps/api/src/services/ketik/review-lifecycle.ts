@@ -272,3 +272,81 @@ export async function processOldestQueuedJob(
 
   return await claimAndProcessKetikReviewJob(job.session_id, workerId);
 }
+
+/**
+ * Membuka kembali telaah yang sudah selesai supaya bisa dijalankan ulang.
+ * Hasil lama tidak dihapus di sini; processor baru menggantinya setelah AI
+ * berhasil. Mengembalikan `false` bila sesi tidak dalam keadaan selesai atau
+ * telaah ulang lain sudah berjalan.
+ */
+export async function reopenKetikReviewForRerun(
+  sessionId: string,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+
+  const { data: job } = await adminClient
+    .from("ketik_review_jobs")
+    .select("status")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (job) {
+    // Bersyarat pada status, supaya dua permintaan bersamaan tidak sama-sama
+    // membuka job yang sama.
+    const { data: reopened, error } = await adminClient
+      .from("ketik_review_jobs")
+      .update({
+        status: "queued",
+        attempt_count: 0,
+        lease_owner: null,
+        lease_expires_at: null,
+        error_message: null,
+      })
+      .eq("session_id", sessionId)
+      .eq("status", "completed")
+      .select("id");
+    if (error) throw error;
+    if (!reopened || reopened.length === 0) return false;
+  }
+
+  const { error: historyError } = await adminClient
+    .from("ketik_history")
+    .update({ review_status: "pending" })
+    .eq("id", sessionId)
+    .eq("review_status", "completed");
+  if (historyError) throw historyError;
+  return true;
+}
+
+/**
+ * Telaah ulang gagal: bila hasil lama masih tersimpan, sesi dikembalikan ke
+ * status selesai dengan hasil itu. Mengembalikan `true` bila hasil lama dipakai.
+ */
+export async function restoreKetikReviewAfterFailedRerun(
+  sessionId: string,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+
+  const { data: review } = await adminClient
+    .from("ketik_session_reviews")
+    .select("id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (!review) return false;
+
+  await adminClient
+    .from("ketik_review_jobs")
+    .update({
+      status: "completed",
+      lease_owner: null,
+      lease_expires_at: null,
+    })
+    .eq("session_id", sessionId)
+    .eq("status", "failed");
+  await adminClient
+    .from("ketik_history")
+    .update({ review_status: "completed" })
+    .eq("id", sessionId)
+    .eq("review_status", "failed");
+  return true;
+}

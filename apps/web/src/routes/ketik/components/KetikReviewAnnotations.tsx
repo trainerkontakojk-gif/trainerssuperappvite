@@ -148,11 +148,12 @@ export function AgentNoteItem({
   );
 }
 
-export function NotAvailable() {
+export function NotAvailable({ canRerun }: { canRerun: boolean }) {
   return (
     <p className="text-[13px] text-muted-foreground">
       Belum tersedia untuk telaah ini. Penanda pertanyaan konsumen dan kalimat
       agen hanya ada di telaah yang dibuat setelah fitur ini dirilis.
+      {canRerun && " Jalankan Telaah ulang untuk melengkapinya."}
     </p>
   );
 }

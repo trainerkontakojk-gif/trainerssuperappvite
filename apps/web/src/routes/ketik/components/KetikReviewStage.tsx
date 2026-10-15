@@ -15,6 +15,7 @@ import type {
   KetikTypoFinding,
 } from "@trainers/types";
 import { cn } from "cn";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
 import {
   Tabs,
@@ -101,6 +102,7 @@ export function KetikReviewStage({
   const review = useKetikReviewStatus(session, onSessionChange);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
+  const [rerunOpen, setRerunOpen] = useState(false);
   const messageRefs = useRef(new Map<string, HTMLLIElement>());
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
@@ -288,6 +290,8 @@ export function KetikReviewStage({
               typos={review.typos}
               numbers={numbers}
               onShowMessage={showMessage}
+              rerunFailed={review.rerunFailed}
+              onRerun={canStartReview ? () => setRerunOpen(true) : null}
             />
           ) : review.phase === "reviewing" ||
             review.phase === "loading-result" ? (
@@ -307,6 +311,20 @@ export function KetikReviewStage({
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={rerunOpen}
+        title="Telaah ulang sesi ini?"
+        description="AI menilai percakapan ini sekali lagi dan hasil sekarang diganti dengan yang baru. Bila telaah ulang gagal, hasil sekarang tetap dipakai."
+        confirmLabel="Telaah ulang"
+        confirmVariant="default"
+        container={layer}
+        onCancel={() => setRerunOpen(false)}
+        onConfirm={() => {
+          setRerunOpen(false);
+          void review.rerun();
+        }}
+      />
 
       <SessionReplayModal
         isOpen={replayOpen}
@@ -481,6 +499,8 @@ function ReviewResult({
   typos,
   numbers,
   onShowMessage,
+  rerunFailed,
+  onRerun,
 }: {
   session: KetikSessionHistoryItem;
   history: readonly KetikSessionHistoryItem[];
@@ -488,6 +508,9 @@ function ReviewResult({
   typos: KetikTypoFinding[];
   numbers: Map<string, number>;
   onShowMessage: (messageId: string) => void;
+  rerunFailed: boolean;
+  /** `null` untuk peran tanpa izin menjalankan telaah. */
+  onRerun: (() => void) | null;
 }) {
   const finalScore = session.finalScore ?? 0;
   const change = scoreChange(finalScore, previousFinalScore(session, history));
@@ -523,7 +546,27 @@ function ReviewResult({
             <span className="text-[13px] text-muted-foreground">{change}</span>
           )}
         </p>
+        {onRerun && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRerun}
+            className="ml-auto min-h-[44px] gap-2 px-3 text-[13px]"
+          >
+            <RotateCcw data-icon="inline-start" />
+            Telaah ulang
+          </Button>
+        )}
       </div>
+
+      {rerunFailed && (
+        <p role="alert" className="text-[13px] leading-5 text-fg2">
+          <strong className="font-semibold text-foreground">
+            Telaah ulang belum berhasil.
+          </strong>{" "}
+          Hasil sebelumnya tetap ditampilkan. Coba lagi beberapa saat lagi.
+        </p>
+      )}
 
       <ul aria-label="Skor per aspek" className="flex flex-col gap-2.5">
         {aspects.map((aspect) => (
@@ -619,7 +662,7 @@ function ReviewResult({
 
         <TabsContent value="questions" className="flex flex-col gap-3">
           {!points ? (
-            <NotAvailable />
+            <NotAvailable canRerun={onRerun !== null} />
           ) : points.length === 0 ? (
             <Empty>AI tidak menemukan pertanyaan konsumen di percakapan ini.</Empty>
           ) : (
@@ -639,7 +682,7 @@ function ReviewResult({
 
         <TabsContent value="notes" className="flex flex-col gap-3">
           {!notes ? (
-            <NotAvailable />
+            <NotAvailable canRerun={onRerun !== null} />
           ) : notes.length === 0 ? (
             <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
           ) : (

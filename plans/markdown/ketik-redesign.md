@@ -158,3 +158,41 @@ Acceptance:
 - [x] GREEN: Telaah UI (`KetikReviewAnnotations.tsx`, `utils/quoteMarks.tsx`),
       tab list `relative` so the active tab is not scrolled out of view.
 - [x] thermo-nuclear review, gates, `docs/design.md` note.
+
+## Telaah ulang (added 2026-10-15)
+
+### Requirement
+
+Fajar: add a "Telaah ulang" button so a completed review can be run again (for
+example, to give old reviews the new annotations).
+
+- Only roles with `ketik.review` see the button; it sits next to the final
+  score and asks for confirmation (`ConfirmDialog`) before calling the AI.
+- If the rerun fails, the previous result stays and the stage says so
+  ("Telaah ulang belum berhasil. Hasil sebelumnya tetap ditampilkan.").
+  Raw error codes are not shown.
+- Legacy reviews' "Belum tersedia" copy points to Telaah ulang for those roles.
+
+### Design
+
+- `POST /ketik/review` takes optional `rerun: true`. Only for a session whose
+  `review_status` is `completed`: `reopenKetikReviewForRerun` reopens the job
+  with a conditional update (`status = completed` → `queued`,
+  `attempt_count = 0`) and sets history to `pending`; a concurrent rerun gets
+  `processing`. The existing claim/process path runs unchanged; the processor
+  already replaces the review row only after the AI succeeds.
+- On failure (processor result or thrown error),
+  `restoreKetikReviewAfterFailedRerun` restores job/history to `completed`
+  when the old review row still exists and the response carries
+  `previousKept: true`. Same rate limit and `logAiUsage` path as a first review.
+- Web: `ketikApi.startReview(id, { rerun })`, `useKetikReviewStatus().rerun`
+  and `rerunFailed`. No schema or migration change.
+
+### Tasklist
+
+- [x] RED: E2E rerun success (cancel sends nothing; body `{sessionId, rerun}`;
+      new annotations replace old), rerun failure keeps old result, agent sees
+      no button. Two failed before implementation.
+- [x] GREEN: route flag + lifecycle helpers, client, hook, button, dialog,
+      notice, legacy copy.
+- [x] Gates: `ketik-flow.spec.ts`, typecheck, lint, build, `git diff --check`.

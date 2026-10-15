@@ -26,6 +26,8 @@ export interface KetikReviewState {
   failure: KetikReviewFailure | null;
   review: KetikSessionReview | null;
   typos: KetikTypoFinding[];
+  /** Telaah ulang terakhir gagal; yang tampil adalah hasil sebelumnya. */
+  rerunFailed: boolean;
 }
 
 function withScores(
@@ -50,6 +52,7 @@ const INITIAL: KetikReviewState = {
   failure: null,
   review: null,
   typos: [],
+  rerunFailed: false,
 };
 
 /**
@@ -73,6 +76,9 @@ export function useKetikReviewStatus(
   // Setiap sesi/percobaan baru membatalkan hasil async percobaan sebelumnya.
   const runRef = useRef(0);
   const startedAtRef = useRef(0);
+  // Percobaan telaah ulang yang gagal; dibaca saat hasil (lama) dimuat, supaya
+  // polling yang selesai belakangan tidak menghapus pemberitahuannya.
+  const rerunFailedRunRef = useRef(-1);
 
   const sessionId = session?.id ?? null;
   const status = session?.reviewStatus;
@@ -107,6 +113,7 @@ export function useKetikReviewStatus(
           failure: null,
           review: detail.review,
           typos: detail.typos ?? [],
+          rerunFailed: rerunFailedRunRef.current === run,
         });
       } catch (error) {
         console.error("[Ketik] Failed to load review result:", error);
@@ -186,9 +193,36 @@ export function useKetikReviewStatus(
     }
   }, [state.phase, fail, loadResult, update]);
 
+  /** Telaah ulang sesi yang sudah selesai; hasil lama tetap ada bila gagal. */
+  const rerun = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current || state.phase !== "ready") return;
+    const run = ++runRef.current;
+    startedAtRef.current = Date.now();
+    setState({ ...INITIAL, phase: "reviewing" });
+    update({ ...current, reviewStatus: "processing" });
+    try {
+      const result = await ketikApi.startReview(current.id, { rerun: true });
+      if (run !== runRef.current) return;
+      if (result?.status === "completed") {
+        void loadResult(run);
+      } else if (result?.status === "failed") {
+        if (result.previousKept) {
+          rerunFailedRunRef.current = run;
+          void loadResult(run);
+        } else {
+          fail(run, "review");
+        }
+      }
+    } catch (error) {
+      console.error("[Ketik] Failed to rerun review:", error);
+      fail(run, "review");
+    }
+  }, [state.phase, fail, loadResult, update]);
+
   const retryResult = useCallback(() => {
     void loadResult(++runRef.current);
   }, [loadResult]);
 
-  return { ...state, start, retryResult };
+  return { ...state, start, rerun, retryResult };
 }

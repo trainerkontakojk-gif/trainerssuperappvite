@@ -128,14 +128,16 @@ export const ketikApi = {
     const res = await ketikClient.history.$delete();
     await unwrapResponse(res);
   },
-  startReview: async (sessionId: string) => {
+  startReview: async (sessionId: string, options: { rerun?: boolean } = {}) => {
     const res = await ketikClient.review.$post({
-      json: { sessionId },
+      json: options.rerun ? { sessionId, rerun: true } : { sessionId },
     });
     return unwrapResponse(res) as Promise<{
       status: string;
       scores?: KetikReviewDetail["scores"];
       error?: string;
+      /** Telaah ulang gagal dan hasil sebelumnya tetap dipakai. */
+      previousKept?: boolean;
     }>;
   },
   getReviewStatus: async (sessionId: string) => {

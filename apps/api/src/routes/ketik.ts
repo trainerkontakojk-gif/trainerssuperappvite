@@ -352,13 +352,19 @@ ketik.post(
   aiRateLimitMiddleware,
   zValidator(
     "json",
-    z.object({ sessionId: z.string(), workerId: z.string().optional() }),
+    z.object({
+      sessionId: z.string(),
+      workerId: z.string().optional(),
+      // Telaah ulang sesi yang sudah selesai; hasil lama dipakai bila gagal.
+      rerun: z.boolean().optional(),
+    }),
   ),
   async (c) => {
     const body = c.req.valid("json");
 
     const adminClient = createAdminClient();
     const nowIso = new Date().toISOString();
+    let isRerun = false;
 
     try {
       // 1. Verify session ownership
@@ -380,6 +386,20 @@ ketik.post(
           },
           404,
         );
+      }
+
+      isRerun = body.rerun === true && session.review_status === "completed";
+      if (isRerun) {
+        const reopened = await ketikService.reopenKetikReviewForRerun(
+          body.sessionId,
+        );
+        if (!reopened) {
+          console.log(
+            `[KETIK Review] session=${body.sessionId} action=rerun_busy`,
+          );
+          return c.json({ success: true, data: { status: "processing" } });
+        }
+        console.log(`[KETIK Review] session=${body.sessionId} action=rerun`);
       }
 
       // 2. Check existing job state with lease info (legacy parity)
@@ -486,18 +506,36 @@ ketik.post(
         `[KETIK Review] session=${body.sessionId} action=process result=${processResult.status}${processResult.error ? ` error=${processResult.error}` : ""}`,
       );
 
+      const previousKept =
+        isRerun && processResult.status === "failed"
+          ? await ketikService.restoreKetikReviewAfterFailedRerun(
+              body.sessionId,
+            )
+          : false;
+
       return c.json({
         success: true,
         data: {
           status: processResult.status,
           scores: processResult.scores || undefined,
           error: processResult.error || undefined,
+          previousKept: previousKept || undefined,
         },
       });
     } catch (err: any) {
       console.error(
         `[KETIK Review] session=${body.sessionId} action=error error=${err.message}`,
       );
+      if (isRerun) {
+        await ketikService
+          .restoreKetikReviewAfterFailedRerun(body.sessionId)
+          .catch((restoreError) =>
+            console.error(
+              `[KETIK Review] session=${body.sessionId} action=rerun_restore_error`,
+              restoreError,
+            ),
+          );
+      }
       return c.json(
         {
           success: false,
