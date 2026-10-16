@@ -18,6 +18,8 @@ interface RegistryEntry {
   label: string;
   keywords: string[];
   recommendation: string;
+  /** Only rows of these services can match; omitted = every service. */
+  serviceTypes?: ServiceType[];
 }
 
 const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
@@ -113,6 +115,9 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
     clusterId: "proses_ideb_slik",
     priority: 8,
     label: "Proses verifikasi/pengiriman iDeb SLIK tidak sesuai",
+    // Call/chat agents explaining a consumer's own "iDeb SLIK" are not this
+    // back-office SOP, so only SLIK rows may match.
+    serviceTypes: ["slik"],
     keywords: [
       "pendaftaran ideb",
       "permohonan ideb",
@@ -228,7 +233,10 @@ function buildSearchText(
   );
 }
 
-function matchCluster(searchText: string): {
+function matchCluster(
+  searchText: string,
+  serviceType: ServiceType,
+): {
   entry: RegistryEntry;
   matchedKeywords: string[];
 } {
@@ -238,6 +246,10 @@ function matchCluster(searchText: string): {
   } | null = null;
 
   for (const entry of ROOT_CAUSE_REGISTRY) {
+    if (entry.serviceTypes && !entry.serviceTypes.includes(serviceType)) {
+      continue;
+    }
+
     const matchedKeywords = entry.keywords.filter((keyword) =>
       searchText.includes(normalizeText(keyword)),
     );
@@ -373,7 +385,10 @@ export function deriveAgentRootCauses(
 
     // Build search text and match cluster
     const searchText = buildSearchText(row, indicatorName);
-    const { entry, matchedKeywords } = matchCluster(searchText);
+    const { entry, matchedKeywords } = matchCluster(
+      searchText,
+      row.service_type,
+    );
 
     // Get or create accumulator
     let accumulator = groups.get(entry.clusterId);

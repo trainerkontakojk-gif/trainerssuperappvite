@@ -1,7 +1,7 @@
 # Root-cause cluster for SLIK iDeb registration process findings
 
 Lane: **C**. This changes the shared cluster enum used by the SIDAK agent detail, the TNA drill-down, TNA need validation (zod) and `tna_programs.trigger_clusters`. It follows the precedent of [`root-cause-hold-cluster.md`](root-cause-hold-cluster.md).
-Status: **implemented** (2026-10-17). Decisions (Fajar): D1 = (a) no program/migration; D2 = accept that matched SLIK rows move; D3 = defer the soft-skill cluster; D4 = audited at 17.24%.
+Status: **implemented** (2026-10-17). Decisions (Fajar): D1 = (a) no program/migration; D2 = accept that matched SLIK rows move; D3 = defer the soft-skill cluster; D4 = audited at 17.24%. Follow-up: the cluster is now limited to `slik` rows, because the Call rows it caught were consumer-facing ([`root-cause-slik-ideb-service-scope.md`](root-cause-slik-ideb-service-scope.md)).
 
 ## Requirement
 

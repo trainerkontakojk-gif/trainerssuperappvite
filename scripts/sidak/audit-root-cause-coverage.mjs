@@ -14,6 +14,7 @@
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 10000 --label after-expansion
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 10000 --label baseline --out-dir ./custom-reports
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 5000 --label texts --sample-texts
+ *   node scripts/sidak/audit-root-cause-coverage.mjs --label ideb-call --sample-cluster proses_ideb_slik --sample-service call
  *
  * Environment variables (from .env):
  *   SUPABASE_URL=              Required unless --dry-run
@@ -25,6 +26,8 @@
  *
  * --sample-texts adds raw fallback finding text to both reports. The reports
  * live in the gitignored .hermes/ folder; never commit or share them.
+ * --sample-cluster does the same for rows that one cluster wins, with their
+ * matched keywords and the cluster they would get without it.
  *
  * Keep synchronized with:
  *   apps/api/src/services/sidak/agent-root-causes.ts  (ROOT_CAUSE_REGISTRY)
@@ -68,6 +71,10 @@ Options:
                          per service, and for Call rows containing "menit"
                          (raw text: keep the report local, never commit it)
   --sample-limit=<n>     Distinct texts per group with --sample-texts (default: 15)
+  --sample-cluster=<id>  Also write every row that cluster wins: matched keywords,
+                         the cluster it would get without <id>, and raw text
+                         (keep the report local, never commit it)
+  --sample-service=<t>   Only sample service_type <t> with --sample-cluster
   --help, -h             Show this help
 
 Environment:
@@ -86,6 +93,8 @@ const LIMIT = parseInt(readOption("--limit", "10000"), 10);
 const LABEL = readOption("--label", "baseline");
 const SAMPLE_TEXTS = args.includes("--sample-texts");
 const SAMPLE_LIMIT = parseInt(readOption("--sample-limit", "15"), 10);
+const SAMPLE_CLUSTER = readOption("--sample-cluster", null);
+const SAMPLE_SERVICE = readOption("--sample-service", null);
 const OUT_DIR = readOption(
   "--out-dir",
   path.join(import.meta.dirname, "../../.hermes/reports"),
@@ -170,6 +179,7 @@ const ROOT_CAUSE_REGISTRY = [
     clusterId: "proses_ideb_slik",
     priority: 8,
     label: "Proses verifikasi/pengiriman iDeb SLIK tidak sesuai",
+    serviceTypes: ["slik"],
     keywords: [
       "pendaftaran ideb",
       "permohonan ideb",
@@ -230,6 +240,18 @@ const ROOT_CAUSE_REGISTRY = [
 
 const FALLBACK_CLUSTER_ID = "lainnya";
 
+if (
+  SAMPLE_CLUSTER &&
+  !ROOT_CAUSE_REGISTRY.some((e) => e.clusterId === SAMPLE_CLUSTER)
+) {
+  console.error(`[audit] Unknown --sample-cluster: ${SAMPLE_CLUSTER}`);
+  process.exit(1);
+}
+if (SAMPLE_SERVICE && !SAMPLE_CLUSTER) {
+  console.error("[audit] --sample-service requires --sample-cluster");
+  process.exit(1);
+}
+
 // ─── Matcher ────────────────────────────────────────────────────────────────
 
 function buildSearchText(row) {
@@ -241,10 +263,14 @@ function buildSearchText(row) {
   return normalizeText(parts.join(" "));
 }
 
-function matchCluster(searchText) {
+function matchCluster(searchText, serviceType, excludeClusterId = null) {
   let bestMatch = null;
 
   for (const entry of ROOT_CAUSE_REGISTRY) {
+    if (entry.clusterId === excludeClusterId) continue;
+    if (entry.serviceTypes && !entry.serviceTypes.includes(serviceType)) {
+      continue;
+    }
     const matchedKeywords = entry.keywords.filter((kw) =>
       searchText.includes(normalizeText(kw)),
     );
@@ -544,6 +570,55 @@ function collectFallbackSamples(fallbackRows, topPhrases, limit) {
   return { limit, byPhrase, byService, callMenit };
 }
 
+// ─── Cluster Sample Rows (--sample-cluster) ─────────────────────────────────
+
+// Lists every row the cluster wins, so a reviewer can judge whether it belongs
+// there. withoutCluster shows where the row went before the cluster existed.
+function collectClusterSamples(rows, clusterId, serviceType) {
+  const samples = [];
+  const withoutCounts = {};
+
+  for (const row of rows) {
+    if (serviceType && (row.service_type || "unknown") !== serviceType) {
+      continue;
+    }
+    const searchText = buildSearchText(row);
+    const match = matchCluster(searchText, row.service_type);
+    if (match.clusterId !== clusterId) continue;
+
+    const without = matchCluster(searchText, row.service_type, clusterId);
+    withoutCounts[without.clusterId] =
+      (withoutCounts[without.clusterId] || 0) + 1;
+    samples.push({
+      id: row.id,
+      serviceType: row.service_type || "unknown",
+      nilai: row.nilai,
+      indicatorName: row.indicator_name,
+      matchedKeywords: match.matchedKeywords,
+      withoutCluster: without.clusterId,
+      withoutClusterKeywords: without.matchedKeywords,
+      ketidaksesuaian: truncateText(row.ketidaksesuaian),
+      sebaiknya: truncateText(row.sebaiknya),
+    });
+  }
+
+  const keywordCounts = {};
+  for (const sample of samples) {
+    for (const kw of sample.matchedKeywords) {
+      keywordCounts[kw] = (keywordCounts[kw] || 0) + 1;
+    }
+  }
+
+  return {
+    clusterId,
+    serviceType: serviceType || "all",
+    totalRows: samples.length,
+    keywordCounts,
+    withoutClusterCounts: withoutCounts,
+    samples,
+  };
+}
+
 // ─── Coverage Analysis ──────────────────────────────────────────────────────
 
 function analyzeCoverage(rows) {
@@ -578,7 +653,7 @@ function analyzeCoverage(rows) {
 
   for (const row of goodEvidence) {
     const searchText = buildSearchText(row);
-    const { clusterId } = matchCluster(searchText);
+    const { clusterId } = matchCluster(searchText, row.service_type);
     if (clusterId === FALLBACK_CLUSTER_ID) {
       fallbackRows.push(row);
     } else {
@@ -594,7 +669,7 @@ function analyzeCoverage(rows) {
     nilaiGroups[n].total += 1;
 
     const searchText = buildSearchText(row);
-    const { clusterId } = matchCluster(searchText);
+    const { clusterId } = matchCluster(searchText, row.service_type);
     if (clusterId === FALLBACK_CLUSTER_ID) {
       nilaiGroups[n].fallback += 1;
     } else {
@@ -611,7 +686,7 @@ function analyzeCoverage(rows) {
     serviceGroups[st].total += 1;
 
     const searchText = buildSearchText(row);
-    const { clusterId } = matchCluster(searchText);
+    const { clusterId } = matchCluster(searchText, row.service_type);
     if (clusterId === FALLBACK_CLUSTER_ID) {
       serviceGroups[st].fallback += 1;
     } else {
@@ -636,7 +711,7 @@ function analyzeCoverage(rows) {
 
   for (const row of goodEvidence) {
     const searchText = buildSearchText(row);
-    const { clusterId } = matchCluster(searchText);
+    const { clusterId } = matchCluster(searchText, row.service_type);
     if (clusterBreakdown[clusterId]) {
       clusterBreakdown[clusterId].count += 1;
     }
@@ -750,6 +825,15 @@ function analyzeCoverage(rows) {
           ),
         }
       : {}),
+    ...(SAMPLE_CLUSTER
+      ? {
+          clusterSamples: collectClusterSamples(
+            goodEvidence,
+            SAMPLE_CLUSTER,
+            SAMPLE_SERVICE,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -767,6 +851,8 @@ function writeJsonReport(data, outPath) {
       limit: LIMIT,
       dryRun: IS_DRY_RUN,
       sampleTexts: SAMPLE_TEXTS,
+      sampleCluster: SAMPLE_CLUSTER,
+      sampleService: SAMPLE_SERVICE,
     },
     ...data,
   };
@@ -907,6 +993,10 @@ function writeMarkdownReport(data, outPath) {
     writeFallbackSamplesMarkdown(lines, data.fallbackSamples);
   }
 
+  if (data.clusterSamples) {
+    writeClusterSamplesMarkdown(lines, data.clusterSamples);
+  }
+
   // Registry Info
   lines.push(`## Registry Snapshot`);
   lines.push(``);
@@ -960,6 +1050,47 @@ function writeFallbackSamplesMarkdown(lines, samples) {
   for (const group of samples.byPhrase) {
     writeSampleGroupMarkdown(lines, `Phrase \`${group.phrase}\``, group);
   }
+}
+
+function writeClusterSamplesMarkdown(lines, group) {
+  lines.push(
+    `## Cluster Samples: \`${group.clusterId}\` (${group.serviceType})`,
+  );
+  lines.push(``);
+  lines.push(
+    `> Raw finding text from \`--sample-cluster\`. Local report only; do not commit or share.`,
+  );
+  lines.push(``);
+  lines.push(`${group.totalRows} rows won by this cluster.`);
+  lines.push(``);
+  lines.push(`| Matched keyword | Rows |`);
+  lines.push(`|---|---|`);
+  for (const [kw, count] of Object.entries(group.keywordCounts).sort(
+    (a, b) => b[1] - a[1],
+  )) {
+    lines.push(`| \`${kw}\` | ${count} |`);
+  }
+  lines.push(``);
+  lines.push(`| Cluster without \`${group.clusterId}\` | Rows |`);
+  lines.push(`|---|---|`);
+  for (const [id, count] of Object.entries(group.withoutClusterCounts).sort(
+    (a, b) => b[1] - a[1],
+  )) {
+    lines.push(`| \`${id}\` | ${count} |`);
+  }
+  lines.push(``);
+  for (const sample of group.samples) {
+    lines.push(
+      `- \`${sample.serviceType}\` nilai ${sample.nilai} · ${sample.indicatorName ?? "(no indicator)"} · id \`${sample.id}\``,
+    );
+    const matched = sample.matchedKeywords.map((k) => `\`${k}\``).join(", ");
+    lines.push(
+      `  - Matched: ${matched} · without: \`${sample.withoutCluster}\``,
+    );
+    lines.push(`  - Ketidaksesuaian: ${sample.ketidaksesuaian || "—"}`);
+    lines.push(`  - Sebaiknya: ${sample.sebaiknya || "—"}`);
+  }
+  lines.push(``);
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────

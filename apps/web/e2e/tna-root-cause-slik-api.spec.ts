@@ -11,7 +11,9 @@ import { runSql } from "./helpers/sidakRealBackend";
  * detail and TNA drill-down. They match through the finding text or through
  * the iDeb indicator name. Findings under a neutral indicator keep their
  * existing clusters, and a Call-style "pada menit 03.53" timestamp stays in
- * `lainnya`. Local loopback Supabase only (tnaFixture guards the endpoints).
+ * `lainnya`. The cluster is scoped to SLIK: a Call agent explaining or probing
+ * the consumer's own "iDeb SLIK" keeps the cluster its other keywords give it.
+ * Local loopback Supabase only (tnaFixture guards the endpoints).
  */
 test.describe.configure({ mode: "serial" });
 const namespace = randomUUID();
@@ -22,19 +24,35 @@ const indicators = {
   // Production name: carries "alasan penolakan", "permohonan ideb", "ideb slik".
   penolakan: {
     id: randomUUID(),
+    service: "slik",
     name: `Kesesuaian dan kelengkapan pengiriman alasan penolakan permohonan iDeb SLIK ${namespace}`,
   },
   // Production name without any iDeb keyword: the text must carry the match.
-  foto: { id: randomUUID(), name: `Kesesuaian Foto ${namespace}` },
-  neutral: { id: randomUUID(), name: `Kesesuaian Data ${namespace}` },
+  foto: {
+    id: randomUUID(),
+    service: "slik",
+    name: `Kesesuaian Foto ${namespace}`,
+  },
+  neutral: {
+    id: randomUUID(),
+    service: "slik",
+    name: `Kesesuaian Data ${namespace}`,
+  },
+  // Production Call indicator; consumer-facing iDeb SLIK findings live here.
+  penjelasan: {
+    id: randomUUID(),
+    service: "call",
+    name: `Kemampuan Menjelaskan ${namespace}`,
+  },
 };
 type IndicatorKey = keyof typeof indicators;
 let app: Hono;
 let users: Awaited<ReturnType<typeof fixture.seed>>;
 let year: number;
 
-// One SLIK agent, one period. Spec-owned `slik` rows are the only slik
-// findings for this agent, so both responses see exactly these.
+// One agent, one period. Spec-owned `slik` and `call` rows are the only
+// findings of those services for this agent (tnaFixture seeds only chat), so
+// each service-filtered response sees exactly its rows below.
 const findings: Array<
   [
     indicator: IndicatorKey,
@@ -97,6 +115,19 @@ const findings: Array<
     "Agent memotong pembicaraan konsumen pada menit 03.53.",
     null,
   ],
+  // Call: the consumer's own iDeb SLIK is not the back-office SOP.
+  [
+    "penjelasan",
+    "lainnya",
+    "Agent belum membantu konsumen membaca hasil iDeb SLIK miliknya dengan bahasa yang mudah dipahami.",
+    null,
+  ],
+  [
+    "penjelasan",
+    "kurang_menggali",
+    "Agent tidak melakukan probing lanjutan atas pinjaman yang tercantum dalam IDEB SLIK konsumen.",
+    null,
+  ],
 ];
 const expectedCounts = {
   proses_ideb_slik: 5,
@@ -105,6 +136,7 @@ const expectedCounts = {
   kurang_teliti_verifikasi_data: 1,
   lainnya: 1,
 };
+const expectedCallCounts = { lainnya: 1, kurang_menggali: 1 };
 const quoted = (value: string) => `'${value.replaceAll("'", "''")}'`;
 const countsOf = (
   clusters: Array<{ clusterId: string; findingsCount: number }>,
@@ -141,14 +173,14 @@ test.beforeAll(async () => {
   );
   const indicatorRows = Object.values(indicators)
     .map(
-      ({ id, name }) =>
-        `(${quoted(id)},'slik',${quoted(name)},'non_critical',1)`,
+      ({ id, service, name }) =>
+        `(${quoted(id)},${quoted(service)},${quoted(name)},'non_critical',1)`,
     )
     .join(",");
   const rows = findings
     .map(
       ([indicator, , ketidaksesuaian, sebaiknya], i) =>
-        `(${quoted(agentId)},${quoted(periodId)},${quoted(indicators[indicator].id)},'slik',${quoted(`SLIK-${namespace}-${i}`)},false,0,${quoted(ketidaksesuaian)},${sebaiknya === null ? "NULL" : quoted(sebaiknya)},${year})`,
+        `(${quoted(agentId)},${quoted(periodId)},${quoted(indicators[indicator].id)},${quoted(indicators[indicator].service)},${quoted(`SLIK-${namespace}-${i}`)},false,0,${quoted(ketidaksesuaian)},${sebaiknya === null ? "NULL" : quoted(sebaiknya)},${year})`,
     )
     .join(",");
   runSql(
@@ -235,4 +267,24 @@ test("TNA drill-down suggests proses_ideb_slik per SLIK parameter and accepts it
       `SELECT suggested_cluster_id || ',' || validated_cluster_id FROM tna_needs WHERE id=${quoted(need.id)};`,
     ),
   ).toBe("proses_ideb_slik,proses_ideb_slik");
+});
+
+test("Call findings about the consumer's iDeb SLIK stay out of proses_ideb_slik", async () => {
+  const response = await request(
+    `/sidak/agents/${agentId}?year=${year}&service_type=call`,
+    users.admin.token,
+  );
+  expect(response.status).toBe(200);
+  const { data } = await response.json();
+  expect(countsOf(data.rootCauses)).toEqual(expectedCallCounts);
+
+  const query = `service_type=call&period_id=${periodId}&indicator_id=${indicators.penjelasan.id}&compare_count=1`;
+  const detail = await request(
+    `/tna/parameters/detail?${query}`,
+    users.trainer.token,
+  );
+  expect(detail.status).toBe(200);
+  expect(countsOf((await detail.json()).data.clusters)).toEqual(
+    expectedCallCounts,
+  );
 });
