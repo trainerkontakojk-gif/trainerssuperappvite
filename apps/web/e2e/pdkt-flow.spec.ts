@@ -834,6 +834,18 @@ test.describe("PDKT (hermetic)", () => {
     });
     const pause = page.getByRole("button", { name: "Jeda animasi" });
     await expect(pause).toBeVisible({ timeout: 20000 });
+    // Tombol jeda 44px harus muat di bar judulnya (h-11 hanya 38,5px di root
+    // 14px), bukan menonjol keluar bar.
+    // Ukuran layout (offset*), bukan boundingBox: animasi masuk halaman memakai
+    // transform sehingga posisi visual bisa bergeser selama diukur.
+    const fit = await pause.evaluate((button: HTMLElement) => ({
+      button: button.offsetHeight,
+      bar: (button.parentElement as HTMLElement).offsetHeight,
+      top: button.offsetTop - (button.parentElement as HTMLElement).offsetTop,
+    }));
+    expect(fit.button).toBeGreaterThanOrEqual(44);
+    expect(fit.bar).toBeGreaterThanOrEqual(fit.button);
+    expect(fit.top).toBeGreaterThanOrEqual(0);
     await pause.click();
     await expect(
       page.getByRole("button", { name: "Putar animasi" }),

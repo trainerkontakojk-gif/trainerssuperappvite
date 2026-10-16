@@ -36,7 +36,7 @@ export function PdktStageDemo() {
         dikirim, kemudian hasil telaah AI muncul.
       </figcaption>
       <div className="flex h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-surface-elevated">
-        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-border bg-background pl-4 pr-1">
+        <div className="flex h-[44px] shrink-0 items-center gap-3 border-b border-border bg-background pl-4 pr-1">
           <span aria-hidden="true" className="flex gap-1.5">
             <span className="size-2.5 rounded-full bg-border" />
             <span className="size-2.5 rounded-full bg-border" />
@@ -60,7 +60,7 @@ export function PdktStageDemo() {
         </div>
 
         <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
-          <div className="relative flex h-11 shrink-0 border-b border-border text-[13px] font-semibold">
+          <div className="relative flex h-[44px] shrink-0 border-b border-border text-[13px] font-semibold">
             {STAGES.map((stage) => (
               <span
                 key={stage.anim}
