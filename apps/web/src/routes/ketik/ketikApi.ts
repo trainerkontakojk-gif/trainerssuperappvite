@@ -1,4 +1,6 @@
 import type {
+  KetikReviewAccepted,
+  KetikReviewStatus,
   KetikHistoryQuery,
   KetikHistoryPage,
   KetikHistoryDetail,
@@ -175,35 +177,25 @@ export const ketikApi = {
     const res = await ketikClient.history.$delete();
     await unwrapResponse(res);
   },
-  startReview: async (sessionId: string, options: { rerun?: boolean } = {}) => {
-    const res = await ketikClient.review.$post({
-      json: options.rerun ? { sessionId, rerun: true } : { sessionId },
+  startReview: async (
+    sessionId: string,
+    options: { rerun?: boolean; requestId?: string } = {},
+  ) => {
+    const res = await serverClient.review.$post({
+      json: { sessionId, ...options },
     });
-    return unwrapResponse(res) as Promise<{
-      status: string;
-      scores?: KetikReviewDetail["scores"];
-      error?: string;
-      /** Telaah ulang gagal dan hasil sebelumnya tetap dipakai. */
-      previousKept?: boolean;
-    }>;
+    return unwrapResponse(res) as Promise<KetikReviewAccepted>;
   },
-  getReviewStatus: async (sessionId: string) => {
-    const res = await ketikClient.review.status[":sessionId"].$get({
-      param: { sessionId },
-    });
-    return unwrapResponse(res) as Promise<{
-      status: "pending" | "processing" | "completed" | "failed";
-      scores: KetikReviewDetail["scores"] | null;
-      errorMessage?: string;
-      resultReady: boolean;
-    }>;
-  },
-  getReviewDetail: async (sessionId: string) => {
-    const res = await ketikClient.review[":sessionId"].$get({
-      param: { sessionId },
-    });
-    return unwrapResponse(res) as Promise<KetikReviewDetail>;
-  },
+  getReviewStatus: async (sessionId: string) =>
+    unwrapResponse(
+      await serverClient.review.status[":sessionId"].$get({
+        param: { sessionId },
+      }),
+    ) as Promise<KetikReviewStatus>,
+  getReviewDetail: async (sessionId: string) =>
+    unwrapResponse(
+      await serverClient.review[":sessionId"].$get({ param: { sessionId } }),
+    ) as Promise<KetikReviewDetail>,
   getUsageSummary: async () => {
     try {
       const res = await aiClient.usage.summary.$get({

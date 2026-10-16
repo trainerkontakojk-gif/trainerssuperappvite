@@ -523,3 +523,40 @@ Ini sering terjadi pada environment _hosted_ setelah proses migrasi yang menamba
 - RPC: `submit_pdkt_mailbox_batch_with_subject` (unique name, hindari overload PostgREST PGRST203); legacy 8-param `submit_pdkt_mailbox_batch` kini explicit self; `submit_pdkt_mailbox_reply` menyalin atribusi mailbox ke history (self dari profil pembalas). Revoke PUBLIC/anon, grant authenticated.
 - Snapshot participant yang sudah di-resolve API didaftarkan sebagai intent opaque di `pdkt_mailbox_subject_intents` melalui service role, lalu dikonsumsi RPC user-JWT. Direct caller hanya boleh menghilangkan metadata snapshot (RPC me-resolve baris peserta saat ini), sehingga tidak dapat memalsukan snapshot frozen.
 - PDKT `/session/init` dan `/session/create` dapat mengembalikan draft mailbox retry bertanda tangan, actor-bound, dan kedaluwarsa. Draft dikirim kembali melalui RPC mailbox yang sama tanpa regenerasi AI; `client_request_id` dibuat bila caller lama tidak menyediakannya agar retry tetap idempotent.
+
+## KETIK — antrean telaah durable E
+
+Migration `20261016000935_ketik_durable_review_worker.sql` mempertahankan satu
+`ketik_review_jobs` per sesi dan menambah `request_id`, `lease_token`, serta
+`available_at`. Semua RPC baru SECURITY INVOKER dengan search_path kosong dan
+EXECUTE hanya service_role: `can_access_ketik_review`, `enqueue_ketik_review`,
+`claim_ketik_review`, `settle_ketik_review`, dan `read_ketik_review`.
+
+- Enqueue mengunci history lalu job, memeriksa actor aktif/scope assignment,
+  mengembalikan job aktif yang sudah ada dan tidak mengulang UUID permintaan
+  saat ini. UUID baru dibutuhkan untuk rerun/retry manual baru. Ini bukan ledger
+  idempotensi seluruh permintaan historis atau jaminan exactly-once billing.
+- Claim memilih queued yang eligible atau processing expired dengan
+  `FOR UPDATE OF history SKIP LOCKED`, kemudian mengunci job. Semua mutation RPC
+  memakai urutan lock yang sama. Token baru dan increment attempt dipublikasikan
+  atomik; maksimum tiga claim AI. Lease NULL/expired tidak berhak publish/settle.
+- Settle success memeriksa token/lease di bawah lock dan mengganti review, typo,
+  skor/history, job completed serta legacy `results` jika tabel tersedia dalam
+  satu transaksi. Kegagalan persist rollback seluruh batch. Rerun mempertahankan
+  history completed dan seluruh hasil lama selama antrean/pemrosesan; terminal
+  job failed tetap eksplisit dengan `previousKept=true` pada API status.
+- RPC baca memakai satu snapshot statement untuk history/review/typo/job dan
+  scope actor. API memproyeksikan DTO saja. Polling tidak memutasi status akibat
+  umur antrean/expiry. Detail history memakai scope telaah; list/summary/delete
+  tetap self. Label legacy UI berasal dari `transcript_provenance` tersimpan.
+- Grant SELECT tabel job lama dicabut dari anon/authenticated karena table-wide
+  SELECT juga mengekspos kolom token baru. Authenticated hanya dapat membaca
+  kolom lama yang aman melalui RLS owner; `lease_token`, `request_id`, dan
+  `available_at` tidak diberi SELECT. Mutasi/RPC tetap backend-only.
+
+Rollback E menolak job queued/processing, menghapus RPC/index/kolom tambahan,
+dan mengembalikan SELECT tabel lama setelah kolom token dihapus. Review, typo,
+dan skor published tetap ada. Terapkan rollback hanya setelah drain/stop dan
+pergantian build yang dijelaskan di [deployment.md](deployment.md). Migration,
+rollback, reapply, grants dan atomic failure diuji pada loopback disposable;
+ledger migration CLI lokal/remote tidak otomatis berubah oleh apply SQL tes.

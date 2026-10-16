@@ -1,12 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Download,
-  Link2,
-  Play,
-  RotateCcw,
-} from "lucide-react";
+import { ArrowLeft, Download, Link2, Play, RotateCcw } from "lucide-react";
 import type {
   ChatMessage,
   KetikDimensionGuidance,
@@ -173,6 +166,11 @@ export function KetikReviewStage({
           KETIK
         </Button>
         <KetikStageNav />
+        {session.transcriptProvenance === "legacy" && (
+          <p className="text-[13px] text-muted-foreground">
+            Transkrip lama belum terverifikasi server.
+          </p>
+        )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -281,6 +279,22 @@ export function KetikReviewStage({
           <h2 id="ketik-result-title" className="sr-only">
             Hasil telaah
           </h2>
+          {review.pollFailed && (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+            >
+              <p>Status telaah belum dapat diperbarui.</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={review.refreshStatus}
+              >
+                Coba cek status
+              </Button>
+            </div>
+          )}
           {review.phase === "ready" && review.review ? (
             <ReviewResult
               session={session}
@@ -294,7 +308,10 @@ export function KetikReviewStage({
             />
           ) : review.phase === "reviewing" ||
             review.phase === "loading-result" ? (
-            <ReviewProgress loadingResult={review.phase === "loading-result"} />
+            <ReviewProgress
+              loadingResult={review.phase === "loading-result"}
+              queueStatus={review.queueStatus}
+            />
           ) : review.phase === "failed" ? (
             <ReviewFailed
               failure={review.failure ?? "review"}
@@ -374,8 +391,7 @@ function NotReviewed({
       ) : (
         <>
           <p className="max-w-[60ch] text-[15px] leading-6 text-fg2">
-            Hanya admin, trainer, dan QA yang dapat menjalankan telaah AI. Minta
-            trainer Anda membuka sesi ini dari halaman Riwayat.
+            Anda belum memiliki izin menelaah sesi ini. Hubungi trainer Anda.
           </p>
           <Button
             type="button"
@@ -392,49 +408,27 @@ function NotReviewed({
   );
 }
 
-function ReviewProgress({ loadingResult }: { loadingResult: boolean }) {
-  const steps = [
-    { label: "Percakapan tersimpan", state: "done" },
-    {
-      label: "Menilai lima aspek",
-      state: loadingResult ? "done" : "current",
-    },
-    { label: "Memuat hasil", state: loadingResult ? "current" : "todo" },
-  ] as const;
-
+function ReviewProgress({
+  loadingResult,
+  queueStatus,
+}: {
+  loadingResult: boolean;
+  queueStatus: "queued" | "processing" | null;
+}) {
+  const title = loadingResult
+    ? "Memuat hasil telaah"
+    : queueStatus === "queued"
+      ? "Menunggu giliran telaah"
+      : queueStatus === "processing"
+        ? "Sedang ditelaah AI"
+        : "Memeriksa permintaan telaah";
   return (
     <div role="status" aria-busy="true" className="flex flex-col gap-4">
-      <h3 className={sectionTitle}>Sedang ditelaah AI</h3>
-      <ol className="flex flex-col gap-2 text-[15px]">
-        {steps.map((step) => (
-          <li
-            key={step.label}
-            className={cn(
-              "flex items-center gap-2",
-              step.state === "current"
-                ? "font-semibold text-foreground"
-                : step.state === "done"
-                  ? "text-fg2"
-                  : "text-muted-foreground",
-            )}
-          >
-            {step.state === "done" ? (
-              <Check aria-hidden="true" className="size-4 text-chart-green" />
-            ) : step.state === "current" ? (
-              <span
-                aria-hidden="true"
-                className="size-4 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none"
-              />
-            ) : (
-              <span aria-hidden="true" className="size-4" />
-            )}
-            {step.label}
-            {step.state === "current" && "…"}
-          </li>
-        ))}
-      </ol>
-      <p className="text-[13px] text-muted-foreground">
-        Biasanya selesai dalam satu menit.
+      <h3 className={sectionTitle}>{title}</h3>
+      <p className="text-[15px] leading-6 text-fg2">
+        {loadingResult
+          ? "Hasil sudah tersedia dan sedang dimuat."
+          : "Percakapan tetap tersimpan. Anda boleh meninggalkan halaman ini dan kembali untuk melihat hasilnya."}
       </p>
     </div>
   );
@@ -442,7 +436,6 @@ function ReviewProgress({ loadingResult }: { loadingResult: boolean }) {
 
 const FAILURE_COPY: Record<KetikReviewFailure, string> = {
   review: "AI belum memberi hasil telaah.",
-  timeout: "AI tidak memberi hasil dalam 2 menit.",
   result: "Telaah sudah selesai, tetapi hasilnya belum bisa dimuat.",
 };
 

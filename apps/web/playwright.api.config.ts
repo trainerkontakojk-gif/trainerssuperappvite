@@ -17,6 +17,10 @@ export default defineConfig({
   outputDir: "./test-results/api",
   projects: [
     {
+      name: "ketik-review-worker-real-backend",
+      testMatch: "ketik-review-worker-api.spec.ts",
+    },
+    {
       name: "ketik-history-real-backend",
       testMatch: "ketik-history-api.spec.ts",
     },

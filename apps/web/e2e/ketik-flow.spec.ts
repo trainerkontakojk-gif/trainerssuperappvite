@@ -329,6 +329,7 @@ function ketikMocks(
       method: "GET", path: "/api/v1/ketik/history/summary",
       body: { success: true, data: summarizeKetikLanding(history) },
     },
+    ...history.map((item): ApiMock => ({ method: "GET", path: `/api/v1/ketik/review/status/${item.id}`, body: { success: true, data: { status: item.reviewStatus === "processing" ? "processing" : item.reviewStatus === "completed" ? "completed" : item.reviewStatus === "failed" ? "failed" : "pending", resultReady: item.reviewStatus === "completed", previousKept: false, scores: null } } })),
     ...history.map((item): ApiMock => ({
       method: "GET", path: `/api/v1/ketik/history/${item.id}`,
       body: { success: true, data: { ...item, previousFinalScore: item.id === REVIEWED_SESSION.id ? OLDER_REVIEWED.finalScore : null } },
@@ -822,7 +823,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("sesi belum ditelaah: agen melihat penjelasan akses, tanpa tombol mulai", async ({
+  test("sesi belum ditelaah: agen dapat memulai secara manual tanpa pemicu otomatis", async ({
     page,
   }) => {
     const audit = await open(
@@ -835,10 +836,8 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByText("Belum ditelaah")).toBeVisible({
       timeout: 20000,
     });
-    await expect(result).toContainText(
-      "Hanya admin, trainer, dan QA yang dapat menjalankan telaah AI",
-    );
-    await expect(result.getByRole("button", { name: /Mulai telaah/ })).toHaveCount(0);
+    await expect(result.getByRole("button", { name: /Mulai telaah/ })).toBeVisible();
+    expect(audit.mockedApi.some((path) => path.startsWith("POST /api/v1/ketik/review"))).toBe(false);
     // Transkrip tetap bisa dibaca.
     await expect(
       page
@@ -947,7 +946,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
       .getByRole("button", { name: "Telaah ulang" })
       .click();
     await expect(result.getByRole("region", { name: "Inti kasus" })).toBeVisible();
-    expect(rerunBody).toEqual({ sessionId: REVIEWED_SESSION.id, rerun: true });
+    expect(rerunBody).toEqual({ sessionId: REVIEWED_SESSION.id, rerun: true, requestId: expect.any(String) });
     expectHermetic(audit);
   });
 
@@ -962,11 +961,13 @@ test.describe("KETIK Telaah (hermetic)", () => {
         path: "/api/v1/ketik/review",
         body: {
           success: true,
-          data: { status: "failed", previousKept: true, error: "AI_TIMEOUT" },
+          data: { status: "queued" },
         },
       },
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    await page.route(`**/api/v1/ketik/review/status/${REVIEWED_SESSION.id}`, (route) => route.fulfill({ json: { success: true, data: { status: "failed", previousKept: true, resultReady: true, scores: REVIEW_DETAIL.scores } } }));
     await result
       .getByRole("button", { name: "Telaah ulang" })
       .click({ timeout: 20000 });
@@ -984,7 +985,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("agen tidak melihat tombol Telaah ulang", async ({ page }) => {
+  test("agen dapat menelaah ulang sesi sendiri secara manual", async ({ page }) => {
     const audit = await open(
       page,
       telaahPath(REVIEWED_SESSION.id),
@@ -995,7 +996,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
-    await expect(result.getByRole("button", { name: "Telaah ulang" })).toHaveCount(0);
+    await expect(result.getByRole("button", { name: "Telaah ulang" })).toBeVisible();
     expectHermetic(audit);
   });
 

@@ -27,7 +27,6 @@
       "src/__tests__/telefun-routes.test.ts",
       "src/__tests__/telefun-phase5-hardening.test.ts",
       "src/__tests__/telefun-scoring-worker-runtime.test.ts",
-      "src/__tests__/ketik-review-lifecycle.test.ts",
       "src/__tests__/pdkt.test.ts",
       "src/__tests__/monitoring-history-delete-migration.test.ts",
       "src/__tests__/simulation-subject-service.test.ts",

@@ -35,6 +35,10 @@ function decodeCursor(query: KetikHistoryQuery) {
 // Query projection is controlled here and in the RPC, not supplied by callers.
 function mapRow(row: Record<string, unknown>): KetikHistorySummaryItem {
   return {
+    ...(row.transcript_provenance === "legacy" ||
+    row.transcript_provenance === "server_v1"
+      ? { transcriptProvenance: row.transcript_provenance }
+      : {}),
     id: row.id as string,
     date: row.date as string,
     scenarioTitle: (row.scenario_title || "Simulation Chat") as string,
@@ -100,18 +104,17 @@ export async function getHistoryDetail(
   id: string,
 ): Promise<KetikHistoryDetail | null> {
   const db = createAdminClient();
-  const { data, error } = await db
-    .from("ketik_history")
-    .select(`${COLUMNS},messages`)
-    .eq("user_id", owner)
-    .eq("id", id)
-    .maybeSingle();
+  const { data: snapshot, error } = await db.rpc("read_ketik_review", {
+    p_actor: owner,
+    p_session: id,
+  });
   if (error) throw error;
-  if (!data) return null;
+  if (!snapshot) return null;
+  const data = snapshot.history;
   const previous = await db
     .from("ketik_history")
     .select("final_score")
-    .eq("user_id", owner)
+    .eq("user_id", data.user_id)
     .eq("review_status", "completed")
     .not("final_score", "is", null)
     .lt("date", data.date)
@@ -208,14 +211,12 @@ export async function getHistorySummary(
         }
       : null,
     focus: focusOf(reviewed),
-    recent: reviewed
-      .slice(0, 3)
-      .map((session) => ({
-        session,
-        subjectLabel: participantLabel(session),
-        score: session.finalScore!,
-        lowestAspect: focusOf([session])?.label ?? null,
-      })),
+    recent: reviewed.slice(0, 3).map((session) => ({
+      session,
+      subjectLabel: participantLabel(session),
+      score: session.finalScore!,
+      lowestAspect: focusOf([session])?.label ?? null,
+    })),
     followUps: (results[3].data ?? []).map(mapRow).map((session) => ({
       session,
       meta: [

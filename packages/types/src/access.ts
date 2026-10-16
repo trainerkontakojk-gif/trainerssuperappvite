@@ -26,7 +26,7 @@ export const CAPABILITIES = {
   "ketik.history.read": ["admin", "trainer", "leader", "agent"],
   "ketik.history.write": ["admin", "trainer", "leader", "agent"],
   "ketik.landing": ["admin", "trainer", "leader", "agent"],
-  "ketik.review": ["admin", "trainer"],
+  "ketik.review": ["admin", "trainer", "leader", "agent"],
   "ketik.review.read": ["admin", "trainer", "leader", "agent"],
   "ketik.settings.read": ["admin", "trainer", "leader", "agent"],
   "ketik.settings.write": ["admin", "trainer", "leader", "agent"],
