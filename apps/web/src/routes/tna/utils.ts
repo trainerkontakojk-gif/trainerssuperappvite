@@ -46,6 +46,7 @@ export const clusterLabels: Record<RootCauseClusterId, string> = {
   salah_penggunaan_sistem: "Salah penggunaan sistem",
   hold_waktu_tunggu: "Durasi hold/waktu tunggu",
   salah_jawaban: "Salah jawaban",
+  proses_ideb_slik: "Proses iDeb SLIK",
   kurang_teliti_verifikasi_data: "Kurang teliti verifikasi data",
   kurang_paham_standar_jawaban: "Kurang paham standar jawaban",
   kurang_menggali: "Kurang menggali",

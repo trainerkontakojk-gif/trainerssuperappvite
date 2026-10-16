@@ -106,6 +106,26 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
   },
   {
+    // SLIK back-office SOP: verifying iDeb registrations, writing rejection
+    // reasons, sending results. Bare "ideb"/"slik" are excluded because Call
+    // and chat findings that explain SLIK to consumers are not this process.
+    // Placed after salah_jawaban so a 1-1 tie at priority 8 keeps that cluster.
+    clusterId: "proses_ideb_slik",
+    priority: 8,
+    label: "Proses verifikasi/pengiriman iDeb SLIK tidak sesuai",
+    keywords: [
+      "pendaftaran ideb",
+      "permohonan ideb",
+      "hasil ideb",
+      "ideb slik",
+      "alasan penolakan",
+      "gagal verifikasi",
+      "foto diri mengikuti gambar",
+    ],
+    recommendation:
+      "Latih SOP verifikasi pendaftaran iDeb: cek kesesuaian foto dan dokumen terhadap instruksi, terima/tolak sesuai ketentuan, lampirkan alasan penolakan lengkap pada opsi Alasan dan Keterangan Lainnya, dan kirim hasil iDeb lengkap sesuai Nama/NIK pemohon.",
+  },
+  {
     clusterId: "kurang_teliti_verifikasi_data",
     priority: 7,
     label: "Kurang teliti verifikasi data",

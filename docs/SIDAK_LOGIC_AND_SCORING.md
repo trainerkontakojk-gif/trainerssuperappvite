@@ -605,10 +605,11 @@ Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan d
 3. `salah_penggunaan_sistem` (prioritas 9) — ditambahkan Phase 3 untuk error sistem/APPK
 4. `hold_waktu_tunggu` (prioritas 9) — durasi hold/waktu tunggu/dead air melebihi standar (Call)
 5. `salah_jawaban` (prioritas 8)
-6. `kurang_teliti_verifikasi_data` (prioritas 7)
-7. `kurang_paham_standar_jawaban` (prioritas 6)
-8. `kurang_menggali` (prioritas 5)
-9. `lainnya` (prioritas 0 — fallback)
+6. `proses_ideb_slik` (prioritas 8) — verifikasi/penolakan/pengiriman iDeb SLIK tidak sesuai SOP (SLIK)
+7. `kurang_teliti_verifikasi_data` (prioritas 7)
+8. `kurang_paham_standar_jawaban` (prioritas 6)
+9. `kurang_menggali` (prioritas 5)
+10. `lainnya` (prioritas 0 — fallback)
 
 Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/src/sidak.ts`); `tnaClusterIdSchema` TNA diturunkan dari daftar yang sama. Kolom cluster di `tna_needs`/`tna_programs` bertipe `text` tanpa CHECK, sehingga menambah klaster tidak memerlukan migrasi kecuali program TNA perlu memicu klaster baru.
 
@@ -636,7 +637,9 @@ Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/
 - Baseline (sebelum ekspansi): 84.5% fallback.
 - Setelah ekspansi keyword Phase 2: ~47% fallback.
 - Setelah cluster baru `salah_penggunaan_sistem` (Phase 3): ~31% fallback.
-- Final setelah semua ekspansi: **17.49% fallback** — target tercapai.
+- Final setelah semua ekspansi: **17.49% fallback** — target tercapai (2026-07-09).
+- 2026-10-17, setelah `hold_waktu_tunggu`: **25.39%** (710/2796). Penyebab utama: service `slik` baru (205/233 = 88% fallback). Audit kini juga mencocokkan nama parameter seperti API: 24.96% (698/2796).
+- Setelah `proses_ideb_slik`: menunggu audit ulang (proyeksi offline ≈18%).
 
 ### Ekspansi Registry (Phase 2)
 
@@ -651,6 +654,12 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 ### Klaster `hold_waktu_tunggu`
 
 Ditambahkan setelah temuan produksi "Etika Bertelepon" (Call, Oktober 2026) seluruhnya jatuh ke `lainnya` (contoh: "Agent melakukan HOLD pertama selama 01.04 menit"). Keyword: `melakukan hold`, `hold pertama`, `hold kedua`, `hold berikutnya`, `durasi hold`, `waktu hold`, `fitur hold`, `waktu tunggu`, `dead air`. Kata tunggal `hold`, `menunggu`, `menit`, dan `detik` sengaja tidak dipakai karena matcher berbasis substring (mis. `threshold`) dan terlalu umum. Temuan "tidak sesuai dalam melakukan HOLD pertama" kini masuk klaster ini (2 match vs 1 match `salah_jawaban`). Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-hold-api.spec.ts`.
+
+### Klaster `proses_ideb_slik`
+
+Ditambahkan setelah audit 2026-10-17 menunjukkan 205 temuan SLIK jatuh ke `lainnya`. Seluruh sampel adalah SOP back-office iDeb: alasan penolakan pendaftaran iDeb tidak lengkap/tidak sesuai, hasil iDeb dikirim tidak lengkap, pendaftaran ditolak padahal seharusnya diterima, dan verifikasi "Foto Diri Mengikuti Gambar". Keyword: `pendaftaran ideb`, `permohonan ideb`, `hasil ideb`, `ideb slik`, `alasan penolakan`, `gagal verifikasi`, `foto diri mengikuti gambar`. Kata tunggal `ideb`/`slik` sengaja tidak dipakai karena temuan Call/chat yang menjelaskan SLIK kepada konsumen bukan proses ini. Karena nama parameter iDeb sendiri memuat keyword, temuan SLIK yang sebelumnya cocok klaster lain (mis. `tidak melampirkan` → `kurang_teliti_verifikasi_data`) kini masuk klaster ini (keputusan D2). Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-slik-api.spec.ts`.
+
+`menit` pada temuan Call fallback adalah **timestamp rekaman** ("pada menit 03.53"), bukan durasi hold/AHT, sehingga tidak dijadikan keyword. Sisa fallback Call didominasi soft skill komunikasi (intonasi, artikulasi, menyimak, pilihan kata, empati); klaster untuk itu ditunda sampai audit ulang.
 
 ### Batasan AI
 

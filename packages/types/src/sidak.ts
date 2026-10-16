@@ -593,6 +593,7 @@ export const rootCauseClusterIds = [
   "salah_penggunaan_sistem",
   "hold_waktu_tunggu",
   "salah_jawaban",
+  "proses_ideb_slik",
   "kurang_teliti_verifikasi_data",
   "kurang_paham_standar_jawaban",
   "kurang_menggali",
