@@ -329,12 +329,20 @@ function isLocalDevRequest(request: RequestShape): boolean {
  *      jadi tidak ada backend produksi yang bisa dilayani di belakang `/api`.
  */
 export async function assertLocalDevOnlyTarget(): Promise<void> {
+  await assertLocalDevOnlyTargetAt(APP_ORIGIN);
+}
+
+export async function assertLocalDevOnlyTargetAt(
+  origin: string,
+): Promise<void> {
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname))
+    throw new Error("E2E preflight requires a loopback origin");
   const failures: string[] = [];
 
   let documentBody: string;
   try {
-    const response = await fetch(`${APP_ORIGIN}/`);
-    const client = await fetch(`${APP_ORIGIN}/@vite/client`);
+    const response = await fetch(`${origin}/`);
+    const client = await fetch(`${origin}/@vite/client`);
     if (!response.ok) failures.push(`GET / = ${response.status}`);
     if (
       !client.ok ||
@@ -347,7 +355,7 @@ export async function assertLocalDevOnlyTarget(): Promise<void> {
     documentBody = await response.text();
   } catch (error) {
     throw new Error(
-      `[preflight] tidak ada listener dev di ${APP_ORIGIN}: ${(error as Error).message}. ` +
+      `[preflight] tidak ada listener dev di ${origin}: ${(error as Error).message}. ` +
         `Jalankan dev server lokal apps/web (port 3005) sebelum E2E.`,
       { cause: error },
     );
@@ -384,7 +392,7 @@ export async function assertLocalDevOnlyTarget(): Promise<void> {
     );
   }
   console.log(
-    `[preflight] OK: ${APP_ORIGIN} = Vite dev server repo ini; proxy /api = loopback; guard browser = fail-closed`,
+    `[preflight] OK: ${origin} = Vite dev server repo ini; proxy /api = loopback; guard browser = fail-closed`,
   );
 }
 

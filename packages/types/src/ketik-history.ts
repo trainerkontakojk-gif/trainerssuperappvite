@@ -22,6 +22,14 @@ export interface KetikHistoryPage {
 }
 export interface KetikHistoryDetail extends KetikSessionHistoryItem {
   previousFinalScore: number | null;
+  /** Images actually sent, resolved from the immutable session snapshot. */
+  attachments?: KetikHistoryAttachment[];
+}
+export interface KetikHistoryAttachment {
+  /** Original SEND_IMAGE index; never renumber filtered/missing images. */
+  index: number;
+  src: string;
+  alt: string;
 }
 export interface KetikLandingSummary {
   sessionsThisMonth: number;

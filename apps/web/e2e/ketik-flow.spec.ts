@@ -7,13 +7,14 @@ import {
   type KetikServerSession,
 } from "@trainers/types";
 import {
+  APP_ORIGIN,
   expectHermetic,
   formatAudit,
   openHermeticShell,
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
-import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { assertLocalDevOnlyTargetAt as assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { summarizeKetikLanding } from "../src/routes/ketik/utils/landingSummary";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
@@ -194,6 +195,11 @@ const ANNOTATED_REVIEW_DETAIL = {
     ...REVIEW_DETAIL.review,
     education: {
       ...REVIEW_DETAIL.review.education,
+      dimensionGuidance: REVIEW_DETAIL.review.education.dimensionGuidance.map(item => ({
+        ...item,
+        source: "transcript",
+        evidence: [{ messageId: "m2", quote: "Baik Bu" }],
+      })),
       caseCore:
         "Tagihan kartu kredit konsumen tertagih dua kali dan ia minta segera dibereskan.",
       consumerPoints: [
@@ -379,7 +385,7 @@ async function open(page: Page, path: string, apiMocks: ApiMock[], role?: string
 
 test.describe("KETIK landing (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   for (const backup of [false, true]) {
@@ -622,7 +628,7 @@ test.describe("KETIK landing (hermetic)", () => {
 
 test.describe("KETIK Telaah (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("skor akhir tampil pertama, lima aspek, dan temuan menunjuk nomor pesan", async ({
@@ -676,6 +682,174 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByText(/verifikasi data terlambat/)).toBeVisible();
 
     await waitForMockedApi(audit, [`/ketik/review/${REVIEWED_SESSION.id}`]);
+    expectHermetic(audit);
+  });
+
+  test("lampiran Telaah tampil dari detail sesi dan bisa dibuka dengan keyboard setelah reload", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9ZkAAAAASUVORK5CYII=";
+    const messages = REVIEWED_SESSION.messages.map(message => message.id === "m1" ? { ...message, text: "Tagihan saya dobel. [SEND_IMAGE:0] [SEND_IMAGE:2]" } : message);
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      { method: "GET", path: `/api/v1/ketik/history/${REVIEWED_SESSION.id}`, body: { success: true, data: { ...REVIEWED_SESSION, messages, previousFinalScore: null, attachments: [{ index: 0, src: png, alt: "Bukti tagihan asli" }, { index: 2, src: png, alt: "Bukti pembayaran" }] } } },
+      ...ketikMocks(FULL_HISTORY),
+      { ...reviewDetailMock, body: { success: true, data: ANNOTATED_REVIEW_DETAIL } },
+    ]);
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const button = transcript.getByRole("button", { name: "Buka lampiran 1: Bukti tagihan asli" });
+      await expect(button).toBeVisible();
+      await button.focus();
+      await page.keyboard.press("Enter");
+      const preview = page.getByRole("dialog", { name: "Lampiran 1" });
+      await expect(preview).toBeVisible();
+      const image = preview.getByRole("img", { name: "Bukti tagihan asli" });
+      await expect(image).toHaveAttribute("src", png);
+      await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+      await page.screenshot({ path: test.info().outputPath(`attachment-preview-${width}.png`), animations: "disabled" });
+      await page.keyboard.press("Escape");
+      await expect(preview).toBeHidden();
+      await expect(button).toBeFocused();
+      await transcript.getByRole("button", { name: "Buka lampiran 3: Bukti pembayaran" }).click();
+      await page.getByRole("dialog", { name: "Lampiran 3" }).getByRole("button", { name: "Tutup lampiran" }).click();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.reload();
+    await expect(transcript.getByRole("button", { name: "Buka lampiran 1: Bukti tagihan asli" })).toBeVisible();
+    await expect(transcript.getByRole("button", { name: "Lihat pertanyaan konsumen A" })).toBeVisible();
+    await expect(transcript.getByTestId("ketik-message-2").locator("mark mark", { hasText: "tagihn" })).toBeVisible();
+    await waitForMockedApi(audit, [`/ketik/history/${REVIEWED_SESSION.id}`, `/ketik/review/${REVIEWED_SESSION.id}`]);
+    expect(pageErrors).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("lampiran lama yang hilang dan gambar rusak dijelaskan tanpa mengganti dengan gambar lain", async ({ page }) => {
+    const messages = [{ ...REVIEWED_SESSION.messages[0], text: "[SEND_IMAGE:0] [SEND_IMAGE:1]" }, ...REVIEWED_SESSION.messages.slice(1)];
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      { method: "GET", path: `/api/v1/ketik/history/${REVIEWED_SESSION.id}`, body: { success: true, data: { ...REVIEWED_SESSION, messages, previousFinalScore: null, attachments: [{ index: 0, src: "data:image/png;base64,broken", alt: "Bukti rusak" }] } } },
+      ...ketikMocks(FULL_HISTORY), reviewDetailMock,
+    ]);
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    await expect(transcript).toContainText("Lampiran 2 tidak tersedia dalam riwayat sesi ini.");
+    await transcript.getByRole("button", { name: "Buka lampiran 1: Bukti rusak" }).click();
+    const preview = page.getByRole("dialog", { name: "Lampiran 1" });
+    await expect(preview).toContainText("Gambar lampiran tidak dapat dimuat.");
+    await preview.getByRole("button", { name: "Coba muat lagi" }).click();
+    await expect(preview.getByRole("alert")).toContainText("Gambar lampiran tidak dapat dimuat.");
+    await preview.getByRole("button", { name: "Tutup lampiran" }).click();
+    expectHermetic(audit);
+  });
+
+  test("feedback berbukti: skor tinggi tetap menampilkan kesalahan dan kekuatan berupa kalimat agen", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      {
+        ...reviewDetailMock,
+        body: { success: true, data: ANNOTATED_REVIEW_DETAIL },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result.getByRole("tab", { name: /Perbaiki dulu/ }).click();
+    await expect(result).toContainText(
+      "Belum ada langkah atau estimasi waktu.",
+    );
+    await expect(result).toContainText("Verifikasi terlambat");
+    await result.getByRole("tab", { name: /Sudah baik/ }).click();
+    await expect(result).toContainText(
+      "Sapaan sopan dan menyebut panggilan konsumen.",
+    );
+    await expect(
+      result.getByRole("button", { name: /Pesan 2.*Baik Bu/ }),
+    ).toBeVisible();
+    await expect(result).not.toContainText("Diagnosis Resolusi.");
+    await result
+      .getByRole("button", { name: /Jelaskan skor Resolusi/ })
+      .click();
+    await expect(
+      result.getByRole("tab", { name: /Penjelasan skor/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      result.getByRole("article", { name: "Resolusi" }),
+    ).toContainText("Cara memperbaiki Resolusi.");
+    await expect(result.getByRole("article", { name: "Resolusi" })).toContainText("Bukti percakapan");
+    await expect(result.getByRole("article", { name: "Resolusi" })).toContainText("Diagnosis Resolusi.");
+    expectHermetic(audit);
+  });
+
+  test("penanda anotasi lompat dua arah, berulang, dengan keyboard di desktop dan mobile", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      {
+        ...reviewDetailMock,
+        body: { success: true, data: ANNOTATED_REVIEW_DETAIL },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const marker = transcript.getByRole("button", {
+        name: "Lihat kalimat agen 1",
+      });
+      await marker.focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        result.getByRole("tab", { name: /Kalimat agen/ }),
+      ).toHaveAttribute("aria-selected", "true");
+      const note = result
+        .getByRole("list", { name: "Kalimat agen yang dinilai" })
+        .getByRole("listitem")
+        .first();
+      await expect(note).toBeFocused();
+      await note.getByRole("button", { name: /Pesan 2/ }).click();
+      await expect(transcript.getByTestId("ketik-message-2")).toBeFocused();
+      await marker.click();
+      await expect(note).toBeFocused();
+      await transcript
+        .getByRole("button", { name: "Lihat pertanyaan konsumen B" })
+        .click();
+      const point = result
+        .getByRole("list", { name: "Pertanyaan konsumen" })
+        .getByRole("listitem")
+        .nth(1);
+      await expect(point).toBeFocused();
+      await expect(point).toBeInViewport();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: test.info().outputPath(`annotation-navigation-${width}.png`),
+      });
+    }
+    expect(errors).toEqual([]);
+    expectHermetic(audit);
+  });
+
+  test("penjelasan skor lama mengungkap keterbatasan dan tidak menyebut template sebagai bukti", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      reviewDetailMock,
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result.getByRole("button", { name: /Jelaskan skor Empati/ }).click();
+    const aspect = result.getByRole("article", { name: "Empati & Komunikasi" });
+    await expect(aspect).toContainText(
+      "Alasan skor berdasarkan percakapan belum tersedia",
+    );
+    await expect(aspect).toContainText("Panduan umum");
+    await expect(aspect).not.toContainText("Bukti percakapan");
     expectHermetic(audit);
   });
 
@@ -1095,7 +1269,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
 
 test.describe("KETIK ruang chat (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("chat tanpa petunjuk sesi, akhiri dengan konfirmasi, lalu masuk tahap Telaah", async ({
@@ -1247,7 +1421,7 @@ test.describe("KETIK ruang chat (hermetic)", () => {
 
 test.describe("KETIK Riwayat (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("halaman Riwayat berupa tabel dengan filter status dan penanda peserta", async ({
@@ -1393,7 +1567,7 @@ async function openKetikSettings(page: Page) {
 
 test.describe("KETIK Pengaturan (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("kategori berlabel jelas, daftar skenario bisa dicari dan disaring", async ({
@@ -1549,7 +1723,7 @@ test.describe("KETIK Pengaturan (hermetic)", () => {
 test("KETIK agent without assignment cannot start but can edit personal settings", async ({
   page,
 }) => {
-  await assertLocalDevOnlyTarget();
+  await assertLocalDevOnlyTarget(APP_ORIGIN);
   const audit = await open(
     page,
     "/ketik",

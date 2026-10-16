@@ -317,20 +317,19 @@ export interface ChatSession {
 // AI only narrates diagnosis/howToFix/exampleRewrite; the backend owns
 // label/score/verdict/priorityRank deterministically from canonical scores.
 export type KetikDimensionKey =
-  | "empathy"
-  | "probing"
-  | "resolution"
-  | "typo"
-  | "compliance";
+  "empathy" | "probing" | "resolution" | "typo" | "compliance";
 
 export type KetikDimensionVerdict =
-  | "Sangat Baik"
-  | "Baik"
-  | "Cukup"
-  | "Perlu Coaching";
+  "Sangat Baik" | "Baik" | "Cukup" | "Perlu Coaching";
+
+export interface KetikScoreEvidence {
+  messageId: string;
+  quote: string;
+}
 
 /** Shape requested from the model — narration fields only. */
 export interface KetikDimensionGuidanceAI {
+  evidence?: KetikScoreEvidence[];
   key: KetikDimensionKey;
   /** 1-2 sentences quoting 3-6 words of the transcript. */
   diagnosis: string;
@@ -342,6 +341,8 @@ export interface KetikDimensionGuidanceAI {
 
 /** Backend-enriched guidance persisted in ketik_session_reviews.education. */
 export interface KetikDimensionGuidance extends KetikDimensionGuidanceAI {
+  /** Absent on older reviews; transcript means quotes were checked by backend. */
+  source?: "transcript" | "general";
   label: string;
   score: number;
   verdict: KetikDimensionVerdict;
@@ -555,6 +556,10 @@ export const generateMessageSchema = z.object({
 
 // ── Evaluasi Edukatif Zod (opsional — backward compatible) ──
 export const ketikDimensionGuidanceAiSchema = z.object({
+  evidence: z
+    .array(z.object({ messageId: z.string(), quote: z.string().max(300) }))
+    .max(3)
+    .optional(),
   key: z.enum(["empathy", "probing", "resolution", "typo", "compliance"]),
   diagnosis: z.string().max(500),
   howToFix: z.string().max(500),
@@ -564,6 +569,7 @@ export const ketikDimensionGuidanceAiSchema = z.object({
 export const ketikEducationSchema = z.object({
   dimensionGuidance: z.array(
     ketikDimensionGuidanceAiSchema.extend({
+      source: z.enum(["transcript", "general"]).optional(),
       label: z.string(),
       score: z.number(),
       verdict: z.enum(["Sangat Baik", "Baik", "Cukup", "Perlu Coaching"]),

@@ -8,6 +8,7 @@ import {
   type KetikLandingSummary,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
+import { readHistoryAttachments } from "./history-attachments";
 
 const COLUMNS =
   "id,date,scenario_title,consumer_name,consumer_phone,consumer_city,simulation_duration,final_score,empathy_score,probing_score,resolution_score,typo_score,compliance_score,review_status,simulation_subject_type,simulation_subject_peserta_id,simulation_subject_name,simulation_subject_batch_name,simulation_subject_team";
@@ -111,20 +112,25 @@ export async function getHistoryDetail(
   if (error) throw error;
   if (!snapshot) return null;
   const data = snapshot.history;
-  const previous = await db
-    .from("ketik_history")
-    .select("final_score")
-    .eq("user_id", data.user_id)
-    .eq("review_status", "completed")
-    .not("final_score", "is", null)
-    .lt("date", data.date)
-    .order("date", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(1);
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+  const [attachments, previous] = await Promise.all([
+    readHistoryAttachments(db, id, data.user_id, messages),
+    db
+      .from("ketik_history")
+      .select("final_score")
+      .eq("user_id", data.user_id)
+      .eq("review_status", "completed")
+      .not("final_score", "is", null)
+      .lt("date", data.date)
+      .order("date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1),
+  ]);
   if (previous.error) throw previous.error;
   return {
     ...mapRow(data),
-    messages: Array.isArray(data.messages) ? data.messages : [],
+    messages,
+    attachments,
     previousFinalScore: previous.data?.[0]?.final_score ?? null,
   };
 }
