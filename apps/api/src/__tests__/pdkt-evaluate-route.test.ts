@@ -7,8 +7,10 @@ vi.mock("../services/pdkt-service", () => ({
   evaluateAgentResponse: mockEvaluateAgentResponse,
 }));
 
-vi.mock("../middleware/role", () => ({
-  requireRole: () => async (_c: unknown, next: () => Promise<void>) => next(),
+vi.mock("../middleware/role", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../middleware/role")>()),
+  requireCapability: () => async (_c: unknown, next: () => Promise<void>) =>
+    next(),
 }));
 
 vi.mock("../middleware/rateLimit", () => ({
