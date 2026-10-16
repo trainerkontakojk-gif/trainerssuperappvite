@@ -30,6 +30,8 @@ interface MonthRangePickerProps {
   onRangeChange: (start: number | null, end: number | null) => void;
   id?: string;
   className?: string;
+  /** Awalan nama aksesibel pemicu; bawaan "Rentang bulan". */
+  ariaLabel?: string;
 }
 
 /** Teks rentang di pemicu: "Januari – Oktober", "Oktober", atau "Semua bulan". */
@@ -54,6 +56,7 @@ export function MonthRangePicker({
   onRangeChange,
   id,
   className,
+  ariaLabel = "Rentang bulan",
 }: MonthRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -87,7 +90,7 @@ export function MonthRangePicker({
     >
       <PopoverTrigger
         id={id}
-        aria-label={`Rentang bulan: ${label}`}
+        aria-label={`${ariaLabel}: ${label}`}
         render={
           <Button
             variant="outline"

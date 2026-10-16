@@ -60,6 +60,8 @@ interface Props {
   onDelete: (id: string) => void;
   /** Permintaan membuka satu tiket (dari ringkasan). `nonce` baru = permintaan baru. */
   focusRequest?: TemuanFocusRequest | null;
+  /** Daftar sedang disaring Bulan/Cari; kosong berarti tidak ada yang cocok. */
+  filtered?: boolean;
 }
 
 export interface TemuanFocusRequest {
@@ -94,6 +96,7 @@ export default function AgentTemuanTab({
   onEdit,
   onDelete,
   focusRequest = null,
+  filtered = false,
 }: Props) {
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
   const [appliedNonce, setAppliedNonce] = useState<number | null>(null);
@@ -146,9 +149,13 @@ export default function AgentTemuanTab({
             <EmptyMedia variant="icon" className="size-12 rounded-xl bg-muted text-muted-foreground">
               <Ticket className="size-6" aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle className="text-lg font-bold">Belum ada temuan</EmptyTitle>
+            <EmptyTitle className="text-lg font-bold">
+              {filtered ? "Tidak ada temuan yang cocok" : "Belum ada temuan"}
+            </EmptyTitle>
             <EmptyDescription>
-              Belum ada temuan untuk layanan atau tahun yang dipilih.
+              {filtered
+                ? "Ganti bulan atau kata pencarian."
+                : "Belum ada temuan untuk layanan atau tahun yang dipilih."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

@@ -139,9 +139,7 @@ test.describe("Tata letak detail agent", () => {
         height === 768 ? "false" : "true",
       );
       // Isi paling bawah selalu bisa dicapai dengan scroll halaman biasa.
-      const lastItem = aside.getByRole("button", {
-        name: "Cara membaca peringkat",
-      });
+      const lastItem = aside.getByText("Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.");
       await lastItem.scrollIntoViewIfNeeded();
       await expect(lastItem).toBeInViewport();
     }
@@ -152,8 +150,8 @@ test.describe("Tata letak detail agent", () => {
 
     // Skor terbaru Juni 84.1 < 85 → perlu perhatian, selisih dari Mei.
     const latest = sidebar(page).getByRole("region", { name: "Skor terbaru" });
-    await expect(latest.getByText("Skor terbaru · Juni 2026")).toBeVisible();
-    await expect(latest.getByText(/^84\.1\s*%$/)).toBeVisible();
+    await expect(latest.getByText("Skor Juni 2026")).toBeVisible();
+    await expect(latest.getByText(/^84\.1$/)).toBeVisible();
     await expect(latest.getByText("Perlu perhatian")).toBeVisible();
     await expect(latest.getByText("Naik 4.3 poin dari Mei")).toBeVisible();
 
@@ -317,6 +315,64 @@ test.describe("Tata letak detail agent", () => {
       group.getByText("Verifikasi Identitas", { exact: true }),
     ).toBeVisible();
     await expect(group).toBeInViewport();
+  });
+
+  test("sidebar ringkas: skor, dua peringkat, forecast sebaris, catatan terlihat", async ({
+    page,
+  }) => {
+    await openRichDetail(page, { width: 1440, height: 1000 });
+    const aside = sidebar(page);
+    const sameRow = async (label: Locator, value: Locator) => {
+      const a = await box(label);
+      const b = await box(value);
+      expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2))).toBeLessThanOrEqual(4);
+      expect(b.x).toBeGreaterThan(a.x + a.width);
+    };
+    const latest = aside.getByRole("region", { name: "Skor terbaru" });
+    await sameRow(latest.getByText("Skor Juni 2026"), latest.getByText("84.1", { exact: true }));
+    const combined = aside.getByRole("group", { name: "Tim Gabungan: peringkat 7" });
+    await sameRow(combined.getByText("Peringkat tim gabungan"), combined.getByText("7 / 42"));
+    const leader = aside.getByRole("group", { name: "Tim Leader: peringkat 3" });
+    await sameRow(leader.getByText("Peringkat Tim Leader Andika"), leader.getByText("3 / 12"));
+    const forecast = aside.getByRole("group", { name: "Forecast: Memburuk" });
+    await sameRow(forecast.getByText("Forecast 3 bulan"), forecast.getByText("Memburuk", { exact: true }));
+    await expect(aside.getByText("Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.")).toBeVisible();
+    await expect(aside.getByRole("button", { name: "Cara membaca peringkat" })).toHaveCount(0);
+  });
+
+  test("tab Temuan menyebut jumlah temuan; Bulan dan Cari menyaring daftar", async ({
+    page,
+  }) => {
+    await openRichDetail(page, { width: 1440, height: 1000 });
+    const tab = page.getByRole("tab", { name: "Temuan" });
+    await expect(tab).toHaveAccessibleName("Temuan 8");
+    await tab.click();
+    const panel = page.getByRole("tabpanel", { name: "Temuan" });
+
+    // Bulan: hanya bulan yang punya temuan, plus Semua bulan.
+    await page.getByRole("combobox", { name: "Bulan temuan" }).click();
+    await expect(page.getByRole("option")).toHaveText([
+      "Semua bulan",
+      "Juni",
+      "Mei",
+      "Maret",
+    ]);
+    await page.getByRole("option", { name: "Mei", exact: true }).click();
+    await expect(panel.getByText("Juni 2026")).toHaveCount(0);
+    await expect(panel.getByText(/Mei 2026/).first()).toBeVisible();
+
+    // Cari: nomor tiket atau parameter, tanpa membedakan huruf besar.
+    await page.getByRole("combobox", { name: "Bulan temuan" }).click();
+    await page.getByRole("option", { name: "Semua bulan", exact: true }).click();
+    const search = page.getByRole("searchbox", { name: "Cari temuan" });
+    await expect(search).toHaveAttribute("placeholder", "No. tiket atau parameter");
+    await search.fill("tkt-2026-03");
+    await expect(panel.getByText(/Maret 2026/).first()).toBeVisible();
+    await expect(panel.getByText("Juni 2026")).toHaveCount(0);
+    await search.fill("tidak ada yang cocok");
+    await expect(panel.getByText("Tidak ada temuan yang cocok")).toBeVisible();
+    // Jumlah di tab tetap total cakupan, bukan hasil saring.
+    await expect(tab).toHaveAccessibleName("Temuan 8");
   });
 
   test("tab aktif masuk ke alamat dan bertahan setelah muat ulang", async ({

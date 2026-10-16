@@ -57,7 +57,9 @@ test.describe("Heatmap di detail agent", () => {
   }) => {
     const a = await openHeatmapTab(page, { counts: { "2026-01-05": 4 } });
 
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Kalender temuan 2026" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "05/01/2026: 4 temuan" }),
     ).toBeVisible();
@@ -73,7 +75,9 @@ test.describe("Heatmap di detail agent", () => {
     page,
   }) => {
     await openHeatmapTab(page, { role: "leader", sidakAccess: "approved" });
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Kalender temuan 2026" }),
+    ).toBeVisible();
   });
 
   test("toggle satuan mengirim count_by=tiket", async ({ page }) => {

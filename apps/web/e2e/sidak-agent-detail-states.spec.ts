@@ -22,7 +22,7 @@ import {
 
 const AGENT_NAME = "Rahmawati Kusumaningrum";
 const RANKING_NOTE =
-  "Peringkat 1 berarti temuan paling sedikit sepanjang tahun berjalan; peringkat terakhir berarti temuan terbanyak. Agen dengan jumlah temuan yang sama berbagi peringkat.";
+  "Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.";
 
 type Quickview = ReturnType<typeof richQuickviewPayload>;
 
@@ -109,17 +109,19 @@ test.describe("Detail agent — quickview performa", () => {
     const combined = strip.getByRole("group", {
       name: "Tim Gabungan: peringkat 7",
     });
-    await expect(combined.getByText("#7")).toBeVisible();
-    await expect(combined.getByText("dari 42")).toBeVisible();
+    await expect(combined.getByText("Peringkat tim gabungan")).toBeVisible();
+    await expect(combined.getByText("7 / 42")).toBeVisible();
     await expect(
       strip.getByRole("group", { name: "Tim Leader: peringkat 3" }),
     ).toBeVisible();
     await expect(
       strip.getByText("Temuan diperkirakan naik dalam 3 bulan ke depan."),
     ).toBeVisible();
-    await expect(strip.getByText(RANKING_NOTE)).toBeHidden();
-    await strip.getByRole("button", { name: "Cara membaca peringkat" }).click();
+    // Catatan dasar peringkat selalu terlihat, tanpa tombol buka-tutup.
     await expect(strip.getByText(RANKING_NOTE)).toBeVisible();
+    await expect(
+      strip.getByRole("button", { name: "Cara membaca peringkat" }),
+    ).toHaveCount(0);
   });
 
   test("skeleton saat memuat, tanpa data atau info seri", async ({ page }) => {
@@ -289,9 +291,6 @@ test.describe("Detail agent — quickview performa", () => {
         .getByText("Berbagi peringkat 1 dengan Tania dan Budi"),
     ).toBeVisible();
     // Info seri tidak menggeser catatan dasar peringkat.
-    await profile(page)
-      .getByRole("button", { name: "Cara membaca peringkat" })
-      .click();
     await expect(profile(page).getByText(RANKING_NOTE)).toBeVisible();
   });
 
@@ -424,9 +423,8 @@ test.describe("Detail agent — toolbar per tab", () => {
     page,
   }) => {
     const audit = await open(page);
-    await expect(
-      page.getByRole("combobox", { name: "Bulan awal tren" }),
-    ).toHaveCount(0);
+    const range = page.getByRole("button", { name: /^Rentang bulan tren/ });
+    await expect(range).toHaveCount(0);
     await expect(
       page.getByRole("combobox", { name: "Tahun audit" }),
     ).toBeVisible();
@@ -435,14 +433,18 @@ test.describe("Detail agent — toolbar per tab", () => {
     await expect(
       page.getByRole("combobox", { name: "Tahun audit" }),
     ).toBeVisible();
+    // Satu kontrol rentang bulan, sama dengan halaman SIDAK lain.
     await expect(
-      page.getByRole("combobox", { name: "Bulan akhir tren" }),
-    ).toBeVisible();
-    await page.getByRole("combobox", { name: "Bulan awal tren" }).click();
-    await page.getByRole("option", { name: "Maret", exact: true }).click();
+      page.getByRole("combobox", { name: "Bulan awal tren" }),
+    ).toHaveCount(0);
+    await range.click();
+    const picker = page.getByRole("dialog", { name: "Pilih rentang bulan" });
+    await picker.getByRole("button", { name: "Maret", exact: true }).click();
+    await picker.getByRole("button", { name: "Mei", exact: true }).click();
+    await expect(range).toContainText("Maret – Mei");
     await expect
       .poll(() => audit.detailQueries?.at(-1) ?? "")
-      .toContain("startMonth=3");
+      .toMatch(/startMonth=3.*endMonth=5|endMonth=5.*startMonth=3/);
   });
 
   test("tab Simulasi menyembunyikan filter audit tapi tetap bisa ganti agen", async ({

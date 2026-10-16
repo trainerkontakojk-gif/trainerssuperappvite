@@ -12,6 +12,8 @@ interface Props {
   panels: Record<SidakAgentDetailTab, ReactNode>;
   /** Filter konteks, dirender di antara daftar tab dan panel aktif. */
   toolbar?: ReactNode;
+  /** Jumlah isi tab (mis. temuan), ditulis setelah label tab. */
+  counts?: Partial<Record<SidakAgentDetailTab, number>>;
 }
 
 export default function SidakAgentDetailTabs({
@@ -20,6 +22,7 @@ export default function SidakAgentDetailTabs({
   onTabChange,
   panels,
   toolbar,
+  counts,
 }: Props) {
   const handleTabKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
@@ -82,6 +85,14 @@ export default function SidakAgentDetailTabs({
               className="h-11 flex-none shrink-0 rounded-none px-0 text-sm font-medium text-muted-foreground after:!bottom-0 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background data-active:text-foreground motion-reduce:transition-none"
             >
               {tab.label}
+              {counts?.[tab.id] !== undefined ? (
+                <>
+                  {" "}
+                  <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-fg2">
+                    {counts[tab.id]}
+                  </span>
+                </>
+              ) : null}
             </TabsTrigger>
           ))}
         </TabsList>

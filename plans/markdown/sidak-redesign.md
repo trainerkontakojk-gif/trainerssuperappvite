@@ -210,6 +210,16 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
     `utils/sidakHomeSummary.ts`, dan `e2e/sidak-landing.spec.ts` ikut dihapus.
   - Grafik tren: label "Proyeksi" di dalam area arsir dihapus karena menumpuk
     dengan angka titik proyeksi; keterangan tetap di legenda.
+  - Detail agen mengikuti mockup: sidebar berupa baris ringkas (Skor bulan,
+    Peringkat tim gabungan "7 / 42", Peringkat tim leader, Forecast 3 bulan)
+    dengan catatan dasar peringkat yang selalu terlihat. **Arti peringkat
+    tetap: 1 = temuan paling sedikit**, kebalikan halaman Ranking (keputusan
+    Fajar; mockup menulis sebaliknya). Tab Temuan menulis jumlah temuan
+    cakupan; Tren memakai satu kontrol rentang bulan; Temuan punya saringan
+    Bulan dan Cari (nomor tiket atau parameter), dikosongkan saat tiket dibuka
+    dari Ringkasan atau Heatmap. Jumlah di tab Simulasi tidak dibuat: riwayat
+    dimuat per halaman tanpa total, jadi butuh request tambahan di tiap
+    pembukaan detail.
 
 ## Design
 

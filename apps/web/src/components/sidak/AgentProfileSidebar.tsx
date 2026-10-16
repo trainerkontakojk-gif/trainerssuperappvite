@@ -307,7 +307,7 @@ export default function AgentProfileSidebar({
       </div>
 
       {latestScore || quickview ? (
-        <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid gap-x-6 border-t border-border pt-1.5 sm:grid-cols-2 lg:grid-cols-1">
           {latestScore}
           {quickview}
         </div>

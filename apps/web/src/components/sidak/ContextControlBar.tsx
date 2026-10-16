@@ -1,5 +1,6 @@
 import { Calendar } from "lucide-react";
 import type { ReactNode } from "react";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -9,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MonthRangePicker } from "../ui/MonthRangePicker";
 import type { SidakAgentDetailTab } from "./sidak-agent-detail-tabs.constants";
 
 const MONTHS = [
@@ -48,6 +50,13 @@ interface Props {
   trendStartMonth: number;
   trendEndMonth: number;
   onTrendRangeChange: (start: number, end: number) => void;
+  /** Saringan tab Temuan; `null` = semua bulan. */
+  temuanMonth: number | null;
+  /** Bulan yang punya temuan, terbaru dulu. */
+  temuanMonths: number[];
+  onTemuanMonthChange: (month: number | null) => void;
+  temuanQuery: string;
+  onTemuanQueryChange: (query: string) => void;
 }
 
 const triggerClassName =
@@ -118,13 +127,22 @@ export default function ContextControlBar({
   trendStartMonth,
   trendEndMonth,
   onTrendRangeChange,
+  temuanMonth,
+  temuanMonths,
+  onTemuanMonthChange,
+  temuanQuery,
+  onTemuanQueryChange,
 }: Props) {
   const showAuditControls = activeTab !== "simulations";
   const showTrendRange = activeTab === "trend";
-  const monthItems = MONTHS.map((month, index) => ({
-    value: String(index + 1),
-    label: month,
-  }));
+  const showTemuanFilters = activeTab === "temuan";
+  const temuanMonthItems = [
+    { value: "all", label: "Semua bulan" },
+    ...temuanMonths.map((month) => ({
+      value: String(month),
+      label: MONTHS[month - 1]!,
+    })),
+  ];
 
   if (!showAuditControls) return null;
 
@@ -179,55 +197,58 @@ export default function ContextControlBar({
           </ContextSelect>
 
           {showTrendRange ? (
+            <div className="col-span-2 min-w-0 sm:w-[13rem]">
+              <Label htmlFor="sidak-trend-range" className={labelClassName}>
+                Bulan
+              </Label>
+              <MonthRangePicker
+                id="sidak-trend-range"
+                ariaLabel="Rentang bulan tren"
+                selectedYear={selectedYear}
+                startMonth={trendStartMonth}
+                endMonth={trendEndMonth}
+                onRangeChange={(start, end) =>
+                  onTrendRangeChange(start ?? 1, end ?? 12)
+                }
+              />
+            </div>
+          ) : null}
+
+          {showTemuanFilters ? (
             <>
               <ContextSelect
-                id="sidak-trend-start"
-                label="Tren dari"
-                ariaLabel="Bulan awal tren"
-                value={String(trendStartMonth)}
-                placeholder="Mulai"
-                className="sm:w-36"
-                items={monthItems}
+                id="sidak-temuan-month"
+                label="Bulan"
+                ariaLabel="Bulan temuan"
+                value={temuanMonth === null ? "all" : String(temuanMonth)}
+                placeholder="Semua bulan"
+                className="sm:w-40"
+                items={temuanMonthItems}
                 onValueChange={(value) => {
-                  if (value !== null) {
-                    onTrendRangeChange(Number(value), trendEndMonth);
-                  }
+                  if (value === null) return;
+                  onTemuanMonthChange(value === "all" ? null : Number(value));
                 }}
               >
-                {MONTHS.map((month, index) => (
-                  <SelectItem
-                    key={month}
-                    value={String(index + 1)}
-                    disabled={index + 1 > trendEndMonth}
-                  >
-                    {month}
+                {temuanMonthItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
                   </SelectItem>
                 ))}
               </ContextSelect>
-              <ContextSelect
-                id="sidak-trend-end"
-                label="Sampai"
-                ariaLabel="Bulan akhir tren"
-                value={String(trendEndMonth)}
-                placeholder="Sampai"
-                className="sm:w-36"
-                items={monthItems}
-                onValueChange={(value) => {
-                  if (value !== null) {
-                    onTrendRangeChange(trendStartMonth, Number(value));
-                  }
-                }}
-              >
-                {MONTHS.map((month, index) => (
-                  <SelectItem
-                    key={month}
-                    value={String(index + 1)}
-                    disabled={index + 1 < trendStartMonth}
-                  >
-                    {month}
-                  </SelectItem>
-                ))}
-              </ContextSelect>
+              <div className="col-span-2 min-w-0 sm:w-64">
+                <Label htmlFor="sidak-temuan-search" className={labelClassName}>
+                  Cari
+                </Label>
+                <Input
+                  id="sidak-temuan-search"
+                  type="search"
+                  aria-label="Cari temuan"
+                  placeholder="No. tiket atau parameter"
+                  value={temuanQuery}
+                  onChange={(event) => onTemuanQueryChange(event.target.value)}
+                  className="h-10 rounded-lg"
+                />
+              </div>
             </>
           ) : null}
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,13 @@ import SidakAgentDetailTabs from "../../components/sidak/SidakAgentDetailTabs";
 import SidakAgentHeatmapPanel from "../../components/sidak/SidakAgentHeatmapPanel";
 import type { SidakAgentDetailTab } from "../../components/sidak/sidak-agent-detail-tabs.constants";
 import SidakSimulationHistory from "../../components/sidak/SidakSimulationHistory";
+import {
+  EMPTY_TEMUAN_FILTER,
+  filterTemuan,
+  isTemuanFilterActive,
+  temuanMonthOptions,
+  type TemuanFilter,
+} from "../../utils/sidakTemuanFilter";
 import {
   SIDAK_QA_TARGET,
   SIDAK_SCORE_TEXT,
@@ -157,9 +164,33 @@ export default function SidakAgentDetailPage() {
   const [temuanFocus, setTemuanFocus] = useState<TemuanFocusRequest | null>(
     null,
   );
+  const [temuanFilter, setTemuanFilter] =
+    useState<TemuanFilter>(EMPTY_TEMUAN_FILTER);
+  const temuanMonths = useMemo(
+    () => temuanMonthOptions(temuanDisplayItems),
+    [temuanDisplayItems],
+  );
+  // Bulan yang tidak ada lagi (tahun/layanan berganti) dianggap Semua bulan.
+  const effectiveTemuanFilter = useMemo<TemuanFilter>(
+    () =>
+      temuanFilter.month !== null && !temuanMonths.includes(temuanFilter.month)
+        ? { ...temuanFilter, month: null }
+        : temuanFilter,
+    [temuanFilter, temuanMonths],
+  );
+  const filteredTemuan = useMemo(
+    () =>
+      filterTemuan(
+        temuanDisplayItems,
+        phantomSessionDisplayItems,
+        effectiveTemuanFilter,
+      ),
+    [temuanDisplayItems, phantomSessionDisplayItems, effectiveTemuanFilter],
+  );
   const handleTicketSelect = useCallback(
     (ticketKey: string) => {
       if (!selectedMonth) return;
+      setTemuanFilter(EMPTY_TEMUAN_FILTER);
       setTemuanFocus((current) => ({
         month: selectedMonth,
         year: selectedYear,
@@ -174,6 +205,7 @@ export default function SidakAgentDetailPage() {
   // Tanggal di tab Heatmap membuka tiketnya di tab Temuan (bulan periode QA).
   const handleHeatmapTicket = useCallback(
     (ticket: SidakHeatmapTicketRef) => {
+      setTemuanFilter(EMPTY_TEMUAN_FILTER);
       setTemuanFocus((current) => ({
         month: ticket.month,
         year: ticket.year,
@@ -318,30 +350,25 @@ export default function SidakAgentDetailPage() {
           }
           latestScore={
             latestSummary ? (
-              <section
-                aria-label="Skor terbaru"
-                className="flex flex-col gap-1"
-              >
-                <h2 className="text-xs font-medium text-muted-foreground">
-                  Skor terbaru · {monthsFull[latestSummary.month - 1]}{" "}
-                  {latestSummary.year}
-                </h2>
-                <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <section aria-label="Skor terbaru" className="py-2.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="min-w-0 text-sm font-normal text-fg2">
+                    Skor {monthsFull[latestSummary.month - 1]}{" "}
+                    {latestSummary.year}
+                  </h2>
                   <span
-                    className={`font-outfit text-4xl font-bold leading-none tracking-tight tabular-nums ${SIDAK_SCORE_TEXT[sidakScoreTone(latestSummary.finalScore)]}`}
+                    className={`font-semibold tabular-nums ${SIDAK_SCORE_TEXT[sidakScoreTone(latestSummary.finalScore)]}`}
                   >
                     {latestSummary.finalScore.toFixed(1)}
-                    <span className="ml-0.5 text-sm font-medium text-muted-foreground">
-                      %
-                    </span>
                   </span>
+                </div>
+                <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
                   <span
-                    className={`text-sm font-semibold ${SIDAK_SCORE_TEXT[sidakScoreTone(latestSummary.finalScore)]}`}
+                    className={`font-medium ${SIDAK_SCORE_TEXT[sidakScoreTone(latestSummary.finalScore)]}`}
                   >
                     {sidakScoreLabel(latestSummary.finalScore)}
                   </span>
-                </p>
-                <p className="text-xs tabular-nums text-muted-foreground">
+                  {" · "}
                   {latestDelta !== null && priorSummary
                     ? describeScoreChange(
                         latestDelta,
@@ -368,6 +395,7 @@ export default function SidakAgentDetailPage() {
           activeTab={activeTab}
           mountedTabs={mountedTabs}
           onTabChange={handleTabChange}
+          counts={loading ? undefined : { temuan: temuanDisplayItems.length }}
           toolbar={
             <ContextControlBar
               activeTab={activeTab}
@@ -380,6 +408,15 @@ export default function SidakAgentDetailPage() {
               trendStartMonth={trendStartMonth}
               trendEndMonth={trendEndMonth}
               onTrendRangeChange={handleTrendRangeChange}
+              temuanMonth={effectiveTemuanFilter.month}
+              temuanMonths={temuanMonths}
+              onTemuanMonthChange={(month) =>
+                setTemuanFilter((current) => ({ ...current, month }))
+              }
+              temuanQuery={temuanFilter.query}
+              onTemuanQueryChange={(query) =>
+                setTemuanFilter((current) => ({ ...current, query }))
+              }
             />
           }
           panels={{
@@ -479,8 +516,9 @@ export default function SidakAgentDetailPage() {
                 </div>
                 <AgentTemuanTab
                   key={`${selectedYear}-${selectedService}`}
-                  items={temuanDisplayItems}
-                  phantomSessions={phantomSessionDisplayItems}
+                  items={filteredTemuan.items}
+                  phantomSessions={filteredTemuan.sessions}
+                  filtered={isTemuanFilterActive(effectiveTemuanFilter)}
                   loading={loading}
                   deletingId={deletingId}
                   canEdit={role === "trainer" || role === "admin"}
