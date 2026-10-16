@@ -597,6 +597,7 @@ export const rootCauseClusterIds = [
   "kurang_teliti_verifikasi_data",
   "kurang_paham_standar_jawaban",
   "kurang_menggali",
+  "komunikasi_layanan",
   "lainnya",
 ] as const;
 export type RootCauseClusterId = (typeof rootCauseClusterIds)[number];

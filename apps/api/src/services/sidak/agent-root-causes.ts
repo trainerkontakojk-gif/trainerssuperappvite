@@ -78,6 +78,10 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       "fitur hold",
       "waktu tunggu",
       "dead air",
+      // Call fallback 2026-10-17: HOLD permission/button procedure (Etika Bertelepon)
+      "izin hold",
+      "tombol hold",
+      "menggunakan hold",
     ],
     recommendation:
       "Latih manajemen hold: minta izin sebelum hold, batasi hold pertama maksimal 60 detik dan hold berikutnya sesuai standar, kembali ke konsumen tepat waktu, dan hindari dead air.",
@@ -103,6 +107,11 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       "salah menulis",                 // wrong writing (sample evidence)
       "tidak memberikan jawaban",      // didn't give correct answer
       "belum memperbaiki",              // hasn't fixed previously flagged issue (163x)
+      // Call fallback 2026-10-17: "tidak tepat dalam ..." variants (Keakuratan Solusi)
+      "tidak tepat dalam menjawab",
+      "tidak tepat dalam memberikan",
+      "tidak tepat dalam menyampaikan",
+      "tidak menjawab",                // unanswered consumer question (call/chat/email)
     ],
     recommendation:
       "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
@@ -148,6 +157,9 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       "tidak mencatat",               // missing recording
       "tidak menuliskan",             // missing writing/entry
       "tidak melampirkan",            // missing document attachment
+      // Call fallback 2026-10-17: "... dalam mencatat" form (Kemampuan Pencatatan)
+      "tidak sesuai dalam mencatat",
+      "belum sesuai dalam mencatat",
     ],
     recommendation:
       "Biasakan checklist verifikasi data pelanggan dan pastikan data dikonfirmasi sebelum memberi arahan.",
@@ -180,9 +192,35 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       // Phase 2 expansion
       "tidak menanyakan",             // did not ask about specific details
       "tidak melakukan probing",      // didn't probe further
+      // Indicator name (Call "Kemampuan Bertanya dan Menganalisa", chat
+      // "Kemampuan Bertanya"): unnecessary or unstructured probing too.
+      "kemampuan bertanya",
     ],
     recommendation:
       "Latih pertanyaan klarifikasi agar kebutuhan, kronologi, dan konteks pelanggan tergali tuntas.",
+  },
+  {
+    // Call communication and etiquette findings are worded too freely for
+    // phrase keywords, so this cluster matches the Call indicator names that
+    // buildSearchText appends. Lowest priority: it loses every tie, so a row
+    // another cluster also matches keeps that cluster. "menit"/"detik" are
+    // transcript timestamps and never keywords.
+    clusterId: "komunikasi_layanan",
+    priority: 4,
+    label: "Komunikasi & etika layanan telepon kurang optimal",
+    serviceTypes: ["call"],
+    keywords: [
+      "kemampuan menyimak",
+      "pilihan kata",
+      "kualitas suara",
+      "kemampuan menjelaskan",
+      "patience empathy",
+      "salam pembuka",
+      "menyapa konsumen",
+      "salam penutup",
+    ],
+    recommendation:
+      "Latih komunikasi layanan telepon: menyimak tanpa memotong atau mengulang pertanyaan, intonasi bervariasi dengan artikulasi dan tempo jelas, pilihan kata baku dan kalimat terstruktur, penjelasan runtut dengan jeda pada informasi penting, kalimat empati dan sikap sabar, serta salam pembuka, sapaan nama, dan salam penutup sesuai standar.",
   },
 ];
 

@@ -39,10 +39,11 @@ const indicators = {
     name: `Kesesuaian Data ${namespace}`,
   },
   // Production Call indicator; consumer-facing iDeb SLIK findings live here.
+  // Not a komunikasi_layanan indicator name, so its rows keep testing scope.
   penjelasan: {
     id: randomUUID(),
     service: "call",
-    name: `Kemampuan Menjelaskan ${namespace}`,
+    name: `Keakuratan Solusi / Informasi ${namespace}`,
   },
 };
 type IndicatorKey = keyof typeof indicators;

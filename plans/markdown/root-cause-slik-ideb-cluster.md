@@ -1,7 +1,7 @@
 # Root-cause cluster for SLIK iDeb registration process findings
 
 Lane: **C**. This changes the shared cluster enum used by the SIDAK agent detail, the TNA drill-down, TNA need validation (zod) and `tna_programs.trigger_clusters`. It follows the precedent of [`root-cause-hold-cluster.md`](root-cause-hold-cluster.md).
-Status: **implemented** (2026-10-17). Decisions (Fajar): D1 = (a) no program/migration; D2 = accept that matched SLIK rows move; D3 = defer the soft-skill cluster; D4 = audited at 17.24%. Follow-up: the cluster is now limited to `slik` rows, because the Call rows it caught were consumer-facing ([`root-cause-slik-ideb-service-scope.md`](root-cause-slik-ideb-service-scope.md)).
+Status: **implemented** (2026-10-17). Decisions (Fajar): D1 = (a) no program/migration; D2 = accept that matched SLIK rows move; D3 = defer the soft-skill cluster (since done: [`root-cause-call-komunikasi-cluster.md`](root-cause-call-komunikasi-cluster.md)); D4 = audited at 17.24%. Follow-up: the cluster is now limited to `slik` rows, because the Call rows it caught were consumer-facing ([`root-cause-slik-ideb-service-scope.md`](root-cause-slik-ideb-service-scope.md)).
 
 ## Requirement
 
@@ -138,4 +138,4 @@ No unit tests are added or run. If an existing unit expectation in `sidak-agent-
 - [x] `thermo-nuclear`: P2, audit script at 1248 lines → dry-run fixture moved to `audit-root-cause-fixture.mjs` (1035 lines, dry-run output unchanged). `graphify update .` run.
 - [x] Commit and push to main.
 - [x] Fajar ran the D4 audit (`after-slik-cluster`, 2026-10-17): **17.24%** fallback (482/2796), target met. `slik` fallback went from 205 to 2. Result recorded in the docs.
-- [ ] Follow-up: review the Call rows that moved into `proses_ideb_slik`. 13 came from `lainnya`, and at least 5 left another cluster. The offline sample predicted no non-SLIK matches. `--sample-texts` samples only fallback rows, so checking them needs a per-cluster sample of matched rows.
+- [x] Follow-up (done in [`root-cause-slik-ideb-service-scope.md`](root-cause-slik-ideb-service-scope.md)): review the Call rows that moved into `proses_ideb_slik`. 13 came from `lainnya`, and at least 5 left another cluster. The offline sample predicted no non-SLIK matches. `--sample-texts` samples only fallback rows, so checking them needs a per-cluster sample of matched rows.

@@ -151,6 +151,9 @@ const ROOT_CAUSE_REGISTRY = [
       "fitur hold",
       "waktu tunggu",
       "dead air",
+      "izin hold",
+      "tombol hold",
+      "menggunakan hold",
     ],
   },
   {
@@ -173,6 +176,10 @@ const ROOT_CAUSE_REGISTRY = [
       "salah menulis",
       "tidak memberikan jawaban",
       "belum memperbaiki",
+      "tidak tepat dalam menjawab",
+      "tidak tepat dalam memberikan",
+      "tidak tepat dalam menyampaikan",
+      "tidak menjawab",
     ],
   },
   {
@@ -207,6 +214,8 @@ const ROOT_CAUSE_REGISTRY = [
       "tidak mencatat",
       "tidak menuliskan",
       "tidak melampirkan",
+      "tidak sesuai dalam mencatat",
+      "belum sesuai dalam mencatat",
     ],
   },
   {
@@ -234,6 +243,23 @@ const ROOT_CAUSE_REGISTRY = [
       "tidak tuntas",
       "tidak menanyakan",
       "tidak melakukan probing",
+      "kemampuan bertanya",
+    ],
+  },
+  {
+    clusterId: "komunikasi_layanan",
+    priority: 4,
+    label: "Komunikasi & etika layanan telepon kurang optimal",
+    serviceTypes: ["call"],
+    keywords: [
+      "kemampuan menyimak",
+      "pilihan kata",
+      "kualitas suara",
+      "kemampuan menjelaskan",
+      "patience empathy",
+      "salam pembuka",
+      "menyapa konsumen",
+      "salam penutup",
     ],
   },
 ];

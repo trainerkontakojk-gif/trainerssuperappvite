@@ -609,7 +609,8 @@ Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan d
 7. `kurang_teliti_verifikasi_data` (prioritas 7)
 8. `kurang_paham_standar_jawaban` (prioritas 6)
 9. `kurang_menggali` (prioritas 5)
-10. `lainnya` (prioritas 0 — fallback)
+10. `komunikasi_layanan` (prioritas 4) — komunikasi & etika layanan telepon: menyimak, pilihan kata, kualitas suara, menjelaskan, empati, salam/sapaan (hanya temuan `call`)
+11. `lainnya` (prioritas 0 — fallback)
 
 Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/src/sidak.ts`); `tnaClusterIdSchema` TNA diturunkan dari daftar yang sama. Kolom cluster di `tna_needs`/`tna_programs` bertipe `text` tanpa CHECK, sehingga menambah klaster tidak memerlukan migrasi kecuali program TNA perlu memicu klaster baru.
 
@@ -652,6 +653,15 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 
 **`kurang_menggali`:** `tidak menanyakan`, `tidak melakukan probing`.
 
+Ekspansi 2026-10-17 dari audit fallback Call (`call-fallback`), seluruhnya frasa verbatim dari teks temuan:
+
+- **`salah_jawaban`:** `tidak tepat dalam menjawab`, `tidak tepat dalam memberikan`, `tidak tepat dalam menyampaikan`, `tidak menjawab` (parameter Keakuratan Solusi / Ketepatan Solusi, call/chat/email).
+- **`kurang_teliti_verifikasi_data`:** `tidak sesuai dalam mencatat`, `belum sesuai dalam mencatat` (Kemampuan Pencatatan; juga BKO Kertas Kerja).
+- **`kurang_menggali`:** `kemampuan bertanya` (nama parameter Call "Kemampuan Bertanya dan Menganalisa" dan chat "Kemampuan Bertanya"; termasuk probing yang tidak perlu/tidak terstruktur).
+- **`hold_waktu_tunggu`:** `izin hold`, `tombol hold`, `menggunakan hold` (Etika Bertelepon).
+
+Nama parameter klaster lama (`kemampuan pencatatan`, `keakuratan solusi`) sengaja **tidak** dijadikan keyword: setiap temuan parameter itu yang sudah cocok klaster lain akan mendapat satu match tambahan dan berpindah klaster saat seri.
+
 ### Klaster `hold_waktu_tunggu`
 
 Ditambahkan setelah temuan produksi "Etika Bertelepon" (Call, Oktober 2026) seluruhnya jatuh ke `lainnya` (contoh: "Agent melakukan HOLD pertama selama 01.04 menit"). Keyword: `melakukan hold`, `hold pertama`, `hold kedua`, `hold berikutnya`, `durasi hold`, `waktu hold`, `fitur hold`, `waktu tunggu`, `dead air`. Kata tunggal `hold`, `menunggu`, `menit`, dan `detik` sengaja tidak dipakai karena matcher berbasis substring (mis. `threshold`) dan terlalu umum. Temuan "tidak sesuai dalam melakukan HOLD pertama" kini masuk klaster ini (2 match vs 1 match `salah_jawaban`). Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-hold-api.spec.ts`.
@@ -662,7 +672,18 @@ Ditambahkan setelah audit 2026-10-17 menunjukkan 205 temuan SLIK jatuh ke `lainn
 
 Audit 2026-10-17 setelah klaster ini: 249 temuan masuk `proses_ideb_slik` — 216 dari `lainnya` (203 SLIK, 13 Call) dan 33 dari klaster lain (`kurang_teliti_verifikasi_data` 20, `salah_jawaban` 9, `kurang_paham_standar_jawaban` 2, `kurang_menggali` 2). Audit `--sample-cluster proses_ideb_slik --sample-service call` menunjukkan 17 temuan Call di klaster ini (13 dari `lainnya`, 4 dari klaster lain), semuanya cocok lewat `ideb slik`. Seluruhnya layanan ke konsumen (menjelaskan, keakuratan jawaban, probing, pencatatan tentang iDeb SLIK milik konsumen), bukan SOP back-office. Karena itu registry kini mendukung `serviceTypes` per klaster, dan `proses_ideb_slik` hanya berlaku untuk temuan `slik`; temuan service lain kembali ke klaster yang diberikan keyword lainnya. Rencana: `plans/markdown/root-cause-slik-ideb-service-scope.md`.
 
-`menit` pada temuan Call fallback adalah **timestamp rekaman** ("pada menit 03.53"), bukan durasi hold/AHT, sehingga tidak dijadikan keyword. Sisa fallback Call didominasi soft skill komunikasi (intonasi, artikulasi, menyimak, pilihan kata, empati); klaster untuk itu ditunda sampai audit ulang.
+`menit` pada temuan Call fallback adalah **timestamp rekaman** ("pada menit 03.53"), bukan durasi hold/AHT, sehingga tidak dijadikan keyword. Sisa fallback Call yang didominasi soft skill komunikasi kini ditangani klaster `komunikasi_layanan`.
+
+### Klaster `komunikasi_layanan`
+
+Ditambahkan setelah audit 2026-10-17 (`--sample-texts --sample-limit 300`, seluruh 295 temuan fallback Call) menunjukkan Call 31.15% fallback. 194 temuan adalah komunikasi & etika layanan telepon: Kemampuan Menyimak 68 (memotong pembicaraan, mengulang pertanyaan), Pilihan Kata & Tata Bahasa 38, Kualitas Suara/Artikulasi 35, Kemampuan Menjelaskan 19, Patience/Empathy 14, Salam Pembuka 8, Menyapa Konsumen 7, Salam Penutup 5. Teksnya terlalu beragam untuk frasa, sehingga klaster ini mencocokkan **nama parameter** Call yang selalu ikut di teks pencarian. Keyword: `kemampuan menyimak`, `pilihan kata`, `kualitas suara`, `kemampuan menjelaskan`, `patience empathy`, `salam pembuka`, `menyapa konsumen`, `salam penutup`.
+
+- Prioritas 4 (terendah): klaster ini **kalah di setiap seri**, sehingga temuan yang juga cocok klaster lain dengan jumlah match sama tetap di klaster lama (mis. Kemampuan Menyimak + `tidak menanyakan` → `kurang_menggali`).
+- Hanya temuan `call` (`serviceTypes`); parameter etiket chat/email tidak terpengaruh.
+- `menit`/`detik`, `etika bertelepon` (temuan HOLD), dan kata teks seperti `intonasi`/`empati`/`memotong` sengaja tidak dipakai.
+- Proyeksi offline (dari laporan fallback lengkap): fallback keseluruhan 495 → 240 (8.58%), Call 295 → 53 (5.60%). Sisa Call: Pencatatan 34, Keakuratan Solusi 18, Etika Bertelepon 1.
+
+Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-komunikasi-api.spec.ts`. Rencana: `plans/markdown/root-cause-call-komunikasi-cluster.md`.
 
 ### Batasan AI
 

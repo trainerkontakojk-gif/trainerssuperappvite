@@ -50,6 +50,7 @@ export const clusterLabels: Record<RootCauseClusterId, string> = {
   kurang_teliti_verifikasi_data: "Kurang teliti verifikasi data",
   kurang_paham_standar_jawaban: "Kurang paham standar jawaban",
   kurang_menggali: "Kurang menggali",
+  komunikasi_layanan: "Komunikasi layanan telepon",
   lainnya: "Lainnya",
 };
 export const number = (value: number | null) =>
