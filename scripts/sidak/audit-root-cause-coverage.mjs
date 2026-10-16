@@ -13,6 +13,7 @@
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 5000
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 10000 --label after-expansion
  *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 10000 --label baseline --out-dir ./custom-reports
+ *   node scripts/sidak/audit-root-cause-coverage.mjs --limit 5000 --label texts --sample-texts
  *
  * Environment variables (from .env):
  *   SUPABASE_URL=              Required unless --dry-run
@@ -21,6 +22,9 @@
  * Output:
  *   .hermes/reports/sidak-root-cause-coverage-{YYYYMMDD}-{label}.json
  *   .hermes/reports/sidak-root-cause-coverage-{YYYYMMDD}-{label}.md
+ *
+ * --sample-texts adds raw fallback finding text to both reports. The reports
+ * live in the gitignored .hermes/ folder; never commit or share them.
  *
  * Keep synchronized with:
  *   apps/api/src/services/sidak/agent-root-causes.ts  (ROOT_CAUSE_REGISTRY)
@@ -59,6 +63,10 @@ Options:
   --limit=<number>       Max rows to fetch from Supabase (default: 10000)
   --label=<string>       Label for output files (default: "baseline")
   --out-dir=<path>       Output directory for reports (default: .hermes/reports/)
+  --sample-texts         Also write distinct fallback texts per top phrase,
+                         per service, and for Call rows containing "menit"
+                         (raw text: keep the report local, never commit it)
+  --sample-limit=<n>     Distinct texts per group with --sample-texts (default: 15)
   --help, -h             Show this help
 
 Environment:
@@ -75,6 +83,8 @@ Example:
 const IS_DRY_RUN = args.includes("--dry-run");
 const LIMIT = parseInt(readOption("--limit", "10000"), 10);
 const LABEL = readOption("--label", "baseline");
+const SAMPLE_TEXTS = args.includes("--sample-texts");
+const SAMPLE_LIMIT = parseInt(readOption("--sample-limit", "15"), 10);
 const OUT_DIR = readOption(
   "--out-dir",
   path.join(import.meta.dirname, "../../.hermes/reports"),
@@ -440,6 +450,17 @@ function getDryRunFixture() {
       ketidaksesuaian: "Lampiran tidak sesuai dengan isi email",
       sebaiknya: "Pastikan lampiran sesuai dengan konten email",
     },
+    // Non-HOLD duration — exercises the --sample-texts Call "menit" group
+    {
+      id: "dr-18b",
+      nilai: 2,
+      service_type: "call",
+      period_id: "p2",
+      indicator_name: "Penutupan",
+      ketidaksesuaian:
+        "Agent menjanjikan callback dalam 30 menit namun tidak dilakukan",
+      sebaiknya: null,
+    },
     {
       id: "dr-19",
       nilai: 0,
@@ -474,6 +495,45 @@ function loadEnv() {
   } catch {
     return {};
   }
+}
+
+// The API matches on ketidaksesuaian + sebaiknya + indicator name, so the
+// audit resolves indicator names too. Unknown ids stay null (weak evidence),
+// unlike the API's "Parameter tidak dikenal" placeholder.
+async function fetchIndicatorNames(supabaseUrl, serviceRoleKey, indicatorIds) {
+  const names = new Map();
+  const ids = [...new Set(indicatorIds.filter(Boolean))];
+  const CHUNK_SIZE = 100;
+
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + CHUNK_SIZE);
+    const url = new URL(`${supabaseUrl}/rest/v1/qa_indicators`);
+    url.searchParams.set("select", "id,name");
+    url.searchParams.set("id", `in.(${chunk.join(",")})`);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        Accept: "application/json",
+      },
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "unknown");
+      throw new Error(
+        `Supabase API error (qa_indicators, status ${response.status}): ${text.slice(0, 500)}`,
+      );
+    }
+
+    for (const indicator of await response.json()) {
+      names.set(indicator.id, indicator.name);
+    }
+  }
+
+  console.error(
+    `[audit] Resolved ${names.size}/${ids.length} indicator names from qa_indicators`,
+  );
+  return names;
 }
 
 async function fetchFromSupabase(limit) {
@@ -571,7 +631,12 @@ async function fetchFromSupabase(limit) {
   }
   console.error(`[audit] Fetched ${allRows.length} rows`);
 
-  // Consistent shape (no joins — indicator_name not available)
+  const indicatorNames = await fetchIndicatorNames(
+    supabaseUrl,
+    serviceRoleKey,
+    allRows.map((r) => r.indicator_id),
+  );
+
   return allRows.map((r) => ({
     id: r.id,
     period_id: r.period_id,
@@ -583,12 +648,99 @@ async function fetchFromSupabase(limit) {
     ketidaksesuaian: r.ketidaksesuaian,
     sebaiknya: r.sebaiknya,
     is_phantom_padding: r.is_phantom_padding,
-    indicator_name: null,
+    indicator_name: indicatorNames.get(r.indicator_id) ?? null,
     indicator_category: null,
     period_year: null,
     period_month: null,
     period_label: null,
   }));
+}
+
+// ─── Fallback Sample Texts (--sample-texts) ─────────────────────────────────
+
+const SAMPLE_TEXT_MAX_CHARS = 500;
+
+function truncateText(value) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > SAMPLE_TEXT_MAX_CHARS
+    ? `${text.slice(0, SAMPLE_TEXT_MAX_CHARS)}…`
+    : text;
+}
+
+// Collapses rows that differ only in digits (durations, dates, ticket numbers)
+// into one template, ranked by how many fallback rows share it.
+function distinctFallbackTexts(rows, limit) {
+  const templates = new Map();
+
+  for (const row of rows) {
+    const key = normalizeText(
+      [row.ketidaksesuaian, row.sebaiknya].filter(Boolean).join(" "),
+    ).replace(/\d+/g, "#");
+    const existing = templates.get(key);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    templates.set(key, {
+      count: 1,
+      exampleId: row.id,
+      serviceType: row.service_type || "unknown",
+      nilai: row.nilai,
+      indicatorName: row.indicator_name,
+      ketidaksesuaian: truncateText(row.ketidaksesuaian),
+      sebaiknya: truncateText(row.sebaiknya),
+    });
+  }
+
+  return {
+    totalRows: rows.length,
+    distinctTemplates: templates.size,
+    samples: [...templates.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit),
+  };
+}
+
+function collectFallbackSamples(fallbackRows, topPhrases, limit) {
+  const withText = fallbackRows.map((row) => ({
+    row,
+    searchText: buildSearchText(row),
+  }));
+
+  const byPhrase = topPhrases.map((p) => ({
+    phrase: p.phrase,
+    ...distinctFallbackTexts(
+      withText
+        .filter(({ searchText }) => searchText.includes(p.phrase))
+        .map(({ row }) => row),
+      limit,
+    ),
+  }));
+
+  const serviceTypes = [
+    ...new Set(fallbackRows.map((r) => r.service_type || "unknown")),
+  ].sort();
+  const byService = serviceTypes.map((serviceType) => ({
+    serviceType,
+    ...distinctFallbackTexts(
+      fallbackRows.filter((r) => (r.service_type || "unknown") === serviceType),
+      limit,
+    ),
+  }));
+
+  const callMenit = distinctFallbackTexts(
+    withText
+      .filter(
+        ({ row, searchText }) =>
+          row.service_type === "call" && searchText.includes("menit"),
+      )
+      .map(({ row }) => row),
+    limit,
+  );
+
+  return { limit, byPhrase, byService, callMenit };
 }
 
 // ─── Coverage Analysis ──────────────────────────────────────────────────────
@@ -787,6 +939,16 @@ function analyzeCoverage(rows) {
     keywordCandidates,
     newClusterCandidates,
     weakEvidenceSampleIds: weakEvidence.slice(0, 20).map((r) => r.id),
+    indicatorNamesResolved: auditable.filter((r) => r.indicator_name).length,
+    ...(SAMPLE_TEXTS
+      ? {
+          fallbackSamples: collectFallbackSamples(
+            fallbackRows,
+            topPhrases,
+            SAMPLE_LIMIT,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -803,6 +965,7 @@ function writeJsonReport(data, outPath) {
       label: LABEL,
       limit: LIMIT,
       dryRun: IS_DRY_RUN,
+      sampleTexts: SAMPLE_TEXTS,
     },
     ...data,
   };
@@ -835,6 +998,7 @@ function writeMarkdownReport(data, outPath) {
   lines.push(
     `| Matched to ${ROOT_CAUSE_REGISTRY.length} clusters | ${data.matchedRows} |`,
   );
+  lines.push(`| Rows with indicator name | ${data.indicatorNamesResolved} |`);
   lines.push(`| Fallback (lainnya) | ${data.fallbackRows} |`);
   lines.push(`| **Fallback percentage** | **${data.fallbackPercentage}%** |`);
   lines.push(``);
@@ -938,6 +1102,10 @@ function writeMarkdownReport(data, outPath) {
     lines.push(``);
   }
 
+  if (data.fallbackSamples) {
+    writeFallbackSamplesMarkdown(lines, data.fallbackSamples);
+  }
+
   // Registry Info
   lines.push(`## Registry Snapshot`);
   lines.push(``);
@@ -954,6 +1122,43 @@ function writeMarkdownReport(data, outPath) {
 
   fs.writeFileSync(outPath, lines.join("\n"), "utf8");
   console.error(`[audit] Markdown report: ${outPath}`);
+}
+
+function writeSampleGroupMarkdown(lines, heading, group) {
+  lines.push(`### ${heading}`);
+  lines.push(``);
+  lines.push(
+    `${group.totalRows} fallback rows, ${group.distinctTemplates} distinct templates (digits collapsed). Top ${group.samples.length}:`,
+  );
+  lines.push(``);
+  for (const sample of group.samples) {
+    lines.push(
+      `- **${sample.count}×** \`${sample.serviceType}\` nilai ${sample.nilai} · ${sample.indicatorName ?? "(no indicator)"} · id \`${sample.exampleId}\``,
+    );
+    lines.push(`  - Ketidaksesuaian: ${sample.ketidaksesuaian || "—"}`);
+    lines.push(`  - Sebaiknya: ${sample.sebaiknya || "—"}`);
+  }
+  lines.push(``);
+}
+
+function writeFallbackSamplesMarkdown(lines, samples) {
+  lines.push(`## Fallback Sample Texts`);
+  lines.push(``);
+  lines.push(
+    `> Raw finding text from \`--sample-texts\`. Local report only; do not commit or share.`,
+  );
+  lines.push(``);
+  writeSampleGroupMarkdown(
+    lines,
+    `Call rows containing \`menit\``,
+    samples.callMenit,
+  );
+  for (const group of samples.byService) {
+    writeSampleGroupMarkdown(lines, `Service \`${group.serviceType}\``, group);
+  }
+  for (const group of samples.byPhrase) {
+    writeSampleGroupMarkdown(lines, `Phrase \`${group.phrase}\``, group);
+  }
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
