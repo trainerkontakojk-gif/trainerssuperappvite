@@ -98,7 +98,16 @@ export interface PdktActionItem extends PdktActionItemAI {
   priorityRank: number;
 }
 
+/** Explanation accepted only when its quote occurs in the agent reply. */
+export interface PdktDimensionExplanation {
+  reason: string;
+  quote: string;
+}
+
 export interface PdktEvaluationEdu {
+  dimensionExplanations?: Partial<
+    Record<PdktDimensionKey, PdktDimensionExplanation>
+  >;
   dimensionTips?: Partial<Record<PdktDimensionKey, string>>;
   /** Additional tips — non-authoritative; ordering lives in actionItems[].priorityRank. */
   improvementTips?: string[];
@@ -315,11 +324,17 @@ export const pdktInitialEmailAiOutputSchema = pdktGeneratedEmailAiOutputSchema;
 
 export const pdktEducationAiOutputSchema = z
   .object({
-    dimensionTips: z
+    dimensionExplanations: z
       .record(
         z.string(),
-        z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+        z.object({
+          reason: z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+          quote: z.string().max(300),
+        }),
       )
+      .optional(),
+    dimensionTips: z
+      .record(z.string(), z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))
       .optional(),
     improvementTips: z
       .array(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))

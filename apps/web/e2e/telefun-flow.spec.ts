@@ -1,12 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  APP_ORIGIN,
   expectHermetic,
   formatAudit,
   openHermeticShell,
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
-import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { assertLocalDevOnlyTargetAt as assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import {
@@ -48,7 +49,7 @@ async function open(page: Page, path: string, apiMocks: ApiMock[]) {
 
 test.describe("Telefun landing (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("hero memberi satu aksi utama, menu kecil, dan demo yang bisa dijeda", async ({
@@ -253,7 +254,7 @@ async function openTelaah(
 
 test.describe("Telefun Telaah (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("skor suara tampil pertama, enam aspek dengan angka mentah, transkrip memutar rekaman", async ({
@@ -295,6 +296,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
 
     // Temuan menunjuk waktu di transkrip.
     await result.getByRole("tab", { name: /^Perbaiki dulu/ }).click();
+    await result.getByRole("tab", { name: "Penjelasan skor" }).click();
     await result.getByRole("button", { name: /00\.36 · Filler/ }).click();
     await expect(agentLine).toHaveAttribute("data-highlighted", "true");
 
@@ -528,18 +530,28 @@ test.describe("Telefun Telaah (hermetic)", () => {
   test("anotasi isi: inti kasus, pertanyaan konsumen berstatus, kalimat agen, dan tanda di transkrip", async ({
     page,
   }) => {
-    const audit = await openTelaah(page, ANNOTATED_ROW, [], [
-      ANNOTATED_ROW,
+    const highAssessment = annotatedAssessment({ fillers: 9 });
+    const highScoreRow = {
+      ...ANNOTATED_ROW,
+      voice_assessment: {
+        ...highAssessment,
+        holdManagement: {
+          ...highAssessment.holdManagement,
+          drill: "Sebutkan perkiraan waktu sebelum hold.",
+        },
+      },
+    };
+    const audit = await openTelaah(page, highScoreRow, [], [
+      highScoreRow,
       ...FULL_HISTORY.filter((row) => row.id !== ANNOTATED_ROW.id),
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
     const transcript = page.getByRole("region", {
       name: "Rekaman dan transkrip",
     });
-    await expect(result.getByRole("region", { name: "Inti kasus" })).toContainText(
-      "Klaim asuransi konsumen ditolak",
-      { timeout: 20000 },
-    );
+    await expect(
+      result.getByRole("region", { name: "Inti kasus" }),
+    ).toContainText("Klaim asuransi konsumen ditolak", { timeout: 20000 });
 
     // Ada poin konsumen: tab Pertanyaan konsumen terbuka lebih dulu.
     await expect(
@@ -551,10 +563,14 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await expect(first).toContainText("Alasan klaim ditolak");
     await expect(first).toContainText("Sebagian");
     await expect(first).toContainText("belum menjelaskan alasannya");
-    await expect(first.getByRole("button", { name: /Dijawab di 01\.18/ })).toBeVisible();
+    await expect(
+      first.getByRole("button", { name: /Dijawab di 01\.18/ }),
+    ).toBeVisible();
     const second = points.getByRole("listitem").nth(1);
     await expect(second).toContainText("Belum terjawab");
-    await expect(second).toContainText("Belum ada jawaban agen untuk pertanyaan ini.");
+    await expect(second).toContainText(
+      "Belum ada jawaban agen untuk pertanyaan ini.",
+    );
 
     // Tombol kutipan menuju baris transkrip.
     await first.getByRole("button", { name: /Konsumen 00\.04/ }).click();
@@ -572,11 +588,15 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await expect(
       agentLine.locator("mark", { hasText: "saya cek dulu ya aturannya" }),
     ).toContainText("2");
-    await expect(agentLine.locator("mark", { hasText: /^Eee$/ })).toHaveCount(1);
+    await expect(agentLine.locator("mark", { hasText: /^Eee$/ })).toHaveCount(
+      1,
+    );
 
     await result.getByRole("tab", { name: "Kalimat agen (2)" }).click();
     const notes = result.getByRole("list", { name: "Kalimat agen" });
-    await expect(notes.getByRole("listitem").nth(0)).toContainText("Sudah tepat");
+    await expect(notes.getByRole("listitem").nth(0)).toContainText(
+      "Sudah tepat",
+    );
     const fix = notes.getByRole("listitem").nth(1);
     await expect(fix).toContainText("Perlu diperbaiki");
     await expect(fix).toContainText(
@@ -584,6 +604,48 @@ test.describe("Telefun Telaah (hermetic)", () => {
     );
     await fix.getByRole("button", { name: /Agen 00\.36/ }).click();
     await expect(agentLine).toHaveAttribute("data-highlighted", "true");
+    // Marker yang sama harus memfokuskan catatan lagi setelah kembali ke transkrip.
+    const marker = agentLine.getByRole("button", {
+      name: "Lihat kalimat agen 2",
+    });
+    const target = page.locator("#telefun-lines-1");
+    for (let round = 0; round < 2; round++) {
+      await marker.click();
+      await expect(target).toBeFocused();
+      await target.getByRole("button", { name: /Agen 00\.36/ }).click();
+      await expect(agentLine).toBeFocused();
+    }
+    await result.getByRole("tab", { name: /^Sudah baik/ }).click();
+    await expect(result.getByRole("tabpanel")).toContainText("Sudah tepat");
+    await expect(result.getByRole("tabpanel")).not.toContainText(
+      "Perlu diperbaiki",
+    );
+    await expect(result.getByRole("tabpanel")).not.toContainText(
+      "Intonasi naik turun wajar.",
+    );
+    await result.getByRole("tab", { name: /^Perbaiki dulu/ }).click();
+    await expect(result.getByRole("tabpanel")).toContainText(
+      "Mohon izin, saya cek aturannya",
+    );
+    await result
+      .getByRole("list", { name: "Skor per aspek" })
+      .getByRole("button", { name: /Intonasi/ })
+      .click();
+    await expect(
+      result.getByRole("tab", { name: "Penjelasan skor" }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(result.getByRole("tabpanel")).toContainText(
+      "Intonasi naik turun wajar.",
+    );
+    await expect(result.getByRole("tabpanel")).toContainText("Sebutkan perkiraan waktu sebelum hold.");
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(result.getByRole("tabpanel")).toBeVisible();
+      await result.getByRole("tabpanel").getByText("Intonasi naik turun wajar.", { exact: true }).scrollIntoViewIfNeeded();
+      expect(await result.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      await page.screenshot({ path: test.info().outputPath(`telefun-scores-${width}.png`) });
+    }
+
     expectHermetic(audit);
   });
 
@@ -816,11 +878,15 @@ test.describe("Telefun Telaah (hermetic)", () => {
     const transcript = page.getByRole("region", {
       name: "Rekaman dan transkrip",
     });
+    await result.getByRole("tab", { name: "Penjelasan skor" }).click();
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
       const found = [
         ...(await findLowContrastText(transcript, { selector: "mark" })),
-        ...(await findLowContrastText(result)),
+        ...(await findLowContrastText(result, {
+          selector: "p, span, button, h3, h4",
+          leafOnly: true,
+        })),
       ];
       expect(found, `${theme}: ${found.join("\n")}`).toEqual([]);
     }
@@ -842,7 +908,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
 
 test.describe("Telefun cek mikrofon ditolak (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("izin mikrofon ditolak: penjelasan, Coba lagi, dan Mulai panggilan nonaktif", async ({
@@ -872,7 +938,7 @@ test.describe("Telefun cek mikrofon ditolak (hermetic)", () => {
 
 test.describe("Telefun Pengaturan (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   test("kategori berlabel jelas, sakelar skenario, perubahan ditandai, tutup memakai konfirmasi aplikasi", async ({

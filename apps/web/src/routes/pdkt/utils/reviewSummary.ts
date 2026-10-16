@@ -1,6 +1,7 @@
 import type {
   PdktActionItem,
   PdktDimensionKey,
+  PdktDimensionExplanation,
   PdktEvaluationResult,
 } from "@trainers/types";
 import {
@@ -9,7 +10,7 @@ import {
   PDKT_DIMENSION_SCORE_FIELDS,
 } from "../../../lib/pdkt-dimensions";
 
-/** Nilai aspek di bawah ini diberi tanda "Perlu perbaikan" dan tipsnya. */
+/** Nilai aspek di bawah ini diberi tanda "Perlu perbaikan" saja. Tips tidak bergantung pada ambang skor. */
 export const PDKT_LOW_DIMENSION_SCORE = 75;
 
 /** Predikat skor total, mengikuti rentang yang dipakai panel monitoring. */
@@ -27,6 +28,7 @@ export interface PdktReviewDimensionRow {
   value: number;
   low: boolean;
   tip: string | null;
+  explanation: PdktDimensionExplanation | null;
 }
 
 /** Baris "Rincian skor" dalam urutan tetap; kosong untuk hasil lama tanpa rincian. */
@@ -44,7 +46,8 @@ export function pdktReviewDimensionRows(
       description: PDKT_DIMENSION_DESCRIPTIONS[dimension],
       value,
       low,
-      tip: low ? (evaluation.edu?.dimensionTips?.[dimension] ?? null) : null,
+      tip: evaluation.edu?.dimensionTips?.[dimension] ?? null,
+      explanation: evaluation.edu?.dimensionExplanations?.[dimension] ?? null,
     };
   });
 }

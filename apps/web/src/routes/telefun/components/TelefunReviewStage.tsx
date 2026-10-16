@@ -140,7 +140,7 @@ export function TelefunReviewStage({
   const [currentMs, setCurrentMs] = useState(0);
   const [highlighted, setHighlighted] = useState<number | null>(null);
   // Butir panel hasil yang ditunjuk dari penanda di transkrip/garis waktu.
-  const [pointed, setPointed] = useState<string | null>(null);
+  const [pointed, setPointed] = useState<{ id: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
   const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
@@ -183,10 +183,13 @@ export function TelefunReviewStage({
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
     [assessment],
   );
-  const pointTo = useCallback((tabValue: string, id: string) => {
-    setTab(tabValue);
-    setPointed(id);
-  }, [setTab]);
+  const pointTo = useCallback(
+    (tabValue: string, id: string) => {
+      setTab(tabValue);
+      setPointed({ id });
+    },
+    [setTab],
+  );
   const quoteMarks = useMemo(
     () =>
       buildTelefunQuoteMarks(assessment?.contentReview, (target) =>
@@ -199,9 +202,14 @@ export function TelefunReviewStage({
   useEffect(() => {
     if (!pointed) return;
     const frame = window.requestAnimationFrame(() => {
-      const element = document.getElementById(pointed);
+      const element = document.getElementById(pointed.id);
       if (!element) return;
-      element.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      element.scrollIntoView({
+        block: "nearest",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
       element.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -252,7 +260,12 @@ export function TelefunReviewStage({
     const element = lineRefs.current.get(startMs);
     setHighlighted(startMs);
     if (!element) return;
-    element.scrollIntoView({ block: "center", behavior: "smooth" });
+    element.scrollIntoView({
+      block: "center",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
     element.focus({ preventScroll: true });
   }, []);
 
@@ -564,7 +577,7 @@ export function TelefunReviewStage({
               tab={tab}
               onTabChange={setTab}
               onShowLine={showLine}
-              highlightedId={pointed}
+              highlightedId={pointed?.id ?? null}
               clockOf={clockOf}
               rerunStartedAt={rerunStartedAt}
               rerunFailed={rerunFailed}
@@ -594,7 +607,7 @@ export function TelefunReviewStage({
                     onAddAnnotation={addAnnotation}
                     onDeleteAnnotation={deleteAnnotation}
                     sessionDurationMs={record.duration * 1000}
-                    highlightedId={pointed}
+                    highlightedId={pointed?.id ?? null}
                     onPlayFrom={(ms) => playerRef.current?.playFrom(ms)}
                   />
                 </Suspense>

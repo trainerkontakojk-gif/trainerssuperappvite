@@ -20,6 +20,7 @@ import {
   type PlacedConsumerPoint,
   renderHighlights,
 } from "../../../lib/pdkt-reply-marks";
+import { PdktScoreBreakdown } from "./PdktScoreBreakdown";
 import { EmailAttachments } from "./EmailAttachments";
 import { EmailBody } from "./EmailDetailPane";
 import type { MailboxReviewState } from "./MailboxSidebar";
@@ -31,7 +32,6 @@ import {
 import {
   formatPdktDuration,
   pdktRankedActionItems,
-  pdktReviewDimensionRows,
   pdktScoreGrade,
 } from "../utils/reviewSummary";
 
@@ -174,6 +174,12 @@ function ScoreSummary({
       </div>
 
       {first && (
+        <p className="text-[13px] leading-6 text-muted-foreground">
+          Langkah tanpa kutipan merupakan saran umum, bukan bukti kesalahan pada
+          kalimat tertentu.
+        </p>
+      )}
+      {first && (
         <div className="flex flex-col gap-1.5 border-t border-border pt-4">
           <span className="text-[12px] font-semibold text-foreground">
             Perbaiki ini dulu
@@ -239,55 +245,6 @@ function ScoreSummary({
         </dl>
       )}
     </section>
-  );
-}
-
-function ScoreBreakdown({ result }: { result: PdktEvaluationResult }) {
-  const rows = pdktReviewDimensionRows(result);
-  if (rows.length === 0) return null;
-
-  return (
-    <Section title="Rincian skor">
-      <ul className="flex flex-col gap-4">
-        {rows.map((row) => (
-          <li key={row.dimension} className="flex flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-3">
-              <span className="text-sm font-medium text-foreground">
-                {row.label}{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  · {row.description}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {row.low && (
-                  <span className="text-[12px] font-semibold text-foreground">
-                    Perlu perbaikan
-                  </span>
-                )}
-                <span className="font-mono text-sm font-bold">{row.value}</span>
-              </span>
-            </div>
-            <div
-              aria-hidden="true"
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  row.low ? "bg-chart-orange" : "bg-foreground/70",
-                )}
-                style={{ width: `${Math.max(0, Math.min(100, row.value))}%` }}
-              />
-            </div>
-            {row.tip && (
-              <p className="text-xs leading-5 text-muted-foreground">
-                {row.tip}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </Section>
   );
 }
 
@@ -900,7 +857,7 @@ export function PdktReviewStage({
                 replyBody={replyBody}
                 replyIdBase={replyIdBase}
               />
-              <ScoreBreakdown result={result} />
+              <PdktScoreBreakdown result={result} />
             </div>
           </>
         ) : (

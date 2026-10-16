@@ -293,6 +293,7 @@ mailbox.post(
         clarityIssues: result.clarityIssues,
         contentGaps: result.contentGaps,
         scoreBreakdown: result.scoreBreakdown,
+        edu: result.edu,
         expectedAnswerAlignment: result.expectedAnswerAlignment,
       },
     });

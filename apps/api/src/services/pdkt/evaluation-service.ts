@@ -409,6 +409,29 @@ export function buildPdktEdu(
     return typeof score === "number" && Number.isFinite(score) ? score : 100;
   };
 
+  // A numeric score cannot establish a specific diagnosis. Retain only model
+  // explanations backed by a bounded quote that actually occurs in the reply.
+  const dimensionExplanations: NonNullable<
+    PdktEvaluationEdu["dimensionExplanations"]
+  > = {};
+  if (isPlainObject(raw.dimensionExplanations)) {
+    for (const key of PDKT_DIMENSION_ORDER) {
+      const item = raw.dimensionExplanations[key];
+      if (!isPlainObject(item)) continue;
+      const reason = readBounded(
+        item.reason,
+        PDKT_PROMPT_INPUT_LIMITS.issueText,
+      );
+      const quote = readBounded(item.quote, PDKT_REPLY_ANNOTATION_LIMITS.quote);
+      if (reason && quote && locateQuote(agentReplyBody, quote)) {
+        dimensionExplanations[key] = {
+          reason: sanitizeAiResponse(reason),
+          quote,
+        };
+      }
+    }
+  }
+
   // ── dimensionTips (AI narration + deterministic conflict tip) ──
   const dimensionTips: Partial<Record<PdktDimensionKey, string>> = {};
   if (isPlainObject(raw.dimensionTips)) {
@@ -468,7 +491,12 @@ export function buildPdktEdu(
     const band = score < 60 ? "critical" : "medium";
     aiItems.push({
       dimension: key,
-      text: PDKT_EDU_FALLBACK_TIPS[key][band],
+      text:
+        key === "recipientDirection"
+          ? getExpectedReplyParty(recipientContext) === "reported_company"
+            ? PDKT_EDU_FALLBACK_TIPS[key][band]
+            : "Periksa sapaan dan penutup sesuai permintaan konsumen kepada OJK; jaga peran Kontak OJK 157."
+          : PDKT_EDU_FALLBACK_TIPS[key][band],
     });
   }
 
@@ -514,6 +542,9 @@ export function buildPdktEdu(
   }
 
   return {
+    ...(Object.keys(dimensionExplanations).length > 0
+      ? { dimensionExplanations }
+      : {}),
     actionItems: rankedItems,
     suggestedRewrite,
     ...(Object.keys(dimensionTips).length > 0 ? { dimensionTips } : {}),

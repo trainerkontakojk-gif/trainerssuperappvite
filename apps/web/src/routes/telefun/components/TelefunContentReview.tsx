@@ -203,23 +203,36 @@ export function ConsumerPointList({
 
 export function AgentNoteList({
   notes,
+  verdict,
   onShowLine,
   highlightedId = null,
   clockOf = formatClock,
-}: ContentListProps & { notes: readonly TelefunAgentNote[] }) {
+}: ContentListProps & {
+  notes: readonly TelefunAgentNote[];
+  verdict?: TelefunAgentNote["verdict"];
+}) {
   return (
     <ol aria-label="Kalimat agen" className="flex flex-col gap-3">
-      {notes.map((note, index) => (
-        <AgentNoteItem
-          key={`${note.startMs}-${index}`}
-          note={note}
-          number={index + 1}
-          id={contentItemId({ tab: "lines", index })}
-          highlighted={highlightedId === contentItemId({ tab: "lines", index })}
-          onShowLine={onShowLine}
-          clockOf={clockOf}
-        />
-      ))}
+      {notes.map(
+        (note, index) =>
+          (!verdict || note.verdict === verdict) && (
+            <AgentNoteItem
+              key={`${note.startMs}-${index}`}
+              note={note}
+              number={index + 1}
+              id={
+                verdict
+                  ? `telefun-${verdict}-lines-${index}`
+                  : contentItemId({ tab: "lines", index })
+              }
+              highlighted={
+                highlightedId === contentItemId({ tab: "lines", index })
+              }
+              onShowLine={onShowLine}
+              clockOf={clockOf}
+            />
+          ),
+      )}
     </ol>
   );
 }

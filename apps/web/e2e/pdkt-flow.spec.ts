@@ -1,12 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
+  APP_ORIGIN,
   expectHermetic,
   formatAudit,
   openHermeticShell,
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
-import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { assertLocalDevOnlyTargetAt as assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import { findTargetsBelow } from "./helpers/touchTarget";
@@ -472,7 +473,7 @@ function stageNav(page: Page) {
 
 test.describe("PDKT (hermetic)", () => {
   test.beforeAll(async () => {
-    await assertLocalDevOnlyTarget();
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
   for (const surface of [
@@ -2093,7 +2094,17 @@ test.describe("PDKT (hermetic)", () => {
             templateComplianceScore: 82,
           },
           edu: {
-            dimensionTips: { normative: "Tuliskan batas waktu tindak lanjut." },
+            dimensionTips: {
+              normative: "Tuliskan batas waktu tindak lanjut.",
+              clarity: "Pecah kalimat panjang meski skor kejelasan tinggi.",
+            },
+            dimensionExplanations: {
+              clarity: {
+                reason:
+                  "Pembuka jelas tetapi kalimat tindak lanjut terlalu panjang.",
+                quote: matchedQuote,
+              },
+            },
             actionItems: [
               {
                 dimension: "normative",
@@ -2193,6 +2204,26 @@ test.describe("PDKT (hermetic)", () => {
     await expect(rows.nth(1)).toContainText(
       "Tuliskan batas waktu tindak lanjut.",
     );
+    await expect(rows.nth(2)).toContainText(
+      "Pecah kalimat panjang meski skor kejelasan tinggi.",
+    );
+    await expect(rows.nth(2)).toContainText(
+      "Pembuka jelas tetapi kalimat tindak lanjut terlalu panjang.",
+    );
+    await expect(rows.nth(2)).toContainText(matchedQuote);
+    await expect(rows.nth(0)).toContainText(
+      "Alasan penilaian dengan kutipan belum tersedia",
+    );
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      expect(await findLowContrastText(breakdown, {
+        selector: "p, span, blockquote, h3",
+        leafOnly: true,
+      })).toEqual([]);
+    }
+    await breakdown.screenshot({
+      path: test.info().outputPath("pdkt-score-explanations.png"),
+    });
 
     const answer = page.getByRole("region", { name: "Balasan Anda" });
     const marks = answer.locator("mark");
@@ -2831,7 +2862,7 @@ async function requestNewEmail(page: Page) {
 }
 
 test.describe("PDKT navigation acceptance", () => {
-  test.beforeAll(() => assertLocalDevOnlyTarget());
+  test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
 
   test("email dibalas dibuka sebagai email dengan tombol Lihat telaah", async ({
     page,
@@ -3327,7 +3358,7 @@ test.describe("PDKT navigation acceptance", () => {
 });
 
 test.describe("PDKT navigation boundaries", () => {
-  test.beforeAll(() => assertLocalDevOnlyTarget());
+  test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
   test("replay tanpa mailbox mempertahankan sesi dan peserta setelah refresh", async ({
     page,
   }) => {
@@ -3495,7 +3526,7 @@ async function createPracticeAgain(page: Page, retiredScenario = false) {
 }
 
 test.describe("PDKT practice again subject policy", () => {
-  test.beforeAll(() => assertLocalDevOnlyTarget());
+  test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
 
   for (const subject of [
     ...LEGACY_PRACTICE_SUBJECTS,

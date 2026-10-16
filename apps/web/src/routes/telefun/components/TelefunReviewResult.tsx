@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type {
-  CommunicationMetric,
   TelefunContentReview,
   TelefunTranscriptEntry,
   VoiceQualityAssessment,
@@ -18,15 +17,14 @@ import { getCommunicationProfileFromAssessment } from "../../../lib/voiceAssessm
 import type { CallRecord } from "../types";
 import {
   TELEFUN_FIX_THRESHOLD,
-  firstFillerLine,
   formatClock,
   formatTelefunScore,
   readTelefunAspects,
   readTelefunScore,
   telefunScoreVerdict,
-  type TelefunAspect,
 } from "../utils/reviewDisplay";
 import { TelefunAnalysisWait } from "./TelefunAnalysisWait";
+import { TelefunScoreDetails } from "./TelefunScoreDetails";
 import { TelefunProfileRadar } from "./TelefunProfileRadar";
 import {
   AgentNoteList,
@@ -36,17 +34,6 @@ import {
 } from "./TelefunContentReview";
 
 /** Panel hasil Telaah Telefun: skor, aspek, inti kasus, dan tab rincian. */
-
-/** Metrik profil komunikasi yang sepadan dengan aspek suara. */
-const PROFILE_KEY: Partial<
-  Record<TelefunAspect["key"], CommunicationMetric["key"]>
-> = {
-  speakingRate: "speakingRate",
-  intonation: "intonation",
-  articulation: "articulation",
-  fillerWords: "fillers",
-  emotionalTone: "tone",
-};
 
 function barColor(score: number): string {
   if (score < TELEFUN_FIX_THRESHOLD) return "bg-chart-orange";
@@ -156,24 +143,10 @@ export function ReviewResult({
   const score = readTelefunScore(record) ?? assessment.overallScore;
   const aspects = readTelefunAspects(assessment);
   const profile = getCommunicationProfileFromAssessment(assessment);
-  const scored = aspects.filter(
-    (aspect): aspect is TelefunAspect & { score: number } =>
-      aspect.score !== null,
-  );
-  const toFix = scored
-    .filter((aspect) => aspect.score < TELEFUN_FIX_THRESHOLD)
-    .sort((a, b) => a.score - b.score);
-  const good = scored.filter((aspect) => aspect.score >= TELEFUN_FIX_THRESHOLD);
-  const fillerLine = firstFillerLine(
-    transcript,
-    assessment.fillerWords.examples,
-  );
-  const metricOf = (aspect: TelefunAspect) => {
-    const key = PROFILE_KEY[aspect.key];
-    return key
-      ? profile?.metrics.find((metric) => metric.key === key)
-      : undefined;
-  };
+  const toFix =
+    content?.agentNotes.filter((note) => note.verdict === "fix") ?? [];
+  const good =
+    content?.agentNotes.filter((note) => note.verdict === "good") ?? [];
   const nextSteps = assessment.overallNextSteps ?? [];
 
   return (
@@ -217,7 +190,14 @@ export function ReviewResult({
             key={aspect.key}
             className="grid grid-cols-[minmax(0,9.5rem)_1fr_2.5rem] items-center gap-x-3 gap-y-0.5 text-[13px]"
           >
-            <span className="text-fg2">{aspect.label}</span>
+            <button
+              type="button"
+              onClick={() => onTabChange("scores")}
+              aria-label={`Lihat penjelasan ${aspect.label}`}
+              className="min-h-[44px] text-left text-fg2 underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {aspect.label}
+            </button>
             <span
               aria-hidden="true"
               className="h-1.5 overflow-hidden rounded-full bg-surface-sunken"
@@ -286,6 +266,12 @@ export function ReviewResult({
             Sudah baik ({good.length})
           </TabsTrigger>
           <TabsTrigger
+            value="scores"
+            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
+          >
+            Penjelasan skor
+          </TabsTrigger>
+          <TabsTrigger
             value="questions"
             className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
           >
@@ -313,56 +299,19 @@ export function ReviewResult({
         </TabsList>
 
         <TabsContent value="fix" className="flex flex-col gap-3">
-          {toFix.length === 0 ? (
+          {!content ? (
+            <ContentNotAvailable review={content} canRerun />
+          ) : toFix.length === 0 ? (
             <Empty>
-              Tidak ada aspek dengan skor di bawah{" "}
-              {formatTelefunScore(TELEFUN_FIX_THRESHOLD)}.
+              Tidak ada kalimat agen yang ditandai perlu diperbaiki.
             </Empty>
           ) : (
-            <ol className="flex flex-col gap-3">
-              {toFix.map((aspect) => {
-                const metric = metricOf(aspect);
-                const line = aspect.key === "fillerWords" ? fillerLine : null;
-                const tip =
-                  metric?.improvementTip ??
-                  metric?.drill ??
-                  (aspect.key === "holdManagement"
-                    ? assessment.holdManagement?.drill
-                    : undefined);
-                return (
-                  <li
-                    key={aspect.key}
-                    className="flex flex-col gap-1.5 rounded-xl border border-border bg-background px-4 py-3"
-                  >
-                    {line ? (
-                      <button
-                        type="button"
-                        onClick={() => onShowLine(line.startMs)}
-                        className="-my-2 min-h-[44px] self-start text-left font-mono text-xs font-medium text-module-telefun hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        {clockOf(line.startMs)} · {aspect.label}
-                      </button>
-                    ) : (
-                      <span className="font-mono text-xs font-medium text-module-telefun">
-                        {aspect.label}
-                      </span>
-                    )}
-                    <p className="text-sm text-foreground">{aspect.feedback}</p>
-                    {tip && (
-                      <p className="rounded-lg bg-muted px-3 py-2 text-[13px] leading-6 text-foreground">
-                        <span className="font-semibold">Latihan: </span>
-                        {tip}
-                      </p>
-                    )}
-                    {metric?.examplePhrase && (
-                      <p className="text-[13px] leading-6 text-fg2">
-                        Contoh: “{metric.examplePhrase}”
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+            <AgentNoteList
+              notes={content.agentNotes}
+              verdict="fix"
+              onShowLine={onShowLine}
+              clockOf={clockOf}
+            />
           )}
           {nextSteps.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -375,35 +324,41 @@ export function ReviewResult({
         </TabsContent>
 
         <TabsContent value="good" className="flex flex-col gap-3">
-          {good.map((aspect) => (
-            <article
-              key={aspect.key}
-              className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3"
-            >
-              <h4 className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-semibold text-foreground">
-                {aspect.label}
-                <span className="font-mono text-xs font-medium text-muted-foreground">
-                  {formatTelefunScore(aspect.score)} · {aspect.verdict}
-                </span>
-              </h4>
-              <p className="text-[13px] leading-6 text-fg2">
-                {aspect.feedback}
-              </p>
-            </article>
-          ))}
+          {!content ? (
+            <ContentNotAvailable review={content} canRerun />
+          ) : good.length === 0 ? (
+            <Empty>
+              Belum ada contoh ucapan agen yang ditandai sudah tepat.
+            </Empty>
+          ) : (
+            <AgentNoteList
+              notes={content.agentNotes}
+              verdict="good"
+              onShowLine={onShowLine}
+              clockOf={clockOf}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="scores" className="flex flex-col gap-3">
+          <p className="text-[13px] leading-6 text-muted-foreground">
+            Penilaian suara dan saran latihan per aspek. Skor tinggi masih dapat
+            disertai koreksi; contoh ucapan dibahas pada tab Sudah baik dan
+            Perbaiki dulu.
+          </p>
+          <TelefunScoreDetails
+            assessment={assessment}
+            transcript={transcript}
+            onShowLine={onShowLine}
+            clockOf={clockOf}
+          />
           {assessment.strengths.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Kekuatan
+              <h4 className="text-[13px] font-semibold">
+                Kekuatan menurut penilaian AI
               </h4>
               <PlainList items={assessment.strengths} />
             </div>
-          )}
-          {good.length === 0 && assessment.strengths.length === 0 && (
-            <Empty>
-              Belum ada aspek dengan skor{" "}
-              {formatTelefunScore(TELEFUN_FIX_THRESHOLD)} ke atas.
-            </Empty>
           )}
         </TabsContent>
 

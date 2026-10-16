@@ -17,6 +17,10 @@ export default defineConfig({
   outputDir: "./test-results/api",
   projects: [
     {
+      name: "pdkt-review-evidence-real-backend",
+      testMatch: "pdkt-review-evidence-api.spec.ts",
+    },
+    {
       name: "ketik-review-worker-real-backend",
       testMatch: "ketik-review-worker-api.spec.ts",
     },
