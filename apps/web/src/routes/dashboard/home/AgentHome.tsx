@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type {
-  KetikSessionHistoryItem,
+  KetikHistorySummaryItem,
   PdktSessionHistory,
 } from "@trainers/types";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
@@ -8,8 +8,9 @@ import { buildNavModel } from "../../../components/layout/nav-config";
 import QaStatePanel from "../../../components/ui/QaStatePanel";
 import { Button, buttonVariants } from "../../../components/ui/button";
 import { Skeleton } from "../../../components/ui/skeleton";
-import { ketikClient, pdktClient, unwrapResponse } from "../../../lib/api";
+import { pdktClient, unwrapResponse } from "../../../lib/api";
 import { HomeHeader } from "./HomeHeader";
+import { ketikApi } from "../../ketik/ketikApi";
 
 const SESSION_LIMIT = 5;
 const DATE = new Intl.DateTimeFormat("id-ID", {
@@ -42,7 +43,7 @@ const REVIEW_STATUS: Record<string, string> = {
   failed: "Penilaian gagal",
 };
 
-function fromKetik(item: KetikSessionHistoryItem): Session {
+function fromKetik(item: KetikHistorySummaryItem): Session {
   return {
     id: `ketik-${item.id}`,
     module: "KETIK",
@@ -86,10 +87,7 @@ export function AgentHome({
   const load = useCallback(async () => {
     setHistory({ status: "loading" });
     const [ketik, pdkt] = await Promise.allSettled([
-      (async () =>
-        (await unwrapResponse(
-          await ketikClient.history.$get(),
-        )) as KetikSessionHistoryItem[])(),
+      ketikApi.getHistory({ limit: SESSION_LIMIT }),
       (async () =>
         (await unwrapResponse(
           await pdktClient.history.$get(),
@@ -100,9 +98,7 @@ export function AgentHome({
       return;
     }
     const sessions = [
-      ...(ketik.status === "fulfilled"
-        ? (ketik.value ?? []).map(fromKetik)
-        : []),
+      ...(ketik.status === "fulfilled" ? ketik.value.items.map(fromKetik) : []),
       ...(pdkt.status === "fulfilled" ? (pdkt.value ?? []).map(fromPdkt) : []),
     ]
       .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))

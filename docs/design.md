@@ -1,8 +1,8 @@
 # Trainers SuperApp Design System Guidelines
 
-Dokumen ini mendeskripsikan aturan desain (Design Guidelines) yang menjadi acuan utama (Source of Truth) untuk seluruh antarmuka (UI) dalam proyek Trainers SuperApp. Desain ini diadaptasi dari pembaruan UI *Landing Page* dan *Auth Modal* yang berfokus pada estetika minimalis, modern, dan profesional (mengacu pada gaya desain *Linear* atau *Vercel*).
+Dokumen ini mendeskripsikan aturan desain (Design Guidelines) yang menjadi acuan utama (Source of Truth) untuk seluruh antarmuka (UI) dalam proyek Trainers SuperApp. Desain ini diadaptasi dari pembaruan UI _Landing Page_ dan _Auth Modal_ yang berfokus pada estetika minimalis, modern, dan profesional (mengacu pada gaya desain _Linear_ atau _Vercel_).
 
-Setiap *engineer* atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat melakukan implementasi atau redesain modul apapun.
+Setiap _engineer_ atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat melakukan implementasi atau redesain modul apapun.
 
 > **Catatan konsolidasi:** `DESIGN.md` (root) adalah pointer ke dokumen ini. Seluruh skill (ui-ux-pro-max, impeccable) wajib membaca `docs/design.md`, bukan duplikat lain.
 
@@ -15,6 +15,7 @@ Setiap *engineer* atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat mel
 **Stack:** React + Vite + TypeScript · Tailwind CSS v4 · shadcn/ui (Base UI primitives) · Lucide React · framer-motion · Monorepo pnpm + Turborepo.
 
 **Design Principles:**
+
 1. **Data-first** — Tabel, kartu statistik, dan grafik adalah elemen utama. Setiap pixel harus membantu user memahami data lebih cepat.
 2. **Clean & Minimal** — Hindari dekorasi yang tidak perlu. Setiap elemen punya tujuan.
 3. **Konsisten** — Satu source of truth untuk spacing, warna, tipografi di seluruh modul (SIDAK, KETIK, PDKT, Telefun, Profiler, KTP, Admin).
@@ -25,28 +26,28 @@ Setiap *engineer* atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat mel
 ## 1. Design Philosophy & "No AI Slop" Rule
 
 - **Utility-First & Minimalist:** Desain berfokus pada konten dan fungsionalitas. Hindari dekorasi yang tidak memiliki makna semantik.
-- **High Contrast & Crisp:** Gunakan garis tepi (*border*) yang tegas, kontras warna yang jelas, dan hindari bayangan (*drop-shadow*) yang terlalu lembut/berlebihan.
+- **High Contrast & Crisp:** Gunakan garis tepi (_border_) yang tegas, kontras warna yang jelas, dan hindari bayangan (_drop-shadow_) yang terlalu lembut/berlebihan.
 - **NO "AI SLOP":**
-  - **Dilarang** menggunakan lencana (*badge*) dekoratif dengan ikon yang tidak berguna (misal: badge "Masuk Aman" dengan ikon tameng).
-  - **Dilarang** menggunakan gradien kompleks, *floating blobs*, atau warna neon yang tidak selaras, kecuali memang diinstruksikan.
+  - **Dilarang** menggunakan lencana (_badge_) dekoratif dengan ikon yang tidak berguna (misal: badge "Masuk Aman" dengan ikon tameng).
+  - **Dilarang** menggunakan gradien kompleks, _floating blobs_, atau warna neon yang tidak selaras, kecuali memang diinstruksikan.
   - Hierarki informasi dibangun menggunakan **Tipografi** dan **Spasi**, bukan dengan kotak/warna-warni latar belakang yang berlebihan.
 
 ---
 
 ## 2. Color Palette (CSS Variables)
 
-Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel CSS ini untuk warna, jangan menggunakan warna *hardcode* (`#hex`).
+Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel CSS ini untuk warna, jangan menggunakan warna _hardcode_ (`#hex`).
 
 ```css
 /* Mode Terang (Light) */
---bg: #fafafa;         /* Background utama aplikasi */
---surface: #f5f5f5;    /* Background untuk Card, Modal, Input */
---border: #e5e5e5;     /* Warna garis pembatas (stroke) */
---fg: #0a0a0a;         /* Teks utama (Heading, Judul) */
---fg2: #404040;        /* Teks sekunder (Deskripsi, Label) */
---fg3: #707070;        /* Teks tersier (Placeholder, Meta info) — ≥4.5:1 di bg/surface */
---inv-bg: #0a0a0a;     /* Background kebalikan (Tombol Primary) */
---inv-fg: #fafafa;     /* Teks kebalikan (Teks Tombol Primary) */
+--bg: #fafafa; /* Background utama aplikasi */
+--surface: #f5f5f5; /* Background untuk Card, Modal, Input */
+--border: #e5e5e5; /* Warna garis pembatas (stroke) */
+--fg: #0a0a0a; /* Teks utama (Heading, Judul) */
+--fg2: #404040; /* Teks sekunder (Deskripsi, Label) */
+--fg3: #707070; /* Teks tersier (Placeholder, Meta info) — ≥4.5:1 di bg/surface */
+--inv-bg: #0a0a0a; /* Background kebalikan (Tombol Primary) */
+--inv-fg: #fafafa; /* Teks kebalikan (Teks Tombol Primary) */
 
 /* Mode Gelap (Dark - Default) */
 --bg: #0a0a0a;
@@ -54,13 +55,13 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 --border: #262626;
 --fg: #fafafa;
 --fg2: #a3a3a3;
---fg3: #8a8a8a;        /* ≥4.5:1 di bg/surface */
+--fg3: #8a8a8a; /* ≥4.5:1 di bg/surface */
 --inv-bg: #fafafa;
 --inv-fg: #0a0a0a;
 ```
 
 > **Aturan Implementasi CSS:**
-> Pastikan selektor kelas `.dark` diaplikasikan dengan benar agar komponen anak mewarisi variabel *dark mode* (contoh: `.dark .my-component { ... }`).
+> Pastikan selektor kelas `.dark` diaplikasikan dengan benar agar komponen anak mewarisi variabel _dark mode_ (contoh: `.dark .my-component { ... }`).
 
 ### Aturan Warna Tambahan
 
@@ -79,18 +80,21 @@ Aplikasi memiliki mode *Dark* (sebagai *default*) dan *Light*. Gunakan variabel 
 Kami menggunakan dua font keluarga dari Google Fonts: **Outfit** dan **Inter**.
 
 ### Headings (Display & Titles)
+
 - **Font Family:** `Outfit`, sans-serif
 - **Weight:** `700` (Bold), `800` (ExtraBold), `900` (Black)
 - **Letter Spacing:** Sangat rapat, antara `-0.02em` hingga `-0.04em`.
 - **Warna:** `var(--fg)`
 
 ### Body & UI Text (Paragraphs, Labels, Buttons)
+
 - **Font Family:** `Inter`, -apple-system, sans-serif
 - **Weight:** `400` (Regular), `500` (Medium), `600` (SemiBold)
 - **Letter Spacing:** Normal atau sedikit renggang untuk label mikro (`0.02em`).
 - **Warna:** `var(--fg2)` untuk deskripsi, `var(--fg)` untuk nilai/data.
 
 ### Aturan Tipografi
+
 - **Cap body line length** di 65–75ch — jangan terlalu lebar.
 - **Display heading max** `clamp()` max ≤ 6rem (~96px).
 - **Pakai** `text-wrap: balance` di h1–h3, `text-wrap: pretty` di long prose.
@@ -102,9 +106,9 @@ Kami menggunakan dua font keluarga dari Google Fonts: **Outfit** dan **Inter**.
 
 ## 4. Layout & Spacing
 
-- **Container Width:** Maksimal `1400px` untuk *wrapper* utama. `max-w-6xl`/`max-w-7xl` — jangan campur.
+- **Container Width:** Maksimal `1400px` untuk _wrapper_ utama. `max-w-6xl`/`max-w-7xl` — jangan campur.
 - **Padding/Margin:** Gunakan kelipatan `4px` atau `8px` (misal: `8px`, `16px`, `24px`, `32px`, `64px`).
-- **Alignment:** Cenderung *Left-aligned* (rata kiri) atau *Centered* (rata tengah) untuk konten hero/fokus.
+- **Alignment:** Cenderung _Left-aligned_ (rata kiri) atau _Centered_ (rata tengah) untuk konten hero/fokus.
 - **Flexbox** untuk 1D, **Grid** untuk 2D — jangan default Grid kalau `flex-wrap` lebih simple.
 - **Responsive grids** tanpa breakpoints: `repeat(auto-fit, minmax(280px, 1fr))`.
 - **Cards** jangan jadi default — pakai hanya kalau memang affordance terbaik. **Nested cards always wrong.**
@@ -118,30 +122,32 @@ Kami menggunakan dua font keluarga dari Google Fonts: **Outfit** dan **Inter**.
 
 Pakai Tailwind spacing scale konsisten: `4` (16px), `6` (24px), `8` (32px) sebagai base unit.
 
-| Element | Gap/Padding |
-|---------|-------------|
-| Antar card | `gap-6` (24px) |
-| Padding card | `p-6` (24px) |
-| Antar section | `space-y-8` (32px) |
-| Form field spacing | `gap-4` (16px) |
-| Modal padding | `p-6` (24px) |
+| Element            | Gap/Padding        |
+| ------------------ | ------------------ |
+| Antar card         | `gap-6` (24px)     |
+| Padding card       | `p-6` (24px)       |
+| Antar section      | `space-y-8` (32px) |
+| Form field spacing | `gap-4` (16px)     |
+| Modal padding      | `p-6` (24px)       |
 
 ---
 
 ## 5. UI Components
 
 ### Buttons (Tombol)
+
 - **Primary:** `background: var(--inv-bg); color: var(--inv-fg);`
-- **Secondary/Ghost:** `background: transparent; color: var(--fg); border: 1px solid var(--border);` atau tanpa *border* dengan *hover state* `background: var(--surface);`
+- **Secondary/Ghost:** `background: transparent; color: var(--fg); border: 1px solid var(--border);` atau tanpa _border_ dengan _hover state_ `background: var(--surface);`
 - **Radius:** Umumnya `6px` untuk tombol kecil/menengah, `8px` untuk tombol besar.
 - **Padding:** `6px 14px` (kecil), `10px 20px` (standar), `14px 28px` (besar).
 - **Font:** `Inter`, ukuran `13px` hingga `15px`, `font-weight: 500`.
 
 ### Cards & Modals
-- **Background:** `var(--surface)` (atau transparan dengan *border* jika di dalam *surface* lain).
+
+- **Background:** `var(--surface)` (atau transparan dengan _border_ jika di dalam _surface_ lain).
 - **Border:** `1px solid var(--border)`
-- **Border Radius:** `12px` hingga `24px` (untuk *container* besar). **Jangan** `32px+` pada cards/sections/inputs.
-- **Shadow:** Hindari *box-shadow*. Andalkan *border* untuk memisahkan *card* dengan *background*.
+- **Border Radius:** `12px` hingga `24px` (untuk _container_ besar). **Jangan** `32px+` pada cards/sections/inputs.
+- **Shadow:** Hindari _box-shadow_. Andalkan _border_ untuk memisahkan _card_ dengan _background_.
 - **Modal:** title + close button di header, backdrop click & Escape nutup modal, focus trap, konten panjang pakai `overflow-y-auto`.
 
 ### Dialog Pengaturan Simulasi
@@ -233,13 +239,15 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 - **E2E:** pilih opsi lewat `e2e/helpers/pickSelect.ts` (klik pemicu berlabel, lalu `role="option"`); `selectOption` tidak berlaku.
 
 ### Inputs & Forms
+
 - **Background:** `transparent` atau `var(--bg)` jika di atas `var(--surface)`.
 - **Border:** `1px solid var(--border)`
 - **Radius:** `6px` hingga `8px`.
-- **Focus State:** Ubah warna *border* menjadi `var(--fg)` dan hapus *outline* bawaan peramban (`outline: none`). Hindari *ring* biru (*default browser*).
+- **Focus State:** Ubah warna _border_ menjadi `var(--fg)` dan hapus _outline_ bawaan peramban (`outline: none`). Hindari _ring_ biru (_default browser_).
 - **Label** di atas input (bukan placeholder sebagai label), validasi inline di bawah field, submit button disabled saat loading, konfirmasi untuk destructive actions.
 
 ### Tabel (Data-heavy)
+
 - **Fixed header** — kolom header sticky.
 - **Striped rows** — `even:bg-muted/50` buat readability.
 - **Sortable columns** — indikator sort arrow.
@@ -249,7 +257,7 @@ Ranking, Heatmap, dan Laporan Data memakai satu pola filter:
 
 ### KETIK (`/ketik`)
 
-- **Landing** mengikuti pola PDKT: hero dengan satu aksi utama "Mulai simulasi", menu kecil (Riwayat, Pemakaian AI, Pengaturan), dan demo chat → telaah (`KetikStageDemo`, `aria-hidden`, tombol jeda, keadaan akhir utuh saat dijeda/reduced motion). Di bawahnya: Progres latihan, Perlu tindak lanjut (sesi belum/gagal ditelaah), Fokus berikutnya (aspek terendah dari 5 sesi terakhir), dan Hasil telaah terbaru dengan kolom aspek terendah. Angka hanya dihitung dari riwayat; tiap bagian punya state loading/error + "Coba lagi".
+- **Landing** mengikuti pola PDKT: hero dengan satu aksi utama "Mulai simulasi", menu kecil (Riwayat, Pemakaian AI, Pengaturan), dan demo chat → telaah (`KetikStageDemo`, `aria-hidden`, tombol jeda, keadaan akhir utuh saat dijeda/reduced motion). Di bawahnya: Progres latihan, Perlu tindak lanjut (sesi belum/gagal ditelaah), Fokus berikutnya (aspek terendah dari 5 sesi terakhir), dan Hasil telaah terbaru dengan kolom aspek terendah. Angka dihitung backend dari seluruh scope riwayat (bulan WIB dan lima reviewed terakhir), terpisah dari halaman daftar; tiap bagian punya state loading/error + "Coba lagi".
 - **Ruang chat** menyerupai aplikasi chat layanan: nama, kota · telepon, percakapan, dan kotak balasan. Tanpa stopwatch, badge "Online", nama skenario, atau penanda tahap. "Akhiri chat" bertombol netral dengan dialog konfirmasi; merah hanya untuk aksi yang menghapus data.
 - **Telaah** adalah tahap layar penuh (`?sesi=<id>&tahap=telaah`), bukan popup: transkrip bernomor di kiri dengan typo digarisbawahi di kalimatnya, hasil di kanan (skor akhir dulu, lima aspek sebagai satu daftar bar, lalu tab). Warna bar: oranye untuk skor < 75, hijau untuk ≥ 85, netral di antaranya. Di bawah 1024px hasil ditumpuk di atas transkrip. Tingkat typo memakai bahasa Indonesia (Berat/Sedang/Ringan).
 - **Anotasi Telaah:** "Inti kasus" tampil di atas tab. Tab "Pertanyaan konsumen" (bawaan bila ada poin) memberi huruf A–E per pertanyaan dengan status Terjawab/Sebagian/Belum terjawab, yang dibedakan oleh gaya garis (utuh/putus/titik) dan warna sekaligus. Tab "Kalimat agen" memberi nomor per kalimat dengan Sudah tepat/Perlu diperbaiki dan "Kalimat yang lebih tepat". Kutipan ditandai di transkrip (typo tetap bertanda di dalamnya), dan setiap butir punya tombol ke pesannya. Telaah lama tanpa anotasi menulis "Belum tersedia". Daftar tab yang bisa digeser wajib `relative`, supaya base-ui menghitung posisi tab aktif dengan benar.
@@ -302,9 +310,9 @@ Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti
 
 ## 6. Motion & Animation
 
-- **CSS Transitions:** Gunakan transisi cepat dan halus. `transition: all 0.15s ease;` (terutama untuk efek *hover* pada tombol dan tautan).
+- **CSS Transitions:** Gunakan transisi cepat dan halus. `transition: all 0.15s ease;` (terutama untuk efek _hover_ pada tombol dan tautan).
 - **Framer Motion (React):**
-  - Untuk elemen yang muncul (*Entrance animation*), gunakan efek *staggered fade-up* (muncul perlahan dari bawah).
+  - Untuk elemen yang muncul (_Entrance animation_), gunakan efek _staggered fade-up_ (muncul perlahan dari bawah).
   - Parameter standar: `initial={{ opacity: 0, y: 15 }}`, `animate={{ opacity: 1, y: 0 }}`, `transition={{ duration: 0.4, ease: "easeOut" }}`.
   - Hindari animasi yang melompat-lompat, berputar, atau memakan waktu lebih dari `0.6s`.
 - **Motion harus intentional** — jangan asal animasi; jangan animate CSS layout properties kalau tidak perlu.
@@ -319,6 +327,7 @@ Landing adalah satu-satunya surface persuasif; modul operasional tetap mengikuti
 ## 7. Contrast & Readability Rules
 
 Untuk memastikan antarmuka mudah dibaca oleh semua pengguna (aksesibilitas tinggi):
+
 - **Contrast Ratio:** Teks utama (`var(--fg)`) harus memiliki kontras minimal 7:1 terhadap latar belakang. Teks sekunder/deskripsi (`var(--fg2)`) harus memiliki kontras minimal 4.5:1.
 - **Muted Text:** Gunakan `var(--fg3)` hanya untuk informasi non-kritis/meta-info. Jangan gunakan `opacity` di bawah `0.8` pada teks yang bertumpuk dengan latar belakang terang.
 - **Font Size Minimum:** Teks yang dibaca minimal `12px`. `text-xs` sudah 12px lewat token `--text-xs` (root 14px membuat `text-xs` bawaan hanya 10,5px); jangan pakai ukuran manual di bawahnya (`text-[11px]`, `text-[0.8rem]`, `fontSize: 11`). Label formulir memakai berat sedang (`font-medium`). E2E menegakkannya lewat `MIN_TEXT_PX` di `apps/web/e2e/helpers/typographyFloor.ts`. Pengecualian: mockup dekoratif `*MotionFrame` dan kanvas ekspor Profiler (slide/PPTX).
@@ -344,7 +353,7 @@ Untuk memastikan antarmuka mudah dibaca oleh semua pengguna (aksesibilitas tingg
 
 ## Kesimpulan
 
-Jika Anda ragu dalam mendesain, pilih jalur yang paling sederhana dan paling bersih. Hapus garis, latar belakang, atau dekorasi yang tidak penting. Biarkan tipografi, jarak (*whitespace*), dan kontras mengambil alih hierarki visual.
+Jika Anda ragu dalam mendesain, pilih jalur yang paling sederhana dan paling bersih. Hapus garis, latar belakang, atau dekorasi yang tidak penting. Biarkan tipografi, jarak (_whitespace_), dan kontras mengambil alih hierarki visual.
 
 ---
 

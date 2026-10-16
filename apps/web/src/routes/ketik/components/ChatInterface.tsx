@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send } from "lucide-react";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
@@ -9,35 +9,15 @@ import {
 } from "../../../components/ui/avatar";
 import { Button } from "../../../components/ui/button";
 import { Textarea } from "../../../components/ui/textarea";
-import type {
-  ChatMessage,
-  KetikSessionConfig,
-  KetikScenario,
-  KetikQuickTemplate,
-  PacingMeta,
-} from "@trainers/types";
+import type { KetikQuickTemplate, KetikServerSession } from "@trainers/types";
 import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
-import { ketikApi } from "../ketikApi";
+import { useServerKetikChat } from "../hooks/useServerKetikChat";
 import { getKetikConsumerAvatarUrl } from "../lib/ketik-avatar";
-import { shouldLogKetikGenerationError } from "../lib/ketik-error";
 import {
   IMAGE_TAG_PATTERN,
   IMAGE_TAG_PATTERN_GLOBAL,
-  allowSolutionAcknowledgement,
-  normalizeGeneratedParts,
-  NO_RESPONSE_PATTERN_GLOBAL,
-  normalizeMessagesForDisplay,
 } from "../lib/message-utils";
-import {
-  classifyTextBand,
-  isAgentGivingSolution,
-  isSlowEligible,
-  boundedRandom,
-  REALISTIC_RANGES,
-  TRAINING_FAST_RANGES,
-  type SessionPhase,
-} from "../lib/pacing";
 import {
   KetikMessageBubble,
   renderKetikMessageContent,
@@ -49,412 +29,80 @@ import {
 } from "./chat/ketikScenarioImages";
 
 interface ChatInterfaceProps {
-  config: KetikSessionConfig;
-  scenario: KetikScenario;
-  onEndSession: (messages: ChatMessage[]) => void;
+  session: KetikServerSession;
+  onEndSession: () => void;
   isEnding?: boolean;
   templates?: KetikQuickTemplate[];
 }
 
 export function ChatInterface({
-  config,
-  scenario,
+  session,
   onEndSession,
   isEnding = false,
   templates = [],
 }: ChatInterfaceProps) {
-  const durationMinutes = config.simulationDuration || 5;
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { config, scenario } = session;
+  const { messages, isLoading, queuedCount, error, retry, send, sessionPhase } =
+    useServerKetikChat(session);
   const [inputText, setInputText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("active");
-  const totalDurationSeconds = durationMinutes * 60;
-  // Waktu sesi tetap dihitung untuk penutupan oleh konsumen, tetapi tidak
-  // ditampilkan: peserta melayani seperti chat sungguhan, tanpa jam hitung.
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [layer, setLayer] = useState<HTMLElement | null>(null);
-  const timeLeft = Math.max(0, totalDurationSeconds - elapsedSeconds);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const pendingTimeoutsRef = useRef<number[]>([]);
-  const sessionPhaseRef = useRef<SessionPhase>("active");
-  const timeoutFinalizedRef = useRef(false);
-  const closingMessageSentRef = useRef(false);
-  const messagesRef = useRef<ChatMessage[]>([]);
-  const isMountedRef = useRef(true);
-  const consumerTurnCountRef = useRef(0);
-  const totalSlowCountRef = useRef(0);
-  const consecutiveSlowCountRef = useRef(0);
-  const sendGenerationRef = useRef(0);
-
-  // ── Character counter ─────────────────────────────────
   const charCount = inputText.length;
   const maxChars = KETIK_PROMPT_LIMITS.chatMessageText;
   const isOverLimit = charCount > maxChars;
-
   const [showTemplatePopup, setShowTemplatePopup] = useState(false);
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const templatePopupRef = useRef<HTMLDivElement>(null);
-
-  const filteredTemplates = (templates || []).filter((t) =>
+  const filteredTemplates = templates.filter((t) =>
     t.keyword.toLowerCase().includes(templateSearchQuery.toLowerCase()),
   );
-
-  const scrollToBottom = () => {
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const clearPendingTimeouts = useCallback(() => {
-    for (const id of pendingTimeoutsRef.current) {
-      clearTimeout(id);
-    }
-    pendingTimeoutsRef.current = [];
-  }, []);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      clearPendingTimeouts();
-    };
-  }, [clearPendingTimeouts]);
-
-  useEffect(() => {
-    scrollToBottom();
   }, [messages, isLoading]);
-
   useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    sessionPhaseRef.current = sessionPhase;
-  }, [sessionPhase]);
-
-  useEffect(() => {
-    if (sessionPhase === "active") {
-      textareaRef.current?.focus();
-    }
-  }, [sessionPhase]);
-
-  useEffect(() => {
-    if (sessionPhase !== "active" && sessionPhase !== "expired") return;
-    const timer = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [sessionPhase]);
-
+    textareaRef.current?.focus();
+  }, []);
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height =
         Math.min(textareaRef.current.scrollHeight, 120) + "px";
     }
-    const lastSlashIndex = inputText.lastIndexOf("/");
-    if (lastSlashIndex !== -1) {
-      const textAfterSlash = inputText.substring(lastSlashIndex + 1);
-      const beforeSlash = inputText.substring(0, lastSlashIndex);
-      const isTriggerValid =
-        (lastSlashIndex === 0 || beforeSlash.endsWith(" ")) &&
-        !textAfterSlash.includes(" ");
-
-      if (isTriggerValid) {
-        setShowTemplatePopup(true);
-        setTemplateSearchQuery(textAfterSlash);
-        setSelectedTemplateIndex((prev) => {
-          const newFiltered = (templates || []).filter((t) =>
-            t.keyword.toLowerCase().includes(textAfterSlash.toLowerCase()),
-          );
-          return prev >= newFiltered.length ? 0 : prev;
-        });
-      } else {
-        setShowTemplatePopup(false);
-      }
-    } else {
-      setShowTemplatePopup(false);
-    }
-  }, [inputText, templates]);
-
+    const slash = inputText.lastIndexOf("/");
+    const query = inputText.substring(slash + 1);
+    const valid =
+      slash >= 0 &&
+      (slash === 0 || inputText[slash - 1] === " ") &&
+      !query.includes(" ");
+    setShowTemplatePopup(valid);
+    setTemplateSearchQuery(query);
+    setSelectedTemplateIndex(0);
+  }, [inputText]);
   useEffect(() => {
     if (!showTemplatePopup) return;
-    const handleClickOutside = (event: MouseEvent) => {
+    const close = (event: MouseEvent) => {
       if (
-        templatePopupRef.current &&
-        !templatePopupRef.current.contains(event.target as Node) &&
-        textareaRef.current &&
-        !textareaRef.current.contains(event.target as Node)
-      ) {
+        !templatePopupRef.current?.contains(event.target as Node) &&
+        !textareaRef.current?.contains(event.target as Node)
+      )
         setShowTemplatePopup(false);
-      }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, [showTemplatePopup]);
-
-  const handleSessionTimeout = useCallback(() => {
-    if (
-      sessionPhaseRef.current !== "active" ||
-      timeoutFinalizedRef.current ||
-      closingMessageSentRef.current
-    )
-      return;
-    timeoutFinalizedRef.current = true;
-    closingMessageSentRef.current = true;
-
-    clearPendingTimeouts();
-    setIsLoading(false);
-
-    const currentMsgs = messagesRef.current;
-    const lastAgentMsg = [...currentMsgs]
-      .reverse()
-      .find((m) => m.sender === "agent");
-    const agentIsGivingSolution = allowSolutionAcknowledgement(
-      lastAgentMsg?.text ?? null,
-    );
-
-    if (agentIsGivingSolution) {
-      sessionPhaseRef.current = "expired";
-      setSessionPhase("expired");
-      return;
-    }
-
-    sessionPhaseRef.current = "expired";
-    setSessionPhase("expired");
-
-    const fallbackClosingText =
-      "Maaf, saya harus lanjut aktivitas dulu. Nanti saya hubungi lagi ya. Terima kasih.";
-    const timeoutMessageId = `timeout-${Date.now()}`;
-
-    setMessages((prev) => {
-      const closingMessage: ChatMessage = {
-        id: timeoutMessageId,
-        sender: "consumer",
-        text: fallbackClosingText,
-        timestamp: new Date().toISOString(),
-      };
-      return normalizeMessagesForDisplay([...prev, closingMessage]);
-    });
-  }, [clearPendingTimeouts]);
-
   useEffect(() => {
-    if (sessionPhase !== "active" || timeLeft > 0) return;
-    handleSessionTimeout();
-  }, [sessionPhase, timeLeft, handleSessionTimeout]);
-
-  // Chat hanya ada di memori: peringatkan sebelum tab ditutup atau dimuat ulang.
-  useEffect(() => {
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
+    if (!queuedCount) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, []);
-
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: Date.now().toString(),
-          sender: "system",
-          text: `iMessage with ${config.identity.name}`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    }
-  }, [messages.length, config.identity.name]);
-
-  const handleSend = async () => {
-    clearPendingTimeouts();
-    sendGenerationRef.current += 1;
-    const currentGeneration = sendGenerationRef.current;
-
-    if (
-      !inputText.trim() ||
-      isOverLimit ||
-      (sessionPhase !== "active" && sessionPhase !== "expired")
-    )
-      return;
-
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      sender: "agent",
-      text: inputText.trim(),
-      timestamp: new Date().toISOString(),
-      status: "sent",
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-
-    if (sessionPhase !== "active" || timeLeft <= 0) return;
-
-    setIsLoading(true);
-
-    const currentHistory = [...messages, userMsg];
-
-    try {
-      const result = await ketikApi.generate({
-        scenarioId: scenario.id,
-        scenarioDraft: {
-          ...scenario,
-          images: scenario.images?.map(() => ""),
-          imageAlts: scenario.imageAlts,
-        },
-        consumerTypeId: config.consumerType.id,
-        consumerTypeDraft: config.consumerType,
-        identity: config.identity,
-        selectedModel: config.selectedModel,
-        simulationDuration: config.simulationDuration,
-        responsePacingMode: config.responsePacingMode,
-        chatHistory: currentHistory,
-        remainingSeconds: timeLeft,
-        elapsedSeconds,
-      });
-
-      if (sessionPhaseRef.current !== "active") {
-        setIsLoading(false);
-        return;
-      }
-
-      if (sendGenerationRef.current !== currentGeneration) return;
-
-      if (!result || !result.text) {
-        setIsLoading(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "error-" + Date.now(),
-            sender: "system",
-            text: "Terjadi kesalahan.",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
-        return;
-      }
-
-      const responseText = result.text
-        .replace(NO_RESPONSE_PATTERN_GLOBAL, "")
-        .trim();
-      if (responseText) {
-        const rawParts = responseText
-          .split("[BREAK]")
-          .map((p: string) => p.trim())
-          .filter((p: string) => p);
-        const parts = normalizeGeneratedParts(rawParts);
-        const pacingMode = config.responsePacingMode || "realistic";
-        const remaining = timeLeft;
-
-        const lastAgentMsg = [...currentHistory]
-          .reverse()
-          .find((m) => m.sender === "agent");
-        const agentGivingSolution = isAgentGivingSolution(lastAgentMsg?.text);
-
-        const isFirstConsumerTurn = consumerTurnCountRef.current === 0;
-        consumerTurnCountRef.current += 1;
-        const currentConsumerTurn = consumerTurnCountRef.current;
-
-        let firstBand: "short" | "normal" | "long" | "slow" | "greeting_reply" =
-          isFirstConsumerTurn
-            ? "greeting_reply"
-            : classifyTextBand(parts[0]?.text.length || 0);
-        const shouldUseSlow =
-          pacingMode === "realistic" &&
-          parts.length > 0 &&
-          !agentGivingSolution &&
-          isSlowEligible({
-            consumerTurnIndex: currentConsumerTurn,
-            consecutiveSlowCount: consecutiveSlowCountRef.current,
-            totalSlowCount: totalSlowCountRef.current,
-            sessionDurationMinutes: durationMinutes,
-            remainingSeconds: remaining,
-            elapsedSeconds,
-            totalDurationSeconds: durationMinutes * 60,
-          });
-
-        if (shouldUseSlow) {
-          firstBand = "slow";
-          totalSlowCountRef.current += 1;
-          consecutiveSlowCountRef.current += 1;
-        } else {
-          consecutiveSlowCountRef.current = 0;
-        }
-
-        const ranges =
-          pacingMode === "realistic" ? REALISTIC_RANGES : TRAINING_FAST_RANGES;
-        let delay = 0;
-
-        for (let i = 0; i < parts.length; i += 1) {
-          const part = parts[i];
-          const isFirst = i === 0;
-          const band = isFirst ? firstBand : "follow_up";
-          const range = ranges[band];
-          let plannedDelay = boundedRandom(range.minMs, range.maxMs);
-
-          if (remaining < 20) {
-            plannedDelay = boundedRandom(1000, 3000);
-          } else if (isFirst && agentGivingSolution && plannedDelay < 10000) {
-            plannedDelay = boundedRandom(10000, Math.max(10000, range.maxMs));
-          } else {
-            const remainingMs = remaining * 1000;
-            const maxAllowed = remainingMs - 5000;
-            if (plannedDelay > maxAllowed && maxAllowed > 0) {
-              plannedDelay = boundedRandom(1000, Math.max(1000, maxAllowed));
-            } else if (maxAllowed <= 0) {
-              plannedDelay = boundedRandom(1000, 3000);
-            }
-          }
-
-          delay += plannedDelay;
-          const pacingMeta: PacingMeta = {
-            mode: pacingMode as "realistic" | "training_fast",
-            band,
-            plannedDelayMs: plannedDelay,
-            timerClamped: remaining < 20,
-          };
-
-          const timeoutId = window.setTimeout(() => {
-            setMessages((prev) =>
-              normalizeMessagesForDisplay([
-                ...prev,
-                {
-                  id: Date.now().toString() + Math.random(),
-                  sender: part.sender,
-                  text: part.text,
-                  timestamp: new Date().toISOString(),
-                  pacingMeta,
-                },
-              ]),
-            );
-          }, delay);
-          pendingTimeoutsRef.current.push(timeoutId);
-        }
-
-        const finishId = window.setTimeout(() => setIsLoading(false), delay);
-        pendingTimeoutsRef.current.push(finishId);
-      } else {
-        setIsLoading(false);
-        setSessionPhase("closed");
-      }
-    } catch (error) {
-      if (shouldLogKetikGenerationError(error)) {
-        console.error("Error generating response", error);
-      }
-      setIsLoading(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: "error-" + Date.now(),
-          sender: "system",
-          text: "Terjadi gangguan koneksi dengan konsumen. Coba kirim pesan lagi.",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    }
+  }, [queuedCount]);
+  const handleSend = () => {
+    if (!inputText.trim() || isOverLimit || sessionPhase !== "active") return;
+    if (send(inputText.trim())) setInputText("");
   };
 
   const insertTemplate = (tmpl: { content: string }) => {
@@ -495,8 +143,7 @@ export function ChatInterface({
 
   const endChat = () => {
     setConfirmEnd(false);
-    clearPendingTimeouts();
-    if (!isLoading && !isEnding) onEndSession(messages);
+    if ((!isLoading || sessionPhase !== "active") && !isEnding) onEndSession();
   };
 
   return (
@@ -532,7 +179,7 @@ export function ChatInterface({
           type="button"
           variant="outline"
           onClick={() => setConfirmEnd(true)}
-          disabled={isLoading || isEnding}
+          disabled={(isLoading && sessionPhase === "active") || isEnding}
           className="min-h-[44px] shrink-0 px-4 text-[13px] font-medium"
         >
           {isEnding ? (
@@ -638,9 +285,30 @@ export function ChatInterface({
       </div>
 
       {/* Input Area */}
-      {sessionPhase === "active" || sessionPhase === "expired" ? (
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 border-t px-4 py-3 text-sm"
+        >
+          <p>{error}</p>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={retry}
+            disabled={isLoading || sessionPhase !== "active"}
+          >
+            Coba kirim lagi
+          </Button>
+        </div>
+      )}
+      {queuedCount > 1 && (
+        <p role="status" className="px-4 py-2 text-sm text-fg2">
+          {queuedCount - 1} pesan menunggu dikirim.
+        </p>
+      )}
+      {sessionPhase === "active" ? (
         <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
-
           <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
             <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
               <label htmlFor="ketik-message-input" className="sr-only">
@@ -774,7 +442,9 @@ export function ChatInterface({
       ) : (
         <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
           <span className="text-[15px] font-semibold text-muted-foreground">
-            Chat telah berakhir
+            {sessionPhase === "expired"
+              ? "Waktu sesi berakhir. Akhiri chat untuk menyimpan percakapan."
+              : "Chat telah berakhir"}
           </span>
         </div>
       )}
@@ -786,7 +456,11 @@ export function ChatInterface({
       <ConfirmDialog
         open={confirmEnd}
         title="Akhiri chat sekarang?"
-        description="Percakapan disimpan, lalu Anda masuk ke tahap Telaah. Chat yang sudah diakhiri tidak bisa dilanjutkan."
+        description={
+          queuedCount
+            ? "Hanya pesan yang sudah tersimpan di server yang disertakan. Pesan antrean yang belum terkirim tidak ikut masuk tahap Telaah."
+            : "Percakapan disimpan, lalu Anda masuk ke tahap Telaah. Chat yang sudah diakhiri tidak bisa dilanjutkan."
+        }
         confirmLabel="Akhiri chat"
         cancelLabel="Lanjutkan chat"
         confirmVariant="default"

@@ -91,6 +91,66 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
   than the friendly text a `mapError` helper would produce. Assert the outcome the user actually
   gets — it is the stronger contract anyway.
 
+## KETIK — riwayat penuh (paket D)
+
+- `ketik-history-api.spec.ts` / project `ketik-history-real-backend`: JWT/Hono/DB loopback asli; 65 sesi, timestamp sama (microseconds), batas bulan WIB, owner lain, pagination stabil, filter/search literal, summary, cursor/limit invalid, detail owner, kegagalan DB aman dan RPC anon/authenticated ditolak. Fixture tambahan 2.001 sesi membuktikan count tidak terpotong oleh cap PostgREST. EXPLAIN sebelum/sesudah indeks memakai fixture yang sama; attachment payload membandingkan bentuk respons HTTP lama (50 sesi dengan transkrip) dan baru (20 ringkasan). Rollback/reapply hanya di DB loopback, mempertahankan jumlah/skor.
+- `home-agent.spec.ts`: fixture page KETIK tanpa messages membuktikan integrasi Beranda dengan kontrak pagination, riwayat gabungan KETIK/PDKT, state kosong dan kegagalan sebagian.
+- `ketik-history-browser.spec.ts`: hermetic dengan 205 sesi; deep-link lama dan detail retry, pagination server, race search, replay/focus, CSV seluruh halaman dan hasil filter, kegagalan ekspor tanpa file parsial, screenshot 390/1280px. Bukan bukti backend nyata; suite API membuktikan batas backend dan regresi JWT browser sesi menguji integrasi transport nyata.
+
+```bash
+pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-history-real-backend --workers=1 --trace on
+pnpm --filter @trainers/web exec playwright test ketik-history-browser.spec.ts --workers=1 --trace on
+```
+
+Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan commit.
+
+## KETIK — integritas dan kegagalan
+
+- `ketik-integrity-api.spec.ts` (`ketik-integrity-real-backend`) memakai JWT nyata
+  dan PostgREST/RLS lokal untuk membuktikan INSERT skor/status langsung ditolak,
+  penyimpanan backend tetap berhasil, read/update owner tidak melonggarkan RLS,
+  serta atribusi peserta tetap dibatasi trainer/admin. Terapkan migration
+  `20261015120000_ketik_history_backend_insert_only.sql` pada database disposable
+  sebelum GREEN; rollback mengembalikan kegagalan tes INSERT yang sama.
+- `ketik-errors-api.spec.ts` (`ketik-errors-real-backend`) memakai Hono/auth/DB nyata
+  dan menyuntik kegagalan pada batas HTTP database/provider. Provider tidak
+  dihubungi; detail internal sentinel tidak boleh muncul pada respons publik.
+  Spec juga memeriksa primary/fallback model, polling/worker, dan konflik settings.
+- `ketik-assignment-api.spec.ts` (`ketik-assignment-real-backend`) memakai JWT,
+  Hono, dan database nyata untuk copy training tanpa identitas/template trainer,
+  edit pribadi/source isolation, version conflicts dan request bersaing, role/RLS,
+  serta direct RPC denial. Trigger gagal bernamespace milik run membuktikan
+  rollback transaksi settings + provenance; kegagalan HTTP membuktikan error aman.
+  Terapkan migration `20261015130000_ketik_configuration_assignments.sql` setelah
+  migration history di atas. Rollback/reapply dilakukan eksternal pada DB disposable.
+  Tidak ada panggilan provider atau test UI penugasan dalam tahap fondasi ini.
+- `ketik-session-api.spec.ts` (`ketik-session-real-backend`) membuktikan
+  snapshot, assignment wajib, strict input, idempotensi/versi/expiry, failed retry,
+  race/reclaim/fencing, RLS/RPC denial, finalisasi atomik dan penolakan legacy 410.
+  Terapkan migration `20261015140000_ketik_server_sessions.sql` setelah dua di atas.
+  Provider hanya HTTP fixture deterministik; tidak ada request keluar/biaya AI.
+- `ketik-server-chat.spec.ts` membuktikan antrean serial, typing/Send/Enter saat
+  loading, failed resume/retry, expiry, assignment error/retry tanpa auto-start,
+  serta dialog konflik/sukses 390px/1280px, keyboard/focus dan target 44px.
+- `ketik-session-browser.spec.ts` opt-in dengan `E2E_KETIK_LIVE=1`: session/JWT
+  Supabase asli, auth/profile lokal dan semua API Hono nyata melalui bridge
+  transport browser (bukan mockAuth atau stub service). Mulai → gagal provider →
+  retry UUID sama → dua turn → reload → finish → telaah manual; pesan dalam prompt
+  review harus sama persis dengan history. Guard menolak egress lain, provider
+  hanya respons HTTP lokal, dan fixture/usage dihapus. Tanpa flag, tes di-skip;
+  flag bukan pengganti guard env/target loopback. Trace berisi auth lokal: jangan commit.
+- `ketik-flow.spec.ts` membuktikan settings gagal dengan/tanpa backup tidak bisa
+  memulai simulasi, retry gagal tetap gagal, dan retry sukses tidak otomatis
+  memulai chat. Screenshot error desktop/mobile disimpan pada output tes.
+
+Jalankan serial:
+
+```bash
+pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-integrity-real-backend --project ketik-errors-real-backend --project ketik-assignment-real-backend --project ketik-session-real-backend --workers=1 --trace on
+pnpm --filter @trainers/web exec playwright test ketik-flow.spec.ts ketik-server-chat.spec.ts --workers=1 --trace on
+E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-session-browser.spec.ts --workers=1 --trace on
+```
+
 ## Repository hygiene
 
 `apps/web/test-results/` is run output: it is gitignored and no longer tracked, because every

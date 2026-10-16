@@ -581,55 +581,6 @@ describe("KETIK Service - History", () => {
     mockFrom.mockReset();
   });
 
-  describe("getHistory", () => {
-    it("returns empty array on error", async () => {
-      mockFrom.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        limit: vi
-          .fn()
-          .mockResolvedValue({ data: null, error: { message: "DB error" } }),
-      });
-      const history = await ketikService.getHistory("user1");
-      expect(history).toEqual([]);
-    });
-
-    it("returns mapped history items", async () => {
-      mockFrom.mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue({
-          data: [
-            {
-              id: "sess1",
-              date: "2025-01-15T10:00:00Z",
-              scenario_title: "Pinjol Ilegal",
-              consumer_name: "Budi",
-              messages: [
-                {
-                  id: "m1",
-                  sender: "agent",
-                  text: "hello",
-                  timestamp: "2025-01-15T10:00:00Z",
-                },
-              ],
-              review_status: "completed",
-              resolution_score: 78,
-            },
-          ],
-          error: null,
-        }),
-      });
-      const history = await ketikService.getHistory("user1");
-      expect(history).toHaveLength(1);
-      expect(history[0].scenarioTitle).toBe("Pinjol Ilegal");
-      expect(history[0].reviewStatus).toBe("completed");
-      expect(history[0].resolutionScore).toBe(78);
-    });
-  });
-
   describe("persistSession", () => {
     it("inserts session and returns mapped item", async () => {
       const mockInsertResult = {

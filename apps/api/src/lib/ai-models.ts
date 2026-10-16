@@ -27,6 +27,12 @@ export {
   getHistoricalTelefunRealtimeModel,
 };
 
+// Central policy for KETIK coaching: one primary and one bounded fallback.
+export const KETIK_REVIEW_MODELS = {
+  primary: "gemini-3.8-flash",
+  fallback: "gpt-5.4-mini",
+} as const;
+
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (model) => model.provider === "gemini",
 );

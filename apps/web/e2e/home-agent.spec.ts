@@ -26,7 +26,6 @@ const KETIK_HISTORY = [
     date: minutesAgo(60),
     scenarioTitle: "Keluhan tagihan kartu kredit",
     consumerName: "Budi",
-    messages: [],
     finalScore: 86,
     reviewStatus: "completed",
   },
@@ -35,10 +34,25 @@ const KETIK_HISTORY = [
     date: minutesAgo(10),
     scenarioTitle: "Pengaduan asuransi",
     consumerName: "Sari",
-    messages: [],
     reviewStatus: "pending",
   },
 ];
+
+const ketikPage = (items: typeof KETIK_HISTORY) => ({
+  items,
+  nextCursor: null,
+  total: items.length,
+  counts: {
+    all: items.length,
+    completed: items.filter((item) => item.reviewStatus === "completed").length,
+    running: items.filter((item) => item.reviewStatus === "pending").length,
+    failed: 0,
+    not_started: 0,
+  },
+  reviewedCount: items.filter((item) => typeof item.finalScore === "number")
+    .length,
+  averageScore: items.length ? 86 : null,
+});
 
 const PDKT_HISTORY = [
   {
@@ -82,7 +96,7 @@ test.describe("Beranda agent", () => {
     const audit = await openHermeticShell(page, {
       path: "/dashboard",
       auth: { role: "agent" },
-      apiMocks: mocks(ok(KETIK_HISTORY), ok(PDKT_HISTORY)),
+      apiMocks: mocks(ok(ketikPage(KETIK_HISTORY)), ok(PDKT_HISTORY)),
     });
     const main = page.getByRole("region", { name: "Konten halaman" });
     await expect(main.getByRole("heading", { level: 1 })).toBeVisible({
@@ -115,7 +129,7 @@ test.describe("Beranda agent", () => {
     const audit = await openHermeticShell(page, {
       path: "/dashboard",
       auth: { role: "agent" },
-      apiMocks: mocks(ok(KETIK_HISTORY), ok(PDKT_HISTORY)),
+      apiMocks: mocks(ok(ketikPage(KETIK_HISTORY)), ok(PDKT_HISTORY)),
     });
     const rows = history(page).getByRole("row");
     // Baris pertama adalah kepala tabel.
@@ -135,7 +149,7 @@ test.describe("Beranda agent", () => {
     const audit = await openHermeticShell(page, {
       path: "/dashboard",
       auth: { role: "agent" },
-      apiMocks: mocks(ok([]), ok([])),
+      apiMocks: mocks(ok(ketikPage([])), ok([])),
     });
     await expect(history(page).getByText("Belum ada sesi latihan")).toBeVisible(
       { timeout: 20000 },

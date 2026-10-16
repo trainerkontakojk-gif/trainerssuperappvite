@@ -1,21 +1,38 @@
 import type {
+  KetikHistoryQuery,
+  KetikHistoryPage,
+  KetikHistoryDetail,
+  KetikLandingSummary,
   KetikAppSettings,
   KetikQuickTemplate,
   KetikSessionHistoryItem,
   KetikReviewDetail,
   KetikScenario,
   KetikConsumerType,
-  ChatMessage,
+  KetikServerSession,
+  KetikSessionTurnRequest,
+  KetikAssignmentSnapshot,
+  AssignKetikConfiguration,
+  ManagedUser,
 } from "@trainers/types";
-import { aiClient, ketikClient, unwrapResponse } from "../../lib/api";
+import {
+  aiClient,
+  adminClient,
+  ketikClient,
+  unwrapResponse,
+} from "../../lib/api";
+import type { hc } from "hono/client";
+import type { KetikRouteType } from "@trainers/api/types";
 import {
   createSettingsVersionStore,
-  safeReadKetikSettingsBackup,
   safeWriteKetikSettingsBackup,
 } from "../../lib/settings-contract";
 
+const serverClient = ketikClient as ReturnType<typeof hc<KetikRouteType>>;
 const settingsVersion = createSettingsVersionStore();
-const templatesVersion = createSettingsVersionStore("x-ketik-templates-version");
+const templatesVersion = createSettingsVersionStore(
+  "x-ketik-templates-version",
+);
 let settingsVersionUserId: string | undefined;
 
 function prepareSettingsVersion(userId: string | undefined): void {
@@ -25,6 +42,62 @@ function prepareSettingsVersion(userId: string | undefined): void {
 }
 
 export const ketikApi = {
+  startSession: async (
+    requestId: string,
+    simulationSubject:
+      { type: "self" } | { type: "participant"; participantId: string },
+  ) =>
+    unwrapResponse(
+      await serverClient.sessions.$post({
+        json: { requestId, simulationSubject },
+      }),
+    ) as Promise<KetikServerSession>,
+  getSession: async (id: string) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].$get({ param: { id } }),
+    ) as Promise<KetikServerSession>,
+  sendTurn: async (id: string, body: KetikSessionTurnRequest) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].turns.$post({
+        param: { id },
+        json: body,
+      }),
+    ) as Promise<KetikServerSession>,
+  finishSession: async (id: string) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].finish.$post({
+        param: { id },
+        json: {},
+      }),
+    ) as Promise<KetikSessionHistoryItem | null>,
+  getAssignment: async (id = "self") =>
+    unwrapResponse(
+      await (id === "self"
+        ? serverClient.assignments.self.$get()
+        : serverClient.assignments[":recipientId"].$get({
+            param: { recipientId: id },
+          })),
+    ) as Promise<KetikAssignmentSnapshot>,
+  assignConfiguration: async (
+    recipientId: string,
+    body: AssignKetikConfiguration,
+  ) =>
+    unwrapResponse(
+      await serverClient.assignments[":recipientId"].$put({
+        param: { recipientId },
+        json: body,
+      }),
+    ) as Promise<KetikAssignmentSnapshot>,
+  getAssignmentRecipients: async () =>
+    unwrapResponse(await adminClient.users.$get()) as Promise<ManagedUser[]>,
+  getAssignmentSource: async () => {
+    const response = await ketikClient.settings.$get();
+    const settings = (await unwrapResponse(response)) as KetikAppSettings;
+    const version = response.headers.get("x-settings-version");
+    if (!version)
+      throw new Error("Versi sumber belum tersedia. Muat ulang pengaturan.");
+    return { settings, version };
+  },
   getScenarios: async () => {
     const res = await ketikClient.scenarios.$get();
     return unwrapResponse(res) as Promise<KetikScenario[]>;
@@ -33,49 +106,22 @@ export const ketikApi = {
     const res = await ketikClient["consumer-types"].$get();
     return unwrapResponse(res) as Promise<KetikConsumerType[]>;
   },
-  generate: async (body: {
-    scenarioId: string;
-    scenarioDraft?: KetikScenario;
-    consumerTypeId: string;
-    consumerTypeDraft?: KetikConsumerType;
-    identity: { name: string; city: string; phone: string };
-    selectedModel: string;
-    simulationDuration: number;
-    responsePacingMode: "realistic" | "training_fast";
-    chatHistory: ChatMessage[];
-    remainingSeconds?: number;
-    elapsedSeconds?: number;
-  }) => {
-    const res = await ketikClient.generate.$post({ json: body });
-    return unwrapResponse(res) as Promise<{ text: string }>;
-  },
   getSettings: async (userId?: string) => {
     prepareSettingsVersion(userId);
-    try {
-      const res = await ketikClient.settings.$get();
-      const settings = (await unwrapResponse(res)) as KetikAppSettings;
+    const res = await ketikClient.settings.$get();
+    const settings = (await unwrapResponse(res)) as KetikAppSettings;
+    if (settingsVersionUserId === userId) {
       settingsVersion.capture(res);
       templatesVersion.capture(res);
-      const version = settingsVersion.current();
-      if (version) {
-        safeWriteKetikSettingsBackup(undefined, userId, version, settings);
-      }
-      return settings;
-    } catch (error) {
-      const backup = safeReadKetikSettingsBackup<KetikAppSettings>(
+      safeWriteKetikSettingsBackup(
         undefined,
         userId,
+        settingsVersion.current(),
+        settings,
       );
-      if (backup) {
-        settingsVersion.restore(backup.version);
-        console.warn(
-          "API error fetching settings, using localStorage backup",
-          error,
-        );
-        return backup.settings;
-      }
-      throw error;
     }
+    // A local backup is not proof that the current server settings loaded.
+    return settings;
   },
   saveSettings: async (settings: KetikAppSettings, userId?: string) => {
     if (settingsVersionUserId !== userId) {
@@ -100,24 +146,25 @@ export const ketikApi = {
     await unwrapResponse(res);
     templatesVersion.capture(res);
   },
-  getHistory: async () => {
-    const res = await ketikClient.history.$get();
-    return unwrapResponse(res) as Promise<KetikSessionHistoryItem[]>;
+  getHistory: async (query: Partial<KetikHistoryQuery> = {}) => {
+    const res = await serverClient.history.$get({
+      query: {
+        limit: String(query.limit ?? 20),
+        q: query.q ?? "",
+        status: query.status ?? "all",
+        ...(query.cursor ? { cursor: query.cursor } : {}),
+      },
+    });
+    return unwrapResponse(res) as Promise<KetikHistoryPage>;
   },
-  persistSession: async (data: {
-    scenarioTitle: string;
-    consumerName: string;
-    consumerPhone: string;
-    consumerCity: string;
-    messages: ChatMessage[];
-    simulationDuration?: number;
-    simulationSubject?:
-      | { type: "self" }
-      | { type: "participant"; participantId: string };
-  }) => {
-    const res = await ketikClient.history.$post({ json: data });
-    return unwrapResponse(res) as Promise<KetikSessionHistoryItem>;
-  },
+  getHistorySummary: async () =>
+    unwrapResponse(
+      await serverClient.history.summary.$get(),
+    ) as Promise<KetikLandingSummary>,
+  getHistoryDetail: async (id: string) =>
+    unwrapResponse(
+      await serverClient.history[":id"].$get({ param: { id } }),
+    ) as Promise<KetikHistoryDetail>,
   deleteSession: async (id: string) => {
     const res = await ketikClient.history[":id"].$delete({
       param: { id },

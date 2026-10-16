@@ -182,27 +182,30 @@ export async function getKetikReviewStatus(
     .eq("user_id", userId)
     .single();
 
-  if (error || !history) return null;
+  if (error && error.code !== "PGRST116") throw error;
+  if (!history) return null;
 
   const historyStatus = history.review_status || "pending";
 
   let job: any = null;
   if (historyStatus !== "completed" && historyStatus !== "failed") {
-    const { data: jobData } = await adminClient
+    const { data: jobData, error: jobError } = await adminClient
       .from("ketik_review_jobs")
       .select("status, lease_expires_at, error_message, updated_at")
       .eq("session_id", sessionId)
       .maybeSingle();
+    if (jobError) throw jobError;
     job = jobData;
   }
 
   let hasReviewRow: boolean | null = null;
   if (historyStatus === "completed" || (job && job.status === "completed")) {
-    const { data: review } = await adminClient
+    const { data: review, error: reviewError } = await adminClient
       .from("ketik_session_reviews")
       .select("id")
       .eq("session_id", sessionId)
       .maybeSingle();
+    if (reviewError) throw reviewError;
     hasReviewRow = !!review;
   }
 
@@ -268,7 +271,8 @@ export async function processOldestQueuedJob(
     .limit(1)
     .maybeSingle();
 
-  if (error || !job) return { status: "no_jobs" };
+  if (error) throw error;
+  if (!job) return { status: "no_jobs" };
 
   return await claimAndProcessKetikReviewJob(job.session_id, workerId);
 }

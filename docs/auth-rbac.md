@@ -30,6 +30,17 @@ Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 
 > **SIDAK Heatmap** (`/sidak/heatmap` dan tab Heatmap di `/sidak/agents/$id`, endpoint `GET /api/v1/sidak/heatmap`): **admin dan trainer** melihat seluruh data; **leader** hanya agent dalam scope-nya (`getAccessibleSidakFilters` → `getLeaderScopeSnapshot`), dengan `service_type` dibatasi `allowedServices` bila `serviceTypeLocked`. Admin/trainer query memakai JWT user (`createUserClient`) sehingga RLS `read_admin_trainer` benar-benar berlaku; leader memakai service-role + filter scope app-side karena RLS memang menolak leader — jangan bergantung pada RLS untuk leader, dan jangan memberi leader akses penuh. Leader tetap harus punya modul SIDAK disetujui (tiga lapis: `nav-config`, `beforeLoad: requireCapability("sidak.view")`, dan backend `requireCapability("sidak.read")` beserta resolver scope). Nama mode `qa` di dalam API hanya menandai kolom tanggal `tanggal_sampel`; role `qa` **tidak** mendapat akses.
 
+## KETIK — penugasan dan salinan pribadi
+
+- Agen/leader tetap boleh membaca dan mengubah skenario/model pada settings **akun sendiri**. Tidak ada izin mengubah sumber trainer atau settings peserta lain.
+- `GET /api/v1/ketik/assignments/self` memakai `ketik.settings.read` untuk keempat role. Respons memuat assignment nullable dan `recipientSettingsVersion`, bukan identitas/template pribadi trainer.
+- `GET`/`PUT /api/v1/ketik/assignments/:recipientId` memakai `ketik.assignments.write` untuk admin/trainer. Trainer hanya mengelola assignment yang dibuatnya (atau membuat untuk akun yang belum ditugaskan); admin dapat melakukan reassignment lintas assigner secara eksplisit. Penerima mutasi wajib agent/leader aktif dan tidak dihapus.
+- PUT tidak menerima konfigurasi/assigner dari browser. Backend mengambil sumber dari settings pemanggil, lalu RPC service-role-only memeriksa ulang role/status, ownership, dan versi sumber/penerima/assignment dalam satu transaksi.
+- RLS tabel assignment hanya memberi SELECT recipient/assigner, tanpa mutasi authenticated. Bahkan JWT admin aplikasi tidak dapat memanggil RPC transaksi langsung; otorisasi admin aplikasi tidak sama dengan role SQL service_role.
+- Menu Penugasan hanya admin/trainer. Agen/leader yang belum ditugaskan atau gagal memuat assignment melihat pemberitahuan/retry dan tidak bisa mulai; pengaturan pribadi tetap tersedia.
+- POST `/api/v1/ketik/sessions`, GET `/sessions/:id`, POST `/sessions/:id/turns` dan `/sessions/:id/finish` memakai `ketik.use` keempat role, selalu owner-only. Backend memvalidasi assignment saat start agen/leader serta resolver subjek trainer/admin. Browser tidak boleh memasok snapshot/transkrip/waktu/skor. SELECT operasional owner melalui JWT; mutasi/RPC SQL hanya service_role.
+- POST generate/history lama tetap melewati capability lalu selalu 410 tanpa AI/write. Izin review agen belum ditambahkan; matriks review baru dan penanda legacy UI tetap tahap E pada [plan KETIK](../plans/markdown/ketik-integrity-resilience.md).
+
 ## Alur Pendaftaran & Approval
 
 Untuk menjaga keamanan internal, pendaftaran user baru melalui proses approval:
@@ -105,12 +116,14 @@ Notasi scope:
 | `POST /v1/ai/monitoring/billing`                                    | `monitoring.billing.write`     | Ya    | Ya      | Tidak  | Tidak | all                                                                            | —                                      | `apps/api/src/routes/ai.ts:674`                      |
 | `GET /v1/ketik/scenarios`                                           | `ketik.use`                    | Ya    | Ya      | Ya     | Ya    | all (konfigurasi/global) atau self (generasi aktor)                            | —                                      | `apps/api/src/routes/ketik.ts:24`                    |
 | `GET /v1/ketik/consumer-types`                                      | `ketik.use`                    | Ya    | Ya      | Ya     | Ya    | all (konfigurasi/global) atau self (generasi aktor)                            | —                                      | `apps/api/src/routes/ketik.ts:28`                    |
-| `POST /v1/ketik/generate`                                           | `ketik.use`                    | Ya    | Ya      | Ya     | Ya    | all (konfigurasi/global) atau self (generasi aktor)                            | —                                      | `apps/api/src/routes/ketik.ts:32`                    |
+| `POST /v1/ketik/generate`                                           | `ketik.use`                    | Ya    | Ya      | Ya     | Ya    | retired: selalu 410, tanpa AI/write                                            | —                                      | `apps/api/src/routes/ketik.ts:32`                    |
 | `GET /v1/ketik/settings`                                            | `ketik.settings.read`          | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:104`                   |
 | `PUT /v1/ketik/templates`                                           | `ketik.templates.shared.write` | Ya    | Tidak   | Tidak  | Tidak | all (konfigurasi/global) atau self (generasi aktor)                            | —                                      | `apps/api/src/routes/ketik.ts:122`                   |
 | `PUT /v1/ketik/settings`                                            | `ketik.settings.write`         | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:164`                   |
 | `GET /v1/ketik/history`                                             | `ketik.history.read`           | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:204`                   |
-| `POST /v1/ketik/history`                                            | `ketik.history.write`          | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:220`                   |
+| `GET /v1/ketik/history/summary`                                     | `ketik.history.read`           | Ya    | Ya      | Ya     | Ya    | self (akun), count/window backend                                              | —                                      | `apps/api/src/routes/ketik-history.ts`               |
+| `GET /v1/ketik/history/:id`                                         | `ketik.history.read`           | Ya    | Ya      | Ya     | Ya    | self (akun), detail/transkrip; cross-owner 404                                 | —                                      | `apps/api/src/routes/ketik-history.ts`               |
+| `POST /v1/ketik/history`                                            | `ketik.history.write`          | Ya    | Ya      | Ya     | Ya    | retired: selalu 410, tanpa write                                               | —                                      | `apps/api/src/routes/ketik.ts:220`                   |
 | `DELETE /v1/ketik/history`                                          | `ketik.history.delete`         | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:265`                   |
 | `DELETE /v1/ketik/history/:id`                                      | `ketik.history.delete`         | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:281`                   |
 | `GET /v1/ketik/review/:sessionId`                                   | `ketik.review.read`            | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ketik.ts:298`                   |
@@ -214,7 +227,7 @@ Notasi scope:
 | `POST /v1/telefun/finalize-recording`                               | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/recordings.ts:171`      |
 | `GET /v1/telefun/recording/:id`                                     | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/recordings.ts:382`      |
 | `POST /v1/telefun/score/:id`                                        | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/recordings.ts:464`      |
-| `POST /v1/telefun/score/:id/rerun`                                  | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/rerun.ts:26`           |
+| `POST /v1/telefun/score/:id/rerun`                                  | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/rerun.ts:26`            |
 | `GET /v1/telefun/coaching-summary/:id`                              | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | all admin/trainer; owner guard inline tetap berlaku                            | —                                      | `apps/api/src/routes/telefun/recordings.ts:964`      |
 | `POST /v1/telefun/remux-recording/:sessionId`                       | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | self (akun/sesi), termasuk admin/trainer                                       | —                                      | `apps/api/src/routes/telefun/remux-recording.ts:203` |
 | `GET /v1/telefun/sessions`                                          | `telefun.use`                  | Ya    | Ya      | Tidak  | Tidak | all admin/trainer; owner guard inline tetap berlaku                            | —                                      | `apps/api/src/routes/telefun/sessions.ts:285`        |
@@ -235,57 +248,57 @@ Gate induk Telefun: `apps/api/src/routes/telefun.ts:15`, capability usulan `tele
 
 `Ya` di tabel ini berlaku terhadap **beforeLoad** saat profil valid, bukan akses backend. `—` menandai redirect/halaman auth tanpa gate role di deklarasi itu. Layout dan `LeaderAccessGate` tetap perlu dikarakterisasi terpisah.
 
-| Path                         | Capability / tindakan          | Admin | Trainer | Leader | Agent | Approval leader di beforeLoad? | Bukti source                  |
-| ---------------------------- | ------------------------------ | ----- | ------- | ------ | ----- | ------------------------------ | ----------------------------- |
-| `/`                          | `layout only`                  | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:63`  |
-| `/dashboard`                 | `dashboard.view`               | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:69`  |
-| `/dashboard/users`           | `admin.users`                  | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:76`  |
-| `/dashboard/access-groups`   | `admin.accessGroups`           | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:83`  |
-| `/dashboard/access-approval` | `admin.leaderAccess`           | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:90`  |
-| `/dashboard/activities`      | `admin.activityLogs.read`      | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:97`  |
-| `/profiler`                  | `profiler.landing`             | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:125` |
-| `/profiler/table`            | `profiler.view`                | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:132` |
-| `/profiler/slides`           | `redirect → /profiler`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:143` |
-| `/profiler/analytics`        | `redirect → /profiler`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:149` |
-| `/profiler/export`           | `redirect → /profiler`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:155` |
-| `/profiler/add`              | `profiler.view`                | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:161` |
-| `/profiler/import`           | `profiler.view`                | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:172` |
-| `/profiler/teams`            | `profiler.view`                | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:183` |
-| `/sidak`                     | `sidak.landing`                | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:194` |
-| `/sidak/dashboard`           | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:201` |
-| `/sidak/forecast`            | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:212` |
-| `/sidak/input`               | `sidak.config.manage`          | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:223` |
-| `/sidak/ranking`             | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:230` |
-| `/sidak/settings`            | `sidak.config.manage`          | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:241` |
-| `/sidak/periods`             | `sidak.config.manage`          | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:248` |
-| `/sidak/heatmap`             | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:255` |
-| `/sidak/jadwal-shifting`     | `sidak.schedule.read`          | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:268` |
-| `/sidak/agents`              | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:329` |
-| `/sidak/agents/$id`          | `sidak.view`                   | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:340` |
-| `/sidak/reports`             | `redirect → /sidak/reports-data`           | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:351` |
-| `/sidak/reports-data`        | `sidak.reports.view`           | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:358` |
-| `/sidak/reports-ai`          | `redirect → /sidak/reports-data`           | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:365` |
-| `/ketik`                     | `ketik.landing`                | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:372` |
-| `/ketik/simulation`          | `redirect → /ketik`            | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:379` |
-| `/ketik/history`             | `redirect → /ketik`            | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:387` |
-| `/pdkt`                      | `pdkt.use`                     | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:395` |
-| `/pdkt/simulation`           | `pdkt.use`                     | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:402` |
-| `/pdkt/history`              | `pdkt.use`                     | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:409` |
-| `/monitoring`                | `monitoring.read`              | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:416` |
-| `/telefun`                   | `telefun.landing`              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:423` |
-| `/telefun/history`           | `telefun.landing`              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx`     |
-| `/telefun/replay/$id`        | `redirect → /telefun?sesi=$id&tahap=telaah` | — | — | —  | —     | —                              | `apps/web/src/router.tsx`     |
-| `/account`                   | `account.read`                 | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:437` |
-| `/waiting-approval`          | `guardWaitingApproval`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:472` |
-| `/reset-password`            | `guardResetPassword`           | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:479` |
-| `/auth/callback`             | `layout only`                  | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:486` |
-| `/unauthorized`              | `layout only`                  | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:492` |
-| `/qa-analyzer`               | `redirect → /sidak`            | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:588` |
-| `/qa-analyzer/$`             | `redirect → /sidak`            | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:596` |
-| `/dashboard/monitoring`      | `redirect → /monitoring`       | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:604` |
-| `/profiler/download`         | `redirect → /profiler`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:612` |
-| `/pending`                   | `redirect → /waiting-approval` | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:618` |
-| `/preview/profiler-slides`   | `redirect → /profiler`         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:626` |
+| Path                         | Capability / tindakan                       | Admin | Trainer | Leader | Agent | Approval leader di beforeLoad? | Bukti source                  |
+| ---------------------------- | ------------------------------------------- | ----- | ------- | ------ | ----- | ------------------------------ | ----------------------------- |
+| `/`                          | `layout only`                               | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:63`  |
+| `/dashboard`                 | `dashboard.view`                            | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:69`  |
+| `/dashboard/users`           | `admin.users`                               | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:76`  |
+| `/dashboard/access-groups`   | `admin.accessGroups`                        | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:83`  |
+| `/dashboard/access-approval` | `admin.leaderAccess`                        | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:90`  |
+| `/dashboard/activities`      | `admin.activityLogs.read`                   | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:97`  |
+| `/profiler`                  | `profiler.landing`                          | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:125` |
+| `/profiler/table`            | `profiler.view`                             | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:132` |
+| `/profiler/slides`           | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:143` |
+| `/profiler/analytics`        | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:149` |
+| `/profiler/export`           | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:155` |
+| `/profiler/add`              | `profiler.view`                             | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:161` |
+| `/profiler/import`           | `profiler.view`                             | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:172` |
+| `/profiler/teams`            | `profiler.view`                             | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:183` |
+| `/sidak`                     | `sidak.landing`                             | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:194` |
+| `/sidak/dashboard`           | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:201` |
+| `/sidak/forecast`            | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:212` |
+| `/sidak/input`               | `sidak.config.manage`                       | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:223` |
+| `/sidak/ranking`             | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:230` |
+| `/sidak/settings`            | `sidak.config.manage`                       | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:241` |
+| `/sidak/periods`             | `sidak.config.manage`                       | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:248` |
+| `/sidak/heatmap`             | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:255` |
+| `/sidak/jadwal-shifting`     | `sidak.schedule.read`                       | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:268` |
+| `/sidak/agents`              | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:329` |
+| `/sidak/agents/$id`          | `sidak.view`                                | Ya    | Ya      | Ya     | Tidak | sidak                          | `apps/web/src/router.tsx:340` |
+| `/sidak/reports`             | `redirect → /sidak/reports-data`            | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:351` |
+| `/sidak/reports-data`        | `sidak.reports.view`                        | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:358` |
+| `/sidak/reports-ai`          | `redirect → /sidak/reports-data`            | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:365` |
+| `/ketik`                     | `ketik.landing`                             | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:372` |
+| `/ketik/simulation`          | `redirect → /ketik`                         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:379` |
+| `/ketik/history`             | `redirect → /ketik`                         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:387` |
+| `/pdkt`                      | `pdkt.use`                                  | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:395` |
+| `/pdkt/simulation`           | `pdkt.use`                                  | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:402` |
+| `/pdkt/history`              | `pdkt.use`                                  | Ya    | Ya      | Ya     | Ya    | tidak                          | `apps/web/src/router.tsx:409` |
+| `/monitoring`                | `monitoring.read`                           | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:416` |
+| `/telefun`                   | `telefun.landing`                           | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:423` |
+| `/telefun/history`           | `telefun.landing`                           | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx`     |
+| `/telefun/replay/$id`        | `redirect → /telefun?sesi=$id&tahap=telaah` | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx`     |
+| `/account`                   | `account.read`                              | Ya    | Ya      | Ya     | Ya    | —                              | `apps/web/src/router.tsx:437` |
+| `/waiting-approval`          | `guardWaitingApproval`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:472` |
+| `/reset-password`            | `guardResetPassword`                        | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:479` |
+| `/auth/callback`             | `layout only`                               | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:486` |
+| `/unauthorized`              | `layout only`                               | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:492` |
+| `/qa-analyzer`               | `redirect → /sidak`                         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:588` |
+| `/qa-analyzer/$`             | `redirect → /sidak`                         | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:596` |
+| `/dashboard/monitoring`      | `redirect → /monitoring`                    | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:604` |
+| `/profiler/download`         | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:612` |
+| `/pending`                   | `redirect → /waiting-approval`              | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:618` |
+| `/preview/profiler-slides`   | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:626` |
 
 Perbedaan UI/API yang wajib dipertahankan atau diputuskan eksplisit:
 

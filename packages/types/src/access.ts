@@ -21,6 +21,7 @@ export const CAPABILITIES = {
   "ai.generate": ["admin", "trainer"],
   "ai.models.read": ["admin", "trainer", "leader", "agent"],
   "dashboard.view": ["admin", "trainer", "leader", "agent"],
+  "ketik.assignments.write": ["admin", "trainer"],
   "ketik.history.delete": ["admin", "trainer", "leader", "agent"],
   "ketik.history.read": ["admin", "trainer", "leader", "agent"],
   "ketik.history.write": ["admin", "trainer", "leader", "agent"],
