@@ -91,6 +91,29 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
   than the friendly text a `mapError` helper would produce. Assert the outcome the user actually
   gets — it is the stronger contract anyway.
 
+## PDKT — integritas dan pemulihan
+
+- `pdkt-resilience-api.spec.ts` / project `pdkt-resilience-real-backend` memakai
+  JWT, Hono, PostgREST/RLS loopback nyata. Kontraknya: INSERT skor buatan dan
+  UPDATE client ditolak; JSON/filter config privat ditolak; owner scalar dan
+  replay API tetap terbaca; init/create/retry tidak membocorkan arah penerima;
+  token retry tetap bisa disimpan; evaluasi gagal langsung bisa diulang tanpa
+  duplikasi attempt; hapus riwayat menjaga email; mailbox 110/history 1.001
+  baris lengkap dan kegagalan halaman tidak menjadi sukses parsial.
+- `pdkt-resilience.spec.ts` memakai browser hermetic untuk retry detail/settings,
+  retry gagal berulang tanpa default/auto-create, skor lama tetap tampil saat
+  re-review ditolak, serta status terminal riwayat dihapus. Error/retry diuji
+  pada 390/1280px, light/dark, kontras teks, target 44px dan fokus keyboard.
+- Migration `20261016153729_pdkt_history_integrity_privacy.sql` hanya diterapkan
+  ke DB disposable untuk verifikasi; rollback mengembalikan RED pada dua tes
+  privilege. Config browser sementara di direktori ignored memakai port 3007
+  agar tidak mengambil server dari worktree lain; env/guard tetap kanonikal.
+
+```bash
+pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project pdkt-resilience-real-backend --project pdkt-evaluation-errors-real-backend --project pdkt-privacy-real-backend --project pdkt-review-evidence-real-backend --workers=1 --trace on
+pnpm --dir apps/web exec playwright test pdkt-flow.spec.ts pdkt-resilience.spec.ts --workers=1 --trace on
+```
+
 ## KETIK — riwayat penuh (paket D)
 
 - `ketik-history-api.spec.ts` / project `ketik-history-real-backend`: JWT/Hono/DB loopback asli; 65 sesi, timestamp sama (microseconds), batas bulan WIB, owner lain, pagination stabil, filter/search literal, summary, cursor/limit invalid, detail owner, kegagalan DB aman dan RPC anon/authenticated ditolak. Fixture tambahan 2.001 sesi membuktikan count tidak terpotong oleh cap PostgREST. EXPLAIN sebelum/sesudah indeks memakai fixture yang sama; attachment payload membandingkan bentuk respons HTTP lama (50 sesi dengan transkrip) dan baru (20 ringkasan). Rollback/reapply hanya di DB loopback, mempertahankan jumlah/skor.

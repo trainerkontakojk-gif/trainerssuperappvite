@@ -1,7 +1,6 @@
 import type {
-  PdktConsumerType,
+  PdktHistoryConfig,
   PdktMailboxItem,
-  PdktScenario,
   SimulationSubjectSnapshot,
 } from "@trainers/types";
 import {
@@ -19,11 +18,7 @@ export interface SessionHistory {
   user_id?: string | null;
   user_email?: string | null;
   user_role?: string | null;
-  config: {
-    scenarios: PdktScenario[];
-    consumerType: PdktConsumerType;
-    writingStyleMode?: "realistic" | "training";
-  } | null;
+  config: PdktHistoryConfig | null;
   emails: Array<PdktMailboxItem | { subject?: string | null } | null> | null;
   evaluation: any;
   evaluationStatus: PdktEvaluationStatus;

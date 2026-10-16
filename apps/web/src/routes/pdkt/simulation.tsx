@@ -22,7 +22,6 @@ import { useApi } from "../../hooks/useApi";
 import { ApiError, pdktClient, unwrapResponse } from "../../lib/api";
 import type {
   PdktMailboxItem,
-  PdktMailboxDetailItem,
   PdktMailboxListItem,
   PdktScenario,
   PdktConsumerType,
@@ -37,7 +36,9 @@ import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { notify } from "../../lib/toast";
-import { createSettingsVersionStore } from "../../lib/settings-contract";
+import { usePdktMailboxDetail } from "./utils/usePdktMailboxDetail";
+import type { PdktSettingsResource } from "./utils/usePdktSettings";
+import { PdktSettingsNotice } from "./components/PdktSettingsNotice";
 import {
   type PdktAppSettings,
   generatePdktSessionConfig,
@@ -65,20 +66,12 @@ interface PdktSimulationProps {
   /** `reply` setelah balasan terkirim; `review` setelah telaah selesai. */
   onAfterActivity?: (reason: "reply" | "review") => void;
   initialReplaySession?: SessionHistory | null;
-  /**
-   * Data already loaded by the landing page. `undefined` means "not provided"
-   * and keeps the session fetching it itself; `null` (settings only) means the
-   * server confirmed there is nothing stored.
-   */
-  initialSettings?: PdktAppSettings | null;
-  initialSettingsVersion?: string;
+  /** Shared account settings, including loading/error and revision state. */
+  settingsResource: PdktSettingsResource;
+  /** Omitted landing data is fetched by the workspace. */
   initialHistory?: SessionHistory[];
   initialScenarios?: PdktScenario[];
   initialConsumerTypes?: PdktConsumerType[];
-  onSettingsChange?: (
-    settings: PdktAppSettings,
-    version: string | undefined,
-  ) => void;
   onHistoryChange?: (history: SessionHistory[]) => void;
 }
 
@@ -93,15 +86,12 @@ export default function PdktSimulation({
   isReviewOpen = false,
   onSelectedIdChange: setSelectedId,
   onBackToHistory,
-  initialSettings,
-  initialSettingsVersion,
+  settingsResource,
   initialHistory,
   initialScenarios,
   initialConsumerTypes,
-  onSettingsChange,
   onHistoryChange,
 }: PdktSimulationProps) {
-  const hasInitialSettings = initialSettings !== undefined;
   const hasInitialHistory = initialHistory !== undefined;
   const hasInitialScenarios = initialScenarios !== undefined;
   const hasInitialConsumerTypes = initialConsumerTypes !== undefined;
@@ -140,10 +130,8 @@ export default function PdktSimulation({
   const navigate = useNavigate();
 
   // Settings state
-  const [settings, setSettings] = useState<PdktAppSettings | null>(
-    initialSettings ?? null,
-  );
-  const [settingsLoading, setSettingsLoading] = useState(!hasInitialSettings);
+  const { settings } = settingsResource;
+  const canCreateEmail = settingsResource.status === "ready";
 
   // History state
   const [history, setHistory] = useState<SessionHistory[]>(
@@ -157,7 +145,6 @@ export default function PdktSimulation({
 
   // Timer for time_taken (per mailbox)
   const sessionStartTimeRef = useRef<Record<string, number>>({});
-  const settingsVersionRef = useRef(createSettingsVersionStore());
   const onHistoryChangeRef = useRef(onHistoryChange);
 
   useEffect(() => {
@@ -170,8 +157,7 @@ export default function PdktSimulation({
       string,
       {
         result: any | null;
-        status:
-          "not_started" | "pending" | "processing" | "completed" | "failed";
+        status: MailboxReviewState["status"];
         error: string | null;
       }
     >
@@ -237,47 +223,10 @@ export default function PdktSimulation({
 
   // Detail rows (attachments + full thread) are fetched on demand so opening
   // the session never downloads every inline attachment of the inbox.
-  const [mailboxDetails, setMailboxDetails] = useState<
-    Record<string, PdktMailboxDetailItem>
-  >({});
-
-  useEffect(() => {
-    if (!selectedId || mailboxDetails[selectedId]) return;
-    // Replay rows are synthesized from history and already hold full payloads.
-    if (!mailboxItems?.some((item) => item.id === selectedId)) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const detail = (await unwrapResponse(
-          await pdktClient.mailbox[":id"].$get({ param: { id: selectedId } }),
-        )) as PdktMailboxDetailItem | null;
-        if (!cancelled && detail) {
-          setMailboxDetails((prev) => ({ ...prev, [detail.id]: detail }));
-        }
-      } catch (err) {
-        console.error("[PDKT] Failed to load mailbox detail:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId, mailboxDetails, mailboxItems]);
-
-  const invalidateMailboxDetail = (id: string | null) => {
-    if (!id) return;
-    setMailboxDetails((prev) => {
-      if (!(id in prev)) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  };
+  const mailboxDetail = usePdktMailboxDetail(selectedId, mailboxItems);
 
   const selectedItem = selectedId
-    ? (mailboxDetails[selectedId] ??
+    ? (mailboxDetail.detail ??
       (replayItem?.id === selectedId ? replayItem : undefined))
     : undefined;
 
@@ -311,25 +260,6 @@ export default function PdktSimulation({
   };
 
   // Fetch Settings & History from DB
-  const fetchSettings = async () => {
-    try {
-      const response = await pdktClient.settings.$get();
-      const res = await (unwrapResponse(
-        response,
-      ) as Promise<PdktAppSettings | null>);
-      settingsVersionRef.current.capture(response);
-      if (res) {
-        setSettings(res);
-      } else {
-        setSettings(null);
-      }
-    } catch (err) {
-      console.error("[PDKT] Failed to load settings:", err);
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
   const fetchHistory = useCallback(async () => {
     try {
       const res = (await unwrapResponse(
@@ -348,17 +278,8 @@ export default function PdktSimulation({
   }, []);
 
   useEffect(() => {
-    if (!hasInitialSettings) fetchSettings();
     if (!hasInitialHistory) fetchHistory();
-  }, [fetchHistory, hasInitialSettings, hasInitialHistory]);
-
-  // Settings saved from inside the session must keep the optimistic-concurrency
-  // version that the landing page already captured.
-  useEffect(() => {
-    if (initialSettingsVersion) {
-      settingsVersionRef.current.restore(initialSettingsVersion);
-    }
-  }, [initialSettingsVersion]);
+  }, [fetchHistory, hasInitialHistory]);
 
   useEffect(() => {
     if (!mailboxItems || initialReplaySession) return;
@@ -426,7 +347,18 @@ export default function PdktSimulation({
       let changed = false;
 
       visibleMailboxItems.forEach((item) => {
-        if (item.status !== "replied" || !item.history_id) return;
+        if (item.status !== "replied") return;
+        if (!item.history_id) {
+          if (next[item.id]?.status !== "unavailable") {
+            next[item.id] = {
+              result: null,
+              status: "unavailable",
+              error: null,
+            };
+            changed = true;
+          }
+          return;
+        }
 
         const historyItem = history.find(
           (candidate) => candidate.id === item.history_id,
@@ -588,14 +520,7 @@ export default function PdktSimulation({
 
   // Save Settings handler
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
-    const response = await pdktClient.settings.$post(
-      { json: { settings: newSettings } },
-      settingsVersionRef.current.requiredRequestOptions(),
-    );
-    await unwrapResponse(response);
-    settingsVersionRef.current.capture(response);
-    setSettings(newSettings);
-    onSettingsChange?.(newSettings, settingsVersionRef.current.current());
+    await settingsResource.save(newSettings);
     // Refetch history as scenarios configuration might affect display
     await fetchHistory();
   };
@@ -720,6 +645,7 @@ export default function PdktSimulation({
     scenario: PdktScenario,
     subject: SimulationSubjectSelection = simulationSubject,
   ) => {
+    if (!canCreateEmail) return;
     setIsStartingNew(true);
     try {
       // 1. Determine Identity (Fallback)
@@ -849,7 +775,7 @@ export default function PdktSimulation({
 
       await refetch();
       await fetchHistory();
-      invalidateMailboxDetail(mailboxId);
+      mailboxDetail.invalidate(mailboxId);
       setIsReplyOpen(false);
       setFilter("open");
       await setSelectedId(null);
@@ -897,18 +823,8 @@ export default function PdktSimulation({
       console.error("[PDKT] Failed to retry evaluation:", err);
       retryStartDeadlinesRef.current.delete(historyId);
       notify.error("Telaah belum bisa diulang. Coba lagi dalam beberapa saat.");
-      setEvaluations((prev) => {
-        const next = {
-          ...prev,
-          [mailboxId]: {
-            result: null,
-            status: "failed" as const,
-            error: null,
-          },
-        };
-        evaluationsRef.current = next;
-        return next;
-      });
+      // A rejected retry request did not change the saved assessment.
+      // Keep the existing result/status and its explicit retry action.
     } finally {
       retryRequestHistoryIdsRef.current.delete(historyId);
     }
@@ -1110,7 +1026,8 @@ export default function PdktSimulation({
   for (const [mailboxId, review] of Object.entries(evaluations)) {
     reviews[mailboxId] = {
       status: review.status,
-      score: typeof review.result?.score === "number" ? review.result.score : null,
+      score:
+        typeof review.result?.score === "number" ? review.result.score : null,
     };
   }
 
@@ -1141,11 +1058,13 @@ export default function PdktSimulation({
       : reviewedSubject?.type === "participant" && reviewedSubject.participantId
         ? { type: "participant", participantId: reviewedSubject.participantId }
         : null;
-  const practiceUnavailableReason = repeatSubject
-    ? undefined
-    : reviewedSubject?.type === "participant"
-      ? "Latihan lagi tidak tersedia karena peserta ini sudah dihapus. Kembali ke halaman awal PDKT untuk memilih peserta aktif."
-      : "Latihan lagi tidak tersedia karena peserta sesi ini tidak tercatat. Kembali ke halaman awal PDKT untuk memilih peserta.";
+  const practiceUnavailableReason = !canCreateEmail
+    ? "Muat ulang pengaturan sebelum membuat email baru."
+    : repeatSubject
+      ? undefined
+      : reviewedSubject?.type === "participant"
+        ? "Latihan lagi tidak tersedia karena peserta ini sudah dihapus. Kembali ke halaman awal PDKT untuk memilih peserta aktif."
+        : "Latihan lagi tidak tersedia karena peserta sesi ini tidak tercatat. Kembali ke halaman awal PDKT untuk memilih peserta.";
 
   const detailSkeleton = (
     <div role="status" className="flex flex-1 flex-col gap-4 p-6">
@@ -1154,6 +1073,40 @@ export default function PdktSimulation({
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-32 w-full" />
     </div>
+  );
+  const detailPending = mailboxDetail.failed ? (
+    <div className="flex min-h-0 flex-1 items-start justify-center p-4 md:p-6">
+      <Alert variant="destructive" className="max-w-lg items-start">
+        <AlertCircle aria-hidden="true" />
+        <div>
+          <AlertDescription className="font-semibold text-foreground">
+            Email belum bisa dimuat
+          </AlertDescription>
+          <p className="mt-1 text-sm leading-6 text-foreground">
+            Periksa koneksi Anda, lalu coba lagi. Email Anda tetap tersimpan.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void setSelectedId(null)}
+              className="min-h-[44px] text-foreground"
+            >
+              Kembali ke daftar email
+            </Button>
+            <Button
+              type="button"
+              onClick={mailboxDetail.retry}
+              className="min-h-[44px]"
+            >
+              Coba lagi
+            </Button>
+          </div>
+        </div>
+      </Alert>
+    </div>
+  ) : (
+    detailSkeleton
   );
 
   let body: React.ReactNode;
@@ -1202,7 +1155,7 @@ export default function PdktSimulation({
         practiceUnavailableReason={practiceUnavailableReason}
       />
     ) : (
-      detailSkeleton
+      detailPending
     );
   } else {
     body = (
@@ -1211,6 +1164,7 @@ export default function PdktSimulation({
           className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[22rem] md:shrink-0`}
         >
           <MailboxSidebar
+            creationDisabled={!canCreateEmail}
             items={filteredByTab}
             openCount={openCount}
             reviews={reviews}
@@ -1250,7 +1204,7 @@ export default function PdktSimulation({
               onBackToList={() => setSelectedId(null)}
             />
           ) : selectedId ? (
-            detailSkeleton
+            detailPending
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-card p-12 text-center">
               <Inbox
@@ -1267,6 +1221,7 @@ export default function PdktSimulation({
                   setPracticeSubject(null);
                   setIsNewModalOpen(true);
                 }}
+                disabled={!canCreateEmail}
                 className="min-h-[44px] text-xs"
               >
                 Buat email baru
@@ -1355,6 +1310,10 @@ export default function PdktSimulation({
         </Alert>
       )}
 
+      <PdktSettingsNotice
+        status={settingsResource.status}
+        onRetry={() => void settingsResource.reload()}
+      />
       {body}
 
       <CreateEmailModal

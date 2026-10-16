@@ -69,10 +69,7 @@ function sessionSubject(session: SessionHistory): string {
     (email) => typeof email?.subject === "string" && email.subject.trim(),
   )?.subject;
   if (typeof subject === "string") return subject.trim();
-  const title = session.config?.scenarios?.[0]?.title;
-  return typeof title === "string" && title.trim()
-    ? title.trim()
-    : PDKT_NO_SUBJECT;
+  return PDKT_NO_SUBJECT;
 }
 
 function mailboxMeta(item: PdktMailboxListItem): string {

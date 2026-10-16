@@ -3,6 +3,7 @@ import type { PdktMailboxDetailItem } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { EmailAttachments } from "./EmailAttachments";
 import { PdktStageNav } from "./PdktStageNav";
+import type { MailboxReviewState } from "./MailboxSidebar";
 import {
   PDKT_NO_SUBJECT,
   formatPdktEmailDate,
@@ -15,13 +16,19 @@ interface EmailDetailPaneProps {
   onReply: () => void;
   onDelete?: () => void;
   onOpenReview?: () => void;
-  reviewStatus?: "not_started" | "pending" | "processing" | "completed" | "failed" | null;
+  reviewStatus?: MailboxReviewState["status"] | null;
   /** Tombol kembali ke daftar email di layar sempit. */
   onBackToList?: () => void;
 }
 
 /** Isi email dipecah per paragraf kosong supaya jarak baca tetap lega. */
-export function EmailBody({ body, className }: { body: string; className?: string }) {
+export function EmailBody({
+  body,
+  className,
+}: {
+  body: string;
+  className?: string;
+}) {
   return (
     <div className={className}>
       {body
@@ -168,9 +175,11 @@ export function EmailDetailPane({
                 ? "Telaah siap"
                 : reviewStatus === "failed"
                   ? "Telaah gagal"
-                  : reviewStatus === "not_started"
-                    ? "Belum ditelaah"
-                    : "Sedang ditelaah AI"}
+                  : reviewStatus === "unavailable"
+                    ? "Telaah sudah dihapus"
+                    : reviewStatus === "not_started"
+                      ? "Belum ditelaah"
+                      : "Sedang ditelaah AI"}
             </span>
             <Button
               type="button"

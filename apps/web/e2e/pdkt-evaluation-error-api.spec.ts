@@ -200,10 +200,11 @@ test("failed telaah stores only a public error code through the real retry route
     .toBe("failed");
   const row = await createAdmin(env)
     .from("pdkt_history")
-    .select("evaluation_error")
+    .select("evaluation_error,evaluation_started_at")
     .eq("id", historyId)
     .single();
   expect(row.error).toBeNull();
+  expect(row.data?.evaluation_started_at).toBeNull();
   expect(PDKT_EVALUATION_ERROR_CODES).toContain(row.data?.evaluation_error);
   // The blocked provider call is an unavailable AI, not a parse or save failure.
   expect(row.data?.evaluation_error).toBe("ai_unavailable");

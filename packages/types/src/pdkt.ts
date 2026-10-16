@@ -69,11 +69,7 @@ export type PdktExpectedAnswerAlignment = z.infer<
 
 // ── Evaluasi Edukatif (edu layer) ────────────────────────
 export type PdktDimensionKey =
-  | "recipientDirection"
-  | "normative"
-  | "clarity"
-  | "typo"
-  | "template";
+  "recipientDirection" | "normative" | "clarity" | "typo" | "template";
 
 /** Urutan tetap dimensi penilaian (dipakai untuk prioritas dan validasi). */
 export const PDKT_DIMENSION_KEYS = [
@@ -120,17 +116,10 @@ export interface PdktEvaluationEdu {
 }
 
 export type ConsumerNameMentionPattern =
-  | "random"
-  | "upfront"
-  | "middle"
-  | "late"
-  | "none";
+  "random" | "upfront" | "middle" | "late" | "none";
 
 export type ResolvedConsumerNameMentionPattern =
-  | "upfront"
-  | "middle"
-  | "late"
-  | "none";
+  "upfront" | "middle" | "late" | "none";
 
 export const pdktConsumerTypeSchema = z.object({
   id: z.string(),
@@ -156,10 +145,7 @@ export const pdktScenarioSchema = z.object({
   title: z.string(),
   description: z.string(),
   isActive: z.boolean(),
-  expectedAnswer: z
-    .string()
-    .max(PDKT_PROMPT_INPUT_LIMITS.longText)
-    .optional(),
+  expectedAnswer: z.string().max(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
   primaryRecipientType: z.enum(["ojk", "reported_company"]).optional(),
   /** Hanya berlaku untuk `reported_company`: isi email juga meminta bantuan OJK. */
   ojkRequestInBody: z.boolean().optional(),
@@ -230,7 +216,9 @@ export const pdktPromptScenarioSchema = pdktScenarioSchema
 
 /** Session creation may carry an evaluation-only reference; generation prompt schemas do not. */
 export const pdktSessionScenarioSchema = pdktPromptScenarioSchema.extend({
-  expectedAnswer: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
+  expectedAnswer: boundedPromptString(
+    PDKT_PROMPT_INPUT_LIMITS.longText,
+  ).optional(),
 });
 
 export const pdktPromptIdentitySchema = pdktIdentitySchema.extend({
@@ -563,6 +551,13 @@ export interface PdktMailboxPermissions {
   can_delete: boolean;
 }
 
+/** Public replay metadata; evaluation config and answer references stay backend-only. */
+export interface PdktHistoryConfig {
+  scenarios: Array<Pick<PdktScenario, "id">>;
+  identity?: PdktIdentity;
+  writingStyleMode?: WritingStyleMode;
+}
+
 export interface PdktSessionHistory {
   id: string;
   timestamp: string;
@@ -573,17 +568,17 @@ export interface PdktSessionHistory {
   emails: EmailMessage[];
   evaluation: PdktEvaluationResult | null;
   evaluationStatus:
-    | "not_started"
-    | "pending"
-    | "processing"
-    | "completed"
-    | "failed";
+    "not_started" | "pending" | "processing" | "completed" | "failed";
   evaluationError?: string | null;
   evaluationStartedAt?: string | null;
   evaluationCompletedAt?: string | null;
   timeTaken: number | null;
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
+
+export type PdktPublicSessionHistory = Omit<PdktSessionHistory, "config"> & {
+  config: PdktHistoryConfig | null;
+};
 
 export const pdktMailboxRetryRequestSchema = z.object({
   mailboxDraftToken: z.string().min(1),

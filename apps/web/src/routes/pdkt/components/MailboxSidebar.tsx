@@ -25,7 +25,13 @@ export type MailboxFilter = "all" | "open" | "replied";
 
 /** Status telaah per email yang sudah dibalas, untuk baris kotak masuk. */
 export interface MailboxReviewState {
-  status: "not_started" | "pending" | "processing" | "completed" | "failed";
+  status:
+    | "not_started"
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "unavailable";
   score: number | null;
 }
 
@@ -37,6 +43,7 @@ interface MailboxSidebarProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  creationDisabled?: boolean;
   onSettings: () => void;
   onHistory: () => void;
 
@@ -110,6 +117,8 @@ function RowStatus({
   if (review?.status === "not_started") {
     return <span>Dibalas · belum ditelaah</span>;
   }
+  if (review?.status === "unavailable")
+    return <span>Dibalas · telaah dihapus</span>;
   return (
     <span className="inline-flex items-center gap-1.5">
       <Loader2
@@ -129,6 +138,7 @@ export function MailboxSidebar({
   selectedId,
   onSelect,
   onNew,
+  creationDisabled = false,
   onSettings,
   onHistory,
   filter,
@@ -190,6 +200,7 @@ export function MailboxSidebar({
               <Button
                 type="button"
                 onClick={onNew}
+                disabled={creationDisabled}
                 className="min-h-[44px] gap-1.5 px-3.5 text-xs font-semibold"
               >
                 <Plus aria-hidden="true" />
@@ -222,6 +233,7 @@ export function MailboxSidebar({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={onSettings}
+                    disabled={creationDisabled}
                     className="min-h-[44px]"
                   >
                     Pengaturan
@@ -296,6 +308,7 @@ export function MailboxSidebar({
                 type="button"
                 variant="outline"
                 onClick={onNew}
+                disabled={creationDisabled}
                 className="mt-4 min-h-[44px] text-xs"
               >
                 Buat email pertama

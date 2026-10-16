@@ -17,6 +17,10 @@ export default defineConfig({
   outputDir: "./test-results/api",
   projects: [
     {
+      name: "pdkt-resilience-real-backend",
+      testMatch: "pdkt-resilience-api.spec.ts",
+    },
+    {
       name: "pdkt-review-evidence-real-backend",
       testMatch: "pdkt-review-evidence-api.spec.ts",
     },

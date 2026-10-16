@@ -6,6 +6,8 @@ honor its STOP conditions, and update your row when done.
 
 ## Per-feature plans
 
+- [PDKT Integrity & Resilience](markdown/pdkt-integrity-resilience.md) — Lane D; all eight findings fixed locally, E2E/rollback/replay/root checks complete. Commit/push to main authorized; deployment and remote migration remain outside scope.
+
 Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked in Git. The git-ignored `plan/markdown/` directory is a legacy local archive; do not add new plans there.
 
 ## Execution order & status

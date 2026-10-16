@@ -2,14 +2,14 @@ import { resolveAccountScope } from "../../services/access/scope";
 import { getActor } from "../../middleware/role";
 import { Hono } from "hono";
 import {
-  PdktSessionHistory,
+  PdktPublicSessionHistory,
   mapSimulationSubjectRowToSnapshot,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
 import { requireCapability } from "../../middleware/role";
 import { createAdminClient } from "../../lib/supabase";
 import { Variables, getUserClient, jsonServerError } from "./route-utils";
-import { toPdktSimulationConfig } from "../../services/pdkt/scenario-projections";
+import { fetchPdktHistory } from "../../services/pdkt/history-service";
 
 const history = new Hono<{ Variables: Variables }>();
 
@@ -19,24 +19,20 @@ history.get("/", requireCapability("pdkt.history.read"), async (c) => {
   const userClient = getUserClient(c);
 
   try {
-    const { data, error } = await userClient
-      .from("pdkt_history")
-      .select("*")
-      .eq("user_id", resolveAccountScope(getActor(c)).userId)
-      .order("timestamp", { ascending: false });
-
-    if (error) throw error;
+    const data = await fetchPdktHistory(
+      userClient,
+      resolveAccountScope(getActor(c)).userId,
+    );
 
     return c.json({
       success: true,
       data: (data || []).map((row: any) => ({
         ...row,
-        config: toPdktSimulationConfig(row.config),
         user_id: row.user_id ?? user.id,
         user_email: user.email ?? null,
         user_role: profile?.role ?? null,
         simulationSubject: mapSimulationSubjectRowToSnapshot(row),
-      })) as PdktSessionHistory[],
+      })) as PdktPublicSessionHistory[],
     });
   } catch (error: unknown) {
     return jsonServerError(c, error);

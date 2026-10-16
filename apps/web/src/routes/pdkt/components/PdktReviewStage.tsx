@@ -709,6 +709,25 @@ function IncompleteReviewNotice({
 }
 
 function ReviewPending({ status, onRetry }: Pick<Props, "status" | "onRetry">) {
+  if (status === "unavailable")
+    return (
+      <Alert
+        role="region"
+        aria-label="Telaah yang dihapus"
+        className="items-start"
+      >
+        <Info aria-hidden="true" />
+        <div>
+          <AlertDescription className="font-semibold text-foreground">
+            Telaah sudah dihapus
+          </AlertDescription>
+          <p className="mt-1 text-sm leading-6 text-foreground">
+            Riwayat latihan ini sudah dihapus. Email dan balasan Anda tetap
+            tersedia di kotak masuk.
+          </p>
+        </div>
+      </Alert>
+    );
   if (status === "failed") {
     // Teks galat dari server/AI tidak pernah ditampilkan ke peserta.
     return (

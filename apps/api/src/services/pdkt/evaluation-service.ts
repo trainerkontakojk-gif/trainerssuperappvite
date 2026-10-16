@@ -311,7 +311,10 @@ function applyRecipientConflictFailsafe(input: {
 }
 
 class PdktEvaluationFailure extends Error {
-  constructor(message: string, readonly code: PdktEvaluationErrorCode) {
+  constructor(
+    message: string,
+    readonly code: PdktEvaluationErrorCode,
+  ) {
     super(message);
     this.name = "PdktEvaluationFailure";
   }
@@ -444,7 +447,8 @@ export function buildPdktEdu(
     }
   }
   if (conflictDetected && !dimensionTips.recipientDirection) {
-    dimensionTips.recipientDirection = buildConflictRecipientTip(recipientContext);
+    dimensionTips.recipientDirection =
+      buildConflictRecipientTip(recipientContext);
   }
 
   // ── improvementTips (non-authoritative passthrough) ──
@@ -751,9 +755,10 @@ export async function evaluateAgentResponse(
 
   return {
     success: false,
-    errorCode: lastError instanceof InvalidPdktEvaluationResponseError
-      ? "ai_invalid_output"
-      : "ai_unavailable",
+    errorCode:
+      lastError instanceof InvalidPdktEvaluationResponseError
+        ? "ai_invalid_output"
+        : "ai_unavailable",
     error:
       lastError instanceof Error
         ? lastError.message
@@ -814,7 +819,7 @@ export async function processPdktEvaluation(
     })
     .eq("id", historyId)
     .or(
-      `evaluation_started_at.is.null,evaluation_started_at.lt.${staleThreshold}`,
+      `evaluation_status.in.(failed,completed),evaluation_started_at.is.null,evaluation_started_at.lt.${staleThreshold}`,
     );
   const { data: claimed, error: claimError } = await (
     reviewWithoutMarks
@@ -910,6 +915,7 @@ export async function processPdktEvaluation(
       .from("pdkt_history")
       .update({
         evaluation_status: "failed",
+        evaluation_started_at: null,
         evaluation_error:
           err instanceof PdktEvaluationFailure ? err.code : "evaluation_failed",
         evaluation_completed_at: new Date().toISOString(),

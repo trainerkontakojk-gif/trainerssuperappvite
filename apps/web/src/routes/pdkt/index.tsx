@@ -15,6 +15,8 @@ import {
 import { summarizePdktLanding } from "./utils/landingSummary";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
+import { PdktSettingsNotice } from "./components/PdktSettingsNotice";
+import { usePdktSettings } from "./utils/usePdktSettings";
 import { mapHistoryRow, type SessionHistory } from "./utils/sessionHistory";
 import { UsagePopover } from "../../components/simulation/UsagePopover";
 import { useApi } from "../../hooks/useApi";
@@ -39,7 +41,6 @@ import {
   type UsageSnapshot,
 } from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
-import { createSettingsVersionStore } from "../../lib/settings-contract";
 
 /** Kepanjangan PDKT dari metadata modul kanonik (`lib/app-config.ts`). */
 const PDKT_EXPANDED_TITLE =
@@ -70,19 +71,16 @@ export default function PdktLanding() {
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  const [settings, setSettings] = useState<PdktAppSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
+  const settingsResource = usePdktSettings(accountKey);
+  const { settings } = settingsResource;
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState(false);
   // Landing data is handed to the session view so it does not refetch it.
-  const [settingsReady, setSettingsReady] = useState(false);
-  const [settingsVersion, setSettingsVersion] = useState<string | undefined>();
   const [historyReady, setHistoryReady] = useState(false);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const usageSnapshotRef = useRef<UsageSnapshot | null>(null);
-  const settingsVersionRef = useRef(createSettingsVersionStore());
   const shouldReduceMotion = useReducedMotion();
 
   const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
@@ -95,27 +93,6 @@ export default function PdktLanding() {
     error: mailboxError,
     refetch: refetchMailbox,
   } = useApi<PdktMailboxListItem[]>("/pdkt/mailbox");
-
-  const fetchSettings = async () => {
-    try {
-      const response = await pdktClient.settings.$get();
-      const res = await (unwrapResponse(
-        response,
-      ) as Promise<PdktAppSettings | null>);
-      settingsVersionRef.current.capture(response);
-      if (res) {
-        setSettings(res);
-      } else {
-        setSettings(null);
-      }
-      setSettingsReady(true);
-      setSettingsVersion(settingsVersionRef.current.current());
-    } catch (err) {
-      console.error("[PDKT] Failed to load settings:", err);
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
 
   const fetchHistory = async () => {
     setHistoryError(false);
@@ -136,19 +113,11 @@ export default function PdktLanding() {
   };
 
   useEffect(() => {
-    fetchSettings();
     fetchHistory();
   }, []);
 
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
-    const response = await pdktClient.settings.$post(
-      { json: { settings: newSettings } },
-      settingsVersionRef.current.requiredRequestOptions(),
-    );
-    await unwrapResponse(response);
-    settingsVersionRef.current.capture(response);
-    setSettings(newSettings);
-    setSettingsVersion(settingsVersionRef.current.current());
+    await settingsResource.save(newSettings);
     await fetchHistory();
   };
 
@@ -283,15 +252,6 @@ export default function PdktLanding() {
     void navigate({ to: "/pdkt", search: { ruang: 1 } });
   };
 
-  const handleSessionSettingsChange = useCallback(
-    (nextSettings: PdktAppSettings, nextVersion: string | undefined) => {
-      setSettings(nextSettings);
-      setSettingsVersion(nextVersion);
-      setSettingsReady(true);
-    },
-    [],
-  );
-
   const handleSessionHistoryChange = useCallback(
     (nextHistory: SessionHistory[]) => {
       setHistory(nextHistory);
@@ -425,6 +385,7 @@ export default function PdktLanding() {
                         type="button"
                         variant="outline"
                         onClick={handleOpenSettings}
+                        disabled={settingsResource.status !== "ready"}
                         className={navButtonClass}
                       >
                         <SlidersHorizontal data-icon="inline-start" />
@@ -440,6 +401,10 @@ export default function PdktLanding() {
               </div>
             </section>
 
+            <PdktSettingsNotice
+              status={settingsResource.status}
+              onRetry={() => void settingsResource.reload()}
+            />
             <PdktLandingOverview
               summary={landingSummary}
               historyState={historyState}
@@ -495,12 +460,8 @@ export default function PdktLanding() {
                     void computeUsageDeltaNow(reason)
                   }
                   initialReplaySession={replaySession}
-                  initialSettings={settingsReady ? settings : undefined}
-                  initialSettingsVersion={
-                    settingsReady ? settingsVersion : undefined
-                  }
+                  settingsResource={settingsResource}
                   initialHistory={historyReady ? history : undefined}
-                  onSettingsChange={handleSessionSettingsChange}
                   onHistoryChange={handleSessionHistoryChange}
                   initialScenarios={defaultScenarios ?? undefined}
                   initialConsumerTypes={

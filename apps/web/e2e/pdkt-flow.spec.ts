@@ -778,7 +778,15 @@ test.describe("PDKT (hermetic)", () => {
       path: "/pdkt",
       // Urutan API mengikuti aktivitas terbaru; email terlama tampil paling atas.
       apiMocks: pdktMocks(
-        [...EVALUATED_HISTORY, reviewing],
+        [
+          {
+            ...EVALUATED_HISTORY[0],
+            // Public history derives the subject from the replay email, not
+            // from the evaluator's private scenario snapshot.
+            emails: [REPLIED_MAIL.detail.inbound_email],
+          },
+          reviewing,
+        ],
         [NEWER_OPEN_MAIL, OPEN_MAIL, REPLIED_MAIL],
       ),
     });
@@ -810,7 +818,7 @@ test.describe("PDKT (hermetic)", () => {
 
     const recent = page.getByRole("region", { name: "Hasil telaah terbaru" });
     await expect(recent.getByRole("row")).toHaveCount(2); // header + 1 sesi
-    await expect(recent).toContainText(SCENARIO.title);
+    await expect(recent).toContainText(REPLIED_MAIL.list.subject);
     await expect(recent).toContainText("85");
 
     // Membuka email terlama: kotak masuk terbuka dengan email itu terpilih,
@@ -1229,7 +1237,7 @@ test.describe("PDKT (hermetic)", () => {
   }) => {
     const audit = await openHermeticShell(page, {
       path: "/pdkt/history",
-      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS, [REPLIED_MAIL]),
+      apiMocks: pdktNavigationMocks(HISTORY_PAGE_SESSIONS, [REPLIED_MAIL]),
     });
 
     const link = page
@@ -2228,10 +2236,12 @@ test.describe("PDKT (hermetic)", () => {
     );
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      expect(await findLowContrastText(breakdown, {
-        selector: "p, span, blockquote, h3",
-        leafOnly: true,
-      })).toEqual([]);
+      expect(
+        await findLowContrastText(breakdown, {
+          selector: "p, span, blockquote, h3",
+          leafOnly: true,
+        }),
+      ).toEqual([]);
     }
     await breakdown.screenshot({
       path: test.info().outputPath("pdkt-score-explanations.png"),
@@ -3488,9 +3498,9 @@ async function openSubjectReview(
         {
           ...EVALUATED_HISTORY[0],
           config: {
-            ...SESSION_CONFIG,
+            identity: SESSION_CONFIG.identity,
             writingStyleMode: "training" as const,
-            scenarios: [{ ...SCENARIO, id: "retired", isActive: false }],
+            scenarios: [{ id: "retired" }],
           },
         },
       ]

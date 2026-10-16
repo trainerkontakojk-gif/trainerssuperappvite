@@ -11,6 +11,7 @@ import {
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
 import { toPdktSimulationEmail } from "./scenario-projections";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 
 type BulkDeleteResult = {
   successCount: number;
@@ -101,8 +102,7 @@ function throwMappedMailboxRpcError(
 }
 
 type BulkDeleteOutcome =
-  | { status: "success" }
-  | { status: "failure"; error: string };
+  { status: "success" } | { status: "failure"; error: string };
 
 /**
  * Checks if an actor can delete a mailbox item.
@@ -241,25 +241,23 @@ export async function fetchMailboxItems(
       ? { id: actorOrId, role: "agent" }
       : actorOrId;
 
-  const { data, error } = await supabaseClient
-    .from("pdkt_mailbox_items")
-    .select(MAILBOX_LIST_COLUMNS)
-    .neq("status", "deleted")
-    .or("is_shared_copy.eq.false,is_shared_copy.is.null")
-    .order("last_activity_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("[PDKT] Mailbox fetch failed:", error);
-    throw new Error("Gagal mengambil data mailbox.");
-  }
-
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  const decorated = await decorateMailboxRows(data, actor);
-  return decorated.map((item) => toMailboxListRow(item));
+  return fetchAllPages<PdktMailboxListItem>({
+    // Profile decoration also uses an `in` URL; keep that batch gateway-safe.
+    pageSize: 100,
+    build: async ({ from, to }) => {
+      const { data, error } = await supabaseClient
+        .from("pdkt_mailbox_items")
+        .select(MAILBOX_LIST_COLUMNS)
+        .neq("status", "deleted")
+        .or("is_shared_copy.eq.false,is_shared_copy.is.null")
+        .order("last_activity_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) return { data: null, error };
+      const decorated = await decorateMailboxRows(data ?? [], actor);
+      return { data: decorated.map(toMailboxListRow), error: null };
+    },
+  });
 }
 
 /**
@@ -311,7 +309,9 @@ export async function fetchMailboxItemById(
   const [item] = await decorateMailboxRows([data], actor);
   if (!item) return null;
 
-  const thread = Array.isArray(emails.emails_thread) ? emails.emails_thread : [];
+  const thread = Array.isArray(emails.emails_thread)
+    ? emails.emails_thread
+    : [];
   return {
     ...item,
     inbound_email: toPdktSimulationEmail(emails.inbound_email),

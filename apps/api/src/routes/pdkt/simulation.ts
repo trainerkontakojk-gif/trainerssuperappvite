@@ -26,7 +26,7 @@ import {
 } from "./route-utils";
 import { createPdktMailboxRetryDraft } from "../../services/pdkt/mailbox-retry";
 import {
-  toPdktSimulationConfig,
+  toPdktSimulationEmail,
   toPdktSimulationScenario,
 } from "../../services/pdkt/scenario-projections";
 
@@ -172,8 +172,8 @@ simulation.post(
         // Keep the original flat EmailMessage fields for existing callers;
         // additive metadata and the explicit message alias support retry-aware
         // clients without changing the legacy response shape.
-        ...initMessage,
-        message: initMessage,
+        ...toPdktSimulationEmail(initMessage),
+        message: toPdktSimulationEmail(initMessage),
         simulationSubject,
         mailboxDraftToken: retryDraft.token,
       },
@@ -240,16 +240,7 @@ simulation.post(
               retryable: true,
               retryDraft: {
                 token: result.retryDraft.token,
-                batch: {
-                  ...retryBatch,
-                  scenario_snapshot: toPdktSimulationScenario(
-                    retryBatch.scenario_snapshot,
-                  ),
-                  config_snapshot: toPdktSimulationConfig(
-                    retryBatch.config_snapshot,
-                  ),
-                },
-                inbound_email: retryBatch.inbound_email,
+                inbound_email: toPdktSimulationEmail(retryBatch.inbound_email),
                 simulationSubject: result.retryDraft.simulationSubjectSnapshot,
               },
             }
@@ -272,7 +263,7 @@ simulation.post(
       success: true,
       data: {
         id: result.data,
-        message: result.message,
+        message: toPdktSimulationEmail(result.message),
         simulationSubject,
       },
     });

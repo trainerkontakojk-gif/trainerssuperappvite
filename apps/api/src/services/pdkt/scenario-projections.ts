@@ -1,11 +1,11 @@
+import type { PdktHistoryConfig } from "@trainers/types";
+
 type WithoutExpectedAnswer<T> = T extends object
   ? Omit<T, "expectedAnswer" | "ojkRequestInBody">
   : T;
 
 type SimulationConfig<T> = T extends { scenarios: Array<infer Scenario> }
-  ? Omit<T, "scenarios"> & {
-      scenarios: Array<WithoutExpectedAnswer<Scenario>>;
-    }
+  ? Omit<T, "scenarios"> & { scenarios: Array<WithoutExpectedAnswer<Scenario>> }
   : T;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -25,7 +25,9 @@ export function toPdktSimulationScenario<T>(
   return simulationScenario as WithoutExpectedAnswer<T>;
 }
 
-type SimulationEmail<T> = T extends object ? Omit<T, "recipientContext"> : T;
+type SimulationEmail<T> = T extends object
+  ? Omit<T, "recipientContext" | "attachmentDiagnostics">
+  : T;
 
 /**
  * Keep the reply direction a test: consumer emails shown in the simulation
@@ -34,7 +36,11 @@ type SimulationEmail<T> = T extends object ? Omit<T, "recipientContext"> : T;
  */
 export function toPdktSimulationEmail<T>(email: T): SimulationEmail<T> {
   if (!isRecord(email)) return email as SimulationEmail<T>;
-  const { recipientContext: _recipientContext, ...simulationEmail } = email;
+  const {
+    recipientContext: _recipientContext,
+    attachmentDiagnostics: _attachmentDiagnostics,
+    ...simulationEmail
+  } = email;
   if (simulationEmail.isAgent === true) {
     return simulationEmail as SimulationEmail<T>;
   }
@@ -43,12 +49,45 @@ export function toPdktSimulationEmail<T>(email: T): SimulationEmail<T> {
 
 /** Keep evaluation-only references private when stored config snapshots are read by the UI. */
 export function toPdktSimulationConfig<T>(config: T): SimulationConfig<T> {
-  if (!isRecord(config) || !Array.isArray(config.scenarios)) {
+  if (!isRecord(config) || !Array.isArray(config.scenarios))
     return config as SimulationConfig<T>;
-  }
-
   return {
     ...config,
     scenarios: config.scenarios.map(toPdktSimulationScenario),
   } as SimulationConfig<T>;
+}
+
+/** A trainee replay has no need for the evaluator's scenario/persona settings. */
+export function toPdktHistoryConfig(config: unknown): PdktHistoryConfig | null {
+  if (!isRecord(config)) return null;
+  const projected: PdktHistoryConfig = {
+    scenarios: Array.isArray(config.scenarios)
+      ? config.scenarios.flatMap((scenario) =>
+          isRecord(scenario) && typeof scenario.id === "string"
+            ? [{ id: scenario.id }]
+            : [],
+        )
+      : [],
+  };
+  const identity = config.identity;
+  if (
+    isRecord(identity) &&
+    typeof identity.name === "string" &&
+    typeof identity.email === "string" &&
+    typeof identity.city === "string" &&
+    typeof identity.bodyName === "string"
+  ) {
+    projected.identity = {
+      name: identity.name,
+      email: identity.email,
+      city: identity.city,
+      bodyName: identity.bodyName,
+    };
+  }
+  if (
+    config.writingStyleMode === "realistic" ||
+    config.writingStyleMode === "training"
+  )
+    projected.writingStyleMode = config.writingStyleMode;
+  return projected;
 }
