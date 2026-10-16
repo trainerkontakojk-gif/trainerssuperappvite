@@ -1,7 +1,7 @@
 # Scope the `proses_ideb_slik` cluster to SLIK findings
 
 Lane: **C**. This changes the shared matcher in `apps/api/src/services/sidak/agent-root-causes.ts`, which feeds both the SIDAK agent detail and the TNA drill-down. It follows up on [`root-cause-slik-ideb-cluster.md`](root-cause-slik-ideb-cluster.md).
-Status: **implemented** (2026-10-17). D1 = (a), approved by Fajar. Awaiting Fajar's audit re-run (step 5).
+Status: **implemented** (2026-10-17). D1 = (a), approved by Fajar. Audited by Fajar: 495/2796 = 17.70% fallback, the cluster holds 231 rows, all `slik`, and 0 Call.
 
 ## Requirement
 

@@ -640,7 +640,7 @@ Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/
 - Final setelah semua ekspansi: **17.49% fallback** — target tercapai (2026-07-09).
 - 2026-10-17, setelah `hold_waktu_tunggu`: **25.39%** (710/2796). Penyebab utama: service `slik` baru (205/233 = 88% fallback). Audit kini juga mencocokkan nama parameter seperti API: 24.96% (698/2796).
 - Setelah `proses_ideb_slik` (2026-10-17): **17.24% fallback** (482/2796) — target tercapai. `slik` turun dari 205 ke 2 fallback; `call` tetap tertinggi (282/947 = 29.78%).
-- Setelah `proses_ideb_slik` dibatasi ke service `slik` (2026-10-17): proyeksi **17.70% fallback** (495/2796) — 13 temuan Call kembali ke `lainnya`. Menunggu audit ulang.
+- Setelah `proses_ideb_slik` dibatasi ke service `slik` (2026-10-17): **17.70% fallback** (495/2796, diaudit) — 13 temuan Call kembali ke `lainnya`; `proses_ideb_slik` kini 231 temuan, seluruhnya `slik`, 0 Call.
 
 ### Ekspansi Registry (Phase 2)
 
