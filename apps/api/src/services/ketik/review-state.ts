@@ -1,3 +1,5 @@
+import { KETIK_ERROR_MESSAGES } from "@trainers/types";
+
 export type KetikHistoryReviewStatus =
   | "pending"
   | "processing"
@@ -83,8 +85,7 @@ export function resolveKetikReviewState(input: {
     return {
       status: "failed",
       resultReady: false,
-      errorMessage:
-        input.job.error_message || "Analisis AI gagal diproses. Silakan jalankan ulang.",
+      errorMessage: KETIK_ERROR_MESSAGES.REVIEW_FAILED,
       shouldMarkHistoryFailed: true,
       shouldMarkJobFailed: false,
     };

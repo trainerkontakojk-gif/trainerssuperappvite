@@ -1,9 +1,9 @@
 import { ArrowRight, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
-import type { KetikSessionHistoryItem } from "@trainers/types";
+import type { KetikHistorySummaryItem } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
-import type { KetikLandingSummary } from "../utils/landingSummary";
+import type { KetikLandingSummary } from "@trainers/types";
 import { formatKetikDate } from "../utils/reviewDisplay";
 
 export type KetikLoadState = "loading" | "ready" | "error";
@@ -12,7 +12,7 @@ interface KetikLandingOverviewProps {
   summary: KetikLandingSummary;
   historyState: KetikLoadState;
   onRetryHistory: () => void;
-  onOpenSession: (session: KetikSessionHistoryItem) => void;
+  onOpenSession: (session: KetikHistorySummaryItem) => void;
   onOpenHistory: () => void;
 }
 

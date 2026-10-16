@@ -37,7 +37,6 @@ import {
 import {
   KETIK_FIX_THRESHOLD,
   numberMessages,
-  previousFinalScore,
   readAspectScores,
   scoreVerdict,
   typoSeverityLabel,
@@ -58,7 +57,7 @@ import { SessionReplayModal } from "./SessionReplayModal";
 
 interface KetikReviewStageProps {
   session: KetikSessionHistoryItem;
-  history: readonly KetikSessionHistoryItem[];
+  previousScore: number | null;
   canStartReview: boolean;
   onSessionChange: (session: KetikSessionHistoryItem) => void;
   onBack: () => void;
@@ -93,7 +92,7 @@ function barColor(score: number): string {
 /** Tahap Telaah KETIK: transkrip di kiri, hasil telaah di kanan. */
 export function KetikReviewStage({
   session,
-  history,
+  previousScore,
   canStartReview,
   onSessionChange,
   onBack,
@@ -285,7 +284,7 @@ export function KetikReviewStage({
           {review.phase === "ready" && review.review ? (
             <ReviewResult
               session={session}
-              history={history}
+              previousScore={previousScore}
               review={review.review}
               typos={review.typos}
               numbers={numbers}
@@ -494,7 +493,7 @@ function ReviewFailed({
 
 function ReviewResult({
   session,
-  history,
+  previousScore,
   review,
   typos,
   numbers,
@@ -503,7 +502,7 @@ function ReviewResult({
   onRerun,
 }: {
   session: KetikSessionHistoryItem;
-  history: readonly KetikSessionHistoryItem[];
+  previousScore: number | null;
   review: KetikSessionReview;
   typos: KetikTypoFinding[];
   numbers: Map<string, number>;
@@ -513,7 +512,7 @@ function ReviewResult({
   onRerun: (() => void) | null;
 }) {
   const finalScore = session.finalScore ?? 0;
-  const change = scoreChange(finalScore, previousFinalScore(session, history));
+  const change = scoreChange(finalScore, previousScore);
   const aspects = readAspectScores(session);
   const guidance = [...(review.education?.dimensionGuidance ?? [])].sort(
     (a, b) => a.priorityRank - b.priorityRank,
@@ -664,9 +663,14 @@ function ReviewResult({
           {!points ? (
             <NotAvailable canRerun={onRerun !== null} />
           ) : points.length === 0 ? (
-            <Empty>AI tidak menemukan pertanyaan konsumen di percakapan ini.</Empty>
+            <Empty>
+              AI tidak menemukan pertanyaan konsumen di percakapan ini.
+            </Empty>
           ) : (
-            <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
+            <ol
+              aria-label="Pertanyaan konsumen"
+              className="flex flex-col gap-3"
+            >
               {points.map((point, index) => (
                 <ConsumerPointItem
                   key={`${point.messageId}-${index}`}

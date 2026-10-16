@@ -16,7 +16,27 @@ export default defineConfig({
   reporter: "list",
   outputDir: "./test-results/api",
   projects: [
+    {
+      name: "ketik-history-real-backend",
+      testMatch: "ketik-history-api.spec.ts",
+    },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
+    {
+      name: "ketik-integrity-real-backend",
+      testMatch: "ketik-integrity-api.spec.ts",
+    },
+    {
+      name: "ketik-errors-real-backend",
+      testMatch: "ketik-errors-api.spec.ts",
+    },
+    {
+      name: "ketik-assignment-real-backend",
+      testMatch: "ketik-assignment-api.spec.ts",
+    },
+    {
+      name: "ketik-session-real-backend",
+      testMatch: "ketik-session-api.spec.ts",
+    },
     { name: "tna-real-backend", testMatch: "tna-*-api.spec.ts" },
     {
       name: "db-guard-real-backend",

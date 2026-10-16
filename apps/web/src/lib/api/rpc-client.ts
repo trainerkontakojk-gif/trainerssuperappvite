@@ -93,6 +93,7 @@ export type PricingEntry = {
 
 type AdminClient = {
   users: {
+    $get(): Promise<RpcResponse<import("@trainers/types").ManagedUser[]>>;
     ":id": {
       status: {
         $put(args: {

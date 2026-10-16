@@ -4,24 +4,31 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import {
-  chatMessageSchema,
-  generateMessageSchema,
+  KETIK_ERROR_MESSAGES,
+  KETIK_SESSION_ERRORS,
   ketikQuickTemplateSchema,
   ketikAppSettingsSchema,
-  simulationSubjectSelectionSchema,
 } from "@trainers/types";
 import * as ketikService from "../services/ketik-service";
-import { SimulationSubjectError } from "../services/simulation-subject-service";
-import { resolveRequestSimulationSubject } from "./pdkt/route-utils";
 import { requireCapability } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import { createAdminClient } from "../lib/supabase";
 import { isSettingsConflictError } from "../lib/guarded-user-settings";
 import { z } from "zod";
+import { ketikAssignments } from "./ketik-assignments";
+import { ketikSessions } from "./ketik-sessions";
+import { ketikHistory } from "./ketik-history";
 
 type Variables = { user: User; profile: any };
 
-const ketik = new Hono<{ Variables: Variables }>();
+const ketik = new Hono<{ Variables: Variables }>()
+  .route("/assignments", ketikAssignments)
+  .route("/sessions", ketikSessions)
+  .route("/history", ketikHistory);
+
+function publicError(code: keyof typeof KETIK_ERROR_MESSAGES) {
+  return { code, message: KETIK_ERROR_MESSAGES[code] };
+}
 
 ketik.get("/scenarios", requireCapability("ketik.use"), (c) => {
   return c.json({ success: true, data: ketikService.getScenarios() });
@@ -31,76 +38,17 @@ ketik.get("/consumer-types", requireCapability("ketik.use"), (c) => {
   return c.json({ success: true, data: ketikService.getConsumerTypes() });
 });
 
-ketik.post(
-  "/generate",
-  requireCapability("ketik.use"),
-  aiRateLimitMiddleware,
-  zValidator("json", generateMessageSchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const userId = user?.id;
-
-    const scenarios = ketikService.getScenarios();
-    const consumerTypes = ketikService.getConsumerTypes();
-    // Prioritize scenarioDraft (custom scenarios) over ID lookup (default scenarios)
-    const scenario = body.scenarioDraft
-      ? body.scenarioDraft
-      : scenarios.find((s) => s.id === body.scenarioId);
-    const consumerType = body.consumerTypeDraft
-      ? body.consumerTypeDraft
-      : consumerTypes.find((ct) => ct.id === body.consumerTypeId);
-
-    if (!scenario || !consumerType) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "NOT_FOUND",
-            message: "Scenario atau consumer type tidak ditemukan.",
-          },
-        },
-        404,
-      );
-    }
-
-    const result = await ketikService.generateConsumerResponse(
-      {
-        scenarios: [scenario],
-        consumerType,
-        identity: body.identity,
-        selectedModel: body.selectedModel,
-        simulationDuration: body.simulationDuration,
-        responsePacingMode: body.responsePacingMode,
+ketik.post("/generate", requireCapability("ketik.use"), (c) =>
+  c.json(
+    {
+      success: false,
+      error: {
+        code: "LEGACY_SESSION_WRITE_DISABLED",
+        message: KETIK_SESSION_ERRORS.LEGACY_SESSION_WRITE_DISABLED,
       },
-      scenario,
-      body.chatHistory,
-      { module: "ketik", action: "generate_consumer_response" },
-      userId,
-      {
-        remainingSeconds: body.remainingSeconds,
-        elapsedSeconds: body.elapsedSeconds,
-        totalDurationSeconds: body.simulationDuration
-          ? body.simulationDuration * 60
-          : undefined,
-      },
-    );
-
-    if (!result.success) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "AI_ERROR",
-            message: result.error || "Gagal generate response.",
-          },
-        },
-        502,
-      );
-    }
-
-    return c.json({ success: true, data: { text: result.text } });
-  },
+    },
+    410,
+  ),
 );
 
 ketik.get("/settings", requireCapability("ketik.settings.read"), async (c) => {
@@ -111,11 +59,12 @@ ketik.get("/settings", requireCapability("ketik.settings.read"), async (c) => {
     c.header("x-settings-version", snapshot.version);
     c.header("x-ketik-templates-version", snapshot.globalTemplatesVersion);
     return c.json({ success: true, data: snapshot.settings });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    console.error("[KETIK] Settings load failed", err);
     return c.json(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
+        error: publicError("SETTINGS_LOAD_FAILED"),
       },
       500,
     );
@@ -152,11 +101,11 @@ ketik.put(
           409,
         );
       }
-      const message = err instanceof Error ? err.message : String(err);
+      console.error("[KETIK] Templates save failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message },
+          error: publicError("TEMPLATES_SAVE_FAILED"),
         },
         500,
       );
@@ -192,11 +141,11 @@ ketik.put(
           409,
         );
       }
-      const message = err instanceof Error ? err.message : String(err);
+      console.error("[KETIK] Settings save failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message },
+          error: publicError("SETTINGS_SAVE_FAILED"),
         },
         500,
       );
@@ -204,69 +153,17 @@ ketik.put(
   },
 );
 
-ketik.get("/history", requireCapability("ketik.history.read"), async (c) => {
-  try {
-    const history = await ketikService.getHistory(
-      resolveAccountScope(getActor(c)).userId,
-    );
-    return c.json({ success: true, data: history });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
+ketik.post("/history", requireCapability("ketik.history.write"), (c) =>
+  c.json(
+    {
+      success: false,
+      error: {
+        code: "LEGACY_SESSION_WRITE_DISABLED",
+        message: KETIK_SESSION_ERRORS.LEGACY_SESSION_WRITE_DISABLED,
       },
-      500,
-    );
-  }
-});
-
-ketik.post(
-  "/history",
-  requireCapability("ketik.history.write"),
-  zValidator(
-    "json",
-    z.object({
-      scenarioTitle: z.string(),
-      consumerName: z.string(),
-      consumerPhone: z.string(),
-      consumerCity: z.string(),
-      messages: z.array(chatMessageSchema),
-      simulationDuration: z.number().finite().min(1).max(60).optional(),
-      simulationSubject: simulationSubjectSelectionSchema.optional(),
-    }),
+    },
+    410,
   ),
-  async (c) => {
-    const body = c.req.valid("json");
-    try {
-      const snapshot = await resolveRequestSimulationSubject(
-        c,
-        body.simulationSubject,
-      );
-      const session = await ketikService.persistSession(
-        resolveAccountScope(getActor(c)).userId,
-        {
-          ...body,
-          simulationSubjectSnapshot: snapshot,
-        },
-      );
-      return c.json({ success: true, data: session });
-    } catch (err: any) {
-      if (err instanceof SimulationSubjectError) {
-        return c.json(
-          { success: false, error: { code: err.code, message: err.message } },
-          err.status as 400,
-        );
-      }
-      return c.json(
-        {
-          success: false,
-          error: { code: "INTERNAL_ERROR", message: "Gagal menyimpan sesi." },
-        },
-        500,
-      );
-    }
-  },
 );
 
 ketik.delete(
@@ -276,11 +173,12 @@ ketik.delete(
     try {
       await ketikService.clearHistory(resolveAccountScope(getActor(c)).userId);
       return c.json({ success: true, message: "Riwayat berhasil dihapus." });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("[KETIK] History delete failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: publicError("HISTORY_DELETE_FAILED"),
         },
         500,
       );
@@ -299,11 +197,12 @@ ketik.delete(
         resolveAccountScope(getActor(c)).userId,
       );
       return c.json({ success: true, message: "Sesi berhasil dihapus." });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("[KETIK] Session delete failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: publicError("HISTORY_DELETE_FAILED"),
         },
         500,
       );
@@ -334,11 +233,12 @@ ketik.get(
         );
       }
       return c.json({ success: true, data: detail });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("[KETIK] Review load failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: publicError("REVIEW_LOAD_FAILED"),
         },
         500,
       );
@@ -375,7 +275,8 @@ ketik.post(
         .eq("user_id", resolveAccountScope(getActor(c)).userId)
         .single();
 
-      if (sessionError || !session) {
+      if (sessionError && sessionError.code !== "PGRST116") throw sessionError;
+      if (!session) {
         return c.json(
           {
             success: false,
@@ -403,7 +304,7 @@ ketik.post(
       }
 
       // 2. Check existing job state with lease info (legacy parity)
-      const { data: existingJob } = await adminClient
+      const { data: existingJob, error: jobError } = await adminClient
         .from("ketik_review_jobs")
         .select(
           "status, lease_owner, lease_expires_at, attempt_count, error_message",
@@ -411,6 +312,7 @@ ketik.post(
         .eq("session_id", body.sessionId)
         .maybeSingle();
 
+      if (jobError) throw jobError;
       if (existingJob?.status === "completed") {
         if (session.review_status !== "completed") {
           await adminClient
@@ -518,7 +420,9 @@ ketik.post(
         data: {
           status: processResult.status,
           scores: processResult.scores || undefined,
-          error: processResult.error || undefined,
+          error: processResult.error
+            ? KETIK_ERROR_MESSAGES.REVIEW_FAILED
+            : undefined,
           previousKept: previousKept || undefined,
         },
       });
@@ -539,9 +443,9 @@ ketik.post(
       return c.json(
         {
           success: false,
-          error: { code: "BAD_REQUEST", message: err.message },
+          error: publicError("REVIEW_FAILED"),
         },
-        400,
+        500,
       );
     }
   },
@@ -562,17 +466,18 @@ ketik.get(
         return c.json(
           {
             success: false,
-            error: { code: "NOT_FOUND", message: "Session not found." },
+            error: publicError("NOT_FOUND"),
           },
           404,
         );
       }
       return c.json({ success: true, data: result });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("[KETIK] Review status load failed", err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: publicError("REVIEW_LOAD_FAILED"),
         },
         500,
       );
@@ -584,12 +489,19 @@ ketik.get("/worker", requireCapability("ketik.worker.process"), async (c) => {
   const workerId = c.req.query("workerId") || "web-daemon";
   try {
     const result = await ketikService.processOldestQueuedJob(workerId);
-    return c.json({ success: true, data: result });
-  } catch (err: any) {
+    return c.json({
+      success: true,
+      data: {
+        ...result,
+        ...(result.error ? { error: KETIK_ERROR_MESSAGES.REVIEW_FAILED } : {}),
+      },
+    });
+  } catch (err: unknown) {
+    console.error("[KETIK] Review worker failed", err);
     return c.json(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
+        error: publicError("REVIEW_FAILED"),
       },
       500,
     );

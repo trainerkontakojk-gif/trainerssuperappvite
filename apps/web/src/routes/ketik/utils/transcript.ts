@@ -1,4 +1,7 @@
-import type { KetikSessionHistoryItem } from "@trainers/types";
+import type {
+  KetikHistorySummaryItem,
+  KetikSessionHistoryItem,
+} from "@trainers/types";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { readFinalScore, reviewStatusLabel } from "./reviewDisplay";
 
@@ -65,7 +68,7 @@ export function downloadKetikTranscript(
 
 /** Unduh daftar riwayat sebagai CSV, satu baris per sesi. */
 export function downloadKetikHistory(
-  history: readonly KetikSessionHistoryItem[],
+  history: readonly KetikHistorySummaryItem[],
 ): void {
   const header = [
     "Tanggal",

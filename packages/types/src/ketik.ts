@@ -2,6 +2,29 @@ import { z } from "zod";
 import { DEFAULT_AI_MODEL_ID } from "./ai-models";
 import type { SimulationSubjectSnapshot } from "./simulation-subject";
 
+// Public copy only. Provider/database detail belongs in backend logs, never here.
+export const KETIK_ERROR_MESSAGES = {
+  ASSIGNMENT_LOAD_FAILED: "Penugasan belum bisa dimuat. Coba lagi.",
+  ASSIGNMENT_SAVE_FAILED: "Penugasan belum bisa disimpan. Coba lagi.",
+  ASSIGNMENT_CONFLICT:
+    "Pengaturan atau penugasan sudah berubah. Muat ulang sebelum mencoba lagi.",
+  ASSIGNMENT_FORBIDDEN: "Anda tidak memiliki akses ke penugasan ini.",
+  ASSIGNMENT_INVALID_RECIPIENT:
+    "Akun penerima aktif tidak ditemukan atau tidak mendukung penugasan.",
+  ASSIGNMENT_INVALID_CONFIGURATION:
+    "Aktifkan skenario dan pilih karakter konsumen sebelum menugaskan.",
+  SETTINGS_LOAD_FAILED: "Pengaturan belum bisa dimuat. Coba lagi.",
+  SETTINGS_SAVE_FAILED: "Pengaturan belum bisa disimpan. Coba lagi.",
+  TEMPLATES_SAVE_FAILED: "Template belum bisa disimpan. Coba lagi.",
+  HISTORY_LOAD_FAILED: "Riwayat belum bisa dimuat. Coba lagi.",
+  HISTORY_DELETE_FAILED: "Riwayat belum bisa dihapus. Coba lagi.",
+  SESSION_SAVE_FAILED: "Percakapan belum bisa disimpan. Coba lagi.",
+  REVIEW_LOAD_FAILED: "Hasil telaah belum bisa dimuat. Coba lagi.",
+  REVIEW_FAILED: "Telaah belum bisa diproses. Coba lagi.",
+  AI_ERROR: "AI belum bisa membalas chat. Coba lagi.",
+  NOT_FOUND: "Sesi tidak ditemukan.",
+} as const;
+
 // ── KETIK Types ────────────────────────────────────────
 export type ChatSender = "agent" | "consumer" | "system";
 
@@ -456,18 +479,52 @@ export const ketikIdentitySettingsSchema = z.object({
   city: z.string(),
 });
 
-export const ketikAppSettingsSchema: z.ZodType<KetikAppSettings> = z.object({
+// Training-only data may be copied to another account; identity/templates must not.
+export const ketikTrainingConfigurationSchema = z.object({
   scenarios: z.array(ketikScenarioSchema).min(1),
   consumerTypes: z.array(ketikConsumerTypeSchema).min(1),
-  quickTemplates: z.array(ketikQuickTemplateSchema),
-  globalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
-  personalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
   activeConsumerTypeId: z.string(),
-  identitySettings: ketikIdentitySettingsSchema,
   selectedModel: z.string().min(1),
   simulationDuration: z.number().finite().min(1).max(60),
   responsePacingMode: z.enum(["realistic", "training_fast"]),
 });
+export type KetikTrainingConfiguration = z.infer<
+  typeof ketikTrainingConfigurationSchema
+>;
+
+export const ketikAppSettingsSchema: z.ZodType<KetikAppSettings> =
+  ketikTrainingConfigurationSchema.extend({
+    quickTemplates: z.array(ketikQuickTemplateSchema),
+    globalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
+    personalQuickTemplates: z.array(ketikQuickTemplateSchema).optional(),
+    identitySettings: ketikIdentitySettingsSchema,
+  });
+
+const ketikSettingsVersionSchema = z.union([
+  z.literal("absent"),
+  z.iso.datetime({ offset: true }),
+]);
+export const assignKetikConfigurationSchema = z.strictObject({
+  sourceSettingsVersion: ketikSettingsVersionSchema,
+  recipientSettingsVersion: ketikSettingsVersionSchema,
+  expectedAssignmentVersion: z.uuid().nullable(),
+});
+export type AssignKetikConfiguration = z.infer<
+  typeof assignKetikConfigurationSchema
+>;
+
+export interface KetikConfigurationAssignment {
+  recipientId: string;
+  assignedBy: string;
+  sourceConfiguration: KetikTrainingConfiguration;
+  sourceSettingsVersion: string;
+  version: string;
+  assignedAt: string;
+}
+export interface KetikAssignmentSnapshot {
+  assignment: KetikConfigurationAssignment | null;
+  recipientSettingsVersion: string;
+}
 
 export const ketikIdentitySchema = z.object({
   name: z.string(),

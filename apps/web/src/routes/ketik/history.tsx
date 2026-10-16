@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Download, Play, Search, Trash2 } from "lucide-react";
-import type { KetikSessionHistoryItem } from "@trainers/types";
+import type {
+  KetikSessionHistoryItem,
+  KetikHistorySummaryItem,
+} from "@trainers/types";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { Pagination } from "../../components/ui/Pagination";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
+import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
 import { ketikApi } from "./ketikApi";
 import { SessionReplayModal } from "./components/SessionReplayModal";
@@ -14,11 +17,11 @@ import {
   readFinalScore,
   reviewStatusLabel,
   sessionParticipant,
-  sortNewestFirst,
 } from "./utils/reviewDisplay";
-import { downloadKetikHistory } from "./utils/transcript";
-
-const PAGE_SIZE = 20;
+import {
+  useKetikHistoryPage,
+  useKetikHistoryExport,
+} from "./hooks/useKetikHistoryPage";
 
 type StatusFilter = "all" | "completed" | "running" | "failed" | "not_started";
 
@@ -31,7 +34,7 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 function statusOf(
-  session: KetikSessionHistoryItem,
+  session: KetikHistorySummaryItem,
 ): Exclude<StatusFilter, "all"> {
   switch (session.reviewStatus) {
     case "completed":
@@ -45,17 +48,54 @@ function statusOf(
   }
 }
 
-type LoadState = "loading" | "ready" | "error";
 type PendingDelete =
-  { kind: "one"; session: KetikSessionHistoryItem } | { kind: "all" };
+  { kind: "one"; session: KetikHistorySummaryItem } | { kind: "all" };
 
 export default function KetikHistory() {
-  const [history, setHistory] = useState<KetikSessionHistoryItem[]>([]);
-  const [state, setState] = useState<LoadState>("loading");
-  const [filter, setFilter] = useState<StatusFilter>("all");
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const userId = useAuthStore((s) => s.session?.user.id);
+  const {
+    data,
+    state,
+    filter,
+    query,
+    setFilter,
+    setQuery,
+    page,
+    reload: loadHistory,
+    resetFilters,
+    previous,
+    next,
+  } = useKetikHistoryPage();
+  const { items: history, counts } = data;
+  const visible = history;
+  const csv = useKetikHistoryExport(filter, query);
   const [replay, setReplay] = useState<KetikSessionHistoryItem | null>(null);
+  const [replayPending, setReplayPending] = useState<string | null>(null);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const replayRequest = useRef(0);
+  useEffect(() => {
+    const invalidate = () => {
+      replayRequest.current++;
+    };
+    invalidate();
+    setReplay(null);
+    setReplayError(null);
+    setReplayPending(null);
+    return invalidate;
+  }, [userId]);
+  const openReplay = async (id: string) => {
+    const request = ++replayRequest.current;
+    setReplayPending(id);
+    setReplayError(null);
+    try {
+      const detail = await ketikApi.getHistoryDetail(id);
+      if (request === replayRequest.current) setReplay(detail);
+    } catch {
+      if (request === replayRequest.current) setReplayError(id);
+    } finally {
+      if (request === replayRequest.current) setReplayPending(null);
+    }
+  };
   // `pendingDelete` dibiarkan terisi saat dialog menutup supaya teksnya tidak
   // berganti selama animasi tutup; `confirmOpen` yang mengatur tampil/tidak.
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
@@ -64,77 +104,18 @@ export default function KetikHistory() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const loadHistory = useCallback(async () => {
-    setState("loading");
-    try {
-      setHistory(sortNewestFirst(await ketikApi.getHistory()));
-      setState("ready");
-    } catch (error) {
-      console.error("[Ketik] Failed to load history:", error);
-      setState("error");
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
-
-  const counts = useMemo(() => {
-    const next: Record<StatusFilter, number> = {
-      all: history.length,
-      completed: 0,
-      running: 0,
-      failed: 0,
-      not_started: 0,
-    };
-    for (const session of history) next[statusOf(session)] += 1;
-    return next;
-  }, [history]);
-
-  const summary = useMemo(() => {
-    if (history.length === 0) return null;
-    const scores = history
-      .map(readFinalScore)
-      .filter((score): score is number => score !== null);
-    const parts = [`${history.length} sesi`];
-    if (scores.length === 0) {
-      parts.push("belum ada yang ditelaah");
-    } else {
-      const average = Math.round(
-        scores.reduce((sum, score) => sum + score, 0) / scores.length,
-      );
-      parts.push(`${scores.length} ditelaah`, `rata-rata skor ${average}`);
-    }
-    return parts.join(" · ");
-  }, [history]);
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const filtered = useMemo(
-    () =>
-      history.filter((session) => {
-        if (filter !== "all" && statusOf(session) !== filter) return false;
-        if (!normalizedQuery) return true;
-        return [
-          session.scenarioTitle,
-          session.consumerName,
-          sessionParticipant(session).name,
-        ].some((text) => text.toLowerCase().includes(normalizedQuery));
-      }),
-    [history, filter, normalizedQuery],
-  );
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount);
-  const visible = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
-
-  const resetFilters = () => {
-    setFilter("all");
-    setQuery("");
-    setPage(1);
-  };
+  const summary =
+    data.total === 0
+      ? null
+      : [
+          `${data.total} sesi`,
+          data.reviewedCount
+            ? `${data.reviewedCount} ditelaah`
+            : "belum ada yang ditelaah",
+          ...(data.averageScore !== null
+            ? [`rata-rata skor ${data.averageScore}`]
+            : []),
+        ].join(" · ");
 
   const askDelete = (next: PendingDelete) => {
     setPendingDelete(next);
@@ -148,11 +129,11 @@ export default function KetikHistory() {
       if (pendingDelete.kind === "one") {
         const { id } = pendingDelete.session;
         await ketikApi.deleteSession(id);
-        setHistory((prev) => prev.filter((session) => session.id !== id));
+        loadHistory();
       } else {
         await ketikApi.clearHistory();
-        setHistory([]);
         resetFilters();
+        loadHistory();
       }
       setConfirmOpen(false);
     } catch (error) {
@@ -196,11 +177,15 @@ export default function KetikHistory() {
             type="button"
             variant="outline"
             className="min-h-[44px] gap-2 px-4 text-[13px]"
-            disabled={history.length === 0}
-            onClick={() => downloadKetikHistory(history)}
+            disabled={
+              state !== "ready" || data.total === 0 || csv.progress !== null
+            }
+            onClick={() => void csv.run()}
           >
             <Download data-icon="inline-start" />
-            Unduh CSV
+            {csv.progress !== null
+              ? `Menyiapkan CSV… ${csv.progress} sesi`
+              : "Unduh CSV"}
           </Button>
         </div>
         {summary && (
@@ -209,7 +194,35 @@ export default function KetikHistory() {
       </header>
 
       <section aria-label="Sesi KETIK" className="flex flex-col gap-4">
-        {state === "ready" && history.length > 0 && (
+        {csv.progress !== null && (
+          <p role="status" className="text-[13px] text-fg2">
+            Menyiapkan seluruh hasil filter: {csv.progress} sesi…
+          </p>
+        )}
+        {csv.error && (
+          <p role="alert" className="text-[13px] text-destructive">
+            CSV belum bisa diunduh. Coba lagi; maksimum 10.000 sesi per ekspor.
+            Tidak ada file parsial yang diunduh.
+          </p>
+        )}
+        {replayPending && (
+          <p role="status" className="text-[13px] text-fg2">
+            Memuat transkrip…
+          </p>
+        )}
+        {replayError && (
+          <div role="alert" className="flex items-center gap-3 text-[13px]">
+            Transkrip belum bisa dimuat.
+            <Button
+              variant="outline"
+              className="min-h-[44px]"
+              onClick={() => void openReplay(replayError)}
+            >
+              Coba lagi
+            </Button>
+          </div>
+        )}
+        {(counts.all > 0 || query || filter !== "all") && (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div
               role="group"
@@ -225,7 +238,6 @@ export default function KetikHistory() {
                   className="min-h-[44px] px-3 text-[13px] aria-pressed:font-semibold"
                   onClick={() => {
                     setFilter(value);
-                    setPage(1);
                   }}
                 >
                   {label}
@@ -242,12 +254,12 @@ export default function KetikHistory() {
               />
               <input
                 type="search"
+                maxLength={120}
                 aria-label="Cari sesi"
                 placeholder="Cari skenario, peserta, konsumen"
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
-                  setPage(1);
                 }}
                 className="min-h-[44px] w-full rounded-lg border border-border bg-background pr-3 pl-9 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
@@ -278,7 +290,7 @@ export default function KetikHistory() {
                 Coba lagi
               </Button>
             </div>
-          ) : history.length === 0 ? (
+          ) : counts.all === 0 && !query && filter === "all" ? (
             <div className="flex flex-col items-start gap-3 px-5 py-8">
               <p className="text-[15px] font-semibold text-foreground">
                 Belum ada sesi latihan
@@ -295,7 +307,7 @@ export default function KetikHistory() {
                 Mulai simulasi
               </Link>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : history.length === 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-[13px] text-foreground">
               Tidak ada sesi yang cocok.
               <Button
@@ -339,7 +351,7 @@ export default function KetikHistory() {
                   <HistoryRow
                     key={session.id}
                     session={session}
-                    onReplay={() => setReplay(session)}
+                    onReplay={() => void openReplay(session.id)}
                     onDelete={() => askDelete({ kind: "one", session })}
                   />
                 ))}
@@ -348,17 +360,37 @@ export default function KetikHistory() {
           )}
         </div>
 
-        {state === "ready" && filtered.length > PAGE_SIZE && (
-          <Pagination
-            page={currentPage}
-            pageSize={PAGE_SIZE}
-            total={filtered.length}
-            onPageChange={setPage}
-          />
+        {state === "ready" && (page > 1 || data.nextCursor) && (
+          <nav
+            aria-label="Halaman riwayat"
+            className="flex flex-wrap items-center justify-between gap-3 text-[13px]"
+          >
+            <p>
+              Halaman {page} · {data.total} sesi
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                disabled={page === 1}
+                onClick={previous}
+              >
+                Sebelumnya
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                disabled={!data.nextCursor}
+                onClick={next}
+              >
+                Berikutnya
+              </Button>
+            </div>
+          </nav>
         )}
       </section>
 
-      {state === "ready" && history.length > 0 && (
+      {state === "ready" && counts.all > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-[13px] text-fg2">
           <p>Hapus semua sesi dan hasil telaahnya dari riwayat Anda.</p>
           <Button
@@ -389,7 +421,7 @@ export default function KetikHistory() {
         description={
           pendingDelete?.kind === "one"
             ? `"${pendingDelete.session.scenarioTitle}" dan hasil telaahnya akan dihapus permanen.`
-            : `${history.length} sesi dan hasil telaahnya akan dihapus permanen.`
+            : "Semua sesi dan hasil telaahnya akan dihapus permanen, termasuk di luar filter aktif."
         }
         confirmLabel={
           pendingDelete?.kind === "all" ? "Hapus semua" : "Hapus sesi"
@@ -407,7 +439,7 @@ function HistoryRow({
   onReplay,
   onDelete,
 }: {
-  session: KetikSessionHistoryItem;
+  session: KetikHistorySummaryItem;
   onReplay: () => void;
   onDelete: () => void;
 }) {
@@ -472,7 +504,6 @@ function HistoryRow({
           size="icon"
           className="size-[44px] text-muted-foreground hover:text-foreground"
           aria-label={`Putar ulang ${session.scenarioTitle}`}
-          disabled={session.messages.length === 0}
           onClick={onReplay}
         >
           <Play data-icon="inline" />

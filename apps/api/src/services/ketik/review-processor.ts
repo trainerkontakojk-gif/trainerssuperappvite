@@ -1,4 +1,5 @@
 import { createAdminClient } from "../../lib/supabase";
+import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenAIContent } from "../../lib/openai";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
@@ -26,7 +27,7 @@ async function generateKetikReviewAiResponse(options: {
   // Try Gemini first
   try {
     const geminiResp = await generateGeminiContent({
-      model: "gemini-3.8-flash",
+      model: resolveModelProvider(KETIK_REVIEW_MODELS.primary).modelId,
       systemInstruction: options.systemInstruction,
       contents: options.contents as any,
       responseMimeType: "application/json",
@@ -52,7 +53,7 @@ async function generateKetikReviewAiResponse(options: {
   // Fallback to direct OpenAI Responses API
   try {
     const orResp = await generateOpenAIContent({
-      model: "gpt-5.4-mini",
+      model: resolveModelProvider(KETIK_REVIEW_MODELS.fallback).modelId,
       systemInstruction: options.systemInstruction,
       contents: options.contents,
       responseMimeType: "application/json",

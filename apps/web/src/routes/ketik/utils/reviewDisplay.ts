@@ -1,7 +1,7 @@
 import type {
   ChatMessage,
   KetikDimensionKey,
-  KetikSessionHistoryItem,
+  KetikHistorySummaryItem,
 } from "@trainers/types";
 
 /** Lima aspek telaah KETIK, dalam urutan tampilan. */
@@ -9,7 +9,7 @@ export const KETIK_ASPECTS: readonly {
   key: KetikDimensionKey;
   label: string;
   field: keyof Pick<
-    KetikSessionHistoryItem,
+    KetikHistorySummaryItem,
     | "empathyScore"
     | "probingScore"
     | "resolutionScore"
@@ -38,7 +38,7 @@ function isScore(value: unknown): value is number {
 }
 
 export function readAspectScores(
-  session: KetikSessionHistoryItem,
+  session: KetikHistorySummaryItem,
 ): KetikAspectScore[] {
   return KETIK_ASPECTS.flatMap(({ key, label, field }) => {
     const score = session[field];
@@ -47,7 +47,7 @@ export function readAspectScores(
 }
 
 export function readFinalScore(
-  session: KetikSessionHistoryItem,
+  session: KetikHistorySummaryItem,
 ): number | null {
   return session.reviewStatus === "completed" && isScore(session.finalScore)
     ? session.finalScore
@@ -56,7 +56,7 @@ export function readFinalScore(
 
 /** Aspek dengan skor terendah satu sesi; seri memakai urutan tampilan. */
 export function lowestAspect(
-  session: KetikSessionHistoryItem,
+  session: KetikHistorySummaryItem,
 ): KetikAspectScore | null {
   return readAspectScores(session).reduce<KetikAspectScore | null>(
     (lowest, aspect) =>
@@ -103,7 +103,7 @@ export type KetikReviewStatusLabel =
   "Ditelaah" | "Sedang ditelaah" | "Telaah gagal" | "Belum ditelaah";
 
 export function reviewStatusLabel(
-  status: KetikSessionHistoryItem["reviewStatus"],
+  status: KetikHistorySummaryItem["reviewStatus"],
 ): KetikReviewStatusLabel {
   switch (status) {
     case "completed":
@@ -118,7 +118,7 @@ export function reviewStatusLabel(
 }
 
 /** Nama peserta dari snapshot sesi; record yang sudah dihapus diberi penanda. */
-export function sessionParticipant(session: KetikSessionHistoryItem): {
+export function sessionParticipant(session: KetikHistorySummaryItem): {
   name: string;
   removed: boolean;
 } {
@@ -135,7 +135,7 @@ export function sessionParticipant(session: KetikSessionHistoryItem): {
 
 /** Label peserta satu baris, untuk daftar yang tidak punya kolom terpisah. */
 export function sessionParticipantLabel(
-  session: KetikSessionHistoryItem,
+  session: KetikHistorySummaryItem,
 ): string {
   const { name, removed } = sessionParticipant(session);
   return removed ? `${name} (data peserta sudah dihapus)` : name;
@@ -147,16 +147,16 @@ function toTime(value: string): number {
 }
 
 /** Riwayat terbaru dulu. */
-export function sortNewestFirst(
-  history: readonly KetikSessionHistoryItem[],
-): KetikSessionHistoryItem[] {
+export function sortNewestFirst<T extends KetikHistorySummaryItem>(
+  history: readonly T[],
+): T[] {
   return [...history].sort((a, b) => toTime(b.date) - toTime(a.date));
 }
 
 /** Skor sesi yang ditelaah sebelum `session`, untuk perbandingan naik/turun. */
 export function previousFinalScore(
-  session: KetikSessionHistoryItem,
-  history: readonly KetikSessionHistoryItem[],
+  session: KetikHistorySummaryItem,
+  history: readonly KetikHistorySummaryItem[],
 ): number | null {
   const time = toTime(session.date);
   const previous = sortNewestFirst(history).find(
