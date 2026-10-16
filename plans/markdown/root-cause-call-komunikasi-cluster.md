@@ -1,7 +1,7 @@
 # Root-cause cluster for Call communication findings, plus near-miss keyword expansion
 
 Lane: **C**. This changes the shared cluster enum used by the SIDAK agent detail, the TNA drill-down, TNA need validation (zod) and `tna_programs.trigger_clusters`. It also changes the shared matcher registry. It follows the precedent of [`root-cause-hold-cluster.md`](root-cause-hold-cluster.md), [`root-cause-slik-ideb-cluster.md`](root-cause-slik-ideb-cluster.md) and [`root-cause-slik-ideb-service-scope.md`](root-cause-slik-ideb-service-scope.md). It resolves the deferred decision D3 of the SLIK plan.
-Status: **implemented** (2026-10-17). Decisions (Fajar): D1 yes, D2 yes, D3 yes, D4 no, D5 (a)+(b), D6 (a). Awaiting Fajar's audit.
+Status: **implemented** (2026-10-17). Decisions (Fajar): D1 yes, D2 yes, D3 yes, D4 no, D5 (a)+(b), D6 (a). Audited by Fajar (`after-komunikasi`): 240/2796 = 8.58% fallback, Call 53/947 = 5.60%, exactly as projected.
 
 ## Requirement
 
@@ -222,4 +222,10 @@ No unit tests are added or run. If an expectation in `sidak-agent-root-causes.te
   - `git diff --check` clean.
 - [x] `thermo-nuclear`: PASS. One P3 that predates this change: the audit script is 1192 lines (+26 here, a registry mirror). `graphify update .` run.
 - [x] Commit and push to main.
-- [ ] Fajar runs the D6 audit. Record the overall and Call fallback, and the moves per cluster, against the projection above.
+- [x] Fajar ran the D6 audit (`after-komunikasi`, 2026-10-17). The results match the projection exactly:
+  - overall fallback 240/2796 = **8.58%**; Call 53/947 = **5.60%**;
+  - `komunikasi_layanan` holds 193 rows, all Call. `withoutClusterCounts` is `lainnya` 193, so **0 rows moved** into it from another cluster;
+  - moves between the existing clusters, computed as each count's delta minus the projected gain from `lainnya`:
+    - in: `salah_jawaban` 361 → 387 (+26, projected +20, so 6 moved in), `kurang_menggali` 53 → 77 (+24 vs +18, 6 in), `kurang_teliti_verifikasi_data` 347 → 368 (+21 vs +20, 1 in), `hold_waktu_tunggu` 174 → 178 (+4 vs +4, 0);
+    - out: `kurang_paham_standar_jawaban` 51 → 41 (−10) and `salah_penggunaan_sistem` 1084 → 1081 (−3);
+    - in total, 13 rows changed cluster. They moved toward the more specific cause, as the D3 bound expected.
