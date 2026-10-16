@@ -639,7 +639,7 @@ Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/
 - Setelah cluster baru `salah_penggunaan_sistem` (Phase 3): ~31% fallback.
 - Final setelah semua ekspansi: **17.49% fallback** — target tercapai (2026-07-09).
 - 2026-10-17, setelah `hold_waktu_tunggu`: **25.39%** (710/2796). Penyebab utama: service `slik` baru (205/233 = 88% fallback). Audit kini juga mencocokkan nama parameter seperti API: 24.96% (698/2796).
-- Setelah `proses_ideb_slik`: menunggu audit ulang (proyeksi offline ≈18%).
+- Setelah `proses_ideb_slik` (2026-10-17): **17.24% fallback** (482/2796) — target tercapai. `slik` turun dari 205 ke 2 fallback; `call` tetap tertinggi (282/947 = 29.78%).
 
 ### Ekspansi Registry (Phase 2)
 
@@ -658,6 +658,8 @@ Ditambahkan setelah temuan produksi "Etika Bertelepon" (Call, Oktober 2026) selu
 ### Klaster `proses_ideb_slik`
 
 Ditambahkan setelah audit 2026-10-17 menunjukkan 205 temuan SLIK jatuh ke `lainnya`. Seluruh sampel adalah SOP back-office iDeb: alasan penolakan pendaftaran iDeb tidak lengkap/tidak sesuai, hasil iDeb dikirim tidak lengkap, pendaftaran ditolak padahal seharusnya diterima, dan verifikasi "Foto Diri Mengikuti Gambar". Keyword: `pendaftaran ideb`, `permohonan ideb`, `hasil ideb`, `ideb slik`, `alasan penolakan`, `gagal verifikasi`, `foto diri mengikuti gambar`. Kata tunggal `ideb`/`slik` sengaja tidak dipakai karena temuan Call/chat yang menjelaskan SLIK kepada konsumen bukan proses ini. Karena nama parameter iDeb sendiri memuat keyword, temuan SLIK yang sebelumnya cocok klaster lain (mis. `tidak melampirkan` → `kurang_teliti_verifikasi_data`) kini masuk klaster ini (keputusan D2). Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-slik-api.spec.ts`.
+
+Audit 2026-10-17 setelah klaster ini: 249 temuan masuk `proses_ideb_slik` — 216 dari `lainnya` (203 SLIK, 13 Call) dan 33 dari klaster lain (`kurang_teliti_verifikasi_data` 20, `salah_jawaban` 9, `kurang_paham_standar_jawaban` 2, `kurang_menggali` 2). Karena hanya 28 temuan SLIK yang sebelumnya cocok klaster lain, minimal 5 temuan Call ikut berpindah. Teks temuan Call tersebut belum ditinjau.
 
 `menit` pada temuan Call fallback adalah **timestamp rekaman** ("pada menit 03.53"), bukan durasi hold/AHT, sehingga tidak dijadikan keyword. Sisa fallback Call didominasi soft skill komunikasi (intonasi, artikulasi, menyimak, pilihan kata, empati); klaster untuk itu ditunda sampai audit ulang.
 
