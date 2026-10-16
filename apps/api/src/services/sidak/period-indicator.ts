@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../../lib/supabase";
 import type {
   QAPeriod,
+  QAPeriodUsage,
   QAIndicator,
   ServiceType,
   ResolvedSidakInputConfig,
@@ -32,7 +33,13 @@ export async function createPeriod(
   return { ...data, label };
 }
 
-export async function deletePeriod(id: string): Promise<{ success: boolean }> {
+/**
+ * Jumlah temuan dan versi aturan yang memakai satu periode. Dipakai oleh
+ * penolakan hapus dan oleh daftar pemakaian, jadi keduanya selalu sepakat.
+ */
+async function countPeriodUsage(
+  id: string,
+): Promise<{ temuanCount: number; ruleCount: number }> {
   const [
     { count: temuanCount, error: temuanCheckError },
     { count: ruleCount, error: ruleCheckError },
@@ -47,16 +54,40 @@ export async function deletePeriod(id: string): Promise<{ success: boolean }> {
       .eq("effective_period_id", id),
   ]);
 
-  // Fail closed: never delete a period if validation checks are uncertain.
-  if (temuanCheckError || ruleCheckError) {
+  // Fail closed: hitungan yang tidak pasti tidak boleh dianggap nol.
+  if (
+    temuanCheckError ||
+    ruleCheckError ||
+    temuanCount === null ||
+    ruleCount === null
+  ) {
     throw new Error("Gagal memverifikasi status periode.");
   }
+  return { temuanCount, ruleCount };
+}
 
-  if (temuanCount !== null && (temuanCount ?? 0) > 0)
+export async function getPeriodUsage(): Promise<QAPeriodUsage[]> {
+  const periods = await getPeriods();
+  return Promise.all(
+    periods.map(async (period) => {
+      const { temuanCount, ruleCount } = await countPeriodUsage(period.id);
+      return {
+        period_id: period.id,
+        temuan_count: temuanCount,
+        rule_version_count: ruleCount,
+      };
+    }),
+  );
+}
+
+export async function deletePeriod(id: string): Promise<{ success: boolean }> {
+  const { temuanCount, ruleCount } = await countPeriodUsage(id);
+
+  if (temuanCount > 0)
     throw new Error(
       "Periode ini sudah memiliki data temuan dan tidak bisa dihapus.",
     );
-  if (ruleCount !== null && (ruleCount ?? 0) > 0)
+  if (ruleCount > 0)
     throw new Error(
       "Periode ini masih digunakan oleh versi aturan QA. Hapus atau pindahkan versi aturan terlebih dahulu.",
     );

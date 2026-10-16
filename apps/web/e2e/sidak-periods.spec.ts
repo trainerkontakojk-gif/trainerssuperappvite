@@ -70,13 +70,16 @@ test.describe("Periode QA (SIDAK)", () => {
     await expect(yearHeadings).toHaveText(["2026", "2025", "2023"]);
 
     // Baris dalam 2026: Oktober lalu Maret (terbaru dulu).
-    const rows2026 = page.getByRole("list", { name: "Periode 2026" }).getByRole("listitem");
+    const rows2026 = page
+      .getByRole("list", { name: "Periode 2026" })
+      .getByRole("listitem");
     await expect(rows2026).toHaveCount(2);
     await expect(rows2026.nth(0)).toContainText("Oktober");
     await expect(rows2026.nth(1)).toContainText("Maret");
 
     // Tombol hapus langsung terlihat (tanpa hover), punya nama aksesibel.
-    for (const label of ["Hapus Oktober 2026", "Hapus Maret 2026", "Hapus Februari 2025", "Hapus Desember 2023"]) {
+    // Periode yang belum dipakai: tombol aktif penuh.
+    for (const label of ["Hapus Maret 2026", "Hapus Januari 2025"]) {
       const btn = page.getByRole("button", { name: label, exact: true });
       await expect(btn).toBeVisible();
       await expect(btn).toHaveCSS("opacity", "1");
@@ -100,13 +103,17 @@ test.describe("Periode QA (SIDAK)", () => {
     await expect(addButton(page)).toBeEnabled();
     await addButton(page).click();
 
-    await expect(page.getByText("Periode Agustus 2026 ditambahkan.")).toBeVisible();
+    await expect(
+      page.getByText("Periode Agustus 2026 ditambahkan."),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Hapus Agustus 2026", exact: true }),
     ).toBeVisible();
     expect(captured("createPeriod")).toEqual([{ month: 8, year: 2026 }]);
     // Urutan terbaru dulu: Oktober, Agustus, Maret.
-    const rows = page.getByRole("list", { name: "Periode 2026" }).getByRole("listitem");
+    const rows = page
+      .getByRole("list", { name: "Periode 2026" })
+      .getByRole("listitem");
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(1)).toContainText("Agustus");
     expectIsolation(audit);
@@ -121,7 +128,9 @@ test.describe("Periode QA (SIDAK)", () => {
     await pick(page, "Tahun", "2026");
     await addButton(page).click();
 
-    await expect(page.getByText("Periode gagal ditambahkan. Coba lagi.")).toBeVisible();
+    await expect(
+      page.getByText("Periode gagal ditambahkan. Coba lagi."),
+    ).toBeVisible();
     await expect(page.getByText(/pg 23505|insert failed/)).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Hapus Agustus 2026", exact: true }),
@@ -130,7 +139,9 @@ test.describe("Periode QA (SIDAK)", () => {
     expect(captured("createPeriod")).toHaveLength(1);
   });
 
-  test("c duplikat: tombol nonaktif + teks 'sudah ada', tanpa POST", async ({ page }) => {
+  test("c duplikat: tombol nonaktif + teks 'sudah ada', tanpa POST", async ({
+    page,
+  }) => {
     await open(page);
 
     await pick(page, "Bulan", "Maret");
@@ -150,7 +161,10 @@ test.describe("Periode QA (SIDAK)", () => {
     page,
   }) => {
     const audit = await open(page);
-    const trigger = page.getByRole("button", { name: "Hapus Januari 2025", exact: true });
+    const trigger = page.getByRole("button", {
+      name: "Hapus Januari 2025",
+      exact: true,
+    });
 
     await trigger.click();
     const dialog = page.getByRole("dialog", { name: "Hapus periode?" });
@@ -184,9 +198,21 @@ test.describe("Periode QA (SIDAK)", () => {
     expectIsolation(audit);
   });
 
-  test("e hapus ditolak backend: toast berbahasa Indonesia, baris tetap ada", async ({ page }) => {
+  test("e hapus ditolak backend: toast berbahasa Indonesia, baris tetap ada", async ({
+    page,
+  }) => {
+    // Tanpa data pemakaian, tombol tetap aktif dan backend yang menolak.
+    failAlways("periodUsage");
     await open(page);
-    const row = page.getByRole("button", { name: "Hapus Oktober 2026", exact: true });
+    await expect(
+      page.getByText(
+        "Jumlah temuan per periode gagal dimuat. Penghapusan tetap dicek saat dikonfirmasi.",
+      ),
+    ).toBeVisible();
+    const row = page.getByRole("button", {
+      name: "Hapus Oktober 2026",
+      exact: true,
+    });
     await row.click();
     await page
       .getByRole("dialog", { name: "Hapus periode?" })
@@ -202,7 +228,62 @@ test.describe("Periode QA (SIDAK)", () => {
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
-  test("f rentang tahun: tahun terlama di data - 1 s.d. tahun berjalan + 1", async ({ page }) => {
+  test("i jumlah temuan per periode; periode terpakai tidak bisa dihapus dan alasannya terbaca", async ({
+    page,
+  }) => {
+    const audit = await open(page);
+
+    const rows2026 = page
+      .getByRole("list", { name: "Periode 2026" })
+      .getByRole("listitem");
+    await expect(rows2026.nth(0)).toContainText("137 temuan");
+    await expect(rows2026.nth(1)).toContainText("Tanpa temuan");
+    const rows2025 = page
+      .getByRole("list", { name: "Periode 2025" })
+      .getByRole("listitem");
+    await expect(rows2025.nth(0)).toContainText("12 temuan");
+    await expect(
+      page.getByRole("list", { name: "Periode 2023" }).getByRole("listitem"),
+    ).toContainText("Dipakai versi parameter");
+
+    // Periode terpakai: tombol nonaktif, deskripsinya menyebut alasannya.
+    const used = page.getByRole("button", {
+      name: "Hapus Oktober 2026",
+      exact: true,
+    });
+    await expect(used).toBeDisabled();
+    await expect(used).toHaveAccessibleDescription(/137 temuan/);
+    await expect(
+      page.getByRole("button", { name: "Hapus Desember 2023", exact: true }),
+    ).toHaveAccessibleDescription(/Dipakai versi parameter/);
+    await expect(
+      page.getByRole("button", { name: "Hapus Maret 2026", exact: true }),
+    ).toBeEnabled();
+
+    await expect(
+      page.getByText(
+        "Periode yang sudah punya temuan atau dipakai versi parameter tidak bisa dihapus.",
+      ),
+    ).toBeVisible();
+    expect(capturedParams("deletePeriod")).toHaveLength(0);
+    expectIsolation(audit);
+  });
+
+  test("j 1440: isi halaman rata kiri, sejajar halaman SIDAK lain", async ({
+    page,
+  }) => {
+    await open(page, { viewport: { width: 1440, height: 900 } });
+    const main = await page.locator("main").boundingBox();
+    const h1 = await page
+      .getByRole("heading", { level: 1, name: "Periode QA" })
+      .boundingBox();
+    // Padding konten 32px; isi yang ditengahkan akan jauh lebih ke kanan.
+    expect(h1!.x - main!.x).toBeLessThanOrEqual(40);
+  });
+
+  test("f rentang tahun: tahun terlama di data - 1 s.d. tahun berjalan + 1", async ({
+    page,
+  }) => {
     await open(page);
     await combo(page, "Tahun").click();
     const options = page.getByRole("option");
@@ -226,7 +307,9 @@ test.describe("Periode QA (SIDAK)", () => {
     await expect(addButton(page)).toBeVisible();
   });
 
-  test("h2 gagal memuat daftar: pesan + Coba lagi memuat ulang", async ({ page }) => {
+  test("h2 gagal memuat daftar: pesan + Coba lagi memuat ulang", async ({
+    page,
+  }) => {
     failAlways("listPeriods");
     const audit = startAudit();
     await openPeriods(page, audit);
@@ -245,11 +328,15 @@ test.describe("Periode QA (SIDAK)", () => {
     { name: "390", width: 390, height: 844 },
     { name: "1440", width: 1440, height: 900 },
   ]) {
-    test(`g ${vp.name}: tanpa overflow horizontal, kontrol >= 44px`, async ({ page }) => {
+    test(`g ${vp.name}: tanpa overflow horizontal, kontrol >= 44px`, async ({
+      page,
+    }) => {
       await open(page, { viewport: { width: vp.width, height: vp.height } });
 
       const overflow = await page.evaluate(() => ({
-        doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        doc:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
         body: document.body.scrollWidth - document.body.clientWidth,
       }));
       expect(overflow.doc).toBeLessThanOrEqual(0);

@@ -231,6 +231,16 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
     bukan "Kritis/Tidak sesuai/Perbaikan/Sesuai" seperti mockup. Baris versi
     parameter ("v4 sejak Agustus 2026") tidak dibuat karena API Input hanya
     mengirim `ruleVersionId`, tanpa nomor versi dan tanggal berlaku.
+  - Periode QA: endpoint baru `GET /sidak/periods/usage`
+    (`sidak.config.manage`) mengembalikan `QAPeriodUsage[]` (jumlah temuan dan
+    versi aturan per periode). Hitungannya memakai fungsi yang sama dengan
+    penolakan hapus (`countPeriodUsage`), fail closed bila hitungan gagal.
+    Baris menampilkan "N temuan", "Dipakai versi parameter", atau "Tanpa
+    temuan"; tombol hapus nonaktif untuk periode terpakai dengan alasan di
+    `aria-describedby`. Bila pemakaian gagal dimuat, daftar tetap tampil,
+    tombol tetap aktif, dan backend tetap menolak saat dikonfirmasi. Isi
+    halaman rata kiri (tanpa `mx-auto`). Hitungan dibuat dua query `head`
+    per periode; cukup untuk puluhan periode, perlu RPC bila jumlahnya ratusan.
 
 ## Design
 

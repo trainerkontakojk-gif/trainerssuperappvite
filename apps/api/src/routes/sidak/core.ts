@@ -25,6 +25,16 @@ sidakCore.get("/periods", requireCapability("sidak.config.read"), async (c) => {
   return c.json({ success: true, data: periods });
 });
 
+// Pemakaian per periode untuk halaman Periode QA (pengelola konfigurasi saja).
+sidakCore.get(
+  "/periods/usage",
+  requireCapability("sidak.config.manage"),
+  async (c) => {
+    const usage = await sidakService.getPeriodUsage();
+    return c.json({ success: true, data: usage });
+  },
+);
+
 sidakCore.post("/periods", requireCapability("sidak.write"), async (c) => {
   const body = await c.req.json();
   const parsed = z

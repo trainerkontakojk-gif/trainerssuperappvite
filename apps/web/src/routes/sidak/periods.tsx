@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
-import type { QAPeriod } from "@trainers/types";
+import type { QAPeriod, QAPeriodUsage } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
@@ -31,6 +31,27 @@ function deleteErrorMessage(error: unknown): string {
     : DELETE_FALLBACK;
 }
 
+/**
+ * Alasan periode tidak bisa dihapus, atau `null` bila boleh. Aturannya sama
+ * dengan penolakan di backend (`deletePeriod`).
+ */
+function usageText(usage: QAPeriodUsage | undefined): {
+  label: string;
+  blocked: boolean;
+} | null {
+  if (!usage) return null;
+  if (usage.temuan_count > 0) {
+    return {
+      label: `${usage.temuan_count.toLocaleString("id-ID")} temuan`,
+      blocked: true,
+    };
+  }
+  if (usage.rule_version_count > 0) {
+    return { label: "Dipakai versi parameter", blocked: true };
+  }
+  return { label: "Tanpa temuan", blocked: false };
+}
+
 const monthItems = MONTHS.map((label, i) => ({
   value: String(i + 1),
   label,
@@ -43,6 +64,17 @@ export default function SidakPeriodsPage() {
     error,
     refetch,
   } = useApi<QAPeriod[]>("/sidak/periods");
+  // Pemakaian dimuat terpisah: daftar periode tetap tampil bila hitungan gagal,
+  // dan penghapusan tetap dicek backend saat dikonfirmasi.
+  const {
+    data: usageRows,
+    error: usageError,
+    refetch: refetchUsage,
+  } = useApi<QAPeriodUsage[]>("/sidak/periods/usage");
+  const usageById = useMemo(
+    () => new Map((usageRows ?? []).map((row) => [row.period_id, row])),
+    [usageRows],
+  );
   const now = new Date();
   const currentYear = now.getFullYear();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -87,7 +119,7 @@ export default function SidakPeriodsPage() {
         await sidakClient.periods.$post({ json: { month, year } }),
       );
       notify.success(`Periode ${selectedLabel} ditambahkan.`);
-      await refetch();
+      await Promise.all([refetch(), refetchUsage()]);
     } catch {
       notify.error("Periode gagal ditambahkan. Coba lagi.");
     } finally {
@@ -105,7 +137,7 @@ export default function SidakPeriodsPage() {
       );
       notify.success(`Periode ${periodLabel(target)} dihapus.`);
       setDeleteTarget(null);
-      await refetch();
+      await Promise.all([refetch(), refetchUsage()]);
     } catch (e) {
       notify.error(deleteErrorMessage(e));
       setDeleteTarget(null);
@@ -120,7 +152,7 @@ export default function SidakPeriodsPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
-        <div className="mx-auto max-w-3xl space-y-8">
+        <div className="max-w-3xl space-y-8">
           <SidakPageHeader
             title="Periode QA"
             eyebrow="SIDAK · Audit"
@@ -247,28 +279,47 @@ export default function SidakPeriodsPage() {
                     aria-label={`Periode ${y}`}
                     className="divide-y divide-border border-y border-border"
                   >
-                    {rows.map((period) => (
-                      <li
-                        key={period.id}
-                        className="flex min-h-[44px] items-center justify-between gap-3 py-1"
-                      >
-                        <span className="text-sm text-foreground">
-                          {MONTHS[period.month - 1]}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-[44px] w-[44px] text-muted-foreground hover:text-destructive"
-                          aria-label={`Hapus ${periodLabel(period)}`}
-                          onClick={() => setDeleteTarget(period)}
+                    {rows.map((period) => {
+                      const usage = usageText(usageById.get(period.id));
+                      const usageId = `period-usage-${period.id}`;
+                      return (
+                        <li
+                          key={period.id}
+                          className="flex min-h-[44px] items-center gap-3 py-1"
                         >
-                          <Trash2 aria-hidden="true" />
-                        </Button>
-                      </li>
-                    ))}
+                          <span className="min-w-0 flex-1 text-sm text-foreground">
+                            {MONTHS[period.month - 1]}
+                          </span>
+                          {usage ? (
+                            <span
+                              id={usageId}
+                              className="text-xs tabular-nums text-muted-foreground"
+                            >
+                              {usage.label}
+                            </span>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-[44px] w-[44px] text-muted-foreground hover:text-destructive"
+                            aria-label={`Hapus ${periodLabel(period)}`}
+                            aria-describedby={usage ? usageId : undefined}
+                            disabled={usage?.blocked ?? false}
+                            onClick={() => setDeleteTarget(period)}
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </Button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </section>
               ))}
+              <p className="text-xs text-muted-foreground">
+                {usageError
+                  ? "Jumlah temuan per periode gagal dimuat. Penghapusan tetap dicek saat dikonfirmasi."
+                  : "Periode yang sudah punya temuan atau dipakai versi parameter tidak bisa dihapus."}
+              </p>
             </div>
           )}
         </div>

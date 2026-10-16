@@ -41,7 +41,10 @@ export const sidakHeatmapCountBySchema = z.enum(["parameter", "tiket"]);
 export type SidakHeatmapCountBy = z.infer<typeof sidakHeatmapCountBySchema>;
 
 /** Allowlist mode -> kolom tanggal. Nama kolom tidak pernah datang dari input. */
-export const HEATMAP_DATE_COLUMN: Record<SidakHeatmapMode, "tanggal_layanan" | "tanggal_sampel"> = {
+export const HEATMAP_DATE_COLUMN: Record<
+  SidakHeatmapMode,
+  "tanggal_layanan" | "tanggal_sampel"
+> = {
   agent: "tanggal_layanan",
   qa: "tanggal_sampel",
 };
@@ -103,9 +106,9 @@ export interface SidakHeatmapResponse {
  * nullable dan TIDAK ada default `CURRENT_DATE`: data lama harus tetap kosong,
  * bukan diisi diam-diam dengan tanggal saat baris disentuh.
  */
-export const tanggalSchema = z.string().date(
-  "Tanggal harus format YYYY-MM-DD dan tanggal kalender yang nyata",
-);
+export const tanggalSchema = z
+  .string()
+  .date("Tanggal harus format YYYY-MM-DD dan tanggal kalender yang nyata");
 
 /** Kedua tanggal bisnis pada satu baris temuan. */
 export const temuanTanggalSchema = z.object({
@@ -122,6 +125,17 @@ export const qaPeriodSchema = z.object({
   created_at: z.string().optional(),
 });
 export type QAPeriod = z.infer<typeof qaPeriodSchema>;
+
+/**
+ * Pemakaian satu periode, dengan aturan yang sama seperti penolakan hapus:
+ * periode dengan temuan atau versi parameter yang berlaku sejak periode itu
+ * tidak bisa dihapus.
+ */
+export interface QAPeriodUsage {
+  period_id: string;
+  temuan_count: number;
+  rule_version_count: number;
+}
 
 export const qaIndicatorSchema = z.object({
   id: z.string().uuid(),
@@ -149,25 +163,27 @@ export function formatQAIndicatorName(
   return group ? `${group} — ${indicator.name}` : indicator.name;
 }
 
-export const qaTemuanSchema = z.object({
-  id: z.string().uuid(),
-  peserta_id: z.string().uuid(),
-  period_id: z.string().uuid(),
-  indicator_id: z.string().uuid(),
-  rule_version_id: z.string().uuid().nullable().optional(),
-  rule_indicator_id: z.string().uuid().nullable().optional(),
-  service_type: serviceTypeSchema,
-  no_tiket: z.string().nullable().optional(),
-  is_phantom_padding: z.boolean().optional(),
-  phantom_batch_id: z.string().nullable().optional(),
-  nilai: z.number().int().min(0).max(3),
-  ketidaksesuaian: z.string().nullable().optional(),
-  sebaiknya: z.string().nullable().optional(),
-  tahun: z.number().int().optional(),
-  created_at: z.string().optional(),
-  qa_indicators: qaIndicatorSchema.partial().optional(),
-  qa_periods: qaPeriodSchema.partial().optional(),
-}).extend(temuanTanggalSchema.shape);
+export const qaTemuanSchema = z
+  .object({
+    id: z.string().uuid(),
+    peserta_id: z.string().uuid(),
+    period_id: z.string().uuid(),
+    indicator_id: z.string().uuid(),
+    rule_version_id: z.string().uuid().nullable().optional(),
+    rule_indicator_id: z.string().uuid().nullable().optional(),
+    service_type: serviceTypeSchema,
+    no_tiket: z.string().nullable().optional(),
+    is_phantom_padding: z.boolean().optional(),
+    phantom_batch_id: z.string().nullable().optional(),
+    nilai: z.number().int().min(0).max(3),
+    ketidaksesuaian: z.string().nullable().optional(),
+    sebaiknya: z.string().nullable().optional(),
+    tahun: z.number().int().optional(),
+    created_at: z.string().optional(),
+    qa_indicators: qaIndicatorSchema.partial().optional(),
+    qa_periods: qaPeriodSchema.partial().optional(),
+  })
+  .extend(temuanTanggalSchema.shape);
 export type QATemuan = z.infer<typeof qaTemuanSchema>;
 
 export const createTemuanBatchSchema = z.object({
@@ -202,11 +218,13 @@ export type CreateTemuanBatch = z.infer<typeof createTemuanBatchSchema>;
  * Karena semua field opsional, `{}` juga sah; service yang memutuskan
  * "pertahankan atau hapus", bukan schema.
  */
-export const updateTemuanSchema = z.object({
-  nilai: z.number().int().min(0).max(3).optional(),
-  ketidaksesuaian: z.string().nullable().optional(),
-  sebaiknya: z.string().nullable().optional(),
-}).extend(temuanTanggalSchema.shape);
+export const updateTemuanSchema = z
+  .object({
+    nilai: z.number().int().min(0).max(3).optional(),
+    ketidaksesuaian: z.string().nullable().optional(),
+    sebaiknya: z.string().nullable().optional(),
+  })
+  .extend(temuanTanggalSchema.shape);
 export type UpdateTemuan = z.infer<typeof updateTemuanSchema>;
 
 export const serviceWeightSchema = z.object({

@@ -35,7 +35,12 @@ export type PeriodsAudit = {
 };
 
 export function startAudit(): PeriodsAudit {
-  return { mockedApi: [], blockedApi: [], blockedAuth: [], blockedExternal: [] };
+  return {
+    mockedApi: [],
+    blockedApi: [],
+    blockedAuth: [],
+    blockedExternal: [],
+  };
 }
 
 function uid(n: number): string {
@@ -51,6 +56,19 @@ export const SEED: Period[] = [
 ];
 /** Periode yang sudah punya temuan: tidak boleh dihapus. */
 export const USED_ID = uid(5);
+
+/**
+ * Pemakaian per periode (`GET /periods/usage`). Periode yang tidak tercantum
+ * (termasuk yang baru dibuat) belum dipakai.
+ */
+export const USAGE: Record<
+  string,
+  { temuan_count: number; rule_version_count: number }
+> = {
+  [USED_ID]: { temuan_count: 137, rule_version_count: 0 },
+  [uid(3)]: { temuan_count: 12, rule_version_count: 0 },
+  [uid(1)]: { temuan_count: 0, rule_version_count: 1 },
+};
 
 let store = { periods: [] as Period[], seq: 1000 };
 let captures: Array<{ kind: string; body: unknown; param?: string }> = [];
@@ -95,9 +113,14 @@ function shouldFail(kind: string): boolean {
 }
 
 function toJson(body: unknown, status = 200) {
-  return { status, contentType: "application/json", body: JSON.stringify(body) };
+  return {
+    status,
+    contentType: "application/json",
+    body: JSON.stringify(body),
+  };
 }
-const ok = (data: unknown, status = 200) => toJson({ success: true, data }, status);
+const ok = (data: unknown, status = 200) =>
+  toJson({ success: true, data }, status);
 
 function handle(method: string, pathname: string, body: any) {
   const path = pathname.slice(API_PREFIX.length);
@@ -114,15 +137,36 @@ function handle(method: string, pathname: string, body: any) {
     );
   }
 
+  if (method === "GET" && path === "/periods/usage") {
+    if (shouldFail("periodUsage"))
+      return toJson(
+        { success: false, error: { code: "INTERNAL_ERROR", message: "boom" } },
+        500,
+      );
+    return ok(
+      store.periods.map((p) => ({
+        period_id: p.id,
+        ...(USAGE[p.id] ?? { temuan_count: 0, rule_version_count: 0 }),
+      })),
+    );
+  }
+
   if (method === "POST" && path === "/periods") {
     captures.push({ kind: "createPeriod", body });
     if (shouldFail("createPeriod"))
       return toJson(
-        { success: false, error: { code: "INTERNAL_ERROR", message: "insert failed: pg 23505" } },
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: "insert failed: pg 23505" },
+        },
         500,
       );
     store.seq += 1;
-    const created: Period = { id: uid(store.seq), month: body.month, year: body.year };
+    const created: Period = {
+      id: uid(store.seq),
+      month: body.month,
+      year: body.year,
+    };
     store.periods.push(created);
     return ok({ ...created, label: `${created.month}/${created.year}` }, 201);
   }
@@ -132,13 +176,22 @@ function handle(method: string, pathname: string, body: any) {
     captures.push({ kind: "deletePeriod", body: null, param: m[1] });
     if (m[1] === USED_ID) {
       return toJson(
-        { success: false, error: { code: "DELETE_ERROR", message: USED_MESSAGE } },
+        {
+          success: false,
+          error: { code: "DELETE_ERROR", message: USED_MESSAGE },
+        },
         400,
       );
     }
     if (shouldFail("deletePeriod"))
       return toJson(
-        { success: false, error: { code: "DELETE_ERROR", message: "Gagal memverifikasi status periode." } },
+        {
+          success: false,
+          error: {
+            code: "DELETE_ERROR",
+            message: "Gagal memverifikasi status periode.",
+          },
+        },
         400,
       );
     store.periods = store.periods.filter((p) => p.id !== m[1]);
@@ -160,7 +213,8 @@ export async function openPeriods(
 ): Promise<void> {
   const { role = "admin", viewport = { width: 1440, height: 900 } } = opts;
   await page.setViewportSize(viewport);
-  if (opts.colorScheme) await page.emulateMedia({ colorScheme: opts.colorScheme });
+  if (opts.colorScheme)
+    await page.emulateMedia({ colorScheme: opts.colorScheme });
   const auth = await installMockAuthSession(page, { role });
 
   await page.route("**/*", async (route: Route) => {
