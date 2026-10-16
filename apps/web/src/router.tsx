@@ -17,6 +17,11 @@ import {
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
 import { fetchApi } from "./hooks/useApi";
+import {
+  validateSidakScopeSearch,
+  type SidakScopeSearch,
+} from "./hooks/useSidakScope";
+import { validateAgentDetailSearch } from "./components/sidak/sidak-agent-detail-tabs.constants";
 
 const IndexPage = lazy(() => import("./routes/index"));
 const DashboardPage = lazy(() => import("./routes/dashboard"));
@@ -185,6 +190,7 @@ const sidakRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak",
   component: SidakLanding,
+  validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.landing"),
 });
 
@@ -192,6 +198,7 @@ const sidakDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/dashboard",
   component: SidakDashboard,
+  validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.view"),
 });
 
@@ -199,6 +206,7 @@ const sidakForecastRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/forecast",
   component: SidakForecast,
+  validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.view"),
 });
 
@@ -213,21 +221,15 @@ const sidakRankingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/ranking",
   component: SidakRanking,
-  // Link "Lihat semua ranking" di dashboard membawa layanan dan tahun yang
-  // aktif. Hanya nilai yang dikenal yang diteruskan sebagai filter awal; nilai
-  // lain dibuang. Scope leader tetap dinormalisasi halaman dan ditegakkan API.
-  //
-  // Kedua kunci selalu dikembalikan: router menggabungkan hasil ini di atas
-  // query mentah, jadi kunci yang tidak ditulis akan tetap membawa nilai mentah.
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { service_type: ServiceType | undefined; year: number | undefined } => ({
-    service_type: VALID_SERVICE_TYPES.find(
-      (value) => value === search.service_type,
-    ),
-    // Router mem-parse `year=2026` sebagai angka; `year=20x6` tetap string.
-    year: /^\d{4}$/.test(String(search.year)) ? Number(search.year) : undefined,
-  }),
+  // Cakupan bersama SIDAK (`layanan`, `tahun`, `dari`, `sampai`, `tim`).
+  // Tautan lama memakai `service_type`/`year`; keduanya dipetakan ke kunci
+  // cakupan lalu dibuang supaya URL hanya punya satu bentuk.
+  validateSearch: (search: Record<string, unknown>): SidakScopeSearch =>
+    validateSidakScopeSearch({
+      layanan: search.service_type,
+      tahun: search.year,
+      ...search,
+    }),
   beforeLoad: requireCapability("sidak.view"),
 });
 
@@ -249,6 +251,7 @@ const sidakHeatmapRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/heatmap",
   component: SidakHeatmap,
+  validateSearch: validateSidakScopeSearch,
   // Admin/trainer (semua data) + leader (hanya scope tim-nya). Leader tetap
   // harus punya modul SIDAK disetujui — tiga lapis: nav, beforeLoad, backend.
   beforeLoad: requireCapability("sidak.view"),
@@ -319,6 +322,7 @@ const sidakAgentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents",
   component: SidakAgents,
+  validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.view"),
 });
 
@@ -326,6 +330,7 @@ const sidakAgentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents/$id",
   component: SidakAgentDetail,
+  validateSearch: validateAgentDetailSearch,
   beforeLoad: requireCapability("sidak.view"),
 });
 

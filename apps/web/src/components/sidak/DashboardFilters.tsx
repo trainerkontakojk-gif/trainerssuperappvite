@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Calendar, Filter, Layers, Users, type LucideIcon } from "lucide-react";
+import { Filter } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,12 +63,13 @@ interface Props {
   leaderLockedService?: string | null;
   availableServices?: string[];
   showHeader?: boolean;
+  /** Kontrol tambahan halaman (mis. Periode proyeksi) di dalam bar yang sama. */
+  trailing?: ReactNode;
 }
 
 interface FilterSelectProps {
   id: string;
   label: string;
-  icon: LucideIcon;
   value: string;
   placeholder: string;
   items: Array<{ value: string; label: string }>;
@@ -87,7 +88,6 @@ interface TeamFilterOption {
 interface TeamComboboxProps {
   id: string;
   label: string;
-  icon: LucideIcon;
   value: string;
   placeholder: string;
   options: TeamFilterOption[];
@@ -101,7 +101,6 @@ function normalizeSearchValue(value: string) {
 function FilterSelect({
   id,
   label,
-  icon: Icon,
   value,
   placeholder,
   items,
@@ -113,9 +112,8 @@ function FilterSelect({
     <div className="min-w-0 flex-1">
       <Label
         htmlFor={id}
-        className="mb-1.5 text-xs font-semibold text-muted-foreground [&_svg]:size-3.5"
+        className="mb-1.5 text-xs font-medium text-fg2"
       >
-        <Icon aria-hidden="true" />
         {label}
       </Label>
       <Select
@@ -147,7 +145,6 @@ function FilterSelect({
 function TeamCombobox({
   id,
   label,
-  icon: Icon,
   value,
   placeholder,
   options,
@@ -159,9 +156,8 @@ function TeamCombobox({
     <div className="min-w-0 flex-1">
       <Label
         htmlFor={id}
-        className="mb-1.5 text-xs font-semibold text-muted-foreground [&_svg]:size-3.5"
+        className="mb-1.5 text-xs font-medium text-fg2"
       >
-        <Icon aria-hidden="true" />
         {label}
       </Label>
       <Combobox
@@ -259,6 +255,7 @@ export default function DashboardFilters({
   leaderLockedService,
   availableServices,
   showHeader = true,
+  trailing,
 }: Props) {
   const serviceOptions = leaderLockedService
     ? [leaderLockedService]
@@ -301,7 +298,10 @@ export default function DashboardFilters({
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/20 p-3 lg:flex-row lg:items-end lg:gap-4">
+    <div
+      data-testid="sidak-filter-bar"
+      className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:gap-3"
+    >
       {showHeader ? (
         <div className="flex shrink-0 items-center gap-3 px-1 py-1 lg:pb-2">
           <div className="flex size-8 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-border">
@@ -318,11 +318,10 @@ export default function DashboardFilters({
         </div>
       ) : null}
 
-      <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-3">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:grid-cols-[9rem_15rem_7rem]">
         <FilterSelect
           id="sidak-filter-service"
           label="Layanan"
-          icon={Layers}
           value={leaderLockedService ?? selectedService}
           placeholder="Pilih layanan"
           items={serviceOptions.map((service) => ({
@@ -342,7 +341,6 @@ export default function DashboardFilters({
         <TeamCombobox
           id="sidak-filter-folder"
           label="Tim"
-          icon={Users}
           value={selectedFolder}
           placeholder="Pilih tim"
           options={teamOptions}
@@ -352,7 +350,6 @@ export default function DashboardFilters({
         <FilterSelect
           id="sidak-filter-year"
           label="Tahun"
-          icon={Calendar}
           value={String(selectedYear)}
           placeholder="Pilih tahun"
           items={availableYears.map((year) => ({
@@ -369,8 +366,8 @@ export default function DashboardFilters({
         </FilterSelect>
       </div>
 
-      <fieldset className="min-w-0 flex-[1.4]">
-        <legend className="mb-1.5 text-xs font-semibold text-muted-foreground">
+      <fieldset className="min-w-0 lg:w-[26rem]">
+        <legend className="mb-1.5 text-xs font-medium text-fg2">
           Periode data
         </legend>
         <MonthRangePicker
@@ -382,6 +379,7 @@ export default function DashboardFilters({
           className="w-full"
         />
       </fieldset>
+      {trailing}
     </div>
   );
 }

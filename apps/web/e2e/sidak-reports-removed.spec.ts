@@ -6,6 +6,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { homeDashboardData } from "./helpers/sidakHomeFixture";
 
 const apiMocks: readonly ApiMock[] = [
   {
@@ -28,6 +29,11 @@ const apiMocks: readonly ApiMock[] = [
     path: "/api/v1/me/access-status",
     body: { success: true, data: {} },
   },
+  {
+    method: "GET",
+    path: "/api/v1/sidak/dashboard",
+    body: { success: true, data: homeDashboardData() },
+  },
 ];
 
 test.beforeAll(() => assertLocalDevOnlyTarget());
@@ -42,7 +48,7 @@ for (const path of ["/sidak/reports", "/sidak/reports-ai"]) {
     });
     await expect(page).toHaveURL(/\/sidak\/reports-data$/, { timeout: 20000 });
     await expect(
-      page.getByRole("heading", { name: "Laporan Data", exact: true }),
+      page.getByRole("heading", { name: "Laporan data", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Kembali ke Laporan" }),
@@ -72,14 +78,14 @@ for (const path of [
       });
       await expect(page).toHaveURL(/\/unauthorized$/);
       await expect(
-        page.getByRole("heading", { name: "Laporan Data", exact: true }),
+        page.getByRole("heading", { name: "Laporan data", exact: true }),
       ).toHaveCount(0);
       expectHermetic(audit);
     });
   }
 }
 
-test("SIDAK card and Laporan navigation open data reports", async ({
+test("SIDAK page list and Laporan navigation open data reports", async ({
   page,
 }) => {
   const audit = await openHermeticShell(page, {
@@ -87,16 +93,16 @@ test("SIDAK card and Laporan navigation open data reports", async ({
     apiMocks,
     auth: { role: "admin" },
   });
-  const card = page.getByRole("link").filter({
-    has: page.getByRole("heading", { name: "Laporan", exact: true }),
-  });
+  const card = page
+    .getByRole("region", { name: "Halaman SIDAK", exact: true })
+    .getByRole("link", { name: /^Laporan/ });
   await expect(card).toHaveAttribute("href", "/sidak/reports-data", {
     timeout: 20000,
   });
   // Grup SIDAK di sidebar sudah terbuka otomatis di `/sidak/*`.
   const nav = page
     .getByRole("navigation", { name: "Navigasi utama" })
-    .getByRole("link", { name: "Laporan", exact: true });
+    .getByRole("link", { name: "Laporan data", exact: true });
   await expect(nav).toHaveAttribute("href", "/sidak/reports-data");
   await nav.click();
   await expect(page).toHaveURL(/\/sidak\/reports-data$/);
@@ -105,7 +111,7 @@ test("SIDAK card and Laporan navigation open data reports", async ({
   await card.click();
   await expect(page).toHaveURL(/\/sidak\/reports-data$/);
   await expect(
-    page.getByRole("heading", { name: "Laporan Data", exact: true }),
+    page.getByRole("heading", { name: "Laporan data", exact: true }),
   ).toBeVisible();
   await waitForMockedApi(audit, [
     "/me/access-status",

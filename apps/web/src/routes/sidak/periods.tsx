@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
 
 // Kasus "sudah punya temuan" datang dari backend dalam bahasa Indonesia; cadangan
 // ini untuk kegagalan lain (jaringan, error mentah) sehingga tidak menebak penyebab.
@@ -120,15 +121,11 @@ export default function SidakPeriodsPage() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
         <div className="mx-auto max-w-3xl space-y-8">
-          <header className="space-y-1">
-            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
-              Periode QA
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Kelola periode audit bulanan yang dipakai Input Temuan, Parameter
-              QA, dan analitik.
-            </p>
-          </header>
+          <SidakPageHeader
+            title="Periode QA"
+            eyebrow="SIDAK · Audit"
+            description="Bulan audit yang dipakai Input temuan, Parameter QA, dan semua analitik."
+          />
 
           <section aria-label="Tambah periode" className="space-y-2">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

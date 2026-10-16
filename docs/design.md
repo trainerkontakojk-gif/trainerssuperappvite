@@ -162,6 +162,23 @@ Dialog pengaturan KETIK, PDKT, dan Telefun mengikuti satu pola visual dan respon
 - Pastikan backdrop dan dialog berada di atas navigasi bawah yang fixed; navigasi bawah tidak
   boleh menutupi isi dialog atau footer.
 
+### Ringkasan SIDAK (`/sidak`)
+
+Beranda modul menjawab "apa yang perlu ditindaklanjuti", bukan menu pemasaran. Analisis lengkap tetap di Dashboard.
+
+- **Kepala:** `SidakPageHeader` dengan `h1 "SIDAK"`, satu kalimat fungsi, baris cakupan, lalu satu aksi utama sesuai peran (admin/trainer `Input temuan`, leader `Lihat agen saya`) dan tautan kecil yang tersaring capability (Laporan, Jadwal shifting, Parameter QA).
+- **Kondisi periode terbaru:** satu strip empat angka dari `periodMetrics` (`GET /sidak/dashboard`): rata-rata skor agen + status, agen diaudit, temuan, tiket bertemuan, masing-masing dengan kalimat perubahan dari periode sebelumnya. Grid 2×2 di ponsel.
+- **Perlu tindak lanjut:** agen `atRisk` dari `GET /sidak/agents` (definisi sama dengan item Beranda "agen di bawah target"), skor terendah dulu, maksimal 8 baris lalu tautan ke Agen. Beranda tidak memicu forecast; arah per agen ditautkan ke Forecast.
+- **Parameter teratas:** tiga teratas Pareto dengan jumlah dan porsi; batang memakai `bg-module-sidak`.
+- **Halaman SIDAK:** daftar berbaris per kelompok kerja (Audit, Analisis, Agen, Laporan) dari `SIDAK_CHILDREN` (`group`, `description`) lewat `buildNavModel`, jadi sidebar dan beranda tidak punya daftar terpisah.
+- Tiap bagian punya state memuat / kosong / gagal sendiri; saat gagal tidak ada angka yang tampil, hanya pesan + `Coba lagi`. Turunan angka ada di `utils/sidakHomeSummary.ts` (murni).
+
+### Kepala halaman dan cakupan (SIDAK)
+
+- **Satu kepala:** semua sub-halaman SIDAK memakai `components/sidak/SidakPageHeader.tsx` (`h1` `font-display text-2xl font-bold tracking-tight`, deskripsi `text-fg2`, baris cakupan, aksi di kanan yang turun ke bawah di layar sempit). Profil di detail agen tetap memakai nama agen sebagai `h1`.
+- **Cakupan bersama:** layanan, tahun, rentang bulan, dan tim disimpan di query (`layanan`, `tahun`, `dari`, `sampai`, `tim`; `tim=ALL` = semua tim dipilih sengaja) lewat `hooks/useSidakScope.ts`, divalidasi `validateSidakScopeSearch` di router. Cakupan terakhir juga disimpan di `sessionStorage` sehingga ikut ketika pindah lewat sidebar, lalu ditulis ke URL. Bawaan: `call`, tahun berjalan, Januari s.d. bulan ini.
+- Dipakai Ringkasan, Dashboard, Forecast, Ranking (tautan lama `service_type`/`year` dipetakan), Heatmap (tahun + layanan), dan Agen (tahun). Halaman yang tidak memakai salah satu filter menyatakannya di baris cakupan (`SidakScopeLine` `note`), mis. "Heatmap memakai tahun dan layanan saja".
+
 ### Entity Directory Cards (SIDAK)
 
 Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang utuh dan perbandingan antar-entitas memang menjadi pekerjaan utama user. Implementasinya wajib tetap operasional, bukan template statistik dekoratif:
@@ -179,6 +196,7 @@ Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang 
 - Pertahankan lebar tiap tab sesuai labelnya. Pada layar sempit, izinkan grup tab digulir horizontal tanpa memotong label atau target interaksi.
 - Susun Ringkasan dengan hierarki eksplisit: judul dan deskripsi, Quickview performa, lalu nilai skor per bulan. Gunakan divider dan jarak section untuk mengelompokkan konten; hindari badge dekoratif atau kartu tambahan yang tidak menambah makna.
 - Jelaskan fungsi pemilih bulan, lalu tampilkan detail skor, tiket pengurang, dan akar masalah untuk bulan yang dipilih.
+- **Bahan coaching** (`AgentCoachingBrief`) berada paling atas di Ringkasan untuk bulan terpilih: skor + status + perubahan, parameter yang paling sering muncul ("n dari m temuan"), pola akar masalah utama, dan tiga tiket pengurang terbesar yang membuka tab Temuan. Tombol `Salin ringkasan` menyalin teks yang sama. Tanpa data backend baru.
 
 ### Input Temuan (SIDAK)
 
@@ -186,7 +204,8 @@ Halaman kerja harian `/sidak/input` memakai satu layar, bukan wizard kartu:
 
 - **Bar konteks** satu `fieldset` (legend `sr-only` "Konteks audit") berisi Folder, Agen, Periode, Layanan. Label terlihat di atas kontrol, tinggi kontrol minimal 44px, memakai `ui/select` dan `ui/combobox` (Agen bisa dicari nama/tim/batch). Desktop satu baris; mobile Folder dan Agen penuh, Periode + Layanan dua kolom. Kontrol berikutnya disabled sampai kontrol sebelumnya terisi.
 - **Ringkasan sesi** satu baris tanpa kartu: skor live (`tabular-nums`) dengan status dari `utils/sidakScoreStatus.ts` (target 95), jumlah temuan, jumlah tiket; aksi `Sesi Tanpa Temuan`, `Import`, `Tambah` di sisi kanan (wrap di layar sempit). Rincian kategori hanya baris teks sekunder.
-- **Pesan** (error, sukses, konfigurasi parameter) memakai `QaStatePanel`/`Alert`; satu blok peringatan konfigurasi. Sukses `role="status"`, error `role="alert"` dengan aksi `Coba lagi` bila bisa diulang.
+- **Pesan** (error, sukses, konfigurasi parameter) memakai `QaStatePanel`/`Alert`; satu blok peringatan konfigurasi. Sukses `role="status"` menyebut hasilnya ("n temuan tersimpan untuk {agen}.") dengan tautan `Buka detail agen`; error `role="alert"` dengan aksi `Coba lagi` bila bisa diulang.
+- **Konfirmasi** (no. tiket kosong, parameter/baris duplikat) memakai `ConfirmDialog` lewat `hooks/useConfirmRequest.ts`, bukan `window.confirm`. Batal tidak mengirim apa pun.
 - **Motion** hanya untuk expand form/import dan dimatikan saat `prefers-reduced-motion`.
 
 ### Parameter QA (SIDAK)
@@ -207,7 +226,7 @@ Halaman `/sidak/periods` mengelola periode audit (bulan + tahun) yang dipakai In
 
 - **Struktur:** `h1 "Periode QA"` + satu baris deskripsi, `max-w-3xl` karena halaman ringkas. Form tambah satu baris (`Select` Bulan, `Select` Tahun, tombol `Tambah periode`), lalu daftar per tahun terbaru dulu: `h2` tahun biasa (bukan uppercase), baris per bulan dipisah divider, bukan kartu bersarang.
 - **Rentang tahun** = min(tahun terlama di data − 1, tahun lalu) s.d. tahun berjalan + 1. Kombinasi yang sudah ada menonaktifkan tombol dan menampilkan teks inline "Periode {Bulan Tahun} sudah ada." (bukan kotak merah).
-- **Hapus** selalu terlihat (ikon `Trash2`, `aria-label="Hapus {Bulan Tahun}"`, target 44px), lewat `ConfirmDialog` bersama di `components/sidak/ConfirmDialog.tsx` (juga dipakai Parameter QA).
+- **Hapus** selalu terlihat (ikon `Trash2`, `aria-label="Hapus {Bulan Tahun}"`, target 44px), lewat `ConfirmDialog` bersama di `components/ConfirmDialog.tsx` (juga dipakai Parameter QA dan Input Temuan).
 - **Umpan balik** lewat `notify` (toast): sukses "Periode {X} ditambahkan./dihapus."; error berbahasa manusia. Penolakan hapus karena periode sudah punya temuan menampilkan pesan backend bila berbahasa Indonesia, selain itu pesan baku. Tidak ada banner error menempel; gagal memuat memakai `QaStatePanel` + `Coba lagi`.
 
 ### Forecast (SIDAK)

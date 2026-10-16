@@ -229,9 +229,9 @@ async function readCalendarGeometry(
     );
     // Sidebar dan tab bar sama-sama "Navigasi utama"; tab bar yang `fixed`.
     const tabBar =
-      Array.from(document.querySelectorAll('[aria-label="Navigasi utama"]')).find(
-        (el) => getComputedStyle(el).position === "fixed",
-      ) ?? null;
+      Array.from(
+        document.querySelectorAll('[aria-label="Navigasi utama"]'),
+      ).find((el) => getComputedStyle(el).position === "fixed") ?? null;
     const tabBarElement = tabBar instanceof HTMLElement ? tabBar : null;
     const tabBarRect = tabBarElement ? rect(tabBarElement) : null;
     const tabBarStyle = tabBarElement ? getComputedStyle(tabBarElement) : null;
@@ -422,6 +422,10 @@ test.describe("Role gate", () => {
     // dimaksud. Role yang ditolak tidak menunggu apa pun: justru tidak boleh
     // ada panggilan sama sekali.
     const openDrawer = async (role: string, expectApiCall = false) => {
+      // Ringkasan `/sidak` dari ronde sebelumnya memuat ulang datanya saat
+      // sesi mock berganti peran; kosongkan halaman dulu supaya request itu
+      // tidak masuk audit ronde berikutnya.
+      await page.goto("about:blank");
       const audit = await openJadwalShifting(page, { role });
       if (expectApiCall) {
         await expect
@@ -430,6 +434,28 @@ test.describe("Role gate", () => {
           })
           .toBeGreaterThan(0);
       }
+      // Ringkasan `/sidak` membaca dashboard + direktori agen. Data itu tidak
+      // relevan untuk menu jadwal, jadi dijawab kosong di sini (route ini
+      // didaftarkan setelah guard, sehingga diperiksa lebih dulu).
+      await page.route(
+        (url) =>
+          url.pathname === "/api/v1/sidak/dashboard" ||
+          url.pathname === "/api/v1/sidak/agents",
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              success: true,
+              data: {
+                agents: [],
+                batches: [],
+                periodMetrics: [],
+                paretoData: [],
+              },
+            }),
+          }),
+      );
       await page.goto("/sidak");
       await page.setViewportSize({ width: 390, height: 844 });
       await page.getByRole("button", { name: "Buka menu navigasi" }).click();

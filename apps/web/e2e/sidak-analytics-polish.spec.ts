@@ -23,7 +23,7 @@ const MIN_LABEL_PX = 12;
 const PAGES = [
   { name: "Ranking", open: openRankingPage, filters: "Filter ranking", comboboxes: 4 },
   { name: "Heatmap", open: openHeatmapPage, filters: "Filter heatmap", comboboxes: 2 },
-  { name: "Laporan Data", open: openReportsDataPage, filters: "Filter temuan", comboboxes: 5 },
+  { name: "Laporan data", open: openReportsDataPage, filters: "Filter temuan", comboboxes: 5 },
 ] as const;
 
 async function heights(locator: Locator): Promise<number[]> {
@@ -184,7 +184,7 @@ test.describe("Perapian analitik SIDAK (hermetic)", () => {
       expect(h).toBeGreaterThanOrEqual(MIN_TARGET_PX);
     }
     await expect(
-      table.getByRole("columnheader", { name: /Total Temuan/ }),
+      table.getByRole("columnheader", { name: /^Temuan/ }),
     ).toHaveAttribute("aria-sort", "descending");
     await expect(
       table.getByRole("columnheader", { name: /^Agen/ }),

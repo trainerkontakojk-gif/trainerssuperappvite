@@ -1,154 +1,183 @@
-import { can, normalizeRole } from "@trainers/types";
+import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  BarChart3,
-  CalendarClock,
-  CalendarDays,
-  LayoutDashboard,
-  LineChart,
-  Users,
-  Trophy,
-  FileText,
-  ArrowRight,
-} from "lucide-react";
-import { useAuthStore } from "../../store/authStore";
+import { can, normalizeRole } from "@trainers/types";
+import type { AgentDirectoryResponse, DashboardData } from "@trainers/types";
+import { buttonVariants } from "@/components/ui/button";
 import LeaderAccessGate from "../../components/LeaderAccessGate";
-import { Card, CardContent } from "../../components/ui/card";
+import { buildNavModel } from "../../components/layout/nav-config";
+import {
+  SidakPageHeader,
+  SidakScopeLine,
+} from "../../components/sidak/SidakPageHeader";
+import { SidakFollowUpList } from "../../components/sidak/home/SidakFollowUpList";
+import { SidakPageDirectory } from "../../components/sidak/home/SidakPageDirectory";
+import { SidakPeriodStrip } from "../../components/sidak/home/SidakPeriodStrip";
+import { SidakTopParameters } from "../../components/sidak/home/SidakTopParameters";
+import type { SidakHomeLoadState } from "../../components/sidak/home/SidakHomeSection";
+import { useApi } from "../../hooks/useApi";
+import { SIDAK_ALL_TEAMS, useSidakScope } from "../../hooks/useSidakScope";
+import { useAuthStore } from "../../store/authStore";
+import {
+  buildFollowUpAgents,
+  buildHomePeriod,
+  buildTopParameters,
+} from "../../utils/sidakHomeSummary";
 
-const CARDS = [
-  {
-    title: "Dashboard",
-    desc: "Pusat kendali utama menampilkan ringkasan metrik secara real-time dan tren kinerja operasional.",
-    icon: LayoutDashboard,
-    href: "/sidak/dashboard",
-  },
-  {
-    title: "Forecast",
-    desc: "Proyeksi tren temuan dan sinyal agent untuk membaca arah perbaikan lebih awal.",
-    icon: LineChart,
-    href: "/sidak/forecast",
-  },
-  {
-    title: "Analisis Individu",
-    desc: "Pemeriksaan mendalam terhadap riwayat, log aktivitas, dan pencapaian target spesifik tiap agen.",
-    icon: Users,
-    href: "/sidak/agents",
-  },
-  {
-    title: "Ranking Agen",
-    desc: "Papan peringkat berbasis data algoritma komposit untuk mengidentifikasi top performer.",
-    icon: Trophy,
-    href: "/sidak/ranking",
-  },
-  {
-    title: "Laporan",
-    desc: "Ekstraksi data historis dan generasi laporan audit dalam berbagai format standar institusi.",
-    icon: FileText,
-    href: "/sidak/reports-data",
-    managerOnly: true,
-  },
-  {
-    // Read-only jadwal WFM. `managerOnly` memakai filter role yang sama dengan
-    // nav dan route guard: admin + trainer saja.
-    title: "Jadwal Shifting",
-    desc: "Jadwal harian agen dari WFM Dash Pro dalam tampilan hanya-baca.",
-    icon: CalendarClock,
-    href: "/sidak/jadwal-shifting",
-    managerOnly: true,
-  },
-  {
-    // Kartu landing untuk heatmap; akses tiga lapis admin+trainer (kartu ini,
-    // nav, dan route guard). Mode `qa` di halaman tetap bukan role `qa`.
-    title: "Heatmap Ketidaksesuaian",
-    desc: "Peta intensitas temuan per tanggal layanan atau tanggal sampel untuk membaca sebaran ketidaksesuaian sepanjang tahun.",
-    icon: CalendarDays,
-    href: "/sidak/heatmap",
-    managerOnly: true,
-  },
+/** Tautan pendamping di kepala beranda, tersaring capability lewat nav. */
+const SECONDARY_LINKS = [
+  { to: "/sidak/reports-data", label: "Laporan" },
+  { to: "/sidak/jadwal-shifting", label: "Jadwal shifting" },
+  { to: "/sidak/settings", label: "Parameter QA" },
 ];
 
-export default function SidakLanding() {
-  const profile = useAuthStore((s) => s.profile);
-  const role = profile?.role ?? "";
-  const isManager = can(normalizeRole(role), "sidak.config.manage");
+function loadState(loading: boolean, error: string | null, hasData: boolean) {
+  if (error && !hasData) return "error" as const;
+  if (loading && !hasData) return "loading" as const;
+  return (hasData ? "ready" : "loading") as SidakHomeLoadState;
+}
 
-  const visibleCards = CARDS.filter((c) => !c.managerOnly || isManager);
+/**
+ * Ringkasan SIDAK: apa yang perlu ditindaklanjuti di periode QA terbaru.
+ * Analisis lengkap ada di Dashboard; halaman ini hanya membaca endpoint yang
+ * sudah ada dan tidak memicu forecast.
+ */
+export default function SidakLanding() {
+  const role = useAuthStore((s) => s.profile?.role ?? "");
+  const canManage = can(normalizeRole(role), "sidak.config.manage");
+  const { scope, setScope } = useSidakScope();
+
+  const sidakPages = useMemo(() => {
+    const sidak = buildNavModel(role)
+      .groups.flatMap((group) => group.items)
+      .find((item) => item.id === "qa-analyzer");
+    return (sidak?.children ?? []).filter((child) => !child.exactMatch);
+  }, [role]);
+  const allowedPaths = new Set(sidakPages.map((page) => page.to));
+
+  const dashboardQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("year", String(scope.tahun));
+    params.set("service_type", scope.layanan);
+    if (scope.tim && scope.tim !== SIDAK_ALL_TEAMS) {
+      params.set("folder_ids", scope.tim);
+    }
+    params.set("startMonth", String(scope.dari));
+    params.set("endMonth", String(scope.sampai));
+    return params.toString();
+  }, [scope]);
+
+  const dashboard = useApi<DashboardData>(`/sidak/dashboard?${dashboardQuery}`);
+  const directory = useApi<AgentDirectoryResponse>(
+    `/sidak/agents?year=${scope.tahun}&show_all=false`,
+  );
+
+  // Leader dengan satu layanan: ikuti layanan yang diizinkan backend.
+  const availableServices = dashboard.data?.availableServices;
+  useEffect(() => {
+    if (!availableServices?.length) return;
+    if (!availableServices.includes(scope.layanan)) {
+      setScope({ layanan: availableServices[0] });
+    }
+  }, [availableServices, scope.layanan, setScope]);
+
+  const period = useMemo(
+    () => buildHomePeriod(dashboard.data?.periodMetrics),
+    [dashboard.data?.periodMetrics],
+  );
+  const parameters = useMemo(
+    () => buildTopParameters(dashboard.data?.paretoData),
+    [dashboard.data?.paretoData],
+  );
+  const directoryAgents = directory.data?.agents;
+  const followUps = useMemo(
+    () =>
+      buildFollowUpAgents(
+        Array.isArray(directoryAgents) ? directoryAgents : [],
+      ),
+    [directoryAgents],
+  );
+
+  const dashboardState = loadState(
+    dashboard.loading,
+    dashboard.error,
+    Boolean(dashboard.data),
+  );
+  const directoryState = loadState(
+    directory.loading,
+    directory.error,
+    Boolean(directory.data),
+  );
+
+  const teamLabel =
+    scope.tim && scope.tim !== SIDAK_ALL_TEAMS
+      ? (dashboard.data?.folders.find((folder) => folder.id === scope.tim)
+          ?.name ?? "Tim terpilih")
+      : null;
 
   return (
     <LeaderAccessGate module="sidak" moduleLabel="SIDAK">
-      <div className="flex flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10">
-            {/* Hero Welcome Card */}
-            <Card className="border-border bg-card py-0">
-              <CardContent className="p-8 sm:p-10 lg:p-12">
-                <div className="max-w-3xl">
-                  <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] font-semibold text-muted-foreground">
-                    <BarChart3 aria-hidden="true" className="h-3.5 w-3.5" />
-                    Modul Utama
-                  </div>
-                  <h2 className="text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
-                    Selamat Datang di SIDAK
-                  </h2>
-                  <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
-                    Pusat kendali analisis kualitas. Pantau performa agen,
-                    identifikasi area perbaikan, dan hasilkan laporan
-                    komprehensif untuk mendorong pertumbuhan dan kualitas
-                    layanan yang lebih baik.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Module Cards */}
-            <div>
-              <div className="mb-6">
-                <h3 className="font-outfit text-xl font-bold tracking-tight text-foreground">
-                  Pilih Modul
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Akses fitur analitik, prediksi, dan laporan SIDAK.
-                </p>
-              </div>
-
-              <div
-                className={`grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 ${visibleCards.length >= 5 ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}
-              >
-                {visibleCards.map((card) => {
-                  return (
-                    <Link
-                      key={card.href}
-                      to={card.href}
-                      className="group/card block h-full"
-                    >
-                      <div className="h-full transition-transform motion-safe:group-hover/card:-translate-y-0.5">
-                        <Card className="group flex h-full flex-col border-border bg-card py-0 transition-colors hover:border-foreground/20">
-                          <CardContent className="flex h-full flex-col p-6">
-                            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-foreground group-hover:text-background">
-                              <card.icon
-                                aria-hidden="true"
-                                className="h-5 w-5"
-                              />
-                            </div>
-                            <h4 className="text-base font-semibold tracking-tight text-foreground">
-                              {card.title}
-                            </h4>
-                            <p className="mt-2 flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                              {card.desc}
-                            </p>
-                            <div className="mt-6 flex items-center text-[12px] font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
-                              Buka Modul <ArrowRight className="ml-1 h-3 w-3" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pt-6 pb-16 sm:px-6 lg:pt-10">
+        <SidakPageHeader
+          title="SIDAK"
+          eyebrow={null}
+          description="Hasil audit QA: siapa yang perlu ditindaklanjuti dan parameter apa yang paling sering muncul."
+          scope={
+            <div data-testid="sidak-home-scope">
+              <SidakScopeLine
+                layanan={scope.layanan}
+                timLabel={teamLabel}
+                tahun={scope.tahun}
+                dari={scope.dari}
+                sampai={scope.sampai}
+              />
             </div>
-          </div>
+          }
+          actions={
+            <>
+              {SECONDARY_LINKS.filter((link) => allowedPaths.has(link.to)).map(
+                (link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className={buttonVariants({
+                      variant: "ghost",
+                      className: "min-h-[44px]",
+                    })}
+                  >
+                    {link.label}
+                  </Link>
+                ),
+              )}
+              <Link
+                to={canManage ? "/sidak/input" : "/sidak/agents"}
+                className={buttonVariants({ className: "min-h-[44px] px-4" })}
+              >
+                {canManage ? "Input temuan" : "Lihat agen saya"}
+              </Link>
+            </>
+          }
+        />
+
+        <SidakPeriodStrip
+          period={period}
+          state={dashboardState}
+          onRetry={() => void dashboard.refetch()}
+        />
+
+        <div className="flex flex-wrap items-start gap-x-10 gap-y-10">
+          <SidakFollowUpList
+            agents={followUps}
+            state={directoryState}
+            onRetry={() => void directory.refetch()}
+          />
+          <SidakTopParameters
+            parameters={parameters}
+            state={dashboardState}
+            onRetry={() => void dashboard.refetch()}
+          />
         </div>
+
+        <SidakPageDirectory pages={sidakPages} />
       </div>
     </LeaderAccessGate>
   );

@@ -28,7 +28,15 @@ import SidakConditionSummary from "../../components/sidak/SidakConditionSummary"
 import SidakDashboardHeatmap from "../../components/sidak/SidakDashboardHeatmap";
 import SidakDashboardPanel from "../../components/sidak/SidakDashboardPanel";
 import SidakParameterRanking from "../../components/sidak/SidakParameterRanking";
-import { MONTH_SHORT } from "../../components/sidak/heatmap-insights";
+import {
+  SidakPageHeader,
+  SidakScopeLine,
+} from "../../components/sidak/SidakPageHeader";
+import {
+  SIDAK_ALL_TEAMS,
+  defaultSidakScope,
+  useSidakScope,
+} from "../../hooks/useSidakScope";
 
 function DashboardSkeleton() {
   return (
@@ -78,14 +86,24 @@ function DashboardSkeleton() {
 export default function SidakDashboardPage() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const maxVisibleParameters = 2;
-  const [selectedService, setSelectedService] = useState("call");
-  const [selectedFolder, setSelectedFolder] = useState("ALL");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [startMonth, setStartMonth] = useState<number | null>(1);
-  const [endMonth, setEndMonth] = useState<number | null>(
-    new Date().getMonth() + 1,
+  // Layanan, tim, tahun, dan rentang bulan adalah cakupan bersama SIDAK
+  // (query URL + sesi), bukan state lokal halaman ini.
+  const { scope, setScope } = useSidakScope();
+  const selectedService: string = scope.layanan;
+  const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
+  const selectedYear = scope.tahun;
+  const startMonth: number | null = scope.dari;
+  const endMonth: number | null = scope.sampai;
+  const setSelectedService = useCallback(
+    (service: string) => setScope({ layanan: service as ServiceType }),
+    [setScope],
+  );
+  const setSelectedFolder = useCallback(
+    (folder: string) => setScope({ tim: folder }),
+    [setScope],
   );
   const [hiddenParams, setHiddenParams] = useState<Set<string> | null>(null);
+  const [showAllTrendParams, setShowAllTrendParams] = useState(false);
   const [showTotalTrend, setShowTotalTrend] = useState(true);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastStatus, setForecastStatus] =
@@ -304,7 +322,7 @@ export default function SidakDashboardPage() {
     ) {
       setSelectedService(availableServices[0]);
     }
-  }, [availableServices, selectedService, loading, data]);
+  }, [availableServices, selectedService, loading, data, setSelectedService]);
 
   useEffect(() => {
     if (loading || !data) return;
@@ -314,8 +332,9 @@ export default function SidakDashboardPage() {
         if (!valid) setSelectedFolder("ALL");
       }
 
-      // Default folder pairing on initial load when folders are fetched
-      if (!initialFolderSetRef.current && selectedFolder === "ALL") {
+      // Pasangan tim bawaan hanya bila cakupan belum memilih tim; "Semua tim"
+      // yang dipilih sengaja (`tim=ALL`) tidak ditimpa.
+      if (!initialFolderSetRef.current && scope.tim === null) {
         const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
         const matchedFolder = findPrimarySidakFolderByName(
           folders,
@@ -327,7 +346,15 @@ export default function SidakDashboardPage() {
         }
       }
     }
-  }, [folders, selectedFolder, loading, data, selectedService]);
+  }, [
+    folders,
+    selectedFolder,
+    loading,
+    data,
+    selectedService,
+    scope.tim,
+    setSelectedFolder,
+  ]);
 
   // Compute leader locked service
   const leaderLockedService = useMemo(() => {
@@ -350,14 +377,13 @@ export default function SidakDashboardPage() {
 
   const handleReset = useCallback(() => {
     initialFolderSetRef.current = false;
-    setSelectedService(leaderLockedService ?? "call");
-    setSelectedFolder("ALL");
-    setSelectedYear(new Date().getFullYear());
-    setStartMonth(1);
-    setEndMonth(new Date().getMonth() + 1);
+    setScope({
+      ...defaultSidakScope(),
+      layanan: (leaderLockedService ?? "call") as ServiceType,
+    });
     setHiddenParams(null);
     setShowTotalTrend(true);
-  }, [leaderLockedService]);
+  }, [leaderLockedService, setScope]);
 
   const summary = data?.summary;
   const hasSummary = summary && summary.totalAgents > 0;
@@ -390,6 +416,19 @@ export default function SidakDashboardPage() {
 
   const complianceLabel =
     startMonth !== endMonth ? "Rata-rata Kepatuhan" : "Tingkat Kepatuhan";
+
+  // Chip parameter tren: empat pertama (urutan Pareto dari API) plus yang
+  // sedang aktif; sisanya di balik "+N parameter lain" supaya tidak ramai.
+  const trendParamChips = (() => {
+    const params = (data?.paramTrend?.datasets ?? []).filter(
+      (ds) => !ds.isTotal,
+    );
+    if (showAllTrendParams) return { visible: params, hiddenCount: 0 };
+    const visible = params.filter(
+      (ds, index) => index < 4 || !activeHiddenParams.has(ds.label),
+    );
+    return { visible, hiddenCount: params.length - visible.length };
+  })();
 
   const KPI_CARDS = [
     {
@@ -437,13 +476,6 @@ export default function SidakDashboardPage() {
       ? "Semua tim"
       : (folders.find((folder) => folder.id === selectedFolder)?.name ??
         "Tim terpilih");
-  const monthRangeLabel =
-    startMonth && endMonth
-      ? startMonth === endMonth
-        ? MONTH_SHORT[startMonth - 1]
-        : `${MONTH_SHORT[startMonth - 1]}–${MONTH_SHORT[endMonth - 1]}`
-      : "Sepanjang";
-  const scopeLine = `${serviceLabel} · ${folderLabel} · ${monthRangeLabel} ${selectedYear}`;
   const chipClass = (active: boolean, disabled: boolean) =>
     `inline-flex min-h-[44px] max-w-full items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-8 ${
       active
@@ -456,58 +488,59 @@ export default function SidakDashboardPage() {
   return (
     <div className="bg-background min-h-full">
       <div className="@container/dashboard mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <h1
-              ref={headingRef}
-              tabIndex={-1}
-              className="font-outfit text-[1.75rem] leading-tight font-bold tracking-[-0.03em] text-balance text-foreground focus:outline-none"
-            >
-              Dashboard SIDAK
-            </h1>
-            <p className="mt-1 text-sm text-fg2">{scopeLine}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            disabled={loading}
-            aria-busy={loading}
-            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={`size-4 ${loading ? "motion-safe:animate-spin" : ""}`}
+        <SidakPageHeader
+          title="Dashboard"
+          description="Tren temuan, parameter penyumbang terbesar, dan pola mingguan untuk cakupan ini."
+          headingRef={headingRef}
+          scope={
+            <SidakScopeLine
+              layanan={selectedService}
+              timLabel={selectedFolder === SIDAK_ALL_TEAMS ? null : folderLabel}
+              tahun={selectedYear}
+              dari={startMonth}
+              sampai={endMonth}
             />
-            {loading ? "Memperbarui data…" : "Perbarui data"}
-          </button>
-        </header>
+          }
+          actions={
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              disabled={loading}
+              aria-busy={loading}
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={`size-4 ${loading ? "motion-safe:animate-spin" : ""}`}
+              />
+              {loading ? "Memperbarui data…" : "Perbarui data"}
+            </button>
+          }
+        />
 
         {/* Filter Bar */}
         <DashboardFilters
           showHeader={false}
           selectedService={selectedService}
           onServiceChange={(svc) => {
-            setSelectedService(svc);
             const matchedFolder = findPrimarySidakFolderByName(
               folders,
               DEFAULT_SERVICE_FOLDER_MAP[svc],
             );
-            if (matchedFolder) {
-              setSelectedFolder(matchedFolder.id);
-            } else {
-              setSelectedFolder("ALL");
-            }
+            setScope({
+              layanan: svc as ServiceType,
+              tim: matchedFolder?.id ?? SIDAK_ALL_TEAMS,
+            });
           }}
           selectedFolder={selectedFolder}
           onFolderChange={setSelectedFolder}
           selectedYear={selectedYear}
-          onYearChange={setSelectedYear}
+          onYearChange={(year) => setScope({ tahun: year })}
           startMonth={startMonth}
           endMonth={endMonth}
-          onMonthRangeChange={(s, e) => {
-            setStartMonth(s);
-            setEndMonth(e);
-          }}
+          onMonthRangeChange={(start, end) =>
+            setScope({ dari: start ?? 1, sampai: end ?? 12 })
+          }
           folders={folders}
           availableYears={availableYears}
           leaderLockedService={leaderLockedService}
@@ -668,45 +701,52 @@ export default function SidakDashboardPage() {
                       >
                         Total Temuan
                       </button>
-                      {data.paramTrend.datasets
-                        .filter((ds) => !ds.isTotal)
-                        .map((ds) => {
-                          const isHidden = activeHiddenParams.has(ds.label);
-                          const disableActivation =
-                            isHidden && !canActivateMoreParams;
-                          return (
-                            <button
-                              key={ds.label}
-                              type="button"
-                              aria-pressed={!isHidden}
-                              disabled={disableActivation}
-                              onClick={() => {
-                                if (disableActivation) return;
-                                setHiddenParams((prev) => {
-                                  const next = new Set(
-                                    prev ?? defaultHiddenParams,
-                                  );
-                                  if (next.has(ds.label)) next.delete(ds.label);
-                                  else next.add(ds.label);
-                                  return next;
-                                });
-                              }}
-                              className={chipClass(
-                                !isHidden,
-                                disableActivation,
-                              )}
-                              title={
-                                disableActivation
-                                  ? "Maksimal 2 parameter aktif. Nonaktifkan salah satu terlebih dahulu."
-                                  : undefined
-                              }
-                            >
-                              <span className="min-w-0 text-left whitespace-normal">
-                                {ds.label}
-                              </span>
-                            </button>
-                          );
-                        })}
+                      {trendParamChips.visible.map((ds) => {
+                        const isHidden = activeHiddenParams.has(ds.label);
+                        const disableActivation =
+                          isHidden && !canActivateMoreParams;
+                        return (
+                          <button
+                            key={ds.label}
+                            type="button"
+                            aria-pressed={!isHidden}
+                            disabled={disableActivation}
+                            onClick={() => {
+                              if (disableActivation) return;
+                              setHiddenParams((prev) => {
+                                const next = new Set(
+                                  prev ?? defaultHiddenParams,
+                                );
+                                if (next.has(ds.label)) next.delete(ds.label);
+                                else next.add(ds.label);
+                                return next;
+                              });
+                            }}
+                            className={chipClass(!isHidden, disableActivation)}
+                            title={
+                              disableActivation
+                                ? "Maksimal 2 parameter aktif. Nonaktifkan salah satu terlebih dahulu."
+                                : undefined
+                            }
+                          >
+                            <span className="min-w-0 text-left whitespace-normal">
+                              {ds.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {trendParamChips.hiddenCount > 0 || showAllTrendParams ? (
+                        <button
+                          type="button"
+                          aria-expanded={showAllTrendParams}
+                          onClick={() => setShowAllTrendParams((prev) => !prev)}
+                          className="inline-flex min-h-[44px] items-center rounded-md px-2 text-xs font-medium text-fg2 underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
+                        >
+                          {showAllTrendParams
+                            ? "Lebih sedikit"
+                            : `+${trendParamChips.hiddenCount} parameter lain`}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {

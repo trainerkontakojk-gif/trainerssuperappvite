@@ -1,8 +1,13 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { Link, useSearch } from "@tanstack/react-router";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { Link } from "@tanstack/react-router";
 import { useApi } from "../../hooks/useApi";
 import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
-import type { TopAgentData, QAPeriod } from "@trainers/types";
+import type { TopAgentData, QAPeriod, ServiceType } from "@trainers/types";
+import {
+  SidakPageHeader,
+  SidakScopeLine,
+} from "../../components/sidak/SidakPageHeader";
+import { SIDAK_ALL_TEAMS, useSidakScope } from "../../hooks/useSidakScope";
 import {
   buildSidakFolderSelectGroups,
   findPrimarySidakFolderByName,
@@ -13,7 +18,17 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Download,
 } from "lucide-react";
+import { cn } from "cn";
+import { notify } from "../../lib/toast";
+import {
+  computeRanks,
+  downloadRankingXlsx,
+  groupByTeam,
+  rankChangeLabel as describeRankChange,
+  tiedNames as tiedNamesFor,
+} from "../../utils/sidakRanking";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
 import { Button } from "@/components/ui/button";
@@ -51,17 +66,21 @@ type SortKey = "defects" | "nama" | "score";
 type SortDirection = "asc" | "desc";
 
 export default function SidakRankingPage() {
-  // `from` (bukan `strict: false`) supaya yang terbaca adalah hasil
-  // `validateSearch` di `sidakRankingRoute`, bukan query mentah dari URL.
-  const search = useSearch({ from: "/sidak/ranking" });
-  const [selectedService, setSelectedService] = useState<string>(
-    search.service_type ?? "call",
+  // Layanan, tahun, dan tim mengikuti cakupan bersama SIDAK (query URL +
+  // sesi). Periode (YTD/bulan) tetap milik halaman ini.
+  const { scope, setScope } = useSidakScope();
+  const selectedService: string = scope.layanan;
+  const selectedYear = scope.tahun;
+  const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
+  const setSelectedService = useCallback(
+    (service: string) => setScope({ layanan: service as ServiceType }),
+    [setScope],
+  );
+  const setSelectedFolder = useCallback(
+    (folder: string) => setScope({ tim: folder }),
+    [setScope],
   );
   const [selectedPeriod, setSelectedPeriod] = useState("ytd");
-  const [selectedYear, setSelectedYear] = useState(
-    search.year ?? new Date().getFullYear(),
-  );
-  const [selectedFolder, setSelectedFolder] = useState("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("defects");
   const initialFolderSetRef = useRef(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -111,7 +130,7 @@ export default function SidakRankingPage() {
     if (availableServices.length > 0 && !availableServices.includes(selectedService)) {
       setSelectedService(availableServices[0]);
     }
-  }, [availableServices, selectedService, loading, data]);
+  }, [availableServices, selectedService, loading, data, setSelectedService]);
 
   useEffect(() => {
     if (loading) return;
@@ -123,7 +142,7 @@ export default function SidakRankingPage() {
       }
 
       // Default folder pairing on initial load/mount when data is fetched
-      if (!initialFolderSetRef.current && selectedFolder === "ALL") {
+      if (!initialFolderSetRef.current && scope.tim === null) {
         const matchedFolder = findPrimarySidakFolderByName(
           folders,
           DEFAULT_SERVICE_FOLDER_MAP[effectiveService],
@@ -134,56 +153,27 @@ export default function SidakRankingPage() {
         }
       }
     }
-  }, [allFolders, selectedFolder, loading, effectiveService]);
+  }, [
+    allFolders,
+    selectedFolder,
+    loading,
+    effectiveService,
+    scope.tim,
+    setSelectedFolder,
+  ]);
 
   const rankings = data?.rankings;
-  const businessRanks = useMemo(() => {
-    if (!rankings) return new Map<string, number>();
+  const [view, setView] = useState<"combined" | "team">("combined");
+  const [exporting, setExporting] = useState(false);
+  const businessRanks = useMemo(
+    () => computeRanks(rankings ?? []),
+    [rankings],
+  );
 
-    const collator = new Intl.Collator("id", {
-      sensitivity: "base",
-      numeric: true,
-    });
-    const businessOrder = [...rankings].sort(
-      (a, b) => b.defects - a.defects || collator.compare(a.nama, b.nama),
-    );
-    const ranks = new Map<string, number>();
-    let previousDefects: number | undefined;
-    let previousRank = 0;
-
-    businessOrder.forEach((agent, index) => {
-      const rank =
-        index > 0 && agent.defects === previousDefects
-          ? previousRank
-          : index + 1;
-      ranks.set(agent.agentId, rank);
-      previousDefects = agent.defects;
-      previousRank = rank;
-    });
-
-    return ranks;
-  }, [rankings]);
-
-  const tiedNamesByAgent = useMemo(() => {
-    const result = new Map<string, string[]>();
-    if (!rankings) return result;
-
-    const groups = new Map<number, string[]>();
-    rankings.forEach((agent) => {
-      const names = groups.get(agent.defects) ?? [];
-      names.push(agent.nama);
-      groups.set(agent.defects, names);
-    });
-
-    rankings.forEach((agent) => {
-      const names = (groups.get(agent.defects) ?? [])
-        .filter((name) => name !== agent.nama)
-        .sort((a, b) => a.localeCompare(b, "id", { sensitivity: "base" }));
-      if (names.length > 0) result.set(agent.agentId, names);
-    });
-
-    return result;
-  }, [rankings]);
+  const tiedNamesByAgent = useMemo(
+    () => tiedNamesFor(rankings ?? []),
+    [rankings],
+  );
 
   const formatTieLabel = (rank: number, names: string[]) => {
     if (names.length === 0) return null;
@@ -194,12 +184,6 @@ export default function SidakRankingPage() {
     return `Berbagi peringkat ${rank} dengan ${peerLabel}`;
   };
 
-  const showBatchColumn = useMemo(() => {
-    const batches = new Set(
-      (rankings ?? []).map((agent) => agent.batch?.trim()).filter(Boolean),
-    );
-    return batches.size > 1;
-  }, [rankings]);
 
   const sortedRankings = useMemo(() => {
     if (!rankings) return [];
@@ -224,6 +208,40 @@ export default function SidakRankingPage() {
     });
   }, [rankings, sortKey, sortDirection]);
 
+  // Per tim leader: urutan tabel sama, peringkat dan seri dihitung di dalam tim.
+  const teamGroups = useMemo(
+    () =>
+      groupByTeam(sortedRankings).map((group) => ({
+        ...group,
+        ranks: computeRanks(group.agents),
+        ties: tiedNamesFor(group.agents),
+      })),
+    [sortedRankings],
+  );
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Excel mengikuti tampilan: per tim leader memakai urutan dan peringkat
+      // di dalam tim, sama seperti tabel.
+      const teamView = view === "team";
+      await downloadRankingXlsx({
+        agents: teamView
+          ? teamGroups.flatMap((group) => group.agents)
+          : sortedRankings,
+        ranks: teamView
+          ? new Map(teamGroups.flatMap((group) => [...group.ranks]))
+          : businessRanks,
+        period: selectedPeriod,
+        fileName: `ranking-sidak-${effectiveService}-${selectedYear}-${selectedPeriod}${teamView ? "-per-tim" : ""}.xlsx`,
+      });
+    } catch {
+      notify.error("File Excel gagal dibuat. Coba lagi.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const toggleSort = (key: SortKey, defaultDirection: SortDirection) => {
     if (sortKey === key) {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -243,207 +261,17 @@ export default function SidakRankingPage() {
       : <ArrowDown className="w-3.5 h-3.5" />;
   };
 
-  const scoreColor = (score: number) => SIDAK_SCORE_TEXT[sidakScoreTone(score)];
-
-  const ariaSort = (key: SortKey) =>
-    sortKey === key
-      ? sortDirection === "asc"
-        ? "ascending"
-        : "descending"
-      : "none";
-
-  const isYearToDate = selectedPeriod === "ytd";
-  const scoreColumnLabel = isYearToDate ? "Rata-rata Skor QA" : "Skor QA";
-
-  const periodsForYear = data?.periods?.filter(
-    (p) => p.year === selectedYear,
-  ) ?? [];
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 pb-14 md:p-8 md:pb-10 lg:pb-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <header className="flex flex-col gap-1">
-            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
-              Ranking prioritas temuan
-            </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Temuan terbanyak berada di peringkat teratas. Jumlah temuan yang sama berbagi peringkat.
-            </p>
-          </header>
-
-          {/* FILTER BAR */}
-          <section aria-label="Filter ranking" className="border-y border-border py-4 md:py-5">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <FilterSelect
-                id="sidak-ranking-service"
-                label="Layanan"
-                value={leaderLockedService ?? selectedService}
-                disabled={!!leaderLockedService}
-                items={(leaderLockedService
-                  ? [leaderLockedService]
-                  : availableServices.length > 0
-                    ? availableServices
-                    : Object.keys(SERVICE_LABELS)
-                ).map((st) => ({ value: st, label: SERVICE_LABELS[st] || st }))}
-                onValueChange={(svc) => {
-                  if (leaderLockedService) return;
-                  setSelectedService(svc);
-                  const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
-                  const folders = allFolders;
-                  if (targetFolderName && folders.length > 0) {
-                    const matchedFolder = folders.find(
-                      (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
-                    );
-                    if (matchedFolder) {
-                      setSelectedFolder(matchedFolder.id);
-                    } else {
-                      setSelectedFolder("ALL");
-                    }
-                  } else {
-                    setSelectedFolder("ALL");
-                  }
-                }}
-              />
-
-              <FilterSelect
-                id="sidak-ranking-period"
-                label="Periode"
-                value={selectedPeriod}
-                onValueChange={setSelectedPeriod}
-                items={[
-                  { value: "ytd", label: "Year to Date (YTD)" },
-                  { value: "alltime", label: "All Time" },
-                ]}
-                groups={[
-                  {
-                    label: "Bulan",
-                    items: periodsForYear.map((p) => ({
-                      value: p.id,
-                      label: `${MONTHS[(p.month ?? 1) - 1]} ${p.year}`,
-                    })),
-                  },
-                ]}
-              />
-
-              <FilterSelect
-                id="sidak-ranking-year"
-                label="Tahun"
-                value={String(selectedYear)}
-                onValueChange={(y) => setSelectedYear(Number(y))}
-                items={(data?.availableYears ?? []).map((y) => ({
-                  value: String(y),
-                  label: String(y),
-                }))}
-              />
-
-              <FilterSelect
-                id="sidak-ranking-folder"
-                label="Folder/tim"
-                value={selectedFolder}
-                onValueChange={setSelectedFolder}
-                items={[
-                  { value: "ALL", label: "Semua Tim" },
-                  ...standaloneFolders.map((f) => ({ value: f.id, label: f.nama })),
-                ]}
-                groups={groupedFolders.map((group) => ({
-                  label: `${group.parent.nama} (gabungan + batch)`,
-                  items: [
-                    { value: group.parent.id, label: `${group.parent.nama} — Semua batch` },
-                    ...group.children.map((child) => ({
-                      value: child.id,
-                      label: `↳ ${child.nama}`,
-                    })),
-                  ],
-                }))}
-              />
-            </div>
-          </section>
-
-          {/* RANKING TABLE */}
-          <section aria-label="Daftar ranking agen" className="border-y border-border">
-            <div className="overflow-x-hidden md:overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="hidden md:table-header-group">
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground w-16">
-                      Rank
-                    </th>
-                    <th
-                      aria-sort={ariaSort("nama")}
-                      className="px-4 py-1 text-[12px] font-semibold text-muted-foreground"
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => toggleSort("nama", "asc")}
-                        className="-ml-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
-                      >
-                        Agen
-                        {renderSortIcon("nama")}
-                      </Button>
-                    </th>
-                    <th className={showBatchColumn ? "px-4 py-3 text-[12px] font-semibold text-muted-foreground" : "hidden"}>
-                      Tim/Batch
-                    </th>
-                    <th
-                      aria-sort={ariaSort("defects")}
-                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => toggleSort("defects", "desc")}
-                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
-                      >
-                        Total Temuan
-                        {renderSortIcon("defects")}
-                      </Button>
-                    </th>
-                    <th
-                      aria-sort={ariaSort("score")}
-                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => toggleSort("score", "desc")}
-                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
-                      >
-                        {scoreColumnLabel}
-                        {renderSortIcon("score")}
-                      </Button>
-                    </th>
-                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground text-center">
-                      Perubahan posisi
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="block md:table-row-group">
-                    {loading ? (
-                      Array.from({ length: 8 }).map((_, i) => (
-                        <tr key={`skeleton-${i}`}>
-                          <td colSpan={6} className="px-6 py-8">
-                            <Skeleton className="h-6 w-full rounded-lg" />
-                          </td>
-                        </tr>
-                      ))
-                    ) : sortedRankings.length > 0 ? (
-                      sortedRankings.map((agent, i) => {
-                        const rank = businessRanks.get(agent.agentId) ?? i + 1;
-                        const tiedNames = tiedNamesByAgent.get(agent.agentId) ?? [];
+  const renderRow = (
+    agent: TopAgentData,
+    rank: number,
+    tiedNames: string[],
+  ) => {
                         const tieLabel = formatTieLabel(rank, tiedNames);
                         const rankChange = agent.rankChange;
-                        const rankChangeLabel =
-                          selectedPeriod === "alltime" || rankChange === undefined
-                            ? null
-                            : rankChange === null
-                              ? "Baru"
-                              : rankChange > 0
-                                ? `Prioritas naik +${rankChange}`
-                                : rankChange < 0
-                                  ? `Prioritas turun ${Math.abs(rankChange)}`
-                                  : "Tetap";
+                        const rankChangeLabel = describeRankChange(
+                          rankChange,
+                          selectedPeriod,
+                        );
                         // Prioritas naik = temuan makin banyak (perlu perhatian);
                         // turun = membaik. Teks label tetap menyatakan arahnya.
                         const rankChangeClass =
@@ -490,10 +318,15 @@ export default function SidakRankingPage() {
                                 </span>
                               )}
                             </td>
-                            <td className={showBatchColumn ? "hidden px-4 py-4 align-middle md:table-cell" : "hidden"}>
-                              <div className="text-[12px] font-semibold text-muted-foreground">
-                                {agent.batch}
-                              </div>
+                            <td className="hidden px-4 py-4 align-middle text-sm text-fg2 md:table-cell">
+                              {[agent.tim?.trim(), agent.batch?.trim()]
+                                .filter(Boolean)
+                                .join(" · ") || "—"}
+                              {agent.hasCritical ? (
+                                <span className={`ml-2 text-xs font-semibold ${SIDAK_SCORE_TEXT.bad}`}>
+                                  kritikal
+                                </span>
+                              ) : null}
                             </td>
                             <td className="hidden px-4 py-4 text-right align-middle font-mono font-semibold text-foreground md:table-cell">
                               {agent.defects}
@@ -519,7 +352,287 @@ export default function SidakRankingPage() {
                             </td>
                           </tr>
                         );
-                      })
+  };
+
+  const scoreColor = (score: number) => SIDAK_SCORE_TEXT[sidakScoreTone(score)];
+
+  const ariaSort = (key: SortKey) =>
+    sortKey === key
+      ? sortDirection === "asc"
+        ? "ascending"
+        : "descending"
+      : "none";
+
+  const isYearToDate = selectedPeriod === "ytd";
+  const scoreColumnLabel = isYearToDate ? "Rata-rata Skor QA" : "Skor QA";
+
+  const periodsForYear = data?.periods?.filter(
+    (p) => p.year === selectedYear,
+  ) ?? [];
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-4 pb-14 md:p-8 md:pb-10 lg:pb-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <SidakPageHeader
+            title="Ranking"
+            description="Agen dengan temuan terbanyak ada di peringkat 1. Jumlah temuan yang sama berbagi peringkat."
+            scope={
+              <SidakScopeLine
+                layanan={effectiveService}
+                timLabel={
+                  selectedFolder === SIDAK_ALL_TEAMS
+                    ? null
+                    : (allFolders.find((f) => f.id === selectedFolder)?.name ??
+                      "Tim terpilih")
+                }
+                tahun={selectedYear}
+                note="periode dipilih di filter, bukan rentang bulan"
+              />
+            }
+            actions={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleExport()}
+                disabled={loading || exporting || sortedRankings.length === 0}
+                className="min-h-[44px]"
+              >
+                <Download data-icon="inline-start" aria-hidden="true" />
+                Unduh Excel
+              </Button>
+            }
+          />
+
+          {/* FILTER BAR: cakupan ringkas seperti halaman SIDAK lain */}
+          <section
+            aria-label="Filter ranking"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end"
+          >
+              <FilterSelect
+                className="flex min-w-0 flex-col gap-1.5 lg:w-36"
+                id="sidak-ranking-service"
+                label="Layanan"
+                value={leaderLockedService ?? selectedService}
+                disabled={!!leaderLockedService}
+                items={(leaderLockedService
+                  ? [leaderLockedService]
+                  : availableServices.length > 0
+                    ? availableServices
+                    : Object.keys(SERVICE_LABELS)
+                ).map((st) => ({ value: st, label: SERVICE_LABELS[st] || st }))}
+                onValueChange={(svc) => {
+                  if (leaderLockedService) return;
+                  const matchedFolder = findPrimarySidakFolderByName(
+                    allFolders,
+                    DEFAULT_SERVICE_FOLDER_MAP[svc],
+                  );
+                  setScope({
+                    layanan: svc as ServiceType,
+                    tim: matchedFolder?.id ?? SIDAK_ALL_TEAMS,
+                  });
+                }}
+              />
+
+              <FilterSelect
+                className="flex min-w-0 flex-col gap-1.5 lg:w-28"
+                id="sidak-ranking-year"
+                label="Tahun"
+                value={String(selectedYear)}
+                onValueChange={(y) => setScope({ tahun: Number(y) })}
+                items={(data?.availableYears ?? []).map((y) => ({
+                  value: String(y),
+                  label: String(y),
+                }))}
+              />
+
+              <FilterSelect
+                className="flex min-w-0 flex-col gap-1.5 lg:w-56"
+                id="sidak-ranking-period"
+                label="Periode"
+                value={selectedPeriod}
+                onValueChange={setSelectedPeriod}
+                items={[
+                  { value: "ytd", label: "Year to Date (YTD)" },
+                  { value: "alltime", label: "All Time" },
+                ]}
+                groups={[
+                  {
+                    label: "Bulan",
+                    items: periodsForYear.map((p) => ({
+                      value: p.id,
+                      label: `${MONTHS[(p.month ?? 1) - 1]} ${p.year}`,
+                    })),
+                  },
+                ]}
+              />
+
+              <FilterSelect
+                className="flex min-w-0 flex-col gap-1.5 lg:w-64"
+                id="sidak-ranking-folder"
+                label="Tim"
+                value={selectedFolder}
+                onValueChange={setSelectedFolder}
+                items={[
+                  { value: "ALL", label: "Semua Tim" },
+                  ...standaloneFolders.map((f) => ({ value: f.id, label: f.nama })),
+                ]}
+                groups={groupedFolders.map((group) => ({
+                  label: `${group.parent.nama} (gabungan + batch)`,
+                  items: [
+                    { value: group.parent.id, label: `${group.parent.nama} — Semua batch` },
+                    ...group.children.map((child) => ({
+                      value: child.id,
+                      label: `↳ ${child.nama}`,
+                    })),
+                  ],
+                }))}
+              />
+          </section>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              role="group"
+              aria-label="Tampilan ranking"
+              className="inline-flex self-start rounded-lg border border-border p-0.5"
+            >
+              {(
+                [
+                  ["combined", "Tim gabungan"],
+                  ["team", "Per tim leader"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={view === value}
+                  onClick={() => setView(value)}
+                  className={cn(
+                    "min-h-[44px] rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                    view === value
+                      ? "bg-foreground text-background"
+                      : "text-fg2 hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {!loading && sortedRankings.length > 0 ? (
+              <p data-testid="ranking-count" className="text-sm text-fg2 tabular-nums">
+                {sortedRankings.length} agen · jumlah temuan sama berbagi peringkat
+              </p>
+            ) : null}
+          </div>
+
+          {/* RANKING TABLE */}
+          <section
+            aria-label="Daftar ranking agen"
+            className="overflow-hidden rounded-xl border border-border bg-surface-elevated"
+          >
+            <div className="overflow-x-hidden md:overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="hidden md:table-header-group">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground w-16">
+                      Rank
+                    </th>
+                    <th
+                      aria-sort={ariaSort("nama")}
+                      className="px-4 py-1 text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => toggleSort("nama", "asc")}
+                        className="-ml-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        Agen
+                        {renderSortIcon("nama")}
+                      </Button>
+                    </th>
+                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground">
+                      Tim · Batch
+                    </th>
+                    <th
+                      aria-sort={ariaSort("defects")}
+                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => toggleSort("defects", "desc")}
+                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        Temuan
+                        {renderSortIcon("defects")}
+                      </Button>
+                    </th>
+                    <th
+                      aria-sort={ariaSort("score")}
+                      className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => toggleSort("score", "desc")}
+                        className="-mr-2 h-[44px] gap-1.5 px-2 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        {scoreColumnLabel}
+                        {renderSortIcon("score")}
+                      </Button>
+                    </th>
+                    <th className="px-4 py-3 text-[12px] font-semibold text-muted-foreground text-center">
+                      Perubahan posisi
+                    </th>
+                  </tr>
+                </thead>
+                {!loading && view === "team" && sortedRankings.length > 0 ? (
+                  teamGroups.map((group) => (
+                    <tbody
+                      key={group.tim}
+                      aria-label={group.tim}
+                      className="block md:table-row-group"
+                    >
+                      <tr className="block border-b border-border bg-muted/30 md:table-row">
+                        <th
+                          scope="colgroup"
+                          colSpan={6}
+                          className="block px-4 py-2 text-left text-sm font-semibold text-foreground md:table-cell"
+                        >
+                          {group.tim}
+                          <span className="ml-2 font-normal text-fg2">
+                            {group.agents.length} agen
+                          </span>
+                        </th>
+                      </tr>
+                      {group.agents.map((agent, i) =>
+                        renderRow(
+                          agent,
+                          group.ranks.get(agent.agentId) ?? i + 1,
+                          group.ties.get(agent.agentId) ?? [],
+                        ),
+                      )}
+                    </tbody>
+                  ))
+                ) : (
+                  <tbody className="block md:table-row-group">
+                    {loading ? (
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <tr key={`skeleton-${i}`}>
+                          <td colSpan={6} className="px-6 py-8">
+                            <Skeleton className="h-6 w-full rounded-lg" />
+                          </td>
+                        </tr>
+                      ))
+                    ) : sortedRankings.length > 0 ? (
+                      sortedRankings.map((agent, i) =>
+                        renderRow(
+                          agent,
+                          businessRanks.get(agent.agentId) ?? i + 1,
+                          tiedNamesByAgent.get(agent.agentId) ?? [],
+                        ),
+                      )
                     ) : (
                       <tr>
                         <td colSpan={6} className="px-6 py-24 text-center">
@@ -532,7 +645,8 @@ export default function SidakRankingPage() {
                         </td>
                       </tr>
                     )}
-                </tbody>
+                  </tbody>
+                )}
               </table>
             </div>
           </section>

@@ -1,0 +1,569 @@
+<title>Redesign Modul SIDAK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: dokumen satu kolom (sama dengan usulan KETIK); tiap mockup dibingkai seperti jendela aplikasi, token mengikuti docs/design.md */
+:root{
+  --bg:#fafafa; --surface:#f5f5f5; --elev:#ffffff; --sunken:#ececec; --border:#e5e5e5;
+  --fg:#0a0a0a; --fg2:#404040; --fg3:#707070; --inv-bg:#0a0a0a; --inv-fg:#fafafa;
+  --sidak:#e11d48; --sidak-soft:#e11d4812;
+  --good:#15803d; --good-soft:#15803d14; --warn:#b45309; --warn-soft:#f59e0b1c; --bad:#b91c1c; --bad-soft:#dc262614;
+  --display:"Outfit",system-ui,sans-serif; --body:"Inter",-apple-system,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a0a0a; --surface:#171717; --elev:#1c1c1f; --sunken:#121212; --border:#262626;
+  --fg:#fafafa; --fg2:#a3a3a3; --fg3:#8a8a8a; --inv-bg:#fafafa; --inv-fg:#0a0a0a;
+  --sidak:#fb7185; --sidak-soft:#fb71851f;
+  --good:#4ade80; --good-soft:#4ade801a; --warn:#fbbf24; --warn-soft:#fbbf241a; --bad:#f87171; --bad-soft:#f871711a;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a0a0a; --surface:#171717; --elev:#1c1c1f; --sunken:#121212; --border:#262626;
+  --fg:#fafafa; --fg2:#a3a3a3; --fg3:#8a8a8a; --inv-bg:#fafafa; --inv-fg:#0a0a0a;
+  --sidak:#fb7185; --sidak-soft:#fb71851f;
+  --good:#4ade80; --good-soft:#4ade801a; --warn:#fbbf24; --warn-soft:#fbbf241a; --bad:#f87171; --bad-soft:#f871711a;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.03em;text-wrap:balance;margin:0;color:var(--fg)}
+h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.06;font-weight:800}
+h2{font-size:1.6rem;line-height:1.15;font-weight:700}
+h3{font-size:1.05rem;font-weight:700;letter-spacing:-.02em}
+p{margin:0;max-width:72ch;color:var(--fg2);text-wrap:pretty}
+code{font-family:var(--mono);font-size:.86em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--sidak)}
+.lead{font-size:17px}
+section{display:flex;flex-direction:column;gap:20px}
+.sec-head{display:flex;flex-direction:column;gap:8px}
+a{color:var(--sidak)}
+:focus-visible{outline:2px solid var(--sidak);outline-offset:2px}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+.tbl-wrap table{min-width:640px}
+th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;font-weight:600;color:var(--fg3)}
+tr:last-child td{border-bottom:0}
+td{color:var(--fg2)}
+.tbl-wrap td:first-child{font-weight:600;color:var(--fg);white-space:nowrap}
+
+.recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.rec{border:1px solid var(--border);border-radius:12px;padding:20px;background:var(--elev);display:flex;flex-direction:column;gap:8px;min-width:0}
+.rec .tag{align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px}
+.p1{background:var(--bad-soft);color:var(--bad)} .p2{background:var(--warn-soft);color:var(--warn)} .p3{background:var(--sunken);color:var(--fg2)}
+.rec p{font-size:14px}
+.rec .why{font-size:13px;color:var(--fg3)}
+
+/* Bingkai mockup */
+.frame-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border)}
+.frame{min-width:960px;background:var(--bg);font-size:13px;line-height:1.5;display:flex;flex-direction:column}
+.chrome{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.chrome i{width:10px;height:10px;border-radius:50%;background:var(--border);display:block}
+.chrome .url{margin-left:12px;font-family:var(--mono);font-size:12px;color:var(--fg3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 10px}
+.app{display:flex;min-height:0}
+.sb{width:210px;flex:none;border-right:1px solid var(--border);background:var(--elev);padding:14px 10px;display:flex;flex-direction:column;gap:2px;font-size:12.5px}
+.sb .grp{font-size:11.5px;color:var(--fg3);padding:10px 10px 4px}
+.sb a{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;border-radius:7px;color:var(--fg2);text-decoration:none}
+.sb a.on{background:var(--surface);color:var(--fg);font-weight:600;box-shadow:inset 0 0 0 1px var(--border)}
+.sb a.sub{padding-left:26px;font-size:12px;min-height:27px}
+.sb .ic{width:14px;height:14px;border-radius:4px;border:1.5px solid currentColor;opacity:.6;flex:none}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.caption{display:flex;flex-direction:column;gap:6px}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 24px;margin:0;padding:0;list-style:none}
+.notes li{font-size:14px;color:var(--fg2);display:flex;gap:10px}
+.notes b{font-family:var(--mono);font-size:12px;color:var(--sidak);min-width:20px;padding-top:2px}
+
+/* UI di dalam mockup */
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:8px;font:500 13px var(--body);border:1px solid var(--border);background:var(--elev);color:var(--fg);white-space:nowrap}
+.btn.primary{background:var(--inv-bg);color:var(--inv-fg);border-color:var(--inv-bg);font-weight:600}
+.btn.sm{min-height:32px;padding:0 10px;font-size:12px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--fg2)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:600}
+.muted{color:var(--fg3)} .fg2{color:var(--fg2)} .fg{color:var(--fg)}
+.num{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg)}
+.box{border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.row{display:flex;align-items:center;gap:12px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.d-ok{background:var(--good)} .d-warn{background:var(--warn)} .d-bad{background:var(--bad)} .d-mute{background:var(--fg3)}
+.bar{height:6px;border-radius:999px;background:var(--sunken);overflow:hidden}
+.bar span{display:block;height:100%;border-radius:999px;background:var(--fg2)}
+
+/* Kepala halaman bersama */
+.phead{padding:22px 32px 18px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--border);background:var(--elev)}
+.phead .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.phead .t{font:700 26px/1.15 var(--display);letter-spacing:-.03em;color:var(--fg)}
+.scope{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:12px;font-weight:600;color:var(--fg2)}
+.sel{min-height:40px;min-width:120px;border:1px solid var(--border);border-radius:8px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--fg);background:var(--bg);font-size:13px}
+.scope-line{font-size:12.5px;color:var(--fg2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.scope-line .lk{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:12px}
+
+/* Beranda */
+.home{padding:24px 32px 32px;display:flex;flex-direction:column;gap:26px}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.strip>div{padding:14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.strip>div:last-child{border-right:0}
+.strip .v{font:700 26px/1.1 var(--mono);letter-spacing:-.02em;color:var(--fg);font-variant-numeric:tabular-nums}
+.strip .l{font-size:12px;color:var(--fg2)}
+.strip .c{font-size:12px}
+.cols{display:flex;gap:24px;align-items:flex-start}
+ul.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--border)}
+.list li:last-child{border-bottom:0}
+.sh{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px}
+.param{display:grid;grid-template-columns:18px minmax(0,1fr) 44px 40px;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:12.5px}
+.param:last-child{border-bottom:0}
+.dir{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border);border-radius:12px;background:var(--elev);overflow:hidden}
+.dir>div{padding:14px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.dir>div:last-child{border-right:0}
+.dir h4{margin:0 0 6px;font:600 12px var(--body);color:var(--fg3)}
+.dir a{display:flex;flex-direction:column;padding:6px 0;text-decoration:none;color:var(--fg);font-weight:600;font-size:12.5px}
+.dir a span{font-weight:400;color:var(--fg3);font-size:12px}
+
+/* Detail agen */
+.agent{display:flex;min-height:0}
+.prof{width:240px;flex:none;border-right:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:12px;background:var(--elev)}
+.photo{width:96px;height:96px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font:700 28px var(--display);color:var(--fg2)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border)}
+.tabs span{padding:9px 12px;font-size:12.5px;color:var(--fg2);border-bottom:2px solid transparent}
+.tabs .on{color:var(--fg);font-weight:600;border-bottom-color:var(--fg)}
+.brief{border:1px solid var(--border);border-radius:12px;background:var(--elev);display:grid;grid-template-columns:200px 1fr 1fr}
+.brief>div{padding:16px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:8px;min-width:0}
+.brief>div:last-child{border-right:0}
+.brief .big{font:800 40px/1 var(--mono);letter-spacing:-.04em;color:var(--fg)}
+.tk{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--border)}
+.tk:last-child{border-bottom:0}
+.months{display:flex;gap:6px;align-items:flex-end;height:120px;padding:8px 0 0;border-bottom:1px solid var(--border);position:relative}
+.months i{flex:1;background:var(--sunken);border-radius:4px 4px 0 0;display:block}
+.months i.sel{background:var(--fg)}
+.months .tgt{position:absolute;left:0;right:0;border-top:1px dashed var(--good)}
+
+/* Dialog */
+.overlay{background:color-mix(in srgb,var(--fg) 8%,var(--bg));padding:36px;display:flex;justify-content:center}
+.sheet{width:520px;max-width:100%;border:1px solid var(--border);border-radius:14px;background:var(--elev);display:flex;flex-direction:column}
+.sheet header,.sheet footer{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sheet header{border-bottom:1px solid var(--border)}
+.sheet footer{border-top:1px solid var(--border);justify-content:flex-end}
+.sheet .body{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.status{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--border);border-radius:10px;background:var(--good-soft);color:var(--fg);font-size:13px}
+
+/* HP */
+.phones{display:flex;gap:24px;flex-wrap:wrap}
+.phone{width:320px;max-width:100%;border:1px solid var(--border);border-radius:28px;padding:10px;background:var(--surface)}
+.phone .scr{border-radius:20px;overflow:hidden;background:var(--bg);border:1px solid var(--border);height:600px;display:flex;flex-direction:column;font-size:12.5px}
+.phone .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--elev);font-size:12px}
+.phone .bd{padding:14px;display:flex;flex-direction:column;gap:14px;overflow:hidden;flex:1}
+.phone .tabbar{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--border);background:var(--elev);font-size:10.5px;text-align:center;color:var(--fg3)}
+.phone .tabbar span{padding:8px 0 10px}
+.phone .tabbar .on{color:var(--fg);font-weight:600}
+.g2{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.g2>div{padding:10px 12px;display:flex;flex-direction:column;gap:0}
+.g2>div:nth-child(odd){border-right:1px solid var(--border)}
+.g2>div:nth-child(-n+2){border-bottom:1px solid var(--border)}
+.g2 .v{font:700 20px/1.2 var(--mono);color:var(--fg)}
+
+.files{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:12px;background:var(--elev);overflow:hidden}
+.files div{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr);gap:16px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px}
+.files div:last-child{border-bottom:0}
+.files code{font-size:12.5px;color:var(--fg);word-break:break-all}
+.files span{color:var(--fg2)}
+ol.phases{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;counter-reset:ph}
+ol.phases li{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--elev)}
+ol.phases li::before{counter-increment:ph;content:counter(ph);font:700 14px var(--mono);color:var(--sidak);min-width:16px}
+ol.phases div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.q{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.q .box{padding:18px;display:flex;flex-direction:column;gap:8px}
+.q .rec-a{font-size:13px;color:var(--fg);border-top:1px solid var(--border);padding-top:8px}
+.h1s{display:flex;flex-direction:column;gap:6px;padding:16px 18px}
+.h1s span{display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px dashed var(--border);padding-bottom:6px}
+.h1s span:last-child{border-bottom:0}
+.h1s code{color:var(--fg3);font-size:11.5px}
+@media (max-width:640px){.files div{grid-template-columns:1fr;gap:4px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="sec-head">
+  <span class="eyebrow">Usulan redesign · modul SIDAK</span>
+  <h1>SIDAK jadi satu alat kerja: tindak lanjut di depan, cakupan yang ikut berpindah</h1>
+  <p class="lead">KETIK, PDKT, dan Telefun sudah memakai pola yang sama: halaman awal berisi data dan satu aksi utama. Sub-halaman SIDAK sudah dirapikan satu per satu, tetapi beranda, filter, dan kepala halamannya belum menyatu. Di bawah ini ada kondisi sekarang, saran menurut dampak, mockup tiap layar, keputusan yang perlu Anda ambil, dan urutan pengerjaan. Semua angka di mockup adalah contoh.</p>
+  <p style="font-size:14px">Plan lengkap: <code>plans/markdown/sidak-redesign.md</code></p>
+</header>
+
+<section>
+  <div class="sec-head">
+    <h2>Kondisi sekarang</h2>
+    <p>Diambil dari kode di <code>main</code> @ 717ff0d, bukan dari ingatan.</p>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Bagian</th><th>SIDAK sekarang</th><th>Pola KETIK / PDKT / Telefun</th></tr></thead>
+      <tbody>
+        <tr><td>Halaman awal</td><td>Hero "Selamat Datang di SIDAK", chip "Modul Utama", lalu 7 kartu tautan berikon dengan teks pemasaran ("algoritma komposit", "pusat kendali"). Tidak ada satu angka pun.</td><td>Satu aksi utama, menu kecil, lalu progres, "Perlu tindak lanjut", dan tabel hasil terbaru.</td></tr>
+        <tr><td>Filter</td><td>Dashboard, Ranking, Heatmap, Forecast, dan Laporan menyimpan layanan/tahun/tim sendiri-sendiri. Pindah halaman berarti memilih ulang.</td><td>Posisi disimpan di URL dan tautan bisa dibagikan.</td></tr>
+        <tr><td>Kepala halaman</td><td>Empat gaya judul berbeda (lihat contoh di bawah). Letak tombol aksi juga berbeda per halaman.</td><td>Satu gaya kepala halaman.</td></tr>
+        <tr><td>Warna</td><td>190 kelas warna hardcode (<code>emerald-*</code>, <code>rose-*</code>, <code>amber-*</code>…) di 22 file, padahal sudah ada peta <code>SIDAK_SCORE_TEXT</code> dan <code>forecast-status.ts</code>.</td><td>Token dan satu peta status.</td></tr>
+        <tr><td>Label</td><td>27 label huruf kapital di 9 file, 2 <code>font-black</code>.</td><td>Label biasa ≥12px.</td></tr>
+        <tr><td>Konfirmasi</td><td>3 <code>window.confirm</code> bawaan browser di Input temuan.</td><td><code>ConfirmDialog</code> aplikasi.</td></tr>
+        <tr><td>Detail agen</td><td>Data coaching lengkap, tetapi tersebar di tab Ringkasan, Temuan, dan sidebar.</td><td>Telaah yang langsung bisa dipakai: skor, lalu apa yang harus diperbaiki.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="box h1s" aria-label="Contoh gaya judul halaman sekarang">
+    <span><b class="fg" style="font:700 20px var(--display);letter-spacing:-.03em">Ranking Agen</b><code>ranking.tsx · font-outfit text-2xl font-bold</code></span>
+    <span><b class="fg" style="font:600 22px var(--body);letter-spacing:-.02em">Forecast</b><code>forecast.tsx · font-heading text-3xl font-semibold</code></span>
+    <span><b class="fg" style="font:800 20px var(--body);letter-spacing:-.03em">Heatmap Ketidaksesuaian</b><code>heatmap.tsx · text-2xl font-extrabold</code></span>
+    <span><b class="fg" style="font:700 17px var(--display);letter-spacing:-.03em">Analisis Individu</b><code>agents.tsx · font-outfit text-xl font-bold</code></span>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Saran perbaikan</h2>
+    <p>Prioritas 1 paling terasa bagi trainer dan leader setiap hari. Tidak ada yang memerlukan perubahan backend.</p>
+  </div>
+  <div class="recs">
+    <div class="rec"><span class="tag p1">Prioritas 1</span><h3>Beranda kerja, bukan brosur</h3><p>Ganti hero dan kartu dengan: kondisi periode terbaru (4 angka + perubahan), agen di bawah target, 3 parameter teratas, dan daftar halaman SIDAK yang dikelompokkan menurut pekerjaan.</p><span class="why">Trainer membuka SIDAK untuk tahu siapa yang perlu dibina. Jawaban itu sekarang ada tiga klik jauhnya.</span></div>
+    <div class="rec"><span class="tag p1">Prioritas 1</span><h3>Cakupan ikut berpindah</h3><p>Layanan, tahun, rentang bulan, dan tim tersimpan di URL dan dibawa ke Dashboard, Ranking, Heatmap, Forecast, Agen, dan Laporan. Halaman yang tidak memakai salah satunya mengatakannya.</p><span class="why">Membandingkan Dashboard dan Ranking untuk Email Oktober tidak lagi butuh memilih ulang filter.</span></div>
+    <div class="rec"><span class="tag p2">Prioritas 2</span><h3>Satu kepala halaman</h3><p><code>SidakPageHeader</code>: judul, satu kalimat fungsi, baris cakupan, aksi di kanan. Dipakai sepuluh halaman SIDAK.</p><span class="why">Pengguna tahu di mana mencari tombol dan cakupan yang sedang aktif.</span></div>
+    <div class="rec"><span class="tag p2">Prioritas 2</span><h3>Bahan coaching di detail agen</h3><p>Blok pertama di Ringkasan: skor bulan terpilih, parameter paling sering, tiga tiket pengurang terbesar, dan arah proyeksi bila ada. Diambil dari dossier yang sudah ada.</p><span class="why">Leader bisa langsung membawa halaman ini ke sesi coaching.</span></div>
+    <div class="rec"><span class="tag p2">Prioritas 2</span><h3>Konfirmasi aplikasi di Input temuan</h3><p>Tiga <code>window.confirm</code> diganti <code>ConfirmDialog</code>. Setelah simpan, status menyebut hasilnya dan memberi tautan ke detail agen.</p><span class="why">Dialog browser tidak bisa diberi gaya, tidak bisa dibaca dengan baik di HP, dan tidak bisa diuji E2E dengan rapi.</span></div>
+    <div class="rec"><span class="tag p3">Prioritas 3</span><h3>Bersihkan sisa gaya lama</h3><p>Warna hardcode ke token dan peta status, label kapital ke label biasa, <code>font-black</code> dihapus. Perilaku tidak berubah.</p><span class="why">Wajib menurut <code>docs/design.md</code>, dan mode gelap jadi konsisten.</span></div>
+  </div>
+</section>
+
+<!-- MOCKUP 1: BERANDA -->
+<section>
+  <div class="caption">
+    <span class="eyebrow">Mockup 1</span>
+    <h2>Beranda SIDAK (trainer)</h2>
+    <p>Sidebar tetap model navigasi yang sudah ada. Isi halaman berganti dari kartu tautan menjadi data yang perlu ditindaklanjuti.</p>
+  </div>
+  <div class="frame-wrap"><div class="frame">
+    <div class="chrome"><i></i><i></i><i></i><span class="url">/sidak?layanan=call&amp;tahun=2026</span></div>
+    <div class="app">
+      <nav class="sb" aria-label="Contoh sidebar">
+        <span class="grp">Kualitas</span>
+        <a class="on"><span class="ic"></span>SIDAK</a>
+        <a class="sub on" style="box-shadow:none;background:transparent">Ringkasan</a>
+        <a class="sub">Dashboard</a>
+        <a class="sub">Ranking</a>
+        <a class="sub">Heatmap</a>
+        <a class="sub">Forecast</a>
+        <a class="sub">Agen</a>
+        <a class="sub">Input temuan</a>
+        <a class="sub">Laporan data</a>
+        <span class="grp">Latihan</span>
+        <a><span class="ic"></span>KETIK</a>
+        <a><span class="ic"></span>PDKT</a>
+        <a><span class="ic"></span>Telefun</a>
+      </nav>
+      <div class="main">
+        <div class="phead">
+          <div class="top">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span class="t">SIDAK</span>
+              <span class="scope-line">Periode QA terbaru <b class="fg">Oktober 2026</b> · <span class="lk">Call ▾</span> <span class="lk">Semua tim ▾</span></span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+              <span class="btn primary">Input temuan →</span>
+              <div class="row" style="gap:6px"><span class="btn sm">Laporan</span><span class="btn sm">Jadwal shifting</span><span class="btn sm">Kelola ▾</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="home">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="sh"><h3>Kondisi Oktober 2026</h3><span class="muted" style="font-size:12px">dibanding September</span></div>
+            <div class="strip">
+              <div><span class="v">93,4</span><span class="l">rata-rata skor agen</span><span class="c bad">↓ 1,2 poin · di bawah target 95</span></div>
+              <div><span class="v">48</span><span class="l">agen diaudit</span><span class="c muted">dari 52 agen aktif</span></div>
+              <div><span class="v">137</span><span class="l">temuan</span><span class="c bad">↑ 18 temuan</span></div>
+              <div><span class="v">96</span><span class="l">tiket bertemuan</span><span class="c ok">↓ 4 tiket</span></div>
+            </div>
+          </div>
+          <div class="cols">
+            <div style="flex:1.55;display:flex;flex-direction:column;gap:10px;min-width:0">
+              <div class="sh"><h3>Perlu tindak lanjut</h3><a style="font-size:12px">Semua agen di bawah target (9)</a></div>
+              <ul class="list box">
+                <li><span class="dot d-bad"></span><span style="flex:1;min-width:0"><b class="fg">Rina Kartika</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 7 · 6 temuan, 2 kritikal · proyeksi memburuk</span></span><span style="text-align:right"><span class="num" style="font-size:15px">81,5</span><br><span class="bad" style="font-size:12px">↓ 6,3</span></span><span class="btn sm">Buka</span></li>
+                <li><span class="dot d-bad"></span><span style="flex:1;min-width:0"><b class="fg">Dimas Prasetyo</b><br><span class="muted" style="font-size:12px">Tim Sari · Batch 5 · 5 temuan, 1 kritikal</span></span><span style="text-align:right"><span class="num" style="font-size:15px">84,0</span><br><span class="muted" style="font-size:12px">sama</span></span><span class="btn sm">Buka</span></li>
+                <li><span class="dot d-warn"></span><span style="flex:1;min-width:0"><b class="fg">Ayu Lestari</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 8 · 3 temuan</span></span><span style="text-align:right"><span class="num" style="font-size:15px">89,2</span><br><span class="bad" style="font-size:12px">↓ 4,1</span></span><span class="btn sm">Buka</span></li>
+                <li><span class="dot d-warn"></span><span style="flex:1;min-width:0"><b class="fg">Fikri Ramadhan</b><br><span class="muted" style="font-size:12px">Tim Sari · Batch 6 · 3 temuan</span></span><span style="text-align:right"><span class="num" style="font-size:15px">91,7</span><br><span class="ok" style="font-size:12px">↑ 2,0</span></span><span class="btn sm">Buka</span></li>
+              </ul>
+              <span class="muted" style="font-size:12px">Titik merah: Perlu perhatian (&lt;85). Titik kuning: Mendekati target (85–94,9). Status juga tertulis di halaman agen.</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
+              <div class="sh"><h3>Parameter teratas</h3><a style="font-size:12px">Dashboard</a></div>
+              <div class="box">
+                <div class="param"><span class="num" style="font-size:12px;color:var(--fg3)">1</span><span class="fg">Informasi tidak lengkap ke konsumen</span><span class="num" style="text-align:right">34</span><span class="muted" style="text-align:right">25%</span></div>
+                <div class="param"><span class="num" style="font-size:12px;color:var(--fg3)">2</span><span class="fg">Verifikasi data konsumen <span class="bad" style="font-size:11.5px">kritikal</span></span><span class="num" style="text-align:right">22</span><span class="muted" style="text-align:right">16%</span></div>
+                <div class="param"><span class="num" style="font-size:12px;color:var(--fg3)">3</span><span class="fg">Hold tanpa izin</span><span class="num" style="text-align:right">19</span><span class="muted" style="text-align:right">14%</span></div>
+                <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:12px" class="fg2">3 parameter ini mencakup 55% temuan Oktober.</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <h3>Halaman SIDAK</h3>
+            <div class="dir">
+              <div><h4>Audit</h4><a>Input temuan<span>Catat temuan per tiket atau impor Excel</span></a><a>Periode QA<span>Bulan audit yang dipakai semua halaman</span></a><a>Parameter QA<span>Versi aturan dan bobot per layanan</span></a></div>
+              <div><h4>Analisis</h4><a>Dashboard<span>Tren, Pareto, pola mingguan</span></a><a>Ranking<span>Agen dengan temuan terbanyak</span></a><a>Heatmap<span>Temuan per tanggal sepanjang tahun</span></a><a>Forecast<span>Arah temuan 1–6 bulan ke depan</span></a></div>
+              <div><h4>Agen</h4><a>Daftar agen<span>Cari agen, buka skor dan temuannya</span></a></div>
+              <div><h4>Laporan</h4><a>Laporan data<span>Tabel temuan dan unduh Excel</span></a><a>Jadwal shifting<span>Jadwal harian dari WFM, hanya-baca</span></a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><b>1</b>Satu aksi utama sesuai peran. Admin/trainer: "Input temuan". Leader: "Lihat agen saya". Menu kecil hanya memuat halaman yang boleh dibuka peran itu.</li>
+    <li><b>2</b>Empat angka diambil dari <code>periodMetrics</code> di <code>GET /sidak/dashboard</code>. Bila API gagal, strip menulis "Data periode belum bisa dimuat" + "Coba lagi", bukan angka nol.</li>
+    <li><b>3</b>"Perlu tindak lanjut" memakai definisi yang sama dengan kartu "Agen di bawah target" di Beranda aplikasi, jadi jumlahnya selalu cocok.</li>
+    <li><b>4</b>"Proyeksi memburuk" hanya muncul bila proyeksi sudah ada di cache. Beranda tidak pernah memicu perhitungan forecast baru.</li>
+    <li><b>5</b>Daftar halaman dibaca dari <code>buildNavModel(role)</code>, sumber yang sama dengan sidebar, bukan daftar kartu lokal seperti sekarang.</li>
+  </ul>
+</section>
+
+<!-- MOCKUP 2: KEPALA + CAKUPAN -->
+<section>
+  <div class="caption">
+    <span class="eyebrow">Mockup 2</span>
+    <h2>Kepala halaman dan cakupan bersama</h2>
+    <p>Contoh di Ranking. Cakupan yang dipilih di Dashboard sudah terbawa lewat URL. Heatmap di bawahnya menyatakan filter mana yang tidak dipakainya.</p>
+  </div>
+  <div class="frame-wrap"><div class="frame">
+    <div class="chrome"><i></i><i></i><i></i><span class="url">/sidak/ranking?layanan=email&amp;tahun=2026&amp;dari=7&amp;sampai=10&amp;tim=tim-sari</span></div>
+    <div class="phead">
+      <div class="top">
+        <div style="display:flex;flex-direction:column;gap:4px"><span class="t">Ranking</span><p style="font-size:13px">Agen dengan temuan terbanyak berada di peringkat 1.</p></div>
+        <div class="row" style="gap:8px"><span class="btn sm">Unduh Excel</span><span class="btn sm">Perbarui data</span></div>
+      </div>
+      <div class="scope" role="group" aria-label="Cakupan">
+        <div class="fld"><label>Layanan</label><span class="sel">Email <span class="muted">▾</span></span></div>
+        <div class="fld"><label>Tahun</label><span class="sel" style="min-width:90px">2026 <span class="muted">▾</span></span></div>
+        <div class="fld"><label>Bulan</label><span class="sel" style="min-width:170px">Juli – Oktober <span class="muted">▾</span></span></div>
+        <div class="fld"><label>Tim</label><span class="sel" style="min-width:150px">Tim Sari <span class="muted">▾</span></span></div>
+        <span class="btn ghost sm" style="margin-bottom:4px">Atur ulang</span>
+      </div>
+    </div>
+    <div style="padding:16px 32px;display:flex;flex-direction:column;gap:10px">
+      <span class="scope-line">Cakupan ini juga dipakai saat Anda membuka <b class="fg">Dashboard</b>, <b class="fg">Heatmap</b>, <b class="fg">Forecast</b>, <b class="fg">Agen</b>, dan <b class="fg">Laporan data</b>.</span>
+      <div class="box" style="overflow:hidden">
+        <table style="font-size:12.5px">
+          <thead><tr><th style="width:60px">Rank</th><th>Agen</th><th>Tim</th><th style="text-align:right">Temuan</th><th style="text-align:right">Skor</th><th>Perubahan posisi</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td class="fg">Rina Kartika</td><td>Tim Sari</td><td class="num" style="text-align:right">11</td><td style="text-align:right"><span class="num bad">82,0</span></td><td class="bad">Naik 2 peringkat</td></tr>
+            <tr><td class="num">2</td><td class="fg">Bayu Saputra</td><td>Tim Sari</td><td class="num" style="text-align:right">8</td><td style="text-align:right"><span class="num warn">88,5</span></td><td class="muted">Tetap</td></tr>
+            <tr><td class="num">3</td><td class="fg">Nadia Putri</td><td>Tim Sari</td><td class="num" style="text-align:right">6</td><td style="text-align:right"><span class="num warn">91,3</span></td><td class="ok">Turun 1 peringkat</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="phead" style="border-top:1px solid var(--border)">
+      <div class="top"><div style="display:flex;flex-direction:column;gap:4px"><span class="t">Heatmap</span><p style="font-size:13px">Jumlah temuan per tanggal sepanjang tahun.</p></div></div>
+      <div class="scope">
+        <div class="fld"><label>Layanan</label><span class="sel">Email <span class="muted">▾</span></span></div>
+        <div class="fld"><label>Tahun</label><span class="sel" style="min-width:90px">2026 <span class="muted">▾</span></span></div>
+        <div class="fld"><label>Hitung per</label><span class="sel">Parameter <span class="muted">▾</span></span></div>
+      </div>
+      <span class="scope-line"><span class="dot d-mute"></span>Heatmap memakai tahun dan layanan saja. Pilihan bulan (Juli–Oktober) dan tim (Tim Sari) tetap tersimpan untuk halaman lain.</span>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><b>1</b>Satu gaya judul untuk semua halaman, satu kalimat fungsi di bawahnya, aksi selalu di kanan atas.</li>
+    <li><b>2</b>Tautan dengan query bisa dikirim ke leader: "lihat Ranking Email Juli–Oktober Tim Sari" terbuka persis seperti itu.</li>
+    <li><b>3</b>Filter yang tidak berlaku tidak disembunyikan diam-diam. Halaman menyebutnya dan cakupan tidak hilang.</li>
+    <li><b>4</b>Komponen: <code>SidakPageHeader</code>, <code>SidakScopeBar</code>, <code>useSidakScope</code>. <code>DashboardFilters</code> pensiun setelah semua halaman pindah.</li>
+  </ul>
+</section>
+
+<!-- MOCKUP 3: DETAIL AGEN -->
+<section>
+  <div class="caption">
+    <span class="eyebrow">Mockup 3</span>
+    <h2>Detail agen: bahan coaching</h2>
+    <p>Blok baru di atas tab Ringkasan. Tidak ada data baru; isinya diringkas dari dossier bulan terpilih yang sudah dihitung.</p>
+  </div>
+  <div class="frame-wrap"><div class="frame">
+    <div class="chrome"><i></i><i></i><i></i><span class="url">/sidak/agents/3f9a…?layanan=call&amp;tahun=2026&amp;bulan=10</span></div>
+    <div class="agent">
+      <aside class="prof">
+        <div class="photo">RK</div>
+        <div><b class="fg" style="font:700 17px var(--display);letter-spacing:-.02em">Rina Kartika</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 7 · Agen Call · 1 th 4 bln</span></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap"><span class="btn sm primary">Input audit</span><span class="btn sm">Unduh laporan ▾</span></div>
+        <span class="btn sm" style="justify-content:space-between">Ganti agen <span class="muted">▾</span></span>
+        <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px;font-size:12px">
+          <span class="row" style="justify-content:space-between"><span class="fg2">Peringkat tim gabungan</span><span class="num">3 / 52</span></span>
+          <span class="row" style="justify-content:space-between"><span class="fg2">Peringkat Tim Andi</span><span class="num">1 / 14</span></span>
+        </div>
+      </aside>
+      <div class="main" style="padding:20px 28px;gap:18px">
+        <div class="tabs"><span class="on">Ringkasan</span><span>Tren</span><span>Temuan</span><span>Heatmap</span><span>Simulasi</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="sh"><h3>Bahan coaching · Oktober 2026</h3><span class="btn sm">Salin ringkasan</span></div>
+          <div class="brief">
+            <div>
+              <span class="muted" style="font-size:12px">Skor Oktober</span>
+              <span class="big">81,5</span>
+              <span class="row" style="gap:6px;font-size:12.5px"><span class="dot d-bad"></span><span class="fg">Perlu perhatian</span></span>
+              <span class="fg2" style="font-size:12px">Turun 6,3 poin dari September. Proyeksi 3 bulan: memburuk.</span>
+            </div>
+            <div>
+              <span class="muted" style="font-size:12px">Yang paling sering muncul</span>
+              <span class="fg" style="font-weight:600">Verifikasi data konsumen</span>
+              <span class="fg2" style="font-size:12.5px">3 dari 6 temuan bulan ini, juga muncul di Agustus dan September. Pola utama: nomor identitas tidak dikonfirmasi sebelum menyebut status pengaduan.</span>
+              <a style="font-size:12px">Lihat akar masalah</a>
+            </div>
+            <div>
+              <span class="muted" style="font-size:12px">Tiket pengurang terbesar</span>
+              <div class="tk"><span class="num" style="font-weight:500">#OJK-2610-0418</span><span class="bad num">−7,5</span></div>
+              <div class="tk"><span class="num" style="font-weight:500">#OJK-2610-0233</span><span class="bad num">−5,0</span></div>
+              <div class="tk"><span class="num" style="font-weight:500">#OJK-2610-0107</span><span class="bad num">−3,0</span></div>
+              <a style="font-size:12px">Buka di tab Temuan</a>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="sh"><h3>Skor per bulan</h3><span class="muted" style="font-size:12px">garis putus-putus = target 95</span></div>
+          <div class="months" aria-hidden="true">
+            <span class="tgt" style="bottom:95px"></span>
+            <i style="height:96px"></i><i style="height:98px"></i><i style="height:97px"></i><i style="height:94px"></i><i style="height:99px"></i><i style="height:96px"></i><i style="height:93px"></i><i style="height:90px"></i><i style="height:88px"></i><i class="sel" style="height:81px"></i><i style="height:0"></i><i style="height:0"></i>
+          </div>
+          <div class="row muted" style="justify-content:space-between;font-size:11.5px"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>Mei</span><span>Jun</span><span>Jul</span><span>Agu</span><span>Sep</span><span class="fg" style="font-weight:600">Okt</span><span>Nov</span><span>Des</span></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li><b>1</b>Tiga kolom menjawab urutan pertanyaan coaching: seberapa jauh dari target, apa polanya, tiket mana yang dibahas.</li>
+    <li><b>2</b>Status skor selalu teks + titik warna, memakai ambang dari <code>sidakScoreStatus.ts</code>.</li>
+    <li><b>3</b>"Salin ringkasan" menyalin teks biasa untuk catatan coaching atau chat ke leader.</li>
+    <li><b>4</b>Klik tiket membuka tab Temuan pada grup tiket itu (perilaku yang sudah ada di dossier).</li>
+  </ul>
+</section>
+
+<!-- MOCKUP 4: INPUT TEMUAN -->
+<section>
+  <div class="caption">
+    <span class="eyebrow">Mockup 4</span>
+    <h2>Input temuan: konfirmasi dan hasil simpan</h2>
+    <p>Pengganti tiga <code>window.confirm</code>. Kiri: dialog sebelum membuat sesi tanpa temuan. Kanan: status setelah tersimpan.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+    <div class="box" style="overflow:hidden">
+      <div class="overlay" style="padding:24px">
+        <div class="sheet" role="dialog" aria-label="Contoh dialog konfirmasi">
+          <header><b class="fg">Buat 5 sesi tanpa temuan?</b><span class="btn ghost sm" aria-label="Tutup">✕</span></header>
+          <div class="body">
+            <p style="font-size:13px">Rina Kartika · Oktober 2026 · Call. Lima sesi bernilai penuh akan ditambahkan dan skor Oktober dihitung ulang.</p>
+            <p style="font-size:13px" class="muted">Sesi ini bisa dihapus lagi dari daftar temuan.</p>
+          </div>
+          <footer><span class="btn sm">Batal</span><span class="btn sm primary">Buat 5 sesi</span></footer>
+        </div>
+      </div>
+    </div>
+    <div class="box" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <b class="fg">Setelah simpan</b>
+      <div class="status" role="status"><span class="dot d-ok"></span><span style="flex:1;min-width:200px">2 temuan untuk tiket <span class="num" style="font-weight:500">#OJK-2610-0418</span> tersimpan. Skor sesi Rina sekarang <b class="num">81,5</b>.</span><span class="btn sm">Buka detail agen</span></div>
+      <div class="status" role="alert" style="background:var(--bad-soft)"><span class="dot d-bad"></span><span style="flex:1;min-width:200px">Temuan belum tersimpan karena periode Oktober belum punya parameter Call yang berlaku.</span><span class="btn sm">Buka Parameter QA</span></div>
+      <p style="font-size:13px">Pesan gagal menyebut sebabnya dan langkah berikutnya, tanpa kode galat mentah. Konfirmasi impor Excel ("Ganti 24 baris yang sudah ada?") memakai dialog yang sama.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MOCKUP 5: HP -->
+<section>
+  <div class="caption">
+    <span class="eyebrow">Mockup 5</span>
+    <h2>Di HP</h2>
+    <p>Beranda leader dan cakupan yang dilipat menjadi satu tombol.</p>
+  </div>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="hd"><span class="muted">Beranda / <b class="fg">SIDAK</b></span><span>☰</span></div>
+      <div class="bd">
+        <div style="display:flex;flex-direction:column;gap:6px"><b class="fg" style="font:700 22px var(--display);letter-spacing:-.03em">SIDAK</b><span class="fg2" style="font-size:12px">Oktober 2026 · Call · Tim Andi</span></div>
+        <span class="btn primary" style="justify-content:center">Lihat agen saya →</span>
+        <div class="g2">
+          <div><span class="v">92,8</span><span class="muted" style="font-size:11.5px">rata-rata skor</span></div>
+          <div><span class="v">14</span><span class="muted" style="font-size:11.5px">agen diaudit</span></div>
+          <div><span class="v">41</span><span class="muted" style="font-size:11.5px">temuan <span class="bad">↑ 7</span></span></div>
+          <div><span class="v">29</span><span class="muted" style="font-size:11.5px">tiket</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <b class="fg" style="font:700 15px var(--display)">Perlu tindak lanjut</b>
+          <ul class="list box" style="font-size:12px">
+            <li style="padding:10px 12px"><span class="dot d-bad"></span><span style="flex:1"><b class="fg">Rina Kartika</b><br><span class="muted">6 temuan · 2 kritikal</span></span><span class="num">81,5</span></li>
+            <li style="padding:10px 12px"><span class="dot d-warn"></span><span style="flex:1"><b class="fg">Ayu Lestari</b><br><span class="muted">3 temuan</span></span><span class="num">89,2</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tabbar"><span>Beranda</span><span class="on">SIDAK</span><span>KETIK</span><span>Monitoring</span><span>Lainnya</span></div>
+    </div></div>
+    <div class="phone"><div class="scr">
+      <div class="hd"><span class="muted">SIDAK / <b class="fg">Ranking</b></span><span>☰</span></div>
+      <div class="bd">
+        <b class="fg" style="font:700 22px var(--display);letter-spacing:-.03em">Ranking</b>
+        <span class="btn" style="justify-content:space-between;min-height:44px"><span>Cakupan: <b>Email · 2026 · Jul–Okt</b></span><span class="muted">▾</span></span>
+        <div class="box" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+          <b class="fg">Cakupan</b>
+          <div class="fld"><label>Layanan</label><span class="sel" style="min-height:44px">Email <span class="muted">▾</span></span></div>
+          <div class="fld"><label>Tahun</label><span class="sel" style="min-height:44px">2026 <span class="muted">▾</span></span></div>
+          <div class="fld"><label>Bulan</label><span class="sel" style="min-height:44px">Juli – Oktober <span class="muted">▾</span></span></div>
+          <div class="fld"><label>Tim</label><span class="sel" style="min-height:44px">Tim Sari <span class="muted">▾</span></span></div>
+          <span class="btn primary" style="justify-content:center;min-height:44px">Terapkan</span>
+        </div>
+      </div>
+      <div class="tabbar"><span>Beranda</span><span class="on">SIDAK</span><span>KETIK</span><span>Monitoring</span><span>Lainnya</span></div>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Keputusan yang perlu Anda ambil</h2>
+    <p>Saya sudah menulis usulan untuk masing-masing. Jawaban Anda menentukan isi E2E dan urutan pengerjaan.</p>
+  </div>
+  <div class="q">
+    <div class="box"><b class="fg">1. Beranda dan Dashboard</b><p style="font-size:13px">Tetap dua halaman, atau <code>/sidak</code> langsung membuka Dashboard?</p><span class="rec-a">Usulan: tetap dua. Beranda menjawab "siapa yang perlu dibina", Dashboard untuk analisis lengkap.</span></div>
+    <div class="box"><b class="fg">2. Demo animasi</b><p style="font-size:13px">KETIK dan Telefun punya demo bergerak di landing. Perlu juga di SIDAK?</p><span class="rec-a">Usulan: tidak. Data nyata lebih berguna daripada demo untuk alat analisis.</span></div>
+    <div class="box"><b class="fg">3. Tautan latihan dari detail agen</b><p style="font-size:13px">"Latih di KETIK/PDKT/Telefun" dari parameter yang sering muncul.</p><span class="rec-a">Usulan: PR terpisah setelah penugasan KETIK (pekerjaan yang sedang berjalan) selesai.</span></div>
+    <div class="box"><b class="fg">4. Nama menu</b><p style="font-size:13px">"Analisis Individu" → "Agen", "Beranda SIDAK" → "Ringkasan".</p><span class="rec-a">Usulan: ganti. Mengubah nav, breadcrumb, dan E2E yang mencari teks lama.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Urutan pengerjaan</h2>
+    <p>Tiap fase bisa di-commit sendiri. Semua RED E2E ditulis sebelum kode, dijalankan satu spec per waktu.</p>
+  </div>
+  <ol class="phases">
+    <li><div><b class="fg">Beranda</b><p style="font-size:14px">RED di <code>sidak-landing.spec.ts</code> untuk admin, trainer, leader, dan state tiap bagian. Lalu komponen <code>components/sidak/home/*</code> dan <code>utils/sidakHomeSummary.ts</code>.</p></div></li>
+    <li><div><b class="fg">Kepala halaman dan cakupan bersama</b><p style="font-size:14px">Spec baru <code>sidak-scope.spec.ts</code>. <code>SidakPageHeader</code>, <code>SidakScopeBar</code>, <code>useSidakScope</code>, validasi search params di <code>router.tsx</code>; pindahkan Dashboard, Ranking, Heatmap, Forecast, Agen, Laporan data satu per satu.</p></div></li>
+    <li><div><b class="fg">Bahan coaching dan konfirmasi Input temuan</b><p style="font-size:14px"><code>AgentCoachingBrief</code>; <code>ConfirmDialog</code> menggantikan <code>window.confirm</code> di <code>useTemuanForm</code> dan <code>useTemuanImport</code>; status setelah simpan.</p></div></li>
+    <li><div><b class="fg">Bersihkan gaya</b><p style="font-size:14px">Warna hardcode ke token/peta status, hapus label kapital dan <code>font-black</code>. Spec SIDAK yang ada dijalankan ulang sebagai regresi.</p></div></li>
+    <li><div><b class="fg">Review dan dokumen</b><p style="font-size:14px">Audit impeccable, review thermo-nuclear, <code>docs/design.md</code> dan <code>docs/modules.md</code> bagian SIDAK, gates lint/typecheck/build, suite penuh di akhir branch.</p></div></li>
+  </ol>
+</section>
+
+<section>
+  <div class="sec-head"><h2>File yang disentuh</h2><p>Tanpa backend, skema, migrasi, atau perubahan capability.</p></div>
+  <div class="files">
+    <div><code>routes/sidak/index.tsx</code><span>Beranda baru; hero dan 7 kartu dihapus</span></div>
+    <div><code>components/sidak/home/*</code><span>Kepala beranda, strip periode, tindak lanjut, parameter teratas, daftar halaman</span></div>
+    <div><code>components/sidak/SidakPageHeader.tsx, SidakScopeBar.tsx</code><span>Kepala dan cakupan bersama</span></div>
+    <div><code>routes/sidak/hooks/useSidakScope.ts, router.tsx</code><span>Cakupan di search params</span></div>
+    <div><code>routes/sidak/{dashboard,ranking,heatmap,forecast,agents,reports-data}.tsx</code><span>Pakai kepala + cakupan bersama</span></div>
+    <div><code>components/sidak/AgentCoachingBrief.tsx</code><span>Blok bahan coaching di detail agen</span></div>
+    <div><code>routes/sidak/hooks/useTemuanForm.ts, useTemuanImport.ts</code><span><code>window.confirm</code> → <code>ConfirmDialog</code></span></div>
+    <div><code>components/sidak/* (22 file)</code><span>Warna hardcode, label kapital, <code>font-black</code></span></div>
+    <div><code>components/layout/nav-config.ts</code><span>Nama menu (bila keputusan 4 disetujui)</span></div>
+    <div><code>e2e/sidak-landing, sidak-scope (baru), sidak-input-layout, sidak-agent-detail</code><span>RED dulu, satu spec per run</span></div>
+  </div>
+</section>
+
+</div>

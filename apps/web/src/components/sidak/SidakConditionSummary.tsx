@@ -235,12 +235,15 @@ export default function SidakConditionSummary({ data, forecast }: Props) {
     <section
       data-dashboard-panel
       aria-labelledby="sidak-condition-summary-title"
-      className="min-w-0 rounded-xl border border-border bg-surface-elevated"
+      className="flex min-w-0 flex-col gap-3"
     >
-      <h2 id="sidak-condition-summary-title" className="sr-only">
+      <h2
+        id="sidak-condition-summary-title"
+        className="font-display text-lg font-bold tracking-tight text-foreground"
+      >
         Ringkasan temuan
       </h2>
-      <div className="grid divide-y divide-border @[720px]/dashboard:grid-cols-3 @[720px]/dashboard:divide-x @[720px]/dashboard:divide-y-0">
+      <div className="grid divide-y divide-border rounded-xl border border-border bg-surface-elevated @[720px]/dashboard:grid-cols-3 @[720px]/dashboard:divide-x @[720px]/dashboard:divide-y-0">
         <LatestPeriod data={data} />
         <CriticalShare data={data} />
         <Forecast forecast={forecast} />

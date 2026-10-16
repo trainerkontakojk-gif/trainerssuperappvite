@@ -16,6 +16,7 @@ import {
 } from "./helpers/hermeticShell";
 import {
   AGENT_FORECAST_PATH,
+  SERVICE_FORECAST,
   SERVICE_FORECAST_PATH,
   agentForecast,
   dashboardData,
@@ -622,6 +623,97 @@ test.describe("Forecast SIDAK (hermetic)", () => {
       .filter({ has: page.getByRole("heading", { name: "Rina Nama 1", exact: true }) });
     await expect(row.getByText("Membaik")).toBeVisible();
     await expect(row.getByText("#1")).toHaveCount(0);
+  });
+
+  test("w grafik menulis angka aktual dan proyeksi di titiknya, area proyeksi berlabel", async ({
+    page,
+  }) => {
+    await open(page);
+    const section = trendSection(page);
+    const labels = (kind: string) =>
+      section
+        .locator(`[data-chart-label="${kind}"]`)
+        .evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim()));
+
+    await expect.poll(() => labels("actual")).toEqual(["12", "10", "8"]);
+    await expect.poll(() => labels("forecast")).toEqual(["7", "6", "5"]);
+    await expect(section.getByTestId("chart-projection-zone")).toHaveText(
+      "Proyeksi",
+    );
+    await expect(section.getByTestId("chart-legend")).toHaveText(
+      /Aktual.*Proyeksi/,
+    );
+  });
+
+  test("x bar filter: Periode proyeksi sejajar dengan filter cakupan di desktop", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page);
+    const bottom = async (name: string) => {
+      const box = await page
+        .getByRole("combobox", { name, exact: true })
+        .boundingBox();
+      if (!box) throw new Error(`${name} tidak terlihat`);
+      return Math.round(box.y + box.height);
+    };
+    const layanan = await bottom("Layanan");
+    expect(Math.abs((await bottom("Periode proyeksi")) - layanan)).toBeLessThanOrEqual(2);
+    // Periode proyeksi berada di dalam bar filter yang sama, bukan di luarnya.
+    const bar = page.getByTestId("sidak-filter-bar");
+    await expect(
+      bar.getByRole("combobox", { name: "Periode proyeksi", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("y Analisis Parameter: nama parameter dan angka perubahan terpisah, tanpa label status berulang", async ({
+    page,
+  }) => {
+    const insight = [
+      "### **Analisis Parameter**",
+      "**Perbaikan Terbesar:**",
+      "- Etika Bertelepon (-12,2): membaik",
+      "**Risiko Terbesar:**",
+      "- Pilihan Kata & Tata Bahasa (+7,4): berisiko",
+      "- Kemampuan Menyimak (+3,2 temuan): berisiko karena sering terpotong",
+    ].join("\n");
+    await open(
+      page,
+      forecastMocks({
+        service: {
+          ...SERVICE_FORECAST,
+          snapshot: {
+            ...SERVICE_FORECAST.snapshot,
+            insight: { text: insight, status: "generated" },
+          },
+        },
+      }),
+    );
+    const rows = trendSection(page).getByTestId("insight-parameter-row");
+    await expect(rows).toHaveCount(3);
+    const read = (index: number) =>
+      rows.nth(index).evaluate((row) => ({
+        name: row.querySelector("[data-part='name']")?.textContent?.trim(),
+        value: row.querySelector("[data-part='value']")?.textContent?.trim(),
+        note: row.querySelector("[data-part='note']")?.textContent?.trim() ?? null,
+      }));
+    expect(await read(0)).toEqual({ name: "Etika Bertelepon", value: "−12,2", note: null });
+    expect(await read(1)).toEqual({
+      name: "Pilihan Kata & Tata Bahasa",
+      value: "+7,4",
+      note: null,
+    });
+    // Keterangan selain kata status tetap ditampilkan.
+    expect(await read(2)).toEqual({
+      name: "Kemampuan Menyimak",
+      value: "+3,2",
+      note: "berisiko karena sering terpotong",
+    });
+    // Angka rata kanan: tepi kanan semua nilai sama.
+    const rights = await rows
+      .locator("[data-part='value']")
+      .evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().right)));
+    expect(new Set(rights.slice(1)).size).toBe(1);
   });
 
   test("v permukaan datar: tanpa kartu atau ikon sparkles, penjelasan proyeksi tampil", async ({

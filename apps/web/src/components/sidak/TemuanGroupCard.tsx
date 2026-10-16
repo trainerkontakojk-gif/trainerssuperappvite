@@ -44,21 +44,21 @@ export interface TemuanGroupCardProps {
 }
 
 const NILAI_OPTIONS = [
-  { v: 0, label: "0", active: "bg-rose-500/15 text-rose-600 border-rose-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
-  { v: 1, label: "1", active: "bg-orange-500/15 text-orange-600 border-orange-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
-  { v: 2, label: "2", active: "bg-amber-500/15 text-amber-600 border-amber-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
-  { v: 3, label: "3", active: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 0, label: "0", active: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 1, label: "1", active: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 2, label: "2", active: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 3, label: "3", active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
 ];
 
 const NILAI_BADGE_STYLE: Record<number, string> = {
-  0: "bg-rose-500/10 text-rose-600 border-rose-500/20",
-  1: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  2: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  3: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  0: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20",
+  1: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20",
+  2: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+  3: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
 };
 
 const NILAI_LABEL_COLOR: Record<number, string> = {
-  0: "text-rose-500", 1: "text-orange-500", 2: "text-amber-500", 3: "text-emerald-500",
+  0: "text-rose-700 dark:text-rose-400", 1: "text-orange-700 dark:text-orange-400", 2: "text-amber-700 dark:text-amber-400", 3: "text-emerald-700 dark:text-emerald-400",
 };
 
 export default function TemuanGroupCard({
@@ -188,7 +188,7 @@ export default function TemuanGroupCard({
                         {indicatorLabelMap.get(item.indicator_id) ?? item.indicator_id.slice(0, 8)}
                       </span>
                       {cat && (
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${isCritical ? "bg-red-500/5 text-red-600 border-red-500/20" : "bg-blue-500/5 text-blue-600 border-blue-500/20"}`}>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${isCritical ? "bg-rose-500/5 text-rose-700 dark:text-rose-400 border-rose-500/20" : "bg-blue-500/5 text-blue-700 dark:text-blue-300 border-blue-500/20"}`}>
                           {isCritical ? "Critical" : "Non-Critical"}
                         </span>
                       )}
@@ -245,8 +245,8 @@ export default function TemuanGroupCard({
                           onClick={() => onDelete(item.id)}
                           className={`p-2 rounded-lg transition-colors ${
                             deletingId === item.id
-                              ? "text-red-500 bg-red-500/10"
-                              : "text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                              ? "text-rose-700 dark:text-rose-400 bg-rose-500/10"
+                              : "text-muted-foreground hover:text-rose-700 dark:hover:text-rose-400 hover:bg-rose-500/10"
                           }`}
                           title={deletingId === item.id ? "Klik lagi untuk konfirmasi" : "Hapus"}
                         >

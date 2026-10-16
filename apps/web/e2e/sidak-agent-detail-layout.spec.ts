@@ -252,6 +252,49 @@ test.describe("Tata letak detail agent", () => {
     await page.waitForURL("**/sidak/agents/peer-2");
   });
 
+  test("Bahan coaching merangkum bulan terpilih di atas Ringkasan", async ({
+    page,
+  }) => {
+    await openRichDetail(page, { width: 1440, height: 1000 });
+    const panel = page.getByRole("tabpanel", { name: "Ringkasan" });
+    const brief = panel.getByRole("region", { name: "Bahan coaching" });
+    await expect(brief).toBeVisible();
+    await expect(brief).toContainText("Juni 2026");
+    await expect(brief).toContainText("84.1");
+    await expect(brief).toContainText("Perlu perhatian");
+    await expect(brief).toContainText("Naik 4.3 poin dari Mei");
+    // Parameter paling sering muncul bulan ini: Kesesuaian Data, 2 dari 5.
+    await expect(brief).toContainText("Kesesuaian Data");
+    await expect(brief).toContainText("2 dari 5 temuan");
+
+    // Bahan coaching berada sebelum grafik skor per bulan.
+    const briefBox = await box(brief);
+    const chartBox = await box(
+      panel.getByRole("heading", { name: "Skor per bulan" }),
+    );
+    expect(briefBox.y).toBeLessThan(chartBox.y);
+
+    // Tiga tiket pengurang terbesar; klik membuka tab Temuan.
+    const tickets = brief.getByRole("button", { name: /TKT-2026-06-/ });
+    await expect(tickets).toHaveCount(3);
+    await brief.getByRole("button", { name: /TKT-2026-06-118/ }).click();
+    await expect(page.getByRole("tab", { name: "Temuan" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page
+        .getByRole("tabpanel", { name: "Temuan" })
+        .getByRole("region", { name: "Tiket TKT-2026-06-118" }),
+    ).toBeFocused();
+
+    // Pindah bulan: Bahan coaching ikut bulan terpilih.
+    await page.getByRole("tab", { name: "Ringkasan" }).click();
+    await panel.getByRole("button", { name: /^Pilih bulan Jan 2026/ }).click();
+    await expect(brief).toContainText("Januari 2026");
+    await expect(brief).toContainText("Memenuhi target");
+  });
+
   test("klik tiket pengurang membuka tab Temuan pada grup tiket itu", async ({
     page,
   }) => {
@@ -274,6 +317,25 @@ test.describe("Tata letak detail agent", () => {
       group.getByText("Verifikasi Identitas", { exact: true }),
     ).toBeVisible();
     await expect(group).toBeInViewport();
+  });
+
+  test("tab aktif masuk ke alamat dan bertahan setelah muat ulang", async ({
+    page,
+  }) => {
+    await openRichDetail(page, { width: 1440, height: 1000 });
+    const temuan = page.getByRole("tab", { name: "Temuan" });
+    await temuan.click();
+    await expect(page).toHaveURL(/[?&]tab=temuan\b/);
+
+    await page.reload();
+    await expect(page.getByRole("tab", { name: "Temuan" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+      { timeout: 20000 },
+    );
+
+    await page.getByRole("tab", { name: "Ringkasan" }).click();
+    await expect(page).not.toHaveURL(/[?&]tab=/);
   });
 
   test("mobile: sidebar jadi blok atas, toolbar dua kolom, tanpa scroll horizontal", async ({

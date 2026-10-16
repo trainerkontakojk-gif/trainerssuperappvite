@@ -8,6 +8,7 @@ import { cn } from "cn";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   parseForecastInsightText,
+  splitParameterItem,
   type ForecastInsightListItem,
   type ForecastInsightSection,
 } from "./forecast-insight-parser";
@@ -82,7 +83,52 @@ function changeDotClass(tone: ForecastInsightListItem["tone"]) {
   return "bg-muted-foreground";
 }
 
+/** "+7,4" → "+7,4", "-12,2" → "−12,2" (tanda minus tipografis). */
+function formatChange(change: string): string {
+  if (change.startsWith("-")) return `−${change.slice(1)}`;
+  if (change.startsWith("+") || Number.parseFloat(change.replace(",", ".")) === 0) {
+    return change;
+  }
+  return `+${change}`;
+}
+
 function ListItemRow({ item }: { item: ForecastInsightListItem }) {
+  const parts = splitParameterItem(item.text);
+  if (parts) {
+    return (
+      <li
+        data-testid="insight-parameter-row"
+        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 border-t border-border/70 py-2 text-sm leading-6"
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            "mt-2 size-1.5 shrink-0 rounded-full",
+            changeDotClass(item.tone),
+          )}
+        />
+        <span className="min-w-0">
+          <span data-part="name" className="text-foreground">
+            {parts.name}
+          </span>
+          {parts.note ? (
+            <span data-part="note" className="block text-muted-foreground">
+              {parts.note}
+            </span>
+          ) : null}
+        </span>
+        <span
+          data-part="value"
+          className={cn(
+            "text-right font-mono font-semibold tabular-nums",
+            changeToneClass(item.tone),
+          )}
+        >
+          {formatChange(parts.change)}
+        </span>
+      </li>
+    );
+  }
   return (
     <li className="flex items-start gap-2 border-t border-border/70 pt-2 text-sm leading-6 text-foreground">
       <span

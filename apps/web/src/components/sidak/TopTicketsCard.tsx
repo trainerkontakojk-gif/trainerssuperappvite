@@ -1,4 +1,5 @@
 import { Ticket, TrendingDown } from "lucide-react";
+import { topTicketLabel } from "./rootCauseTicketUtils";
 import {
   Empty,
   EmptyDescription,
@@ -58,11 +59,7 @@ export default function TopTicketsCard({ tickets, onTicketSelect }: Props) {
         ) : (
           <ol className="divide-y divide-border border-t border-border">
             {tickets.map((ticket, idx) => {
-              const ticketLabel = ticket.isSamplingQa
-                ? "Tiket Sampling QA"
-                : ticket.no_tiket.toLowerCase().startsWith("audit-")
-                  ? "Audit Internal"
-                  : ticket.no_tiket;
+              const ticketLabel = topTicketLabel(ticket);
 
               const content = (
                 <>

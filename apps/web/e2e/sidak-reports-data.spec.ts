@@ -1034,7 +1034,7 @@ async function openReportsData(
   await mockSidakApi(page, audit, dataRequests, rows, indicatorMock, agentDirectoryMock);
   await installNetworkGuard(page, audit);
   await page.goto("/sidak/reports-data");
-  await expect(page.getByRole("heading", { name: "Laporan Data", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Laporan data", level: 1 })).toBeVisible();
   // Bukti mock auth dipakai: halaman tidak pernah dialihkan ke /unauthorized.
   await expect(page).toHaveURL(/\/sidak\/reports-data/);
   expect(

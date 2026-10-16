@@ -81,7 +81,7 @@ export default function SidakInputImportPanel({
           <button
             key={tab}
             onClick={() => onSetImportTab(tab)}
-            className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wide transition-colors ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               importTab === tab
                 ? "text-foreground border-b-2 border-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -96,7 +96,7 @@ export default function SidakInputImportPanel({
         {importTab === "download" ? (
           <div className="space-y-4">
             <div className="bg-blue-500/5 rounded-xl p-4 border border-blue-500/20">
-              <p className="text-xs font-semibold text-blue-600 mb-2">
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2">
                 Cara menggunakan template
               </p>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
@@ -127,7 +127,7 @@ export default function SidakInputImportPanel({
             <button
               onClick={onDownloadTemplate}
               disabled={generatingTemplate || disabled}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold transition-all"
             >
               {generatingTemplate ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -137,7 +137,7 @@ export default function SidakInputImportPanel({
               {generatingTemplate ? "Menyiapkan..." : "Download Template"}
             </button>
             {disabled && (
-              <p className="text-center text-xs font-medium text-amber-600 mt-2">
+              <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-400 mt-2">
                 Belum ada parameter untuk layanan dan periode ini. Tidak dapat
                 mengunduh template.
               </p>
@@ -190,7 +190,7 @@ export default function SidakInputImportPanel({
               )}
             </label>
             {disabled && (
-              <p className="text-center text-xs font-medium text-amber-600 mt-2">
+              <p className="text-center text-xs font-medium text-amber-700 dark:text-amber-400 mt-2">
                 Belum ada parameter untuk layanan dan periode ini. Tidak dapat
                 melakukan import.
               </p>
@@ -200,19 +200,19 @@ export default function SidakInputImportPanel({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-emerald-500/5 rounded-lg p-3 text-center border border-emerald-500/20">
-                    <p className="text-xl font-bold text-emerald-600">
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
                       {validRows.length}
                     </p>
-                    <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wide">
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">
                       Siap import
                     </p>
                   </div>
                   {invalidRows.length > 0 && (
-                    <div className="bg-red-500/5 rounded-lg p-3 text-center border border-red-500/20">
-                      <p className="text-xl font-bold text-red-600">
+                    <div className="bg-rose-500/5 rounded-lg p-3 text-center border border-rose-500/20">
+                      <p className="text-xl font-bold text-rose-700 dark:text-rose-400">
                         {invalidRows.length}
                       </p>
-                      <p className="text-xs text-red-600 font-semibold uppercase tracking-wide">
+                      <p className="text-xs text-rose-700 dark:text-rose-400 font-semibold">
                         Error
                       </p>
                     </div>
@@ -224,7 +224,7 @@ export default function SidakInputImportPanel({
                     <div
                       key={row.rowNum}
                       className={`px-4 py-3 border-b border-border last:border-0 ${
-                        row.error ? "bg-red-500/5" : ""
+                        row.error ? "bg-rose-500/5" : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -258,13 +258,13 @@ export default function SidakInputImportPanel({
                             sampel: {row.tanggal_sampel || "Belum diisi"}
                           </p>
                           {row.error && (
-                            <p className="text-xs text-red-500 mt-1">
+                            <p className="text-xs text-rose-700 dark:text-rose-400 mt-1">
                               {row.error}
                             </p>
                           )}
                         </div>
                         <span
-                          className={`text-xs font-bold ${row.error ? "text-red-500" : "text-green-500"}`}
+                          className={`text-xs font-bold ${row.error ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}
                         >
                           {row.error ? "✗" : "✓"}
                         </span>
@@ -274,8 +274,8 @@ export default function SidakInputImportPanel({
                 </div>
 
                 {hasDuplicateError && (
-                  <div className="bg-red-500/5 rounded-lg p-3 text-center border border-red-500/25">
-                    <p className="text-xs font-semibold text-red-600">
+                  <div className="bg-rose-500/5 rounded-lg p-3 text-center border border-rose-500/25">
+                    <p className="text-xs font-semibold text-rose-700 dark:text-rose-400">
                       Hapus baris duplicate sebelum import
                     </p>
                   </div>
@@ -287,7 +287,7 @@ export default function SidakInputImportPanel({
                     <button
                       onClick={onImportSave}
                       disabled={importing}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold transition-all"
                     >
                       {importing ? (
                         <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />

@@ -3,10 +3,13 @@ import {
   expectHermetic,
   formatAudit,
   openHermeticShell,
-  type ApiMock,
 } from "./helpers/hermeticShell";
 import { PROFILER_MOCKS } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import {
+  SIDAK_HOME_LEADER_MOCKS,
+  SIDAK_HOME_MOCKS,
+} from "./helpers/sidakHomeFixture";
 
 /**
  * Sidebar berlabel (≥1024px) — hermetic.
@@ -23,14 +26,6 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
  * Halaman Profiler dipakai sebagai halaman non-SIDAK karena murah dan sudah punya
  * fixture bersama (`helpers/profilerMocks.ts`).
  */
-
-const SIDAK_LANDING_MOCKS: readonly ApiMock[] = [
-  {
-    method: "GET",
-    path: "/api/v1/me/access-status",
-    body: { success: true, data: {} },
-  },
-];
 
 function sidebar(page: Page) {
   return page.getByRole("navigation", { name: "Navigasi utama" });
@@ -85,13 +80,13 @@ test.describe("Sidebar berlabel", () => {
       timeout: 20000,
     });
     await expect(
-      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+      nav.getByRole("link", { name: "Ranking", exact: true }),
     ).toHaveCount(0);
 
     await sidak.click();
     await expect(sidak).toHaveAttribute("aria-expanded", "true");
     await expect(
-      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+      nav.getByRole("link", { name: "Ranking", exact: true }),
     ).toBeVisible();
     await expect(
       nav.getByRole("link", { name: "KTP", exact: true }),
@@ -104,18 +99,18 @@ test.describe("Sidebar berlabel", () => {
   }) => {
     const audit = await openHermeticShell(page, {
       path: "/sidak",
-      apiMocks: SIDAK_LANDING_MOCKS,
+      apiMocks: SIDAK_HOME_MOCKS,
     });
     const nav = sidebar(page);
     await expect(
       nav.getByRole("button", { name: "SIDAK", exact: true }),
     ).toHaveAttribute("aria-expanded", "true", { timeout: 20000 });
     await expect(
-      nav.getByRole("link", { name: "Beranda SIDAK", exact: true }),
+      nav.getByRole("link", { name: "Ringkasan", exact: true }),
     ).toHaveAttribute("aria-current", "page");
     // Trainer boleh mengelola konfigurasi SIDAK.
     await expect(
-      nav.getByRole("link", { name: "Input Temuan", exact: true }),
+      nav.getByRole("link", { name: "Input temuan", exact: true }),
     ).toBeVisible();
     expectHermetic(audit);
   });
@@ -126,18 +121,18 @@ test.describe("Sidebar berlabel", () => {
     const audit = await openHermeticShell(page, {
       path: "/sidak",
       auth: { role: "leader" },
-      apiMocks: SIDAK_LANDING_MOCKS,
+      apiMocks: SIDAK_HOME_LEADER_MOCKS,
     });
     const nav = sidebar(page);
     await expect(
-      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+      nav.getByRole("link", { name: "Ranking", exact: true }),
     ).toBeVisible({ timeout: 20000 });
     for (const forbidden of [
-      "Input Temuan",
+      "Input temuan",
       "Periode QA",
       "Parameter QA",
-      "Laporan",
-      "Jadwal Shifting",
+      "Laporan data",
+      "Jadwal shifting",
     ]) {
       await expect(
         nav.getByRole("link", { name: forbidden, exact: true }),

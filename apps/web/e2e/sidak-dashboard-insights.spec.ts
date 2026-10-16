@@ -644,10 +644,10 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ]);
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "Dashboard SIDAK" }),
+      page.getByRole("heading", { level: 1, name: "Dashboard" }),
     ).toBeVisible();
     await expect(
-      page.locator("header nav").getByText("Dashboard SIDAK", { exact: true }),
+      page.locator("header nav").getByText("Dashboard", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText(SCOPE_LINE, { exact: true })).toBeVisible();
 
@@ -831,7 +831,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
 
     await page.setViewportSize({ width: 1280, height: 900 });
     await page
-      .getByRole("heading", { level: 1, name: "Dashboard SIDAK" })
+      .getByRole("heading", { level: 1, name: "Dashboard" })
       .scrollIntoViewIfNeeded();
     // Recharts animates on resize: settle it before recording visual evidence.
     await page.waitForTimeout(1800);
@@ -850,7 +850,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     });
     await page.evaluate(() => document.documentElement.classList.add("dark"));
     await page
-      .getByRole("heading", { level: 1, name: "Dashboard SIDAK" })
+      .getByRole("heading", { level: 1, name: "Dashboard" })
       .scrollIntoViewIfNeeded();
     await page.screenshot({
       path: testInfo.outputPath("sidak-dashboard-dark.png"),
@@ -904,7 +904,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
       await expect(refreshButton).toBeVisible();
       if (width === 320) {
         await page
-          .getByRole("heading", { level: 1, name: "Dashboard SIDAK" })
+          .getByRole("heading", { level: 1, name: "Dashboard" })
           .scrollIntoViewIfNeeded();
         await page.screenshot({
           path: testInfo.outputPath("sidak-dashboard-mobile.png"),

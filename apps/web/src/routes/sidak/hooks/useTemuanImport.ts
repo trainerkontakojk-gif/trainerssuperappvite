@@ -8,6 +8,7 @@ import {
   type QATemuan,
 } from "@trainers/types";
 import type { ParsedImportRow as ImportRowType } from "../../../components/sidak/SidakInputImportPanel";
+import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 
 const MONTHS = [
   "Januari",
@@ -42,6 +43,8 @@ interface UseTemuanImportParams {
   setTemuan: React.Dispatch<React.SetStateAction<QATemuan[]>>;
   setErrorMsg: (msg: string | null) => void;
   setSuccessMsg: (msg: string | null) => void;
+  /** Konfirmasi lewat `ConfirmDialog` (bukan `window.confirm`). */
+  confirm: ConfirmFn;
 }
 
 interface TemuanBatchPreview {
@@ -62,6 +65,7 @@ export function useTemuanImport({
   setTemuan,
   setErrorMsg,
   setSuccessMsg,
+  confirm,
 }: UseTemuanImportParams) {
   const [showImport, setShowImport] = useState(false);
   const [importTab, setImportTab] = useState<"download" | "upload">("download");
@@ -389,9 +393,11 @@ export function useTemuanImport({
         return;
       }
       if (preview.stats.skipped_count > 0) {
-        const ok = window.confirm(
-          `${preview.stats.skipped_count} baris sudah ada (duplikat) dan akan di-skip. ${preview.stats.valid_count} akan diimport. Lanjutkan?`,
-        );
+        const ok = await confirm({
+          title: "Lewati baris duplikat?",
+          description: `${preview.stats.skipped_count} baris sudah ada dan akan dilewati. ${preview.stats.valid_count} baris baru akan diimport.`,
+          confirmLabel: "Import yang baru",
+        });
         if (!ok) return;
       }
       const created = (await unwrapResponse(

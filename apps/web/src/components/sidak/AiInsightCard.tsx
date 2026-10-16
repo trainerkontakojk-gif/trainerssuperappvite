@@ -17,10 +17,10 @@ export default function AiInsightCard({ insight }: Props) {
       <div className="rounded-2xl border border-border bg-surface p-6 lg:p-7">
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-            <Zap className="h-5 w-5 text-emerald-500" />
+            <Zap className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-foreground">AI Coaching Insight</p>
+            <p className="text-sm font-semibold text-foreground">AI Coaching Insight</p>
             <p className="text-xs font-medium text-muted-foreground">Tidak ada temuan signifikan</p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function AiInsightCard({ insight }: Props) {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 fill-amber-400 text-amber-400" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-amber-500">Area Perbaikan</span>
+            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Area Perbaikan</span>
           </div>
           <h4 className="font-outfit text-xl font-bold leading-tight tracking-tight sm:text-2xl text-foreground">
             {insight.parameter}
@@ -48,7 +48,7 @@ export default function AiInsightCard({ insight }: Props) {
         </div>
 
         <div className="flex flex-col justify-center lg:border-l lg:border-border lg:pl-8">
-          <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="mb-2.5 text-xs font-semibold text-muted-foreground">
             Rekomendasi Strategis
           </div>
           <blockquote className="max-h-56 overflow-y-auto pr-1 text-sm font-medium italic leading-relaxed sm:text-base text-foreground">

@@ -24,6 +24,7 @@ type RankingRow = {
   agentId: string;
   nama: string;
   batch: string;
+  tim?: string;
   defects: number;
   score: number;
   hasCritical: boolean;
@@ -119,7 +120,7 @@ async function openRanking(
   });
   await waitForMockedApi(audit, ["/sidak/ranking?"]);
   await expect(
-    page.getByRole("heading", { level: 1, name: "Ranking prioritas temuan" }),
+    page.getByRole("heading", { level: 1, name: "Ranking" }),
   ).toBeVisible();
   return audit;
 }
@@ -204,7 +205,7 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     const audit = await openRanking(page, MOVEMENT_ROWS);
 
     const filters = page.getByRole("region", { name: "Filter ranking" });
-    for (const label of ["Layanan", "Periode", "Tahun", "Folder/tim"]) {
+    for (const label of ["Layanan", "Periode", "Tahun", "Tim"]) {
       await expect(selectTrigger(filters, label)).toBeVisible();
     }
     await expect(selectValue(selectTrigger(filters, "Layanan"))).toHaveText(
@@ -346,6 +347,106 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
       expect(request).toContain("service_type=call");
       expect(request).toContain(`year=${YEAR}`);
     }
+    expectHermetic(audit);
+  });
+});
+
+const TEAM_ROWS: RankingRow[] = [
+  { agentId: "t-1", nama: "Andi", batch: "Batch A", tim: "Tim Sari", defects: 9, score: 84, hasCritical: true, rankChange: 1 },
+  { agentId: "t-2", nama: "Bela", batch: "Batch A", tim: "Tim Andi", defects: 7, score: 88, hasCritical: false, rankChange: 0 },
+  { agentId: "t-3", nama: "Caca", batch: "Batch B", tim: "Tim Sari", defects: 4, score: 93, hasCritical: false, rankChange: -2 },
+  { agentId: "t-4", nama: "Dodi", batch: "Batch B", tim: "Tim Andi", defects: 2, score: 97, hasCritical: false, rankChange: null },
+];
+
+test.describe("Ranking SIDAK: tampilan per tim dan Unduh Excel (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget();
+  });
+
+  test("segmen Per tim leader mengelompokkan agen per tim dengan peringkat di dalam tim", async ({
+    page,
+  }) => {
+    const audit = await openRanking(page, TEAM_ROWS);
+    const view = page.getByRole("group", { name: "Tampilan ranking" });
+    await expect(view.getByRole("button", { name: "Tim gabungan" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(page.getByTestId("ranking-count")).toHaveText(
+      "4 agen · jumlah temuan sama berbagi peringkat",
+    );
+    await expect(rowFor(page, "Bela").getByRole("cell").first()).toHaveText("2");
+
+    await view.getByRole("button", { name: "Per tim leader" }).click();
+    const groups = rankingTable(page).getByRole("rowgroup", { name: /^Tim / });
+    await expect(groups).toHaveCount(2);
+    // Tim diurutkan menurut nama; peringkat dihitung ulang di dalam tim.
+    await expect(groups.nth(0)).toHaveAccessibleName("Tim Andi");
+    await expect(groups.nth(1)).toHaveAccessibleName("Tim Sari");
+    await expect(rowFor(page, "Bela").getByRole("cell").first()).toHaveText("1");
+    await expect(rowFor(page, "Dodi").getByRole("cell").first()).toHaveText("2");
+    await expect(rowFor(page, "Caca").getByRole("cell").first()).toHaveText("2");
+    expectHermetic(audit);
+  });
+
+  test("Unduh Excel di kepala halaman menyimpan baris ranking yang tampil", async ({
+    page,
+  }) => {
+    const audit = await openRanking(page, TEAM_ROWS);
+    const header = page.locator("header").filter({
+      has: page.getByRole("heading", { level: 1, name: "Ranking" }),
+    });
+    const downloadPromise = page.waitForEvent("download");
+    await header.getByRole("button", { name: "Unduh Excel" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(`ranking-sidak-call-${YEAR}-ytd.xlsx`);
+
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(await download.path());
+    const sheet = workbook.worksheets[0];
+    const rows: unknown[][] = [];
+    sheet.eachRow((row) => rows.push((row.values as unknown[]).slice(1)));
+    expect(rows[0]).toEqual([
+      "Peringkat",
+      "Agen",
+      "Tim",
+      "Batch",
+      "Temuan",
+      "Skor QA",
+      "Kritikal",
+      "Perubahan posisi",
+    ]);
+    expect(rows.slice(1)).toEqual([
+      [1, "Andi", "Tim Sari", "Batch A", 9, 84, "Ya", "Prioritas naik +1"],
+      [2, "Bela", "Tim Andi", "Batch A", 7, 88, "Tidak", "Tetap"],
+      [3, "Caca", "Tim Sari", "Batch B", 4, 93, "Tidak", "Prioritas turun 2"],
+      [4, "Dodi", "Tim Andi", "Batch B", 2, 97, "Tidak", "Baru"],
+    ]);
+
+    // Per tim leader: Excel mengikuti urutan dan peringkat di dalam tim.
+    await page
+      .getByRole("group", { name: "Tampilan ranking" })
+      .getByRole("button", { name: "Per tim leader" })
+      .click();
+    const teamDownloadPromise = page.waitForEvent("download");
+    await header.getByRole("button", { name: "Unduh Excel" }).click();
+    const teamDownload = await teamDownloadPromise;
+    expect(teamDownload.suggestedFilename()).toBe(
+      `ranking-sidak-call-${YEAR}-ytd-per-tim.xlsx`,
+    );
+    const teamBook = new ExcelJS.Workbook();
+    await teamBook.xlsx.readFile(await teamDownload.path());
+    const teamRows: unknown[][] = [];
+    teamBook.worksheets[0].eachRow((row) =>
+      teamRows.push((row.values as unknown[]).slice(1, 3)),
+    );
+    expect(teamRows.slice(1)).toEqual([
+      [1, "Bela"],
+      [2, "Dodi"],
+      [1, "Andi"],
+      [2, "Caca"],
+    ]);
     expectHermetic(audit);
   });
 });

@@ -33,6 +33,10 @@ import {
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { useConfirmRequest } from "../../hooks/useConfirmRequest";
+import { Link } from "@tanstack/react-router";
 
 type ServiceType = QAIndicator["service_type"];
 
@@ -195,6 +199,7 @@ export default function SidakInputPage() {
   );
 
   // Initialize Hooks
+  const confirmer = useConfirmRequest();
   const editHook = useTemuanEdit({
     temuan,
     setTemuan,
@@ -212,6 +217,7 @@ export default function SidakInputPage() {
     setTemuan,
     setErrorMsg,
     setSuccessMsg,
+    confirm: confirmer.confirm,
   });
 
   const importHook = useTemuanImport({
@@ -224,6 +230,7 @@ export default function SidakInputPage() {
     setTemuan,
     setErrorMsg,
     setSuccessMsg,
+    confirm: confirmer.confirm,
   });
 
   const indicatorLabelMap = useMemo(() => {
@@ -520,14 +527,11 @@ export default function SidakInputPage() {
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
         <div className="mx-auto max-w-6xl space-y-5">
-          <header className="space-y-1">
-            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
-              Input Temuan
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Pilih agen dan periode, lalu catat temuan audit per tiket.
-            </p>
-          </header>
+          <SidakPageHeader
+            title="Input temuan"
+            eyebrow="SIDAK · Audit"
+            description="Catat temuan per tiket untuk satu agen dan satu periode."
+          />
 
           <SidakInputContextBar
             folders={folderOptions}
@@ -573,7 +577,22 @@ export default function SidakInputPage() {
             />
           ) : null}
           {successMsg ? (
-            <QaStatePanel type="success" compact title={successMsg} />
+            <QaStatePanel
+              type="success"
+              compact
+              title={successMsg}
+              action={
+                selectedAgent ? (
+                  <Link
+                    to="/sidak/agents/$id"
+                    params={{ id: selectedAgent.id }}
+                    className="inline-flex min-h-[44px] items-center text-sm font-medium text-foreground underline underline-offset-4"
+                  >
+                    Buka detail agen
+                  </Link>
+                ) : null
+              }
+            />
           ) : null}
           {showConfigWarning ? (
             <QaStatePanel
@@ -766,6 +785,15 @@ export default function SidakInputPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmer.request !== null}
+        title={confirmer.request?.title ?? ""}
+        description={confirmer.request?.description ?? ""}
+        confirmLabel={confirmer.request?.confirmLabel ?? "Lanjutkan"}
+        confirmVariant="default"
+        onConfirm={() => confirmer.resolve(true)}
+        onCancel={() => confirmer.resolve(false)}
+      />
     </div>
   );
 }

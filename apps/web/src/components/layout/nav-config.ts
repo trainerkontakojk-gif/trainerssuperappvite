@@ -9,16 +9,25 @@ import {
 } from "lucide-react";
 import { APP_MODULES, isCapabilityAllowed } from "../../lib/app-config";
 
-export const SIDAK_CHILDREN = [
-  { to: "/sidak", label: "Beranda SIDAK", exactMatch: true },
-  { to: "/sidak/dashboard", label: "Dashboard SIDAK" },
-  { to: "/sidak/forecast", label: "Forecast" },
-  { to: "/sidak/agents", label: "Analisis Individu" },
-  { to: "/sidak/ranking", label: "Ranking Agen" },
+/**
+ * Sub-halaman SIDAK. `group` dan `description` dipakai daftar "Halaman SIDAK"
+ * di Ringkasan (`/sidak`), jadi sidebar dan beranda modul membaca satu daftar.
+ */
+export const SIDAK_CHILDREN: readonly (NavChild & {
+  capability?: Capability;
+})[] = [
+  { to: "/sidak", label: "Ringkasan", exactMatch: true },
   {
-    to: "/sidak/reports-data",
-    label: "Laporan",
-    capability: "sidak.reports.view" as const,
+    to: "/sidak/dashboard",
+    label: "Dashboard",
+    group: "analisis",
+    description: "Tren, Pareto, pola mingguan",
+  },
+  {
+    to: "/sidak/ranking",
+    label: "Ranking",
+    group: "analisis",
+    description: "Agen dengan temuan terbanyak",
   },
   {
     // Volume temuan ketidaksesuaian per hari. Admin/trainer melihat semua;
@@ -26,30 +35,59 @@ export const SIDAK_CHILDREN = [
     // berarti role `qa` punya akses.
     to: "/sidak/heatmap",
     label: "Heatmap",
-    capability: "sidak.view" as const,
+    group: "analisis",
+    description: "Temuan per tanggal sepanjang tahun",
+    capability: "sidak.view",
+  },
+  {
+    to: "/sidak/forecast",
+    label: "Forecast",
+    group: "analisis",
+    description: "Arah temuan 1–6 bulan ke depan",
+  },
+  {
+    to: "/sidak/agents",
+    label: "Agen",
+    group: "agen",
+    description: "Cari agen, buka skor dan temuannya",
   },
   {
     to: "/sidak/input",
-    label: "Input Temuan",
+    label: "Input temuan",
+    group: "audit",
+    description: "Catat temuan per tiket atau impor Excel",
     capability: "sidak.config.manage" as const,
   },
   {
     to: "/sidak/periods",
     label: "Periode QA",
+    group: "audit",
+    description: "Bulan audit yang dipakai semua halaman",
     capability: "sidak.config.manage" as const,
+  },
+  {
+    to: "/sidak/settings",
+    label: "Parameter QA",
+    group: "audit",
+    description: "Versi aturan dan bobot per layanan",
+    capability: "sidak.config.manage" as const,
+  },
+  {
+    to: "/sidak/reports-data",
+    label: "Laporan data",
+    group: "laporan",
+    description: "Tabel temuan dan unduh Excel",
+    capability: "sidak.reports.view",
   },
   {
     // Read-only jadwal WFM. Role dibatasi admin+trainer di tiga lapis: nav ini,
     // route guard, dan `requireCapability` di backend. Leader/agent tidak termasuk —
     // jangan menambah role lain tanpa persetujuan Fajar.
     to: "/sidak/jadwal-shifting",
-    label: "Jadwal Shifting",
+    label: "Jadwal shifting",
+    group: "laporan",
+    description: "Jadwal harian dari WFM, hanya-baca",
     capability: "sidak.schedule.read" as const,
-  },
-  {
-    to: "/sidak/settings",
-    label: "Parameter QA",
-    capability: "sidak.config.manage" as const,
   },
 ];
 
@@ -93,10 +131,16 @@ export type NavGroupId =
   | "data"
   | "administrasi";
 
+export type SidakPageGroup = "audit" | "analisis" | "agen" | "laporan";
+
 export interface NavChild {
   to: string;
   label: string;
   exactMatch?: boolean;
+  /** Kelompok kerja di daftar "Halaman SIDAK"; kosong untuk Ringkasan. */
+  group?: SidakPageGroup;
+  /** Satu baris fungsi halaman, bahasa biasa. */
+  description?: string;
 }
 
 export interface NavItem {
@@ -185,7 +229,13 @@ export function buildNavModel(role: string | null | undefined): NavModel {
     children:
       module.id === "qa-analyzer"
         ? SIDAK_CHILDREN.filter((child) => allowed(child.capability)).map(
-            ({ to, label, exactMatch }) => ({ to, label, exactMatch }),
+            ({ to, label, exactMatch, group, description }) => ({
+              to,
+              label,
+              exactMatch,
+              group,
+              description,
+            }),
           )
         : undefined,
   });
@@ -259,7 +309,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
         i === crumbs.length - 1 ? { ...c, href: undefined } : c,
       );
     if (pathname === "/sidak/dashboard") {
-      crumbs.push({ label: "Dashboard SIDAK" });
+      crumbs.push({ label: "Dashboard" });
       return crumbs;
     }
     if (pathname === "/sidak/forecast") {
@@ -267,7 +317,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
       return crumbs;
     }
     if (pathname === "/sidak/input") {
-      crumbs.push({ label: "Input Temuan" });
+      crumbs.push({ label: "Input temuan" });
       return crumbs;
     }
     if (pathname === "/sidak/ranking") {
@@ -275,15 +325,15 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
       return crumbs;
     }
     if (pathname === "/sidak/settings") {
-      crumbs.push({ label: "Parameter" });
+      crumbs.push({ label: "Parameter QA" });
       return crumbs;
     }
     if (pathname === "/sidak/periods") {
-      crumbs.push({ label: "Periode" });
+      crumbs.push({ label: "Periode QA" });
       return crumbs;
     }
     if (pathname === "/sidak/jadwal-shifting") {
-      crumbs.push({ label: "Jadwal Shifting" });
+      crumbs.push({ label: "Jadwal shifting" });
       return crumbs;
     }
     if (pathname.startsWith("/sidak/agents/")) {
@@ -292,11 +342,15 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
       return crumbs;
     }
     if (pathname === "/sidak/agents") {
-      crumbs.push({ label: "Analisis Individu" });
+      crumbs.push({ label: "Agen" });
       return crumbs;
     }
     if (pathname.startsWith("/sidak/reports")) {
-      crumbs.push({ label: "Laporan" });
+      crumbs.push({ label: "Laporan data" });
+      return crumbs;
+    }
+    if (pathname === "/sidak/heatmap") {
+      crumbs.push({ label: "Heatmap" });
       return crumbs;
     }
     crumbs.push({ label: pathname.split("/").pop() || "" });

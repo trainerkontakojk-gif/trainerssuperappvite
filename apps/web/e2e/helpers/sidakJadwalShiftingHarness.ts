@@ -44,8 +44,8 @@ const APP_URL = new URL(APP_ORIGIN);
 const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 
 /** Label UI yang jadi tempat kueri diuji lewat teks, bukan lewat selector rapuh. */
-export const PAGE_TITLE = "Jadwal Shifting";
-export const NAV_LABEL = "Jadwal Shifting";
+export const PAGE_TITLE = "Jadwal shifting";
+export const NAV_LABEL = "Jadwal shifting";
 
 type MockedEndpoint = {
   id: string;

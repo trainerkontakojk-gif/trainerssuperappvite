@@ -43,3 +43,14 @@ export function formatTicketLabel(ref: RootCauseTicketReference): string {
     ref.periodLabel;
   return `${ref.no_tiket} (${month})`;
 }
+
+/** Label tiket pengurang: sampling QA dan audit internal tidak punya nomor tiket. */
+export function topTicketLabel(ticket: {
+  no_tiket: string;
+  isSamplingQa?: boolean;
+}): string {
+  if (ticket.isSamplingQa) return "Tiket Sampling QA";
+  if (ticket.no_tiket.toLowerCase().startsWith("audit-"))
+    return "Audit Internal";
+  return ticket.no_tiket;
+}

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectHermetic, waitForMockedApi } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { homeMocks } from "./helpers/sidakHomeFixture";
 import {
   detail,
   ids,
@@ -343,7 +344,18 @@ for (const width of [1440, 390]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    const audit = await openTna(page, "/tna", [], "leader", /\/unauthorized$/);
+    // `/sidak` dibuka hanya untuk memeriksa navigasi; Ringkasan SIDAK membaca
+    // dashboard + direktori agen, jadi keduanya dijawab dari fixture beranda.
+    const sidakHome = homeMocks().filter(
+      (mock) => mock.path !== "/api/v1/me/access-status",
+    );
+    const audit = await openTna(
+      page,
+      "/tna",
+      sidakHome,
+      "leader",
+      /\/unauthorized$/,
+    );
     await expect(page).toHaveURL(/\/unauthorized$/);
     await page.goto("/sidak");
     if (width < 1024)

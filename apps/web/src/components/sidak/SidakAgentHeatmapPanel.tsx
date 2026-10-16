@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getErrorMessage } from "../../lib/api";
 import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "./SidakHeatmapCalendar";
 import SidakHeatmapInsights from "./SidakHeatmapInsights";
+import {
+  buildHeatmapInsights,
+  formatInsightDateShort,
+  formatInsightDateWithWeekday,
+} from "./heatmap-insights";
 import {
   VALID_SERVICE_TYPES,
   type SidakHeatmapCountBy,
@@ -72,6 +77,11 @@ export default function SidakAgentHeatmapPanel({
     };
   }, [load]);
 
+  const insights = useMemo(
+    () => buildHeatmapInsights(data?.days ?? []),
+    [data?.days],
+  );
+
   useEffect(() => {
     setSelected(null);
   }, [agentId, year, countBy, resolvedService]);
@@ -121,9 +131,9 @@ export default function SidakAgentHeatmapPanel({
       {error && (
         <div
           role="alert"
-          className="rounded-xl border border-red-500/30 bg-red-500/5 p-4"
+          className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4"
         >
-          <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">
             Gagal memuat heatmap
           </p>
           <p className="mt-1 text-sm text-muted-foreground">{error}</p>
@@ -146,55 +156,91 @@ export default function SidakAgentHeatmapPanel({
 
       {!error && data && (
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">
-                Total temuan {data.year}
-              </p>
-              <p className="text-2xl font-extrabold tabular-nums text-foreground">
-                {data.totalFindings}
-              </p>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(16rem,1fr)] lg:items-start">
+            <div data-testid="agent-heatmap-calendar" className="min-w-0">
+              <SidakHeatmapCalendar
+                year={data.year}
+                days={data.days}
+                selectedDate={selected?.date ?? null}
+                onSelectDay={setSelected}
+              />
             </div>
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Temuan tanpa tanggal</p>
-              <p className="text-2xl font-extrabold tabular-nums text-foreground">
-                {data.missingDateFindingsAllPeriods}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Dari semua tahun; tidak tampil di kalender karena tanggalnya
-                kosong.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs text-muted-foreground">Tanggal dipilih</p>
-              {selected ? (
-                <>
-                  <p
-                    className="text-sm font-semibold text-foreground"
-                    data-testid="agent-heatmap-selected-day"
+
+            <aside
+              aria-label="Ringkasan heatmap agen"
+              className="flex min-w-0 flex-col gap-3"
+            >
+              <div className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4">
+                <p className="text-xs text-muted-foreground">Tanggal dipilih</p>
+                {selected ? (
+                  <>
+                    <p
+                      className="font-display text-base font-bold text-foreground"
+                      data-testid="agent-heatmap-selected-day"
+                    >
+                      {formatInsightDateWithWeekday(selected.date)}
+                    </p>
+                    <p className="text-sm tabular-nums text-fg2">
+                      {selected.count} temuan
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Pilih tanggal di kalender untuk melihat jumlah temuannya.
+                  </p>
+                )}
+              </div>
+
+              <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-border [&>div]:bg-surface gap-px">
+                <div className="flex flex-col gap-0.5 p-3">
+                  <dt className="text-xs text-muted-foreground">
+                    Total temuan {data.year}
+                  </dt>
+                  <dd className="font-mono text-lg font-bold tabular-nums text-foreground">
+                    {data.totalFindings}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5 p-3">
+                  <dt className="text-xs text-muted-foreground">
+                    Hari dengan temuan
+                  </dt>
+                  <dd
+                    data-testid="agent-heatmap-fact-days"
+                    className="font-mono text-lg font-bold tabular-nums text-foreground"
                   >
-                    {selected.date}
-                  </p>
-                  <p className="mt-1 text-sm tabular-nums text-foreground">
-                    {selected.count} temuan
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Pilih tanggal di kalender untuk melihat jumlah temuannya.
-                </p>
-              )}
-            </div>
+                    {insights.activeDays}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5 p-3">
+                  <dt className="text-xs text-muted-foreground">
+                    Tanggal terbanyak
+                  </dt>
+                  <dd
+                    data-testid="agent-heatmap-fact-peak"
+                    className="font-mono text-lg font-bold tabular-nums text-foreground"
+                  >
+                    {insights.busiestDay
+                      ? formatInsightDateShort(insights.busiestDay.date)
+                      : "—"}
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5 p-3">
+                  <dt className="text-xs text-muted-foreground">
+                    Temuan tanpa tanggal
+                  </dt>
+                  <dd className="font-mono text-lg font-bold tabular-nums text-foreground">
+                    {data.missingDateFindingsAllPeriods}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-xs text-muted-foreground">
+                Temuan tanpa tanggal dihitung dari semua tahun dan tidak tampil
+                di kalender.
+              </p>
+            </aside>
           </div>
 
           <SidakHeatmapInsights days={data.days} />
-
-          <SidakHeatmapCalendar
-            year={data.year}
-            days={data.days}
-            selectedDate={selected?.date ?? null}
-            onSelectDay={setSelected}
-          />
         </div>
       )}
     </div>

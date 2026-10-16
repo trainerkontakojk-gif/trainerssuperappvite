@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type {
+  ServiceType,
   DashboardData,
   SidakAgentForecastResponse,
   SidakForecastLookupResult,
@@ -14,6 +15,11 @@ import { notify } from "../../lib/toast";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import {
+  SidakPageHeader,
+  SidakScopeLine,
+} from "../../components/sidak/SidakPageHeader";
+import { SIDAK_ALL_TEAMS, useSidakScope } from "../../hooks/useSidakScope";
 import ForecastFilterBar from "../../components/sidak/forecast/ForecastFilterBar";
 import ForecastLane from "../../components/sidak/forecast/ForecastLane";
 import ForecastSummary from "../../components/sidak/forecast/ForecastSummary";
@@ -33,13 +39,26 @@ import {
 
 export default function SidakForecastPage() {
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
 
-  const [selectedService, setSelectedService] = useState("call");
-  const [selectedFolder, setSelectedFolder] = useState("ALL");
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [startMonth, setStartMonth] = useState<number | null>(1);
-  const [endMonth, setEndMonth] = useState<number | null>(currentMonth);
+  // Layanan, tim, tahun, dan rentang bulan adalah cakupan bersama SIDAK.
+  const { scope, setScope } = useSidakScope();
+  const selectedService: string = scope.layanan;
+  const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
+  const selectedYear = scope.tahun;
+  const startMonth: number | null = scope.dari;
+  const endMonth: number | null = scope.sampai;
+  const setSelectedService = useCallback(
+    (service: string) => setScope({ layanan: service as ServiceType }),
+    [setScope],
+  );
+  const setSelectedFolder = useCallback(
+    (folder: string) => setScope({ tim: folder }),
+    [setScope],
+  );
+  const setSelectedYear = useCallback(
+    (year: number) => setScope({ tahun: year }),
+    [setScope],
+  );
   const [selectedHorizon, setSelectedHorizon] = useState(3);
   const [serviceForecastLookup, setServiceForecastLookup] =
     useState<SidakForecastLookupResult | null>(null);
@@ -127,7 +146,7 @@ export default function SidakForecastPage() {
     if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
       setSelectedYear(availableYears[0]);
     }
-  }, [availableYears, data, selectedYear]);
+  }, [availableYears, data, selectedYear, setSelectedYear]);
 
   useEffect(() => {
     if (!data) return;
@@ -137,7 +156,7 @@ export default function SidakForecastPage() {
     ) {
       setSelectedService(String(availableServices[0]));
     }
-  }, [availableServices, data, selectedService]);
+  }, [availableServices, data, selectedService, setSelectedService]);
 
   useEffect(() => {
     if (!folders.length) return;
@@ -149,7 +168,7 @@ export default function SidakForecastPage() {
       }
     }
 
-    if (!initialFolderSetRef.current && selectedFolder === "ALL") {
+    if (!initialFolderSetRef.current && scope.tim === null) {
       const matchedFolder = findPrimarySidakFolderByName(
         folders,
         DEFAULT_SERVICE_FOLDER_MAP[effectiveService] ?? null,
@@ -159,7 +178,7 @@ export default function SidakForecastPage() {
         initialFolderSetRef.current = true;
       }
     }
-  }, [folders, selectedFolder, effectiveService]);
+  }, [folders, selectedFolder, effectiveService, scope.tim, setSelectedFolder]);
 
   const serviceForecastFilters = useMemo(
     () => ({
@@ -362,9 +381,11 @@ export default function SidakForecastPage() {
   const handleServiceChange = (value: string) => {
     const nextFolderName = DEFAULT_SERVICE_FOLDER_MAP[value] ?? null;
     const matchedFolder = findPrimarySidakFolderByName(folders, nextFolderName);
-    setSelectedService(value);
-    setSelectedFolder(matchedFolder?.id ?? "ALL");
-    initialFolderSetRef.current = Boolean(matchedFolder);
+    setScope({
+      layanan: value as ServiceType,
+      tim: matchedFolder?.id ?? SIDAK_ALL_TEAMS,
+    });
+    initialFolderSetRef.current = true;
   };
 
   const hasHistory =
@@ -373,33 +394,43 @@ export default function SidakForecastPage() {
   return (
     <div className="min-h-dvh bg-background">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <div className="min-w-0">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Forecast
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Lihat proyeksi layanan dan tentukan agen yang perlu diprioritaskan.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="h-[44px] w-full sm:w-auto"
-          >
-            <RefreshCw
-              data-icon="inline-start"
-              className={cn(
-                isRefreshing && "animate-spin motion-reduce:animate-none",
-              )}
-              aria-hidden="true"
+        <SidakPageHeader
+          title="Forecast"
+          description="Arah temuan layanan dan agen berdasarkan tren bulan-bulan sebelumnya."
+          scope={
+            <SidakScopeLine
+              layanan={effectiveService}
+              timLabel={
+                selectedFolder === SIDAK_ALL_TEAMS
+                  ? null
+                  : (folders.find((folder) => folder.id === selectedFolder)
+                      ?.name ?? "Tim terpilih")
+              }
+              tahun={selectedYear}
+              dari={startMonth}
+              sampai={endMonth}
             />
-            Perbarui
-          </Button>
-        </header>
+          }
+          actions={
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-[44px] w-full sm:w-auto"
+            >
+              <RefreshCw
+                data-icon="inline-start"
+                className={cn(
+                  isRefreshing && "animate-spin motion-reduce:animate-none",
+                )}
+                aria-hidden="true"
+              />
+              Perbarui
+            </Button>
+          }
+        />
 
         <ForecastFilterBar
           selectedService={selectedService}
@@ -410,10 +441,9 @@ export default function SidakForecastPage() {
           onYearChange={setSelectedYear}
           startMonth={startMonth}
           endMonth={endMonth}
-          onMonthRangeChange={(start, end) => {
-            setStartMonth(start);
-            setEndMonth(end);
-          }}
+          onMonthRangeChange={(start, end) =>
+            setScope({ dari: start ?? 1, sampai: end ?? 12 })
+          }
           folders={folders}
           availableYears={availableYears}
           leaderLockedService={leaderLockedService}

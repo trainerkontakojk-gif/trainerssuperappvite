@@ -17,6 +17,7 @@ import {
   normalizeReportAgents,
   validateReportFilters,
 } from "./reports-data-utils";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
@@ -363,18 +364,11 @@ export default function SidakReportsData() {
       >
         <div className="mx-auto max-w-7xl space-y-6">
           {/* Header: tipografi + spasi, tanpa ikon dekoratif dan tanpa motion. */}
-          <header className="space-y-3">
-            <div>
-              <h1 className="font-heading text-2xl font-semibold tracking-tight text-balance text-foreground">
-                Laporan Data
-              </h1>
-              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-fg2">
-                Daftar temuan QA per layanan atau per agen, lengkap dengan nomor
-                tiket, Temuan, dan Rekomendasi. Data ini berasal dari input QA,
-                bukan ringkasan AI.
-              </p>
-            </div>
-          </header>
+          <SidakPageHeader
+            title="Laporan data"
+            eyebrow="SIDAK · Laporan"
+            description="Temuan yang punya isi Temuan dan Rekomendasi, siap diunduh sebagai Excel."
+          />
 
           {/* Filter: section datar, tanpa kartu di dalam kartu. */}
           <section aria-label="Filter temuan" className="border-y border-border py-4 md:py-5">

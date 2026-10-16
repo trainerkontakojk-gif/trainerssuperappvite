@@ -6,6 +6,7 @@ import {
 } from "./helpers/hermeticShell";
 import { PROFILER_MOCKS } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { SIDAK_HOME_MOCKS } from "./helpers/sidakHomeFixture";
 
 /**
  * Header, drawer, dan fokus shell — hermetic.
@@ -52,7 +53,11 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
   },
 ];
 
-const SHELL_MOCKS: readonly ApiMock[] = [...DASHBOARD_MOCKS, ...PROFILER_MOCKS];
+const SHELL_MOCKS: readonly ApiMock[] = [
+  ...DASHBOARD_MOCKS,
+  ...PROFILER_MOCKS,
+  ...SIDAK_HOME_MOCKS,
+];
 
 test.describe("Header, drawer, dan fokus shell", () => {
   test.beforeAll(async () => {
@@ -125,12 +130,11 @@ test.describe("Header, drawer, dan fokus shell", () => {
     ).toBeFocused();
     await expect(page).toHaveTitle("Beranda · Trainers SuperApp");
 
-    // Landing SIDAK tidak punya h1: fokus jatuh ke region konten.
     await nav.getByRole("button", { name: "SIDAK", exact: true }).click();
-    await nav.getByRole("link", { name: "Beranda SIDAK", exact: true }).click();
+    await nav.getByRole("link", { name: "Ringkasan", exact: true }).click();
     await expect(page).toHaveURL(/\/sidak$/);
     await expect(
-      page.getByRole("region", { name: "Konten halaman" }),
+      page.getByRole("heading", { level: 1, name: "SIDAK", exact: true }),
     ).toBeFocused();
     await expect(page).toHaveTitle("SIDAK · Trainers SuperApp");
     expectHermetic(audit);

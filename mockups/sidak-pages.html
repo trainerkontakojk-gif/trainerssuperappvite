@@ -1,0 +1,1007 @@
+<title>Mockup Halaman SIDAK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: prototipe yang bisa diklik; bingkai aplikasi (sidebar + konten), layar diganti lewat sidebar/pemilih. Token mengikuti docs/design.md */
+:root{
+  --bg:#fafafa; --surface:#f5f5f5; --elev:#ffffff; --sunken:#ececec; --border:#e5e5e5;
+  --fg:#0a0a0a; --fg2:#404040; --fg3:#707070; --inv-bg:#0a0a0a; --inv-fg:#fafafa;
+  --sidak:#e11d48; --sidak-soft:#e11d4812;
+  --good:#15803d; --good-soft:#15803d16; --warn:#b45309; --warn-soft:#f59e0b1f; --bad:#b91c1c; --bad-soft:#dc262614; --info:#1d4ed8; --ketik:#2563eb; --pdkt:#9333ea; --telefun:#047857;
+  --heat0:#ececec; --heat1:#fecdd3; --heat2:#fb7185; --heat3:#e11d48; --heat4:#9f1239;
+  --display:"Outfit",system-ui,sans-serif; --body:"Inter",-apple-system,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a0a0a; --surface:#171717; --elev:#1c1c1f; --sunken:#121212; --border:#262626;
+  --fg:#fafafa; --fg2:#a3a3a3; --fg3:#8a8a8a; --inv-bg:#fafafa; --inv-fg:#0a0a0a;
+  --sidak:#fb7185; --sidak-soft:#fb71851f;
+  --good:#4ade80; --good-soft:#4ade801a; --warn:#fbbf24; --warn-soft:#fbbf241a; --bad:#f87171; --bad-soft:#f871711a; --info:#60a5fa; --ketik:#3b82f6; --pdkt:#a855f7; --telefun:#34d399;
+  --heat0:#1f1f23; --heat1:#4c0519; --heat2:#9f1239; --heat3:#e11d48; --heat4:#fb7185;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a0a0a; --surface:#171717; --elev:#1c1c1f; --sunken:#121212; --border:#262626;
+  --fg:#fafafa; --fg2:#a3a3a3; --fg3:#8a8a8a; --inv-bg:#fafafa; --inv-fg:#0a0a0a;
+  --sidak:#fb7185; --sidak-soft:#fb71851f;
+  --good:#4ade80; --good-soft:#4ade801a; --warn:#fbbf24; --warn-soft:#fbbf241a; --bad:#f87171; --bad-soft:#f871711a; --info:#60a5fa; --ketik:#3b82f6; --pdkt:#a855f7; --telefun:#34d399;
+  --heat0:#1f1f23; --heat1:#4c0519; --heat2:#9f1239; --heat3:#e11d48; --heat4:#fb7185;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 72px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.03em;text-wrap:balance;margin:0;color:var(--fg)}
+h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.08;font-weight:800}
+h3{font-size:15px;font-weight:700;letter-spacing:-.02em}
+p{margin:0;max-width:72ch;color:var(--fg2);text-wrap:pretty}
+code{font-family:var(--mono);font-size:.86em}
+a{color:var(--sidak)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sidak);outline-offset:2px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--sidak)}
+.intro{display:flex;flex-direction:column;gap:8px}
+
+/* Pemilih layar (berguna di HP) */
+.picker{display:flex;gap:6px;flex-wrap:wrap}
+.picker button{min-height:36px;padding:0 12px;border:1px solid var(--border);border-radius:999px;background:var(--elev);font-size:13px;color:var(--fg2);cursor:pointer}
+.picker button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600}
+
+/* Bingkai aplikasi */
+.frame-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border)}
+.frame{min-width:1080px;background:var(--bg);font-size:13px;line-height:1.5;display:flex;flex-direction:column}
+.chrome{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.chrome i{width:10px;height:10px;border-radius:50%;background:var(--border);display:block}
+.chrome .url{margin-left:12px;font-family:var(--mono);font-size:12px;color:var(--fg3);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:760px}
+.chrome .thm{margin-left:auto;min-height:28px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);font-size:12px;cursor:pointer;color:var(--fg2)}
+.app{display:flex;min-height:760px}
+.sb{width:220px;flex:none;border-right:1px solid var(--border);background:var(--elev);padding:14px 10px;display:flex;flex-direction:column;gap:1px;font-size:12.5px}
+.sb .brand{font:800 15px var(--display);letter-spacing:-.03em;padding:2px 10px 10px;color:var(--fg)}
+.sb .grp{font-size:11.5px;color:var(--fg3);padding:12px 10px 4px}
+.sb button{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;border-radius:7px;color:var(--fg2);background:transparent;border:0;text-align:left;cursor:pointer;width:100%}
+.sb button:hover{background:var(--surface);color:var(--fg)}
+.sb button[aria-current="page"]{background:var(--surface);color:var(--fg);font-weight:600;box-shadow:inset 0 0 0 1px var(--border)}
+.sb .mod{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;color:var(--fg);font-weight:600}
+.sb .mod i{width:8px;height:8px;border-radius:50%;background:var(--sidak)}
+.sb .other{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 10px;color:var(--fg3)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.screen{display:flex;flex-direction:column;min-width:0}
+
+/* Kepala halaman + cakupan bersama */
+.phead{padding:20px 28px 16px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--border);background:var(--elev)}
+.phead .top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.phead .tt{display:flex;flex-direction:column;gap:3px}
+.phead .crumb{font-size:12px;color:var(--fg3)}
+.phead .t{font:700 24px/1.15 var(--display);letter-spacing:-.03em;color:var(--fg)}
+.phead p{font-size:13px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.scope{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label{font-size:12px;font-weight:600;color:var(--fg2)}
+.sel,.inp{min-height:40px;min-width:120px;border:1px solid var(--border);border-radius:8px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--fg);background:var(--bg);font-size:13px}
+.inp{color:var(--fg3);justify-content:flex-start}
+.sel::after{content:"▾";color:var(--fg3);font-size:11px}
+.scope-line{font-size:12.5px;color:var(--fg2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.body{padding:22px 28px 32px;display:flex;flex-direction:column;gap:24px}
+
+/* Komponen dasar */
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:8px;font:500 13px var(--body);border:1px solid var(--border);background:var(--elev);color:var(--fg);white-space:nowrap;cursor:default}
+.btn.primary{background:var(--inv-bg);color:var(--inv-fg);border-color:var(--inv-bg);font-weight:600}
+.btn.sm{min-height:32px;padding:0 10px;font-size:12px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--fg2)}
+.btn.on{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--elev)}
+.seg span{padding:0 12px;min-height:38px;display:flex;align-items:center;font-size:12.5px;color:var(--fg2);border-right:1px solid var(--border)}
+.seg span:last-child{border-right:0}
+.seg .on{background:var(--fg);color:var(--bg);font-weight:600}
+.muted{color:var(--fg3)} .fg2{color:var(--fg2)} .fg{color:var(--fg)}
+.num{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.box{border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.row{display:flex;align-items:center;gap:12px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.d-ok{background:var(--good)} .d-warn{background:var(--warn)} .d-bad{background:var(--bad)} .d-mute{background:var(--fg3)} .d-info{background:var(--info)}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg2);white-space:nowrap}
+.bar{height:6px;border-radius:999px;background:var(--sunken);overflow:hidden}
+.bar span{display:block;height:100%;border-radius:999px;background:var(--fg2)}
+.sh{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px;flex-wrap:wrap}
+.sec{display:flex;flex-direction:column;gap:10px;min-width:0}
+.cols{display:flex;gap:20px;align-items:stretch}
+.cols>*{min-width:0}
+ul.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--border)}
+.list li:last-child{border-bottom:0}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;font-weight:600;color:var(--fg3);background:var(--elev);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td{color:var(--fg2)}
+td.r,th.r{text-align:right}
+tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--surface) 55%,transparent)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.strip>div{padding:14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px;min-width:0}
+.strip>div:last-child{border-right:0}
+.strip .v{font:700 26px/1.1 var(--mono);letter-spacing:-.02em;color:var(--fg);font-variant-numeric:tabular-nums}
+.strip .l{font-size:12px;color:var(--fg2)}
+.strip .c{font-size:12px}
+svg text{font-family:var(--body)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border)}
+.tabs span{padding:9px 12px;font-size:12.5px;color:var(--fg2);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs .on{color:var(--fg);font-weight:600;border-bottom-color:var(--fg)}
+[hidden]{display:none!important}
+.atabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 12px;font-size:12.5px;color:var(--fg2);cursor:pointer;min-height:40px;white-space:nowrap}
+.atabs button:hover{color:var(--fg)}
+.atabs button[aria-selected="true"]{color:var(--fg);font-weight:600;border-bottom-color:var(--fg)}
+.atabs .cnt{font:600 11px var(--mono);color:var(--fg3);margin-left:4px}
+.note{border-top:1px solid var(--border);padding-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 24px}
+.note li{font-size:14px;color:var(--fg2);display:flex;gap:10px;list-style:none}
+.note b{font-family:var(--mono);font-size:12px;color:var(--sidak);min-width:18px;padding-top:2px}
+.note ul{margin:0;padding:0;display:contents}
+.changes{display:flex;flex-direction:column;gap:10px}
+
+/* Khusus layar */
+.param{display:grid;grid-template-columns:18px minmax(0,1fr) 44px 40px;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:12.5px}
+.param:last-child{border-bottom:0}
+.dir{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:12px;background:var(--elev);overflow:hidden}
+.dir>div{padding:14px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.dir>div:last-child{border-right:0}
+.dir h4{margin:0 0 6px;font:600 12px var(--body);color:var(--fg3)}
+.dir button{display:flex;flex-direction:column;padding:6px 0;background:none;border:0;text-align:left;cursor:pointer;color:var(--fg);font-weight:600;font-size:12.5px}
+.dir button span{font-weight:400;color:var(--fg3);font-size:12px}
+.dir button:hover{color:var(--sidak)}
+.hl{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.hl>div{padding:14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px;min-width:0}
+.hl>div:last-child{border-right:0}
+.comp{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--sunken)}
+.hbar{display:grid;grid-template-columns:minmax(0,1fr) 1.2fr 34px 38px;gap:10px;align-items:center;font-size:12.5px;padding:6px 0}
+.hbar .bar{height:8px}
+.agcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.agc{border:1px solid var(--border);border-radius:12px;background:var(--elev);padding:16px;display:flex;flex-direction:column;gap:12px;cursor:pointer}
+.agc:hover{border-color:var(--fg3)}
+.agc .who{display:flex;gap:12px;align-items:center}
+.av{width:40px;height:40px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font:700 14px var(--display);color:var(--fg2);flex:none}
+.agc dl{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0}
+.agc dt{font-size:11.5px;color:var(--fg3)}
+.agc dd{margin:0;font-size:12.5px;color:var(--fg)}
+.lanes{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.lane{border:1px solid var(--border);border-radius:12px;background:var(--elev);display:flex;flex-direction:column}
+.lane header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600;color:var(--fg)}
+.lane .it{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.lane .it:last-child{border-bottom:0}
+.heat{display:flex;flex-direction:column;gap:3px;overflow-x:auto}
+.heat .wk{display:grid;grid-template-columns:28px repeat(53,1fr);gap:3px;min-width:760px}
+.heat i{display:block;aspect-ratio:1;border-radius:2px;background:var(--heat0)}
+.heat i.x{background:transparent}
+.heat .dl{font-size:10.5px;color:var(--fg3);line-height:1}
+.heat .ml{display:grid;grid-template-columns:28px repeat(12,1fr);font-size:11px;color:var(--fg3);min-width:760px}
+.legend{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--fg3)}
+.legend i{width:12px;height:12px;border-radius:2px;display:block}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.facts>div{padding:12px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.facts>div:nth-child(4n){border-right:0}
+.facts>div:nth-last-child(-n+4){border-bottom:0}
+.facts .v{font:700 17px var(--mono);color:var(--fg)}
+.facts .l{font-size:12px;color:var(--fg2)}
+.tix{border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.tix header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.tix .f{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.3fr) 110px 70px;gap:14px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:12.5px;align-items:start}
+.tix .f:last-child{border-bottom:0}
+.form{border:1px solid var(--fg3);border-radius:12px;background:var(--elev);padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.form .full{grid-column:1/-1}
+.form .half{grid-column:span 2}
+.ta{min-height:64px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--fg3);background:var(--bg);font-size:13px}
+.nilai{display:flex;gap:6px;flex-wrap:wrap}
+.nilai span{min-height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg2);background:var(--bg)}
+.nilai .on{border-color:var(--fg);color:var(--fg);font-weight:600;box-shadow:inset 0 0 0 1px var(--fg)}
+.vers{border:1px solid var(--border);border-radius:12px;background:var(--elev);display:flex;flex-direction:column}
+.vers .v{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;cursor:default}
+.vers .v:last-child{border-bottom:0}
+.vers .v.on{background:var(--surface);box-shadow:inset 2px 0 0 var(--fg)}
+.ind{display:grid;grid-template-columns:minmax(0,1fr) 120px 80px 32px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.ind:last-child{border-bottom:0}
+.wgt{display:grid;grid-template-columns:150px 1fr 56px;gap:14px;align-items:center;font-size:12.5px;padding:6px 0}
+.slider{height:6px;border-radius:999px;background:var(--sunken);position:relative}
+.slider span{display:block;height:100%;border-radius:999px;background:var(--fg)}
+.slider i{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--elev);border:2px solid var(--fg);transform:translate(-50%,-50%)}
+.yr{display:flex;flex-direction:column;gap:6px}
+.pr{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:0 4px;border-bottom:1px solid var(--border)}
+.pr:last-child{border-bottom:0}
+.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;color:var(--fg3)}
+.shift{display:inline-flex;min-width:34px;justify-content:center;padding:1px 6px;border-radius:5px;font:600 11.5px var(--mono);border:1px solid var(--border);background:var(--surface);color:var(--fg)}
+.shift.off{color:var(--fg3);background:transparent;border-style:dashed}
+.grp-row td{background:var(--surface)!important;font-weight:600;color:var(--fg)}
+.month-matrix{overflow:auto;max-height:340px;border:1px solid var(--border);border-radius:12px;background:var(--elev)}
+.month-matrix table{font-size:11.5px}
+.month-matrix th,.month-matrix td{padding:6px 6px;text-align:center;white-space:nowrap}
+.month-matrix th:first-child,.month-matrix td:first-child{text-align:left;position:sticky;left:0;background:var(--elev);z-index:1;min-width:150px}
+.wrapcell{white-space:normal;min-width:220px}
+
+@media (max-width:720px){
+  .frame-hint{display:block}
+}
+.frame-hint{display:none;font-size:13px;color:var(--fg3)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <span class="eyebrow">Prototipe redesign · modul SIDAK</span>
+    <h1>Seluruh halaman SIDAK setelah redesign</h1>
+    <p>Klik menu di sidebar (atau tombol di bawah) untuk berpindah halaman. Tiap halaman memakai kepala halaman yang sama, dan cakupan Layanan · Tahun · Bulan · Tim ikut terbawa di alamatnya. Catatan "Yang berubah" ada di bawah bingkai. Semua nama dan angka adalah contoh.</p>
+    <p style="font-size:14px">Rencana: <code>plans/markdown/sidak-redesign.md</code> · ringkasan usulan ada di artifact "Redesign Modul SIDAK".</p>
+  </header>
+
+  <nav class="picker" id="picker" aria-label="Pilih halaman"></nav>
+  <p class="frame-hint">Di layar sempit, geser bingkai ke samping untuk melihat seluruh halaman.</p>
+
+  <div class="frame-wrap"><div class="frame">
+    <div class="chrome"><i></i><i></i><i></i><span class="url" id="url">/sidak</span><button type="button" class="thm" id="thm">Ganti tema</button></div>
+    <div class="app">
+      <nav class="sb" aria-label="Sidebar contoh">
+        <span class="brand">Trainers SuperApp</span>
+        <span class="other">Beranda</span>
+        <span class="grp">Latihan</span>
+        <span class="other">KETIK</span><span class="other">PDKT</span><span class="other">Telefun</span>
+        <span class="grp">Kualitas</span>
+        <span class="mod"><i></i>SIDAK</span>
+        <div id="sbnav" style="display:flex;flex-direction:column;gap:1px;padding-left:8px"></div>
+        <span class="grp">Data</span>
+        <span class="other">Monitoring</span><span class="other">Profiler</span>
+      </nav>
+      <main class="main" id="main">
+
+<!-- ============ BERANDA ============ -->
+<section class="screen" data-page="beranda">
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="t">SIDAK</span>
+        <span class="scope-line">Periode QA terbaru <b class="fg">Oktober 2026</b> · Call · Semua tim</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <button class="btn primary" data-go="input">Input temuan →</button>
+        <div class="acts"><button class="btn sm" data-go="laporan">Laporan</button><button class="btn sm" data-go="jadwal">Jadwal shifting</button><button class="btn sm" data-go="parameter">Kelola</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sec">
+      <div class="sh"><h3>Kondisi Oktober 2026</h3><span class="muted" style="font-size:12px">dibanding September</span></div>
+      <div class="strip">
+        <div><span class="v">93,4</span><span class="l">rata-rata skor agen</span><span class="c bad">↓ 1,2 poin · di bawah target 95</span></div>
+        <div><span class="v">48</span><span class="l">agen diaudit</span><span class="c muted">dari 52 agen aktif</span></div>
+        <div><span class="v">137</span><span class="l">temuan</span><span class="c bad">↑ 18 temuan</span></div>
+        <div><span class="v">96</span><span class="l">tiket bertemuan</span><span class="c ok">↓ 4 tiket</span></div>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="sec" style="flex:1.55">
+        <div class="sh"><h3>Perlu tindak lanjut</h3><button class="btn ghost sm" data-go="agen">Semua agen di bawah target (9)</button></div>
+        <ul class="list box">
+          <li><span class="dot d-bad"></span><span style="flex:1"><b class="fg">Rina Kartika</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 7 · 6 temuan, 2 kritikal · proyeksi memburuk</span></span><span style="text-align:right"><span class="num" style="font-size:15px">81,5</span><br><span class="bad" style="font-size:12px">↓ 6,3</span></span><button class="btn sm" data-go="detail">Buka</button></li>
+          <li><span class="dot d-bad"></span><span style="flex:1"><b class="fg">Dimas Prasetyo</b><br><span class="muted" style="font-size:12px">Tim Sari · Batch 5 · 5 temuan, 1 kritikal</span></span><span style="text-align:right"><span class="num" style="font-size:15px">84,0</span><br><span class="muted" style="font-size:12px">sama</span></span><button class="btn sm" data-go="detail">Buka</button></li>
+          <li><span class="dot d-warn"></span><span style="flex:1"><b class="fg">Ayu Lestari</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 8 · 3 temuan</span></span><span style="text-align:right"><span class="num" style="font-size:15px">89,2</span><br><span class="bad" style="font-size:12px">↓ 4,1</span></span><button class="btn sm" data-go="detail">Buka</button></li>
+          <li><span class="dot d-warn"></span><span style="flex:1"><b class="fg">Fikri Ramadhan</b><br><span class="muted" style="font-size:12px">Tim Sari · Batch 6 · 3 temuan</span></span><span style="text-align:right"><span class="num" style="font-size:15px">91,7</span><br><span class="ok" style="font-size:12px">↑ 2,0</span></span><button class="btn sm" data-go="detail">Buka</button></li>
+        </ul>
+      </div>
+      <div class="sec" style="flex:1">
+        <div class="sh"><h3>Parameter teratas</h3><button class="btn ghost sm" data-go="dashboard">Dashboard</button></div>
+        <div class="box">
+          <div class="param"><span class="muted mono">1</span><span class="fg">Informasi tidak lengkap ke konsumen</span><span class="num r" style="text-align:right">34</span><span class="muted" style="text-align:right">25%</span></div>
+          <div class="param"><span class="muted mono">2</span><span class="fg">Verifikasi data konsumen <span class="bad" style="font-size:11.5px">kritikal</span></span><span class="num" style="text-align:right">22</span><span class="muted" style="text-align:right">16%</span></div>
+          <div class="param"><span class="muted mono">3</span><span class="fg">Hold tanpa izin</span><span class="num" style="text-align:right">19</span><span class="muted" style="text-align:right">14%</span></div>
+          <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:12px" class="fg2">3 parameter ini mencakup 55% temuan Oktober.</div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <h3>Halaman SIDAK</h3>
+      <div class="dir">
+        <div><h4>Audit</h4><button data-go="input">Input temuan<span>Catat temuan per tiket atau impor Excel</span></button><button data-go="periode">Periode QA<span>Bulan audit yang dipakai semua halaman</span></button><button data-go="parameter">Parameter QA<span>Versi aturan dan bobot per layanan</span></button></div>
+        <div><h4>Analisis</h4><button data-go="dashboard">Dashboard<span>Tren, Pareto, pola mingguan</span></button><button data-go="ranking">Ranking<span>Agen dengan temuan terbanyak</span></button><button data-go="heatmap">Heatmap<span>Temuan per tanggal sepanjang tahun</span></button><button data-go="forecast">Forecast<span>Arah temuan 1–6 bulan ke depan</span></button></div>
+        <div><h4>Agen</h4><button data-go="agen">Daftar agen<span>Cari agen, buka skor dan temuannya</span></button></div>
+        <div><h4>Laporan</h4><button data-go="laporan">Laporan data<span>Tabel temuan dan unduh Excel</span></button><button data-go="jadwal">Jadwal shifting<span>Jadwal harian dari WFM, hanya-baca</span></button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section class="screen" data-page="dashboard" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK</span><span class="t">Dashboard</span><p>Tren temuan, parameter penyumbang terbesar, dan pola mingguan untuk cakupan ini.</p></div>
+      <div class="acts"><span class="btn sm">Perbarui data</span></div>
+    </div>
+    <div class="scope" data-scope></div>
+  </div>
+  <div class="body">
+    <div class="strip">
+      <div><span class="l">Rata-rata skor agen</span><span class="v">93,4</span><span class="c bad">↓ 1,2 poin dari Sep</span><svg viewBox="0 0 120 26" width="100%" height="26" aria-hidden="true" data-spark="95.1,94.8,95.6,95.0,94.2,94.6,94.6,93.4"></svg></div>
+      <div><span class="l">Temuan</span><span class="v">137</span><span class="c bad">↑ 15% dari Sep</span><svg viewBox="0 0 120 26" width="100%" height="26" aria-hidden="true" data-spark="96,104,88,110,121,115,119,137"></svg></div>
+      <div><span class="l">Tiket bertemuan</span><span class="v">96</span><span class="c ok">↓ 4% dari Sep</span><svg viewBox="0 0 120 26" width="100%" height="26" aria-hidden="true" data-spark="80,84,77,90,95,98,100,96"></svg></div>
+      <div><span class="l">Temuan kritikal</span><span class="v">31</span><span class="c muted">23% dari temuan berkategori</span><svg viewBox="0 0 120 26" width="100%" height="26" aria-hidden="true" data-spark="22,25,19,24,27,26,28,31"></svg></div>
+    </div>
+    <div class="sec">
+      <h3>Ringkasan temuan</h3>
+      <div class="hl">
+        <div><span class="muted" style="font-size:12px">Periode terbaru · Oktober</span><span class="fg"><b class="num" style="font-size:20px">137</b> temuan, naik 18 dari September.</span><span class="fg2" style="font-size:12px">Perubahan jumlah, bukan tingkat temuan.</span></div>
+        <div><span class="muted" style="font-size:12px">Porsi kritikal</span><span class="fg"><b class="num" style="font-size:20px">23%</b> · 31 dari 133 temuan berkategori</span><div class="comp"><span style="width:23%;background:var(--bad)"></span><span style="width:77%;background:var(--fg3)"></span></div><span class="fg2" style="font-size:12px"><span class="dot d-bad"></span> Kritikal 31 · <span class="dot d-mute"></span> Non-kritikal 102</span></div>
+        <div><span class="muted" style="font-size:12px">Perkiraan temuan · 3 bulan</span><span class="fg"><b class="bad">Naik</b> sekitar <b class="num">+11%</b> per bulan</span><span class="fg2" style="font-size:12px">Kepercayaan sedang · 10 titik data</span><div class="row" style="gap:6px"><span class="btn sm">Perbarui proyeksi</span><button class="btn ghost sm" data-go="forecast">Forecast →</button></div></div>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="sec box" style="flex:1.6;padding:16px">
+        <div class="sh"><h3>Tren temuan</h3><div class="acts"><span class="btn sm on">Total temuan</span><span class="btn sm">Verifikasi data</span><span class="btn sm">Hold tanpa izin</span><span class="btn sm">Garis proyeksi ✓</span></div></div>
+        <svg id="trend" viewBox="0 0 620 230" width="100%" aria-label="Grafik tren temuan Januari sampai Oktober dengan proyeksi tiga bulan"></svg>
+      </div>
+      <div class="sec box" style="flex:1;padding:16px">
+        <div class="sh"><h3>Top 5 agen</h3><button class="btn ghost sm" data-go="ranking">Ranking →</button></div>
+        <table>
+          <thead><tr><th>Agen</th><th class="r">Temuan</th><th class="r">Skor</th></tr></thead>
+          <tbody>
+            <tr><td><b class="fg">Rina Kartika</b><br><span class="muted">Tim Andi · <span class="bad">kritikal</span></span></td><td class="r num">11</td><td class="r num bad">81,5</td></tr>
+            <tr><td><b class="fg">Dimas Prasetyo</b><br><span class="muted">Tim Sari · <span class="bad">kritikal</span></span></td><td class="r num">9</td><td class="r num bad">84,0</td></tr>
+            <tr><td><b class="fg">Bayu Saputra</b><br><span class="muted">Tim Sari</span></td><td class="r num">8</td><td class="r num warn">88,5</td></tr>
+            <tr><td><b class="fg">Ayu Lestari</b><br><span class="muted">Tim Andi</span></td><td class="r num">7</td><td class="r num warn">89,2</td></tr>
+            <tr><td><b class="fg">Nadia Putri</b><br><span class="muted">Tim Sari</span></td><td class="r num">6</td><td class="r num warn">91,3</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="cols">
+      <div class="sec box" style="flex:1.2;padding:16px">
+        <div class="sh"><h3>Parameter teratas</h3><span class="muted" style="font-size:12px">5 parameter = 80% temuan</span></div>
+        <div>
+          <div class="hbar"><span class="fg">Informasi tidak lengkap ke konsumen</span><div class="bar"><span style="width:100%"></span></div><span class="num" style="text-align:right">34</span><span class="muted" style="text-align:right">25%</span></div>
+          <div class="hbar"><span class="fg">Verifikasi data konsumen</span><div class="bar"><span style="width:65%;background:var(--bad)"></span></div><span class="num" style="text-align:right">22</span><span class="muted" style="text-align:right">16%</span></div>
+          <div class="hbar"><span class="fg">Hold tanpa izin</span><div class="bar"><span style="width:56%"></span></div><span class="num" style="text-align:right">19</span><span class="muted" style="text-align:right">14%</span></div>
+          <div class="hbar"><span class="fg">Salam penutup tidak sesuai</span><div class="bar"><span style="width:47%"></span></div><span class="num" style="text-align:right">16</span><span class="muted" style="text-align:right">12%</span></div>
+          <div class="hbar"><span class="fg">Janji tindak lanjut tanpa waktu</span><div class="bar"><span style="width:38%"></span></div><span class="num" style="text-align:right">13</span><span class="muted" style="text-align:right">9%</span></div>
+        </div>
+        <span class="fg2" style="font-size:12px">Merah = parameter kritikal.</span>
+      </div>
+      <div class="sec box" style="flex:1;padding:16px">
+        <div class="sh"><h3>Pola temuan mingguan</h3><button class="btn ghost sm" data-go="heatmap">Kalender lengkap →</button></div>
+        <svg id="week" viewBox="0 0 400 180" width="100%" aria-label="Jumlah temuan per hari dalam seminggu"></svg>
+        <span class="fg2" style="font-size:12px">Hari tersibuk Senin · 214 hari dengan temuan · rata-rata 5,3 per hari aktif · akhir pekan 9%. Volume, bukan tingkat temuan.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FORECAST ============ -->
+<section class="screen" data-page="forecast" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK</span><span class="t">Forecast</span><p>Arah temuan layanan dan agen berdasarkan tren bulan-bulan sebelumnya.</p></div>
+      <div class="acts"><span class="btn sm">Perbarui</span></div>
+    </div>
+    <div class="scope"><span data-scope-inline></span><div class="fld"><label>Periode proyeksi</label><span class="sel" style="min-width:110px">3 bulan</span></div></div>
+  </div>
+  <div class="body">
+    <div class="sec box" style="padding:16px">
+      <div class="sh"><h3>Tren layanan</h3><span class="st"><span class="dot d-bad"></span><b class="fg">Memburuk</b> · temuan diproyeksikan naik ±11% per bulan</span></div>
+      <span class="fg2" style="font-size:12px">Regresi linear · 10 titik data · Januari–Oktober 2026. Data cukup untuk proyeksi 3 bulan.</span>
+      <div class="acts"><span class="btn sm on">Total temuan</span><span class="btn sm on">Verifikasi data</span><span class="btn sm">Hold tanpa izin</span><span class="btn sm">Informasi tidak lengkap</span><span class="muted" style="font-size:12px">maks. 2 seri</span></div>
+      <svg id="fc" viewBox="0 0 900 220" width="100%" aria-label="Grafik tren dan proyeksi temuan"></svg>
+      <div class="row" style="gap:10px;align-items:flex-start;border-top:1px solid var(--border);padding-top:12px"><span class="dot d-warn" style="margin-top:7px"></span><p style="font-size:13px"><b class="fg">Yang perlu dilakukan:</b> kenaikan didorong "Verifikasi data konsumen" di Tim Andi. Jadwalkan penyegaran prosedur verifikasi sebelum November.</p></div>
+    </div>
+    <div class="sec">
+      <div class="sh"><h3>Prioritas agen</h3><span class="muted" style="font-size:12px">46 agen siap diproyeksikan · periode 3 bulan</span></div>
+      <div class="lanes">
+        <div class="lane"><header><span class="st" style="font-size:13px"><span class="dot d-bad"></span><b class="fg">Memburuk</b></span><span class="num">7</span></header>
+          <div class="it"><b class="fg">Rina Kartika</b><span class="fg2" style="font-size:12px">81,5 → <b class="bad">76,0</b> · Tim Andi</span></div>
+          <div class="it"><b class="fg">Ayu Lestari</b><span class="fg2" style="font-size:12px">89,2 → <b class="bad">85,4</b> · Tim Andi</span></div>
+          <div class="it"><b class="fg">Gilang Pratama</b><span class="fg2" style="font-size:12px">92,0 → <b class="bad">89,1</b> · Tim Sari</span></div></div>
+        <div class="lane"><header><span class="st" style="font-size:13px"><span class="dot d-ok"></span><b class="fg">Membaik</b></span><span class="num">12</span></header>
+          <div class="it"><b class="fg">Fikri Ramadhan</b><span class="fg2" style="font-size:12px">91,7 → <b class="ok">95,2</b> · Tim Sari</span></div>
+          <div class="it"><b class="fg">Sinta Maharani</b><span class="fg2" style="font-size:12px">93,0 → <b class="ok">96,1</b> · Tim Andi</span></div>
+          <div class="it"><b class="fg">Yoga Aditya</b><span class="fg2" style="font-size:12px">90,4 → <b class="ok">93,0</b> · Tim Sari</span></div></div>
+        <div class="lane"><header><span class="st" style="font-size:13px"><span class="dot d-mute"></span><b class="fg">Stabil/stagnan</b></span><span class="num">21</span></header>
+          <div class="it"><b class="fg">Bayu Saputra</b><span class="fg2" style="font-size:12px">88,5 → 88,7 · Tim Sari</span></div>
+          <div class="it"><b class="fg">Nadia Putri</b><span class="fg2" style="font-size:12px">91,3 → 91,0 · Tim Sari</span></div>
+          <div class="it"><b class="fg">Hana Wulandari</b><span class="fg2" style="font-size:12px">97,5 → 97,6 · Tim Andi</span></div></div>
+        <div class="lane"><header><span class="st" style="font-size:13px"><span class="dot d-info"></span><b class="fg">Pantauan</b></span><span class="num">6</span></header>
+          <div class="it"><b class="fg">Dimas Prasetyo</b><span class="fg2" style="font-size:12px">Baru 2 bulan data · Tim Sari</span></div>
+          <div class="it"><b class="fg">Laras Ayuningtyas</b><span class="fg2" style="font-size:12px">Baru 1 bulan data · Tim Andi</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AGEN ============ -->
+<section class="screen" data-page="agen" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK</span><span class="t">Agen</span><p>Cari agen, lalu buka skor, temuan, dan bahan coaching-nya.</p></div>
+    </div>
+    <div class="scope">
+      <div class="fld" style="flex:1;min-width:260px"><label>Cari</label><span class="inp">Cari nama, tim, atau batch…</span></div>
+      <div class="fld"><label>Batch</label><span class="sel">Semua batch</span></div>
+      <div class="fld"><label>Status</label><span class="sel">Semua status</span></div>
+      <span class="btn" style="margin-bottom:0">Sertakan agen tambahan</span>
+    </div>
+    <span class="scope-line">Skor dan status mengikuti cakupan <b class="fg">Call · 2026 · Oktober</b>.</span>
+  </div>
+  <div class="body">
+    <div class="sh"><span class="fg2">52 agen · 9 di bawah target</span><div class="seg"><span class="on">Skor terendah dulu</span><span>Nama A–Z</span></div></div>
+    <div class="agcards" id="agcards"></div>
+    <span class="btn" style="align-self:center">Muat 24 agen lagi</span>
+  </div>
+</section>
+
+<!-- ============ DETAIL AGEN ============ -->
+<section class="screen" data-page="detail" hidden>
+  <div style="display:flex;min-height:0;flex:1">
+    <aside style="width:250px;flex:none;border-right:1px solid var(--border);padding:20px;display:flex;flex-direction:column;gap:12px;background:var(--elev)">
+      <span class="crumb muted" style="font-size:12px">SIDAK / Agen</span>
+      <div style="width:120px;height:120px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font:700 34px var(--display);color:var(--fg2)">RK</div>
+      <div><b class="fg" style="font:700 19px var(--display);letter-spacing:-.02em">Rina Kartika</b><br><span class="muted" style="font-size:12px">Tim Andi · Batch 7 · Agen Call · 1 th 4 bln</span></div>
+      <div class="acts"><button class="btn sm primary" data-go="input">Input audit</button><span class="btn sm">Unduh laporan ▾</span></div>
+      <span class="btn sm" style="justify-content:space-between">Ganti agen <span class="muted">▾</span></span>
+      <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:12px">
+        <span class="row" style="justify-content:space-between"><span class="fg2">Skor Oktober</span><span class="num bad">81,5</span></span>
+        <span class="row" style="justify-content:space-between"><span class="fg2">Peringkat tim gabungan</span><span class="num">1 / 52</span></span>
+        <span class="row" style="justify-content:space-between"><span class="fg2">Peringkat Tim Andi</span><span class="num">1 / 14</span></span>
+        <span class="row" style="justify-content:space-between"><span class="fg2">Forecast 3 bulan</span><span class="st"><span class="dot d-bad"></span>Memburuk</span></span>
+      </div>
+      <span class="muted" style="font-size:12px">Peringkat 1 = temuan terbanyak.</span>
+    </aside>
+    <div style="flex:1;min-width:0;padding:20px 28px 32px;display:flex;flex-direction:column;gap:20px">
+      <div class="tabs atabs" role="tablist" aria-label="Bagian detail agen"><button type="button" role="tab" data-tab="ringkasan" aria-selected="true">Ringkasan</button><button type="button" role="tab" data-tab="tren" aria-selected="false">Tren</button><button type="button" role="tab" data-tab="temuan" aria-selected="false">Temuan <span class="cnt">6</span></button><button type="button" role="tab" data-tab="heatmap" aria-selected="false">Heatmap</button><button type="button" role="tab" data-tab="simulasi" aria-selected="false">Simulasi <span class="cnt">4</span></button></div>
+      <div class="scope" id="agscope"><div class="fld"><label>Tahun</label><span class="sel" style="min-width:90px">2026</span></div><div class="fld"><label>Layanan</label><span class="sel">Call</span></div><div class="fld" data-only="tren"><label>Bulan</label><span class="sel" style="min-width:170px">Januari – Oktober</span></div><div class="fld" data-only="temuan"><label>Bulan</label><span class="sel" style="min-width:140px">Semua bulan</span></div><div class="fld" data-only="temuan" style="min-width:220px"><label>Cari</label><span class="inp">No. tiket atau parameter</span></div></div>
+      <p class="scope-line" id="simnote" hidden><span class="dot d-mute"></span>Riwayat simulasi tidak mengikuti tahun dan layanan audit; semua sesi milik agen ini ditampilkan.</p>
+      <div data-panel="ringkasan" style="display:flex;flex-direction:column;gap:20px">
+      <div class="sec">
+        <div class="sh"><h3>Bahan coaching · Oktober 2026</h3><span class="btn sm">Salin ringkasan</span></div>
+        <div class="hl" style="grid-template-columns:200px 1fr 1fr">
+          <div><span class="muted" style="font-size:12px">Skor Oktober</span><span style="font:800 40px/1 var(--mono);letter-spacing:-.04em;color:var(--fg)">81,5</span><span class="st"><span class="dot d-bad"></span><span class="fg">Perlu perhatian</span></span><span class="fg2" style="font-size:12px">Turun 6,3 poin dari September.</span></div>
+          <div><span class="muted" style="font-size:12px">Yang paling sering muncul</span><b class="fg">Verifikasi data konsumen</b><span class="fg2" style="font-size:12.5px">3 dari 6 temuan bulan ini, juga di Agustus dan September. Pola utama: nomor identitas tidak dikonfirmasi sebelum menyebut status pengaduan.</span></div>
+          <div><span class="muted" style="font-size:12px">Tiket pengurang terbesar</span>
+            <span class="row" style="justify-content:space-between;font-size:12.5px"><span class="mono">#OJK-2610-0418</span><span class="num bad">−7,5</span></span>
+            <span class="row" style="justify-content:space-between;font-size:12.5px"><span class="mono">#OJK-2610-0233</span><span class="num bad">−5,0</span></span>
+            <span class="row" style="justify-content:space-between;font-size:12.5px"><span class="mono">#OJK-2610-0107</span><span class="num bad">−3,0</span></span>
+            <a href="#" data-tab-go="temuan" style="font-size:12px">Buka di tab Temuan</a></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sh"><h3>Skor per bulan</h3><span class="muted" style="font-size:12px">klik batang untuk memilih bulan · garis putus-putus = target 95</span></div>
+        <svg id="months" viewBox="0 0 760 190" width="100%" aria-label="Skor bulanan Januari sampai Desember"></svg>
+      </div>
+      <div class="cols">
+        <div class="sec" style="flex:1"><h3>Sesi Oktober</h3>
+          <div class="facts" style="grid-template-columns:repeat(3,1fr)">
+            <div style="border-bottom:0"><span class="v">10</span><span class="l">sesi diaudit</span></div><div style="border-bottom:0"><span class="v">6</span><span class="l">temuan</span></div><div style="border-bottom:0;border-right:0"><span class="v bad">−13,5</span><span class="l">selisih dari target</span></div>
+          </div></div>
+        <div class="sec" style="flex:1.3"><h3>Dibanding rata-rata</h3>
+          <table class="box" style="border-radius:12px;overflow:hidden">
+            <thead><tr><th>Parameter</th><th class="r">Rina</th><th class="r">Tim Andi</th><th class="r">Layanan</th></tr></thead>
+            <tbody><tr><td class="fg">Verifikasi data konsumen</td><td class="r num">7</td><td class="r mono">2,1</td><td class="r mono">1,6</td></tr><tr><td class="fg">Informasi tidak lengkap</td><td class="r num">5</td><td class="r mono">3,4</td><td class="r mono">2,9</td></tr></tbody>
+          </table></div>
+      </div>
+      </div>
+
+      <!-- TAB TREN -->
+      <div data-panel="tren" hidden style="display:flex;flex-direction:column;gap:20px">
+        <div class="sec box" style="padding:16px">
+          <div class="sh"><div><h3>Tren temuan per bulan</h3><span class="fg2" style="font-size:12px">10 bulan berdata. Pilih satu parameter untuk melihat porsinya di total.</span></div></div>
+          <div class="acts" role="group" aria-label="Filter seri grafik"><span class="btn sm on">Total + parameter</span><span class="btn sm">Total saja</span><span class="btn sm">Verifikasi data konsumen</span><span class="btn sm">Informasi tidak lengkap</span><span class="btn sm">Hold tanpa izin</span></div>
+          <svg id="agtrend" viewBox="0 0 860 220" width="100%" aria-label="Grafik temuan Rina per bulan"></svg>
+          <div class="row" style="gap:16px;flex-wrap:wrap;font-size:12px"><span class="st"><span class="dot" style="background:var(--fg)"></span>Total temuan</span><span class="st"><span class="dot d-bad"></span>Verifikasi data konsumen</span><span class="st"><span class="dot d-info"></span>Informasi tidak lengkap</span></div>
+        </div>
+        <div class="sec">
+          <div class="sh"><h3>Temuan per parameter</h3><span class="muted" style="font-size:12px">tabel yang sama dipakai di laporan unduhan</span></div>
+          <div class="box" style="overflow:auto">
+            <table>
+              <thead><tr><th>Parameter</th><th class="r">Jun</th><th class="r">Jul</th><th class="r">Agu</th><th class="r">Sep</th><th class="r">Okt</th><th class="r">Total</th><th>Arah</th></tr></thead>
+              <tbody>
+                <tr><td class="fg">Verifikasi data konsumen <span class="bad" style="font-size:11.5px">kritikal</span></td><td class="r mono">0</td><td class="r mono">1</td><td class="r mono">1</td><td class="r mono">2</td><td class="r num">3</td><td class="r num">7</td><td class="bad">Naik 3 bulan berturut-turut</td></tr>
+                <tr><td class="fg">Informasi tidak lengkap ke konsumen</td><td class="r mono">1</td><td class="r mono">1</td><td class="r mono">2</td><td class="r mono">0</td><td class="r num">1</td><td class="r num">5</td><td class="muted">Naik turun</td></tr>
+                <tr><td class="fg">Hold tanpa izin</td><td class="r mono">0</td><td class="r mono">0</td><td class="r mono">1</td><td class="r mono">1</td><td class="r num">1</td><td class="r num">3</td><td class="muted">Stabil</td></tr>
+                <tr><td class="fg">Salam penutup tidak sesuai</td><td class="r mono">1</td><td class="r mono">0</td><td class="r mono">0</td><td class="r mono">0</td><td class="r num">1</td><td class="r num">2</td><td class="muted">Muncul lagi</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB TEMUAN -->
+      <div data-panel="temuan" hidden style="display:flex;flex-direction:column;gap:16px">
+        <div class="sh"><span class="fg2"><b class="num">6</b> temuan di <b class="num">3</b> tiket · Oktober 2026 · Call</span><div class="acts"><button class="btn sm" data-go="input">Tambah temuan</button></div></div>
+        <div class="sec">
+          <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:8px"><h3>Oktober 2026</h3><span class="fg2" style="font-size:12px">skor <b class="num bad">81,5</b> · 10 sesi · ▾</span></div>
+          <div class="tix" style="box-shadow:0 0 0 2px var(--fg)">
+            <header><span><b class="fg mono">#OJK-2610-0418</b> <span class="muted" style="font-size:12px">· layanan 6 Okt · sampel 8 Okt · 2 temuan</span></span><span class="row" style="gap:10px"><span class="muted" style="font-size:12px">dibuka dari Bahan coaching</span><span class="num bad">−7,5</span></span></header>
+            <div class="f"><span class="fg">Verifikasi data konsumen</span><span>Menyebut status pengaduan sebelum mencocokkan NIK.</span><span>Cocokkan nama dan 4 digit akhir NIK sebelum memberi informasi.</span><span class="st"><span class="dot d-bad"></span>Kritis</span><span class="row" style="gap:0"><span class="icon-btn" aria-label="Ubah temuan">✎</span><span class="icon-btn" aria-label="Hapus temuan">🗑</span></span></div>
+            <div class="f"><span class="fg">Hold tanpa izin</span><span>Hold 90 detik tanpa meminta izin.</span><span>Minta izin dan sebutkan perkiraan lama hold.</span><span class="st"><span class="dot d-warn"></span>Tidak sesuai</span><span class="row" style="gap:0"><span class="icon-btn" aria-label="Ubah temuan">✎</span><span class="icon-btn" aria-label="Hapus temuan">🗑</span></span></div>
+          </div>
+          <div class="tix">
+            <header><span><b class="fg mono">#OJK-2610-0233</b> <span class="muted" style="font-size:12px">· layanan 9 Okt · 2 temuan</span></span><span class="num bad">−5,0</span></header>
+            <div class="f"><span class="fg">Verifikasi data konsumen</span><span>Tidak menanyakan nomor pengaduan sebelumnya.</span><span>Tanyakan nomor pengaduan untuk menghindari data ganda.</span><span class="st"><span class="dot d-warn"></span>Tidak sesuai</span><span class="row" style="gap:0"><span class="icon-btn" aria-label="Ubah temuan">✎</span><span class="icon-btn" aria-label="Hapus temuan">🗑</span></span></div>
+            <div class="f"><span class="fg">Informasi tidak lengkap ke konsumen</span><span>Tidak menjelaskan batas waktu tanggapan PUJK.</span><span>Sampaikan PUJK wajib menanggapi paling lama 10 hari kerja.</span><span class="st"><span class="dot d-info"></span>Perbaikan</span><span class="row" style="gap:0"><span class="icon-btn" aria-label="Ubah temuan">✎</span><span class="icon-btn" aria-label="Hapus temuan">🗑</span></span></div>
+          </div>
+          <div class="tix"><header><span><b class="fg mono">#OJK-2610-0107</b> <span class="muted" style="font-size:12px">· layanan 13 Okt · 2 temuan</span></span><span class="row" style="gap:10px"><span class="num bad">−3,0</span><span class="muted">▸</span></span></header></div>
+        </div>
+        <div class="sec">
+          <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:8px"><h3>September 2026</h3><span class="fg2" style="font-size:12px">skor <b class="num warn">87,8</b> · 10 sesi · ▸</span></div>
+          <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:8px"><h3>Agustus 2026</h3><span class="fg2" style="font-size:12px">skor <b class="num warn">90,1</b> · 10 sesi · ▸</span></div>
+          <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:8px"><h3>Mei 2026</h3><span class="fg2" style="font-size:12px">skor <b class="num ok">99,0</b> · 5 sesi tanpa temuan · ▸</span></div>
+        </div>
+        <span class="fg2" style="font-size:12px">Hapus temuan selalu lewat dialog konfirmasi dan skor bulan itu dihitung ulang.</span>
+      </div>
+
+      <!-- TAB HEATMAP -->
+      <div data-panel="heatmap" hidden style="display:flex;flex-direction:column;gap:16px">
+        <p style="font-size:13px">Jumlah temuan agen ini per tanggal layanan, untuk tahun dan layanan terpilih.</p>
+        <div class="cols">
+          <div class="sec box" style="flex:1.7;padding:16px">
+            <div class="sh"><h3>Kalender 2026</h3><span class="legend">Sedikit <i style="background:var(--heat0)"></i><i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i> Banyak</span></div>
+            <div class="heat" id="agheat" aria-label="Kalender temuan agen per hari"></div>
+          </div>
+          <div class="sec" style="flex:1">
+            <div class="box" style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <span class="muted" style="font-size:12px">Tanggal dipilih</span>
+              <b class="fg" style="font:700 17px var(--display)">Senin, 6 Oktober 2026</b>
+              <span class="fg2"><b class="num">2</b> temuan · tiket <span class="mono">#OJK-2610-0418</span></span>
+              <a href="#" data-tab-go="temuan" style="font-size:12px">Buka di tab Temuan</a>
+            </div>
+            <div class="facts" style="grid-template-columns:1fr 1fr">
+              <div><span class="l">Hari dengan temuan</span><span class="v">17</span></div>
+              <div style="border-right:0"><span class="l">Tanggal terbanyak</span><span class="v">6 Okt</span></div>
+              <div style="border-bottom:0"><span class="l">Hari terbanyak</span><span class="v">Senin</span></div>
+              <div style="border-right:0;border-bottom:0"><span class="l">Temuan tanpa tanggal</span><span class="v">1</span></div>
+            </div>
+            <span class="muted" style="font-size:12px">Temuan tanpa tanggal dihitung dari semua tahun dan tidak tampil di kalender.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB SIMULASI -->
+      <div data-panel="simulasi" hidden style="display:flex;flex-direction:column;gap:16px">
+        <div class="sh"><div><h3>Riwayat simulasi</h3><span class="fg2" style="font-size:12px">Sesi KETIK, PDKT, dan Telefun milik agen ini.</span></div><div class="seg" role="group" aria-label="Filter modul riwayat simulasi"><span class="on">Semua</span><span>KETIK</span><span>PDKT</span><span>Telefun</span></div></div>
+        <div class="box" style="overflow:hidden">
+          <table>
+            <thead><tr><th>Modul</th><th>Skenario</th><th>Tanggal</th><th>Telaah</th><th class="r">Skor</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><span class="st"><span class="dot" style="background:var(--ketik)"></span>KETIK</span></td><td class="fg">Pinjol Ilegal</td><td>14 Okt, 09.12</td><td><span class="st"><span class="dot d-ok"></span>Selesai</span></td><td class="r num">82</td><td class="r"><span class="btn sm">Lihat telaah</span></td></tr>
+              <tr><td><span class="st"><span class="dot" style="background:var(--telefun)"></span>Telefun</span></td><td class="fg">Klaim Asuransi Ditolak</td><td>10 Okt, 14.30</td><td><span class="st"><span class="dot d-ok"></span>Selesai</span></td><td class="r num">7,4</td><td class="r"><span class="btn sm">Lihat telaah</span></td></tr>
+              <tr><td><span class="st"><span class="dot" style="background:var(--pdkt)"></span>PDKT</span></td><td class="fg">Pengecekan SLIK</td><td>2 Okt, 10.05</td><td><span class="st"><span class="dot d-warn"></span>Belum ditelaah</span></td><td class="r muted">—</td><td class="r"><span class="btn sm">Lihat sesi</span></td></tr>
+              <tr><td><span class="st"><span class="dot" style="background:var(--ketik)"></span>KETIK</span></td><td class="fg">Investasi Bodong</td><td>24 Sep, 16.40</td><td><span class="st"><span class="dot d-bad"></span>Gagal</span></td><td class="r muted">—</td><td class="r"><span class="btn sm">Lihat sesi</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <span class="fg2" style="font-size:12px">"Lihat telaah" membuka telaah yang sama dengan Monitoring dan tidak menjalankan AI. Skala skor mengikuti modulnya (KETIK/PDKT 0–100, Telefun 0–10).</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RANKING ============ -->
+<section class="screen" data-page="ranking" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK</span><span class="t">Ranking</span><p>Agen dengan temuan terbanyak ada di peringkat 1.</p></div>
+      <div class="acts"><span class="btn sm">Unduh Excel</span><span class="btn sm">Perbarui data</span></div>
+    </div>
+    <div class="scope" data-scope></div>
+  </div>
+  <div class="body">
+    <div class="sh"><div class="seg"><span class="on">Tim gabungan</span><span>Per tim leader</span></div><span class="muted" style="font-size:12px">52 agen · jumlah temuan sama berbagi peringkat</span></div>
+    <div class="box" style="overflow:hidden">
+      <table>
+        <thead><tr><th style="width:70px">Rank</th><th>Agen</th><th>Tim · Batch</th><th class="r">Temuan ↓</th><th class="r">Kritikal</th><th class="r">Skor</th><th>Perubahan posisi</th></tr></thead>
+        <tbody id="rankrows"></tbody>
+      </table>
+    </div>
+    <span class="fg2" style="font-size:12px">Naik peringkat berarti temuan bertambah dibanding periode sebelumnya, jadi ditandai merah.</span>
+  </div>
+</section>
+
+<!-- ============ HEATMAP ============ -->
+<section class="screen" data-page="heatmap" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK</span><span class="t">Heatmap</span><p>Jumlah temuan ketidaksesuaian per tanggal sepanjang tahun.</p></div>
+    </div>
+    <div class="scope">
+      <div class="fld"><label>Tanggal yang dibaca</label><div class="seg"><span class="on">Agent · tanggal layanan</span><span>QA · tanggal sampel</span></div></div>
+      <div class="fld"><label>Layanan</label><span class="sel">Call</span></div>
+      <div class="fld"><label>Tahun</label><span class="sel" style="min-width:90px">2026</span></div>
+      <div class="fld"><label>Hitung per</label><span class="sel">Parameter</span></div>
+    </div>
+    <span class="scope-line"><span class="dot d-mute"></span>Heatmap memakai tahun dan layanan saja. Pilihan bulan dan tim tetap tersimpan untuk halaman lain.</span>
+  </div>
+  <div class="body">
+    <div class="sec box" style="padding:16px">
+      <div class="sh"><h3>Kalender 2026</h3><span class="legend">Sedikit <i style="background:var(--heat0)"></i><i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i><i style="background:var(--heat4)"></i> Banyak</span></div>
+      <div class="heat" id="heat" aria-label="Kalender temuan per hari"></div>
+      <span class="muted" style="font-size:12px">Kotak kosong 0 temuan · 1–2 · 3–4 · 5–7 · 8 ke atas (kuartil hari bertemuan tahun ini).</span>
+    </div>
+    <div class="sec">
+      <h3>Pola temuan ketidaksesuaian</h3>
+      <p style="font-size:14px">Tahun 2026 mencatat <b class="fg">1.142 temuan</b> pada <b class="fg">214 hari</b>. Puncaknya <b class="fg">Senin, 6 Oktober</b> (14 temuan). Hari Senin dan bulan Oktober paling banyak temuannya. Angka ini volume temuan, bukan tingkat ketidaksesuaian; bandingkan dengan jumlah audit tiap periode.</p>
+      <div class="facts">
+        <div><span class="l">Tanggal terbanyak</span><span class="v">6 Okt</span><span class="muted" style="font-size:12px">14 temuan</span></div>
+        <div><span class="l">Tanggal paling sedikit</span><span class="v">3 Jan</span><span class="muted" style="font-size:12px">1 temuan</span></div>
+        <div><span class="l">Hari terbanyak</span><span class="v">Senin</span><span class="muted" style="font-size:12px">268 temuan</span></div>
+        <div><span class="l">Bulan terbanyak</span><span class="v">Oktober</span><span class="muted" style="font-size:12px">137 temuan</span></div>
+        <div><span class="l">Hari dengan temuan</span><span class="v">214</span><span class="muted" style="font-size:12px">dari 288 hari</span></div>
+        <div><span class="l">Rata-rata harian</span><span class="v">5,3</span><span class="muted" style="font-size:12px">per hari bertemuan</span></div>
+        <div><span class="l">Rentang</span><span class="v">1–14</span><span class="muted" style="font-size:12px">temuan per hari</span></div>
+        <div><span class="l">Temuan tanpa tanggal</span><span class="v">12</span><span class="muted" style="font-size:12px">semua tahun, tidak tampil</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INPUT TEMUAN ============ -->
+<section class="screen" data-page="input" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK · Audit</span><span class="t">Input temuan</span><p>Catat temuan per tiket untuk satu agen dan satu periode.</p></div>
+    </div>
+    <fieldset class="scope" style="border:0;margin:0;padding:0">
+      <legend style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Konteks audit</legend>
+      <div class="fld"><label>Folder</label><span class="sel" style="min-width:150px">Tim Andi</span></div>
+      <div class="fld" style="min-width:240px"><label>Agen</label><span class="sel">Rina Kartika · Batch 7</span></div>
+      <div class="fld"><label>Periode</label><span class="sel">Oktober 2026</span></div>
+      <div class="fld"><label>Layanan</label><span class="sel">Call</span></div>
+    </fieldset>
+  </div>
+  <div class="body">
+    <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:14px">
+      <div class="row" style="gap:20px;flex-wrap:wrap"><span><span class="muted" style="font-size:12px">Skor sesi</span> <b class="num" style="font-size:20px">81,5</b> <span class="st"><span class="dot d-bad"></span>Perlu perhatian · target 95</span></span><span class="fg2"><b class="num">6</b> temuan</span><span class="fg2"><b class="num">3</b> tiket</span></div>
+      <div class="acts"><span class="btn sm">Sesi tanpa temuan</span><span class="btn sm">Impor Excel</span><span class="btn sm primary">Tambah temuan</span></div>
+    </div>
+    <span class="fg2" style="font-size:12px">Kritikal 2 · Non-kritikal 4 · versi parameter Call berlaku: v4 (sejak Agustus 2026)</span>
+    <div class="form" aria-label="Formulir temuan baru">
+      <b class="fg full">Temuan baru</b>
+      <div class="fld"><label>No. tiket</label><span class="inp">Contoh: L202503001</span></div>
+      <div class="fld"><label>Tanggal layanan</label><span class="inp">dd/mm/yyyy</span></div>
+      <div class="fld"><label>Tanggal sampel (opsional)</label><span class="inp">dd/mm/yyyy</span></div>
+      <div class="fld"><label>Parameter</label><span class="sel">Verifikasi data konsumen</span></div>
+      <div class="fld full"><label>Nilai</label><div class="nilai"><span><i class="dot d-bad"></i>Kritis</span><span class="on"><i class="dot d-warn"></i>Tidak sesuai</span><span><i class="dot d-info"></i>Perbaikan</span><span><i class="dot d-ok"></i>Sesuai</span></div></div>
+      <div class="fld half"><label>Ketidaksesuaian</label><div class="ta">Apa yang dilakukan agen…</div></div>
+      <div class="fld half"><label>Sebaiknya</label><div class="ta">Apa yang seharusnya dilakukan…</div></div>
+      <div class="full row" style="justify-content:flex-end;gap:8px"><span class="btn sm">Batal</span><span class="btn sm primary">Simpan temuan</span></div>
+    </div>
+    <div class="row" role="status" style="gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--border);border-radius:10px;background:var(--good-soft);font-size:13px"><span class="dot d-ok"></span><span class="fg" style="flex:1">2 temuan untuk tiket <span class="mono">#OJK-2610-0418</span> tersimpan. Skor sesi Rina sekarang <b class="num">81,5</b>.</span><button class="btn sm" data-go="detail">Buka detail agen</button></div>
+    <div class="tix">
+      <header><span><b class="fg mono">#OJK-2610-0418</b> <span class="muted" style="font-size:12px">· 6 Okt 2026 · 2 temuan</span></span><span class="num bad">−7,5</span></header>
+      <div class="f"><span class="fg">Verifikasi data konsumen</span><span>Menyebut status pengaduan sebelum mencocokkan NIK.</span><span>Cocokkan nama dan 4 digit akhir NIK sebelum memberi informasi.</span><span class="st"><span class="dot d-bad"></span>Kritis</span><span class="row" style="gap:2px"><span class="btn ghost sm">Ubah</span></span></div>
+      <div class="f"><span class="fg">Hold tanpa izin</span><span>Hold 90 detik tanpa meminta izin.</span><span>Minta izin dan sebutkan perkiraan lama hold.</span><span class="st"><span class="dot d-warn"></span>Tidak sesuai</span><span class="row" style="gap:2px"><span class="btn ghost sm">Ubah</span></span></div>
+    </div>
+    <div class="tix">
+      <header><span><b class="fg mono">#OJK-2610-0233</b> <span class="muted" style="font-size:12px">· 9 Okt 2026 · 2 temuan</span></span><span class="num bad">−5,0</span></header>
+      <div class="f"><span class="fg">Informasi tidak lengkap ke konsumen</span><span>Tidak menjelaskan batas waktu tanggapan PUJK.</span><span>Sampaikan bahwa PUJK wajib menanggapi paling lama 10 hari kerja.</span><span class="st"><span class="dot d-warn"></span>Tidak sesuai</span><span class="btn ghost sm">Ubah</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAPORAN DATA ============ -->
+<section class="screen" data-page="laporan" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK · Laporan</span><span class="t">Laporan data</span><p>Temuan yang punya isi Temuan dan Rekomendasi, siap diunduh sebagai Excel.</p></div>
+      <div class="acts"><span class="btn sm">Unduh Excel (48 baris)</span></div>
+    </div>
+    <div class="scope">
+      <div class="fld"><label>Lingkup</label><div class="seg"><span class="on">Per layanan</span><span>Per individu</span></div></div>
+      <span data-scope-inline></span>
+      <div class="fld" style="min-width:220px"><label>Parameter</label><span class="sel">Semua parameter</span></div>
+      <span class="btn primary">Cari data</span>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sh"><span class="fg2">48 temuan · Call · Juli–Oktober 2026 · Semua tim</span><span class="inp" style="min-width:240px">Cari nomor tiket atau agen…</span></div>
+    <div class="box" style="overflow:auto;max-height:420px">
+      <table>
+        <thead><tr><th>Periode</th><th>Agen</th><th>No. tiket</th><th>Parameter</th><th class="wrapcell">Temuan</th><th class="wrapcell">Rekomendasi</th><th class="r">Skor</th></tr></thead>
+        <tbody>
+          <tr><td>Okt 2026</td><td class="fg">Rina Kartika</td><td class="mono fg">OJK-2610-0418</td><td>Verifikasi data konsumen</td><td class="wrapcell">Menyebut status pengaduan sebelum mencocokkan NIK konsumen.</td><td class="wrapcell">Cocokkan nama dan 4 digit akhir NIK sebelum memberi informasi apa pun.</td><td class="r num bad">81,5</td></tr>
+          <tr><td>Okt 2026</td><td class="fg">Dimas Prasetyo</td><td class="mono fg">OJK-2610-0377</td><td>Hold tanpa izin</td><td class="wrapcell">Hold 2 menit tanpa meminta izin dan tanpa kembali menyapa.</td><td class="wrapcell">Minta izin, sebutkan perkiraan lama, dan sapa kembali tiap 60 detik.</td><td class="r num bad">84,0</td></tr>
+          <tr><td>Sep 2026</td><td class="fg">Ayu Lestari</td><td class="mono fg">OJK-2609-1102</td><td>Informasi tidak lengkap ke konsumen</td><td class="wrapcell">Tidak menyebut kanal pengaduan lanjutan bila PUJK tidak merespons.</td><td class="wrapcell">Jelaskan bahwa konsumen dapat mengajukan pengaduan ke OJK melalui APPK.</td><td class="r num warn">89,2</td></tr>
+          <tr><td>Sep 2026</td><td class="fg">Bayu Saputra</td><td class="mono fg">—</td><td>Salam penutup tidak sesuai</td><td class="wrapcell">Menutup panggilan tanpa menanyakan kebutuhan lain.</td><td class="wrapcell">Tanyakan apakah ada hal lain yang bisa dibantu sebelum menutup.</td><td class="r num warn">88,5</td></tr>
+          <tr><td>Agu 2026</td><td class="fg">Nadia Putri</td><td class="mono fg">OJK-2608-0821</td><td>Janji tindak lanjut tanpa waktu</td><td class="wrapcell">Menjanjikan "segera dihubungi" tanpa perkiraan waktu.</td><td class="wrapcell">Sebutkan perkiraan waktu tindak lanjut sesuai SLA.</td><td class="r num warn">91,3</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ JADWAL SHIFTING ============ -->
+<section class="screen" data-page="jadwal" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK · Laporan</span><span class="t">Jadwal shifting</span><p>Jadwal harian agen dari WFM Dash Pro. Hanya-baca.</p></div>
+      <div class="acts"><div class="seg"><span class="on">Hari ini</span><span>Kalender</span></div></div>
+    </div>
+    <div class="scope">
+      <div class="fld"><label>Tanggal</label><span class="sel" style="min-width:170px">Kamis, 15 Okt 2026</span></div>
+      <div class="fld"><label>Bagian layanan</label><span class="sel" style="min-width:150px">Semua bagian</span></div>
+      <div class="fld" style="min-width:220px"><label>Cari</label><span class="inp">Nama agen</span></div>
+    </div>
+    <span class="scope-line">Data dari WFM untuk tanggal 2026-10-15 · 86 baris · dimuat 08.02 WIB</span>
+  </div>
+  <div class="body">
+    <div class="box" style="overflow:auto;max-height:520px">
+      <table>
+        <thead><tr><th>Nama</th><th>Team Leader</th><th>Shift</th><th>Mulai</th><th>Pulang</th><th>Istirahat</th><th>Shift sebelumnya</th></tr></thead>
+        <tbody>
+          <tr class="grp-row"><td colspan="7">Call · 42 agen</td></tr>
+          <tr><td class="fg">Rina Kartika</td><td>Andi Wijaya</td><td><span class="shift">S1</span></td><td class="mono">07.00</td><td class="mono">16.00</td><td class="mono">11.00–12.00</td><td><span class="shift">S1</span></td></tr>
+          <tr><td class="fg">Sinta Maharani</td><td>Andi Wijaya</td><td><span class="shift">S1</span></td><td class="mono">07.00</td><td class="mono">16.00</td><td class="mono">11.30–12.30</td><td><span class="shift off">Off</span></td></tr>
+          <tr><td class="fg">Dimas Prasetyo</td><td>Sari Hidayat</td><td><span class="shift">H</span></td><td class="mono">08.00</td><td class="mono">17.00</td><td class="mono">12.00–13.00</td><td><span class="shift">H</span></td></tr>
+          <tr><td class="fg">Bayu Saputra</td><td>Sari Hidayat</td><td><span class="shift">S3</span></td><td class="mono">22.00</td><td class="mono">07.00 <span class="muted">+1</span></td><td class="muted">tidak tersedia</td><td><span class="shift">S3</span></td></tr>
+          <tr><td class="fg">Ayu Lestari</td><td>Andi Wijaya</td><td><span class="shift off">Off</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td><td><span class="shift">S2</span></td></tr>
+          <tr class="grp-row"><td colspan="7">Digital Chat · 24 agen</td></tr>
+          <tr><td class="fg">Fikri Ramadhan</td><td>Sari Hidayat</td><td><span class="shift">S2</span></td><td class="mono">13.00</td><td class="mono">22.00</td><td class="mono">17.15–18.15</td><td><span class="shift">S2</span></td></tr>
+          <tr><td class="fg">Nadia Putri</td><td>Sari Hidayat</td><td><span class="shift">TBCCI</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">tidak tersedia</td><td><span class="shift">S1</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="sec">
+      <div class="sh"><h3>Tampilan Kalender · Oktober 2026</h3><div class="acts"><span class="btn sm">‹</span><span class="btn sm">›</span></div></div>
+      <div class="month-matrix" id="matrix"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PARAMETER QA ============ -->
+<section class="screen" data-page="parameter" hidden>
+  <div class="phead">
+    <div class="top">
+      <div class="tt"><span class="crumb">SIDAK · Audit</span><span class="t">Parameter QA</span><p>Versi aturan penilaian per layanan. Setiap publish mengubah skor semua agen.</p></div>
+      <div class="acts"><span class="btn sm">Buat draft dari versi berlaku</span></div>
+    </div>
+    <div class="tabs" style="border-bottom:0"><span class="on">Call</span><span>Email</span><span>Digital Chat</span><span>Walk-in</span><span>SLIK</span></div>
+  </div>
+  <div class="body">
+    <div class="cols">
+      <div class="vers" style="width:260px;flex:none">
+        <div class="v on"><span class="row" style="justify-content:space-between"><b class="fg">v5</b><span class="st"><span class="dot d-warn"></span>Draft</span></span><span class="muted" style="font-size:12px">dibuat 12 Okt · belum berlaku</span></div>
+        <div class="v"><span class="row" style="justify-content:space-between"><b class="fg">v4</b><span class="st"><span class="dot d-ok"></span>Berlaku</span></span><span class="muted" style="font-size:12px">sejak Agustus 2026</span></div>
+        <div class="v"><span class="row" style="justify-content:space-between"><b class="fg">v3</b><span class="st"><span class="dot d-mute"></span>Digantikan</span></span><span class="muted" style="font-size:12px">Maret–Juli 2026</span></div>
+        <div class="v"><span class="row" style="justify-content:space-between"><b class="fg">v2</b><span class="st"><span class="dot d-mute"></span>Digantikan</span></span><span class="muted" style="font-size:12px">Jan–Feb 2026</span></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:24px">
+        <div class="sh" style="border-bottom:1px solid var(--border);padding-bottom:14px"><div><b class="fg" style="font:700 18px var(--display)">Versi 5 · Draft</b><br><span class="muted" style="font-size:12px">3 perubahan dibanding v4 yang berlaku</span></div><div class="acts"><span class="btn sm">Hapus draft</span><span class="btn sm primary">Publish…</span></div></div>
+        <div class="sec"><div class="sh"><h3>Bobot kategori</h3><span class="muted" style="font-size:12px">Tersimpan</span></div>
+          <div class="wgt"><span class="fg">Kritikal</span><div class="slider"><span style="width:60%"></span><i style="left:60%"></i></div><span class="num" style="text-align:right">60%</span></div>
+          <div class="wgt"><span class="fg">Non-kritikal</span><div class="slider"><span style="width:40%"></span><i style="left:40%"></i></div><span class="num" style="text-align:right">40%</span></div>
+        </div>
+        <div class="sec"><div class="sh"><h3>Parameter (14)</h3><span class="btn sm">Tambah parameter</span></div>
+          <div>
+            <div class="ind"><span><b class="fg">Verifikasi data konsumen</b><br><span class="muted" style="font-size:12px">Kritikal · Urutan #1 · Ambang 1</span></span><span class="fg2">Bobot 20</span><span class="st"><span class="dot d-warn"></span>diubah</span><span class="icon-btn" aria-label="Ubah">✎</span></div>
+            <div class="ind"><span><b class="fg">Informasi tidak lengkap ke konsumen</b><br><span class="muted" style="font-size:12px">Non-kritikal · Urutan #2 · N/A diizinkan</span></span><span class="fg2">Bobot 15</span><span class="muted" style="font-size:12px">—</span><span class="icon-btn" aria-label="Ubah">✎</span></div>
+            <div class="ind"><span><b class="fg">Hold tanpa izin</b><br><span class="muted" style="font-size:12px">Non-kritikal · Urutan #3</span></span><span class="fg2">Bobot 10</span><span class="muted" style="font-size:12px">—</span><span class="icon-btn" aria-label="Ubah">✎</span></div>
+            <div class="ind"><span><b class="fg">Konfirmasi ulang solusi</b><br><span class="muted" style="font-size:12px">Non-kritikal · Urutan #4 · Tertaut ke parameter lama</span></span><span class="fg2">Bobot 10</span><span class="st"><span class="dot d-ok"></span>baru</span><span class="icon-btn" aria-label="Ubah">✎</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PERIODE QA ============ -->
+<section class="screen" data-page="periode" hidden>
+  <div class="phead">
+    <div class="top"><div class="tt"><span class="crumb">SIDAK · Audit</span><span class="t">Periode QA</span><p>Bulan audit yang dipakai Input temuan, Parameter QA, dan semua analitik.</p></div></div>
+  </div>
+  <div class="body" style="max-width:760px">
+    <div class="scope"><div class="fld"><label>Bulan</label><span class="sel" style="min-width:150px">November</span></div><div class="fld"><label>Tahun</label><span class="sel" style="min-width:100px">2026</span></div><span class="btn primary">Tambah periode</span></div>
+    <div class="yr"><h3>2026</h3>
+      <div class="box" style="padding:0 14px">
+        <div class="pr"><span class="fg">Oktober 2026</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">137 temuan</span><span class="icon-btn" aria-label="Hapus Oktober 2026">🗑</span></span></div>
+        <div class="pr"><span class="fg">September 2026</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">119 temuan</span><span class="icon-btn" aria-label="Hapus September 2026">🗑</span></span></div>
+        <div class="pr"><span class="fg">Agustus 2026</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">115 temuan</span><span class="icon-btn" aria-label="Hapus Agustus 2026">🗑</span></span></div>
+        <div class="pr"><span class="fg">Juli 2026</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">121 temuan</span><span class="icon-btn" aria-label="Hapus Juli 2026">🗑</span></span></div>
+      </div></div>
+    <div class="yr"><h3>2025</h3>
+      <div class="box" style="padding:0 14px">
+        <div class="pr"><span class="fg">Desember 2025</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">98 temuan</span><span class="icon-btn" aria-label="Hapus Desember 2025">🗑</span></span></div>
+        <div class="pr"><span class="fg">November 2025</span><span class="row" style="gap:16px"><span class="muted" style="font-size:12px">tanpa temuan</span><span class="icon-btn" aria-label="Hapus November 2025">🗑</span></span></div>
+      </div></div>
+    <span class="fg2" style="font-size:12px">Periode yang sudah punya temuan tidak bisa dihapus; dialog konfirmasi akan menjelaskannya.</span>
+  </div>
+</section>
+
+      </main>
+    </div>
+  </div></div>
+
+  <section class="changes" aria-live="polite">
+    <h3 id="chg-title">Yang berubah</h3>
+    <div class="note"><ul id="chg"></ul></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const PAGES=[
+    {id:"beranda",label:"Ringkasan",url:"/sidak?layanan=call&tahun=2026",chg:[
+      "Hero \"Selamat Datang\" dan 7 kartu berikon diganti data: kondisi periode terbaru, agen di bawah target, parameter teratas.",
+      "Satu aksi utama per peran (trainer: Input temuan, leader: Lihat agen saya); Laporan, Jadwal, dan Kelola jadi menu kecil.",
+      "Daftar halaman dikelompokkan menurut pekerjaan dan dibaca dari model navigasi yang sama dengan sidebar.",
+      "Tiap bagian memuat datanya sendiri dengan state memuat, kosong, dan gagal + Coba lagi."]},
+    {id:"dashboard",label:"Dashboard",url:"/sidak/dashboard?layanan=call&tahun=2026&dari=1&sampai=10",chg:[
+      "Kepala halaman bersama: judul, satu kalimat fungsi, aksi kanan, lalu bar cakupan yang sama dengan halaman lain.",
+      "Isi tetap (KPI, ringkasan, tren, Top 5, Pareto, pola mingguan); warna hardcode diganti token dan peta status.",
+      "Tautan ke Ranking, Forecast, dan Heatmap membawa cakupan yang sama.",
+      "Merah hanya untuk kritikal dan arah memburuk; label tanpa huruf kapital."]},
+    {id:"forecast",label:"Forecast",url:"/sidak/forecast?layanan=call&tahun=2026&dari=1&sampai=10&proyeksi=3",chg:[
+      "Bar filter memakai cakupan bersama + Periode proyeksi.",
+      "Struktur Tren layanan → Prioritas agen dipertahankan; empat kelompok memakai satu peta status.",
+      "Kalimat \"Yang perlu dilakukan\" tampil di bawah grafik, bukan kartu terpisah.",
+      "Tiap agen di kelompok membuka detail agen dengan cakupan yang sama."]},
+    {id:"agen",label:"Agen",url:"/sidak/agents?layanan=call&tahun=2026&sampai=10",chg:[
+      "Nama menu \"Analisis Individu\" menjadi \"Agen\" (menunggu keputusan Anda).",
+      "Filter Status baru (Perlu perhatian, Mendekati target, Memenuhi target, Belum diaudit) dan urutan skor terendah dulu.",
+      "Kartu tetap satu surface yang bisa diklik; status selalu teks + titik.",
+      "Kalimat cakupan menjelaskan bulan mana yang dipakai untuk skor."]},
+    {id:"detail",label:"Detail agen",url:"/sidak/agents/3f9a…?layanan=call&tahun=2026&bulan=10",chg:[
+      "Lima tab tetap: Ringkasan, Tren, Temuan, Heatmap, Simulasi. Klik tab di bingkai untuk melihat isinya; tab aktif masuk ke alamat (&tab=…).",
+      "Ringkasan: blok \"Bahan coaching\" baru di atas grafik skor bulanan, dossier bulan, dan tabel pembanding.",
+      "Tren: kontrol seri satu baris (Total + parameter / Total saja / per parameter), lalu tabel temuan per parameter dengan kolom Arah.",
+      "Temuan: dikelompokkan per bulan lalu per tiket; tiket yang dibuka dari Bahan coaching atau Heatmap disorot. Nilai jadi titik + teks.",
+      "Heatmap: kalender agen di kiri, tanggal terpilih dan fakta singkat di kanan, dengan tautan ke tiketnya di tab Temuan.",
+      "Simulasi: tabel (bukan kartu berikon) dengan filter modul; menyatakan bahwa tahun/layanan audit tidak berlaku di sini."]},
+    {id:"ranking",label:"Ranking",url:"/sidak/ranking?layanan=call&tahun=2026&dari=7&sampai=10",chg:[
+      "Cakupan bersama menggantikan filter lokal (Layanan, Tahun, Periode, Folder/tim).",
+      "Tim gabungan / per tim leader jadi satu kontrol segmen.",
+      "Perubahan posisi tetap ditulis dengan kata, naik prioritas = merah.",
+      "Unduh Excel pindah ke kepala halaman."]},
+    {id:"heatmap",label:"Heatmap",url:"/sidak/heatmap?layanan=call&tahun=2026&mode=agent",chg:[
+      "Halaman menyatakan bahwa bulan dan tim tidak dipakai, tanpa menghapus pilihan itu dari cakupan.",
+      "Mode Agent/QA ditulis bersama kolom tanggal yang dibaca.",
+      "Warna kalender memakai skala token, terbaca di tema gelap.",
+      "Narasi dan 8 fakta dipertahankan dari halaman sekarang."]},
+    {id:"input",label:"Input temuan",url:"/sidak/input?folder=tim-andi&agent_id=…&period_id=…&service=call",chg:[
+      "Tiga window.confirm (sesi tanpa temuan, hapus, timpa impor) diganti dialog konfirmasi aplikasi.",
+      "Setelah simpan, status menyebut hasil dan memberi tautan ke detail agen.",
+      "Nilai Kritis/Tidak sesuai/Perbaikan/Sesuai memakai titik + teks biasa, bukan badge kapital berwarna.",
+      "Label form tanpa huruf kapital, kontrol tinggi 44px."]},
+    {id:"laporan",label:"Laporan data",url:"/sidak/reports-data?layanan=call&tahun=2026&dari=7&sampai=10",chg:[
+      "Cakupan bersama mengisi Layanan, Tahun, dan Bulan; Parameter tetap filter khusus halaman ini.",
+      "Unduh Excel di kepala halaman menyebut jumlah barisnya.",
+      "Temuan dan Rekomendasi tetap dibungkus utuh, nomor tiket monospace.",
+      "Header kolom file Excel tidak berubah (tetap \"Seharusnya\")."]},
+    {id:"jadwal",label:"Jadwal shifting",url:"/sidak/jadwal-shifting?tanggal=2026-10-15",chg:[
+      "Hanya kepala halaman yang berubah; urutan Call → Digital Chat, aturan Off, dan +1 tetap.",
+      "Kode shift memakai satu gaya chip netral; Off bergaris putus-putus.",
+      "Baris sumber data (tanggal, jumlah baris, jam muat) tampil di bawah filter.",
+      "Kalender tetap matriks dengan kolom nama menempel di kiri."]},
+    {id:"parameter",label:"Parameter QA",url:"/sidak/settings?layanan=call&versi=v5",chg:[
+      "Struktur sekarang dipertahankan: tab layanan, riwayat versi, detail versi.",
+      "Status Draft/Berlaku/Digantikan memakai titik + teks; parameter yang diubah atau baru ditandai di baris.",
+      "Kepala versi menyebut jumlah perubahan dibanding versi berlaku sebelum Publish.",
+      "Pakai kepala halaman bersama."]},
+    {id:"periode",label:"Periode QA",url:"/sidak/periods",chg:[
+      "Hanya kepala halaman yang berubah; form satu baris dan daftar per tahun tetap.",
+      "Jumlah temuan per periode ditampilkan, jadi jelas mana yang bisa dihapus.",
+      "Hapus tetap lewat dialog konfirmasi bersama."]}
+  ];
+  const ORDER=["beranda","dashboard","forecast","agen","detail","ranking","heatmap","input","laporan","jadwal","parameter","periode"];
+  const SB=[["beranda"],["dashboard"],["ranking"],["heatmap"],["forecast"],["agen"],["input"],["periode"],["parameter"],["laporan"],["jadwal"]];
+  const byId=Object.fromEntries(PAGES.map(p=>[p.id,p]));
+  const sbnav=document.getElementById("sbnav"), picker=document.getElementById("picker");
+  SB.forEach(([id])=>{const b=document.createElement("button");b.type="button";b.dataset.go=id;b.textContent=byId[id].label;sbnav.appendChild(b);});
+  ORDER.forEach(id=>{const b=document.createElement("button");b.type="button";b.dataset.go=id;b.textContent=byId[id].label;picker.appendChild(b);});
+
+  // Bar cakupan bersama
+  const scopeHTML='<div class="fld"><label>Layanan</label><span class="sel">Call</span></div><div class="fld"><label>Tahun</label><span class="sel" style="min-width:90px">2026</span></div><div class="fld"><label>Bulan</label><span class="sel" style="min-width:170px">Januari – Oktober</span></div><div class="fld"><label>Tim</label><span class="sel" style="min-width:140px">Semua tim</span></div>';
+  document.querySelectorAll("[data-scope]").forEach(el=>{el.innerHTML=scopeHTML+'<span class="btn ghost sm">Atur ulang</span>';});
+  document.querySelectorAll("[data-scope-inline]").forEach(el=>{el.outerHTML=scopeHTML;});
+
+  function show(id){
+    if(!byId[id]) id="beranda";
+    document.querySelectorAll(".screen").forEach(s=>{s.hidden=s.dataset.page!==id;});
+    document.querySelectorAll("#sbnav button").forEach(b=>{const on=b.dataset.go===id||(id==="detail"&&b.dataset.go==="agen");on?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current");});
+    document.querySelectorAll("#picker button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.go===id)));
+    document.getElementById("url").textContent=byId[id].url;
+    document.getElementById("chg-title").textContent="Yang berubah · "+byId[id].label;
+    document.getElementById("chg").innerHTML=byId[id].chg.map((c,i)=>"<li><b>"+(i+1)+"</b><span>"+c+"</span></li>").join("");
+    try{history.replaceState(null,"","#"+id);}catch(e){}
+  }
+  document.addEventListener("click",e=>{const t=e.target.closest("[data-go]");if(t){e.preventDefault();show(t.dataset.go);document.querySelector(".frame-wrap").scrollIntoView({block:"nearest"});}});
+  document.getElementById("thm").addEventListener("click",()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark";});
+
+  const NS="http://www.w3.org/2000/svg";
+  function el(tag,attrs,text){const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(text!=null)n.textContent=text;return n;}
+
+  // Sparkline
+  document.querySelectorAll("[data-spark]").forEach(svg=>{
+    const v=svg.dataset.spark.split(",").map(Number),mn=Math.min(...v),mx=Math.max(...v);
+    const pts=v.map((y,i)=>[2+i*(116/(v.length-1)),22-((y-mn)/(mx-mn||1))*18]);
+    svg.appendChild(el("polyline",{points:pts.map(p=>p.join(",")).join(" "),fill:"none",stroke:"var(--fg3)","stroke-width":"1.5"}));
+    const l=pts[pts.length-1];svg.appendChild(el("circle",{cx:l[0],cy:l[1],r:"2.5",fill:"var(--fg)"}));
+  });
+
+  // Grafik garis umum
+  function lineChart(svg,o){
+    const W=o.w,H=o.h,L=36,R=12,T=14,B=26,lab=o.labels,n=lab.length;
+    const x=i=>L+i*((W-L-R)/(n-1)), y=v=>T+(1-(v-o.min)/(o.max-o.min))*(H-T-B);
+    for(let t=o.min;t<=o.max;t+=o.step){svg.appendChild(el("line",{x1:L,x2:W-R,y1:y(t),y2:y(t),stroke:"var(--border)"}));svg.appendChild(el("text",{x:L-6,y:y(t)+4,"text-anchor":"end","font-size":"10.5",fill:"var(--fg3)"},t));}
+    lab.forEach((l,i)=>svg.appendChild(el("text",{x:x(i),y:H-8,"text-anchor":"middle","font-size":"10.5",fill:(o.projFrom!=null&&i>=o.projFrom)?"var(--fg3)":"var(--fg2)"},l)));
+    if(o.projFrom!=null){svg.appendChild(el("rect",{x:x(o.projFrom-1),y:T,width:x(n-1)-x(o.projFrom-1),height:H-T-B,fill:"var(--surface)"}));svg.appendChild(el("text",{x:x(n-1),y:T+10,"text-anchor":"end","font-size":"10.5",fill:"var(--fg3)"},"proyeksi"));}
+    o.series.forEach(s=>{
+      const real=s.data.slice(0,o.projFrom??n).map((v,i)=>[x(i),y(v)]);
+      if(s.area){svg.appendChild(el("polygon",{points:real.map(p=>p.join(",")).join(" ")+` ${real[real.length-1][0]},${H-B} ${real[0][0]},${H-B}`,fill:s.color,opacity:"0.08"}));}
+      svg.appendChild(el("polyline",{points:real.map(p=>p.join(",")).join(" "),fill:"none",stroke:s.color,"stroke-width":"2"}));
+      if(s.proj){const pr=[[x(o.projFrom-1),y(s.data[o.projFrom-1])]].concat(s.proj.map((v,i)=>[x(o.projFrom+i),y(v)]));svg.appendChild(el("polyline",{points:pr.map(p=>p.join(",")).join(" "),fill:"none",stroke:s.color,"stroke-width":"2","stroke-dasharray":"5 4"}));}
+      const last=real[real.length-1];svg.appendChild(el("circle",{cx:last[0],cy:last[1],r:"4",fill:s.color}));
+      if(s.endLabel)svg.appendChild(el("text",{x:last[0],y:last[1]-10,"text-anchor":"middle","font-size":"11","font-weight":"700",fill:"var(--fg)"},s.endLabel));
+    });
+  }
+  const M=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des","Jan"];
+  lineChart(document.getElementById("trend"),{w:620,h:230,min:0,max:160,step:40,labels:M.slice(0,13),projFrom:10,
+    series:[{data:[96,104,88,110,121,115,121,115,119,137],proj:[148,159,170].map(v=>Math.min(v,160)),color:"var(--fg)",area:true,endLabel:"137"},
+            {data:[14,16,12,18,17,19,20,19,21,22],color:"var(--bad)"}]});
+  lineChart(document.getElementById("fc"),{w:900,h:220,min:0,max:180,step:45,labels:M.slice(0,13),projFrom:10,
+    series:[{data:[96,104,88,110,121,115,121,115,119,137],proj:[148,159,170],color:"var(--fg)",area:true,endLabel:"137"},
+            {data:[14,16,12,18,17,19,20,19,21,22],proj:[24,26,28],color:"var(--bad)",endLabel:"22"}]});
+
+  // Pola mingguan
+  (function(){const svg=document.getElementById("week"),d=[268,214,201,188,152,62,40],lab=["Sen","Sel","Rab","Kam","Jum","Sab","Min"],mx=300,H=180,B=24,T=18,bw=38,gap=(400-7*bw)/8;
+    d.forEach((v,i)=>{const h=(v/mx)*(H-B-T),xx=gap+i*(bw+gap);svg.appendChild(el("rect",{x:xx,y:H-B-h,width:bw,height:h,rx:"4",fill:i===0?"var(--fg)":"var(--sunken)",stroke:i===0?"none":"var(--border)"}));svg.appendChild(el("text",{x:xx+bw/2,y:H-B-h-5,"text-anchor":"middle","font-size":"11","font-weight":"600",fill:"var(--fg)"},v));svg.appendChild(el("text",{x:xx+bw/2,y:H-7,"text-anchor":"middle","font-size":"11",fill:"var(--fg2)"},lab[i]));});
+  })();
+
+  // Skor bulanan detail agen
+  (function(){const svg=document.getElementById("months"),d=[96.2,98.0,97.1,94.4,99.0,96.3,93.2,90.1,87.8,81.5,null,null],W=760,H=190,L=34,B=24,T=14,mn=70,mx=100,bw=(W-L-10)/12-10;
+    const y=v=>T+(1-(v-mn)/(mx-mn))*(H-T-B);
+    [70,80,90,100].forEach(t=>{svg.appendChild(el("line",{x1:L,x2:W,y1:y(t),y2:y(t),stroke:"var(--border)"}));svg.appendChild(el("text",{x:L-6,y:y(t)+4,"text-anchor":"end","font-size":"10.5",fill:"var(--fg3)"},t));});
+    d.forEach((v,i)=>{const xx=L+8+i*(bw+10);if(v!=null){const tone=v>=95?"var(--good)":v>=85?"var(--warn)":"var(--bad)";svg.appendChild(el("rect",{x:xx,y:y(v),width:bw,height:H-B-y(v),rx:"4",fill:i===9?"var(--fg)":"var(--sunken)",stroke:i===9?"none":"var(--border)"}));svg.appendChild(el("text",{x:xx+bw/2,y:y(v)-5,"text-anchor":"middle","font-size":"10.5","font-weight":"700",fill:i===9?"var(--fg)":tone},String(v).replace(".",",")));}
+      svg.appendChild(el("text",{x:xx+bw/2,y:H-7,"text-anchor":"middle","font-size":"11","font-weight":i===9?"700":"400",fill:i===9?"var(--fg)":"var(--fg2)"},M[i]));});
+    svg.appendChild(el("line",{x1:L,x2:W,y1:y(95),y2:y(95),stroke:"var(--good)","stroke-dasharray":"5 4"}));
+    svg.appendChild(el("text",{x:W-2,y:y(95)-4,"text-anchor":"end","font-size":"10.5",fill:"var(--good)"},"target 95"));
+  })();
+
+  // Kartu agen
+  (function(){const A=[["Rina Kartika","Tim Andi · Batch 7",81.5,"↓ 6,3"],["Dimas Prasetyo","Tim Sari · Batch 5",84.0,"sama"],["Bayu Saputra","Tim Sari · Batch 6",88.5,"↓ 1,0"],["Ayu Lestari","Tim Andi · Batch 8",89.2,"↓ 4,1"],["Nadia Putri","Tim Sari · Batch 6",91.3,"↑ 0,8"],["Fikri Ramadhan","Tim Sari · Batch 6",91.7,"↑ 2,0"],["Sinta Maharani","Tim Andi · Batch 7",96.0,"↑ 3,0"],["Hana Wulandari","Tim Andi · Batch 5",97.5,"↑ 0,5"],["Laras Ayuningtyas","Tim Andi · Batch 9",null,""]];
+    document.getElementById("agcards").innerHTML=A.map(([n,t,s,c])=>{const tone=s==null?"mute":s>=95?"ok":s>=85?"warn":"bad";const lbl=s==null?"Belum diaudit":s>=95?"Memenuhi target":s>=85?"Mendekati target":"Perlu perhatian";const ini=n.split(" ").map(w=>w[0]).join("").slice(0,2);
+      return `<div class="agc" data-go="detail" role="link" tabindex="0"><div class="who"><span class="av">${ini}</span><span><b class="fg">${n}</b><br><span class="muted" style="font-size:12px">${t}</span></span></div><dl><div><dt>Skor audit</dt><dd class="num ${tone==="mute"?"":tone}" style="font-size:18px">${s==null?"—":String(s.toFixed(1)).replace(".",",")}</dd></div><div><dt>Status audit</dt><dd><span class="st"><span class="dot d-${tone}"></span>${lbl}</span></dd></div><div><dt>Periode</dt><dd>${s==null?"—":"Oktober 2026"}</dd></div><div><dt>Perubahan</dt><dd class="${c.startsWith("↓")?"bad":c.startsWith("↑")?"ok":"fg2"}">${c||"—"}</dd></div></dl></div>`;}).join("");
+  })();
+
+  // Ranking
+  (function(){const R=[[1,"Rina Kartika","Tim Andi · 7",11,3,81.5,"Naik 2 peringkat","bad"],[2,"Dimas Prasetyo","Tim Sari · 5",9,2,84.0,"Tetap","muted"],[3,"Bayu Saputra","Tim Sari · 6",8,1,88.5,"Turun 1 peringkat","ok"],[4,"Ayu Lestari","Tim Andi · 8",7,1,89.2,"Naik 4 peringkat","bad"],[5,"Nadia Putri","Tim Sari · 6",6,0,91.3,"Tetap","muted"],[5,"Gilang Pratama","Tim Sari · 7",6,0,92.0,"Baru","muted"],[7,"Fikri Ramadhan","Tim Sari · 6",5,0,91.7,"Turun 3 peringkat","ok"],[8,"Yoga Aditya","Tim Sari · 8",4,0,93.6,"Turun 1 peringkat","ok"]];
+    document.getElementById("rankrows").innerHTML=R.map(r=>{const tone=r[5]>=95?"ok":r[5]>=85?"warn":"bad";return `<tr data-go="detail" style="cursor:pointer"><td class="num">${r[0]}${r[0]===5?' <span class="muted" style="font-weight:400;font-size:11px">bersama</span>':""}</td><td class="fg"><b>${r[1]}</b></td><td>${r[2]}</td><td class="r num">${r[3]}</td><td class="r mono ${r[4]?"bad":"muted"}">${r[4]}</td><td class="r num ${tone}">${r[5].toFixed(1).replace(".",",")}</td><td class="${r[7]}">${r[6]}</td></tr>`;}).join("");
+  })();
+
+  // Heatmap kalender (data contoh deterministik)
+  function renderHeat(host,seed,scale,minW){const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+    const start=new Date(2026,0,1),end=new Date(2026,9,15),off=(start.getDay()+6)%7;const rows=[[],[],[],[],[],[],[]];const days=["Sen","","Rab","","Jum","","Min"];
+    for(let w=0;w<53;w++)for(let d=0;d<7;d++){const idx=w*7+d-off;const dt=new Date(2026,0,1+idx);let cls="x";if(idx>=0&&dt.getFullYear()===2026){if(dt>end){cls="";}else{const we=d>=5;const base=we?0.4:(d===0?1.6:1);const v=rnd()<(we?0.55:scale.zero)?0:Math.round(rnd()*scale.max*base*(dt.getMonth()>=8?1.3:1));cls=v===0?"":v<=scale.t[0]?"h1":v<=scale.t[1]?"h2":v<=scale.t[2]?"h3":"h4";}}rows[d].push(cls);}
+    const lev={h1:"var(--heat1)",h2:"var(--heat2)",h3:"var(--heat3)",h4:"var(--heat4)"};
+    let html='<div class="ml"'+(minW?` style="min-width:${minW}px"`:'')+'><span></span>'+M.slice(0,12).map(m=>`<span>${m}</span>`).join("")+"</div>";
+    rows.forEach((r,d)=>{html+=`<div class="wk"${minW?` style="min-width:${minW}px"`:''}><span class="dl">${days[d]}</span>`+r.map(c=>c==="x"?'<i class="x"></i>':`<i${lev[c]?` style="background:${lev[c]}"`:""}></i>`).join("")+"</div>";});
+    host.innerHTML=html;
+  }
+  renderHeat(document.getElementById("heat"),7,{zero:0.15,max:7,t:[2,4,7]});
+  renderHeat(document.getElementById("agheat"),11,{zero:0.93,max:2,t:[1,1,2]},560);
+
+  // Tren detail agen
+  lineChart(document.getElementById("agtrend"),{w:860,h:220,min:0,max:8,step:2,labels:M.slice(0,10),
+    series:[{data:[1,0,2,1,0,2,2,4,5,6],color:"var(--fg)",area:true,endLabel:"6"},{data:[0,0,1,0,0,0,1,1,2,3],color:"var(--bad)"},{data:[1,0,1,1,0,1,1,2,0,1],color:"var(--info)"}]});
+
+  // Tab detail agen
+  function showTab(t){
+    document.querySelectorAll(".atabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===t)));
+    document.querySelectorAll("[data-panel]").forEach(p=>{p.hidden=p.dataset.panel!==t;});
+    document.querySelectorAll("#agscope [data-only]").forEach(f=>{f.hidden=f.dataset.only!==t;});
+    document.getElementById("agscope").hidden=t==="simulasi";
+    document.getElementById("simnote").hidden=t!=="simulasi";
+    const u=document.getElementById("url");if(u&&u.textContent.startsWith("/sidak/agents/"))u.textContent="/sidak/agents/3f9a…?layanan=call&tahun=2026&bulan=10"+(t==="ringkasan"?"":"&tab="+t);
+    try{history.replaceState(null,"","#detail"+(t==="ringkasan"?"":"-"+t));}catch(e){}
+  }
+  window.__showTab=showTab;
+  document.addEventListener("click",e=>{const b=e.target.closest("[data-tab],[data-tab-go]");if(!b)return;e.preventDefault();showTab(b.dataset.tab||b.dataset.tabGo);});
+
+  // Matriks bulanan jadwal
+  (function(){const names=["Rina Kartika","Sinta Maharani","Dimas Prasetyo","Bayu Saputra","Ayu Lestari","Fikri Ramadhan"],codes=["S1","S1","H","S2","S3","Off","S1","H","S2","Off"];let s=3;
+    let h="<table><thead><tr><th>Agen</th>"+Array.from({length:31},(_,i)=>`<th>${i+1}</th>`).join("")+"</tr></thead><tbody>";
+    names.forEach(n=>{h+=`<tr><td class="fg">${n}</td>`;for(let d=0;d<31;d++){s=(s*7+d)%10;const c=codes[s];h+=`<td><span class="shift${c==="Off"?" off":""}">${c}</span></td>`;}h+="</tr>";});
+    document.getElementById("matrix").innerHTML=h+"</tbody></table>";
+  })();
+
+  let start="beranda",tab=null;try{const h=location.hash.slice(1);const m=h.match(/^detail-(\w+)$/);if(m){start="detail";tab=m[1];}else if(byId[h])start=h;}catch(e){}
+  show(start);showTab(tab||"ringkasan");if(start!=="detail")try{history.replaceState(null,"","#"+start);}catch(e){}
+})();
+</script>

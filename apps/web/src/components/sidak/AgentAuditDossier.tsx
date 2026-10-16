@@ -56,8 +56,8 @@ export default function AgentAuditDossier({
     delta === null || delta === 0
       ? "text-muted-foreground"
       : delta > 0
-        ? "text-emerald-700 dark:text-emerald-400"
-        : "text-rose-700 dark:text-rose-400";
+        ? SIDAK_SCORE_TEXT.ok
+        : SIDAK_SCORE_TEXT.bad;
 
   return (
     <section

@@ -209,7 +209,7 @@ export default function IndicatorDropdown({
             ) : (
               <>
                 <div className="sticky top-0 z-10 border-b border-border bg-blue-500/10 px-3 py-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
                     Non-Critical Error
                   </p>
                 </div>
@@ -218,8 +218,8 @@ export default function IndicatorDropdown({
                   value={value}
                   onSelect={handleSelect}
                 />
-                <div className="sticky top-0 z-10 border-y border-border bg-red-500/10 px-3 py-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                <div className="sticky top-0 z-10 border-y border-border bg-rose-500/10 px-3 py-2">
+                  <p className="text-xs font-bold text-rose-700 dark:text-rose-400">
                     Critical Error
                   </p>
                 </div>

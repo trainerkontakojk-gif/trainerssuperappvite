@@ -1,5 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LabelList,
+  ReferenceArea,
+} from "recharts";
 import type { SidakForecastSeries } from "@trainers/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -20,6 +30,47 @@ interface Props {
   colorMap?: Record<string, string>;
   forecastResult?: SidakForecastSeries | null;
   forecastResults?: SidakForecastSeries[];
+}
+
+const VALUE_FORMAT = new Intl.NumberFormat("id-ID", {
+  maximumFractionDigits: 1,
+});
+
+type ChartRow = Record<string, string | number | null>;
+
+interface PointLabelProps {
+  x?: number | string;
+  y?: number | string;
+  value?: unknown;
+  index?: number;
+}
+
+/**
+ * Angka di atas tiap titik. Titik proyeksi hanya diberi label di bulan
+ * mendatang; bulan terakhir data sudah berlabel angka aktualnya.
+ */
+function pointLabel(kind: "actual" | "forecast", rows: ChartRow[]) {
+  return function PointLabel({ x, y, value, index }: PointLabelProps) {
+    if (typeof value !== "number" || x === undefined || y === undefined) {
+      return null;
+    }
+    if (kind === "forecast" && rows[index ?? -1]?.isForecast !== 1) return null;
+    return (
+      <text
+        data-chart-label={kind}
+        x={Number(x)}
+        y={Number(y) - 10}
+        textAnchor="middle"
+        fontSize={12}
+        fontWeight={kind === "actual" ? 600 : 500}
+        fill={
+          kind === "actual" ? "var(--foreground)" : "var(--muted-foreground)"
+        }
+      >
+        {VALUE_FORMAT.format(value)}
+      </text>
+    );
+  };
 }
 
 export default function ParamTrendChart({
@@ -140,6 +191,15 @@ export default function ParamTrendChart({
     [normalizedForecastResults],
   );
 
+  const projectionRange = useMemo(() => {
+    const firstForecast = chartData.findIndex((row) => row.isForecast === 1);
+    if (firstForecast < 1) return null;
+    return {
+      from: String(chartData[firstForecast - 1].name),
+      to: String(chartData[chartData.length - 1].name),
+    };
+  }, [chartData]);
+
   if (!mounted || !containerReady) {
     return (
       <div
@@ -169,7 +229,11 @@ export default function ParamTrendChart({
   const animationEnabled = !prefersReducedMotion;
 
   return (
-    <div ref={chartContainerRef} className="h-full w-full animate-in fade-in duration-700 motion-reduce:animate-none">
+    <div
+      ref={chartContainerRef}
+      className="flex h-full w-full flex-col animate-in fade-in duration-700 motion-reduce:animate-none"
+    >
+      <div className="min-h-0 flex-1">
       <ResponsiveContainer
         width="100%"
         height="100%"
@@ -177,7 +241,29 @@ export default function ParamTrendChart({
         minHeight={0}
         initialDimension={{ width: 1, height: 1 }}
       >
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 24, right: 16, left: -20, bottom: 0 }}>
+          {projectionRange ? (
+            <ReferenceArea
+              x1={projectionRange.from}
+              x2={projectionRange.to}
+              fill="var(--muted)"
+              fillOpacity={0.5}
+              stroke="none"
+              ifOverflow="extendDomain"
+              label={({ viewBox }: { viewBox?: { x?: number; y?: number; width?: number } }) => (
+                <text
+                  data-testid="chart-projection-zone"
+                  x={(viewBox?.x ?? 0) + (viewBox?.width ?? 0) - 4}
+                  y={(viewBox?.y ?? 0) + 12}
+                  textAnchor="end"
+                  fontSize={12}
+                  fill="var(--muted-foreground)"
+                >
+                  Proyeksi
+                </text>
+              )}
+            />
+          ) : null}
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.05} />
           <XAxis
             dataKey="name"
@@ -207,7 +293,7 @@ export default function ParamTrendChart({
               if (isForecastSeries && !isForecast) return null;
               return [
                 <span key="val" className="flex items-center gap-1.5">
-                  {value} {isForecast && <span className="rounded bg-primary/20 px-1 py-0.5 text-xs font-bold uppercase text-primary">Prediksi</span>}
+                  {value} {isForecast && <span className="rounded bg-primary/20 px-1 py-0.5 text-xs font-bold text-primary">Prediksi</span>}
                 </span>,
                 name
               ];
@@ -236,9 +322,16 @@ export default function ParamTrendChart({
                     fillOpacity={isFiltered ? 0.15 : 0.05}
                     isAnimationActive={animationEnabled}
                     animationDuration={1000}
-                    dot={isFiltered ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
+                    dot={isFiltered || isForecastingThis ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
                     connectNulls
-                  />
+                  >
+                    {isFiltered || isForecastingThis ? (
+                      <LabelList
+                        dataKey={`actual_dataset_${i}`}
+                        content={pointLabel("actual", chartData)}
+                      />
+                    ) : null}
+                  </Area>
                   {isForecastingThis && (
                     <Area
                       key={`param-forecast-${i}`}
@@ -252,7 +345,12 @@ export default function ParamTrendChart({
                       isAnimationActive={animationEnabled}
                       animationDuration={1000}
                       dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: color }}
-                    />
+                    >
+                      <LabelList
+                        dataKey={`forecast_dataset_${i}`}
+                        content={pointLabel("forecast", chartData)}
+                      />
+                    </Area>
                   )}
                 </g>
               );
@@ -281,7 +379,12 @@ export default function ParamTrendChart({
                   dot={{ r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: "var(--primary)" }}
                   activeDot={{ r: 5, strokeWidth: 0, fill: "var(--primary)" }}
                   connectNulls
-                />
+                >
+                  <LabelList
+                    dataKey={`actual_dataset_${i}`}
+                    content={pointLabel("actual", chartData)}
+                  />
+                </Area>
                 {isForecastingTotal && (
                   <Area
                     key={`total-forecast-${i}`}
@@ -295,13 +398,37 @@ export default function ParamTrendChart({
                     isAnimationActive={animationEnabled}
                     animationDuration={1500}
                     dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: "var(--primary)" }}
-                  />
+                  >
+                    <LabelList
+                      dataKey={`forecast_dataset_${i}`}
+                      content={pointLabel("forecast", chartData)}
+                    />
+                  </Area>
                 )}
               </g>
             );
           })}
         </AreaChart>
       </ResponsiveContainer>
+      </div>
+      {projectionRange ? (
+        <p
+          data-testid="chart-legend"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 text-xs text-muted-foreground"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-foreground" />
+            Aktual
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="h-0 w-4 border-t-2 border-dashed border-muted-foreground"
+            />
+            Proyeksi
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

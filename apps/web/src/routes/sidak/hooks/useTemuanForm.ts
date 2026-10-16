@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
+import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 
 interface AgentEntry {
   id: string;
@@ -20,6 +21,8 @@ interface UseTemuanFormParams {
   setTemuan: React.Dispatch<React.SetStateAction<QATemuan[]>>;
   setErrorMsg: (msg: string | null) => void;
   setSuccessMsg: (msg: string | null) => void;
+  /** Konfirmasi lewat `ConfirmDialog` (bukan `window.confirm`). */
+  confirm: ConfirmFn;
 }
 
 export interface FormEntry {
@@ -50,6 +53,7 @@ export function useTemuanForm({
   setTemuan,
   setErrorMsg,
   setSuccessMsg,
+  confirm,
 }: UseTemuanFormParams) {
   const [showForm, setShowForm] = useState(false);
   const [noTiket, setNoTiket] = useState("");
@@ -125,9 +129,12 @@ export function useTemuanForm({
       }
     }
     if (!normalizedTicket) {
-      const ok = window.confirm(
-        "No. Tiket kosong. Setiap temuan tanpa no. tiket dihitung sebagai sesi terpisah. Lanjutkan?"
-      );
+      const ok = await confirm({
+        title: "Simpan tanpa no. tiket?",
+        description:
+          "Setiap temuan tanpa no. tiket dihitung sebagai sesi terpisah dan memengaruhi skor sesi.",
+        confirmLabel: "Simpan tanpa tiket",
+      });
       if (!ok) return;
     }
     setPreviewing(true);
@@ -161,9 +168,11 @@ export function useTemuanForm({
         return;
       }
       if (preview.stats.skipped_count > 0) {
-        const ok = window.confirm(
-          `${preview.stats.skipped_count} parameter sudah ada (duplikat) dan akan di-skip. ${preview.stats.valid_count} akan disimpan. Lanjutkan?`
-        );
+        const ok = await confirm({
+          title: "Lewati temuan duplikat?",
+          description: `${preview.stats.skipped_count} parameter sudah ada untuk tiket ini dan akan dilewati. ${preview.stats.valid_count} temuan baru akan disimpan.`,
+          confirmLabel: "Simpan yang baru",
+        });
         if (!ok) return;
       }
       setSaving(true);
@@ -187,8 +196,10 @@ export function useTemuanForm({
       setTemuan((updated as any).items ?? []);
       resetForm();
       setPreviewResult(null);
-      setSuccessMsg(`${(created as any)?.inserted ?? 0} temuan berhasil disimpan!`);
-      setTimeout(() => setSuccessMsg(null), 3000);
+      setSuccessMsg(
+        `${(created as any)?.inserted ?? 0} temuan tersimpan untuk ${selectedAgent.nama}.`,
+      );
+      setTimeout(() => setSuccessMsg(null), 6000);
     } catch (e: any) {
       setErrorMsg(e.message || "Gagal menyimpan temuan");
     } finally {

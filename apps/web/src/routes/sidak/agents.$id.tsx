@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAgentDetail } from "../../hooks/useAgentDetail";
 import { useAgentQuickview } from "../../hooks/useAgentQuickview";
 import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
+import AgentCoachingBrief from "../../components/sidak/AgentCoachingBrief";
 import AgentPerformanceQuickview from "../../components/sidak/AgentPerformanceQuickview";
 import AgentProfileSidebar from "../../components/sidak/AgentProfileSidebar";
 import AgentSwitcher from "../../components/sidak/AgentSwitcher";
@@ -82,18 +83,43 @@ export default function SidakAgentDetailPage() {
     error: quickviewError,
     refetch: refetchQuickview,
   } = useAgentQuickview(id, selectedYear, selectedService);
-  const [activeTab, setActiveTab] = useState<SidakAgentDetailTab>("summary");
+  // Tab aktif disimpan di alamat (`?tab=`) supaya bisa dibagikan dan bertahan
+  // saat dimuat ulang.
+  const search = useSearch({ from: "/sidak/agents/$id" });
+  const navigate = useNavigate({ from: "/sidak/agents/$id" });
+  const urlTab: SidakAgentDetailTab = search.tab ?? "summary";
+  // Tab berganti seketika di state lokal (fokus ke tiket butuh panelnya sudah
+  // tampil); alamat menyusul lewat navigate. Back/forward ikut lewat urlTab.
+  const [activeTab, setActiveTab] = useState<SidakAgentDetailTab>(urlTab);
   const [mountedTabs, setMountedTabs] = useState<Set<SidakAgentDetailTab>>(
-    () => new Set(["summary"]),
+    () => new Set<SidakAgentDetailTab>(["summary", urlTab]),
   );
+  const [syncedUrlTab, setSyncedUrlTab] = useState(urlTab);
+  if (urlTab !== syncedUrlTab) {
+    setSyncedUrlTab(urlTab);
+    setActiveTab(urlTab);
+    if (!mountedTabs.has(urlTab)) {
+      setMountedTabs(new Set(mountedTabs).add(urlTab));
+    }
+  }
 
-  const handleTabChange = useCallback((tab: SidakAgentDetailTab) => {
-    setActiveTab(tab);
-    setMountedTabs((current) => {
-      if (current.has(tab)) return current;
-      return new Set(current).add(tab);
-    });
-  }, []);
+  const handleTabChange = useCallback(
+    (tab: SidakAgentDetailTab) => {
+      setActiveTab(tab);
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          tab: tab === "summary" ? undefined : tab,
+        }),
+        replace: true,
+      });
+      setMountedTabs((current) => {
+        if (current.has(tab)) return current;
+        return new Set(current).add(tab);
+      });
+    },
+    [navigate],
+  );
 
   const [temuanFocus, setTemuanFocus] = useState<TemuanFocusRequest | null>(
     null,
@@ -319,49 +345,69 @@ export default function SidakAgentDetailPage() {
                     description="Pilih tahun atau layanan lain, atau tambahkan audit lewat Input Audit."
                   />
                 ) : (
-                  <section
-                    aria-labelledby="agent-monthly-score-heading"
-                    className="flex min-w-0 flex-col gap-3"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <h2
-                        id="agent-monthly-score-heading"
-                        className="font-outfit text-lg font-bold tracking-tight text-foreground"
-                      >
-                        Skor per bulan
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Klik batang bulan untuk melihat tiket pengurang skor dan
-                        akar masalahnya.
-                      </p>
-                    </div>
-                    <MonthRail
-                      summaries={monthlySummaries}
-                      selectedMonth={selectedMonth}
-                      onMonthSelect={handleMonthSelect}
-                    />
-                    {latestPeriod && (
-                      <div className="pt-2">
-                        <AgentAuditDossier
-                          finalScore={latestPeriod.finalScore}
-                          sessionCount={latestPeriod.sessionCount}
-                          findingsCount={latestPeriod.findingsCount}
-                          previousScore={previousPeriod?.finalScore ?? null}
-                          previousMonthName={
-                            previousPeriod
-                              ? monthsFull[previousPeriod.month - 1]
-                              : undefined
-                          }
-                          monthLabel={activeLabel}
-                          monthTitle={activeTitle}
-                          tickets={topTickets}
-                          causes={activeRootCauses}
-                          rootCauseMonthLabel={rootCauseScopeLabel}
-                          onTicketSelect={handleTicketSelect}
-                        />
+                  <>
+                    {latestPeriod && selectedMonth && activeTitle ? (
+                      <AgentCoachingBrief
+                        monthTitle={activeTitle}
+                        month={selectedMonth}
+                        year={selectedYear}
+                        score={latestPeriod.finalScore}
+                        previousScore={previousPeriod?.finalScore ?? null}
+                        previousMonthName={
+                          previousPeriod
+                            ? monthsFull[previousPeriod.month - 1]
+                            : undefined
+                        }
+                        findings={temuanDisplayItems}
+                        tickets={topTickets}
+                        causes={activeRootCauses}
+                        onTicketSelect={handleTicketSelect}
+                      />
+                    ) : null}
+                    <section
+                      aria-labelledby="agent-monthly-score-heading"
+                      className="flex min-w-0 flex-col gap-3"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <h2
+                          id="agent-monthly-score-heading"
+                          className="font-outfit text-lg font-bold tracking-tight text-foreground"
+                        >
+                          Skor per bulan
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          Klik batang bulan untuk melihat tiket pengurang skor
+                          dan akar masalahnya.
+                        </p>
                       </div>
-                    )}
-                  </section>
+                      <MonthRail
+                        summaries={monthlySummaries}
+                        selectedMonth={selectedMonth}
+                        onMonthSelect={handleMonthSelect}
+                      />
+                      {latestPeriod && (
+                        <div className="pt-2">
+                          <AgentAuditDossier
+                            finalScore={latestPeriod.finalScore}
+                            sessionCount={latestPeriod.sessionCount}
+                            findingsCount={latestPeriod.findingsCount}
+                            previousScore={previousPeriod?.finalScore ?? null}
+                            previousMonthName={
+                              previousPeriod
+                                ? monthsFull[previousPeriod.month - 1]
+                                : undefined
+                            }
+                            monthLabel={activeLabel}
+                            monthTitle={activeTitle}
+                            tickets={topTickets}
+                            causes={activeRootCauses}
+                            rootCauseMonthLabel={rootCauseScopeLabel}
+                            onTicketSelect={handleTicketSelect}
+                          />
+                        </div>
+                      )}
+                    </section>
+                  </>
                 )}
               </div>
             ),

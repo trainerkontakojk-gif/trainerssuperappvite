@@ -65,6 +65,11 @@ export function formatInsightDateLong(iso: string) {
   return `${d} ${MONTH_FULL[m - 1]} ${y}`;
 }
 
+/** "Senin, 6 Oktober 2026". */
+export function formatInsightDateWithWeekday(iso: string) {
+  return `${WEEKDAY_FULL[weekdayIndex(iso)]}, ${formatInsightDateLong(iso)}`;
+}
+
 export function formatInsightDateShort(iso: string) {
   const { m, d } = parts(iso);
   return `${d} ${MONTH_SHORT[m - 1]}`;

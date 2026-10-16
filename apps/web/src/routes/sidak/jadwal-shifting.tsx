@@ -37,6 +37,7 @@ import {
   shiftMonth,
   todaySectionOptions,
 } from "../../components/sidak/jadwal-shifting/schedule-sections";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
 
 /**
  * `/sidak/jadwal-shifting` — tampilan read-only jadwal shifting WFM Dash Pro
@@ -417,14 +418,11 @@ export default function SidakJadwalShiftingPage() {
   );
   const pageHeader = (
     <header className="flex min-w-0 flex-col gap-3">
-      <div className="min-w-0">
-        <h1 className="font-outfit text-xl font-bold tracking-tight text-foreground">
-          Jadwal Shifting
-        </h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Dibaca langsung dari WFM Dash Pro. Hanya-baca.
-        </p>
-      </div>
+      <SidakPageHeader
+        title="Jadwal shifting"
+            eyebrow="SIDAK · Laporan"
+        description="Jadwal harian agen dari WFM Dash Pro. Hanya-baca."
+      />
       <Tabs
         value={view}
         onValueChange={(next) =>

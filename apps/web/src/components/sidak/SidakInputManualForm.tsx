@@ -8,7 +8,7 @@ const NILAI_OPTIONS = [
     v: 0,
     sub: "Sangat Tidak Sesuai",
     label: "Sangat",
-    active: "bg-rose-500/15 text-rose-600 border-rose-500/30",
+    active: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30",
     inactive:
       "bg-background border-border text-muted-foreground hover:bg-muted",
   },
@@ -16,7 +16,7 @@ const NILAI_OPTIONS = [
     v: 1,
     sub: "Tidak Sesuai",
     label: "Tidak",
-    active: "bg-orange-500/15 text-orange-600 border-orange-500/30",
+    active: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30",
     inactive:
       "bg-background border-border text-muted-foreground hover:bg-muted",
   },
@@ -24,7 +24,7 @@ const NILAI_OPTIONS = [
     v: 2,
     sub: "Perlu Perbaikan",
     label: "Perlu",
-    active: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+    active: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
     inactive:
       "bg-background border-border text-muted-foreground hover:bg-muted",
   },
@@ -32,7 +32,7 @@ const NILAI_OPTIONS = [
     v: 3,
     sub: "Sesuai",
     label: "Sesuai",
-    active: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
+    active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
     inactive:
       "bg-background border-border text-muted-foreground hover:bg-muted",
   },
@@ -110,7 +110,7 @@ export default function SidakInputManualForm({
       </div>
       <div className="p-6 space-y-6">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
             No. Tiket
           </label>
           <input
@@ -131,7 +131,7 @@ export default function SidakInputManualForm({
           <div>
             <label
               htmlFor="temuan-tanggal-layanan"
-              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+              className="text-xs font-semibold text-muted-foreground mb-1.5 block"
             >
               Tanggal layanan — opsional
             </label>
@@ -149,7 +149,7 @@ export default function SidakInputManualForm({
           <div>
             <label
               htmlFor="temuan-tanggal-sampel"
-              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block"
+              className="text-xs font-semibold text-muted-foreground mb-1.5 block"
             >
               Tanggal sampel — opsional
             </label>
@@ -177,13 +177,13 @@ export default function SidakInputManualForm({
               className="rounded-xl border border-border overflow-visible bg-background/20"
             >
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">
+                <p className="text-xs font-semibold text-muted-foreground">
                   Parameter {idx + 1}
                 </p>
                 {entries.length > 1 && (
                   <button
                     onClick={() => onRemoveEntry(entry.uid)}
-                    className="text-muted-foreground hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10"
+                    className="text-muted-foreground hover:text-rose-700 dark:hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -191,7 +191,7 @@ export default function SidakInputManualForm({
               </div>
               <div className="p-4 space-y-4">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                  <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                     Parameter
                   </label>
                   <IndicatorDropdown
@@ -204,13 +204,13 @@ export default function SidakInputManualForm({
                     }
                   />
                   {activeIndicators.length === 0 && (
-                    <p className="mt-2 text-xs font-medium text-amber-600">
+                    <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
                       Belum ada parameter untuk layanan dan periode ini.
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                  <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                     Nilai
                   </label>
                   <div className="grid grid-cols-4 gap-2">
@@ -226,7 +226,7 @@ export default function SidakInputManualForm({
                         }`}
                       >
                         <p className="text-lg font-bold">{opt.v}</p>
-                        <p className="text-xs font-semibold uppercase opacity-65">
+                        <p className="text-xs font-semibold opacity-65">
                           {opt.label}
                         </p>
                       </button>
@@ -235,7 +235,7 @@ export default function SidakInputManualForm({
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                       Ketidaksesuaian
                     </label>
                     <textarea
@@ -250,7 +250,7 @@ export default function SidakInputManualForm({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 block">
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">
                       Sebaiknya
                     </label>
                     <textarea
@@ -283,7 +283,7 @@ export default function SidakInputManualForm({
             disabled={
               saving || previewing || entries.some((e) => !e.indicator_id)
             }
-            className="flex-1 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2"
           >
             {saving ? (
               <>
@@ -302,7 +302,7 @@ export default function SidakInputManualForm({
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-lg text-xs font-semibold uppercase tracking-wide transition sm:w-auto"
+            className="px-6 py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-lg text-xs font-semibold transition sm:w-auto"
           >
             Batal
           </button>

@@ -18,6 +18,27 @@ vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
 }));
 
+// Cakupan SIDAK hidup di query router; di sini cukup state lokal supaya
+// halaman bisa dirender tanpa RouterProvider.
+vi.mock("../hooks/useSidakScope", async () => {
+  const { useCallback, useState } = await import("react");
+  const actual = await vi.importActual<
+    typeof import("../hooks/useSidakScope")
+  >("../hooks/useSidakScope");
+  return {
+    ...actual,
+    useSidakScope: () => {
+      const [scope, setState] = useState(actual.defaultSidakScope());
+      const setScope = useCallback(
+        (patch: Partial<typeof scope>) =>
+          setState((previous) => ({ ...previous, ...patch })),
+        [],
+      );
+      return { scope, explicit: {}, setScope };
+    },
+  };
+});
+
 vi.mock("../components/sidak/KpiCard", () => ({
   default: () => <div />,
 }));
@@ -229,16 +250,10 @@ describe("SIDAK leader scope — single allowed service", () => {
 
     render(<SidakRankingPage />);
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "chat"),
-    )!;
-
-    expect(serviceSelect).toBeDefined();
+    // Ranking memakai `FilterSelect` (Base UI), bukan `<select>` native.
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
+    expect(serviceSelect).toHaveTextContent("Chat");
     expect(serviceSelect).toBeDisabled();
-    expect(serviceSelect.options).toHaveLength(1);
-    expect(serviceSelect.options[0].value).toBe("chat");
-    expect(serviceSelect.options[0].text).toBe("Chat");
 
     const calls = useApiMock.mock.calls;
     const lastCallPath = calls[calls.length - 1]?.[0] ?? "";
@@ -329,39 +344,26 @@ describe("SIDAK default filter pairing", () => {
     }));
 
     render(<SidakRankingPage />);
+    const serviceSelect = screen.getByRole("combobox", { name: "Layanan" });
+    const folderSelect = screen.getByRole("combobox", { name: "Tim" });
 
-    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((select) =>
-      Array.from(select.options).some((option) => option.value === "call"),
-    )!;
-    const folderSelect = selects.find((select) =>
-      Array.from(select.options).some(
-        (option) => option.value === "team-call-id",
-      ),
-    )!;
+    expect(serviceSelect).toHaveTextContent("Call");
+    expect(folderSelect).toHaveTextContent("Tim Call — Semua batch");
 
-    expect(serviceSelect).toBeDefined();
-    expect(folderSelect).toBeDefined();
-    expect(serviceSelect).toHaveValue("call");
-    expect(folderSelect).toHaveValue("team-call-id");
+    fireEvent.click(folderSelect);
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "team-call-id",
-      )?.text,
-    ).toBe("Tim Call — Semua batch");
+      screen.getByRole("option", { name: "Tim Call — Semua batch" }),
+    ).toBeInTheDocument();
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "batch-fahmi-id",
-      )?.text,
-    ).toBe("↳ Muhammad Fahmi Nasrulloh");
+      screen.getByRole("option", { name: "↳ Muhammad Fahmi Nasrulloh" }),
+    ).toBeInTheDocument();
     expect(
-      Array.from(folderSelect.options).find(
-        (option) => option.value === "team-whatsapp-id",
-      )?.text,
-    ).toBe("Tim Whatsapp — Semua batch");
+      screen.getByRole("option", { name: "Tim Whatsapp — Semua batch" }),
+    ).toBeInTheDocument();
+    fireEvent.click(folderSelect);
 
-    fireEvent.change(serviceSelect, { target: { value: "chat" } });
-    expect(serviceSelect).toHaveValue("chat");
-    expect(folderSelect).toHaveValue("team-whatsapp-id");
+    selectOption("Layanan", "Chat");
+    expect(serviceSelect).toHaveTextContent("Chat");
+    expect(folderSelect).toHaveTextContent("Tim Whatsapp — Semua batch");
   });
 });

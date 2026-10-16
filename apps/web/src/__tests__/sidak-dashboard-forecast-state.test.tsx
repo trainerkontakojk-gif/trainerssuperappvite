@@ -14,11 +14,42 @@ vi.mock("../lib/api", () => ({
     },
   },
   unwrapResponse: vi.fn(),
+  getErrorMessage: (_error: unknown, fallback: string) => fallback,
+}));
+
+// Halaman dirender tanpa RouterProvider; tautan cukup jadi anchor biasa.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, params: _params, search: _search, ...rest }: any) => (
+    <a href={typeof to === "string" ? to : "#"} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock("../hooks/useApi", () => ({
   useApi: vi.fn(),
 }));
+
+// Cakupan SIDAK hidup di query router; di sini cukup state lokal supaya
+// halaman bisa dirender tanpa RouterProvider.
+vi.mock("../hooks/useSidakScope", async () => {
+  const { useCallback, useState } = await import("react");
+  const actual = await vi.importActual<
+    typeof import("../hooks/useSidakScope")
+  >("../hooks/useSidakScope");
+  return {
+    ...actual,
+    useSidakScope: () => {
+      const [scope, setState] = useState(actual.defaultSidakScope());
+      const setScope = useCallback(
+        (patch: Partial<typeof scope>) =>
+          setState((previous) => ({ ...previous, ...patch })),
+        [],
+      );
+      return { scope, explicit: {}, setScope };
+    },
+  };
+});
 
 vi.mock("../components/sidak/ParamTrendChart", () => ({
   default: (props: any) => (
@@ -228,31 +259,22 @@ describe("SidakDashboardPage forecast state", () => {
       render(<SidakDashboardPage />);
     });
 
-    expect(await screen.findByText("Insight lama.")).toBeInTheDocument();
-    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
-      '"type":"total"',
+    const chartProps = screen.getByTestId("param-trend-chart-props");
+    await waitFor(() =>
+      expect(chartProps).toHaveTextContent('"type":"total"'),
     );
 
-    await userEvent.click(
-      screen.getByRole("button", { name: "Sembunyikan Prediksi" }),
-    );
+    const forecastLine = screen.getByRole("button", { name: "Garis proyeksi" });
+    await userEvent.click(forecastLine);
+    expect(forecastLine).toHaveAttribute("aria-pressed", "false");
+    expect(chartProps).toHaveTextContent('"forecastScopes":[]');
 
-    expect(screen.queryByText("Insight lama.")).not.toBeInTheDocument();
-    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
-      '"forecastScopes":[]',
-    );
-    expect(
-      screen.getByRole("button", { name: "Tampilkan Prediksi" }),
-    ).toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Tampilkan Prediksi" }),
-    );
-
-    expect(await screen.findByText("Insight lama.")).toBeInTheDocument();
-    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
-      '"type":"total"',
-    );
+    // Snapshot tetap ada: menyalakan lagi tidak memicu lookup baru.
+    const lookups = vi.mocked(unwrapResponse).mock.calls.length;
+    await userEvent.click(forecastLine);
+    expect(forecastLine).toHaveAttribute("aria-pressed", "true");
+    expect(chartProps).toHaveTextContent('"type":"total"');
+    expect(vi.mocked(unwrapResponse).mock.calls.length).toBe(lookups);
   });
 
   it("clears an old forecast immediately while changed data is being checked", async () => {
@@ -274,7 +296,10 @@ describe("SidakDashboardPage forecast state", () => {
 
     const view = render(<SidakDashboardPage />);
 
-    expect(await screen.findByText("Insight lama.")).toBeInTheDocument();
+    const chartProps = screen.getByTestId("param-trend-chart-props");
+    await waitFor(() =>
+      expect(chartProps).toHaveTextContent('"type":"total"'),
+    );
 
     vi.mocked(useApi).mockReturnValue({
       data: {
@@ -294,12 +319,12 @@ describe("SidakDashboardPage forecast state", () => {
 
     view.rerender(<SidakDashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByText("Insight lama.")).not.toBeInTheDocument();
+    // Proyeksi lama langsung dibuang selama data baru dicek.
+    await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Update Prediksi" }),
-      ).toBeInTheDocument();
-    });
+        screen.getByTestId("param-trend-chart-props"),
+      ).toHaveTextContent('"forecastScopes":[]'),
+    );
 
     resolveLookup?.({ status: "stale", snapshot: null });
     expect(

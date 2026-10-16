@@ -277,7 +277,7 @@ test.describe(`Teks shell minimal ${MIN_TEXT_PX}px (hermetic)`, () => {
       .getByRole("button", { name: "SIDAK", exact: true })
       .click({ timeout: 20000 });
     await expect(
-      nav.getByRole("link", { name: "Ranking Agen", exact: true }),
+      nav.getByRole("link", { name: "Ranking", exact: true }),
     ).toBeVisible();
     let offenders = await findTextBelowFloor(nav);
     expect(offenders, `sidebar: ${offenders.join("\n")}`).toEqual([]);

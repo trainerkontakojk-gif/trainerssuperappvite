@@ -193,7 +193,7 @@ test.describe("Halaman Heatmap", () => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3 }, missing: 7 };
     await open(page, "trainer");
 
-    await expect(page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Heatmap", exact: true })).toBeVisible();
     await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
     await expect(page.getByLabel(/Kalender Desember 2026/)).toBeVisible();
 
@@ -217,7 +217,7 @@ test.describe("Halaman Heatmap", () => {
     await pickSelect(page, "Tahun", "2025");
     await expect.poll(() => captured.at(-1)?.year).toBe("2025");
 
-    await pickSelect(page, "Layanan", "slik");
+    await pickSelect(page, "Layanan", "SLIK");
     await expect.poll(() => captured.at(-1)?.service_type).toBe("slik");
   });
 
@@ -431,7 +431,7 @@ test.describe("Halaman Heatmap", () => {
     sidakAccess = "approved";
     await open(page, "leader");
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { level: 1, name: "Heatmap", exact: true }),
     ).toBeVisible();
   });
 
@@ -439,35 +439,39 @@ test.describe("Halaman Heatmap", () => {
     sidakAccess = "none";
     await open(page, "leader");
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { level: 1, name: "Heatmap", exact: true }),
     ).toHaveCount(0);
   });
 
   test("admin diizinkan membuka halaman heatmap", async ({ page }) => {
     await open(page, "admin");
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { level: 1, name: "Heatmap", exact: true }),
     ).toBeVisible();
   });
 
   test("role agent ditolak membuka halaman heatmap", async ({ page }) => {
     await open(page, "agent");
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { level: 1, name: "Heatmap", exact: true }),
     ).toHaveCount(0);
   });
 
-  test("kartu landing SIDAK membuka halaman heatmap", async ({ page }) => {
+  test("daftar halaman di Ringkasan SIDAK membuka halaman heatmap", async ({
+    page,
+  }) => {
     await installMocks(page, "trainer");
     await page.goto("/sidak");
 
-    const card = page.getByRole("link", { name: /Heatmap Ketidaksesuaian/ });
+    const card = page
+      .getByRole("region", { name: "Halaman SIDAK", exact: true })
+      .getByRole("link", { name: /^Heatmap/ });
     await expect(card).toBeVisible();
     await card.click();
 
     await expect(page).toHaveURL(/\/sidak\/heatmap$/);
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { level: 1, name: "Heatmap", exact: true }),
     ).toBeVisible();
   });
 

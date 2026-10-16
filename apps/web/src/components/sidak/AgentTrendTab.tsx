@@ -11,6 +11,9 @@ import {
 import ParamTrendChart from "./ParamTrendChart";
 import QaStatePanel from "./QaStatePanel";
 import AgentComparisonTableView from "./AgentComparisonTable";
+import { cn } from "cn";
+import { parameterDirection } from "../../utils/parameterTrendDirection";
+import { SIDAK_SCORE_TEXT } from "../../utils/sidakScoreStatus";
 
 interface TrendDataset {
   label: string;
@@ -127,7 +130,7 @@ export default function AgentTrendTab({
             aria-pressed={activeFilter === null}
             className="min-h-11 rounded-xl px-3 text-sm font-semibold motion-reduce:transition-none"
           >
-            Semua parameter
+            Total + parameter
           </Button>
           <Button
             type="button"
@@ -192,8 +195,117 @@ export default function AgentTrendTab({
           />
         </div>
 
+        {paramDatasets.length > 0 ? (
+          <ParameterTable labels={labels} datasets={paramDatasets} />
+        ) : null}
+
         <AgentComparisonTableView comparisonTable={comparisonTable} embedded />
       </CardContent>
     </Card>
+  );
+}
+
+const DIRECTION_TEXT = {
+  bad: SIDAK_SCORE_TEXT.bad,
+  ok: SIDAK_SCORE_TEXT.ok,
+  neutral: "text-fg2",
+} as const;
+
+/** Temuan per parameter per bulan, terbanyak dulu, dengan arah dalam kata. */
+function ParameterTable({
+  labels,
+  datasets,
+}: {
+  labels: string[];
+  datasets: TrendDataset[];
+}) {
+  const rows = datasets
+    .map((ds) => ({
+      label: ds.label,
+      values: labels.map((_, i) => ds.data[i] ?? 0),
+    }))
+    .map((row) => ({
+      ...row,
+      total: row.values.reduce((sum, value) => sum + value, 0),
+      direction: parameterDirection(row.values),
+    }))
+    .sort(
+      (a, b) => b.total - a.total || a.label.localeCompare(b.label, "id"),
+    );
+
+  return (
+    <section
+      aria-labelledby="agent-parameter-table-title"
+      className="mt-6 flex min-w-0 flex-col gap-2"
+    >
+      <h3
+        id="agent-parameter-table-title"
+        className="font-display text-base font-bold tracking-tight text-foreground"
+      >
+        Temuan per parameter
+      </h3>
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-border">
+        <table
+          aria-labelledby="agent-parameter-table-title"
+          className="w-full border-collapse text-left text-sm"
+        >
+          <thead>
+            <tr className="border-b border-border">
+              <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+                Parameter
+              </th>
+              {labels.map((label) => (
+                <th
+                  key={label}
+                  className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground"
+                >
+                  {label}
+                </th>
+              ))}
+              <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
+                Total
+              </th>
+              <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+                Arah
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label} className="border-b border-border last:border-0">
+                <th
+                  scope="row"
+                  className="min-w-[12rem] px-3 py-2 font-medium text-foreground"
+                >
+                  {row.label}
+                </th>
+                {row.values.map((value, i) => (
+                  <td
+                    key={labels[i]}
+                    className={cn(
+                      "px-3 py-2 text-right font-mono tabular-nums",
+                      value === 0 ? "text-muted-foreground" : "text-foreground",
+                    )}
+                  >
+                    {value}
+                  </td>
+                ))}
+                <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-foreground">
+                  {row.total}
+                </td>
+                <td
+                  className={cn(
+                    "whitespace-nowrap px-3 py-2",
+                    DIRECTION_TEXT[row.direction.tone],
+                  )}
+                >
+                  {row.direction.label}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

@@ -9,6 +9,18 @@ import AgentCard from "../../components/sidak/AgentCard";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { titleize } from "../../lib/humanize";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
+import { useSidakScope } from "../../hooks/useSidakScope";
+import {
+  AGENT_SORT_OPTIONS,
+  AGENT_STATUS_OPTIONS,
+  agentStatus,
+  isBelowTarget,
+  sortAgents,
+  type AgentSort,
+  type AgentStatusFilter,
+} from "../../utils/sidakAgentList";
+import { cn } from "cn";
 
 const INITIAL_VISIBLE = 24;
 const AGENT_GRID_CLASS =
@@ -51,9 +63,14 @@ const ALL_BATCHES = "__all__";
 export default function SidakAgentsPage() {
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [status, setStatus] = useState<AgentStatusFilter>("all");
+  const [sort, setSort] = useState<AgentSort>("score-asc");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [showAll, setShowAll] = useState(false);
-  const year = new Date().getFullYear();
+  // Tahun mengikuti cakupan bersama SIDAK; layanan/tim tidak dipakai di sini
+  // karena skor tiap agen dihitung dari layanan timnya sendiri.
+  const { scope } = useSidakScope();
+  const year = scope.tahun;
 
   const { data, loading, error, refetch } = useApi<AgentDirectoryResponse>(
     `/sidak/agents?year=${year}&show_all=${showAll}`,
@@ -65,11 +82,11 @@ export default function SidakAgentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, selectedBatch, showAll]);
+  }, [search, selectedBatch, status, sort, showAll]);
 
   const filtered = useMemo(() => {
     const agents = data?.agents ?? [];
-    return agents.filter((a) => {
+    const matches = agents.filter((a) => {
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -80,9 +97,15 @@ export default function SidakAgentsPage() {
           return false;
       }
       if (selectedBatch && a.batch_name !== selectedBatch) return false;
+      if (status !== "all" && agentStatus(a) !== status) return false;
       return true;
     });
-  }, [data?.agents, search, selectedBatch]);
+    return sortAgents(matches, sort);
+  }, [data?.agents, search, selectedBatch, status, sort]);
+  const belowTarget = useMemo(
+    () => (data?.agents ?? []).filter(isBelowTarget).length,
+    [data?.agents],
+  );
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
@@ -91,11 +114,13 @@ export default function SidakAgentsPage() {
     filtered.length - visibleCount,
   );
   const batches = data?.batches ?? [];
-  const hasActiveFilters = Boolean(search || selectedBatch);
+  const hasActiveFilters = Boolean(search || selectedBatch || status !== "all");
+  const totalAgents = data?.agents.length ?? 0;
 
   function resetFilters() {
     setSearch("");
     setSelectedBatch(null);
+    setStatus("all");
     setVisibleCount(INITIAL_VISIBLE);
   }
 
@@ -107,49 +132,16 @@ export default function SidakAgentsPage() {
   return (
     <div className="min-w-0 overflow-x-hidden pb-16">
       <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0">
-            <h1 className="font-outfit text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Daftar agen
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Tinjau skor, tren, dan status audit setiap agen dalam satu daftar.
+        <SidakPageHeader
+          title="Agen"
+          description="Cari agen, lalu buka skor, temuan, dan bahan coaching-nya."
+          scope={
+            <p className="text-sm text-fg2">
+              <span className="text-foreground">Tahun {year}</span> · skor dari
+              periode audit terakhir tiap agen, di layanan timnya
             </p>
-          </div>
-
-          <Button
-            type="button"
-            variant={showAll ? "default" : "outline"}
-            size="lg"
-            aria-pressed={showAll}
-            aria-label={
-              showAll
-                ? "Sembunyikan agen tambahan"
-                : "Tampilkan agen tambahan dari daftar utama"
-            }
-            title={
-              showAll
-                ? "Sembunyikan agen tambahan"
-                : "Sertakan agen di luar daftar utama"
-            }
-            onClick={() => {
-              setShowAll((s) => !s);
-              setVisibleCount(INITIAL_VISIBLE);
-            }}
-            className="min-h-[44px] w-full sm:w-auto"
-          >
-            {showAll ? (
-              <EyeOff data-icon="inline-start" aria-hidden="true" />
-            ) : (
-              <Eye data-icon="inline-start" aria-hidden="true" />
-            )}
-            <span>
-              {showAll
-                ? "Sembunyikan agen tambahan"
-                : "Tampilkan agen tambahan"}
-            </span>
-          </Button>
-        </div>
+          }
+        />
 
         {error && !data ? (
           <QaStatePanel
@@ -173,12 +165,15 @@ export default function SidakAgentsPage() {
           <>
             <section
               aria-label="Filter daftar agen"
-              className="flex flex-col gap-4 border-y border-border bg-surface/30 py-4 sm:py-5"
+              className="flex flex-col gap-4 border-y border-border py-4"
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <label htmlFor="sidak-agent-search" className="sr-only">
-                    Cari agen berdasarkan nama, tim, atau batch
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <div className="flex min-w-0 flex-col gap-1.5 lg:flex-1">
+                  <label
+                    htmlFor="sidak-agent-search"
+                    className="text-[12px] font-medium text-fg2"
+                  >
+                    Cari agen
                   </label>
                   <div className="relative">
                     <Search
@@ -188,7 +183,7 @@ export default function SidakAgentsPage() {
                     <Input
                       id="sidak-agent-search"
                       type="search"
-                      placeholder="Cari nama, tim, atau batch..."
+                      placeholder="Nama, tim, atau batch"
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
                       className="h-[44px] pl-10 pr-4"
@@ -196,17 +191,84 @@ export default function SidakAgentsPage() {
                   </div>
                 </div>
 
-                {data ? (
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:contents">
+                  {batches.length > 0 ? (
+                    <FilterSelect
+                      id="sidak-batch-filter"
+                      label="Batch"
+                      className="flex min-w-0 flex-col gap-1.5 lg:w-52"
+                      value={selectedBatch ?? ALL_BATCHES}
+                      onValueChange={(value) => {
+                        setSelectedBatch(value === ALL_BATCHES ? null : value);
+                        setVisibleCount(INITIAL_VISIBLE);
+                      }}
+                      items={[
+                        { value: ALL_BATCHES, label: "Semua batch" },
+                        ...batches.map((batch) => ({
+                          value: batch,
+                          label: titleize(batch),
+                        })),
+                      ]}
+                    />
+                  ) : null}
+                  <FilterSelect
+                    id="sidak-status-filter"
+                    label="Status"
+                    className="flex min-w-0 flex-col gap-1.5 lg:w-52"
+                    value={status}
+                    onValueChange={(value) =>
+                      setStatus(value as AgentStatusFilter)
+                    }
+                    items={AGENT_STATUS_OPTIONS}
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant={showAll ? "default" : "outline"}
+                  size="lg"
+                  aria-pressed={showAll}
+                  aria-label={
+                    showAll
+                      ? "Sembunyikan agen tambahan"
+                      : "Tampilkan agen tambahan dari daftar utama"
+                  }
+                  title={
+                    showAll
+                      ? "Sembunyikan agen tambahan"
+                      : "Sertakan agen di luar daftar utama"
+                  }
+                  onClick={() => {
+                    setShowAll((s) => !s);
+                    setVisibleCount(INITIAL_VISIBLE);
+                  }}
+                  className="min-h-[44px] w-full sm:w-auto"
+                >
+                  {showAll ? (
+                    <EyeOff data-icon="inline-start" aria-hidden="true" />
+                  ) : (
+                    <Eye data-icon="inline-start" aria-hidden="true" />
+                  )}
+                  <span>
+                    {showAll
+                      ? "Sembunyikan agen tambahan"
+                      : "Tampilkan agen tambahan"}
+                  </span>
+                </Button>
+              </div>
+
+              {data ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <p
-                      className="text-sm text-muted-foreground"
+                      data-testid="sidak-agents-count"
+                      className="text-sm text-fg2 tabular-nums"
                       aria-live="polite"
                     >
-                      Menampilkan{" "}
-                      <span className="font-semibold tabular-nums text-foreground">
-                        {filtered.length}
-                      </span>{" "}
-                      dari {data.agents.length} agen
+                      {hasActiveFilters
+                        ? `${filtered.length} dari ${totalAgents} agen`
+                        : `${totalAgents} agen`}{" "}
+                      · {belowTarget} di bawah target
                     </p>
                     {hasActiveFilters ? (
                       <Button
@@ -214,7 +276,7 @@ export default function SidakAgentsPage() {
                         variant="ghost"
                         size="default"
                         onClick={resetFilters}
-                        className="min-h-[44px] self-start px-2 sm:self-auto"
+                        className="min-h-[44px] px-2"
                       >
                         <RotateCcw
                           data-icon="inline-start"
@@ -224,27 +286,29 @@ export default function SidakAgentsPage() {
                       </Button>
                     ) : null}
                   </div>
-                ) : null}
-              </div>
-
-              {batches.length > 0 ? (
-                <FilterSelect
-                  id="sidak-batch-filter"
-                  label="Batch"
-                  className="flex min-w-0 flex-col gap-1.5 sm:max-w-[320px]"
-                  value={selectedBatch ?? ALL_BATCHES}
-                  onValueChange={(value) => {
-                    setSelectedBatch(value === ALL_BATCHES ? null : value);
-                    setVisibleCount(INITIAL_VISIBLE);
-                  }}
-                  items={[
-                    { value: ALL_BATCHES, label: "Semua batch" },
-                    ...batches.map((batch) => ({
-                      value: batch,
-                      label: titleize(batch),
-                    })),
-                  ]}
-                />
+                  <div
+                    role="group"
+                    aria-label="Urutkan agen"
+                    className="inline-flex self-start rounded-lg border border-border p-0.5 sm:self-auto"
+                  >
+                    {AGENT_SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={sort === option.value}
+                        onClick={() => setSort(option.value)}
+                        className={cn(
+                          "min-h-[44px] rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
+                          sort === option.value
+                            ? "bg-foreground text-background"
+                            : "text-fg2 hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </section>
 

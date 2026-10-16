@@ -14,8 +14,8 @@ import {
 } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
- * Sisa perapian SIDAK (hermetic): filter batch Daftar agen, label beranda
- * SIDAK, dan penanda shift lintas tengah malam di Jadwal Shifting.
+ * Sisa perapian SIDAK (hermetic): filter batch Daftar agen dan penanda shift
+ * lintas tengah malam di Jadwal Shifting.
  * Plan: plans/markdown/sidak-minor-polish.md.
  */
 
@@ -139,38 +139,6 @@ test.describe("Sisa perapian SIDAK (hermetic)", () => {
     await expect(page.getByText("72.0%", { exact: true })).toHaveClass(
       /text-rose-700/,
     );
-    expectHermetic(audit);
-  });
-
-  test("Beranda SIDAK: label modul tanpa huruf kapital dan teks kartu >= 12px", async ({
-    page,
-  }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/sidak",
-      apiMocks: [ACCESS_MOCK],
-    });
-    const badge = page.getByText("Modul Utama", { exact: true });
-    await expect(badge).toBeVisible({ timeout: 20000 });
-    expect(
-      await badge.evaluate((el) => getComputedStyle(el).textTransform),
-    ).not.toBe("uppercase");
-    expect(await fontSize(badge)).toBeGreaterThanOrEqual(12);
-
-    const cta = page.getByText("Buka Modul").first();
-    expect(await fontSize(cta)).toBeGreaterThanOrEqual(12);
-    const desc = page.getByText(/Proyeksi tren temuan dan sinyal agent/i);
-    expect(await fontSize(desc)).toBeGreaterThanOrEqual(12);
-
-    // Kartu modul tidak lagi dibungkus elemen framer-motion (transform inline).
-    const forecastLink = page.getByRole("link", { name: /forecast/i }).first();
-    await forecastLink.hover();
-    const inlineTransforms = await forecastLink.evaluate(
-      (el) =>
-        [el, ...Array.from(el.querySelectorAll("*"))].filter(
-          (node) => (node as HTMLElement).style.transform,
-        ).length,
-    );
-    expect(inlineTransforms).toBe(0);
     expectHermetic(audit);
   });
 

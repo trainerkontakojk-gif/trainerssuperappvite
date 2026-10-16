@@ -48,6 +48,37 @@ function extractChangeValue(text: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const STATUS_ONLY_NOTE =
+  /^(membaik|berisiko|stabil|memburuk|meningkat|menurun|naik|turun)\.?$/i;
+
+export interface ForecastInsightParameterParts {
+  name: string;
+  /** Perubahan apa adanya dari teks AI, mis. "+7,4" atau "-12,2". */
+  change: string;
+  /** Keterangan setelah angka; kosong bila hanya kata status. */
+  note: string | null;
+}
+
+/**
+ * Pisahkan butir "Nama (+7,4): berisiko" menjadi nama, angka, dan keterangan,
+ * supaya angka bisa rata kanan. Kata status saja dibuang karena judul kolom
+ * (Perbaikan/Risiko) sudah menyatakannya. `null` bila butir tidak berpola itu.
+ */
+export function splitParameterItem(
+  text: string,
+): ForecastInsightParameterParts | null {
+  const match = text.match(
+    /^(.+?)\s*\(([+-]?\d+(?:[.,]\d+)?)(?:\s+(?:temuan|defects?|poin))?\)\s*:?\s*(.*)$/i,
+  );
+  if (!match) return null;
+  const note = match[3].trim();
+  return {
+    name: match[1].trim(),
+    change: match[2],
+    note: note && !STATUS_ONLY_NOTE.test(note) ? note : null,
+  };
+}
+
 function classifyListTone(
   subsectionTitle: string,
   changeValue: number | null,

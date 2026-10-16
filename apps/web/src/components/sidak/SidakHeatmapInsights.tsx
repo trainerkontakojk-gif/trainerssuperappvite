@@ -31,7 +31,7 @@ function InsightCard({
       data-testid={`insight-${id}`}
       className="rounded-lg border border-border bg-background p-3"
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium text-muted-foreground">
         {label}
       </p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>

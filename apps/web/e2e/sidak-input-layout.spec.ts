@@ -13,6 +13,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import {
+  captured,
   expectIsolation,
   FIXTURE,
   openInputAudit,
@@ -74,7 +75,7 @@ test.describe("Input Temuan: satu layar kerja", () => {
     await openInputAudit(page, audit);
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "Input Temuan" }),
+      page.getByRole("heading", { level: 1, name: "Input temuan" }),
     ).toHaveCount(1);
     await expect(page.getByRole("group", { name: "Konteks audit" })).toBeVisible();
     await expect(trigger(page, "Folder")).toContainText("Batch Uji");
@@ -102,7 +103,7 @@ test.describe("Input Temuan: satu layar kerja", () => {
     await openInputAudit(page, audit, { initialUrl: "/sidak/input" });
 
     await expect(
-      page.getByRole("heading", { level: 1, name: "Input Temuan" }),
+      page.getByRole("heading", { level: 1, name: "Input temuan" }),
     ).toBeVisible();
     await expect(trigger(page, "Folder")).toBeEnabled();
     await expect(trigger(page, "Agen")).toBeDisabled();
@@ -352,4 +353,74 @@ test.describe("Input Temuan: responsif", () => {
       expectIsolation(audit);
     });
   }
+});
+
+/**
+ * Konfirmasi Input Temuan memakai `ConfirmDialog`, bukan `window.confirm`
+ * (`plans/markdown/sidak-redesign.md` requirement 5). Dialog native langsung
+ * menggagalkan test; Batal tidak mengirim apa pun; setuju mengirim sekali.
+ */
+test.describe("Input Temuan: konfirmasi lewat dialog", () => {
+  const OPEN_FORM = /^(Tambah Temuan|Tambah)$/;
+
+  async function openManualForm(page: Page) {
+    page.on("dialog", (dialog) => {
+      throw new Error(`dialog native muncul: ${dialog.message()}`);
+    });
+    const audit = startAudit();
+    await openInputAudit(page, audit);
+    await selectPeriod(page);
+    await page.getByRole("button", { name: OPEN_FORM }).first().click();
+    await page
+      .locator('button[aria-haspopup="listbox"]:not(fieldset *)')
+      .first()
+      .click();
+    await page.getByRole("option", { name: NON_CRITICAL.name }).first().click();
+    return audit;
+  }
+
+  test("no. tiket kosong: Batal tidak mengirim, Lanjutkan mengirim sekali", async ({
+    page,
+  }) => {
+    const audit = await openManualForm(page);
+
+    await page.getByRole("button", { name: /Simpan Temuan/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Simpan tanpa no. tiket?" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(captured("preview")).toHaveLength(0);
+    expect(captured("batch")).toHaveLength(0);
+
+    await page.getByRole("button", { name: /Simpan Temuan/ }).click();
+    await dialog.getByRole("button", { name: "Simpan tanpa tiket" }).click();
+    await expect.poll(() => captured("batch").length).toBe(1);
+
+    // Status setelah simpan menyebut hasilnya dan memberi jalan ke detail agen.
+    const status = page.getByRole("status").filter({ hasText: "temuan tersimpan" });
+    await expect(status).toBeVisible();
+    await expect(
+      status.getByRole("link", { name: "Buka detail agen" }),
+    ).toHaveAttribute("href", new RegExp(`/sidak/agents/${FIXTURE.agent.id}`));
+    expectIsolation(audit);
+  });
+
+  test("parameter duplikat: dialog menyebut jumlah yang dilewati", async ({
+    page,
+  }) => {
+    seedTemuan([
+      { indicator_id: NON_CRITICAL.id, nilai: 1, no_tiket: "TKT-DUP-1" },
+    ]);
+    const audit = await openManualForm(page);
+    await page.getByPlaceholder(/Contoh: L/).fill("TKT-DUP-1");
+
+    await page.getByRole("button", { name: /Simpan Temuan/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Lewati temuan duplikat?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("1 parameter sudah ada");
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(captured("batch")).toHaveLength(0);
+    expectIsolation(audit);
+  });
 });

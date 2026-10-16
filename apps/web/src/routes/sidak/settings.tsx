@@ -28,6 +28,7 @@ import {
   indicatorToFormState,
   pickDefaultVersion,
 } from "./settings/utils";
+import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
 
 interface RuleVersionMeta {
   service_type: string;
@@ -449,15 +450,11 @@ export default function SidakSettingsPage() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto px-4 pb-8 pt-6 md:px-8">
         <div className="mx-auto max-w-6xl space-y-5">
-          <header className="space-y-1">
-            <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
-              Parameter QA
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Kelola versi aturan penilaian per layanan: bobot, parameter, dan
-              periode berlakunya.
-            </p>
-          </header>
+          <SidakPageHeader
+            title="Parameter QA"
+            eyebrow="SIDAK · Audit"
+            description="Versi aturan penilaian per layanan. Setiap publish mengubah skor semua agen."
+          />
 
           <ServiceTabs value={activeTeam} onChange={changeTeam} />
 
