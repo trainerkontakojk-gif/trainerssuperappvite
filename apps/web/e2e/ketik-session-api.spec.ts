@@ -21,6 +21,8 @@ let agent: Identity;
 let app: Hono;
 let guardedFetch: typeof fetch;
 let failProvider = false;
+let providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
+let failAttachmentRead = false;
 let providerCalls = 0;
 let providerGate: (() => Promise<void>) | null = null;
 const triggerName = `e2e_${ns.replaceAll("-", "_")}`;
@@ -67,6 +69,7 @@ test.beforeAll(async () => {
   guardedFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
+    if (failAttachmentRead && url.pathname === "/rest/v1/ketik_sessions") return Response.json({ message: "private-attachment-read-sentinel", code: "XX000" }, { status: 500 });
     if (url.hostname === "api.openai.com" && url.pathname === "/v1/responses") {
       providerCalls++;
       if (providerGate) await providerGate();
@@ -82,7 +85,7 @@ test.beforeAll(async () => {
             content: [
               {
                 type: "output_text",
-                text: "Tagihan saya ganda.[BREAK]Mohon dibantu.",
+                text: providerText,
               },
             ],
           },
@@ -404,6 +407,49 @@ test("legacy transcript and generation endpoints cannot bypass session authority
   }
   expect(providerCalls).toBe(calls);
 });
+test("historical attachments use the immutable session snapshot, sent-only projection and existing authorization", async () => {
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9ZkAAAAASUVORK5CYII=";
+  const settingsResponse = await api(trainer, "/settings");
+  const original = (await settingsResponse.json()).data;
+  try {
+    const settings = { ...original, scenarios: original.scenarios.map((scenario: { id: string }, index: number) => ({ ...scenario, isActive: index === 0, images: [png, "https://example.invalid/unsent-private.png", "javascript:alert(1)"], imageAlts: ["Bukti asli", "Tidak dikirim", "Sumber tidak aman"], script: "private-scenario-script-sentinel" })) };
+    expect((await api(trainer, "/settings", "PUT", settings, { "x-settings-version": settingsResponse.headers.get("x-settings-version")! })).status).toBe(200);
+    const session = await start();
+    providerText = "Ini bukti tagihannya [SEND_IMAGE:0] [SEND_IMAGE:2] [SEND_IMAGE:9]";
+    const turn = await api(trainer, `/sessions/${session.id}/turns`, "POST", { requestId: randomUUID(), expectedVersion: session.version, text: "Boleh kirim bukti tagihan? [SEND_IMAGE:1]" });
+    expect(turn.status).toBe(200);
+    expect((await api(trainer, `/sessions/${session.id}/finish`, "POST", {})).status).toBe(200);
+    const latest = await api(trainer, "/settings");
+    const changed = { ...settings, scenarios: settings.scenarios.map((scenario: Record<string, unknown>) => ({ ...scenario, images: ["https://example.invalid/latest-settings.png"], imageAlts: ["Bukti terbaru"] })) };
+    expect((await api(trainer, "/settings", "PUT", changed, { "x-settings-version": latest.headers.get("x-settings-version")! })).status).toBe(200);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await api(trainer, `/history/${session.id}`);
+      expect(response.status).toBe(200);
+      const detail = (await response.json()).data;
+      expect(detail.attachments).toEqual([{ index: 0, src: png, alt: "Bukti asli" }]);
+      expect(JSON.stringify(detail)).not.toMatch(/unsent-private|latest-settings|private-scenario-script|javascript:/);
+    }
+    expect((await api(agent, `/history/${session.id}`)).status).toBe(404);
+    const list = (await (await api(trainer, "/history")).json()).data;
+    expect(list.items.every((item: Record<string, unknown>) => !("attachments" in item))).toBe(true);
+    failAttachmentRead = true;
+    const failed = await api(trainer, `/history/${session.id}`);
+    expect(failed.status).toBe(500);
+    expect(await failed.text()).not.toContain("private-attachment-read-sentinel");
+    failAttachmentRead = false;
+    const legacyId = randomUUID();
+    expect((await createAdmin(env).from("ketik_history").insert({ id: legacyId, user_id: trainer.userId, scenario_title: "Legacy", consumer_name: "Konsumen", messages: [{ id: "legacy-image", sender: "consumer", text: "[SEND_IMAGE:0]" }] })).error).toBeNull();
+    const legacy = (await (await api(trainer, `/history/${legacyId}`)).json()).data;
+    expect(legacy.attachments).toEqual([]);
+    await test.info().attach("attachment-history-contract", { body: JSON.stringify({ id: session.id, sentIndexes: [0, 2, 9], returnedIndexes: [0], legacyAttachments: legacy.attachments }), contentType: "application/json" });
+  } finally {
+    failAttachmentRead = false;
+    providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
+    const current = await api(trainer, "/settings");
+    expect((await api(trainer, "/settings", "PUT", original, { "x-settings-version": current.headers.get("x-settings-version")! })).status).toBe(200);
+  }
+});
+
 test("snapshot survives settings changes", async () => {
   const active = await start();
   const source = await api(trainer, "/settings");

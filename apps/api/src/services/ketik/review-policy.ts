@@ -1,13 +1,19 @@
-import type { KetikAgentNote, KetikConsumerPoint } from "@trainers/types";
+import {
+  readMessages,
+  readText,
+  locateQuote,
+  type TranscriptMessage,
+} from "./review-transcript";
+import type {
+  KetikAgentNote,
+  KetikConsumerPoint,
+  KetikScoreEvidence,
+} from "@trainers/types";
 import { Type } from "@google/genai";
 
 // ── Evaluasi Edukatif (deterministic education layer) ──
 export type KetikDimensionKey =
-  | "empathy"
-  | "probing"
-  | "resolution"
-  | "typo"
-  | "compliance";
+  "empathy" | "probing" | "resolution" | "typo" | "compliance";
 
 export interface KetikReviewScores {
   final: number;
@@ -87,11 +93,28 @@ export const KETIK_REVIEW_RESPONSE_SCHEMA = {
             type: Type.STRING,
             enum: KETIK_DIMENSION_ORDER,
           },
+          evidence: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                messageId: { type: Type.STRING },
+                quote: { type: Type.STRING },
+              },
+              required: ["messageId", "quote"],
+            },
+          },
           diagnosis: { type: Type.STRING },
           howToFix: { type: Type.STRING },
           exampleRewrite: { type: Type.STRING },
         },
-        required: ["key", "diagnosis", "howToFix", "exampleRewrite"],
+        required: [
+          "key",
+          "diagnosis",
+          "howToFix",
+          "exampleRewrite",
+          "evidence",
+        ],
       },
     },
     overallNextSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -139,6 +162,7 @@ export const KETIK_REVIEW_RESPONSE_SCHEMA = {
     "coachingFocus",
     "scores",
     "typos",
+    "dimensionGuidance",
   ],
 };
 
@@ -155,6 +179,14 @@ Kategori Evaluasi (skala 0-100):
 
 Skor akhir adalah rata-rata lima kategori tersebut.
 
+Dasar penilaian yang dapat diamati:
+- Empati: mengakui keluhan/perasaan secara relevan, bahasa sopan, respons mudah dipahami, dan konsisten saat keluhan berubah. Sapaan sopan saja bukan bukti empati yang lengkap.
+- Probing: menggali informasi penting yang belum tersedia, kronologi dan kebutuhan; jangan menghukum agen karena tidak menanyakan ulang data yang sudah jelas atau mengharuskan jumlah pertanyaan tertentu.
+- Resolusi: menjawab kebutuhan konsumen, memberi langkah konkret, pemilik tindak lanjut dan waktu bila tersedia. Jangan mengarang SLA, kewenangan, hasil, atau janji untuk menaikkan nilai.
+- Kepatuhan: akurasi informasi, batas kewenangan, tanpa janji absolut, victim blaming atau bahasa kasar. Nyatakan bila kebenaran faktual tidak dapat diverifikasi dari transkrip.
+- Tata Tulis: kesalahan nyata dan dampaknya pada keterbacaan; ikuti aturan singkatan di bawah.
+Nilai tiap aspek harus konsisten dengan bukti dan diagnosisnya. Skor tinggi tidak menghapus kesalahan pada aspek tersebut. Jangan mengarang potongan angka untuk membuat skor terlihat pasti.
+
 Rubrik Penilaian (0-100):
 - 90-100: Sangat Baik
 - 75-89: Baik
@@ -169,8 +201,9 @@ Aturan Deteksi Typo:
 Seluruh respons tekstual (summary, strengths, weaknesses, coachingFocus) WAJIB dalam Bahasa Indonesia.
 
 Evaluasi Edukatif:
-- Untuk setiap dari 5 kategori (empathy/probing/resolution/typo/compliance), berikan "dimensionGuidance" berisi HANYA "key", "diagnosis" (1-2 kalimat, kutip 3-6 kata dari transkrip tanpa nama/PII), "howToFix" (langkah konkret 1-2 kalimat), dan "exampleRewrite" (contoh sebelum → sesudah, maks 500 karakter).
-- JANGAN menentukan score/label/verdict/priority — backend akan menentukannya dari skor kanonik.
+- Untuk setiap dari 5 kategori (empathy/probing/resolution/typo/compliance), berikan "dimensionGuidance" berisi "key", "evidence" (1-3 kutipan PERSIS dari pesan terkait beserta messageId), "diagnosis" (jelaskan indikator yang terpenuhi, indikator yang belum terpenuhi, serta mengapa hal itu menghasilkan skor tersebut; bila sudah maksimal jelaskan buktinya), "howToFix" (langkah konkret 1-2 kalimat), dan "exampleRewrite" (contoh sebelum → sesudah, maks 500 karakter).
+- Pada dimensionGuidance JANGAN menyalin score/label/verdict/priority — backend akan menentukannya dari scores. diagnosis harus merujuk evidence; kutipan harus ada di transkrip. Untuk kekurangan berupa tindakan yang tidak dilakukan, kutip giliran yang seharusnya ditanggapi.
+- Jangan menulis kelemahan di strengths. strengths/agentNotes good hanya untuk tindakan konkret yang tepat, disertai alasan; semua kesalahan tetap masuk weaknesses/agentNotes fix walaupun skor tinggi.
 - "overallNextSteps" opsional sebagai catatan tambahan; prioritas perbaikan di UI diambil dari ranking backend, bukan dari field ini.
 - Semua teks edukasi WAJIB dalam Bahasa Indonesia.
 
@@ -228,7 +261,6 @@ export function ketikDimensionVerdict(score: number): KetikVerdict {
 }
 
 interface KetikEducationFallbackRule {
-  diagnosis: string;
   howToFix: string;
   exampleRewrite: string;
 }
@@ -248,23 +280,18 @@ const KETIK_EDUCATION_FALLBACK: Record<
 > = {
   empathy: {
     critical: {
-      diagnosis:
-        "Empati hampir tidak terlihat: agen langsung ke penjelasan atau permintaan data tanpa mengakui keluhan konsumen.",
       howToFix:
-        "Mulai setiap balasan dengan validasi perasaan satu kalimat sebelum menjawab inti masalah.",
+        "Akui keluhan atau kekhawatiran konsumen secara relevan sebelum menjawab inti masalah.",
       exampleRewrite:
         "Sebelumnya: 'Silakan cek email Anda.' — Sesudahnya: 'Saya paham hal ini cukup mengganggu, Bapak/Ibu. Saya bantu cek emailnya sekarang ya.'",
     },
     medium: {
-      diagnosis:
-        "Ada empati tetapi belum konsisten di seluruh percakapan, terutama saat konsumen mengulang keluhan.",
       howToFix:
         "Berikan pengakuan singkat setiap kali konsumen menyampaikan keluhan baru, jangan hanya di awal percakapan.",
       exampleRewrite:
         "Sebelumnya: 'Sudah kami periksa.' — Sesudahnya: 'Maaf atas ketidaknyamanannya, saya sudah periksa ulang ya.'",
     },
     good: {
-      diagnosis: "Empati sudah baik dan konsisten sepanjang percakapan.",
       howToFix: "Pertahankan pola validasi perasaan sebelum penjelasan.",
       exampleRewrite:
         "Contoh yang sudah benar: 'Terima kasih kesabarannya, Bapak/Ibu — saya bantu tindak lanjuti sekarang.'",
@@ -272,23 +299,18 @@ const KETIK_EDUCATION_FALLBACK: Record<
   },
   probing: {
     critical: {
-      diagnosis:
-        "Penggalian informasi minim: kronologi dan detail kebutuhan konsumen tidak digali.",
       howToFix:
-        "Ajukan minimal dua pertanyaan lanjutan: kapan kejadian dan apa dampaknya bagi konsumen.",
+        "Gali kronologi dan dampak yang belum dijelaskan konsumen; jangan mengulang pertanyaan yang sudah terjawab.",
       exampleRewrite:
         "Sebelumnya: 'Baik, kami proses.' — Sesudahnya: 'Boleh saya tahu kapan pembayaran terakhir dilakukan dan nomor kontraknya, Bapak/Ibu?'",
     },
     medium: {
-      diagnosis:
-        "Probing berjalan tetapi belum mendalam; ada informasi penting yang terlewat.",
       howToFix:
         "Gunakan pertanyaan terbuka untuk melengkapi kronologi sebelum memberikan solusi.",
       exampleRewrite:
         "Sebelumnya: 'Apakah sudah pernah terjadi sebelumnya?' — Sesudahnya: 'Kapan pertama kali kendala ini muncul dan bagaimana bentuknya?'",
     },
     good: {
-      diagnosis: "Probing sudah baik: kronologi dan kebutuhan tergali jelas.",
       howToFix: "Pertahankan pertanyaan terbuka sebelum menyimpulkan solusi.",
       exampleRewrite:
         "Contoh yang sudah benar: 'Agar tepat sasaran, boleh dijelaskan urutan kejadiannya dari awal?'",
@@ -296,45 +318,36 @@ const KETIK_EDUCATION_FALLBACK: Record<
   },
   resolution: {
     critical: {
-      diagnosis:
-        "Solusi tidak actionable: konsumen tidak diberi langkah konkret atau estimasi waktu.",
       howToFix:
-        "Tutup dengan langkah spesifik: apa yang dilakukan agen, apa yang dilakukan konsumen, dan estimasi waktunya.",
+        "Jelaskan langkah agen dan konsumen serta tindak lanjutnya; sebut estimasi waktu hanya jika tersedia dari ketentuan yang terverifikasi.",
       exampleRewrite:
-        "Sebelumnya: 'Nanti akan kami proses.' — Sesudahnya: 'Saya ajukan hari ini, hasilnya maksimal 2x24 jam dikirim ke email Bapak/Ibu.'",
+        "Sebelumnya: 'Nanti akan kami proses.' — Sesudahnya: 'Saya bantu teruskan pengajuannya sesuai prosedur dan konfirmasikan estimasi setelah mendapat informasi dari tim terkait.'",
     },
     medium: {
-      diagnosis:
-        "Solusi ada tetapi kurang lengkap; langkah konsumen atau estimasi waktu tidak disebut.",
       howToFix:
         "Lengkapi resolusi dengan estimasi waktu dan tindak lanjut yang jelas.",
       exampleRewrite:
-        "Sebelumnya: 'Kami cek dulu ya.' — Sesudahnya: 'Saya cek sampai sore ini dan kabari progressnya lewat chat ini ya.'",
+        "Sebelumnya: 'Kami cek dulu ya.' — Sesudahnya: 'Saya bantu cek dan konfirmasikan tindak lanjut melalui chat ini setelah ada informasi.'",
     },
     good: {
-      diagnosis: "Resolusi sudah jelas, actionable, dan lengkap.",
       howToFix: "Pertahankan pola langkah + estimasi waktu pada setiap solusi.",
       exampleRewrite:
-        "Contoh yang sudah benar: 'Pengajuan sudah saya buat, konfirmasi akan dikirim H+1 via WhatsApp.'",
+        "Contoh yang sudah benar: 'Pengajuan sudah saya teruskan sesuai prosedur; saya akan mengabari tindak lanjutnya.'",
     },
   },
   typo: {
     critical: {
-      diagnosis:
-        "Typo muncul berulang dan mengganggu keterbacaan serta profesionalisme pesan.",
       howToFix:
         "Baca ulang pesan sebelum kirim; gunakan template resmi untuk istilah produk.",
       exampleRewrite:
         "Sebelumnya: 'pembayaran sudah sauy diterima' — Sesudahnya: 'pembayaran sudah kami terima'.",
     },
     medium: {
-      diagnosis: "Terdapat beberapa typo yang masih memengaruhi keterbacaan.",
       howToFix: "Periksa ejaan kata baku sebelum mengirim pesan.",
       exampleRewrite:
         "Sebelumnya: 'mohon ditungu ya kak' — Sesudahnya: 'Mohon ditunggu, Bapak/Ibu.'",
     },
     good: {
-      diagnosis: "Penulisan sudah bersih dan profesional.",
       howToFix: "Pertahankan standar penulisan yang sudah baik.",
       exampleRewrite:
         "Contoh yang sudah benar: 'Dokumen telah kami terima dan sedang diproses.'",
@@ -342,24 +355,20 @@ const KETIK_EDUCATION_FALLBACK: Record<
   },
   compliance: {
     critical: {
-      diagnosis:
-        "Ada pelanggaran kepatuhan: janji berlebihan, misinformasi, atau bahasa tidak pantas.",
       howToFix:
         "Hindari janji absolut ('pasti', 'dijamin'); sampaikan batas kewenangan dengan jujur.",
       exampleRewrite:
         "Sebelumnya: 'Dijamin lunas besok.' — Sesudahnya: 'Pengajuan saya teruskan hari ini; hasilnya akan dikonfirmasi oleh tim terkait.'",
     },
     medium: {
-      diagnosis:
-        "Secara umum patuh tetapi ada kalimat yang berpotensi ditafsirkan sebagai janji.",
       howToFix:
         "Gunakan frasa probabilitas yang aman untuk komitmen yang belum pasti.",
       exampleRewrite:
-        "Sebelumnya: 'Pasti cepat kok.' — Sesudahnya: 'Estimasi kami 2-3 hari kerja sesuai SLA.'",
+        "Sebelumnya: 'Pasti cepat kok.' — Sesudahnya: 'Saya konfirmasikan dulu estimasi sesuai ketentuan yang berlaku.'",
     },
     good: {
-      diagnosis: "Kepatuhan terjaga: tanpa misinformasi dan bahasa pantas.",
-      howToFix: "Pertahankan kepatuhan terhadap batas kewenangan dan informasi resmi.",
+      howToFix:
+        "Pertahankan kepatuhan terhadap batas kewenangan dan informasi resmi.",
       exampleRewrite:
         "Contoh yang sudah benar: 'Sesuai ketentuan yang berlaku, dokumen ini dapat diajukan kembali.'",
     },
@@ -375,6 +384,8 @@ export interface KetikDimensionGuidanceResult {
   diagnosis: string;
   howToFix: string;
   exampleRewrite: string;
+  source: "transcript" | "general";
+  evidence: KetikScoreEvidence[];
 }
 
 export interface KetikEducationResult {
@@ -397,24 +408,55 @@ function readNarration(
   raw: unknown,
   key: KetikDimensionKey,
   band: KetikEducationBand,
-): KetikEducationFallbackRule {
+  messages: TranscriptMessage[],
+): KetikEducationFallbackRule & {
+  diagnosis: string;
+  source: "transcript" | "general";
+  evidence: KetikScoreEvidence[];
+} {
   const fallback = KETIK_EDUCATION_FALLBACK[key][band];
-  const list = Array.isArray(raw)
-    ? (raw as unknown[])
-    : Array.isArray((raw as any)?.dimensionGuidance)
-      ? ((raw as any).dimensionGuidance as unknown[])
-      : [];
+  const source =
+    raw && typeof raw === "object" && "dimensionGuidance" in raw
+      ? raw.dimensionGuidance
+      : raw;
+  const list: unknown[] = Array.isArray(source) ? source : [];
   const match = list.find(
     (item): item is Record<string, unknown> =>
-      !!item && typeof item === "object" && (item as any).key === key,
+      !!item && typeof item === "object" && "key" in item && item.key === key,
   );
-  if (!match) return fallback;
-  const pick = (value: unknown, fb: string) =>
-    typeof value === "string" && value.trim().length > 0 ? value.trim() : fb;
+  const general = {
+    ...fallback,
+    diagnosis:
+      "Alasan skor berdasarkan percakapan belum tersedia untuk aspek ini.",
+    source: "general" as const,
+    evidence: [],
+  };
+  if (!match) return general;
+  const evidence = Array.isArray(match.evidence)
+    ? match.evidence
+        .flatMap((entry: unknown) => {
+          if (!entry || typeof entry !== "object") return [];
+          const item = entry as Record<string, unknown>;
+          const quote = readText(item.quote, 300);
+          if (!quote) return [];
+          const messageId =
+            locateQuote(messages, "agent", item.messageId, quote) ??
+            locateQuote(messages, "consumer", item.messageId, quote);
+          return messageId ? [{ messageId, quote }] : [];
+        })
+        .slice(0, 3)
+    : [];
+  const diagnosis = readText(match.diagnosis, 500);
+  const howToFix = readText(match.howToFix, 500);
+  const exampleRewrite = readText(match.exampleRewrite, 500);
+  if (evidence.length === 0 || !diagnosis || !howToFix || !exampleRewrite)
+    return general;
   return {
-    diagnosis: pick(match.diagnosis, fallback.diagnosis),
-    howToFix: pick(match.howToFix, fallback.howToFix),
-    exampleRewrite: pick(match.exampleRewrite, fallback.exampleRewrite),
+    source: "transcript",
+    evidence,
+    diagnosis,
+    howToFix,
+    exampleRewrite,
   };
 }
 
@@ -427,7 +469,9 @@ function readNarration(
 export function buildKetikEducation(
   rawAiGuidance: unknown,
   canonicalScores: KetikReviewScores,
+  transcript?: unknown,
 ): KetikEducationResult {
+  const messages = readMessages(transcript);
   const ranked = [...KETIK_DIMENSION_ORDER]
     .sort((a, b) => {
       const diff = canonicalScores[a] - canonicalScores[b];
@@ -443,13 +487,20 @@ export function buildKetikEducation(
 
   const dimensionGuidance = ranked.map(({ key, rank }) => {
     const score = clampScore(canonicalScores[key]);
-    const narration = readNarration(rawAiGuidance, key, ketikScoreBand(score));
+    const narration = readNarration(
+      rawAiGuidance,
+      key,
+      ketikScoreBand(score),
+      messages,
+    );
     return {
       key,
       label: KETIK_DIMENSION_LABELS[key],
       score,
       verdict: ketikDimensionVerdict(score),
       priorityRank: rank as 1 | 2 | 3 | 4 | 5,
+      source: narration.source,
+      evidence: narration.evidence,
       diagnosis: narration.diagnosis,
       howToFix: narration.howToFix,
       exampleRewrite: narration.exampleRewrite,

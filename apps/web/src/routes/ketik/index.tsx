@@ -331,6 +331,7 @@ export default function KetikLanding() {
       updateDetail({
         ...updated,
         previousFinalScore: previous.previousFinalScore,
+        attachments: previous.attachments,
       });
       loadHistory();
     },

@@ -35,6 +35,7 @@ let workerLog = "";
 const fixtures = new Set<string>();
 let boundaryRequests: unknown[] = [];
 let providerCalls = 0;
+let guidancePayload: unknown;
 let providerOrigin: string;
 const server = createServer(async (req, res) => {
   let raw = "";
@@ -72,6 +73,7 @@ const server = createServer(async (req, res) => {
                     typo: 80,
                     compliance: 80,
                   },
+                  dimensionGuidance: guidancePayload,
                   summary: "Local review",
                   strengths: ["Jelas"],
                   weaknesses: ["Probing"],
@@ -293,6 +295,7 @@ test.beforeEach(() => {
   providerMode = "hold";
   providerCalls = 0;
   boundaryRequests = [];
+  guidancePayload = undefined;
 });
 test.afterEach(async () => {
   await stopWorker();
@@ -302,6 +305,84 @@ test.afterEach(async () => {
       (await db.from("ketik_history").delete().eq("id", id)).error,
     ).toBeNull();
   fixtures.clear();
+});
+
+test("score explanations preserve real evidence and disclose missing or fabricated evidence", async () => {
+  providerMode = "success";
+  guidancePayload = [
+    {
+      key: "empathy",
+      diagnosis:
+        "Sapaan sopan, tetapi belum mengakui kekhawatiran konsumen sehingga empati belum maksimal.",
+      howToFix: "Validasi perasaan sebelum menjawab.",
+      exampleRewrite: "Saya paham kekhawatirannya, saya bantu cek.",
+      evidence: [{ messageId: "wrong-id", quote: "Selamat pagi" }],
+    },
+    {
+      key: "probing",
+      diagnosis: "Kronologi belum digali.",
+      howToFix: "Tanyakan kronologi.",
+      exampleRewrite: "Kapan kendala mulai terjadi?",
+      evidence: [{ messageId: "m1", quote: "kutipan yang tidak ada" }],
+    },
+    {
+      key: "typo",
+      diagnosis: "",
+      howToFix: "Baca ulang.",
+      exampleRewrite: "Selamat pagi.",
+      evidence: [{ messageId: "m1", quote: "Selamat pagi" }],
+    },
+  ];
+  const id = await seedSession();
+  expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+    202,
+  );
+  await startWorker();
+  await expect
+    .poll(async () => (await job(id)).status, { timeout: 20_000 })
+    .toBe("completed");
+  const response = await request(`/review/${id}`);
+  expect(response.status).toBe(200);
+  const detail = (await response.json()).data;
+  expect(detail.scores).toEqual({
+    final: 80,
+    empathy: 80,
+    probing: 80,
+    resolution: 80,
+    typo: 80,
+    compliance: 80,
+  });
+  const guidance = detail.review.education.dimensionGuidance;
+  expect(
+    guidance.find((item: { key: string }) => item.key === "empathy"),
+  ).toMatchObject({
+    source: "transcript",
+    evidence: [{ messageId: "m1", quote: "Selamat pagi" }],
+    diagnosis: expect.stringContaining("belum mengakui"),
+  });
+  for (const key of ["probing", "resolution", "typo", "compliance"]) {
+    expect(
+      guidance.find((item: { key: string }) => item.key === key),
+    ).toMatchObject({
+      source: "general",
+      evidence: [],
+      diagnosis: expect.stringContaining("belum tersedia"),
+    });
+  }
+  const legacy = await seedSession(trainer.userId, true);
+  const old = (await request(`/review/${legacy}`).then((r) => r.json())).data;
+  expect(
+    old.review.education.dimensionGuidance.every(
+      (item: { source: string }) => item.source === "general",
+    ),
+  ).toBe(true);
+  await test.info().attach("review-evidence-response", {
+    body: JSON.stringify({
+      scores: detail.scores,
+      education: detail.review.education,
+    }),
+    contentType: "application/json",
+  });
 });
 
 test("manual POST returns accepted before AI and only enqueues without a running worker", async () => {

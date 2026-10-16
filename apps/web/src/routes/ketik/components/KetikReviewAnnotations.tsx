@@ -10,7 +10,7 @@ const aspectLabel = (key: string) =>
   KETIK_ASPECTS.find((aspect) => aspect.key === key)?.label ?? key;
 
 /** Tombol menuju pesan di transkrip, dengan kutipannya. */
-function QuoteButton({
+export function QuoteButton({
   prefix,
   messageId,
   quote,
@@ -44,7 +44,11 @@ export function ConsumerPointItem({
   letter,
   numbers,
   onShowMessage,
+  targetKey,
+  highlighted,
 }: {
+  targetKey?: string;
+  highlighted?: boolean;
   point: KetikConsumerPoint;
   letter: string;
   numbers: Map<string, number>;
@@ -52,7 +56,12 @@ export function ConsumerPointItem({
 }) {
   const status = pointStatus[point.status];
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3">
+    <li
+      data-review-target={targetKey}
+      tabIndex={-1}
+      data-highlighted={highlighted}
+      className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-ring"
+    >
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-mono text-xs font-bold text-foreground">
           {letter}
@@ -102,7 +111,11 @@ export function AgentNoteItem({
   number,
   numbers,
   onShowMessage,
+  targetKey,
+  highlighted,
 }: {
+  targetKey?: string;
+  highlighted?: boolean;
   note: KetikAgentNote;
   number: number;
   numbers: Map<string, number>;
@@ -110,7 +123,12 @@ export function AgentNoteItem({
 }) {
   const isFix = note.verdict === "fix";
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3">
+    <li
+      data-review-target={targetKey}
+      tabIndex={-1}
+      data-highlighted={highlighted}
+      className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-ring"
+    >
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-mono text-xs font-bold text-foreground">
           {number}

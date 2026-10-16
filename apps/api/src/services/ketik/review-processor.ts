@@ -177,23 +177,13 @@ export async function processKetikReviewJob(
 
     if (!reviewResult.summary)
       reviewResult.summary = "Ringkasan tidak tersedia.";
-    if (
-      !Array.isArray(reviewResult.strengths) ||
-      reviewResult.strengths.length === 0
-    )
-      reviewResult.strengths = [
-        "Pertahankan profesionalisme dalam berkomunikasi.",
-      ];
-    if (
-      !Array.isArray(reviewResult.weaknesses) ||
-      reviewResult.weaknesses.length === 0
-    )
-      reviewResult.weaknesses = ["Terus latih teknik probing dan empati."];
-    if (
-      !Array.isArray(reviewResult.coachingFocus) ||
-      reviewResult.coachingFocus.length === 0
-    )
-      reviewResult.coachingFocus = ["Fokus pada detail kebutuhan konsumen."];
+    for (const key of ["strengths", "weaknesses", "coachingFocus"]) {
+      reviewResult[key] = Array.isArray(reviewResult[key])
+        ? reviewResult[key].filter(
+            (item: unknown) => typeof item === "string" && item.trim(),
+          )
+        : [];
+    }
 
     if (
       !reviewResult ||
@@ -221,6 +211,7 @@ export async function processKetikReviewJob(
   const education = buildKetikEducation(
     reviewResult.dimensionGuidance ?? reviewResult.education?.dimensionGuidance,
     reviewResult.scores,
+    session.messages,
   );
   if (Array.isArray(reviewResult.overallNextSteps)) {
     education.overallNextSteps = reviewResult.overallNextSteps;
