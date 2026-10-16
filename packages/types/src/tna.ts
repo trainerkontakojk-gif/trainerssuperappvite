@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   categorySchema,
+  rootCauseClusterIds,
   serviceTypeSchema,
   tanggalSchema,
   type RootCauseResult,
@@ -25,16 +26,7 @@ export const tnaPlanStatusSchema = z.enum([
   "selesai",
   "dibatalkan",
 ]);
-export const tnaClusterIdSchema = z.enum([
-  "salah_nama_perusahaan_produk",
-  "kelebihan_standar_jawaban",
-  "salah_penggunaan_sistem",
-  "salah_jawaban",
-  "kurang_teliti_verifikasi_data",
-  "kurang_paham_standar_jawaban",
-  "kurang_menggali",
-  "lainnya",
-]);
+export const tnaClusterIdSchema = z.enum(rootCauseClusterIds);
 export const tnaAuditStatusSchema = z.enum(["audited", "no_audit"]);
 export const tnaTrendStatusSchema = z.enum([
   "no_current_audit",

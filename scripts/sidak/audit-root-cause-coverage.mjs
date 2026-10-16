@@ -5,7 +5,7 @@
  * ========================================================
  *
  * Measures how many SIDAK qa_temuan rows fall into the "lainnya" (fallback)
- * cluster vs. matching one of the 7 deterministic root-cause clusters.
+ * cluster vs. matching one of the deterministic root-cause clusters.
  *
  * Usage:
  *   node scripts/sidak/audit-root-cause-coverage.mjs --help
@@ -116,6 +116,22 @@ const ROOT_CAUSE_REGISTRY = [
     priority: 9,
     label: "Kesalahan penggunaan sistem/APPK",
     keywords: ["appk", "pada appk", "di appk"],
+  },
+  {
+    clusterId: "hold_waktu_tunggu",
+    priority: 9,
+    label: "Durasi hold/waktu tunggu melebihi standar",
+    keywords: [
+      "melakukan hold",
+      "hold pertama",
+      "hold kedua",
+      "hold berikutnya",
+      "durasi hold",
+      "waktu hold",
+      "fitur hold",
+      "waktu tunggu",
+      "dead air",
+    ],
   },
   {
     clusterId: "salah_jawaban",

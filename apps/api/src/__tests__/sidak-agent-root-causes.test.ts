@@ -597,7 +597,8 @@ describe("deriveAgentRootCauses", () => {
       temuan: [
         row({
           id: "r-melakukan",
-          ketidaksesuaian: "Agent tidak sesuai dalam melakukan HOLD pertama.",
+          ketidaksesuaian:
+            "Agent tidak sesuai dalam melakukan konfirmasi ulang.",
         }),
       ],
     });

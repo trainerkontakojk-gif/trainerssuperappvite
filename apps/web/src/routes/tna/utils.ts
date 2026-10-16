@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type {
+  RootCauseClusterId,
   TnaFollowUp,
   TnaMetricsSnapshot,
   TnaPlanStatus,
@@ -39,10 +40,11 @@ export const interventionLabels = {
   kelompok_kecil: "Kelompok kecil",
   coaching_individu: "Coaching individu",
 };
-export const clusterLabels = {
+export const clusterLabels: Record<RootCauseClusterId, string> = {
   salah_nama_perusahaan_produk: "Salah nama perusahaan atau produk",
   kelebihan_standar_jawaban: "Kelebihan standar jawaban",
   salah_penggunaan_sistem: "Salah penggunaan sistem",
+  hold_waktu_tunggu: "Durasi hold/waktu tunggu",
   salah_jawaban: "Salah jawaban",
   kurang_teliti_verifikasi_data: "Kurang teliti verifikasi data",
   kurang_paham_standar_jawaban: "Kurang paham standar jawaban",

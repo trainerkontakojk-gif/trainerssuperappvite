@@ -585,15 +585,20 @@ export interface SidakAgentQuickviewResponse {
   forecast: SidakAgentForecastQuickview | null;
 }
 
-export type RootCauseClusterId =
-  | "salah_nama_perusahaan_produk"
-  | "kelebihan_standar_jawaban"
-  | "salah_jawaban"
-  | "kurang_teliti_verifikasi_data"
-  | "kurang_paham_standar_jawaban"
-  | "kurang_menggali"
-  | "salah_penggunaan_sistem"
-  | "lainnya";
+// Single source for root-cause cluster ids. SIDAK root causes and the TNA
+// cluster enum (tnaClusterIdSchema) both derive from this list.
+export const rootCauseClusterIds = [
+  "salah_nama_perusahaan_produk",
+  "kelebihan_standar_jawaban",
+  "salah_penggunaan_sistem",
+  "hold_waktu_tunggu",
+  "salah_jawaban",
+  "kurang_teliti_verifikasi_data",
+  "kurang_paham_standar_jawaban",
+  "kurang_menggali",
+  "lainnya",
+] as const;
+export type RootCauseClusterId = (typeof rootCauseClusterIds)[number];
 
 export interface RootCauseEvidence {
   id: string;

@@ -603,11 +603,14 @@ Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan d
 1. `salah_nama_perusahaan_produk` (prioritas 10)
 2. `kelebihan_standar_jawaban` (prioritas 9)
 3. `salah_penggunaan_sistem` (prioritas 9) — ditambahkan Phase 3 untuk error sistem/APPK
-4. `salah_jawaban` (prioritas 8)
-5. `kurang_teliti_verifikasi_data` (prioritas 7)
-6. `kurang_paham_standar_jawaban` (prioritas 6)
-7. `kurang_menggali` (prioritas 5)
-8. `lainnya` (prioritas 0 — fallback)
+4. `hold_waktu_tunggu` (prioritas 9) — durasi hold/waktu tunggu/dead air melebihi standar (Call)
+5. `salah_jawaban` (prioritas 8)
+6. `kurang_teliti_verifikasi_data` (prioritas 7)
+7. `kurang_paham_standar_jawaban` (prioritas 6)
+8. `kurang_menggali` (prioritas 5)
+9. `lainnya` (prioritas 0 — fallback)
+
+Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/src/sidak.ts`); `tnaClusterIdSchema` TNA diturunkan dari daftar yang sama. Kolom cluster di `tna_needs`/`tna_programs` bertipe `text` tanpa CHECK, sehingga menambah klaster tidak memerlukan migrasi kecuali program TNA perlu memicu klaster baru.
 
 ### Aturan
 
@@ -644,6 +647,10 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 **`kurang_teliti_verifikasi_data`:** `tidak sesuai mencatat`, `tidak mencatat`, `tidak menuliskan`, `tidak melampirkan`.
 
 **`kurang_menggali`:** `tidak menanyakan`, `tidak melakukan probing`.
+
+### Klaster `hold_waktu_tunggu`
+
+Ditambahkan setelah temuan produksi "Etika Bertelepon" (Call, Oktober 2026) seluruhnya jatuh ke `lainnya` (contoh: "Agent melakukan HOLD pertama selama 01.04 menit"). Keyword: `melakukan hold`, `hold pertama`, `hold kedua`, `hold berikutnya`, `durasi hold`, `waktu hold`, `fitur hold`, `waktu tunggu`, `dead air`. Kata tunggal `hold`, `menunggu`, `menit`, dan `detik` sengaja tidak dipakai karena matcher berbasis substring (mis. `threshold`) dan terlalu umum. Temuan "tidak sesuai dalam melakukan HOLD pertama" kini masuk klaster ini (2 match vs 1 match `salah_jawaban`). Belum ada program TNA yang memicu klaster ini. Bukti: `apps/web/e2e/tna-root-cause-hold-api.spec.ts`.
 
 ### Batasan AI
 

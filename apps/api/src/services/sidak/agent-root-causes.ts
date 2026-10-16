@@ -61,6 +61,26 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
       "Latih agent memilih tiket, mengisi kolom, dan mencatat data dengan benar di sistem yang tersedia.",
   },
   {
+    // Matching is substring-based: bare "hold" (threshold/stakeholder),
+    // "menunggu", "menit" and "detik" are deliberately excluded as too broad.
+    clusterId: "hold_waktu_tunggu",
+    priority: 9,
+    label: "Durasi hold/waktu tunggu melebihi standar",
+    keywords: [
+      "melakukan hold",
+      "hold pertama",
+      "hold kedua",
+      "hold berikutnya",
+      "durasi hold",
+      "waktu hold",
+      "fitur hold",
+      "waktu tunggu",
+      "dead air",
+    ],
+    recommendation:
+      "Latih manajemen hold: minta izin sebelum hold, batasi hold pertama maksimal 60 detik dan hold berikutnya sesuai standar, kembali ke konsumen tepat waktu, dan hindari dead air.",
+  },
+  {
     clusterId: "salah_jawaban",
     priority: 8,
     label: "Jawaban salah/tidak akurat",
