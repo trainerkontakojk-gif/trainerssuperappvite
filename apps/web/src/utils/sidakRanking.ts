@@ -48,26 +48,14 @@ export function tiedNames(agents: TopAgentData[]): Map<string, string[]> {
 
 export const NO_TEAM_LABEL = "Tanpa tim";
 
-/** Kelompok per tim leader, diurutkan menurut nama tim. */
-export function groupByTeam(
-  agents: TopAgentData[],
-): { tim: string; agents: TopAgentData[] }[] {
-  const groups = new Map<string, TopAgentData[]>();
-  for (const agent of agents) {
-    const tim = agent.tim?.trim() || NO_TEAM_LABEL;
-    groups.set(tim, [...(groups.get(tim) ?? []), agent]);
-  }
-  return [...groups.entries()]
-    .sort(([a], [b]) => collator.compare(a, b))
-    .map(([tim, members]) => ({ tim, agents: members }));
-}
+/** Teks bila ranking tidak punya periode pembanding (tidak pernah kosong). */
+export const NO_COMPARISON_LABEL = "Tanpa pembanding";
 
-/** Label perubahan posisi; `null` bila periode tidak punya pembanding. */
+/** Label perubahan posisi; tanpa periode pembanding ditulis apa adanya. */
 export function rankChangeLabel(
   rankChange: number | null | undefined,
-  period: string,
-): string | null {
-  if (period === "alltime" || rankChange === undefined) return null;
+): string {
+  if (rankChange === undefined) return NO_COMPARISON_LABEL;
   if (rankChange === null) return "Baru";
   if (rankChange > 0) return `Prioritas naik +${rankChange}`;
   if (rankChange < 0) return `Prioritas turun ${Math.abs(rankChange)}`;
@@ -78,7 +66,6 @@ export function rankChangeLabel(
 export async function downloadRankingXlsx(options: {
   agents: TopAgentData[];
   ranks: Map<string, number>;
-  period: string;
   fileName: string;
 }): Promise<void> {
   const rows = options.agents.map((agent) => ({
@@ -88,8 +75,8 @@ export async function downloadRankingXlsx(options: {
     Batch: agent.batch ?? "",
     Temuan: agent.defects,
     "Skor QA": Math.round(agent.score * 10) / 10,
-    Kritikal: agent.hasCritical ? "Ya" : "Tidak",
-    "Perubahan posisi": rankChangeLabel(agent.rankChange, options.period) ?? "",
+    Kritikal: agent.criticalFindings ?? 0,
+    "Perubahan posisi": rankChangeLabel(agent.rankChange),
   }));
   await writeFlatExcel("Ranking", rows, options.fileName);
 }

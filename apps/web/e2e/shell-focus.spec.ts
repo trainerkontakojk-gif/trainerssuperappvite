@@ -131,12 +131,12 @@ test.describe("Header, drawer, dan fokus shell", () => {
     await expect(page).toHaveTitle("Beranda · Trainers SuperApp");
 
     await nav.getByRole("button", { name: "SIDAK", exact: true }).click();
-    await nav.getByRole("link", { name: "Ringkasan", exact: true }).click();
-    await expect(page).toHaveURL(/\/sidak$/);
+    await nav.getByRole("link", { name: "Dashboard", exact: true }).click();
+    await expect(page).toHaveURL(/\/sidak\/dashboard$/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "SIDAK", exact: true }),
+      page.getByRole("heading", { level: 1, name: "Dashboard", exact: true }),
     ).toBeFocused();
-    await expect(page).toHaveTitle("SIDAK · Trainers SuperApp");
+    await expect(page).toHaveTitle("Dashboard · Trainers SuperApp");
     expectHermetic(audit);
   });
 

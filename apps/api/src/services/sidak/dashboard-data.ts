@@ -264,6 +264,7 @@ export async function getDashboardData(params: {
     let agentScoreSum = 0;
     let agentPeriodsCount = 0;
     let agentFindings = 0;
+    let agentCriticalFindings = 0;
     let hasCritical = false;
 
     for (const [pid, periodRows] of rowsByPeriod) {
@@ -312,8 +313,10 @@ export async function getDashboardData(params: {
             count: (paretoMap.get(key)?.count ?? 0) + 1,
             cat: toParetoCategory(ind.category),
           });
-          if (ind.category === "critical") criticalCount++;
-          else if (ind.category === "non_critical") nonCriticalCount++;
+          if (ind.category === "critical") {
+            criticalCount++;
+            agentCriticalFindings++;
+          } else if (ind.category === "non_critical") nonCriticalCount++;
         }
       }
     }
@@ -326,6 +329,7 @@ export async function getDashboardData(params: {
         finalAgentScore,
         agentFindings,
         hasCritical,
+        criticalFindings: agentCriticalFindings,
       }),
     );
 
@@ -436,6 +440,7 @@ export async function getDashboardData(params: {
       defects: agent.agentFindings,
       score: roundTo(agent.finalAgentScore, 2),
       hasCritical: agent.hasCritical,
+      criticalFindings: agent.criticalFindings ?? 0,
     }))
     .sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama));
 

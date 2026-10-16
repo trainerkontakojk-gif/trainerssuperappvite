@@ -10,7 +10,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAgentDetail } from "../../hooks/useAgentDetail";
+import {
+  useAgentDetail,
+  type AgentDetailScope,
+} from "../../hooks/useAgentDetail";
+import { useSidakScope } from "../../hooks/useSidakScope";
 import { useAgentQuickview } from "../../hooks/useAgentQuickview";
 import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
 import AgentCoachingBrief from "../../components/sidak/AgentCoachingBrief";
@@ -37,10 +41,39 @@ import {
   sidakScoreTone,
 } from "../../utils/sidakScoreStatus";
 import { SERVICE_LABELS } from "../../lib/scoring";
-import type { ServiceType } from "@trainers/types";
+import {
+  VALID_SERVICE_TYPES,
+  type ServiceType,
+  type SidakHeatmapTicketRef,
+} from "@trainers/types";
+
+function isServiceType(value: string): value is ServiceType {
+  return (VALID_SERVICE_TYPES as readonly string[]).includes(value);
+}
 
 export default function SidakAgentDetailPage() {
   const { id } = useParams({ from: "/sidak/agents/$id" });
+  // Tahun, layanan, dan rentang tren mengikuti cakupan bersama SIDAK, dan
+  // perubahan di sini ikut menulisnya kembali.
+  const { explicit: explicitScope, setScope } = useSidakScope();
+  const [initialScope] = useState(() => ({
+    year: explicitScope.tahun,
+    service: explicitScope.layanan,
+    startMonth: explicitScope.dari,
+    endMonth: explicitScope.sampai,
+  }));
+  const handleScopeChange = useCallback(
+    (patch: AgentDetailScope) =>
+      setScope({
+        ...(patch.year !== undefined ? { tahun: patch.year } : {}),
+        ...(patch.service && isServiceType(patch.service)
+          ? { layanan: patch.service }
+          : {}),
+        ...(patch.startMonth !== undefined ? { dari: patch.startMonth } : {}),
+        ...(patch.endMonth !== undefined ? { sampai: patch.endMonth } : {}),
+      }),
+    [setScope],
+  );
   const {
     data,
     loading,
@@ -76,7 +109,7 @@ export default function SidakAgentDetailPage() {
     handleEditSave,
     handleDelete,
     handleAgentChange,
-  } = useAgentDetail(id);
+  } = useAgentDetail(id, initialScope, handleScopeChange);
   const {
     data: quickviewData,
     loading: quickviewLoading,
@@ -136,6 +169,20 @@ export default function SidakAgentDetailPage() {
       handleTabChange("temuan");
     },
     [selectedMonth, selectedYear, handleTabChange],
+  );
+
+  // Tanggal di tab Heatmap membuka tiketnya di tab Temuan (bulan periode QA).
+  const handleHeatmapTicket = useCallback(
+    (ticket: SidakHeatmapTicketRef) => {
+      setTemuanFocus((current) => ({
+        month: ticket.month,
+        year: ticket.year,
+        ticketKey: ticket.noTiket,
+        nonce: (current?.nonce ?? 0) + 1,
+      }));
+      handleTabChange("temuan");
+    },
+    [handleTabChange],
   );
 
   const handleRefresh = useCallback(() => {
@@ -448,6 +495,7 @@ export default function SidakAgentDetailPage() {
                 agentId={id}
                 year={selectedYear}
                 serviceType={selectedService}
+                onOpenTicket={handleHeatmapTicket}
               />
             ),
             simulations: <SidakSimulationHistory agentId={id} />,

@@ -18,6 +18,8 @@ import {
   validateReportFilters,
 } from "./reports-data-utils";
 import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
+import { useSidakScope } from "../../hooks/useSidakScope";
+import { VALID_SERVICE_TYPES, type ServiceType } from "@trainers/types";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
@@ -150,13 +152,40 @@ export default function SidakReportsData() {
   const { data: periods } = useApi<any[]>("/sidak/periods");
 
   const [mode, setMode] = useState<"layanan" | "individu">("layanan");
-  const [serviceType, setServiceType] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
+  // Layanan, tahun, dan bulan diisi dari cakupan bersama SIDAK; perubahan di
+  // sini ikut menulisnya kembali. "Semua layanan" dan rentang terbalik tetap
+  // lokal karena cakupan bersama tidak punya bentuk itu.
+  const { explicit: explicitScope, setScope } = useSidakScope();
+  const [serviceType, setServiceTypeState] = useState<string>(
+    explicitScope.layanan ?? "",
+  );
+  const [year, setYearState] = useState(
+    explicitScope.tahun ?? new Date().getFullYear(),
+  );
   const { data: agentDirectory, loading: agentsLoading } =
     useApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}`);
   const agents = normalizeReportAgents(agentDirectory);
-  const [startMonth, setStartMonth] = useState(1);
-  const [endMonth, setEndMonth] = useState(12);
+  const [startMonth, setStartMonthState] = useState(explicitScope.dari ?? 1);
+  const [endMonth, setEndMonthState] = useState(explicitScope.sampai ?? 12);
+  // Bulan lokal ikut ditulis supaya cakupan tidak jatuh ke bawaan Jan–bulan ini.
+  const localMonths = () =>
+    startMonth <= endMonth ? { dari: startMonth, sampai: endMonth } : {};
+  const setServiceType = (next: string) => {
+    setServiceTypeState(next);
+    const layanan = VALID_SERVICE_TYPES.find((s) => s === next);
+    if (layanan) setScope({ layanan: layanan as ServiceType, ...localMonths() });
+  };
+  const setYear = (next: number) => {
+    setYearState(next);
+    setScope({ tahun: next, ...localMonths() });
+  };
+  const setMonthRange = (dari: number, sampai: number) => {
+    setStartMonthState(dari);
+    setEndMonthState(sampai);
+    if (dari <= sampai) setScope({ dari, sampai });
+  };
+  const setStartMonth = (next: number) => setMonthRange(next, endMonth);
+  const setEndMonth = (next: number) => setMonthRange(startMonth, next);
   const [pesertaId, setPesertaId] = useState("");
   const [indicatorId, setIndicatorId] = useState("");
   const [results, setResults] = useState<any[] | null>(null);

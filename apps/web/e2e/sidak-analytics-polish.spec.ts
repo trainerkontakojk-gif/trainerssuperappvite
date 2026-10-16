@@ -21,7 +21,7 @@ const MIN_TARGET_PX = 44;
 const MIN_LABEL_PX = 12;
 
 const PAGES = [
-  { name: "Ranking", open: openRankingPage, filters: "Filter ranking", comboboxes: 4 },
+  { name: "Ranking", open: openRankingPage, filters: "Filter ranking", comboboxes: 3 },
   { name: "Heatmap", open: openHeatmapPage, filters: "Filter heatmap", comboboxes: 2 },
   { name: "Laporan data", open: openReportsDataPage, filters: "Filter temuan", comboboxes: 5 },
 ] as const;

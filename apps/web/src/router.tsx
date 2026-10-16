@@ -33,7 +33,7 @@ const DashboardAccessApproval = lazy(
   () => import("./routes/dashboard/access-approval"),
 );
 const DashboardActivities = lazy(() => import("./routes/dashboard/activities"));
-const SidakLanding = lazy(() => import("./routes/sidak/index"));
+const SidakIndexRedirect = lazy(() => import("./routes/sidak/index"));
 const SidakDashboard = lazy(() => import("./routes/sidak/dashboard"));
 const SidakForecast = lazy(() => import("./routes/sidak/forecast"));
 const SidakInput = lazy(() => import("./routes/sidak/input"));
@@ -189,7 +189,7 @@ const profilerTeamsRoute = createRoute({
 const sidakRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak",
-  component: SidakLanding,
+  component: SidakIndexRedirect,
   validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.landing"),
 });
@@ -346,6 +346,7 @@ const sidakReportsDataRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/reports-data",
   component: SidakReportsData,
+  validateSearch: validateSidakScopeSearch,
   beforeLoad: requireCapability("sidak.reports.view"),
 });
 

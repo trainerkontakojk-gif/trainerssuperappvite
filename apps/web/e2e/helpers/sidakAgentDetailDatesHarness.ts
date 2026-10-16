@@ -175,6 +175,11 @@ export type OpenAgentOptions = {
   sidakAccess?: "none" | "approved";
   /** Hitungan heatmap per tanggal yang dibalas endpoint heatmap. */
   heatmapCounts?: Record<string, number>;
+  /** Tiket per tanggal (heatmap agen), untuk tautan ke tab Temuan. */
+  heatmapTickets?: Record<
+    string,
+    Array<{ noTiket: string; month: number; year: number }>
+  >;
   /**
    * Ganti payload `AgentDetailData` default. Dipakai spec tata letak yang
    * butuh beberapa bulan, tiket, dan akar masalah sekaligus.
@@ -192,6 +197,8 @@ export type OpenAgentOptions = {
   quickviewGate?: Promise<void>;
   /** Agen yang dibalas direktori `GET /sidak/agents` (pemilih agen). */
   directoryAgents?: unknown[];
+  /** Query halaman, mis. cakupan bersama `?layanan=chat&tahun=2025`. */
+  query?: string;
 };
 
 export async function openAgentDetail(
@@ -204,6 +211,7 @@ export async function openAgentDetail(
     failUpdate = false,
     sidakAccess = "none",
     heatmapCounts = {},
+    heatmapTickets = {},
     detailPayload = agentDetailPayload,
     quickviewPayload,
     folderAgents = [],
@@ -211,6 +219,7 @@ export async function openAgentDetail(
     quickviewFailStatus,
     quickviewGate,
     directoryAgents = [],
+    query = "",
   } = opts;
 
   await mockSupabaseAuth(page, { role });
@@ -306,12 +315,20 @@ export async function openAgentDetail(
     const url = new URL(route.request().url());
     (audit.heatmapQueries ??= []).push(url.search);
     const year = Number(url.searchParams.get("year") ?? "2026");
-    const days: Array<{ date: string; count: number }> = [];
+    const days: Array<{
+      date: string;
+      count: number;
+      tickets?: Array<{ noTiket: string; month: number; year: number }>;
+    }> = [];
     for (let month = 1; month <= 12; month++) {
       const perMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
       for (let day = 1; day <= perMonth; day++) {
         const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        days.push({ date: iso, count: heatmapCounts[iso] ?? 0 });
+        days.push({
+          date: iso,
+          count: heatmapCounts[iso] ?? 0,
+          tickets: heatmapTickets[iso] ?? [],
+        });
       }
     }
     await route.fulfill(
@@ -378,7 +395,9 @@ export async function openAgentDetail(
   // `domcontentloaded`, bukan default `load`: halaman punya koneksi
   // HMR yang membuat event `load` tidak pernah sampai, sehingga setiap
   // aksi Playwright ikut menggantung menunggu navigasi.
-  await page.goto(`/sidak/agents/${AGENT_ID}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/sidak/agents/${AGENT_ID}${query}`, {
+    waitUntil: "domcontentloaded",
+  });
 }
 
 function isApiPath(pathname: string): boolean {

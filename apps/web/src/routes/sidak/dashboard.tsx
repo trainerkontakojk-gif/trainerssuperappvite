@@ -88,7 +88,7 @@ export default function SidakDashboardPage() {
   const maxVisibleParameters = 2;
   // Layanan, tim, tahun, dan rentang bulan adalah cakupan bersama SIDAK
   // (query URL + sesi), bukan state lokal halaman ini.
-  const { scope, setScope } = useSidakScope();
+  const { scope, setScope, resetScope } = useSidakScope();
   const selectedService: string = scope.layanan;
   const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
   const selectedYear = scope.tahun;
@@ -545,6 +545,7 @@ export default function SidakDashboardPage() {
           availableYears={availableYears}
           leaderLockedService={leaderLockedService}
           availableServices={availableServices}
+          onReset={resetScope}
         />
 
         {error && data && (

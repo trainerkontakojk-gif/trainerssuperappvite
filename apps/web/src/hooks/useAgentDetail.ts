@@ -93,17 +93,38 @@ function computeTenure(bergabungDate: string | null): string {
   return rem > 0 ? `${years} thn ${rem} bln` : `${years} thn`;
 }
 
-export function useAgentDetail(agentId: string) {
+/** Cakupan awal dari cakupan bersama SIDAK (URL atau sesi). */
+export interface AgentDetailScope {
+  year?: number;
+  service?: string;
+  startMonth?: number;
+  endMonth?: number;
+}
+
+export function useAgentDetail(
+  agentId: string,
+  initial: AgentDetailScope = {},
+  /** Dipanggil saat tahun, layanan, atau rentang tren diubah di halaman ini. */
+  onScopeChange?: (patch: AgentDetailScope) => void,
+) {
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role ?? "agent";
 
   const currentMonth = new Date().getMonth() + 1;
 
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedService, setSelectedService] = useState("");
+  const [selectedYear, setSelectedYear] = useState(
+    initial.year ?? new Date().getFullYear(),
+  );
+  const [selectedService, setSelectedService] = useState(
+    initial.service ?? "",
+  );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [trendStartMonth, setTrendStartMonth] = useState(1);
-  const [trendEndMonth, setTrendEndMonth] = useState(currentMonth);
+  const [trendStartMonth, setTrendStartMonth] = useState(
+    initial.startMonth ?? 1,
+  );
+  const [trendEndMonth, setTrendEndMonth] = useState(
+    initial.endMonth ?? currentMonth,
+  );
   const [editingTemuan, setEditingTemuan] = useState<TemuanDisplayItem | null>(
     null,
   );
@@ -678,27 +699,40 @@ export function useAgentDetail(agentId: string) {
     [refetch],
   );
 
-  const handleYearChange = useCallback((year: number) => {
-    setSelectedYear(year);
-    setSelectedMonth(null);
-    const isCurrent = year === new Date().getFullYear();
-    setTrendStartMonth(1);
-    setTrendEndMonth(isCurrent ? new Date().getMonth() + 1 : 12);
-  }, []);
+  const handleYearChange = useCallback(
+    (year: number) => {
+      setSelectedYear(year);
+      setSelectedMonth(null);
+      const isCurrent = year === new Date().getFullYear();
+      const endMonth = isCurrent ? new Date().getMonth() + 1 : 12;
+      setTrendStartMonth(1);
+      setTrendEndMonth(endMonth);
+      onScopeChange?.({ year, startMonth: 1, endMonth });
+    },
+    [onScopeChange],
+  );
 
-  const handleServiceChange = useCallback((svc: string) => {
-    setSelectedService(svc);
-    setSelectedMonth(null);
-  }, []);
+  const handleServiceChange = useCallback(
+    (svc: string) => {
+      setSelectedService(svc);
+      setSelectedMonth(null);
+      onScopeChange?.({ service: svc });
+    },
+    [onScopeChange],
+  );
 
   const handleMonthSelect = useCallback((month: number) => {
     setSelectedMonth((prev) => (prev === month ? null : month));
   }, []);
 
-  const handleTrendRangeChange = useCallback((start: number, end: number) => {
-    setTrendStartMonth(start);
-    setTrendEndMonth(end);
-  }, []);
+  const handleTrendRangeChange = useCallback(
+    (start: number, end: number) => {
+      setTrendStartMonth(start);
+      setTrendEndMonth(end);
+      onScopeChange?.({ startMonth: start, endMonth: end });
+    },
+    [onScopeChange],
+  );
 
   const handleAgentChange = useCallback((newAgentId: string) => {
     window.location.assign(`/sidak/agents/${newAgentId}`);

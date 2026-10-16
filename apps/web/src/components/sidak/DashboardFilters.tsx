@@ -65,6 +65,8 @@ interface Props {
   showHeader?: boolean;
   /** Kontrol tambahan halaman (mis. Periode proyeksi) di dalam bar yang sama. */
   trailing?: ReactNode;
+  /** Kembalikan cakupan bersama ke bawaan. Tombol tampil bila diisi. */
+  onReset?: () => void;
 }
 
 interface FilterSelectProps {
@@ -110,10 +112,7 @@ function FilterSelect({
 }: FilterSelectProps) {
   return (
     <div className="min-w-0 flex-1">
-      <Label
-        htmlFor={id}
-        className="mb-1.5 text-xs font-medium text-fg2"
-      >
+      <Label htmlFor={id} className="mb-1.5 text-xs font-medium text-fg2">
         {label}
       </Label>
       <Select
@@ -154,10 +153,7 @@ function TeamCombobox({
 
   return (
     <div className="min-w-0 flex-1">
-      <Label
-        htmlFor={id}
-        className="mb-1.5 text-xs font-medium text-fg2"
-      >
+      <Label htmlFor={id} className="mb-1.5 text-xs font-medium text-fg2">
         {label}
       </Label>
       <Combobox
@@ -256,6 +252,7 @@ export default function DashboardFilters({
   availableServices,
   showHeader = true,
   trailing,
+  onReset,
 }: Props) {
   const serviceOptions = leaderLockedService
     ? [leaderLockedService]
@@ -366,20 +363,32 @@ export default function DashboardFilters({
         </FilterSelect>
       </div>
 
-      <fieldset className="min-w-0 lg:w-[26rem]">
-        <legend className="mb-1.5 text-xs font-medium text-fg2">
-          Periode data
-        </legend>
+      <div className="min-w-0 lg:w-[13rem]">
+        <Label
+          htmlFor="sidak-filter-months"
+          className="mb-1.5 text-xs font-medium text-fg2"
+        >
+          Bulan
+        </Label>
         <MonthRangePicker
+          id="sidak-filter-months"
           selectedYear={selectedYear}
           startMonth={startMonth}
           endMonth={endMonth}
           onRangeChange={onMonthRangeChange}
-          variant="toolbar"
-          className="w-full"
         />
-      </fieldset>
+      </div>
       {trailing}
+      {onReset ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onReset}
+          className="min-h-[44px] self-start px-3 text-fg2 lg:self-end"
+        >
+          Atur ulang
+        </Button>
+      ) : null}
     </div>
   );
 }

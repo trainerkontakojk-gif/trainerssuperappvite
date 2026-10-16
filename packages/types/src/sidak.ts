@@ -55,6 +55,13 @@ export const sidakHeatmapQuerySchema = z.object({
 });
 export type SidakHeatmapQuery = z.infer<typeof sidakHeatmapQuerySchema>;
 
+/** Tiket bertemuan pada satu tanggal heatmap agen, dengan bulan periode QA-nya. */
+export interface SidakHeatmapTicketRef {
+  noTiket: string;
+  month: number;
+  year: number;
+}
+
 export interface SidakHeatmapResponse {
   mode: SidakHeatmapMode;
   year: number;
@@ -64,7 +71,15 @@ export interface SidakHeatmapResponse {
   countBy: SidakHeatmapCountBy;
   /** Filter agent yang dipakai respons ini, `null` bila semua agent. */
   agentId: string | null;
-  days: Array<{ date: string; count: number }>;
+  /**
+   * `tickets` hanya diisi untuk heatmap satu agen (`agent_id`), supaya tanggal
+   * bisa membuka tiketnya di tab Temuan. Heatmap semua agen tidak mengirimnya.
+   */
+  days: Array<{
+    date: string;
+    count: number;
+    tickets?: SidakHeatmapTicketRef[];
+  }>;
   totalFindings: number;
   /**
    * Temuan countable tanpa tanggal mode terpilih pada SELURUH periode untuk
@@ -343,6 +358,8 @@ export interface TopAgentData {
   defects: number;
   score: number;
   hasCritical: boolean;
+  /** Jumlah temuan pada parameter kritikal dalam cakupan. */
+  criticalFindings?: number;
   rankChange?: number | null;
 }
 

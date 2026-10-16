@@ -10,24 +10,19 @@ import {
 import { APP_MODULES, isCapabilityAllowed } from "../../lib/app-config";
 
 /**
- * Sub-halaman SIDAK. `group` dan `description` dipakai daftar "Halaman SIDAK"
- * di Ringkasan (`/sidak`), jadi sidebar dan beranda modul membaca satu daftar.
+ * Sub-halaman SIDAK di sidebar. `/sidak` sendiri tidak punya halaman: route
+ * itu membuka Dashboard.
  */
 export const SIDAK_CHILDREN: readonly (NavChild & {
   capability?: Capability;
 })[] = [
-  { to: "/sidak", label: "Ringkasan", exactMatch: true },
   {
     to: "/sidak/dashboard",
     label: "Dashboard",
-    group: "analisis",
-    description: "Tren, Pareto, pola mingguan",
   },
   {
     to: "/sidak/ranking",
     label: "Ranking",
-    group: "analisis",
-    description: "Agen dengan temuan terbanyak",
   },
   {
     // Volume temuan ketidaksesuaian per hari. Admin/trainer melihat semua;
@@ -35,48 +30,34 @@ export const SIDAK_CHILDREN: readonly (NavChild & {
     // berarti role `qa` punya akses.
     to: "/sidak/heatmap",
     label: "Heatmap",
-    group: "analisis",
-    description: "Temuan per tanggal sepanjang tahun",
     capability: "sidak.view",
   },
   {
     to: "/sidak/forecast",
     label: "Forecast",
-    group: "analisis",
-    description: "Arah temuan 1–6 bulan ke depan",
   },
   {
     to: "/sidak/agents",
     label: "Agen",
-    group: "agen",
-    description: "Cari agen, buka skor dan temuannya",
   },
   {
     to: "/sidak/input",
     label: "Input temuan",
-    group: "audit",
-    description: "Catat temuan per tiket atau impor Excel",
     capability: "sidak.config.manage" as const,
   },
   {
     to: "/sidak/periods",
     label: "Periode QA",
-    group: "audit",
-    description: "Bulan audit yang dipakai semua halaman",
     capability: "sidak.config.manage" as const,
   },
   {
     to: "/sidak/settings",
     label: "Parameter QA",
-    group: "audit",
-    description: "Versi aturan dan bobot per layanan",
     capability: "sidak.config.manage" as const,
   },
   {
     to: "/sidak/reports-data",
     label: "Laporan data",
-    group: "laporan",
-    description: "Tabel temuan dan unduh Excel",
     capability: "sidak.reports.view",
   },
   {
@@ -85,8 +66,6 @@ export const SIDAK_CHILDREN: readonly (NavChild & {
     // jangan menambah role lain tanpa persetujuan Fajar.
     to: "/sidak/jadwal-shifting",
     label: "Jadwal shifting",
-    group: "laporan",
-    description: "Jadwal harian dari WFM, hanya-baca",
     capability: "sidak.schedule.read" as const,
   },
 ];
@@ -131,16 +110,10 @@ export type NavGroupId =
   | "data"
   | "administrasi";
 
-export type SidakPageGroup = "audit" | "analisis" | "agen" | "laporan";
-
 export interface NavChild {
   to: string;
   label: string;
   exactMatch?: boolean;
-  /** Kelompok kerja di daftar "Halaman SIDAK"; kosong untuk Ringkasan. */
-  group?: SidakPageGroup;
-  /** Satu baris fungsi halaman, bahasa biasa. */
-  description?: string;
 }
 
 export interface NavItem {
@@ -229,13 +202,7 @@ export function buildNavModel(role: string | null | undefined): NavModel {
     children:
       module.id === "qa-analyzer"
         ? SIDAK_CHILDREN.filter((child) => allowed(child.capability)).map(
-            ({ to, label, exactMatch, group, description }) => ({
-              to,
-              label,
-              exactMatch,
-              group,
-              description,
-            }),
+            ({ to, label, exactMatch }) => ({ to, label, exactMatch }),
           )
         : undefined,
   });

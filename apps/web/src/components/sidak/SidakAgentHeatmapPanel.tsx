@@ -5,6 +5,7 @@ import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "./SidakHeatmapCalendar";
 import SidakHeatmapInsights from "./SidakHeatmapInsights";
+import { SidakWeekdayPattern } from "./SidakWeekdayBars";
 import {
   buildHeatmapInsights,
   formatInsightDateShort,
@@ -14,6 +15,7 @@ import {
   VALID_SERVICE_TYPES,
   type SidakHeatmapCountBy,
   type SidakHeatmapResponse,
+  type SidakHeatmapTicketRef,
   type ServiceType,
 } from "@trainers/types";
 
@@ -29,11 +31,14 @@ export default function SidakAgentHeatmapPanel({
   agentId,
   year,
   serviceType,
+  onOpenTicket,
 }: {
   agentId: string;
   year: number;
   /** Nilai kontrol konteks: `""` (default), `"all"`, atau ServiceType. */
   serviceType: string;
+  /** Buka tiket tanggal terpilih di tab Temuan. */
+  onOpenTicket?: (ticket: SidakHeatmapTicketRef) => void;
 }) {
   const [countBy, setCountBy] = useState<SidakHeatmapCountBy>("parameter");
   const [data, setData] = useState<SidakHeatmapResponse | null>(null);
@@ -77,6 +82,13 @@ export default function SidakAgentHeatmapPanel({
     };
   }, [load]);
 
+  const selectedTickets = useMemo(
+    () =>
+      (selected &&
+        data?.days.find((day) => day.date === selected.date)?.tickets) ||
+      [],
+    [data, selected],
+  );
   const insights = useMemo(
     () => buildHeatmapInsights(data?.days ?? []),
     [data?.days],
@@ -157,13 +169,16 @@ export default function SidakAgentHeatmapPanel({
       {!error && data && (
         <div className="flex min-w-0 flex-col gap-4">
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(16rem,1fr)] lg:items-start">
-            <div data-testid="agent-heatmap-calendar" className="min-w-0">
-              <SidakHeatmapCalendar
-                year={data.year}
-                days={data.days}
-                selectedDate={selected?.date ?? null}
-                onSelectDay={setSelected}
-              />
+            <div className="flex min-w-0 flex-col gap-4">
+              <div data-testid="agent-heatmap-calendar" className="min-w-0">
+                <SidakHeatmapCalendar
+                  year={data.year}
+                  days={data.days}
+                  selectedDate={selected?.date ?? null}
+                  onSelectDay={setSelected}
+                />
+              </div>
+              <SidakWeekdayPattern days={data.days} year={data.year} />
             </div>
 
             <aside
@@ -182,7 +197,27 @@ export default function SidakAgentHeatmapPanel({
                     </p>
                     <p className="text-sm tabular-nums text-fg2">
                       {selected.count} temuan
+                      {selectedTickets.length > 0 ? (
+                        <>
+                          {" · tiket "}
+                          <span className="font-mono">
+                            {selectedTickets.map((t) => t.noTiket).join(", ")}
+                          </span>
+                        </>
+                      ) : null}
                     </p>
+                    {onOpenTicket
+                      ? selectedTickets.map((ticket) => (
+                          <button
+                            key={`${ticket.noTiket}-${ticket.year}-${ticket.month}`}
+                            type="button"
+                            onClick={() => onOpenTicket(ticket)}
+                            className="inline-flex min-h-[44px] items-center self-start text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                          >
+                            Buka {ticket.noTiket} di tab Temuan
+                          </button>
+                        ))
+                      : null}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">

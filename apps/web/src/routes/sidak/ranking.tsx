@@ -20,17 +20,16 @@ import {
   ArrowDown,
   Download,
 } from "lucide-react";
-import { cn } from "cn";
 import { notify } from "../../lib/toast";
 import {
   computeRanks,
   downloadRankingXlsx,
-  groupByTeam,
   rankChangeLabel as describeRankChange,
   tiedNames as tiedNamesFor,
 } from "../../utils/sidakRanking";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
+import { MonthRangePicker } from "../../components/ui/MonthRangePicker";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -48,11 +47,9 @@ const SERVICE_LABELS: Record<string, string> = {
   slik: "SLIK",
 };
 
-const MONTHS = [
-  "Januari", "Februari", "Maret", "April",
-  "Mei", "Juni", "Juli", "Agustus",
-  "September", "Oktober", "November", "Desember",
-];
+/** Ranking selalu dibaca per rentang bulan cakupan bersama. */
+const RANGE_PERIOD = "range";
+const pad2 = (month: number) => String(month).padStart(2, "0");
 
 interface RankingResponse {
   rankings: TopAgentData[];
@@ -60,15 +57,18 @@ interface RankingResponse {
   folders: { id: string; name: string; parent_id?: string | null }[];
   availableYears: number[];
   availableServices?: string[];
+  /** Rentang pembanding "Perubahan posisi", mis. "Jan–Sep 2026". */
+  comparison?: { label: string } | null;
 }
 
 type SortKey = "defects" | "nama" | "score";
 type SortDirection = "asc" | "desc";
 
 export default function SidakRankingPage() {
-  // Layanan, tahun, dan tim mengikuti cakupan bersama SIDAK (query URL +
-  // sesi). Periode (YTD/bulan) tetap milik halaman ini.
-  const { scope, setScope } = useSidakScope();
+  // Layanan, tahun, rentang bulan, dan tim mengikuti cakupan bersama SIDAK
+  // (query URL + sesi).
+  const { scope, setScope, resetScope } = useSidakScope();
+  const { dari: startMonth, sampai: endMonth } = scope;
   const selectedService: string = scope.layanan;
   const selectedYear = scope.tahun;
   const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
@@ -80,18 +80,19 @@ export default function SidakRankingPage() {
     (folder: string) => setScope({ tim: folder }),
     [setScope],
   );
-  const [selectedPeriod, setSelectedPeriod] = useState("ytd");
   const [sortKey, setSortKey] = useState<SortKey>("defects");
   const initialFolderSetRef = useRef(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
-    p.set("period", selectedPeriod);
+    p.set("period", RANGE_PERIOD);
+    p.set("startMonth", String(startMonth));
+    p.set("endMonth", String(endMonth));
     p.set("service_type", selectedService);
     p.set("year", String(selectedYear));
     p.set("folder", selectedFolder);
     return p.toString();
-  }, [selectedService, selectedPeriod, selectedYear, selectedFolder]);
+  }, [selectedService, startMonth, endMonth, selectedYear, selectedFolder]);
 
   const { data, loading } = useApi<RankingResponse>(
     `/sidak/ranking?${queryParams}`,
@@ -163,7 +164,6 @@ export default function SidakRankingPage() {
   ]);
 
   const rankings = data?.rankings;
-  const [view, setView] = useState<"combined" | "team">("combined");
   const [exporting, setExporting] = useState(false);
   const businessRanks = useMemo(
     () => computeRanks(rankings ?? []),
@@ -208,32 +208,14 @@ export default function SidakRankingPage() {
     });
   }, [rankings, sortKey, sortDirection]);
 
-  // Per tim leader: urutan tabel sama, peringkat dan seri dihitung di dalam tim.
-  const teamGroups = useMemo(
-    () =>
-      groupByTeam(sortedRankings).map((group) => ({
-        ...group,
-        ranks: computeRanks(group.agents),
-        ties: tiedNamesFor(group.agents),
-      })),
-    [sortedRankings],
-  );
-
   const handleExport = async () => {
     setExporting(true);
     try {
-      // Excel mengikuti tampilan: per tim leader memakai urutan dan peringkat
-      // di dalam tim, sama seperti tabel.
-      const teamView = view === "team";
+      // Excel mengikuti urutan tabel yang tampil.
       await downloadRankingXlsx({
-        agents: teamView
-          ? teamGroups.flatMap((group) => group.agents)
-          : sortedRankings,
-        ranks: teamView
-          ? new Map(teamGroups.flatMap((group) => [...group.ranks]))
-          : businessRanks,
-        period: selectedPeriod,
-        fileName: `ranking-sidak-${effectiveService}-${selectedYear}-${selectedPeriod}${teamView ? "-per-tim" : ""}.xlsx`,
+        agents: sortedRankings,
+        ranks: businessRanks,
+        fileName: `ranking-sidak-${effectiveService}-${selectedYear}-${pad2(startMonth)}-${pad2(endMonth)}.xlsx`,
       });
     } catch {
       notify.error("File Excel gagal dibuat. Coba lagi.");
@@ -268,10 +250,7 @@ export default function SidakRankingPage() {
   ) => {
                         const tieLabel = formatTieLabel(rank, tiedNames);
                         const rankChange = agent.rankChange;
-                        const rankChangeLabel = describeRankChange(
-                          rankChange,
-                          selectedPeriod,
-                        );
+                        const rankChangeLabel = describeRankChange(rankChange);
                         // Prioritas naik = temuan makin banyak (perlu perhatian);
                         // turun = membaik. Teks label tetap menyatakan arahnya.
                         const rankChangeClass =
@@ -305,6 +284,11 @@ export default function SidakRankingPage() {
                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground md:hidden">
                                 {agent.batch && <span>{agent.batch}</span>}
                                 <span>{agent.defects} temuan</span>
+                                {(agent.criticalFindings ?? 0) > 0 ? (
+                                  <span className={SIDAK_SCORE_TEXT.bad}>
+                                    {agent.criticalFindings} kritikal
+                                  </span>
+                                ) : null}
                                 <span>Skor QA {agent.score.toFixed(1)}%</span>
                               </div>
                               {rankChangeLabel && (
@@ -322,14 +306,18 @@ export default function SidakRankingPage() {
                               {[agent.tim?.trim(), agent.batch?.trim()]
                                 .filter(Boolean)
                                 .join(" · ") || "—"}
-                              {agent.hasCritical ? (
-                                <span className={`ml-2 text-xs font-semibold ${SIDAK_SCORE_TEXT.bad}`}>
-                                  kritikal
-                                </span>
-                              ) : null}
                             </td>
                             <td className="hidden px-4 py-4 text-right align-middle font-mono font-semibold text-foreground md:table-cell">
                               {agent.defects}
+                            </td>
+                            <td
+                              className={`hidden px-4 py-4 text-right align-middle font-mono md:table-cell ${
+                                (agent.criticalFindings ?? 0) > 0
+                                  ? `font-semibold ${SIDAK_SCORE_TEXT.bad}`
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {agent.criticalFindings ?? 0}
                             </td>
                             <td
                               className={`hidden px-4 py-4 text-right align-middle font-semibold md:table-cell ${scoreColor(agent.score)}`}
@@ -363,12 +351,8 @@ export default function SidakRankingPage() {
         : "descending"
       : "none";
 
-  const isYearToDate = selectedPeriod === "ytd";
-  const scoreColumnLabel = isYearToDate ? "Rata-rata Skor QA" : "Skor QA";
-
-  const periodsForYear = data?.periods?.filter(
-    (p) => p.year === selectedYear,
-  ) ?? [];
+  const scoreColumnLabel =
+    startMonth !== endMonth ? "Rata-rata Skor QA" : "Skor QA";
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -387,7 +371,8 @@ export default function SidakRankingPage() {
                       "Tim terpilih")
                 }
                 tahun={selectedYear}
-                note="periode dipilih di filter, bukan rentang bulan"
+                dari={startMonth}
+                sampai={endMonth}
               />
             }
             actions={
@@ -446,26 +431,23 @@ export default function SidakRankingPage() {
                 }))}
               />
 
-              <FilterSelect
-                className="flex min-w-0 flex-col gap-1.5 lg:w-56"
-                id="sidak-ranking-period"
-                label="Periode"
-                value={selectedPeriod}
-                onValueChange={setSelectedPeriod}
-                items={[
-                  { value: "ytd", label: "Year to Date (YTD)" },
-                  { value: "alltime", label: "All Time" },
-                ]}
-                groups={[
-                  {
-                    label: "Bulan",
-                    items: periodsForYear.map((p) => ({
-                      value: p.id,
-                      label: `${MONTHS[(p.month ?? 1) - 1]} ${p.year}`,
-                    })),
-                  },
-                ]}
-              />
+              <div className="flex min-w-0 flex-col gap-1.5 lg:w-52">
+                <label
+                  htmlFor="sidak-ranking-months"
+                  className="text-xs font-medium text-fg2"
+                >
+                  Bulan
+                </label>
+                <MonthRangePicker
+                  id="sidak-ranking-months"
+                  selectedYear={selectedYear}
+                  startMonth={startMonth}
+                  endMonth={endMonth}
+                  onRangeChange={(start, end) =>
+                    setScope({ dari: start ?? 1, sampai: end ?? 12 })
+                  }
+                />
+              </div>
 
               <FilterSelect
                 className="flex min-w-0 flex-col gap-1.5 lg:w-64"
@@ -488,42 +470,24 @@ export default function SidakRankingPage() {
                   ],
                 }))}
               />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetScope}
+                className="min-h-[44px] self-start px-3 text-fg2 lg:self-end"
+              >
+                Atur ulang
+              </Button>
           </section>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div
-              role="group"
-              aria-label="Tampilan ranking"
-              className="inline-flex self-start rounded-lg border border-border p-0.5"
-            >
-              {(
-                [
-                  ["combined", "Tim gabungan"],
-                  ["team", "Per tim leader"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  aria-pressed={view === value}
-                  onClick={() => setView(value)}
-                  className={cn(
-                    "min-h-[44px] rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
-                    view === value
-                      ? "bg-foreground text-background"
-                      : "text-fg2 hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {!loading && sortedRankings.length > 0 ? (
-              <p data-testid="ranking-count" className="text-sm text-fg2 tabular-nums">
-                {sortedRankings.length} agen · jumlah temuan sama berbagi peringkat
-              </p>
-            ) : null}
-          </div>
+          {!loading && sortedRankings.length > 0 ? (
+            <p data-testid="ranking-count" className="text-sm text-fg2 tabular-nums">
+              {sortedRankings.length} agen · jumlah temuan sama berbagi peringkat ·{" "}
+              {data?.comparison
+                ? `perubahan posisi dibanding ${data.comparison.label}`
+                : "belum ada periode pembanding untuk perubahan posisi"}
+            </p>
+          ) : null}
 
           {/* RANKING TABLE */}
           <section
@@ -568,6 +532,9 @@ export default function SidakRankingPage() {
                         {renderSortIcon("defects")}
                       </Button>
                     </th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold text-muted-foreground">
+                      Kritikal
+                    </th>
                     <th
                       aria-sort={ariaSort("score")}
                       className="px-4 py-1 text-right text-[12px] font-semibold text-muted-foreground"
@@ -587,40 +554,11 @@ export default function SidakRankingPage() {
                     </th>
                   </tr>
                 </thead>
-                {!loading && view === "team" && sortedRankings.length > 0 ? (
-                  teamGroups.map((group) => (
-                    <tbody
-                      key={group.tim}
-                      aria-label={group.tim}
-                      className="block md:table-row-group"
-                    >
-                      <tr className="block border-b border-border bg-muted/30 md:table-row">
-                        <th
-                          scope="colgroup"
-                          colSpan={6}
-                          className="block px-4 py-2 text-left text-sm font-semibold text-foreground md:table-cell"
-                        >
-                          {group.tim}
-                          <span className="ml-2 font-normal text-fg2">
-                            {group.agents.length} agen
-                          </span>
-                        </th>
-                      </tr>
-                      {group.agents.map((agent, i) =>
-                        renderRow(
-                          agent,
-                          group.ranks.get(agent.agentId) ?? i + 1,
-                          group.ties.get(agent.agentId) ?? [],
-                        ),
-                      )}
-                    </tbody>
-                  ))
-                ) : (
-                  <tbody className="block md:table-row-group">
+                <tbody className="block md:table-row-group">
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={`skeleton-${i}`}>
-                          <td colSpan={6} className="px-6 py-8">
+                          <td colSpan={7} className="px-6 py-8">
                             <Skeleton className="h-6 w-full rounded-lg" />
                           </td>
                         </tr>
@@ -635,7 +573,7 @@ export default function SidakRankingPage() {
                       )
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-6 py-24 text-center">
+                        <td colSpan={7} className="px-6 py-24 text-center">
                           <QaStatePanel
                             type="empty"
                             title="Data ranking belum tersedia untuk filter ini"
@@ -646,7 +584,6 @@ export default function SidakRankingPage() {
                       </tr>
                     )}
                   </tbody>
-                )}
               </table>
             </div>
           </section>

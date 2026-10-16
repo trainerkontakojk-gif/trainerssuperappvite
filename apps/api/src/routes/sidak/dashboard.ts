@@ -9,7 +9,10 @@ import { User } from "@supabase/supabase-js";
 import { serviceTypeSchema } from "@trainers/types";
 import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
-import { getRankingData } from "../../services/sidak-ranking-service";
+import {
+  getRankingData,
+  RankingInputError,
+} from "../../services/sidak-ranking-service";
 
 type Variables = { user: User; profile: any };
 
@@ -476,6 +479,12 @@ sidakDashboard.get("/ranking", requireCapability("sidak.read"), async (c) => {
     ? parseInt(c.req.query("year")!)
     : new Date().getFullYear();
   const folder = c.req.query("folder") || "ALL";
+  const startMonth = c.req.query("startMonth")
+    ? Number(c.req.query("startMonth"))
+    : undefined;
+  const endMonth = c.req.query("endMonth")
+    ? Number(c.req.query("endMonth"))
+    : undefined;
 
   const accessibleIds = await sidakService.getAccessibleAgentIds(
     user.id,
@@ -501,6 +510,8 @@ sidakDashboard.get("/ranking", requireCapability("sidak.read"), async (c) => {
       period,
       service_type,
       year,
+      startMonth,
+      endMonth,
       folder,
       accessibleIds,
       filterScope,
@@ -512,6 +523,12 @@ sidakDashboard.get("/ranking", requireCapability("sidak.read"), async (c) => {
     });
   } catch (e: any) {
     if (e instanceof ScopeUnavailableError) throw e;
+    if (e instanceof RankingInputError) {
+      return c.json(
+        { success: false, error: { code: "INVALID_INPUT", message: e.message } },
+        400,
+      );
+    }
     return c.json(
       {
         success: false,

@@ -121,6 +121,7 @@ export interface UseSidakScopeResult {
   /** Kunci yang benar-benar dipilih (URL atau sesi), bukan bawaan. */
   explicit: SidakScopeSearch;
   setScope: (patch: Partial<SidakScope>) => void;
+  resetScope: () => void;
 }
 
 export function useSidakScope(): UseSidakScopeResult {
@@ -184,5 +185,16 @@ export function useSidakScope(): UseSidakScopeResult {
     [scope, writeUrl],
   );
 
-  return { scope, explicit, setScope };
+  /** Kembali ke bawaan: query cakupan dan cakupan sesi dihapus. */
+  const resetScope = useCallback(() => {
+    pendingRef.current = null;
+    try {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Penyimpanan sesi diblokir: cukup bersihkan URL.
+    }
+    writeUrl({});
+  }, [writeUrl]);
+
+  return { scope, explicit, setScope, resetScope };
 }

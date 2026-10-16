@@ -7,6 +7,7 @@ import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "../../components/sidak/SidakHeatmapCalendar";
 import SidakHeatmapInsights from "../../components/sidak/SidakHeatmapInsights";
+import { SidakWeekdayPattern } from "../../components/sidak/SidakWeekdayBars";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
 import {
@@ -242,6 +243,7 @@ export default function SidakHeatmap() {
             selectedDate={selected?.date ?? null}
             onSelectDay={setSelected}
           />
+          <SidakWeekdayPattern days={heatmap.days} year={heatmap.year} />
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-border bg-surface p-4">

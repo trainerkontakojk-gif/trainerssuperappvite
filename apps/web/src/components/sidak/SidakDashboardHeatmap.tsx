@@ -4,11 +4,11 @@ import type { ServiceType, SidakHeatmapResponse } from "@trainers/types";
 import { getErrorMessage } from "../../lib/api";
 import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import {
-  WEEKDAY_FULL,
   buildHeatmapInsights,
   formatInsightDateLong,
 } from "./heatmap-insights";
 import SidakDashboardPanel, { panelLinkClass } from "./SidakDashboardPanel";
+import { SidakWeekdayBars } from "./SidakWeekdayBars";
 
 interface Props {
   year: number;
@@ -22,7 +22,6 @@ const PERCENT = new Intl.NumberFormat("id-ID", {
   style: "percent",
   maximumFractionDigits: 0,
 });
-const WEEKDAY_SHORT = WEEKDAY_FULL.map((label) => label.slice(0, 3));
 
 export default function SidakDashboardHeatmap({
   year,
@@ -68,7 +67,6 @@ export default function SidakDashboardHeatmap({
     [data],
   );
   const weekdayTotals = insights?.weekdayTotals ?? new Array<number>(7).fill(0);
-  const maxWeekday = Math.max(...weekdayTotals);
   const weekendTotal = weekdayTotals[5]! + weekdayTotals[6]!;
 
   return (
@@ -127,60 +125,8 @@ export default function SidakDashboardHeatmap({
               {INTEGER.format(insights.busiestDay.count)} temuan
             </p>
           </div>
-          <div
-            role="img"
-            aria-label={`Temuan per hari dalam minggu ${year}: ${weekdayTotals
-              .map((total, index) => `${WEEKDAY_FULL[index]}: ${total} temuan`)
-              .join(", ")}`}
-            className="mt-5 flex min-h-0 flex-1 flex-col"
-          >
-            <div className="relative min-h-32 flex-1 border-b border-border">
-              <div className="absolute inset-0 flex items-end gap-2 pt-5">
-                {weekdayTotals.map((total, index) => {
-                  const isPeak = total === maxWeekday;
-                  return (
-                    <div
-                      key={WEEKDAY_FULL[index]}
-                      title={`${WEEKDAY_FULL[index]}: ${INTEGER.format(total)} temuan`}
-                      className="flex h-full flex-1 items-end"
-                    >
-                      <div
-                        className={`relative w-full rounded-t-[3px] ${
-                          isPeak ? "bg-foreground" : "bg-foreground/45"
-                        }`}
-                        style={{
-                          height:
-                            total > 0
-                              ? `${Math.max(4, (total / maxWeekday) * 100)}%`
-                              : "2px",
-                        }}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`absolute inset-x-0 bottom-full mb-1 text-center text-xs leading-4 tabular-nums ${
-                            isPeak
-                              ? "font-semibold text-foreground"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {INTEGER.format(total)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div
-              aria-hidden="true"
-              className="mt-1.5 flex gap-2 text-center text-xs text-muted-foreground"
-            >
-              {WEEKDAY_SHORT.map((label) => (
-                <span key={label} className="flex-1">
-                  {label}
-                </span>
-              ))}
-            </div>
+          <div className="mt-5 flex min-h-0 flex-1 flex-col">
+            <SidakWeekdayBars totals={weekdayTotals} year={year} />
           </div>
           <ul
             aria-label="Statistik pola harian"

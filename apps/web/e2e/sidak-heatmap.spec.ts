@@ -194,8 +194,30 @@ test.describe("Halaman Heatmap", () => {
     await open(page, "trainer");
 
     await expect(page.getByRole("heading", { level: 1, name: "Heatmap", exact: true })).toBeVisible();
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
-    await expect(page.getByLabel(/Kalender Desember 2026/)).toBeVisible();
+    // Satu kisi setahun: kolom = minggu (Senin di atas), baris = hari.
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    await expect(calendar).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Kalender 2026" })).toBeVisible();
+    await expect(calendar.getByRole("button", { name: "31/12/2026: 0 temuan" })).toBeVisible();
+    const box = async (name: string) => {
+      const b = await calendar.getByRole("button", { name }).boundingBox();
+      if (!b) throw new Error(`hari ${name} tidak ter-render`);
+      return b;
+    };
+    const mon = await box("05/01/2026: 3 temuan");
+    const tue = await box("06/01/2026: 0 temuan");
+    const nextMon = await box("12/01/2026: 0 temuan");
+    expect(Math.abs(tue.x - mon.x)).toBeLessThan(1);
+    expect(tue.y).toBeGreaterThan(mon.y);
+    expect(Math.abs(nextMon.y - mon.y)).toBeLessThan(1);
+    expect(nextMon.x).toBeGreaterThan(mon.x);
+    // Antarbulan ada jeda: 31 Jan (Sabtu) dan 1 Feb (Minggu) tidak berdempet.
+    const jan31 = await box("31/01/2026: 0 temuan");
+    const feb1 = await box("01/02/2026: 0 temuan");
+    expect(feb1.x - (jan31.x + jan31.width)).toBeGreaterThanOrEqual(12);
+    const months = calendar.getByTestId("heatmap-month-labels");
+    await expect(months).toContainText("Jan");
+    await expect(months).toContainText("Des");
 
     // Jumlah pada hari terbaca sebagai TEKS, bukan hanya warna.
     await expect(page.getByRole("button", { name: "05/01/2026: 3 temuan" })).toBeVisible();
@@ -207,6 +229,57 @@ test.describe("Halaman Heatmap", () => {
     await expect(missingCard).toContainText("7");
     await expect(missingCard).toContainText(/Dari semua tahun/);
     await expect(missingCard).toContainText("tidak tampil di kalender");
+  });
+
+  test("tiap kotak menulis angka tanggal; di HP kisi dibuka di temuan terakhir", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-10-06": 14 } };
+    await page.setViewportSize({ width: 390, height: 900 });
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    await expect(calendar).toBeVisible();
+    // Angka tanggal tampil di kotak, bukan hanya di tooltip.
+    await expect(calendar.getByRole("button", { name: "06/10/2026: 14 temuan" })).toHaveText("6");
+    await expect(calendar.getByRole("button", { name: "31/12/2026: 0 temuan" })).toHaveText("31");
+    const cell = await calendar.getByRole("button", { name: "06/10/2026: 14 temuan" }).boundingBox();
+    expect(cell!.width).toBeGreaterThanOrEqual(21.5);
+
+    // Layar sempit: kisi bisa digeser dan dibuka di hari bertemuan terakhir.
+    const scroller = page.getByTestId("heatmap-calendar-scroller");
+    await expect
+      .poll(() => scroller.evaluate((el) => el.scrollLeft))
+      .toBeGreaterThan(0);
+    await expect(calendar.getByRole("button", { name: "06/10/2026: 14 temuan" })).toBeInViewport();
+    // Label hari menempel di kiri, jadi tetap terlihat setelah digeser.
+    await expect(calendar.getByText("Sen", { exact: true })).toBeInViewport();
+    // Halaman sendiri tidak ikut melebar.
+    const pageOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(pageOverflow).toBeLessThanOrEqual(1);
+  });
+
+  test("bar hari di bawah kalender membandingkan Senin sampai Minggu", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-10-06": 14, "2026-10-13": 2 } };
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    await expect(calendar).toBeVisible();
+    const bars = page.getByRole("region", { name: "Temuan per hari dalam minggu" });
+    await expect(bars).toBeVisible();
+    const chart = bars.getByRole("img");
+    await expect(chart).toHaveAttribute("aria-label", /Senin: 3 temuan/);
+    await expect(chart).toHaveAttribute("aria-label", /Selasa: 16 temuan/);
+    await expect(chart).toHaveAttribute("aria-label", /Minggu: 0 temuan/);
+    // Angka tiap bar tertulis, hari tersibuk disebut.
+    await expect(bars).toContainText("16");
+    await expect(bars).toContainText("Selasa paling banyak");
+
+    // Tepat di bawah kalender.
+    const calBox = await calendar.boundingBox();
+    const barBox = await bars.boundingBox();
+    expect(barBox!.y).toBeGreaterThan(calBox!.y + calBox!.height);
   });
 
   test("filter mode, tahun, dan layanan benar-benar dikirim", async ({ page }) => {
@@ -248,11 +321,11 @@ test.describe("Halaman Heatmap", () => {
     await expect(alert).toBeVisible();
     await expect(alert).toContainText(/Gagal memuat heatmap/);
     // Kalender TIDAK boleh tampil seolah-olah tidak ada temuan.
-    await expect(page.getByLabel(/Kalender Januari/)).toHaveCount(0);
+    await expect(page.getByLabel(/Kalender temuan/)).toHaveCount(0);
 
     behaviour = { kind: "data", counts: {} };
     await page.getByRole("button", { name: "Coba lagi" }).click();
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(page.getByLabel(/Kalender temuan 2026/)).toBeVisible();
   });
 
   test("loading terlihat sebelum data arrives", async ({ page }) => {
@@ -262,10 +335,10 @@ test.describe("Halaman Heatmap", () => {
 
     // Respons ditahan, jadi loading pasti terlihat dan kalender belum ada.
     await expect(page.getByTestId("heatmap-loading")).toBeVisible();
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toHaveCount(0);
+    await expect(page.getByLabel(/Kalender temuan 2026/)).toHaveCount(0);
 
     gate.release();
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(page.getByLabel(/Kalender temuan 2026/)).toBeVisible();
     await expect(page.getByTestId("heatmap-loading")).toHaveCount(0);
   });
 
@@ -336,7 +409,7 @@ test.describe("Halaman Heatmap", () => {
     behaviour = { kind: "data", counts, missing: 0 };
     await open(page, "trainer");
     // Tunggu data benar-benar ter-render sebelum membaca bucket hari.
-    await expect(page.getByLabel(/Kalender Januari 2026/)).toBeVisible();
+    await expect(page.getByLabel(/Kalender temuan 2026/)).toBeVisible();
 
     const labels = await page
       .locator("[data-intensity]")
@@ -457,17 +530,16 @@ test.describe("Halaman Heatmap", () => {
     ).toHaveCount(0);
   });
 
-  test("daftar halaman di Ringkasan SIDAK membuka halaman heatmap", async ({
-    page,
-  }) => {
+  test("navigasi SIDAK membuka halaman heatmap", async ({ page }) => {
     await installMocks(page, "trainer");
     await page.goto("/sidak");
+    await expect(page).toHaveURL(/\/sidak\/dashboard/);
 
-    const card = page
-      .getByRole("region", { name: "Halaman SIDAK", exact: true })
-      .getByRole("link", { name: /^Heatmap/ });
-    await expect(card).toBeVisible();
-    await card.click();
+    const link = page
+      .getByRole("navigation", { name: "Navigasi utama" })
+      .getByRole("link", { name: "Heatmap", exact: true });
+    await expect(link).toBeVisible();
+    await link.click();
 
     await expect(page).toHaveURL(/\/sidak\/heatmap$/);
     await expect(

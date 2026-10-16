@@ -344,8 +344,8 @@ for (const width of [1440, 390]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    // `/sidak` dibuka hanya untuk memeriksa navigasi; Ringkasan SIDAK membaca
-    // dashboard + direktori agen, jadi keduanya dijawab dari fixture beranda.
+    // `/sidak` dibuka hanya untuk memeriksa navigasi; route itu membuka
+    // Dashboard SIDAK, jadi API-nya dijawab dari fixture SIDAK.
     const sidakHome = homeMocks().filter(
       (mock) => mock.path !== "/api/v1/me/access-status",
     );

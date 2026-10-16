@@ -24,6 +24,7 @@ import {
   HEATMAP_DATE_COLUMN,
   type SidakHeatmapCountBy,
   type SidakHeatmapResponse,
+  type SidakHeatmapTicketRef,
 } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import {
@@ -55,6 +56,8 @@ type TemuanRow = {
   sebaiknya: string | null;
   no_tiket: string | null;
   tanggal: string | null;
+  /** Hanya diambil untuk heatmap satu agen. */
+  period?: { month: number; year: number } | null;
 };
 
 /** Deret semua tanggal satu tahun, termasuk 29 Februari bila tahun itu leap. */
@@ -121,6 +124,9 @@ async function fetchCountableRows(args: {
 }): Promise<TemuanRow[]> {
   const { supabase, mode, year, serviceType, agentId, scope } = args;
   const column = HEATMAP_DATE_COLUMN[mode];
+  // Heatmap satu agen ikut membaca bulan periode QA supaya tanggal bisa
+  // membuka tiketnya di tab Temuan (dikelompokkan per periode).
+  const periodJoin = agentId ? ", period:qa_periods(month, year)" : "";
 
   return fetchAllPages<TemuanRow>({
     build: ({ from, to }) => {
@@ -128,7 +134,7 @@ async function fetchCountableRows(args: {
         .from("qa_temuan")
         // Alias kolom tanggal menjadi `tanggal` supaya pembacaan di bawah tidak
         // bergantung pada mode. PostgREST mengembalikan key sesuai nama kolom.
-        .select(`${SELECT_COLUMNS}, tanggal:${column}`)
+        .select(`${SELECT_COLUMNS}, tanggal:${column}${periodJoin}`)
         .eq("is_phantom_padding", false)
         .gte(column, `${year}-01-01`)
         .lte(column, `${year}-12-31`)
@@ -209,6 +215,26 @@ function aggregateByDay(
   return { counts, total };
 }
 
+/** Tiket bertemuan per tanggal (distinct nomor + periode), urut nomor tiket. */
+function ticketsByDay(rows: TemuanRow[]): Map<string, SidakHeatmapTicketRef[]> {
+  const byDay = new Map<string, Map<string, SidakHeatmapTicketRef>>();
+  for (const row of rows) {
+    if (!row.tanggal || !row.period || !isCountable(row)) continue;
+    if (!hasTicketNumber(row.no_tiket)) continue;
+    const noTiket = row.no_tiket.trim().toUpperCase();
+    const key = `${noTiket}|${row.period.year}-${row.period.month}`;
+    const day = byDay.get(row.tanggal) ?? new Map<string, SidakHeatmapTicketRef>();
+    day.set(key, { noTiket, month: row.period.month, year: row.period.year });
+    byDay.set(row.tanggal, day);
+  }
+  return new Map(
+    [...byDay].map(([date, refs]) => [
+      date,
+      [...refs.values()].sort((a, b) => a.noTiket.localeCompare(b.noTiket)),
+    ]),
+  );
+}
+
 /** Hitung temuan tanpa tanggal pada seluruh periode sesuai satuan. */
 function countMissingByUnit(
   rows: CountableRow[],
@@ -271,6 +297,7 @@ export async function getSidakHeatmap(args: {
   ]);
 
   const { counts, total } = aggregateByDay(rows, countBy);
+  const tickets = agentId ? ticketsByDay(rows) : null;
 
   return {
     mode,
@@ -282,6 +309,7 @@ export async function getSidakHeatmap(args: {
     days: buildYearDays(year).map((date) => ({
       date,
       count: counts.get(date) ?? 0,
+      ...(tickets ? { tickets: tickets.get(date) ?? [] } : {}),
     })),
     totalFindings: total,
     missingDateFindingsAllPeriods: countMissingByUnit(missingRows, countBy),

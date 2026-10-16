@@ -537,7 +537,8 @@ test.describe("Forecast SIDAK (hermetic)", () => {
         }),
       });
     });
-    await page.getByRole("button", { name: "Reset rentang bulan" }).click();
+    await page.getByRole("button", { name: /^Rentang bulan/ }).click();
+    await page.getByRole("button", { name: "Semua bulan" }).click();
     await expect.poll(() => scopedLoads).toBeGreaterThan(0);
     await expect(page.getByText("Rina Nama 1")).toBeVisible();
 
@@ -573,27 +574,24 @@ test.describe("Forecast SIDAK (hermetic)", () => {
     await expect(page.getByRole("option")).toHaveText(["Call", "Chat", "Email"]);
   });
 
-  test("t kontrol filter >= 44px dan rentang bulan berlabel (Dari/Sampai di mobile)", async ({
+  test("t kontrol filter >= 44px dan rentang bulan satu kontrol berlabel", async ({
     page,
   }) => {
     await open(page);
     for (const control of [
       page.getByRole("button", { name: "Perbarui" }),
       page.getByRole("combobox", { name: "Periode proyeksi" }),
-      page.getByRole("combobox", { name: "Bulan awal" }),
-      page.getByRole("combobox", { name: "Bulan akhir" }),
-      page.getByRole("button", { name: "Reset rentang bulan" }),
+      page.getByRole("button", { name: /^Rentang bulan/ }),
     ]) {
       const box = await control.boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(43.5);
     }
-    const reset = await page.getByRole("button", { name: "Reset rentang bulan" }).boundingBox();
-    expect(reset!.width).toBeGreaterThanOrEqual(43.5);
 
     await page.setViewportSize({ width: 390, height: 900 });
-    await expect(page.getByText("Dari", { exact: true })).toBeVisible();
-    await expect(page.getByText("Sampai", { exact: true })).toBeVisible();
+    await expect(
+      page.getByTestId("sidak-filter-bar").getByText("Bulan", { exact: true }),
+    ).toBeVisible();
   });
 
   test("u scroll lane hanya di desktop, tanpa badge peringkat lokal", async ({
@@ -625,7 +623,7 @@ test.describe("Forecast SIDAK (hermetic)", () => {
     await expect(row.getByText("#1")).toHaveCount(0);
   });
 
-  test("w grafik menulis angka aktual dan proyeksi di titiknya, area proyeksi berlabel", async ({
+  test("w grafik menulis angka aktual dan proyeksi di titiknya, keterangan proyeksi hanya di legenda", async ({
     page,
   }) => {
     await open(page);
@@ -637,9 +635,10 @@ test.describe("Forecast SIDAK (hermetic)", () => {
 
     await expect.poll(() => labels("actual")).toEqual(["12", "10", "8"]);
     await expect.poll(() => labels("forecast")).toEqual(["7", "6", "5"]);
-    await expect(section.getByTestId("chart-projection-zone")).toHaveText(
-      "Proyeksi",
-    );
+    // Tanpa teks "Proyeksi" di dalam grafik: teks itu menumpuk dengan angka
+    // titik proyeksi di pojok kanan atas. Area tetap diarsir.
+    await expect(section.locator("svg text", { hasText: "Proyeksi" })).toHaveCount(0);
+    await expect(section.locator(".recharts-reference-area")).toHaveCount(1);
     await expect(section.getByTestId("chart-legend")).toHaveText(
       /Aktual.*Proyeksi/,
     );

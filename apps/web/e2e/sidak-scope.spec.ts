@@ -147,6 +147,23 @@ test.describe("Cakupan bersama SIDAK (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("/sidak langsung membuka Dashboard dengan cakupan yang sama", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: `/sidak?layanan=chat&tahun=${PAST_YEAR}&dari=3&sampai=6`,
+      apiMocks: SCOPE_MOCKS,
+      waitForUrl: /\/sidak\/dashboard/,
+    });
+    await expect(page).toHaveURL(
+      new RegExp(`/sidak/dashboard\\?.*layanan=chat.*tahun=${PAST_YEAR}`),
+    );
+    await expect
+      .poll(() => lastRequest(audit, "/sidak/dashboard?"), { timeout: 20000 })
+      .toContain("service_type=chat");
+    expectHermetic(audit);
+  });
+
   test("mengubah layanan di Dashboard menulis query", async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/sidak/dashboard",
@@ -158,6 +175,40 @@ test.describe("Cakupan bersama SIDAK (hermetic)", () => {
     await expect
       .poll(() => lastRequest(audit, "/sidak/dashboard?"))
       .toContain("service_type=chat");
+    expectHermetic(audit);
+  });
+
+  test("Atur ulang mengembalikan cakupan ke bawaan dan membersihkan query", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: `/sidak/dashboard?layanan=chat&tahun=${PAST_YEAR}&dari=3&sampai=6`,
+      apiMocks: SCOPE_MOCKS,
+      waitForUrl: /\/sidak\/dashboard/,
+    });
+    await expect
+      .poll(() => lastRequest(audit, "/sidak/dashboard?"), { timeout: 20000 })
+      .toContain("service_type=chat");
+
+    const bar = page.getByTestId("sidak-filter-bar");
+    await bar.getByRole("button", { name: "Atur ulang" }).click();
+    await expect(page).not.toHaveURL(/layanan=chat/);
+    await expect
+      .poll(() => lastRequest(audit, "/sidak/dashboard?"))
+      .toContain("service_type=call");
+    const request = lastRequest(audit, "/sidak/dashboard?");
+    expect(request).toContain(`year=${YEAR}`);
+    expect(request).toContain("startMonth=1");
+    expect(request).toContain(`endMonth=${new Date().getMonth() + 1}`);
+
+    // Cakupan lama tidak terbawa lagi lewat sidebar.
+    await sidebar(page)
+      .getByRole("link", { name: "Ranking", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/sidak\/ranking/);
+    await expect
+      .poll(() => lastRequest(audit, "/sidak/ranking?"))
+      .toContain(`year=${YEAR}`);
     expectHermetic(audit);
   });
 

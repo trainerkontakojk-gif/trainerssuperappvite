@@ -250,18 +250,6 @@ export default function ParamTrendChart({
               fillOpacity={0.5}
               stroke="none"
               ifOverflow="extendDomain"
-              label={({ viewBox }: { viewBox?: { x?: number; y?: number; width?: number } }) => (
-                <text
-                  data-testid="chart-projection-zone"
-                  x={(viewBox?.x ?? 0) + (viewBox?.width ?? 0) - 4}
-                  y={(viewBox?.y ?? 0) + 12}
-                  textAnchor="end"
-                  fontSize={12}
-                  fill="var(--muted-foreground)"
-                >
-                  Proyeksi
-                </text>
-              )}
             />
           ) : null}
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.05} />

@@ -41,7 +41,7 @@ export default function SidakForecastPage() {
   const currentYear = new Date().getFullYear();
 
   // Layanan, tim, tahun, dan rentang bulan adalah cakupan bersama SIDAK.
-  const { scope, setScope } = useSidakScope();
+  const { scope, setScope, resetScope } = useSidakScope();
   const selectedService: string = scope.layanan;
   const selectedFolder = scope.tim ?? SIDAK_ALL_TEAMS;
   const selectedYear = scope.tahun;
@@ -450,6 +450,7 @@ export default function SidakForecastPage() {
           availableServices={availableServices as string[]}
           horizon={selectedHorizon}
           onHorizonChange={setSelectedHorizon}
+          onReset={resetScope}
         />
 
         <section

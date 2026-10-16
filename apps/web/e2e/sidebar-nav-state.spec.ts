@@ -94,7 +94,7 @@ test.describe("Sidebar berlabel", () => {
     expectHermetic(audit);
   });
 
-  test("grup SIDAK terbuka otomatis di /sidak dan sub-halaman aktif ditandai", async ({
+  test("/sidak membuka Dashboard; grup SIDAK terbuka dan tanpa Ringkasan", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -102,12 +102,16 @@ test.describe("Sidebar berlabel", () => {
       apiMocks: SIDAK_HOME_MOCKS,
     });
     const nav = sidebar(page);
+    await expect(page).toHaveURL(/\/sidak\/dashboard/, { timeout: 20000 });
     await expect(
       nav.getByRole("button", { name: "SIDAK", exact: true }),
-    ).toHaveAttribute("aria-expanded", "true", { timeout: 20000 });
+    ).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      nav.getByRole("link", { name: "Dashboard", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     await expect(
       nav.getByRole("link", { name: "Ringkasan", exact: true }),
-    ).toHaveAttribute("aria-current", "page");
+    ).toHaveCount(0);
     // Trainer boleh mengelola konfigurasi SIDAK.
     await expect(
       nav.getByRole("link", { name: "Input temuan", exact: true }),

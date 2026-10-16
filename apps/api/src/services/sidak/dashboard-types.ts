@@ -74,6 +74,7 @@ export type DashboardAgentMetrics = {
   finalAgentScore: number;
   agentFindings: number;
   hasCritical: boolean;
+  criticalFindings?: number;
 };
 
 export type DashboardAgentWithMetrics = DashboardAgentGroup &

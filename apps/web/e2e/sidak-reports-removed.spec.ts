@@ -85,7 +85,7 @@ for (const path of [
   }
 }
 
-test("SIDAK page list and Laporan navigation open data reports", async ({
+test("Laporan data di navigasi SIDAK membuka laporan", async ({
   page,
 }) => {
   const audit = await openHermeticShell(page, {
@@ -93,22 +93,16 @@ test("SIDAK page list and Laporan navigation open data reports", async ({
     apiMocks,
     auth: { role: "admin" },
   });
-  const card = page
-    .getByRole("region", { name: "Halaman SIDAK", exact: true })
-    .getByRole("link", { name: /^Laporan/ });
-  await expect(card).toHaveAttribute("href", "/sidak/reports-data", {
-    timeout: 20000,
-  });
+  // `/sidak` membuka Dashboard; klik setelah pengalihan selesai.
+  await expect(page).toHaveURL(/\/sidak\/dashboard/, { timeout: 20000 });
   // Grup SIDAK di sidebar sudah terbuka otomatis di `/sidak/*`.
   const nav = page
     .getByRole("navigation", { name: "Navigasi utama" })
     .getByRole("link", { name: "Laporan data", exact: true });
-  await expect(nav).toHaveAttribute("href", "/sidak/reports-data");
+  await expect(nav).toHaveAttribute("href", "/sidak/reports-data", {
+    timeout: 20000,
+  });
   await nav.click();
-  await expect(page).toHaveURL(/\/sidak\/reports-data$/);
-  await page.goto("/sidak");
-  await expect(card).toBeVisible();
-  await card.click();
   await expect(page).toHaveURL(/\/sidak\/reports-data$/);
   await expect(
     page.getByRole("heading", { name: "Laporan data", exact: true }),

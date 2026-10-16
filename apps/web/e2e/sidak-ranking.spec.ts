@@ -28,8 +28,12 @@ type RankingRow = {
   defects: number;
   score: number;
   hasCritical: boolean;
+  criticalFindings?: number;
   rankChange?: number | null;
 };
+
+const MONTH = new Date().getMonth() + 1;
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
 const MOVEMENT_ROWS: RankingRow[] = [
   {
@@ -82,6 +86,7 @@ const TIE_ROWS: RankingRow[] = [
 const rankingMocks = (
   rankings: RankingRow[],
   availableServices?: string[],
+  comparison: { label: string } | null = null,
 ): ApiMock[] => [
   {
     method: "GET",
@@ -101,6 +106,7 @@ const rankingMocks = (
         folders: [],
         availableYears: [YEAR - 1, YEAR],
         ...(availableServices ? { availableServices } : {}),
+        comparison,
       },
     },
   },
@@ -111,10 +117,11 @@ async function openRanking(
   rankings: RankingRow[],
   path = "/sidak/ranking",
   availableServices?: string[],
+  comparison: { label: string } | null = null,
 ): Promise<ShellAudit> {
   const audit = await openHermeticShell(page, {
     path,
-    apiMocks: rankingMocks(rankings, availableServices),
+    apiMocks: rankingMocks(rankings, availableServices, comparison),
     // The router may drop invalid search params, so match the pathname only.
     waitForUrl: /\/sidak\/ranking(\?|$)/,
   });
@@ -147,7 +154,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     const request = audit.mockedApi.find((entry) =>
       entry.includes("/sidak/ranking?"),
     );
-    expect(request).toContain("period=ytd");
+    // Periode mengikuti rentang bulan cakupan bersama (bawaan Jan–bulan ini).
+    expect(request).toContain("period=range");
+    expect(request).toContain("startMonth=1");
+    expect(request).toContain(`endMonth=${MONTH}`);
     expect(request).toContain("service_type=call");
     expect(request).toContain(`year=${YEAR}`);
 
@@ -205,9 +215,13 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     const audit = await openRanking(page, MOVEMENT_ROWS);
 
     const filters = page.getByRole("region", { name: "Filter ranking" });
-    for (const label of ["Layanan", "Periode", "Tahun", "Tim"]) {
+    for (const label of ["Layanan", "Tahun", "Tim"]) {
       await expect(selectTrigger(filters, label)).toBeVisible();
     }
+    await expect(
+      filters.getByRole("button", { name: /^Rentang bulan/ }),
+    ).toBeVisible();
+    await expect(filters.getByRole("combobox", { name: "Periode" })).toHaveCount(0);
     await expect(selectValue(selectTrigger(filters, "Layanan"))).toHaveText(
       "Call",
     );
@@ -352,40 +366,39 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
 });
 
 const TEAM_ROWS: RankingRow[] = [
-  { agentId: "t-1", nama: "Andi", batch: "Batch A", tim: "Tim Sari", defects: 9, score: 84, hasCritical: true, rankChange: 1 },
-  { agentId: "t-2", nama: "Bela", batch: "Batch A", tim: "Tim Andi", defects: 7, score: 88, hasCritical: false, rankChange: 0 },
-  { agentId: "t-3", nama: "Caca", batch: "Batch B", tim: "Tim Sari", defects: 4, score: 93, hasCritical: false, rankChange: -2 },
-  { agentId: "t-4", nama: "Dodi", batch: "Batch B", tim: "Tim Andi", defects: 2, score: 97, hasCritical: false, rankChange: null },
+  { agentId: "t-1", nama: "Andi", batch: "Batch A", tim: "Tim Sari", defects: 9, score: 84, hasCritical: true, criticalFindings: 2, rankChange: 1 },
+  { agentId: "t-2", nama: "Bela", batch: "Batch A", tim: "Tim Andi", defects: 7, score: 88, hasCritical: false, criticalFindings: 0, rankChange: 0 },
+  { agentId: "t-3", nama: "Caca", batch: "Batch B", tim: "Tim Sari", defects: 4, score: 93, hasCritical: false, criticalFindings: 0, rankChange: -2 },
+  { agentId: "t-4", nama: "Dodi", batch: "Batch B", tim: "Tim Andi", defects: 2, score: 97, hasCritical: false, criticalFindings: 0, rankChange: null },
 ];
 
-test.describe("Ranking SIDAK: tampilan per tim dan Unduh Excel (hermetic)", () => {
+test.describe("Ranking SIDAK: pembanding dan Unduh Excel (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("segmen Per tim leader mengelompokkan agen per tim dengan peringkat di dalam tim", async ({
+  test("tanpa segmen tampilan; baris jumlah menyebut periode pembanding", async ({
     page,
   }) => {
-    const audit = await openRanking(page, TEAM_ROWS);
-    const view = page.getByRole("group", { name: "Tampilan ranking" });
-    await expect(view.getByRole("button", { name: "Tim gabungan" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    const audit = await openRanking(page, TEAM_ROWS, undefined, undefined, {
+      label: `Jan–Sep ${YEAR}`,
+    });
+    await expect(page.getByRole("group", { name: "Tampilan ranking" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Per tim leader" })).toHaveCount(0);
     await expect(page.getByTestId("ranking-count")).toHaveText(
-      "4 agen · jumlah temuan sama berbagi peringkat",
+      `4 agen · jumlah temuan sama berbagi peringkat · perubahan posisi dibanding Jan–Sep ${YEAR}`,
     );
-    await expect(rowFor(page, "Bela").getByRole("cell").first()).toHaveText("2");
+    expectHermetic(audit);
+  });
 
-    await view.getByRole("button", { name: "Per tim leader" }).click();
-    const groups = rankingTable(page).getByRole("rowgroup", { name: /^Tim / });
-    await expect(groups).toHaveCount(2);
-    // Tim diurutkan menurut nama; peringkat dihitung ulang di dalam tim.
-    await expect(groups.nth(0)).toHaveAccessibleName("Tim Andi");
-    await expect(groups.nth(1)).toHaveAccessibleName("Tim Sari");
-    await expect(rowFor(page, "Bela").getByRole("cell").first()).toHaveText("1");
-    await expect(rowFor(page, "Dodi").getByRole("cell").first()).toHaveText("2");
-    await expect(rowFor(page, "Caca").getByRole("cell").first()).toHaveText("2");
+  test("tanpa periode pembanding, Perubahan posisi tetap berisi keterangan", async ({
+    page,
+  }) => {
+    const audit = await openRanking(page, TIE_ROWS);
+    await expect(page.getByTestId("ranking-count")).toContainText(
+      "belum ada periode pembanding",
+    );
+    await expect(rowFor(page, "Agent Tie A")).toContainText("Tanpa pembanding");
     expectHermetic(audit);
   });
 
@@ -399,7 +412,9 @@ test.describe("Ranking SIDAK: tampilan per tim dan Unduh Excel (hermetic)", () =
     const downloadPromise = page.waitForEvent("download");
     await header.getByRole("button", { name: "Unduh Excel" }).click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(`ranking-sidak-call-${YEAR}-ytd.xlsx`);
+    expect(download.suggestedFilename()).toBe(
+      `ranking-sidak-call-${YEAR}-01-${pad2(MONTH)}.xlsx`,
+    );
 
     const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
@@ -418,35 +433,51 @@ test.describe("Ranking SIDAK: tampilan per tim dan Unduh Excel (hermetic)", () =
       "Perubahan posisi",
     ]);
     expect(rows.slice(1)).toEqual([
-      [1, "Andi", "Tim Sari", "Batch A", 9, 84, "Ya", "Prioritas naik +1"],
-      [2, "Bela", "Tim Andi", "Batch A", 7, 88, "Tidak", "Tetap"],
-      [3, "Caca", "Tim Sari", "Batch B", 4, 93, "Tidak", "Prioritas turun 2"],
-      [4, "Dodi", "Tim Andi", "Batch B", 2, 97, "Tidak", "Baru"],
+      [1, "Andi", "Tim Sari", "Batch A", 9, 84, 2, "Prioritas naik +1"],
+      [2, "Bela", "Tim Andi", "Batch A", 7, 88, 0, "Tetap"],
+      [3, "Caca", "Tim Sari", "Batch B", 4, 93, 0, "Prioritas turun 2"],
+      [4, "Dodi", "Tim Andi", "Batch B", 2, 97, 0, "Baru"],
     ]);
 
-    // Per tim leader: Excel mengikuti urutan dan peringkat di dalam tim.
-    await page
-      .getByRole("group", { name: "Tampilan ranking" })
-      .getByRole("button", { name: "Per tim leader" })
-      .click();
-    const teamDownloadPromise = page.waitForEvent("download");
-    await header.getByRole("button", { name: "Unduh Excel" }).click();
-    const teamDownload = await teamDownloadPromise;
-    expect(teamDownload.suggestedFilename()).toBe(
-      `ranking-sidak-call-${YEAR}-ytd-per-tim.xlsx`,
-    );
-    const teamBook = new ExcelJS.Workbook();
-    await teamBook.xlsx.readFile(await teamDownload.path());
-    const teamRows: unknown[][] = [];
-    teamBook.worksheets[0].eachRow((row) =>
-      teamRows.push((row.values as unknown[]).slice(1, 3)),
-    );
-    expect(teamRows.slice(1)).toEqual([
-      [1, "Bela"],
-      [2, "Dodi"],
-      [1, "Andi"],
-      [2, "Caca"],
-    ]);
+    expectHermetic(audit);
+  });
+
+  test("kolom Kritikal menulis jumlah temuan kritikal per agen", async ({
+    page,
+  }) => {
+    const audit = await openRanking(page, TEAM_ROWS);
+    await expect(
+      rankingTable(page).getByRole("columnheader", { name: "Kritikal" }),
+    ).toBeVisible();
+    const cells = (name: string) =>
+      rowFor(page, name).getByRole("cell");
+    await expect(cells("Andi").nth(4)).toHaveText("2");
+    await expect(cells("Bela").nth(4)).toHaveText("0");
+    expectHermetic(audit);
+  });
+
+  test("rentang bulan memakai cakupan bersama dan dikirim ke API", async ({
+    page,
+  }) => {
+    const audit = await openRanking(page, TEAM_ROWS);
+    const filters = page.getByRole("region", { name: "Filter ranking" });
+    await filters.getByRole("button", { name: /^Rentang bulan/ }).click();
+    const picker = page.getByRole("dialog", { name: "Pilih rentang bulan" });
+    await picker.getByRole("button", { name: "Februari", exact: true }).click();
+    await picker.getByRole("button", { name: "April", exact: true }).click();
+    await expect(page).toHaveURL(/dari=2/);
+    await expect(page).toHaveURL(/sampai=4/);
+    await expect
+      .poll(() =>
+        audit.mockedApi.some(
+          (e) =>
+            e.includes("/sidak/ranking?") &&
+            e.includes("startMonth=2") &&
+            e.includes("endMonth=4"),
+        ),
+      )
+      .toBe(true);
+    await expect(page.getByTestId("sidak-scope-line")).toContainText("Feb–Apr");
     expectHermetic(audit);
   });
 });

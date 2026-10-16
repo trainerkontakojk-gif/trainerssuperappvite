@@ -92,15 +92,12 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
 
 ## Penyimpangan dari usulan (hasil cek kode)
 
-- **Proyeksi per agen di beranda tidak ditampilkan.** `POST /sidak/forecast/agents`
-  tidak punya mode `cacheOnly`, jadi membacanya dari beranda akan menghitung
-  proyeksi baru. Beranda hanya menautkan ke Forecast ("Arah per agen ada di
-  Forecast"). Begitu juga Bahan coaching: arah forecast tetap di sidebar profil
-  (sudah ada), tidak diulang.
+- **Proyeksi per agen di beranda** awalnya tidak ditampilkan; sejak putaran
+  keempat ditampilkan (lihat di bawah). Bahan coaching: arah forecast tetap di
+  sidebar profil (sudah ada), tidak diulang.
 - **Cakupan bersama** dipakai Ringkasan, Dashboard, Forecast, Ranking, Heatmap
-  (tahun + layanan; "Semua layanan" tetap lokal), dan Agen (tahun). Detail agen
-  dan Laporan Data belum membaca cakupan: keduanya punya state konteks sendiri
-  (`useAgentDetail`, form laporan) dan perlu PR terpisah. Sidebar tidak membawa
+  (tahun + layanan; "Semua layanan" tetap lokal), dan Agen (tahun); sejak
+  putaran keempat juga Detail agen dan Laporan data. Sidebar tidak membawa
   query, jadi cakupan terakhir juga disimpan di `sessionStorage` lalu ditulis ke
   URL. `tim=ALL` = "Semua tim" dipilih sengaja (pasangan tim bawaan tidak
   menimpanya).
@@ -169,6 +166,50 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
     tabelnya dalam kotak.
   - Heatmap: kalender tampil sebelum angka dan pola. Kalender masih per bulan,
     belum satu kisi setahun seperti di mockup.
+
+  Putaran keempat (setelah commit `5451c676`), menutup sisa celah di atas:
+  - Heatmap (halaman dan tab agen): satu kisi setahun, kolom = minggu (Senin di
+    atas), label bulan di atas, skala warna rose yang terbaca di tema gelap.
+    Tiap hari tetap tombol berlabel tanggal + jumlah.
+  - Rentang bulan jadi satu kontrol (`MonthRangePicker`): pemicu "Januari –
+    Oktober", popover kisi 12 bulan (klik awal lalu akhir), dan "Semua bulan".
+  - Cakupan bersama juga dibaca Detail agen (tahun, layanan, rentang tren;
+    `?tab=` tetap) dan Laporan data (layanan, tahun, bulan; "Semua layanan" dan
+    rentang terbalik tetap lokal). Bar cakupan Dashboard/Forecast/Ranking punya
+    "Atur ulang" (`resetScope`: hapus query + sesi). `SidakScopeBar` tetap tidak
+    dibuat; bar filter tiap halaman yang membaca cakupan.
+  - Ranking memakai rentang bulan cakupan: API `GET /sidak/ranking?period=range
+&startMonth&endMonth` memetakan bulan ke periode QA (tanpa periode = ranking
+    kosong, bukan semua periode) dan membandingkan dengan rentang sepanjang yang
+    sama tepat sebelumnya. Rentang tidak valid = 400. Periode YTD/All time/bulan
+    dihapus dari UI. `TopAgentData.criticalFindings` (jumlah temuan pada
+    parameter kritikal) mengisi kolom Kritikal di tabel dan Excel.
+  - Heatmap agen: respons dengan `agent_id` menyertakan `days[].tickets`
+    (nomor tiket + bulan periode QA). Tanggal terpilih menyebut tiketnya dan
+    "Buka … di tab Temuan" membuka grup tiket itu.
+  - Ringkasan: "proyeksi memburuk" di Perlu tindak lanjut dari
+    `POST /sidak/forecast/agents`. Endpoint itu regresi linear tanpa AI dan
+    tanpa simpan (biaya sama dengan membuka Forecast), jadi tidak butuh mode
+    cache; hanya dipanggil untuk peran dengan `sidak.forecast.generate`. Bila
+    gagal, daftar tetap tampil dan halaman menyebut proyeksi belum bisa dimuat.
+
+  Putaran kelima (setelah cek browser Fajar):
+  - Ranking: segmen "Tim gabungan / Per tim leader" dihapus (dropdown Tim sudah
+    ada). "Perubahan posisi" tidak pernah kosong: tanpa pembanding tertulis
+    "Tanpa pembanding", dan baris jumlah menyebut rentang pembandingnya
+    (`comparison.label`). Pembanding rentang = bulan dalam rentang sebelum
+    periode aktif terakhir; bila periode aktif terakhir bulan pertama rentang,
+    bulan sebelumnya.
+  - Heatmap: jeda 10px antarbulan, dan bar "Temuan per hari dalam minggu"
+    (`SidakWeekdayBars`, sama dengan Dashboard) di bawah kalender halaman dan
+    tab agen.
+  - **Ringkasan dihapus atas permintaan Fajar.** `/sidak` membuka Dashboard
+    dengan query cakupan yang sama (gerbang akses leader tetap di `/sidak`,
+    karena route guard mengalihkan leader belum disetujui ke sana). Menu
+    "Ringkasan", daftar "Halaman SIDAK", komponen `components/sidak/home/*`,
+    `utils/sidakHomeSummary.ts`, dan `e2e/sidak-landing.spec.ts` ikut dihapus.
+  - Grafik tren: label "Proyeksi" di dalam area arsir dihapus karena menumpuk
+    dengan angka titik proyeksi; keterangan tetap di legenda.
 
 ## Design
 
@@ -253,5 +294,6 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
 - [x] Suite browser penuh (55 spec non-API, tanpa dua spec integrasi Heatmap):
       611 lolos, 3 dilewati, 2 gagal di `tna-flow` (tes peran leader membuka
       `/sidak` tanpa mock beranda) → mock beranda ditambahkan, rerun 2/2 lolos.
-- [ ] Lanjutan (PR terpisah): cakupan di Detail agen dan Laporan Data; tautan
-      latihan KETIK/PDKT/Telefun dari Bahan coaching.
+- [x] Cakupan di Detail agen dan Laporan data (putaran keempat).
+- [ ] Lanjutan (PR terpisah): tautan latihan KETIK/PDKT/Telefun dari Bahan
+      coaching.

@@ -659,12 +659,11 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     await expect(page.getByRole("combobox", { name: "Tahun" })).toContainText(
       String(YEAR),
     );
-    await expect(
-      page.getByRole("combobox", { name: "Bulan awal" }),
-    ).toContainText("Januari");
-    await expect(
-      page.getByRole("combobox", { name: "Bulan akhir" }),
-    ).toContainText(currentMonth);
+    // Satu kontrol rentang bulan: "Januari – <bulan ini>".
+    const range = page.getByRole("button", { name: /^Rentang bulan/ });
+    await expect(range).toContainText(
+      currentMonth === "Januari" ? "Januari" : `Januari – ${currentMonth}`,
+    );
     const dashboardRequest = audit.mockedApi.find((entry) =>
       entry.includes("/sidak/dashboard?"),
     );
@@ -957,6 +956,45 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     ).toBeEnabled();
 
     console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test("rentang bulan dipilih lewat satu kontrol: klik awal lalu akhir", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/dashboard",
+      apiMocks: DASHBOARD_READY_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?"]);
+
+    const range = page.getByRole("button", { name: /^Rentang bulan/ });
+    await expect(range).toBeVisible();
+    expect((await range.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
+    // Kontrol lama Dari/Sampai sudah tidak ada.
+    await expect(page.getByRole("combobox", { name: "Bulan awal" })).toHaveCount(0);
+
+    await range.click();
+    const picker = page.getByRole("dialog", { name: "Pilih rentang bulan" });
+    await expect(picker).toBeVisible();
+    await picker.getByRole("button", { name: "Juni", exact: true }).click();
+    await picker.getByRole("button", { name: "Maret", exact: true }).click();
+    await expect(picker).toBeHidden();
+    await expect(range).toContainText("Maret – Juni");
+    await expect
+      .poll(() =>
+        audit.mockedApi.some(
+          (e) =>
+            e.includes("/sidak/dashboard?") &&
+            e.includes("startMonth=3") &&
+            e.includes("endMonth=6"),
+        ),
+      )
+      .toBe(true);
+
+    await range.click();
+    await picker.getByRole("button", { name: "Semua bulan" }).click();
+    await expect(range).toContainText("Semua bulan");
     expectHermetic(audit);
   });
 

@@ -1,14 +1,12 @@
-import { Calendar, XCircle } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const MONTHS = [
   "Januari",
@@ -30,219 +28,122 @@ interface MonthRangePickerProps {
   startMonth: number | null;
   endMonth: number | null;
   onRangeChange: (start: number | null, end: number | null) => void;
-  className?: string;
-  variant?: "standalone" | "compact" | "toolbar";
-}
-
-interface MonthSelectProps {
-  id: string;
-  label: string;
-  value: number | null;
-  placeholder: string;
-  invalid: boolean;
-  onChange: (value: number | null) => void;
+  id?: string;
   className?: string;
 }
 
-function MonthSelect({
-  id,
-  label,
-  value,
-  placeholder,
-  invalid,
-  onChange,
-  className,
-}: MonthSelectProps) {
-  const items = [
-    { value: null, label: placeholder },
-    ...MONTHS.map((month, index) => ({
-      value: String(index + 1),
-      label: month,
-    })),
-  ];
-
-  return (
-    <Select
-      items={items}
-      value={value === null ? null : String(value)}
-      onValueChange={(nextValue) => {
-        onChange(nextValue === null ? null : Number(nextValue));
-      }}
-    >
-      <SelectTrigger
-        id={id}
-        aria-label={label}
-        aria-invalid={invalid || undefined}
-        className={cn(
-          "h-8 w-full min-w-0 rounded-lg border-border bg-background px-2.5 text-xs font-semibold text-foreground",
-          "hover:bg-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
-          invalid && "border-destructive/60",
-          className,
-        )}
-      >
-        <Calendar aria-hidden="true" className="text-muted-foreground" />
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent align="start">
-        <SelectGroup>
-          <SelectItem value={null}>{placeholder}</SelectItem>
-          {MONTHS.map((month, index) => (
-            <SelectItem key={month} value={String(index + 1)}>
-              {month}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
-  );
+/** Teks rentang di pemicu: "Januari – Oktober", "Oktober", atau "Semua bulan". */
+function formatMonthRange(start: number | null, end: number | null) {
+  if ((start ?? 1) === 1 && (end ?? 12) === 12) return "Semua bulan";
+  if (start === null) return `Sampai ${MONTHS[end! - 1]}`;
+  if (end === null) return `Mulai ${MONTHS[start - 1]}`;
+  if (start === end) return MONTHS[start - 1];
+  return `${MONTHS[start - 1]} – ${MONTHS[end - 1]}`;
 }
 
-function ResetRangeButton({
-  onClick,
-  showLabel = false,
-  className,
-}: {
-  onClick: () => void;
-  showLabel?: boolean;
-  className?: string;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size={showLabel ? "sm" : "icon-sm"}
-      className={cn("h-8 shrink-0", !showLabel && "w-8", className)}
-      onClick={onClick}
-      aria-label="Reset rentang bulan"
-      title="Reset rentang bulan"
-    >
-      <XCircle data-icon="inline-start" aria-hidden="true" />
-      {showLabel ? "Reset" : null}
-    </Button>
-  );
-}
-
+/**
+ * Satu kontrol rentang bulan dalam tahun terpilih. Klik pertama memilih bulan
+ * awal, klik kedua bulan akhir (urutan klik bebas), lalu popover tertutup.
+ * Rentang baru dikirim sekali setelah klik kedua; menutup popover setelah satu
+ * klik memilih bulan itu saja.
+ */
 export function MonthRangePicker({
   selectedYear,
   startMonth,
   endMonth,
   onRangeChange,
-  className = "",
-  variant = "standalone",
+  id,
+  className,
 }: MonthRangePickerProps) {
-  const isInvalidRange =
-    startMonth !== null && endMonth !== null && endMonth < startMonth;
-  const hasRange = startMonth !== null || endMonth !== null;
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<number | null>(null);
+  const label = formatMonthRange(startMonth, endMonth);
 
-  const handleReset = () => onRangeChange(null, null);
+  const close = (commitAnchor: boolean) => {
+    if (commitAnchor && anchor !== null) onRangeChange(anchor, anchor);
+    setAnchor(null);
+    setOpen(false);
+  };
 
-  // Toolbar variant sits alongside 44px filter selects in
-  // DashboardFilters, so it keeps the 44px touch height. Compact is the
-  // button-height toolbar used in tight filter bars like /dashboard trend.
-  const toolbarTriggerClassName =
-    variant === "toolbar" ? "min-h-[44px] text-sm font-medium" : undefined;
-  const toolbarResetClassName =
-    variant === "toolbar" ? "min-h-[44px] min-w-[44px]" : undefined;
+  const pick = (month: number) => {
+    if (anchor === null) {
+      setAnchor(month);
+      return;
+    }
+    onRangeChange(Math.min(anchor, month), Math.max(anchor, month));
+    close(false);
+  };
 
-  const startSelect = (
-    <MonthSelect
-      id="month-range-start"
-      label="Bulan awal"
-      value={startMonth}
-      placeholder={variant === "toolbar" ? "Awal" : "Bulan awal"}
-      invalid={isInvalidRange}
-      onChange={(value) => onRangeChange(value, endMonth)}
-      className={toolbarTriggerClassName}
-    />
-  );
-  const endSelect = (
-    <MonthSelect
-      id="month-range-end"
-      label="Bulan akhir"
-      value={endMonth}
-      placeholder={variant === "toolbar" ? "Akhir" : "Bulan akhir"}
-      invalid={isInvalidRange}
-      onChange={(value) => onRangeChange(startMonth, value)}
-      className={toolbarTriggerClassName}
-    />
-  );
-
-  if (variant === "toolbar") {
-    return (
-      <div className={cn("flex flex-col gap-2", className)}>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground sm:hidden">
-              Dari
-            </span>
-            {startSelect}
-          </div>
-          <span className="hidden shrink-0 px-1 text-xs font-medium text-muted-foreground sm:block">
-            sampai
-          </span>
-          <div className="min-w-0 sm:min-w-[8rem] sm:flex-1">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground sm:hidden">
-              Sampai
-            </span>
-            {endSelect}
-          </div>
-          {hasRange ? (
-            <ResetRangeButton
-              onClick={handleReset}
-              className={toolbarResetClassName}
-            />
-          ) : null}
-        </div>
-        {isInvalidRange ? (
-          <p className="flex items-center gap-1.5 px-1 text-xs font-medium text-destructive">
-            <XCircle aria-hidden="true" />
-            Rentang bulan tidak valid
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (variant === "compact") {
-    return (
-      <div className={cn("flex flex-wrap items-center gap-2", className)}>
-        <div className="min-w-[8rem] flex-1">{startSelect}</div>
-        <span className="shrink-0 text-xs font-medium text-muted-foreground">
-          sampai
-        </span>
-        <div className="min-w-[8rem] flex-1">{endSelect}</div>
-        {hasRange ? <ResetRangeButton onClick={handleReset} /> : null}
-      </div>
-    );
-  }
+  const inRange = (month: number) => {
+    if (anchor !== null) return month === anchor;
+    if (startMonth === null && endMonth === null) return false;
+    return month >= (startMonth ?? 1) && month <= (endMonth ?? 12);
+  };
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-muted/20 p-4">
-        <div className="min-w-44 flex-1">
-          <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
-            Rentang bulan ({selectedYear})
-          </p>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="min-w-[8rem] flex-1">{startSelect}</div>
-            <span className="shrink-0 text-xs font-medium text-muted-foreground">
-              sampai
-            </span>
-            <div className="min-w-[8rem] flex-1">{endSelect}</div>
-          </div>
+    <Popover
+      open={open}
+      onOpenChange={(next) => (next ? setOpen(true) : close(true))}
+    >
+      <PopoverTrigger
+        id={id}
+        aria-label={`Rentang bulan: ${label}`}
+        render={
+          <Button
+            variant="outline"
+            size="lg"
+            className={cn(
+              "min-h-[44px] w-full min-w-0 justify-between rounded-lg border-border px-3 text-sm font-medium text-foreground hover:bg-muted",
+              className,
+            )}
+          />
+        }
+      >
+        <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+        <ChevronDown aria-hidden="true" className="text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        aria-label="Pilih rentang bulan"
+        className="w-[min(20rem,calc(100vw-2rem))] p-3"
+      >
+        <p className="px-1 pb-2 text-xs font-medium text-muted-foreground">
+          {anchor === null
+            ? `Pilih bulan awal (${selectedYear})`
+            : `${MONTHS[anchor - 1]} sampai… pilih bulan akhir`}
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          {MONTHS.map((month, index) => {
+            const value = index + 1;
+            const active = inRange(value);
+            return (
+              <Button
+                key={month}
+                type="button"
+                variant={active ? "default" : "ghost"}
+                aria-pressed={active}
+                onClick={() => pick(value)}
+                className={cn("h-[44px] px-2", !active && "text-fg2")}
+              >
+                {month}
+              </Button>
+            );
+          })}
         </div>
-        {hasRange ? <ResetRangeButton onClick={handleReset} showLabel /> : null}
-        {isInvalidRange ? (
-          <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
-            <XCircle aria-hidden="true" />
-            Rentang bulan tidak valid
-          </p>
-        ) : null}
-      </div>
-      <p className="text-xs font-medium text-muted-foreground">
-        Rentang bulan dibatasi dalam tahun {selectedYear}. Ubah tahun di filter
-        untuk tahun lain.
-      </p>
-    </div>
+        <div className="mt-2 border-t border-border pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              onRangeChange(null, null);
+              close(false);
+            }}
+            className="h-[44px] w-full"
+          >
+            Semua bulan
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

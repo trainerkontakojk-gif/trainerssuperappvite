@@ -183,7 +183,7 @@ test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
   }) => {
     await open(page);
     await page.getByRole("tab", { name: "Heatmap" }).click();
-    const calendar = page.getByLabel(/Kalender Januari 2026/);
+    const calendar = page.getByLabel(/Kalender temuan 2026/);
     await expect(calendar).toBeVisible();
 
     const aside = page.getByRole("complementary", {
@@ -210,6 +210,23 @@ test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
     await expect(aside.getByTestId("agent-heatmap-selected-day")).toHaveText(
       "Selasa, 6 Oktober 2026",
     );
+  });
+
+  test("Heatmap: bar hari di bawah kalender agen", async ({ page }) => {
+    await open(page);
+    await page.getByRole("tab", { name: "Heatmap" }).click();
+    const panel = page.getByRole("tabpanel", { name: "Heatmap" });
+    const bars = panel.getByRole("region", {
+      name: "Temuan per hari dalam minggu",
+    });
+    await expect(bars).toBeVisible();
+    // 6 Okt (Selasa) = 2, 9 Okt (Jumat) = 1.
+    const chart = bars.getByRole("img");
+    await expect(chart).toHaveAttribute("aria-label", /Selasa: 2 temuan/);
+    await expect(chart).toHaveAttribute("aria-label", /Jumat: 1 temuan/);
+    const calBox = await page.getByTestId("agent-heatmap-calendar").boundingBox();
+    const barBox = await bars.boundingBox();
+    expect(barBox!.y).toBeGreaterThan(calBox!.y);
   });
 
   test("Simulasi: tabel Modul, Skenario, Tanggal, Telaah, Skor dengan filter modul", async ({
@@ -253,5 +270,87 @@ test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
       simulationQueries.some((query) => query.includes("module=telefun")),
     ).toBe(true);
     await expect(page.getByText(/Skala skor mengikuti modulnya/)).toBeVisible();
+  });
+});
+
+test.describe("Heatmap detail agen ke tab Temuan", () => {
+  test("tanggal terpilih menyebut tiketnya dan membuka grup tiket di tab Temuan", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const audit: AgentAudit = {
+      mockedApi: [],
+      blockedApi: [],
+      blockedExternal: [],
+    };
+    await openAgentDetail(page, audit, {
+      detailPayload: () => ({
+        ...(richAgentDetailPayload() as Record<string, unknown>),
+        personalTrend: TREND,
+      }),
+      quickviewPayload: richQuickviewPayload(),
+      folders: LAYOUT_FOLDERS,
+      heatmapCounts: { "2026-06-12": 2 },
+      heatmapTickets: {
+        "2026-06-12": [{ noTiket: "TKT-2026-06-142", month: 6, year: 2026 }],
+      },
+    });
+    await expect(page.getByRole("heading", { name: AGENT_NAME })).toBeVisible({
+      timeout: 20000,
+    });
+    await page.getByRole("tab", { name: "Heatmap" }).click();
+    await page.getByRole("button", { name: "12/06/2026: 2 temuan" }).click();
+
+    const aside = page.getByRole("complementary", {
+      name: "Ringkasan heatmap agen",
+    });
+    await expect(aside).toContainText("TKT-2026-06-142");
+    await aside
+      .getByRole("button", { name: "Buka TKT-2026-06-142 di tab Temuan" })
+      .click();
+
+    await expect(page.getByRole("tab", { name: "Temuan" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const group = page
+      .getByRole("tabpanel", { name: "Temuan" })
+      .getByRole("region", { name: "Tiket TKT-2026-06-142" });
+    await expect(group).toBeFocused();
+  });
+});
+
+test.describe("Detail agen mengikuti cakupan bersama", () => {
+  test("layanan, tahun, dan bulan dari alamat dipakai request dan tetap saat ganti tab", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const audit: AgentAudit = {
+      mockedApi: [],
+      blockedApi: [],
+      blockedExternal: [],
+    };
+    await openAgentDetail(page, audit, {
+      detailPayload: () => ({
+        ...(richAgentDetailPayload() as Record<string, unknown>),
+        personalTrend: TREND,
+      }),
+      quickviewPayload: richQuickviewPayload(),
+      folders: LAYOUT_FOLDERS,
+      query: "?layanan=call&tahun=2025&dari=3&sampai=6",
+    });
+    await expect
+      .poll(() => audit.detailQueries?.[0] ?? "")
+      .toContain("year=2025");
+    const first = new URLSearchParams(audit.detailQueries![0]);
+    expect(first.get("service_type")).toBe("call");
+    expect(first.get("startMonth")).toBe("3");
+    expect(first.get("endMonth")).toBe("6");
+
+    await page.getByRole("tab", { name: "Tren" }).click();
+    await expect(page).toHaveURL(/tab=trend/);
+    await expect(page).toHaveURL(/tahun=2025/);
+    await expect(page).toHaveURL(/dari=3/);
+    await expect(page).toHaveURL(/sampai=6/);
   });
 });

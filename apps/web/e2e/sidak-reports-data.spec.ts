@@ -1028,12 +1028,13 @@ async function openReportsData(
   rows: ReportRow[] | ((body: Record<string, unknown>) => ReportRow[]),
   indicatorMock?: IndicatorMock,
   agentDirectoryMock?: AgentDirectoryMock,
+  path = "/sidak/reports-data",
 ) {
   await mockSupabaseAuth(page);
   await tapSupabaseMocks(page, audit);
   await mockSidakApi(page, audit, dataRequests, rows, indicatorMock, agentDirectoryMock);
   await installNetworkGuard(page, audit);
-  await page.goto("/sidak/reports-data");
+  await page.goto(path);
   await expect(page.getByRole("heading", { name: "Laporan data", level: 1 })).toBeVisible();
   // Bukti mock auth dipakai: halaman tidak pernah dialihkan ke /unauthorized.
   await expect(page).toHaveURL(/\/sidak\/reports-data/);
@@ -1993,6 +1994,38 @@ test.describe("SIDAK reports data workspace", () => {
     expect(await selectedLabel(page.getByRole("combobox", { name: "Dari bulan" }))).toBe(MIDDLE_FROM_MONTH.label);
     expect(await selectedLabel(page.getByRole("combobox", { name: "Ke bulan" }))).toBe(MIDDLE_TO_MONTH.label);
 
+    expectNoApplicationTraffic(audit);
+  });
+
+  test("Cakupan bersama dari alamat mengisi Layanan, Tahun, dan Bulan", async ({ page }) => {
+    const audit = startAudit();
+    const dataRequests: DataRequest[] = [];
+
+    await openReportsData(
+      page,
+      audit,
+      dataRequests,
+      ALL_ROWS,
+      undefined,
+      undefined,
+      "/sidak/reports-data?layanan=email&tahun=2025&dari=3&sampai=5",
+    );
+    await expect(page.getByRole("combobox", { name: "Layanan" })).toContainText("Email");
+    await expect(page.getByRole("combobox", { name: "Tahun" })).toContainText("2025");
+
+    await page.getByRole("button", { name: "Cari Data" }).click();
+    await expect(page.getByTestId(RESULTS_COUNT)).toBeVisible();
+    expect(dataRequests[0].body).toEqual({
+      serviceType: "email",
+      year: 2025,
+      startMonth: 3,
+      endMonth: 5,
+    });
+
+    // Mengubah tahun di sini ikut menulis cakupan bersama.
+    const thisYear = new Date().getFullYear();
+    await pickSelect(page, "Tahun", String(thisYear));
+    await expect(page).toHaveURL(new RegExp(`tahun=${thisYear}`));
     expectNoApplicationTraffic(audit);
   });
 

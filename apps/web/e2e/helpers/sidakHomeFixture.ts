@@ -136,6 +136,52 @@ export const HOME_AGENTS = [
   agent("a-eko", "Eko Wibowo", null, null),
 ];
 
+function forecastEntry(
+  agentId: string,
+  nama: string,
+  forecastStatus: "improving" | "declining" | "stable" | "insufficient_data",
+) {
+  return {
+    agentId,
+    nama,
+    tim: "Tim Call",
+    batchName: "Batch 7",
+    jabatan: "Agent",
+    foto_url: null,
+    latestPeriodLabel: "Okt 26",
+    latestScore: 85,
+    latestFindingsCount: 4,
+    latestCriticalFindingsCount: 1,
+    projectedScore: 83,
+    projectedScoreChange: -2,
+    projectedFindings: 5,
+    projectedFindingsChange: 1,
+    findingsSlope: 1,
+    projectedCriticalFindings: 1,
+    projectedCriticalFindingsChange: 0,
+    sourcePointCount: 6,
+    forecastStatus,
+    confidence: "medium",
+    historical: [],
+  };
+}
+
+/** Proyeksi per agen: Rina memburuk, Bima membaik. */
+export const HOME_AGENT_FORECAST = {
+  improvingAgents: [forecastEntry("a-bima", "Bima Saputra", "improving")],
+  decliningAgents: [forecastEntry("a-rina", "Rina Marlina", "declining")],
+  stableAgents: [],
+  watchlistAgents: [],
+  summary: {
+    totalEligible: 2,
+    improvingCount: 1,
+    decliningCount: 1,
+    stableCount: 0,
+    watchlistCount: 0,
+    latestPeriodLabel: "Okt 26",
+  },
+};
+
 export const ACCESS_MOCK: ApiMock = {
   method: "GET",
   path: "/api/v1/me/access-status",
@@ -162,6 +208,7 @@ export function homeMocks(
     access?: ApiMock;
     dashboard?: { status?: number; body?: unknown };
     agents?: { status?: number; body?: unknown };
+    forecast?: { status?: number; body?: unknown };
   } = {},
 ): ApiMock[] {
   return [
@@ -184,10 +231,40 @@ export function homeMocks(
         data: { agents: HOME_AGENTS, batches: ["Batch 7"] },
       },
     },
+    {
+      method: "GET",
+      path: "/api/v1/sidak/heatmap",
+      body: {
+        success: true,
+        data: {
+          days: [],
+          totalFindings: 0,
+          missingDateFindingsAllPeriods: 0,
+          mode: "agent",
+          year: HOME_YEAR,
+          serviceType: "call",
+          dateBasis: "tanggal_layanan",
+        },
+      },
+    },
+    {
+      method: "POST",
+      path: "/api/v1/sidak/dashboard/forecast",
+      body: { success: true, data: { status: "missing", snapshot: null } },
+    },
+    {
+      method: "POST",
+      path: "/api/v1/sidak/forecast/agents",
+      status: options.forecast?.status ?? 200,
+      body: options.forecast?.body ?? {
+        success: true,
+        data: HOME_AGENT_FORECAST,
+      },
+    },
   ];
 }
 
-/** Mock minimal untuk spec shell yang hanya perlu membuka `/sidak`. */
+/** Mock minimal untuk spec shell yang membuka `/sidak` (dialihkan ke Dashboard). */
 export const SIDAK_HOME_MOCKS: readonly ApiMock[] = homeMocks();
 export const SIDAK_HOME_LEADER_MOCKS: readonly ApiMock[] = homeMocks({
   access: LEADER_ACCESS_MOCK,
