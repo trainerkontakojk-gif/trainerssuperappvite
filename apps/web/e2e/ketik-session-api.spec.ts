@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { DEFAULT_KETIK_SETTINGS, KETIK_DUMMY_CONSUMERS } from "@trainers/types";
 import {
   createAdmin,
   createUserWithJwt,
@@ -658,4 +658,36 @@ test("failed finalization preserves the active transcript and retry publishes ex
     .eq("session_id", active.id);
   expect(turns.error).toBeNull();
   expect(turns.data).toEqual([]);
+});
+
+test("server-picked and custom consumer identities carry the gender used for the portrait", async () => {
+  const source = await api(trainer, "/settings");
+  const body = (await source.json()).data;
+  const put = async (displayName: string) => {
+    const latest = await api(trainer, "/settings");
+    const saved = await api(
+      trainer,
+      "/settings",
+      "PUT",
+      { ...body, identitySettings: { ...body.identitySettings, displayName } },
+      { "x-settings-version": latest.headers.get("x-settings-version")! },
+    );
+    expect(saved.status).toBe(200);
+  };
+  try {
+    await put("");
+    for (let i = 0; i < 4; i++) {
+      const { name, gender } = (await start()).config.identity;
+      expect(KETIK_DUMMY_CONSUMERS).toContainEqual({ name, gender });
+    }
+    await put("Pak Hendra");
+    expect((await start()).config.identity).toMatchObject({
+      name: "Pak Hendra",
+      gender: "male",
+    });
+    await put("Konsumen server");
+    expect((await start()).config.identity.gender).toBeUndefined();
+  } finally {
+    await put(body.identitySettings.displayName);
+  }
 });

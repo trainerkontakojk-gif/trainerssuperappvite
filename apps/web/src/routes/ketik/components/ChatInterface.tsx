@@ -28,6 +28,43 @@ import {
   getKetikScenarioImageAlts,
 } from "./chat/ketikScenarioImages";
 
+/** Counts simulation time up from the server start; stops when the chat ends. */
+function SimulationTimer({
+  startedAt,
+  expiresAt,
+  running,
+}: {
+  startedAt: string;
+  expiresAt: string;
+  running: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    // One last reading when the chat stops, then the value stays frozen.
+    setNow(Date.now());
+    if (!running) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [running]);
+  const start = Date.parse(startedAt);
+  const seconds = Math.max(
+    0,
+    Math.floor((Math.min(now, Date.parse(expiresAt)) - start) / 1000),
+  );
+  const label = [Math.floor(seconds / 60), seconds % 60]
+    .map((part) => String(part).padStart(2, "0"))
+    .join(":");
+  return (
+    <span
+      role="timer"
+      aria-label="Durasi simulasi"
+      className="shrink-0 rounded-md bg-muted px-2 py-1 text-[13px] font-medium tabular-nums text-muted-foreground"
+    >
+      {label}
+    </span>
+  );
+}
+
 interface ChatInterfaceProps {
   session: KetikServerSession;
   onEndSession: () => void;
@@ -44,6 +81,7 @@ export function ChatInterface({
   const { config, scenario } = session;
   const { messages, isLoading, queuedCount, error, retry, send, sessionPhase } =
     useServerKetikChat(session);
+  const avatarUrl = getKetikConsumerAvatarUrl(config.identity);
   const [inputText, setInputText] = useState("");
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [layer, setLayer] = useState<HTMLElement | null>(null);
@@ -155,12 +193,14 @@ export function ChatInterface({
     >
       <header className="module-clean-toolbar relative z-50 flex w-full shrink-0 items-center gap-3 border-b px-3 py-2 sm:px-5">
         <Avatar size="lg" className="!size-10 !rounded-lg after:!rounded-lg">
-          <AvatarImage
-            src={getKetikConsumerAvatarUrl(config.identity)}
-            alt=""
-            className="!rounded-lg"
-            referrerPolicy="no-referrer"
-          />
+          {avatarUrl && (
+            <AvatarImage
+              src={avatarUrl}
+              alt=""
+              className="!rounded-lg"
+              referrerPolicy="no-referrer"
+            />
+          )}
           <AvatarFallback className="!rounded-lg bg-module-ketik/15 text-sm font-bold text-module-ketik">
             {config.identity.name.charAt(0).toUpperCase()}
           </AvatarFallback>
@@ -175,6 +215,11 @@ export function ChatInterface({
               .join(" · ")}
           </p>
         </div>
+        <SimulationTimer
+          startedAt={session.startedAt}
+          expiresAt={session.expiresAt}
+          running={sessionPhase === "active"}
+        />
         <Button
           type="button"
           variant="outline"

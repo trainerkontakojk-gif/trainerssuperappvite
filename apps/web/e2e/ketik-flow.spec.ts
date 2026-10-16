@@ -1191,9 +1191,13 @@ test.describe("KETIK ruang chat (hermetic)", () => {
     const input = room.getByRole("textbox", { name: "Tulis balasan" });
     await expect(input).toBeVisible();
 
-    // Tidak ada stopwatch, badge "Online", atau nama skenario di layar.
+    // Tidak ada badge "Online" atau nama skenario; satu-satunya jam di layar
+    // adalah timer maju yang mengukur durasi simulasi (bukan hitung mundur).
     await expect(room.getByText("Online", { exact: true })).toHaveCount(0);
-    await expect(room.getByText(/^\d+:\d{2}$/)).toHaveCount(0);
+    await expect(room.getByText(/^\d+:\d{2}$/)).toHaveCount(1);
+    await expect(
+      room.getByRole("timer", { name: "Durasi simulasi" }),
+    ).toHaveText(/^00:[0-5]\d$/);
 
     await input.fill("Selamat pagi, ada yang bisa dibantu?");
     await input.press("Enter");

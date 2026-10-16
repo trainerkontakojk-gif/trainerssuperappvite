@@ -545,3 +545,100 @@ for (const width of [390, 1280])
     ).toBeFocused();
     expectHermetic(audit);
   });
+
+test("simulation timer counts up from the server start and stops once the chat closes", async ({
+  page,
+}) => {
+  const startedAt = Date.now() - 65000;
+  await page.clock.install({ time: startedAt + 65000 });
+  const live = session({
+    startedAt: new Date(startedAt).toISOString(),
+    expiresAt: new Date(startedAt + 300000).toISOString(),
+  });
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=chat`,
+    apiMocks: [
+      ...base,
+      {
+        method: "GET",
+        path: `/api/v1/ketik/sessions/${id}`,
+        body: { success: true, data: live },
+      },
+    ],
+    expectedThirdPartyHosts: ["randomuser.me"],
+  });
+  const room = page.getByRole("region", { name: "Ruang chat" });
+  const timer = room.getByRole("timer", { name: "Durasi simulasi" });
+  await expect(timer).toHaveText(/^01:(0[5-9]|1\d)$/);
+  await page.clock.fastForward(60000);
+  await expect(timer).toHaveText(/^02:(0[5-9]|1\d)$/);
+  // Past the server expiry the measured simulation time stops at its limit.
+  await page.clock.fastForward(600000);
+  await expect(timer).toHaveText("05:00");
+  await page.clock.fastForward(30000);
+  await expect(timer).toHaveText("05:00");
+  expectHermetic(audit);
+});
+
+for (const { label, identity, portrait } of [
+  {
+    label: "explicit male gender",
+    identity: { name: "Andi Tenri", gender: "male" as const },
+    portrait: "/portraits/men/",
+  },
+  {
+    label: "explicit female gender",
+    identity: { name: "Bambang Pamungkas", gender: "female" as const },
+    portrait: "/portraits/women/",
+  },
+  {
+    label: "legacy male name without gender",
+    identity: { name: "La Ode Haris" },
+    portrait: "/portraits/men/",
+  },
+  {
+    label: "unknown name without gender",
+    identity: { name: "Konsumen server" },
+    portrait: null,
+  },
+]) {
+  test(`consumer portrait never guesses the wrong gender: ${label}`, async ({
+    page,
+  }) => {
+    const portraits: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("randomuser.me")) portraits.push(request.url());
+    });
+    const live = session();
+    live.config.identity = {
+      ...identity,
+      city: "Bandung",
+      phone: "0800000000",
+    };
+    const audit = await openHermeticShell(page, {
+      path: `/ketik?sesi=${id}&tahap=chat`,
+      apiMocks: [
+        ...base,
+        {
+          method: "GET",
+          path: `/api/v1/ketik/sessions/${id}`,
+          body: { success: true, data: live },
+        },
+      ],
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(
+      room.getByRole("heading", { name: identity.name }),
+    ).toBeVisible();
+    if (portrait) {
+      await expect.poll(() => portraits.length).toBeGreaterThan(0);
+      expect(portraits.every((url) => url.includes(portrait))).toBe(true);
+    } else {
+      await page.waitForTimeout(500);
+      expect(portraits).toEqual([]);
+      await expect(room.getByText("K", { exact: true })).toBeVisible();
+    }
+    expectHermetic(audit);
+  });
+}
