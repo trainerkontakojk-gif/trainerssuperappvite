@@ -517,12 +517,12 @@ Container ranking juga memiliki `aria-label` per cohort: `"Tim Gabungan: peringk
   - `findingsSlope < −0.5` → `"improving"`
   - Sisanya → `"stable"`
 - **Mapping label & supporting text** (konstanta `FORECAST_COPY`, baris 31–51):
-  | Status | Label | supportingText |
-  | -------------------- | -------------------- | --------------------------------------- |
-  | `improving` | Membaik | Temuan diproyeksikan turun |
-  | `declining` | Memburuk | Temuan diproyeksikan naik |
-  | `stable` | Stabil/Stagnan | Perubahan temuan belum signifikan |
-  | `insufficient_data` | Data belum cukup | Butuh minimal 2 periode audit |
+  | Status              | Label            | supportingText                    |
+  | ------------------- | ---------------- | --------------------------------- |
+  | `improving`         | Membaik          | Temuan diproyeksikan turun        |
+  | `declining`         | Memburuk         | Temuan diproyeksikan naik         |
+  | `stable`            | Stabil/Stagnan   | Perubahan temuan belum signifikan |
+  | `insufficient_data` | Data belum cukup | Butuh minimal 2 periode audit     |
 - **findingsSlope** di quickview: untuk status `insufficient_data` dengan `sourcePointCount < 2`, field di-set `null` (baris 136–139).
 - **Status tidak diklasifikasikan ulang di frontend** — quickview hanya memetakan nilai yang sudah dihasilkan service ke label/ikon/className.
 
@@ -634,7 +634,7 @@ Daftar id klaster bersumber tunggal dari `rootCauseClusterIds` (`packages/types/
 - Root cause clustering bersifat **deterministic** (rule-based), bukan formula skor.
 - Persentase `lainnya` adalah target **operasional coverage** — bukan metrik kualitas AI.
 - Target coverage: **lainnya < 20%** dari temuan countable dengan evidence.
-- Audit coverage dilakukan via `scripts/sidak/audit-root-cause-coverage.mjs` terhadap data real `qa_temuan`.
+- Audit coverage dilakukan via `scripts/sidak/audit-root-cause-coverage.mjs` terhadap data real `qa_temuan`. Salinan registry dan matcher untuk audit ada di `scripts/sidak/audit-root-cause-matcher.mjs` dan wajib disinkronkan dengan `agent-root-causes.ts`.
 - Baseline (sebelum ekspansi): 84.5% fallback.
 - Setelah ekspansi keyword Phase 2: ~47% fallback.
 - Setelah cluster baru `salah_penggunaan_sistem` (Phase 3): ~31% fallback.
