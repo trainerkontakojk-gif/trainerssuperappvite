@@ -24,7 +24,11 @@ import {
   periodLabel,
   SERVICE_TYPES,
 } from "../../components/sidak/sidak-input.constants";
-import { calculateQAScoreFromTemuan, SERVICE_LABELS } from "../../lib/scoring";
+import {
+  calculateQAScoreFromTemuan,
+  calculateSessionScoreFromTemuan,
+  SERVICE_LABELS,
+} from "../../lib/scoring";
 import { resolveInitialInputService } from "../../lib/sidak-input-service";
 import {
   normalizeAgentsResponse,
@@ -205,6 +209,7 @@ export default function SidakInputPage() {
     setTemuan,
     setErrorMsg,
     setSuccessMsg,
+    confirm: confirmer.confirm,
   });
 
   const formHook = useTemuanForm({
@@ -456,6 +461,25 @@ export default function SidakInputPage() {
     );
   }, [temuan, activeIndicators, activeWeight]);
 
+  // Potongan skor per tiket = 100 − skor sesi tiket itu, dengan aturan yang
+  // sama seperti skor live di ringkasan sesi.
+  const ticketGroups = useMemo(
+    () =>
+      groupedTemuan.map((group) => ({
+        ...group,
+        deduction:
+          activeIndicators.length && activeWeight
+            ? 100 -
+              calculateSessionScoreFromTemuan(
+                activeIndicators,
+                group.items,
+                activeWeight,
+              )
+            : null,
+      })),
+    [groupedTemuan, activeIndicators, activeWeight],
+  );
+
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
     activeIndicators.forEach((i) => {
@@ -634,8 +658,8 @@ export default function SidakInputPage() {
                         >
                           <Check aria-hidden="true" />
                           {formHook.hasBadFindings
-                            ? "Sudah Ada Temuan"
-                            : "Sesi Tanpa Temuan"}
+                            ? "Sudah ada temuan"
+                            : "Sesi tanpa temuan"}
                         </Button>
                       )}
                       <Button
@@ -650,7 +674,7 @@ export default function SidakInputPage() {
                         }}
                       >
                         <Upload aria-hidden="true" />
-                        Import
+                        Impor Excel
                       </Button>
                       <Button
                         type="button"
@@ -658,7 +682,7 @@ export default function SidakInputPage() {
                         onClick={() => formHook.setShowForm(true)}
                       >
                         <Plus aria-hidden="true" />
-                        Tambah
+                        Tambah temuan
                       </Button>
                     </>
                   ) : null
@@ -752,14 +776,14 @@ export default function SidakInputPage() {
                         onClick={() => formHook.setShowForm(true)}
                       >
                         <Plus aria-hidden="true" />
-                        Tambah Temuan
+                        Tambah temuan
                       </Button>
                     ) : undefined
                   }
                 />
               ) : (
                 <TemuanGroupGrid
-                  groups={groupedTemuan}
+                  groups={ticketGroups}
                   indicatorLabelMap={indicatorLabelMap}
                   categoryMap={categoryMap}
                   editingId={editHook.editingId}
@@ -773,7 +797,7 @@ export default function SidakInputPage() {
                   onStartEdit={editHook.startEdit}
                   onCancelEdit={editHook.cancelEdit}
                   onSaveEdit={editHook.handleSaveEdit}
-                  onDelete={editHook.handleDelete}
+                  onDelete={(item, label) => editHook.handleDelete(item.id, label)}
                   setEditNilai={editHook.setEditNilai}
                   setEditKetidaksesuaian={editHook.setEditKetidaksesuaian}
                   setEditSebaiknya={editHook.setEditSebaiknya}
@@ -790,7 +814,7 @@ export default function SidakInputPage() {
         title={confirmer.request?.title ?? ""}
         description={confirmer.request?.description ?? ""}
         confirmLabel={confirmer.request?.confirmLabel ?? "Lanjutkan"}
-        confirmVariant="default"
+        confirmVariant={confirmer.request?.destructive ? "destructive" : "default"}
         onConfirm={() => confirmer.resolve(true)}
         onCancel={() => confirmer.resolve(false)}
       />

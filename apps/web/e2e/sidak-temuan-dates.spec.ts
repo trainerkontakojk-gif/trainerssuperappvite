@@ -33,7 +33,7 @@ import {
  * saat panel kosong, "Tambah" di header setelah ada temuan. Keduanya memanggil
  * aksi yang sama, jadi keduanya boleh dipakai.
  */
-const OPEN_FORM = /^(Tambah Temuan|Tambah)$/;
+const OPEN_FORM = "Tambah temuan";
 const LAYAN = /^Tanggal layanan/;
 const SAMPEL = /^Tanggal sampel/;
 
@@ -259,7 +259,7 @@ test.describe("Edit inline di Input Audit", () => {
     // Detail menampilkan tanggal yang tersimpan.
     await expect(page.getByText("2026-01-05").first()).toBeVisible();
 
-    await page.getByRole("button", { name: /Edit/ }).first().click();
+    await page.getByRole("button", { name: /^Ubah temuan/ }).first().click();
     const editLayanan = page.getByLabel("Tanggal layanan", { exact: true }).last();
     const editSampel = page.getByLabel("Tanggal sampel", { exact: true }).last();
     await expect(editLayanan).toHaveValue("2026-01-05");
@@ -278,7 +278,7 @@ test.describe("Edit inline di Input Audit", () => {
   test("mengosongkan tanggal lewat edit memakai null, bukan string kosong", async ({ page }) => {
     const audit = await seedOneFinding(page);
 
-    await page.getByRole("button", { name: /Edit/ }).first().click();
+    await page.getByRole("button", { name: /^Ubah temuan/ }).first().click();
     const editLayanan = page.getByLabel("Tanggal layanan", { exact: true }).last();
     await editLayanan.fill("");
     await page.getByRole("button", { name: /^Simpan$/ }).click();
@@ -301,7 +301,7 @@ test.describe("Edit inline di Input Audit", () => {
     expect(allRows()[0]!.tanggal_layanan).toBeNull();
     expect(allRows()[0]!.tanggal_sampel).toBeNull();
 
-    await page.getByRole("button", { name: /Edit/ }).first().click();
+    await page.getByRole("button", { name: /^Ubah temuan/ }).first().click();
     const editLayanan = page.getByLabel("Tanggal layanan", { exact: true }).last();
     await expect(editLayanan).toHaveValue("");
 

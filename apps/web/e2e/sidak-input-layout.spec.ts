@@ -77,7 +77,9 @@ test.describe("Input Temuan: satu layar kerja", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Input temuan" }),
     ).toHaveCount(1);
-    await expect(page.getByRole("group", { name: "Konteks audit" })).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Konteks audit" }),
+    ).toBeVisible();
     await expect(trigger(page, "Folder")).toContainText("Batch Uji");
     await expect(trigger(page, "Agen")).toContainText(FIXTURE.agent.nama);
     await expect(trigger(page, "Layanan")).toContainText("Call");
@@ -174,7 +176,9 @@ test.describe("Input Temuan: periode, URL state, dan pencarian agen", () => {
     await expect(page.getByRole("option")).toHaveCount(3);
     await page.getByRole("combobox", { name: "Cari agen" }).fill("budi");
     await expect(page.getByRole("option")).toHaveCount(1);
-    await expect(page.getByRole("option", { name: /Budi Santoso/ })).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: /Budi Santoso/ }),
+    ).toBeVisible();
     await expect(page.getByRole("option", { name: /Chat/ })).toBeVisible();
     await page.getByRole("option", { name: /Budi Santoso/ }).click();
 
@@ -302,18 +306,28 @@ test.describe("Input Temuan: peran leader", () => {
   // jadi aksi tulis tidak pernah dapat dijangkau leader. Guard `role !== "leader"`
   // di halaman tetap ada sebagai lapisan kedua, tetapi tidak bisa dijangkau lewat
   // browser; kontrak yang dapat dibuktikan E2E adalah penolakan ini.
-  test("leader ditolak router: tanpa Tambah/Import/Sesi Tanpa Temuan", async ({
+  test("leader ditolak router: tanpa Tambah temuan/Impor Excel/Sesi tanpa temuan", async ({
     page,
   }) => {
-    seedTemuan([{ indicator_id: CRITICAL.id, nilai: 1, no_tiket: "TKT-LDR-1" }]);
+    seedTemuan([
+      { indicator_id: CRITICAL.id, nilai: 1, no_tiket: "TKT-LDR-1" },
+    ]);
     const audit = startAudit();
     await openInputAudit(page, audit, { role: "leader" });
 
-    await expect(page.getByRole("heading", { name: "Akses Ditolak" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Akses Ditolak" }),
+    ).toBeVisible();
     await expect(page.getByText("TKT-LDR-1")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /^(Tambah Temuan|Tambah)$/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Import", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Sesi Tanpa Temuan|Sudah Ada Temuan/ })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Tambah temuan" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Impor Excel", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /Sesi tanpa temuan|Sudah ada temuan/ }),
+    ).toHaveCount(0);
   });
 });
 
@@ -322,7 +336,9 @@ test.describe("Input Temuan: responsif", () => {
     test(`${width}px: tanpa overflow horizontal dan kontrol konteks >= 44px`, async ({
       page,
     }) => {
-      seedTemuan([{ indicator_id: CRITICAL.id, nilai: 1, no_tiket: "TKT-RWD-1" }]);
+      seedTemuan([
+        { indicator_id: CRITICAL.id, nilai: 1, no_tiket: "TKT-RWD-1" },
+      ]);
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
       const audit = startAudit();
       await openInputAudit(page, audit);
@@ -330,7 +346,9 @@ test.describe("Input Temuan: responsif", () => {
       await expect(page.getByText("TKT-RWD-1")).toBeVisible();
 
       const overflow = await page.evaluate(() => ({
-        doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        doc:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
         body: document.body.scrollWidth - document.documentElement.clientWidth,
       }));
       expect(overflow.doc).toBeLessThanOrEqual(0);
@@ -361,7 +379,7 @@ test.describe("Input Temuan: responsif", () => {
  * menggagalkan test; Batal tidak mengirim apa pun; setuju mengirim sekali.
  */
 test.describe("Input Temuan: konfirmasi lewat dialog", () => {
-  const OPEN_FORM = /^(Tambah Temuan|Tambah)$/;
+  const OPEN_FORM = "Tambah temuan";
 
   async function openManualForm(page: Page) {
     page.on("dialog", (dialog) => {
@@ -385,7 +403,9 @@ test.describe("Input Temuan: konfirmasi lewat dialog", () => {
     const audit = await openManualForm(page);
 
     await page.getByRole("button", { name: /Simpan Temuan/ }).click();
-    const dialog = page.getByRole("dialog", { name: "Simpan tanpa no. tiket?" });
+    const dialog = page.getByRole("dialog", {
+      name: "Simpan tanpa no. tiket?",
+    });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Batal" }).click();
     await expect(dialog).toHaveCount(0);
@@ -397,7 +417,9 @@ test.describe("Input Temuan: konfirmasi lewat dialog", () => {
     await expect.poll(() => captured("batch").length).toBe(1);
 
     // Status setelah simpan menyebut hasilnya dan memberi jalan ke detail agen.
-    const status = page.getByRole("status").filter({ hasText: "temuan tersimpan" });
+    const status = page
+      .getByRole("status")
+      .filter({ hasText: "temuan tersimpan" });
     await expect(status).toBeVisible();
     await expect(
       status.getByRole("link", { name: "Buka detail agen" }),
@@ -415,12 +437,123 @@ test.describe("Input Temuan: konfirmasi lewat dialog", () => {
     await page.getByPlaceholder(/Contoh: L/).fill("TKT-DUP-1");
 
     await page.getByRole("button", { name: /Simpan Temuan/ }).click();
-    const dialog = page.getByRole("dialog", { name: "Lewati temuan duplikat?" });
+    const dialog = page.getByRole("dialog", {
+      name: "Lewati temuan duplikat?",
+    });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("1 parameter sudah ada");
     await dialog.getByRole("button", { name: "Batal" }).click();
     await expect(dialog).toHaveCount(0);
     expect(captured("batch")).toHaveLength(0);
+    expectIsolation(audit);
+  });
+});
+
+/**
+ * Daftar temuan mengikuti mockup Input temuan: satu kolom, satu blok per tiket.
+ * Kepala tiket menyebut tanggal layanan, jumlah temuan, dan potongan skor sesi
+ * tiket itu (100 − skor sesi). Nilai 0–3 tetap tampil apa adanya.
+ */
+test.describe("Input Temuan: daftar per tiket", () => {
+  test("satu blok per tiket dengan tanggal, jumlah, potongan skor; aksi berlabel lengkap", async ({
+    page,
+  }) => {
+    seedTemuan([
+      {
+        indicator_id: CRITICAL.id,
+        nilai: 1,
+        no_tiket: "TKT-LIST-A",
+        tanggal_layanan: "2026-01-06",
+        ketidaksesuaian: "Dokumen tidak dicek",
+        sebaiknya: "Cek semua dokumen",
+      },
+      { indicator_id: NON_CRITICAL.id, nilai: 1, no_tiket: "TKT-LIST-A" },
+      // Satu non-kritikal bernilai 2 => skor sesi 93,3 => potongan 6,7.
+      { indicator_id: NON_CRITICAL.id, nilai: 2, no_tiket: "TKT-LIST-B" },
+    ]);
+    const audit = startAudit();
+    await openInputAudit(page, audit);
+    await selectPeriod(page);
+
+    const list = page.getByRole("list", { name: "Temuan per tiket" });
+    await expect(list).toBeVisible();
+    const tickets = list.getByRole("listitem").filter({
+      has: page.getByRole("heading", { level: 3 }),
+    });
+    await expect(tickets).toHaveCount(2);
+
+    const a = tickets.filter({ hasText: "TKT-LIST-A" });
+    await expect(a.getByRole("heading", { level: 3 })).toContainText(
+      "TKT-LIST-A",
+    );
+    await expect(a).toContainText("6 Jan 2026");
+    await expect(a).toContainText("2 temuan");
+    await expect(a).toContainText("Dokumen tidak dicek");
+    await expect(a).toContainText("Cek semua dokumen");
+    await expect(a).toContainText("Kritikal");
+    await expect(a).not.toContainText("Critical");
+
+    const b = tickets.filter({ hasText: "TKT-LIST-B" });
+    await expect(b.getByLabel("Potongan skor sesi")).toHaveText("−6,7");
+    await expect(b).toContainText("Non-kritikal");
+    // Tanpa tanggal layanan, kepala tiket hanya menyebut jumlah temuan.
+    await expect(b.getByRole("heading", { level: 3 })).toHaveText(
+      "TKT-LIST-B · 1 temuan",
+    );
+
+    // Satu kolom: blok tiket ditumpuk, bukan kisi kartu berdampingan.
+    const [boxA, boxB] = await Promise.all([a.boundingBox(), b.boundingBox()]);
+    expect(Math.round(boxA!.x)).toBe(Math.round(boxB!.x));
+    expect(boxB!.y).toBeGreaterThan(boxA!.y);
+
+    // Tiket A punya nilai buruk, jadi tombol sesi tanpa temuan berlabel
+    // "Sudah ada temuan" (nonaktif); label lengkap tetap dicek.
+    for (const name of ["Sudah ada temuan", "Impor Excel", "Tambah temuan"]) {
+      const button = page.getByRole("button", { name, exact: true });
+      await expect(button, name).toBeVisible();
+      expect((await button.boundingBox())!.height, name).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+    expectIsolation(audit);
+  });
+
+  test("hapus temuan lewat dialog: Batal tidak menghapus, Hapus temuan menghapus sekali", async ({
+    page,
+  }) => {
+    page.on("dialog", (dialog) => {
+      throw new Error(`dialog native muncul: ${dialog.message()}`);
+    });
+    seedTemuan([
+      { indicator_id: CRITICAL.id, nilai: 1, no_tiket: "TKT-DEL-1" },
+      { indicator_id: NON_CRITICAL.id, nilai: 2, no_tiket: "TKT-DEL-1" },
+    ]);
+    const audit = startAudit();
+    await openInputAudit(page, audit);
+    await selectPeriod(page);
+
+    const remove = page.getByRole("button", {
+      name: `Hapus temuan ${CRITICAL.name}`,
+    });
+    const deletes = () =>
+      audit.mockedApi.filter((entry) => entry === "temuan:DELETE").length;
+
+    await remove.click();
+    const dialog = page.getByRole("dialog", { name: "Hapus temuan ini?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(CRITICAL.name);
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(deletes()).toBe(0);
+    await expect(remove).toBeVisible();
+
+    await remove.click();
+    await dialog.getByRole("button", { name: "Hapus temuan" }).click();
+    await expect(remove).toHaveCount(0);
+    expect(deletes()).toBe(1);
+    await expect(page.getByTestId("sidak-session-summary")).toContainText(
+      "1 temuan",
+    );
     expectIsolation(audit);
   });
 });

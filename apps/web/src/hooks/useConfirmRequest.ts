@@ -4,6 +4,8 @@ export interface ConfirmRequest {
   title: string;
   description: string;
   confirmLabel: string;
+  /** Tombol konfirmasi bergaya destruktif (hapus). */
+  destructive?: boolean;
 }
 
 /**

@@ -117,7 +117,7 @@ export default function SidakInputManualForm({
             value={noTiket}
             onChange={(e) => onSetNoTiket(e.target.value)}
             placeholder="Contoh: L202503001"
-            className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
+            className="w-full h-11 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
           />
         </div>
 
@@ -140,7 +140,7 @@ export default function SidakInputManualForm({
               type="date"
               value={tanggalLayanan}
               onChange={(e) => onSetTanggalLayanan(e.target.value)}
-              className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
+              className="w-full h-11 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
             />
             <p className="text-xs text-muted-foreground mt-1.5">
               Kapan layanan yang ditinjau benar-benar terjadi.
@@ -158,7 +158,7 @@ export default function SidakInputManualForm({
               type="date"
               value={tanggalSampel}
               onChange={(e) => onSetTanggalSampel(e.target.value)}
-              className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
+              className="w-full h-11 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground"
             />
             <p className="text-xs text-muted-foreground mt-1.5">
               Kapan QA memeriksa sampel dan menetapkan temuan ini.

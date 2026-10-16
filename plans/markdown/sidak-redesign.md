@@ -220,6 +220,17 @@ tracking` dan `font-black`; label ≥12px, kontrol `min-h-[44px]`. Istilah:
     dari Ringkasan atau Heatmap. Jumlah di tab Simulasi tidak dibuat: riwayat
     dimuat per halaman tanpa total, jadi butuh request tambahan di tiap
     pembukaan detail.
+  - Input temuan: daftar temuan jadi satu kolom, satu blok per tiket. Kepala
+    tiket menyebut tanggal layanan, jumlah temuan, dan potongan skor sesi
+    (100 − skor sesi, dihitung dengan `calculateSessionScoreFromTemuan`).
+    Kolom baris: parameter + Kritikal/Non-kritikal, ketidaksesuaian,
+    sebaiknya, nilai, Ubah/Hapus. Hapus memakai dialog aplikasi (bukan klik
+    dua kali). Tombol "Sesi tanpa temuan", "Impor Excel", "Tambah temuan";
+    input form 44px. **Poin nilai 3/2/1/0 tidak diubah** (keputusan Fajar):
+    pemilih dan tampilan nilai tetap angka dengan warna dan label lamanya,
+    bukan "Kritis/Tidak sesuai/Perbaikan/Sesuai" seperti mockup. Baris versi
+    parameter ("v4 sejak Agustus 2026") tidak dibuat karena API Input hanya
+    mengirim `ruleVersionId`, tanpa nomor versi dan tanggal berlaku.
 
 ## Design
 

@@ -66,7 +66,7 @@ function legacyRow(over: Partial<Record<string, Cell>> = {}): Cell[] {
 
 /** Buka panel import (tombol "Import" di header Input Audit). */
 async function openImportPanel(page: import("@playwright/test").Page) {
-  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByRole("button", { name: "Impor Excel", exact: true }).click();
 }
 
 /** Unggah workbook lewat input file milik panel import. */

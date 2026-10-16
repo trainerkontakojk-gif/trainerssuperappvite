@@ -94,7 +94,9 @@ async function seedFixture(): Promise<Fixture> {
     .map((line) => line.trim())
     .filter(Boolean);
   if (indicatorRows.length < 3) {
-    throw new Error(`Butuh 3 indikator SLIK aktif, dapat ${indicatorRows.length}`);
+    throw new Error(
+      `Butuh 3 indikator SLIK aktif, dapat ${indicatorRows.length}`,
+    );
   }
   const indicators = indicatorRows.map((row) => {
     const [id, name, parameter_group, category, bobot] = row.split("|");
@@ -137,14 +139,13 @@ async function pickParameter(
   await page
     // Dropdown parameter milik form; pemilih di bar konteks (fieldset) dikecualikan.
     .locator('button[aria-haspopup="listbox"]:not(fieldset *)')
-    .nth(index).click();
+    .nth(index)
+    .click();
   await page.getByRole("option", { name }).first().click();
 }
 
 function countRows(pesertaId: string, ticket?: string): number {
-  const where = ticket
-    ? `AND no_tiket = '${ticket}'`
-    : "";
+  const where = ticket ? `AND no_tiket = '${ticket}'` : "";
   return Number(
     sqlOne(
       ENV,
@@ -153,7 +154,8 @@ function countRows(pesertaId: string, ticket?: string): number {
   );
 }
 
-test.describe.serial("Integrasi browser: manual + import → route nyata → DB → heatmap", () => {
+test.describe
+  .serial("Integrasi browser: manual + import → route nyata → DB → heatmap", () => {
   let fx: Fixture;
   let app: Awaited<ReturnType<typeof createRealSidakApp>>;
   let trainerUserId = "";
@@ -162,10 +164,9 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     mode: "agent" | "qa",
     date: string,
   ): Promise<number> {
-    const res = await app.request(
-      `/v1/sidak/heatmap?mode=${mode}&year=2026`,
-      { method: "GET" },
-    );
+    const res = await app.request(`/v1/sidak/heatmap?mode=${mode}&year=2026`, {
+      method: "GET",
+    });
     expect(res.status).toBe(200);
     const body = JSON.parse(res.bodyText);
     expect(body.success).toBe(true);
@@ -188,9 +189,18 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
   test.afterAll(async () => {
     // Cleanup HANYA fixture milik run ini.
     if (fx?.pesertaId) {
-      runSql(ENV, `DELETE FROM public.qa_temuan WHERE peserta_id='${fx.pesertaId}';`);
-      runSql(ENV, `DELETE FROM public.profiler_peserta WHERE id='${fx.pesertaId}';`);
-      runSql(ENV, `DELETE FROM public.profiler_folders WHERE name='${fx.folderName}';`);
+      runSql(
+        ENV,
+        `DELETE FROM public.qa_temuan WHERE peserta_id='${fx.pesertaId}';`,
+      );
+      runSql(
+        ENV,
+        `DELETE FROM public.profiler_peserta WHERE id='${fx.pesertaId}';`,
+      );
+      runSql(
+        ENV,
+        `DELETE FROM public.profiler_folders WHERE name='${fx.folderName}';`,
+      );
     }
     if (trainerUserId) await admin.auth.admin.deleteUser(trainerUserId);
   });
@@ -203,7 +213,7 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
 
     // Pilih periode (lewat kontrol `Periode`).
     await selectPeriod(page, fx.fixture.period);
-    await page.getByRole("button", { name: /^(Tambah Temuan|Tambah)$/ }).first().click();
+    await page.getByRole("button", { name: "Tambah temuan" }).first().click();
     await expect(page.getByLabel(/^Tanggal layanan/)).toBeVisible();
 
     // Satu tiket, DUA parameter, tanggal layanan/sampel yang sama.
@@ -219,7 +229,9 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     await page.getByRole("button", { name: /Simpan Temuan/ }).click();
 
     // Read-after-write lewat route GET nyata (list halaman) + DB.
-    await expect.poll(() => countRows(fx.pesertaId, "TKT-BROWSER-MANUAL")).toBe(2);
+    await expect
+      .poll(() => countRows(fx.pesertaId, "TKT-BROWSER-MANUAL"))
+      .toBe(2);
     await expect(page.getByText("TKT-BROWSER-MANUAL").first()).toBeVisible();
     expect(
       sqlOne(
@@ -235,8 +247,14 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     expect(await heatmapDay("qa", SAMPEL_DATE)).toBe(2);
 
     // Edit satu baris: layanan pindah dari 17 → 18.
-    await page.getByRole("button", { name: "Edit" }).first().click();
-    await page.getByLabel("Tanggal layanan", { exact: true }).last().fill(LAYANAN_MOVED);
+    await page
+      .getByRole("button", { name: /^Ubah temuan/ })
+      .first()
+      .click();
+    await page
+      .getByLabel("Tanggal layanan", { exact: true })
+      .last()
+      .fill(LAYANAN_MOVED);
     await page.getByRole("button", { name: /^Simpan$/ }).click();
     await expect
       .poll(() =>
@@ -250,10 +268,15 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     expect(await heatmapDay("agent", LAYANAN_DATE)).toBe(1);
     expect(await heatmapDay("agent", LAYANAN_MOVED)).toBe(1);
 
-    // Delete baris itu (tombol konfirmasi dua klik) → count berkurang.
-    const del = page.getByRole("button", { name: /Hapus|Klik lagi untuk konfirmasi/ });
-    await del.first().click();
-    await del.first().click();
+    // Delete baris itu (konfirmasi lewat dialog) → count berkurang.
+    await page
+      .getByRole("button", { name: /^Hapus temuan/ })
+      .first()
+      .click();
+    await page
+      .getByRole("dialog", { name: "Hapus temuan ini?" })
+      .getByRole("button", { name: "Hapus temuan" })
+      .click();
     await expect.poll(() => countRows(fx.pesertaId)).toBe(1);
     expect(await heatmapDay("agent", LAYANAN_MOVED)).toBe(0);
     expect(await heatmapDay("agent", LAYANAN_DATE)).toBe(1);
@@ -308,7 +331,9 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     ]);
     const buffer = Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 
-    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Impor Excel", exact: true })
+      .click();
     await page.getByRole("button", { name: "Upload & Preview" }).click();
     await page.locator('input[type="file"]').first().setInputFiles({
       name: "browser-import.xlsx",
@@ -318,7 +343,9 @@ test.describe.serial("Integrasi browser: manual + import → route nyata → DB 
     });
     await page.getByRole("button", { name: /^Import \d+ Temuan$/ }).click();
 
-    await expect.poll(() => countRows(fx.pesertaId, "TKT-BROWSER-IMP-1")).toBe(2);
+    await expect
+      .poll(() => countRows(fx.pesertaId, "TKT-BROWSER-IMP-1"))
+      .toBe(2);
     expect(
       sqlOne(
         ENV,

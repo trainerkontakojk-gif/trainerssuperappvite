@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QATemuan } from "@trainers/types";
+import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 
 interface UseTemuanEditParams {
   temuan: QATemuan[];
   setTemuan: React.Dispatch<React.SetStateAction<QATemuan[]>>;
   setErrorMsg: (msg: string | null) => void;
   setSuccessMsg: (msg: string | null) => void;
+  /** Konfirmasi hapus lewat `ConfirmDialog`. */
+  confirm: ConfirmFn;
 }
 
 export function useTemuanEdit({
@@ -14,6 +17,7 @@ export function useTemuanEdit({
   setTemuan,
   setErrorMsg,
   setSuccessMsg,
+  confirm,
 }: UseTemuanEditParams) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNilai, setEditNilai] = useState(3);
@@ -47,15 +51,20 @@ export function useTemuanEdit({
     setSavingEdit(true);
     setErrorMsg(null);
     try {
-      await unwrapResponse(await sidakClient.temuan[":id"].$put({ param: { id }, json: {
-        nilai: editNilai,
-        ketidaksesuaian: editKetidaksesuaian || null,
-        sebaiknya: editSebaiknya || null,
-        // String kosong berarti "kosongkan tanggal" di baris ini saja, bukan
-        // mengubah tanggal parameter lain pada tiket yang sama.
-        tanggal_layanan: editTanggalLayanan || null,
-        tanggal_sampel: editTanggalSampel || null,
-      }}));
+      await unwrapResponse(
+        await sidakClient.temuan[":id"].$put({
+          param: { id },
+          json: {
+            nilai: editNilai,
+            ketidaksesuaian: editKetidaksesuaian || null,
+            sebaiknya: editSebaiknya || null,
+            // String kosong berarti "kosongkan tanggal" di baris ini saja, bukan
+            // mengubah tanggal parameter lain pada tiket yang sama.
+            tanggal_layanan: editTanggalLayanan || null,
+            tanggal_sampel: editTanggalSampel || null,
+          },
+        }),
+      );
       setTemuan((prev) =>
         prev.map((t) =>
           t.id === id
@@ -67,8 +76,8 @@ export function useTemuanEdit({
                 tanggal_layanan: editTanggalLayanan || null,
                 tanggal_sampel: editTanggalSampel || null,
               }
-            : t
-        )
+            : t,
+        ),
       );
       setEditingId(null);
       setSuccessMsg("Temuan berhasil diperbarui!");
@@ -80,14 +89,20 @@ export function useTemuanEdit({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (deletingId !== id) {
-      setDeletingId(id);
-      setEditingId(null);
-      return;
-    }
+  const handleDelete = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: "Hapus temuan ini?",
+      description: `Temuan ${label} dihapus dari sesi ini dan skor sesi dihitung ulang.`,
+      confirmLabel: "Hapus temuan",
+      destructive: true,
+    });
+    if (!ok) return;
+    setDeletingId(id);
+    setEditingId(null);
     try {
-      await unwrapResponse(await sidakClient.temuan[":id"].$delete({ param: { id } }));
+      await unwrapResponse(
+        await sidakClient.temuan[":id"].$delete({ param: { id } }),
+      );
       setTemuan((prev) => prev.filter((t) => t.id !== id));
       setDeletingId(null);
       setSuccessMsg("Temuan berhasil dihapus!");

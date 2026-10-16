@@ -1,20 +1,28 @@
-import TemuanGroupCard, { type TemuanGroup, type TemuanGroupCardProps } from "./TemuanGroupCard";
+import TemuanGroupCard, {
+  type TemuanGroup,
+  type TemuanGroupCardProps,
+} from "./TemuanGroupCard";
 
-type CardHandlers = Omit<TemuanGroupCardProps, "group" | "gIdx">;
+type CardHandlers = Omit<TemuanGroupCardProps, "group">;
 
 interface TemuanGroupGridProps extends CardHandlers {
   groups: TemuanGroup[];
 }
 
-export default function TemuanGroupGrid({ groups, ...cardProps }: TemuanGroupGridProps) {
+/** Daftar satu kolom, satu blok per tiket (mockup Input temuan). */
+export default function TemuanGroupGrid({
+  groups,
+  ...cardProps
+}: TemuanGroupGridProps) {
   return (
-    <div
+    <ul
       data-testid="temuan-group-grid"
-      className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3"
+      aria-label="Temuan per tiket"
+      className="space-y-3"
     >
-      {groups.map((group, gIdx) => (
-        <TemuanGroupCard key={group.key} group={group} gIdx={gIdx} {...cardProps} />
+      {groups.map((group) => (
+        <TemuanGroupCard key={group.key} group={group} {...cardProps} />
       ))}
-    </div>
+    </ul>
   );
 }
