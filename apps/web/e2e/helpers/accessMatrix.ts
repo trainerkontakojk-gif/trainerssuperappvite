@@ -81,7 +81,7 @@ const rows = [
   ["DELETE", "/v1/ketik/history", "ketik.history.delete", ALL],
   ["DELETE", "/v1/ketik/history/:id", "ketik.history.delete", ALL],
   ["GET", "/v1/ketik/review/:sessionId", "ketik.review.read", ALL],
-  ["POST", "/v1/ketik/review", "ketik.review", MANAGERS],
+  ["POST", "/v1/ketik/review", "ketik.review", ALL],
   ["GET", "/v1/ketik/review/status/:sessionId", "ketik.review.read", ALL],
   ["GET", "/v1/ketik/worker", "ketik.worker.process", MANAGERS],
   ["GET", "/v1/pdkt/history", "pdkt.history.read", ALL],

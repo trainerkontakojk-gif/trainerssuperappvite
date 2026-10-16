@@ -116,6 +116,11 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
   };
   const db = createAdmin(env);
   let userId: string | undefined;
+  let reviewWorker:
+    | ReturnType<
+        typeof import("../../api/src/workers/ketik-review-worker-runtime").createKetikReviewWorker
+      >
+    | undefined;
   try {
     const password = randomUUID();
     const email = `ketik-live-${randomUUID()}@local.test`;
@@ -294,6 +299,14 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
     ]);
     expect(calls).toBe(3);
     expect(reviewCalls).toBe(0); // Finish never auto-reviews.
+    const { createKetikReviewWorker } =
+      await import("../../api/src/workers/ketik-review-worker-runtime");
+    reviewWorker = createKetikReviewWorker({
+      intervalMs: 250,
+      shutdownMs: 500,
+      healthPort: 0,
+    });
+    reviewWorker.start();
     await page
       .getByRole("button", { name: "Mulai telaah", exact: true })
       .click();
@@ -314,6 +327,7 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
     );
     expect(blocked).toEqual([]);
   } finally {
+    await reviewWorker?.shutdown();
     globalThis.fetch = guarded;
     if (userId) {
       expect(

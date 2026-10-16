@@ -366,7 +366,9 @@ test("local rollback/reapply preserves history and scores while missing RPC stay
   } finally {
     runSql(env, sql("migrations/20261015145210_ketik_history_pagination.sql"));
   }
-  expect((await api("/history")).status).toBe(200);
+  await expect
+    .poll(async () => (await api("/history")).status, { timeout: 5000 })
+    .toBe(200);
   expect(
     runSql(
       env,

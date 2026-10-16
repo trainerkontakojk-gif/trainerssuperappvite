@@ -365,35 +365,16 @@ export async function getReviewDetail(
 ): Promise<KetikReviewDetail | null> {
   const adminClient = createAdminClient();
 
-  const { data: history, error: historyError } = await adminClient
-    .from("ketik_history")
-    .select(
-      "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score",
-    )
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .single();
-
-  if (historyError && historyError.code !== "PGRST116") throw historyError;
-  if (!history || history.review_status !== "completed") return null;
-
-  const [reviewResult, typosResult] = await Promise.all([
-    adminClient
-      .from("ketik_session_reviews")
-      .select("*")
-      .eq("session_id", sessionId)
-      .maybeSingle(),
-    adminClient
-      .from("ketik_typo_findings")
-      .select("*")
-      .eq("session_id", sessionId),
-  ]);
-
-  if (reviewResult.error) throw reviewResult.error;
-  if (typosResult.error) throw typosResult.error;
-  const reviewData = reviewResult.data;
-  const typosData = typosResult.data;
-  if (!reviewData) return null;
+  const { data, error } = await adminClient.rpc("read_ketik_review", {
+    p_actor: userId,
+    p_session: sessionId,
+  });
+  if (error) throw error;
+  if (!data || data.history.review_status !== "completed" || !data.review)
+    return null;
+  const history = data.history;
+  const reviewData = data.review;
+  const typosData = data.typos;
 
   const review: KetikSessionReview = {
     id: reviewData.id,

@@ -234,6 +234,7 @@ export const DEFAULT_KETIK_SETTINGS: KetikAppSettings = {
 };
 
 export interface KetikSessionHistoryItem {
+  transcriptProvenance?: "legacy" | "server_v1";
   id: string;
   date: string;
   scenarioTitle: string;

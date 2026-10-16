@@ -66,7 +66,11 @@ test.beforeAll(async () => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     if (
       url.origin === new URL(env.apiUrl).origin &&
-      url.pathname === `/rest/v1/${failedTable}`
+      (url.pathname === `/rest/v1/${failedTable}` ||
+        (failedTable === "ketik_history" &&
+          url.pathname === "/rest/v1/rpc/read_ketik_review") ||
+        (failedTable === "ketik_review_jobs" &&
+          url.pathname === "/rest/v1/rpc/enqueue_ketik_review"))
     ) {
       return Response.json({ code: "XX000", message: marker }, { status: 500 });
     }
@@ -110,7 +114,7 @@ test.afterAll(async () => {
   }
 });
 
-test("database errors in settings, mutation, detail, and worker stay private", async () => {
+test("database errors in settings, mutation, detail, and enqueue stay private", async () => {
   failedTable = "user_settings";
   await expectSafe(
     await api("/settings"),
@@ -152,7 +156,7 @@ test("database errors in settings, mutation, detail, and worker stay private", a
   );
   failedTable = "ketik_review_jobs";
   await expectSafe(
-    await api("/worker"),
+    await api("/review", "POST", { sessionId: randomUUID() }),
     500,
     "REVIEW_FAILED",
     "Telaah belum bisa diproses. Coba lagi.",
@@ -215,7 +219,7 @@ test("generation hides raw provider detail while preserving failure status", asy
   expect(providerCalls).toHaveLength(1);
 });
 
-test("failed review, polling, and worker return safe copy and still use primary then fallback", async () => {
+test("enqueue does not call AI; claimed attempts use primary/fallback and polling keeps errors private", async () => {
   // Review fixture setup bypasses the retired browser transcript endpoint.
   const saved = await createAdmin(env)
     .from("ketik_history")
@@ -239,8 +243,16 @@ test("failed review, polling, and worker return safe copy and still use primary 
   expect(saved.error).toBeNull();
   const session = saved.data!;
   const response = await api("/review", "POST", { sessionId: session.id });
-  expect(response.status).toBe(200);
-  expect((await response.json()).data).toMatchObject({
+  expect(response.status).toBe(202);
+  expect((await response.json()).data.status).toBe("queued");
+  expect(providerCalls).toHaveLength(0);
+  const { claimAndProcessKetikReviewJob } =
+    await import("../../api/src/services/ketik/review-lifecycle");
+  const attempt = await claimAndProcessKetikReviewJob(
+    session.id,
+    "e2e-error-worker",
+  );
+  expect(attempt).toMatchObject({
     status: "failed",
     error: "Telaah belum bisa diproses. Coba lagi.",
   });
@@ -265,24 +277,11 @@ test("failed review, polling, and worker return safe copy and still use primary 
     status: "failed",
     errorMessage: "Telaah belum bisa diproses. Coba lagi.",
   });
-  // Do not let the global worker claim a fixture owned by another test/run.
-  const otherJobs = await admin
-    .from("ketik_review_jobs")
-    .select("session_id")
-    .or(
-      `status.eq.queued,and(status.eq.processing,lease_expires_at.lt.${new Date().toISOString()})`,
-    );
-  expect(otherJobs.error).toBeNull();
-  expect(otherJobs.data).toEqual([]);
-  const queued = await admin
-    .from("ketik_review_jobs")
-    .update({ status: "queued" })
-    .eq("session_id", session.id);
-  expect(queued.error).toBeNull();
   const worked = await api("/worker");
-  expect(worked.status).toBe(200);
-  expect((await worked.json()).data).toMatchObject({
-    status: "failed",
-    error: "Telaah belum bisa diproses. Coba lagi.",
-  });
+  await expectSafe(
+    worked,
+    410,
+    "WORKER_ENDPOINT_RETIRED",
+    "Telaah diproses oleh worker backend.",
+  );
 });
