@@ -1,4 +1,5 @@
 import { createAdminClient } from "../../lib/supabase";
+import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenAIContent } from "../../lib/openai";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
@@ -26,7 +27,7 @@ async function generateKetikReviewAiResponse(options: {
   // Try Gemini first
   try {
     const geminiResp = await generateGeminiContent({
-      model: "gemini-3.8-flash",
+      model: resolveModelProvider(KETIK_REVIEW_MODELS.primary).modelId,
       systemInstruction: options.systemInstruction,
       contents: options.contents as any,
       responseMimeType: "application/json",
@@ -52,7 +53,7 @@ async function generateKetikReviewAiResponse(options: {
   // Fallback to direct OpenAI Responses API
   try {
     const orResp = await generateOpenAIContent({
-      model: "gpt-5.4-mini",
+      model: resolveModelProvider(KETIK_REVIEW_MODELS.fallback).modelId,
       systemInstruction: options.systemInstruction,
       contents: options.contents,
       responseMimeType: "application/json",
@@ -93,7 +94,9 @@ function sanitizeKetikReviewResult(result: any): void {
 }
 
 /** Sanitize every AI-generated nested education string (per-string sanitizer). */
-function sanitizeKetikEducation(education: ReturnType<typeof buildKetikEducation>): void {
+function sanitizeKetikEducation(
+  education: ReturnType<typeof buildKetikEducation>,
+): void {
   for (const guidance of education.dimensionGuidance) {
     guidance.diagnosis = sanitizeAiResponse(guidance.diagnosis);
     guidance.howToFix = sanitizeAiResponse(guidance.howToFix);
@@ -129,8 +132,9 @@ function sanitizeKetikEducation(education: ReturnType<typeof buildKetikEducation
 
 export async function processKetikReviewJob(
   sessionId: string,
-  leaseOwner?: string,
+  leaseToken?: string,
 ): Promise<any> {
+  if (!leaseToken) throw new Error("Review requires a backend claim token");
   const adminClient = createAdminClient();
 
   const { data: session, error: sessionError } = await adminClient
@@ -173,23 +177,13 @@ export async function processKetikReviewJob(
 
     if (!reviewResult.summary)
       reviewResult.summary = "Ringkasan tidak tersedia.";
-    if (
-      !Array.isArray(reviewResult.strengths) ||
-      reviewResult.strengths.length === 0
-    )
-      reviewResult.strengths = [
-        "Pertahankan profesionalisme dalam berkomunikasi.",
-      ];
-    if (
-      !Array.isArray(reviewResult.weaknesses) ||
-      reviewResult.weaknesses.length === 0
-    )
-      reviewResult.weaknesses = ["Terus latih teknik probing dan empati."];
-    if (
-      !Array.isArray(reviewResult.coachingFocus) ||
-      reviewResult.coachingFocus.length === 0
-    )
-      reviewResult.coachingFocus = ["Fokus pada detail kebutuhan konsumen."];
+    for (const key of ["strengths", "weaknesses", "coachingFocus"]) {
+      reviewResult[key] = Array.isArray(reviewResult[key])
+        ? reviewResult[key].filter(
+            (item: unknown) => typeof item === "string" && item.trim(),
+          )
+        : [];
+    }
 
     if (
       !reviewResult ||
@@ -217,6 +211,7 @@ export async function processKetikReviewJob(
   const education = buildKetikEducation(
     reviewResult.dimensionGuidance ?? reviewResult.education?.dimensionGuidance,
     reviewResult.scores,
+    session.messages,
   );
   if (Array.isArray(reviewResult.overallNextSteps)) {
     education.overallNextSteps = reviewResult.overallNextSteps;
@@ -228,108 +223,25 @@ export async function processKetikReviewJob(
   );
   sanitizeKetikEducation(education);
 
-  if (leaseOwner) {
-    const renewedLeaseExpiresAt = new Date(
-      Date.now() + 5 * 60 * 1000,
-    ).toISOString();
-    const { data: leaseRows, error: leaseError } = await adminClient
-      .from("ketik_review_jobs")
-      .update({ lease_expires_at: renewedLeaseExpiresAt })
-      .eq("session_id", sessionId)
-      .eq("status", "processing")
-      .eq("lease_owner", leaseOwner)
-      .select("id");
-
-    if (leaseError) throw leaseError;
-
-    if (!leaseRows || leaseRows.length === 0) {
-      console.warn(
-        `[processKetikReviewJob] Lease lost before persistence for session: ${sessionId}`,
-      );
-      return { status: "processing" };
-    }
-  }
-
-  await adminClient
-    .from("ketik_session_reviews")
-    .delete()
-    .eq("session_id", sessionId);
-
-  const { error: reviewInsertError } = await adminClient
-    .from("ketik_session_reviews")
-    .insert({
-      session_id: sessionId,
-      ai_summary: reviewResult.summary,
-      strengths: reviewResult.strengths,
-      weaknesses: reviewResult.weaknesses,
-      coaching_focus: reviewResult.coachingFocus,
-      education,
-    });
-
-  if (reviewInsertError) throw reviewInsertError;
-
-  await adminClient
-    .from("ketik_typo_findings")
-    .delete()
-    .eq("session_id", sessionId);
-
-  if (reviewResult.typos && reviewResult.typos.length > 0) {
-    const typoInserts = reviewResult.typos.map((t: any) => ({
-      session_id: sessionId,
-      message_id: t.messageId,
-      original_word: t.originalWord,
-      corrected_word: t.correctedWord,
-      severity: t.severity,
-    }));
-
-    const { error: typoInsertError } = await adminClient
-      .from("ketik_typo_findings")
-      .insert(typoInserts);
-
-    if (typoInsertError) throw typoInsertError;
-  }
-
-  const { error: updateError } = await adminClient
-    .from("ketik_history")
-    .update({
-      final_score: reviewResult.scores.final,
-      empathy_score: reviewResult.scores.empathy,
-      probing_score: reviewResult.scores.probing,
-      resolution_score: reviewResult.scores.resolution,
-      typo_score: reviewResult.scores.typo,
-      compliance_score: reviewResult.scores.compliance,
-      review_status: "completed",
-    })
-    .eq("id", sessionId);
-
-  if (updateError) throw updateError;
-
-  // Dual-update to results
-  try {
-    await adminClient
-      .from("results")
-      .update({
-        score: reviewResult.scores.final,
-        status: "completed",
-      })
-      .eq("session_id", sessionId)
-      .eq("module", "ketik");
-  } catch (e) {
-    console.error(e);
-  }
-
-  let jobUpdateQuery = adminClient
-    .from("ketik_review_jobs")
-    .update({ status: "completed", lease_owner: null, lease_expires_at: null })
-    .eq("session_id", sessionId)
-    .eq("status", "processing");
-
-  if (leaseOwner) {
-    jobUpdateQuery = jobUpdateQuery.eq("lease_owner", leaseOwner);
-  }
-
-  const { error: jobUpdateError } = await jobUpdateQuery;
-  if (jobUpdateError) throw jobUpdateError;
-
+  const { data: published, error: publishError } = await adminClient.rpc(
+    "settle_ketik_review",
+    {
+      p_session: sessionId,
+      p_token: leaseToken,
+      p_result: {
+        scores: reviewResult.scores,
+        review: {
+          summary: reviewResult.summary,
+          strengths: reviewResult.strengths,
+          weaknesses: reviewResult.weaknesses,
+          coachingFocus: reviewResult.coachingFocus,
+          education,
+        },
+        typos: Array.isArray(reviewResult.typos) ? reviewResult.typos : [],
+      },
+    },
+  );
+  if (publishError) throw publishError;
+  if (!published) return { status: "lease_lost" };
   return { status: "completed", scores: reviewResult.scores };
 }

@@ -7,37 +7,35 @@ import type {
 } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
 
-/** Batas tunggu telaah sebelum dilaporkan gagal. */
-export const KETIK_REVIEW_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 3_000;
-
-/**
- * Tahap telaah yang benar-benar diketahui klien; tidak ada persen yang
- * dikarang. `loading-result` berarti AI sudah selesai dan hasil sedang diambil.
- */
 export type KetikReviewPhase =
   "idle" | "reviewing" | "loading-result" | "ready" | "failed";
-
-/** Alasan gagal dalam bahasa peserta; detail teknis tidak diteruskan. */
-export type KetikReviewFailure = "review" | "timeout" | "result";
-
+export type KetikReviewFailure = "review" | "result";
 export interface KetikReviewState {
   phase: KetikReviewPhase;
   failure: KetikReviewFailure | null;
   review: KetikSessionReview | null;
   typos: KetikTypoFinding[];
-  /** Telaah ulang terakhir gagal; yang tampil adalah hasil sebelumnya. */
   rerunFailed: boolean;
+  queueStatus: "queued" | "processing" | null;
+  pollFailed: boolean;
 }
-
+const INITIAL: KetikReviewState = {
+  phase: "idle",
+  failure: null,
+  review: null,
+  typos: [],
+  rerunFailed: false,
+  queueStatus: null,
+  pollFailed: false,
+};
 function withScores(
   session: KetikSessionHistoryItem,
-  scores: KetikReviewDetail["scores"] | null | undefined,
+  scores: KetikReviewDetail["scores"],
 ): KetikSessionHistoryItem {
-  const completed = { ...session, reviewStatus: "completed" as const };
-  if (!scores) return completed;
   return {
-    ...completed,
+    ...session,
+    reviewStatus: "completed",
     finalScore: scores.final,
     empathyScore: scores.empathy,
     probingScore: scores.probing,
@@ -47,19 +45,7 @@ function withScores(
   };
 }
 
-const INITIAL: KetikReviewState = {
-  phase: "idle",
-  failure: null,
-  review: null,
-  typos: [],
-  rerunFailed: false,
-};
-
-/**
- * Status telaah satu sesi KETIK: memuat hasil yang sudah ada, menjalankan
- * telaah baru, dan memantau telaah yang sedang berjalan. Setiap perubahan status
- * sesi dikirim lewat `onSessionChange` supaya riwayat di halaman ikut segar.
- */
+/** Only server status can declare a job failed. Poll/network failures preserve the unknown state. */
 export function useKetikReviewStatus(
   session: KetikSessionHistoryItem | null,
   onSessionChange: (session: KetikSessionHistoryItem) => void,
@@ -67,162 +53,185 @@ export function useKetikReviewStatus(
   const [state, setState] = useState<KetikReviewState>(INITIAL);
   const sessionRef = useRef(session);
   const onChangeRef = useRef(onSessionChange);
-  // Disalin di effect (bukan saat render); effect ini dideklarasikan sebelum
-  // effect lain sehingga selalu jalan lebih dulu.
+  const runRef = useRef(0);
+  const rerunFailedRun = useRef(-1);
+  const requestRef = useRef<{
+    sessionId: string;
+    requestId: string;
+    rerun: boolean;
+  } | null>(null);
+  const sessionId = session?.id ?? null;
   useEffect(() => {
     sessionRef.current = session;
     onChangeRef.current = onSessionChange;
   });
-  // Setiap sesi/percobaan baru membatalkan hasil async percobaan sebelumnya.
-  const runRef = useRef(0);
-  const startedAtRef = useRef(0);
-  // Percobaan telaah ulang yang gagal; dibaca saat hasil (lama) dimuat, supaya
-  // polling yang selesai belakangan tidak menghapus pemberitahuannya.
-  const rerunFailedRunRef = useRef(-1);
-
-  const sessionId = session?.id ?? null;
-  const status = session?.reviewStatus;
-
   const update = useCallback((next: KetikSessionHistoryItem) => {
     sessionRef.current = next;
     onChangeRef.current(next);
   }, []);
-
   const fail = useCallback(
-    (run: number, failure: KetikReviewFailure) => {
+    (run: number, failure: KetikReviewFailure, confirmed = false) => {
       if (run !== runRef.current || !sessionRef.current) return;
       setState({ ...INITIAL, phase: "failed", failure });
-      if (failure !== "result") {
+      if (confirmed) {
+        requestRef.current = null;
         update({ ...sessionRef.current, reviewStatus: "failed" });
       }
     },
     [update],
   );
-
   const loadResult = useCallback(
     async (run: number) => {
       const current = sessionRef.current;
-      if (!current) return;
+      if (!current || run !== runRef.current) return;
       setState((prev) => ({ ...prev, phase: "loading-result", failure: null }));
       try {
         const detail = await ketikApi.getReviewDetail(current.id);
         if (run !== runRef.current) return;
+        requestRef.current = null;
         update(withScores(current, detail.scores));
-        setState({
+        setState((prev) => ({
+          ...INITIAL,
           phase: "ready",
-          failure: null,
           review: detail.review,
           typos: detail.typos ?? [],
-          rerunFailed: rerunFailedRunRef.current === run,
-        });
-      } catch (error) {
-        console.error("[Ketik] Failed to load review result:", error);
+          rerunFailed: rerunFailedRun.current === run,
+          pollFailed: prev.pollFailed,
+        }));
+      } catch {
         fail(run, "result");
       }
     },
     [fail, update],
   );
-
-  // Sesi baru (atau status yang berubah dari luar): sesuaikan tampilan.
+  const checkStatus = useCallback(
+    async (run: number, initial = false) => {
+      const current = sessionRef.current;
+      if (!current || run !== runRef.current) return;
+      try {
+        const data = await ketikApi.getReviewStatus(current.id);
+        if (run !== runRef.current) return;
+        setState((prev) => ({ ...prev, pollFailed: false }));
+        if (data.status === "failed" && data.previousKept && data.resultReady) {
+          rerunFailedRun.current = run;
+          await loadResult(run);
+        } else if (data.status === "completed" && data.resultReady) {
+          await loadResult(run);
+        } else if (data.status === "failed") {
+          fail(run, "review", true);
+        } else if (data.status === "queued" || data.status === "processing") {
+          if (
+            current.reviewStatus !== "completed" &&
+            current.reviewStatus !== "processing"
+          )
+            update({ ...current, reviewStatus: "processing" });
+          const queueStatus = data.status;
+          setState((prev) => ({ ...prev, phase: "reviewing", queueStatus }));
+        } else if (!initial) {
+          // The server confirms no active request. Retrying can reuse the unacknowledged UUID.
+          fail(run, "review");
+        } else {
+          setState(INITIAL);
+        }
+      } catch {
+        if (run !== runRef.current) return;
+        setState((prev) => ({ ...prev, pollFailed: true }));
+        if (initial && current.reviewStatus === "completed")
+          await loadResult(run);
+      }
+    },
+    [fail, loadResult, update],
+  );
   useEffect(() => {
-    const run = ++runRef.current;
-    if (!sessionId) {
-      setState(INITIAL);
-      return;
-    }
-    if (status === "completed") {
-      void loadResult(run);
-    } else if (status === "processing") {
-      startedAtRef.current = Date.now();
+    const invalidate = () => ++runRef.current;
+    const run = invalidate();
+    requestRef.current = null;
+    rerunFailedRun.current = -1;
+    const current = sessionRef.current;
+    if (!sessionId || !current) setState(INITIAL);
+    else if (current.reviewStatus === "completed") void checkStatus(run, true);
+    else if (current.reviewStatus === "processing")
       setState({ ...INITIAL, phase: "reviewing" });
-    } else if (status === "failed") {
+    else if (current.reviewStatus === "failed")
       setState({ ...INITIAL, phase: "failed", failure: "review" });
-    } else {
-      setState(INITIAL);
-    }
-    // Status sengaja tidak jadi dependensi: perubahan yang dibuat hook ini
-    // sendiri tidak boleh memulai ulang alurnya.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, loadResult]);
-
-  // Pantau telaah yang sedang berjalan sampai selesai, gagal, atau melewati batas.
+    else setState(INITIAL);
+    return () => {
+      invalidate();
+    };
+  }, [sessionId, checkStatus]);
   useEffect(() => {
     if (state.phase !== "reviewing" || !sessionId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
     const run = runRef.current;
     const poll = async () => {
-      if (Date.now() - startedAtRef.current > KETIK_REVIEW_TIMEOUT_MS) {
-        fail(run, "timeout");
-        return;
-      }
-      try {
-        const data = await ketikApi.getReviewStatus(sessionId);
-        if (run !== runRef.current) return;
-        // Job bisa selesai sesaat sebelum hasilnya tersimpan; tunggu hasilnya.
-        if (data.status === "completed" && data.resultReady) {
-          void loadResult(run);
-        } else if (data.status === "failed") {
-          fail(run, "review");
-        }
-      } catch (error) {
-        console.warn("[Ketik] Review status poll failed:", error);
-      }
+      await checkStatus(run);
+      if (!cancelled)
+        timer = setTimeout(() => {
+          void poll();
+        }, POLL_INTERVAL_MS);
     };
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [state.phase, sessionId, fail, loadResult]);
-
-  const start = useCallback(async () => {
-    const current = sessionRef.current;
-    if (!current || state.phase === "reviewing") return;
-    const run = ++runRef.current;
-    startedAtRef.current = Date.now();
-    setState({ ...INITIAL, phase: "reviewing" });
-    update({ ...current, reviewStatus: "processing" });
-    try {
-      const result = await ketikApi.startReview(current.id);
-      if (run !== runRef.current) return;
-      if (result?.status === "completed") {
-        void loadResult(run);
-      } else if (result?.status === "failed") {
-        fail(run, "review");
-      }
-      // Status lain (processing/queued): polling di atas yang meneruskan.
-    } catch (error) {
-      console.error("[Ketik] Failed to start review:", error);
-      fail(run, "review");
-    }
-  }, [state.phase, fail, loadResult, update]);
-
-  /** Telaah ulang sesi yang sudah selesai; hasil lama tetap ada bila gagal. */
-  const rerun = useCallback(async () => {
-    const current = sessionRef.current;
-    if (!current || state.phase !== "ready") return;
-    const run = ++runRef.current;
-    startedAtRef.current = Date.now();
-    setState({ ...INITIAL, phase: "reviewing" });
-    update({ ...current, reviewStatus: "processing" });
-    try {
-      const result = await ketikApi.startReview(current.id, { rerun: true });
-      if (run !== runRef.current) return;
-      if (result?.status === "completed") {
-        void loadResult(run);
-      } else if (result?.status === "failed") {
-        if (result.previousKept) {
-          rerunFailedRunRef.current = run;
-          void loadResult(run);
-        } else {
-          fail(run, "review");
+    // Give the enqueue request a chance to return before polling a previously pending row.
+    timer = setTimeout(() => {
+      void poll();
+    }, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [state.phase, sessionId, checkStatus]);
+  const submit = useCallback(
+    async (rerun: boolean) => {
+      const current = sessionRef.current;
+      if (
+        !current ||
+        state.phase === "reviewing" ||
+        state.phase === "loading-result"
+      )
+        return;
+      const run = ++runRef.current;
+      rerunFailedRun.current = -1;
+      const request =
+        requestRef.current?.sessionId === current.id &&
+        requestRef.current.rerun === rerun
+          ? requestRef.current
+          : { sessionId: current.id, requestId: crypto.randomUUID(), rerun };
+      requestRef.current = request;
+      setState({ ...INITIAL, phase: "reviewing" });
+      try {
+        const result = await ketikApi.startReview(current.id, {
+          rerun,
+          requestId: request.requestId,
+        });
+        if (run !== runRef.current) return;
+        if (result.status === "completed") await loadResult(run);
+        else if (result.status === "failed") await checkStatus(run);
+        else {
+          if (
+            current.reviewStatus !== "completed" &&
+            current.reviewStatus !== "processing"
+          )
+            update({ ...current, reviewStatus: "processing" });
+          const queueStatus = result.status;
+          setState((prev) => ({ ...prev, queueStatus }));
         }
+      } catch {
+        // Acceptance may have succeeded despite a lost response; polling is the primary recovery path.
+        if (run === runRef.current)
+          setState((prev) => ({ ...prev, pollFailed: true }));
       }
-    } catch (error) {
-      console.error("[Ketik] Failed to rerun review:", error);
-      fail(run, "review");
-    }
-  }, [state.phase, fail, loadResult, update]);
-
-  const retryResult = useCallback(() => {
-    void loadResult(++runRef.current);
-  }, [loadResult]);
-
-  return { ...state, start, rerun, retryResult };
+    },
+    [state.phase, loadResult, checkStatus, update],
+  );
+  return {
+    ...state,
+    start: () => submit(false),
+    rerun: () => submit(true),
+    retryResult: () => {
+      void loadResult(++runRef.current);
+    },
+    refreshStatus: () => {
+      void checkStatus(runRef.current);
+    },
+  };
 }

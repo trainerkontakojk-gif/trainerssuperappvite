@@ -1,3 +1,4 @@
+import type { KetikReviewTarget } from "./reviewNavigation";
 import type { ReactNode } from "react";
 import type { KetikAgentNote, KetikConsumerPoint } from "@trainers/types";
 import {
@@ -40,6 +41,7 @@ function withTypoMarks(text: string, words: readonly string[]): ReactNode {
 export function buildQuoteMarks(
   points: readonly KetikConsumerPoint[],
   notes: readonly KetikAgentNote[],
+  onSelect: (target: KetikReviewTarget) => void,
 ): Map<string, QuoteMark[]> {
   const marks = new Map<string, QuoteMark[]>();
   const add = (messageId: string, mark: QuoteMark) =>
@@ -48,6 +50,8 @@ export function buildQuoteMarks(
     add(point.messageId, {
       quote: point.quote,
       label: pointLetter(index),
+      onSelect: () => onSelect({ tab: "questions", key: index }),
+      selectLabel: `Lihat pertanyaan konsumen ${pointLetter(index)}`,
       className: consumerMarkClass(point.status),
     }),
   );
@@ -55,6 +59,8 @@ export function buildQuoteMarks(
     add(note.messageId, {
       quote: note.quote,
       label: String(index + 1),
+      onSelect: () => onSelect({ tab: "notes", key: index }),
+      selectLabel: `Lihat kalimat agen ${index + 1}`,
       // Gelembung agen berwarna modul: tanda memakai warna teksnya sendiri.
       className: agentMarkClass(note.verdict),
     }),

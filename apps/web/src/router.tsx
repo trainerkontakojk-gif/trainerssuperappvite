@@ -364,11 +364,15 @@ const ketikRoute = createRoute({
   component: KetikLanding,
   validateSearch: (
     search: Record<string, unknown>,
-  ): { sesi?: string; tahap?: "telaah" } => ({
+  ): { sesi?: string; tahap?: "telaah" | "chat" } => ({
     ...(typeof search.sesi === "string" && search.sesi
       ? { sesi: search.sesi }
       : {}),
-    ...(search.tahap === "telaah" ? { tahap: "telaah" } : {}),
+    ...(search.tahap === "telaah"
+      ? { tahap: "telaah" as const }
+      : search.tahap === "chat"
+        ? { tahap: "chat" as const }
+        : {}),
   }),
   beforeLoad: requireAuth(),
 });

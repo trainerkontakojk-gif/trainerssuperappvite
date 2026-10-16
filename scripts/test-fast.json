@@ -23,7 +23,6 @@
       "src/__tests__/ketik-image-alt.test.ts",
       "src/__tests__/ketik-prompt-compaction.test.ts",
       "src/__tests__/ketik-review-ai-parser.test.ts",
-      "src/__tests__/ketik-review-lifecycle.test.ts",
       "src/__tests__/ketik-service.test.ts",
       "src/__tests__/ketik-settings-route.test.ts",
       "src/__tests__/leader-access-service.test.ts",

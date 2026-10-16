@@ -20,6 +20,85 @@ Sistem keamanan database kami dirancang dengan prinsip **"Tolak Akses Sejak Awal
 
 ---
 
+## KETIK — penulisan history hanya melalui backend
+
+Migration `20261015120000_ketik_history_backend_insert_only.sql` mencabut policy
+`ketik_history_insert_own`. Dengan RLS aktif dan tanpa policy INSERT, pengguna
+`authenticated` tidak bisa menyisipkan history langsung, termasuk skor dan status
+review arbitrer. Policy SELECT owner-only, grant tabel, dan trigger atribusi subjek
+tidak berubah. Penyimpanan sesi sah tetap melalui API dengan pemeriksaan capability
+serta resolver subjek, kemudian RPC `finish_ketik_session()` memakai service-role backend.
+
+Rollback pasangannya mengembalikan policy lama **dan membuka kembali risiko**;
+jangan menerapkannya tanpa persetujuan rollback keamanan. SQL migration/rollback
+sudah diuji pada Supabase lokal disposable, bukan database remote. Perubahan ini
+berdiri sendiri; otoritas transkrip sesi baru disediakan migration sesi server di bawah.
+
+## KETIK — pagination riwayat
+
+Migration `20261015145210_ketik_history_pagination.sql` menambah indeks
+`ketik_history_owner_date_id_idx(user_id,date DESC,id DESC)` dan RPC baca
+`ketik_history_page(uuid,integer,text,text,timestamptz,uuid)`. RPC SECURITY INVOKER,
+search_path kosong, EXECUTE hanya service_role (PUBLIC/anon/authenticated dicabut).
+Owner selalu ditentukan backend; SQL parameterized, pencarian literal substring
+skenario/konsumen/peserta, filter status, count/average atas seluruh hasil filter,
+dan keyset `(date,id)` mempertahankan presisi microseconds. Proyeksi daftar
+mengecualikan messages; transkrip hanya di detail owner. Tidak ada perubahan RLS,
+policy/grant tabel, data, atau skor lama. Rollback pasangannya menghapus RPC/index
+saja; backend yang mengharapkan RPC akan mengembalikan error eksplisit sampai
+migration di-reapply. Summary memakai count exact (bukan jumlah row maksimal
+PostgREST), rentang bulan WIB, serta query bounded lima reviewed/tiga follow-up.
+
+## KETIK — provenance penugasan konfigurasi
+
+Migration `20261015130000_ketik_configuration_assignments.sql` menambah
+`ketik_configuration_assignments` (recipient PK, assigner, snapshot konfigurasi
+training sumber, versi settings sumber, versi UUID assignment, waktu penugasan).
+Snapshot tidak memuat identitas atau template trainer; settings aktif tetap di
+`user_settings.settings.ketik` milik penerima dan boleh diedit secara pribadi.
+
+RPC `assign_ketik_configuration` hanya diberi EXECUTE kepada `service_role`.
+Transaksi mengunci profil penerima, memvalidasi role/status dan ownership, memeriksa
+versi source/recipient/assignment, lalu menyalin enam field training dan menerbitkan
+provenance secara atomik. Identitas/template pribadi, settings modul lain, dan
+perubahan yang lebih baru tidak ditimpa. RLS authenticated hanya SELECT untuk
+recipient/assigner; INSERT/UPDATE/DELETE dan RPC langsung ditolak.
+
+Rollback menghapus fungsi/tabel provenance, tetapi **mempertahankan settings
+pribadi penerima**. Hentikan assignment writes dahulu. Apply/rollback/reapply hanya
+diuji di database lokal disposable; tidak ada backfill atau migration remote.
+Kewajiban assignment ditegakkan pada endpoint mulai sesi server berikut.
+
+## KETIK — sesi dan transkrip server
+
+Migration `20261015140000_ketik_server_sessions.sql` menambah:
+
+- `ketik_sessions`: snapshot immutable konfigurasi/skenario/subjek/versi assignment,
+  pemilik, waktu server, versi dan transkrip aktif. Sesi belum selesai tidak masuk
+  History/Monitoring/SIDAK.
+- `ketik_session_turns`: request UUID, expected version, payload agen untuk
+  idempotensi, status dan lease/fencing. Satu turn unresolved per sesi; maksimal
+  100 turn selesai. Bukan sumber transkrip penilaian kedua.
+- `ketik_history.transcript_provenance`: `legacy` untuk row lama dan `server_v1`
+  untuk finalisasi sesi baru. Tidak ada backfill atau regrade.
+
+RPC `start_ketik_session`, `claim_ketik_session_turn`,
+`publish_ketik_session_turn`, `finish_ketik_session` adalah SECURITY INVOKER dan
+EXECUTE service-role-only. Authenticated hanya SELECT owner pada dua tabel
+operasional. Start memeriksa status akun, versi settings dan assignment wajib
+agen/leader. Claim memvalidasi owner/versi/expiry dan menyimpan pesan agen sekali.
+AI berlangsung di luar transaksi; retry ID/payload sama memakai fencing baru
+setelah lease hilang. Respons lease lama tidak bisa dipublikasikan. Tidak ada
+jaminan exactly-once biaya provider ketika crash/reclaim.
+
+Finalisasi atomik menulis history ber-ID sama tanpa skor, lalu mengosongkan
+`ketik_sessions.messages`; replay finish membaca history yang sama. Sesi kosong
+discarded. Menghapus history menghapus metadata sesi/turn lewat FK; menghapus
+metadata operasional tidak menghapus history. Rollback menolak adanya sesi aktif,
+mempertahankan history/skor, tetapi menghapus metadata sesi dan label provenance.
+Hentikan writes dahulu; pengujian apply/rollback/reapply hanya pada DB lokal
+(disposable, ledger CLI tidak diperbarui), bukan izin apply remote.
+
 ## ER Diagram (Overview)
 
 ```mermaid
@@ -444,3 +523,40 @@ Ini sering terjadi pada environment _hosted_ setelah proses migrasi yang menamba
 - RPC: `submit_pdkt_mailbox_batch_with_subject` (unique name, hindari overload PostgREST PGRST203); legacy 8-param `submit_pdkt_mailbox_batch` kini explicit self; `submit_pdkt_mailbox_reply` menyalin atribusi mailbox ke history (self dari profil pembalas). Revoke PUBLIC/anon, grant authenticated.
 - Snapshot participant yang sudah di-resolve API didaftarkan sebagai intent opaque di `pdkt_mailbox_subject_intents` melalui service role, lalu dikonsumsi RPC user-JWT. Direct caller hanya boleh menghilangkan metadata snapshot (RPC me-resolve baris peserta saat ini), sehingga tidak dapat memalsukan snapshot frozen.
 - PDKT `/session/init` dan `/session/create` dapat mengembalikan draft mailbox retry bertanda tangan, actor-bound, dan kedaluwarsa. Draft dikirim kembali melalui RPC mailbox yang sama tanpa regenerasi AI; `client_request_id` dibuat bila caller lama tidak menyediakannya agar retry tetap idempotent.
+
+## KETIK — antrean telaah durable E
+
+Migration `20261016000935_ketik_durable_review_worker.sql` mempertahankan satu
+`ketik_review_jobs` per sesi dan menambah `request_id`, `lease_token`, serta
+`available_at`. Semua RPC baru SECURITY INVOKER dengan search_path kosong dan
+EXECUTE hanya service_role: `can_access_ketik_review`, `enqueue_ketik_review`,
+`claim_ketik_review`, `settle_ketik_review`, dan `read_ketik_review`.
+
+- Enqueue mengunci history lalu job, memeriksa actor aktif/scope assignment,
+  mengembalikan job aktif yang sudah ada dan tidak mengulang UUID permintaan
+  saat ini. UUID baru dibutuhkan untuk rerun/retry manual baru. Ini bukan ledger
+  idempotensi seluruh permintaan historis atau jaminan exactly-once billing.
+- Claim memilih queued yang eligible atau processing expired dengan
+  `FOR UPDATE OF history SKIP LOCKED`, kemudian mengunci job. Semua mutation RPC
+  memakai urutan lock yang sama. Token baru dan increment attempt dipublikasikan
+  atomik; maksimum tiga claim AI. Lease NULL/expired tidak berhak publish/settle.
+- Settle success memeriksa token/lease di bawah lock dan mengganti review, typo,
+  skor/history, job completed serta legacy `results` jika tabel tersedia dalam
+  satu transaksi. Kegagalan persist rollback seluruh batch. Rerun mempertahankan
+  history completed dan seluruh hasil lama selama antrean/pemrosesan; terminal
+  job failed tetap eksplisit dengan `previousKept=true` pada API status.
+- RPC baca memakai satu snapshot statement untuk history/review/typo/job dan
+  scope actor. API memproyeksikan DTO saja. Polling tidak memutasi status akibat
+  umur antrean/expiry. Detail history memakai scope telaah; list/summary/delete
+  tetap self. Label legacy UI berasal dari `transcript_provenance` tersimpan.
+- Grant SELECT tabel job lama dicabut dari anon/authenticated karena table-wide
+  SELECT juga mengekspos kolom token baru. Authenticated hanya dapat membaca
+  kolom lama yang aman melalui RLS owner; `lease_token`, `request_id`, dan
+  `available_at` tidak diberi SELECT. Mutasi/RPC tetap backend-only.
+
+Rollback E menolak job queued/processing, menghapus RPC/index/kolom tambahan,
+dan mengembalikan SELECT tabel lama setelah kolom token dihapus. Review, typo,
+dan skor published tetap ada. Terapkan rollback hanya setelah drain/stop dan
+pergantian build yang dijelaskan di [deployment.md](deployment.md). Migration,
+rollback, reapply, grants dan atomic failure diuji pada loopback disposable;
+ledger migration CLI lokal/remote tidak otomatis berubah oleh apply SQL tes.

@@ -1,6 +1,5 @@
 import {
   mapSimulationSubjectRowToSnapshot,
-  parseSimulationSubjectSnapshot,
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import {
@@ -204,11 +203,7 @@ export async function getSettingsSnapshot(
 }
 
 export async function getSettings(userId: string): Promise<KetikAppSettings> {
-  try {
-    return (await getSettingsSnapshot(userId)).settings;
-  } catch {
-    return DEFAULT_KETIK_SETTINGS;
-  }
+  return (await getSettingsSnapshot(userId)).settings;
 }
 
 export async function saveSettings(
@@ -238,88 +233,6 @@ export async function saveSettings(
       cause: error,
     });
   }
-}
-
-export async function getHistory(
-  userId: string,
-): Promise<KetikSessionHistoryItem[]> {
-  const adminClient = createAdminClient();
-
-  let data, error;
-
-  // Try 1: specific columns
-  const res1 = await adminClient
-    .from("ketik_history")
-    .select(
-      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
-    )
-    .eq("user_id", userId)
-    .order("date", { ascending: false })
-    .limit(50);
-
-  data = res1.data;
-  error = res1.error;
-
-  // Try 2: wildcard
-  if (error) {
-    const res2 = await adminClient
-      .from("ketik_history")
-      .select("*")
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .limit(50);
-    data = res2.data;
-    error = res2.error;
-  }
-
-  // Try 3: results table fallback
-  if (error) {
-    const res3 = await adminClient
-      .from("results")
-      .select("session_id, created_at, metadata, score, status")
-      .eq("user_id", userId)
-      .eq("module", "ketik")
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (!res3.error && res3.data) {
-      return res3.data.map((item: any) => ({
-        id: item.session_id,
-        date: item.created_at,
-        scenarioTitle: item.metadata?.scenario_title || "Simulation Chat",
-        consumerName: item.metadata?.consumer_name || "Consumer",
-        consumerPhone: "",
-        consumerCity: "",
-        messages: [],
-        simulationDuration: item.metadata?.simulation_duration,
-        finalScore: item.score,
-        reviewStatus: item.status || "pending",
-        simulationSubject: parseSimulationSubjectSnapshot(
-          item.metadata?.simulation_subject,
-        ),
-      }));
-    }
-    return [];
-  }
-
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    date: item.date || item.created_at,
-    scenarioTitle: item.scenario_title || "Simulation Chat",
-    consumerName: item.consumer_name || "Consumer",
-    consumerPhone: item.consumer_phone,
-    consumerCity: item.consumer_city,
-    messages: Array.isArray(item.messages) ? item.messages : [],
-    simulationDuration: item.simulation_duration,
-    finalScore: item.final_score,
-    empathyScore: item.empathy_score,
-    probingScore: item.probing_score,
-    resolutionScore: item.resolution_score ?? undefined,
-    typoScore: item.typo_score,
-    complianceScore: item.compliance_score,
-    reviewStatus: item.review_status,
-    simulationSubject: mapSimulationSubjectRowToSnapshot(item),
-  }));
 }
 
 export async function persistSession(
@@ -452,31 +365,16 @@ export async function getReviewDetail(
 ): Promise<KetikReviewDetail | null> {
   const adminClient = createAdminClient();
 
-  const { data: history, error: historyError } = await adminClient
-    .from("ketik_history")
-    .select(
-      "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score",
-    )
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .single();
-
-  if (historyError || !history || history.review_status !== "completed")
+  const { data, error } = await adminClient.rpc("read_ketik_review", {
+    p_actor: userId,
+    p_session: sessionId,
+  });
+  if (error) throw error;
+  if (!data || data.history.review_status !== "completed" || !data.review)
     return null;
-
-  const [{ data: reviewData }, { data: typosData }] = await Promise.all([
-    adminClient
-      .from("ketik_session_reviews")
-      .select("*")
-      .eq("session_id", sessionId)
-      .maybeSingle(),
-    adminClient
-      .from("ketik_typo_findings")
-      .select("*")
-      .eq("session_id", sessionId),
-  ]);
-
-  if (!reviewData) return null;
+  const history = data.history;
+  const reviewData = data.review;
+  const typosData = data.typos;
 
   const review: KetikSessionReview = {
     id: reviewData.id,
