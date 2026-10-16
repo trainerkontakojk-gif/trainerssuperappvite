@@ -21,7 +21,7 @@ High-salience guardrails for every harness. Detailed policy belongs in [`docs/AG
 - For changed runtime behavior use focused Playwright E2E, written/run RED-first when applicable, against local or explicitly test-only disposable targets. Produce a verifiable, repeatable E2E artifact. Never substitute unit tests for E2E.
 - Ask Fajar before adding or running any non-E2E test; explain the exact contract E2E cannot prove and the smallest proposed alternative. For an approved isolated test, list all failure modes before coding.
 - Only after equivalent E2E coverage is verified, remove a superseded unit test and its stale suite-list entry; do not mass-delete unrelated tests. Existing unit-suite scripts/manifests are legacy inventory, not permission to run them. Never add unit tests to `scripts/test-core.json` or `scripts/test-fast.json`.
-- Never point E2E at production. Do not commit, push, deploy, migrate data, or modify remote systems without explicit authorization. Do not claim checks that did not run; report exact commands/evidence.
+- **Standing authorization (Fajar, this repo):** committing, pushing to this repo's own configured remote, merging, branching, and running local terminal/build/test commands are pre-authorized — do them without asking. Everything else still needs explicit authorization: production deploys (Vercel `--prod`/promote, Railway prod), remote Supabase mutations or `db push`/migrations against any non-local project, and any other change to a remote system. Never point E2E at production. Do not claim checks that did not run; report exact commands/evidence.
 
 ## Skills and knowledge tools
 

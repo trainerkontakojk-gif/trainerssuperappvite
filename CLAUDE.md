@@ -18,7 +18,7 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 `.claude/settings.json` wires the scripts in `.claude/hooks/` to enforce `AGENTS.md` guardrails mechanically:
 
 - `protect-env.sh` blocks agent edits to `.env*` files except `.env.example`.
-- `guard-remote.sh` asks before `git push`, remote Supabase CLI commands, Vercel deploys, and remote-mutating Supabase/Vercel MCP calls. It blocks MCP calls aimed at the production project ref.
+- `guard-remote.sh` lets `git push` to this repo's own remote run unattended (logged to `~/.claude/logs/git-push-audit.log`), and asks before remote Supabase CLI commands, Vercel deploys, and remote-mutating Supabase/Vercel MCP calls. It blocks MCP calls aimed at the production project ref.
 - `one-test-run.sh` refuses a second concurrent Playwright run.
 - `block-superpowers.sh` refuses `superpowers:*` skills.
 - `format-changed.sh` runs Prettier on a touched `.ts`/`.tsx`/`.md` file only when that file is new or was already Prettier-clean, so legacy files are not reformatted wholesale.
