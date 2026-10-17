@@ -51,3 +51,11 @@ Fix:
 - [ ] Implement 1–5.
 - [ ] GREEN: run the spec against local disposable Supabase.
 - [ ] API typecheck, lint; thermo-nuclear review.
+
+## Follow-up: year index (Lane D, approved by Fajar 2026-10-17)
+
+`supabase/migrations/20261017160000_qa_temuan_tahun_id_index.sql` adds
+`idx_qa_temuan_tahun_id ON qa_temuan (tahun, id)`, matching the dashboard's
+`tahun = ?` filter with keyset paging on `id`. Index only: no data change, no
+role or grant change. Rollback drops the index. Applying it to production is a
+separate step that needs Fajar's explicit OK.

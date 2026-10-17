@@ -256,3 +256,11 @@ test("staf yang dikecualikan SIDAK tidak muncul di tabel agen", async () => {
   expect(data.topAgents.map((a) => a.agentId)).toEqual([created.pesertaId]);
   expect(data.topAgents[0]!.defects).toBe(8);
 });
+
+test("index tahun untuk baca dashboard per halaman ada", () => {
+  const index = runSql(
+    env,
+    `SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='idx_qa_temuan_tahun_id';`,
+  );
+  expect(index).toContain("(tahun, id)");
+});

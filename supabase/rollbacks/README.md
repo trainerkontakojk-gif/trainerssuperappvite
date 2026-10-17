@@ -172,3 +172,5 @@ done
 - `rollback_20261017150000_ketik_settle_review_drop_legacy_results.sql`
   restores the `settle_ketik_review` body that also updates `results`. No data
   loss, but with `results` present every KETIK review publish fails again.
+- `rollback_20261017160000_qa_temuan_tahun_id_index.sql` drops the SIDAK
+  dashboard year index. Independently reversible, no data loss.
