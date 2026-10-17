@@ -8,9 +8,9 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "../../../../components/ui/avatar";
-import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
 import { Card, CardContent, CardFooter } from "../../../../components/ui/card";
+import { ReorderButtons } from "./ProfilerParticipantTable";
 
 const selectableId = (p: ProfilerPeserta): string | null =>
   typeof p.id === "string" && p.id.length > 0 ? p.id : null;
@@ -25,7 +25,11 @@ interface ProfilerParticipantCardProps {
   isDragOver: boolean;
   density: "comfortable" | "compact";
   toggleSelect: (id: string) => void;
-  setSelectedPeserta: (p: ProfilerPeserta) => void;
+  isReadOnly: boolean;
+  lastIndex: number;
+  onOpenProfile: (p: ProfilerPeserta) => void;
+  onEdit: (p: ProfilerPeserta) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
   onViewAnalysis: (id: string) => void;
   handleDragStart: (e: React.DragEvent, index: number) => void;
   handleDragOver: (e: React.DragEvent, index: number) => void;
@@ -45,7 +49,11 @@ export const ProfilerParticipantCard: React.FC<
   isDragOver,
   density,
   toggleSelect,
-  setSelectedPeserta,
+  isReadOnly,
+  lastIndex,
+  onOpenProfile,
+  onEdit,
+  onMove,
   onViewAnalysis,
   handleDragStart,
   handleDragOver,
@@ -59,7 +67,7 @@ export const ProfilerParticipantCard: React.FC<
       toggleSelect(rowId);
       return;
     }
-    setSelectedPeserta(p);
+    onOpenProfile(p);
   };
 
   return (
@@ -104,10 +112,18 @@ export const ProfilerParticipantCard: React.FC<
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             {sortMode ? (
-              <GripVertical
-                className="size-4 text-muted-foreground"
-                aria-hidden="true"
-              />
+              <>
+                <GripVertical
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <ReorderButtons
+                  nama={p.nama}
+                  index={index}
+                  last={lastIndex}
+                  onMove={onMove}
+                />
+              </>
             ) : selectMode ? (
               <Button
                 type="button"
@@ -135,20 +151,22 @@ export const ProfilerParticipantCard: React.FC<
           </div>
           {!sortMode && !selectMode ? (
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="size-8"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedPeserta(p);
-                }}
-                title="Edit Data"
-                aria-label={`Edit ${p.nama}`}
-              >
-                <Pencil aria-hidden="true" />
-              </Button>
+              {!isReadOnly ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-8"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(p);
+                  }}
+                  title="Edit Data"
+                  aria-label={`Edit ${p.nama}`}
+                >
+                  <Pencil aria-hidden="true" />
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"
@@ -195,12 +213,9 @@ export const ProfilerParticipantCard: React.FC<
               {p.nama || "Tanpa nama"}
             </h3>
             {p.jabatan ? (
-              <Badge
-                variant="secondary"
-                className="mt-1 max-w-full truncate text-xs"
-              >
+              <p className="mt-0.5 truncate text-sm text-muted-foreground">
                 {labelJabatan[p.jabatan] || p.jabatan}
-              </Badge>
+              </p>
             ) : null}
           </div>
         </div>

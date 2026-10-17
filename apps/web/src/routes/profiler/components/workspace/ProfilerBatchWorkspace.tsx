@@ -1,14 +1,16 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { ProfilerPeserta } from "@trainers/types";
+import type {
+  ProfilerFolder,
+  ProfilerPeserta,
+  ProfilerYear,
+} from "@trainers/types";
 import {
-  ArrowUpRight,
   Cake,
   ChevronDown,
   FileSpreadsheet,
   ListPlus,
   PenLine,
-  Search,
   Settings2,
   UserPlus,
 } from "lucide-react";
@@ -22,13 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "cn";
 
 import type { BirthdayEntry } from "../../utils/birthday";
 import type { ProfilerBatchView } from "./batch-views";
-import { ProfilerParticipantGrid } from "../table/ProfilerParticipantGrid";
+import ProfilerParticipantDetail from "../detail/ProfilerParticipantDetail";
+import ProfilerPesertaPanel, {
+  type ProfilerPesertaLayout,
+} from "./ProfilerPesertaPanel";
 
 /** Baris ulang tahun hanya muncul untuk yang jatuh dalam rentang ini. */
 const BIRTHDAY_WINDOW_DAYS = 7;
@@ -45,15 +49,21 @@ const ProfilerStatsPanel = lazy(() => import("./panels/ProfilerStatsPanel"));
 const ProfilerSlidesPanel = lazy(() => import("./panels/ProfilerSlidesPanel"));
 const ProfilerExportPanel = lazy(() => import("./panels/ProfilerExportPanel"));
 
-const EMPTY_SELECTION = new Set<string>();
-
 interface ProfilerBatchWorkspaceProps {
   batchName: string;
   teamName: string | null;
   /** Tab aktif dari `?view=`; `null` = daftar peserta. */
   view: ProfilerBatchView | null;
   participantId: string | null;
+  /** `?layout=tabel` di tab Peserta. */
+  layout: ProfilerPesertaLayout;
+  /** `?edit=1`: form edit peserta `participantId`. */
+  editing: boolean;
   peserta: ProfilerPeserta[];
+  folders: ProfilerFolder[];
+  years: ProfilerYear[];
+  onPesertaChange: (next: ProfilerPeserta[]) => void;
+  onMoved: (ids: string[], targetFolder: string) => void;
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -63,14 +73,18 @@ interface ProfilerBatchWorkspaceProps {
   onPickPeserta: () => void;
 }
 
-const noop = () => {};
-
 export default function ProfilerBatchWorkspace({
   batchName,
   teamName,
   view,
   participantId,
+  layout,
+  editing,
   peserta,
+  folders,
+  years,
+  onPesertaChange,
+  onMoved,
   loading,
   error,
   onRetry,
@@ -80,20 +94,54 @@ export default function ProfilerBatchWorkspace({
   onPickPeserta,
 }: ProfilerBatchWorkspaceProps) {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
   const search = { batch: batchName };
-
-  const visiblePeserta = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return peserta;
-    return peserta.filter((p) => (p.nama ?? "").toLowerCase().includes(needle));
-  }, [peserta, query]);
+  const layoutSearch = layout === "tabel" ? { layout } : {};
 
   const soonBirthdays = upcomingBirthdays.filter(
     (birthday) => birthday.days <= BIRTHDAY_WINDOW_DAYS,
   );
 
-  const openTable = () => navigate({ to: "/profiler/table", search });
+  // Profil peserta hanya di tab Peserta; tab Slide memakai `participant` sendiri.
+  const profileId = view ? null : participantId;
+  const profile =
+    profileId && !loading
+      ? (peserta.find((p) => p.id === profileId) ?? null)
+      : null;
+  const staleProfile = Boolean(profileId) && !loading && !error && !profile;
+
+  const openProfile = (
+    id: string | null,
+    options: { edit?: boolean; replace?: boolean } = {},
+  ) =>
+    navigate({
+      to: "/profiler",
+      search: id
+        ? { ...search, ...layoutSearch, participant: id, ...(options.edit ? { edit: 1 } : {}) }
+        : { ...search, ...layoutSearch },
+      replace: options.replace,
+    });
+
+  useEffect(() => {
+    if (staleProfile) openProfile(null, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staleProfile]);
+
+  if (profile) {
+    return (
+      <ProfilerParticipantDetail
+        batchName={batchName}
+        peserta={peserta}
+        participant={profile}
+        editing={editing}
+        isReadOnly={isReadOnly}
+        folders={folders}
+        years={years}
+        onNavigate={(id, options) => openProfile(id, options)}
+        onPesertaChange={onPesertaChange}
+        onMoved={onMoved}
+      />
+    );
+  }
 
   return (
     <section
@@ -193,16 +241,6 @@ export default function ProfilerBatchWorkspace({
               </li>
             );
           })}
-          <li>
-            <Link
-              to="/profiler/table"
-              search={search}
-              className="inline-flex min-h-11 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Tabel lengkap
-              <ArrowUpRight aria-hidden="true" className="size-3.5" />
-            </Link>
-          </li>
         </ul>
       </nav>
 
@@ -302,46 +340,25 @@ export default function ProfilerBatchWorkspace({
             </button>
           )}
 
-          <div className="flex flex-col gap-4">
-            {peserta.length > 0 && (
-              <div className="relative sm:max-w-xs">
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cari nama peserta"
-                  aria-label="Cari peserta"
-                  className="h-11 pl-9"
-                />
-              </div>
-            )}
-            <ProfilerParticipantGrid
-              displayList={visiblePeserta}
-              sortMode={false}
-              selectMode={false}
-              selectedIds={EMPTY_SELECTION}
-              toggleSelect={noop}
-              density="compact"
-              isReadOnly={isReadOnly}
-              hasActiveFilters={query.trim().length > 0}
-              resetFilters={() => setQuery("")}
-              setSelectedPeserta={openTable}
-              onViewAnalysis={(id) =>
-                navigate({ to: "/sidak/agents/$id", params: { id } })
-              }
-              onAddPeserta={onPickPeserta}
-              dragIndex={null}
-              dragOverIndex={null}
-              handleDragStart={noop}
-              handleDragOver={noop}
-              handleDragLeave={noop}
-              handleDragEnd={noop}
-            />
-          </div>
+          <ProfilerPesertaPanel
+            batchName={batchName}
+            peserta={peserta}
+            layout={layout}
+            isReadOnly={isReadOnly}
+            folders={folders}
+            years={years}
+            onLayoutChange={(next) =>
+              navigate({
+                to: "/profiler",
+                search: next === "tabel" ? { ...search, layout: next } : search,
+                replace: true,
+              })
+            }
+            onOpenProfile={(id, options) => openProfile(id, options)}
+            onAddPeserta={onPickPeserta}
+            onPesertaChange={onPesertaChange}
+            onMoved={onMoved}
+          />
         </>
       )}
     </section>
