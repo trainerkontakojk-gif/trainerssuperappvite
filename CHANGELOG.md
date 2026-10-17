@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- refactor(pdkt): split the 1,361-line simulation workspace into review-polling and delete hooks, a replay mapper and workspace state views without changing behavior
 - fix(telefun): count "panggilan bulan ini" on the server via GET /telefun/sessions/month-count (the list stops at 50 rows), show "–" when the count is unavailable, and stop logging the full call config to the browser console
 - refactor(sidak): split the 1,564-line agent report PDF generator into theme, text, layout and chart modules without changing its output
 - fix(telefun): keep a trainer note in the form when saving fails, list coaching recommendations most urgent first, show moment labels instead of raw keys, and keep at least one consumer character
