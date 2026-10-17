@@ -529,6 +529,13 @@ hanya-baca), dan `20260908093728` ditandai `reverted` (isinya identik dengan
 semua baris Local = Remote. Penerapan tetap per file lewat `db query --linked -f`
 + `migration repair` sampai diputuskan lain.
 
+**2026-10-17 (izin Fajar):** `20261017150000_ketik_settle_review_drop_legacy_results.sql`
+diterapkan ke prod lewat jalur di atas, oleh Fajar dari terminalnya. Readback
+sebelum: `settle_ketik_review` masih menulis `results`, `results` tanpa kolom
+`session_id`, 0 job `failed`, 35 `completed` (bug belum sempat memicu kegagalan).
+Readback sesudah: body tidak lagi menyebut `public.results`; riwayat mencatat
+`20261017150000` sebagai `applied`.
+
 1. `000_profiles_core.sql` — profiles table + auto-create trigger
 2. `001_sidak_core.sql` — SIDAK tables
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT + AI usage logging + pricing

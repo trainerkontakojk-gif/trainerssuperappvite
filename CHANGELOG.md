@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- docs(db): record the prod rollout of 20261017150000 (settle_ketik_review no longer writes results)
 - test(db): allowlist the 11 by-design service_role-only KETIK RPCs in the D5.1 exposed-function guard
 - fix(db): stop settle_ketik_review writing the legacy results table, which failed every KETIK review publish
 - test(e2e): mock the KETIK landing history summary in usage.spec so the hermetic guard passes
