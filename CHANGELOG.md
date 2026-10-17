@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- refactor(api): move the Telefun voice-scoring handler and its helpers out of the 1,054-line recordings route into recording-scoring.ts without changing responses
 - refactor(monitoring): move the history table cell renderers and session-count cards out of the 1,121-line HistoryTab without changing its markup
 - refactor(api): split the 1,054-line profiler service into folder, team and participant modules behind the same import path, without changing behavior
 - refactor(telefun): split the 1,291-line usage logger into live Gemini, retired OpenAI and shared store modules behind the same `usage.js` entry, without changing behavior
