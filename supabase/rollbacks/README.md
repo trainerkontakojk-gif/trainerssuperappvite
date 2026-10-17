@@ -169,3 +169,6 @@ done
 - `rollback_20261017130300_results_legacy_table.sql` drops `results`.
   **Data loss: local/E2E only.** On prod the table predates the repo and holds
   legacy Telefun sessions; revert its grant/policy changes by hand instead.
+- `rollback_20261017150000_ketik_settle_review_drop_legacy_results.sql`
+  restores the `settle_ketik_review` body that also updates `results`. No data
+  loss, but with `results` present every KETIK review publish fails again.

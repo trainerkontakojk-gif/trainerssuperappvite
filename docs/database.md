@@ -541,8 +541,9 @@ EXECUTE hanya service_role: `can_access_ketik_review`, `enqueue_ketik_review`,
   memakai urutan lock yang sama. Token baru dan increment attempt dipublikasikan
   atomik; maksimum tiga claim AI. Lease NULL/expired tidak berhak publish/settle.
 - Settle success memeriksa token/lease di bawah lock dan mengganti review, typo,
-  skor/history, job completed serta legacy `results` jika tabel tersedia dalam
-  satu transaksi. Kegagalan persist rollback seluruh batch. Rerun mempertahankan
+  skor/history dan job completed dalam satu transaksi. Settle tidak menulis
+  tabel legacy `results` (sejak `20261017150000`): tabel itu hanya menyimpan
+  sesi Telefun lama dan tidak punya kolom `session_id`/`status`. Kegagalan persist rollback seluruh batch. Rerun mempertahankan
   history completed dan seluruh hasil lama selama antrean/pemrosesan; terminal
   job failed tetap eksplisit dengan `previousKept=true` pada API status.
 - RPC baca memakai satu snapshot statement untuk history/review/typo/job dan

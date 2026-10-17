@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- fix(db): stop settle_ketik_review writing the legacy results table, which failed every KETIK review publish
 - test(e2e): mock the KETIK landing history summary in usage.spec so the hermetic guard passes
 - fix(e2e): keep the browser E2E /api proxy off :3001 and guard remaining production paths
 - chore(workflow): require a CHANGELOG.md entry in every commit, enforced by a pre-commit hook and CI

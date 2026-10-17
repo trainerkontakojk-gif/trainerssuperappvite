@@ -1014,18 +1014,21 @@ test("migration rollback refuses live jobs, preserves published data, and reappl
       })
     ).error,
   ).not.toBeNull();
-  runSql(
-    env,
-    readFileSync(
-      fileURLToPath(
-        new URL(
-          "../../../supabase/migrations/20261016000935_ketik_durable_review_worker.sql",
-          import.meta.url,
+  // Reapply the worker migration and every later one that redefines its RPCs,
+  // so the database ends at HEAD and a rerun of this spec stays meaningful.
+  for (const migration of [
+    "20261016000935_ketik_durable_review_worker.sql",
+    "20261017150000_ketik_settle_review_drop_legacy_results.sql",
+  ])
+    runSql(
+      env,
+      readFileSync(
+        fileURLToPath(
+          new URL(`../../../supabase/migrations/${migration}`, import.meta.url),
         ),
+        "utf8",
       ),
-      "utf8",
-    ),
-  );
+    );
   // DDL notifications are asynchronous/coalesced. Require stable API readiness after both commits.
   let ready = 0;
   await expect
