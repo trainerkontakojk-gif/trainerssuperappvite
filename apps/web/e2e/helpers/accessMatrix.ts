@@ -49,7 +49,6 @@ const rows = [
   ["POST", "/v1/admin/users/:id/reset-password", "admin.users", MANAGERS],
   ["GET", "/v1/admin/activity-logs", "admin.activityLogs.read", MANAGERS],
   ["GET", "/v1/ai/models", "ai.models.read", ALL],
-  ["POST", "/v1/ai/generate", "ai.generate", MANAGERS],
   ["GET", "/v1/ai/usage", "usage.read", ALL],
   ["GET", "/v1/ai/usage/summary", "usage.read", ALL],
   ["GET", "/v1/ai/monitoring/history", "monitoring.read", LEADERS],

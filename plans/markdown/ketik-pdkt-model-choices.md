@@ -23,3 +23,8 @@ Acceptance:
 - [x] GREEN: shared helper and call sites; E2E pass.
 - [x] Update `ketik-session-api.spec.ts` expectations (saved `gpt-5.4-mini` now starts on `gemini-3.8-flash`); could not run here: local Supabase images could not be pulled.
 - [x] Docs and changelog.
+
+## Follow-up (Fajar, 2026-10-17)
+
+- SIDAK dashboard forecast narration moves from `gemini-3.1-flash-lite` to `gemini-3.8-flash` via `SIDAK_FORECAST_MODEL`. No local E2E can observe the server-side model (browser forecast specs mock `/api`; real-backend specs need local Supabase), so this is verified by typecheck/build only.
+- `POST /v1/ai/generate` and the `ai.generate` capability are removed: no page called it and it accepted any model while logging usage as KETIK. RED/GREEN: `access-matrix-api.spec.ts` "retired free-form AI endpoint is gone" (gate-stub project). The `ai_generate` usage category stays so older usage logs keep their label.

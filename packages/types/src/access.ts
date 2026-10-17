@@ -18,7 +18,6 @@ export const CAPABILITIES = {
   "admin.leaderAccess": ["admin", "trainer"],
   "admin.users": ["admin", "trainer"],
   "admin.users.manageAdmin": ["admin"],
-  "ai.generate": ["admin", "trainer"],
   "ai.models.read": ["admin", "trainer", "leader", "agent"],
   "dashboard.view": ["admin", "trainer", "leader", "agent"],
   "ketik.assignments.write": ["admin", "trainer"],

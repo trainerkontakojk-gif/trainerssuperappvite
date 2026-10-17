@@ -133,7 +133,6 @@ for (const role of ["qa", "tl", "spv", "om"]) {
       "/v1/ketik/generate",
       "/v1/ketik/review",
       "/v1/pdkt/session/init",
-      "/v1/ai/generate",
     ]) {
       const response = await app.request(`http://local.test${path}`, {
         method: "POST",
@@ -143,6 +142,20 @@ for (const role of ["qa", "tl", "spv", "om"]) {
       expect(response.status, `${role} ${path}`).toBe(403);
       expect((await response.json()).error?.code).toBe("FORBIDDEN");
     }
+  });
+}
+
+for (const role of ["admin", "trainer", "leader", "agent"]) {
+  test(`${role}: the retired free-form AI endpoint is gone`, async () => {
+    const response = await mount(role).request(
+      "http://local.test/v1/ai/generate",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "halo", model: "gpt-5.4-mini" }),
+      },
+    );
+    expect(response.status).toBe(404);
   });
 }
 

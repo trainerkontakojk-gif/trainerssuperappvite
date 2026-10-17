@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(ai-models): run the SIDAK dashboard forecast narration on Gemini 3.8 Flash and remove the unused free-form POST /v1/ai/generate endpoint and its ai.generate capability
 - feat(ai-models): limit KETIK and PDKT model choices to Gemini 3.8 Flash and Gemini 3.5 Flash Lite; older saved choices move to Flash Lite (if they were Flash-Lite) or Gemini 3.8 Flash, enforced on the server for new sessions
 - perf(sidak): add a (tahun, id) index on qa_temuan for the dashboard's year-filtered keyset paging
 - perf(sidak): load the dashboard with keyset paging, in-memory staff exclusion and one rule-version read per service, and make a month range narrow the agent table and Pareto too
