@@ -164,70 +164,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).toContain("Pinjol Ilegal");
   });
 
-  it("includes only selected contextual challenges", () => {
-    const prompt = buildTelefunLiveSystemInstruction({
-      identity: {
-        name: "Siti",
-        gender: "female",
-        phone: "0812",
-        city: "Bandung",
-        voiceName: "Kore",
-        signatureName: "",
-      },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType(),
-      responsePacingMode: "realistic",
-      simulationChallengeTypes: ["interruption", "misunderstanding"],
-    });
-
-    expect(prompt).toContain("TANTANGAN PERCAKAPAN");
-    expect(prompt).toContain("terlalu mendominasi");
-    expect(prompt).toContain("pernyataan ambigu");
-    expect(prompt).not.toContain("detail non-identitas");
-    expect(prompt).toContain("Tidak wajib menggunakan seluruh tantangan");
-  });
-
-  it("omits the challenge section when no challenge is selected", () => {
-    const prompt = buildTelefunLiveSystemInstruction({
-      identity: {
-        name: "Budi",
-        gender: "male",
-        phone: "0811",
-        city: "Jakarta",
-        voiceName: "Fenrir",
-        signatureName: "",
-      },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType(),
-      responsePacingMode: "training_fast",
-      simulationChallengeTypes: [],
-    });
-
-    expect(prompt).not.toContain("TANTANGAN PERCAKAPAN");
-    expect(prompt).toContain("JANGAN MENYELA AGEN");
-    expect(prompt).not.toContain("MENYELA KONDISIONAL");
-  });
-
-  it("allows contextual interruption only when that challenge is selected", () => {
-    const prompt = buildTelefunLiveSystemInstruction({
-      identity: {
-        name: "Budi",
-        gender: "male",
-        phone: "0811",
-        city: "Jakarta",
-        voiceName: "Fenrir",
-        signatureName: "",
-      },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType(),
-      responsePacingMode: "realistic",
-      simulationChallengeTypes: ["interruption"],
-    });
-
-    expect(prompt).toContain("MENYELA KONDISIONAL");
-    expect(prompt).not.toContain("JANGAN MENYELA AGEN");
-  });
-
   it("keeps gender as character context while runtime controls the voice", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {
@@ -649,15 +585,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
         difficulty: ConsumerDifficulty.Hard,
       }),
       responsePacingMode: "realistic",
-      simulationChallengeTypes: [
-        "technical_term_confusion",
-        "repeated_question",
-        "misunderstanding",
-        "interruption",
-        "incomplete_data",
-        "unclear_voice",
-        "emotional_escalation",
-      ],
     });
 
     // Regression for production bug: Railway telefun closed real sessions

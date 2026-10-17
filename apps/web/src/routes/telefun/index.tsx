@@ -275,7 +275,6 @@ export default function TelefunLanding() {
         persona_config: {
           consumerType: consumerType?.name || consumerType?.id,
         },
-        disruption_config: settings.simulationChallengeTypes,
         configured_duration: settings.maxCallDuration * 60,
         response_pacing_mode: settings.responsePacingMode,
         telefun_model_id: config.telefunModelId,

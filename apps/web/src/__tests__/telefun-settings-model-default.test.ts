@@ -176,10 +176,6 @@ describe("parseTelefunSettings", () => {
     expect(pasrah?.description).toContain("sedih");
   });
 
-  it("defaults simulationChallengeTypes to an empty array", () => {
-    expect(parseTelefunSettings({}).simulationChallengeTypes).toEqual([]);
-  });
-
   it("drops the legacy orphan systemInstruction during normalization", () => {
     const result = parseTelefunSettings({
       systemInstruction: "Legacy prompt that must not reach runtime.",
@@ -188,7 +184,7 @@ describe("parseTelefunSettings", () => {
     expect("systemInstruction" in result).toBe(false);
   });
 
-  it("normalizes legacy challenge key to filtered, unique simulation challenges", () => {
+  it("drops legacy and removed challenge keys during normalization", () => {
     const result = parseTelefunSettings({
       realisticModeDisruptionTypes: [
         "interruption",
@@ -200,11 +196,7 @@ describe("parseTelefunSettings", () => {
       ],
     });
 
-    expect(result.simulationChallengeTypes).toEqual([
-      "interruption",
-      "misunderstanding",
-      "incomplete_data",
-    ]);
+    expect("simulationChallengeTypes" in result).toBe(false);
     expect("realisticModeEnabled" in result).toBe(false);
     expect("realisticModeDisruptionTypes" in result).toBe(false);
   });
@@ -235,7 +227,7 @@ describe("parseTelefunSettings", () => {
       selectedTelefunModel: DEFAULT_TELEFUN_SETTINGS.telefunModelId,
     });
 
-    expect(result.simulationChallengeTypes).toEqual(["misunderstanding"]);
+    expect("simulationChallengeTypes" in result).toBe(false);
     expect(result.consumerTypes).toEqual([
       {
         ...customConsumers[0],

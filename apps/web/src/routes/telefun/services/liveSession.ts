@@ -648,7 +648,6 @@ export class LiveSession {
       consumerType:
         this.config.activeConsumerType ?? this.config.consumerTypes[0],
       responsePacingMode: this.config.responsePacingMode || "realistic",
-      simulationChallengeTypes: this.config.simulationChallengeTypes,
     });
 
     return {

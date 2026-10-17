@@ -31,9 +31,9 @@ test.use({
 
 const NEW_ID = "telefun-prompt-1";
 
-function callMocks(): ApiMock[] {
+function callMocks(settings: unknown = {}): ApiMock[] {
   return [
-    ...telefunMocks([]),
+    ...telefunMocks([], settings),
     {
       method: "POST",
       path: "/api/v1/telefun/sessions",
@@ -164,6 +164,42 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       expect(cue).toContain("Jangan sebutkan marker");
       expect(cue).not.toMatch(/\d+\s*detik/);
     }
+    expectHermetic(audit);
+  });
+
+  test("tantangan percakapan lama yang tersimpan diabaikan: tidak masuk instruksi maupun sesi", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const sessionBodies: unknown[] = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith("/api/v1/telefun/sessions")
+      )
+        sessionBodies.push(request.postDataJSON());
+    });
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks({
+        simulationChallengeTypes: [
+          "interruption",
+          "misunderstanding",
+          "unclear_voice",
+        ],
+      }),
+      waitForUrl: /\/telefun/,
+    });
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    expect(prompt).not.toContain("TANTANGAN PERCAKAPAN");
+    expect(prompt).not.toContain("MENYELA KONDISIONAL");
+    expect(prompt).not.toContain("pernyataan ambigu");
+    expect(prompt).not.toContain("Minta pengulangan");
+    expect(sessionBodies).toHaveLength(1);
+    expect(sessionBodies[0]).not.toHaveProperty("disruption_config");
     expectHermetic(audit);
   });
 });
