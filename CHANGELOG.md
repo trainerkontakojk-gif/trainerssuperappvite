@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- chore(deps): apply the pending Dependabot minor/patch updates (genai, hono node-server, supabase-js, zod, TanStack, base-ui, framer-motion, lucide, Playwright, Vite, Prettier, typescript-eslint and more) and supabase/setup-cli v3 in CI
 - fix(api): key the per-IP rate limit on the rightmost X-Forwarded-For hop Railway appends, so a caller rotating a fake leftmost value can no longer bypass the 200/min limit
 - test(ketik): type the worker-host activation cases as Record<string, string> so the e2e typecheck (and CI verify) passes again
 - fix(telefun): match content-review quotes on whole words only, so a short quote no longer anchors inside another word on the wrong line
