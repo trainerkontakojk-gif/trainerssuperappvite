@@ -95,6 +95,8 @@ const evaluation = {
     },
   ],
 };
+const PIXEL =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 type Identity = Awaited<ReturnType<typeof createUserWithJwt>>;
 let owner: Identity;
 let other: Identity;
@@ -180,6 +182,28 @@ test.beforeAll(async () => {
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
+    if (
+      url.hostname === "generativelanguage.googleapis.com" &&
+      url.pathname.includes("gemini-3.1-flash-image")
+    ) {
+      return Response.json({
+        candidates: [
+          {
+            content: {
+              role: "model",
+              parts: [{ inlineData: { mimeType: "image/png", data: PIXEL } }],
+            },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 100,
+          candidatesTokenCount: 1_000_000,
+          candidatesTokensDetails: [{ modality: "IMAGE", tokenCount: 1_000_000 }],
+          totalTokenCount: 1_000_100,
+        },
+      });
+    }
     if (url.hostname === "generativelanguage.googleapis.com") {
       providerCalls++;
       return Response.json({
@@ -231,6 +255,7 @@ test.afterAll(async () => {
   for (const user of [owner, other].filter(Boolean)) {
     await admin.from("pdkt_mailbox_items").delete().eq("user_id", user.userId);
     await admin.from("pdkt_history").delete().eq("user_id", user.userId);
+    await admin.from("ai_usage_logs").delete().eq("user_id", user.userId);
     await admin.auth.admin.deleteUser(user.userId);
   }
 });
@@ -333,6 +358,28 @@ test("init, creation and encrypted save-retry never expose private recipient met
   });
   expect(saved.status).toBe(200);
   mailboxIds.push((await saved.json()).data);
+});
+
+test("generated attachment images are costed at the image rate, not the text rate", async () => {
+  const init = await api("/session/init", "POST", {
+    ...generation(),
+    enableImageGeneration: true,
+  });
+  expect(init.status).toBe(200);
+  const logs = await createAdmin(env)
+    .from("ai_usage_logs")
+    .select("model_id,action,output_tokens,estimated_cost_usd")
+    .eq("user_id", owner.userId)
+    .eq("model_id", "gemini-3.1-flash-image");
+  expect(logs.error).toBeNull();
+  // 1M image tokens at $60 per million plus 100 input tokens at $0.50 per million.
+  expect(logs.data).toContainEqual(
+    expect.objectContaining({
+      action: "generate_ai_images",
+      output_tokens: 1_000_000,
+      estimated_cost_usd: 60.00005,
+    }),
+  );
 });
 
 test("fresh failed evaluation retries immediately and concurrent requests create one attempt", async () => {

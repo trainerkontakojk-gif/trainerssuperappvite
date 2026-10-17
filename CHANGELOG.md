@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- fix(ai-usage): cost PDKT attachment images at Google's image-output rate ($60 per 1M tokens for Nano Banana 2) instead of the $3 text rate, so Monitoring matches the bill
 - fix(ai-usage): count Gemini thinking tokens (thoughtsTokenCount) as output tokens so Monitoring cost matches what Google bills
 - feat(ai-models): run the SIDAK dashboard forecast narration on Gemini 3.8 Flash and remove the unused free-form POST /v1/ai/generate endpoint and its ai.generate capability
 - feat(ai-models): limit KETIK and PDKT model choices to Gemini 3.8 Flash and Gemini 3.5 Flash Lite; older saved choices move to Flash Lite (if they were Flash-Lite) or Gemini 3.8 Flash, enforced on the server for new sessions
