@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(telefun): make the AI consumer behave like a real caller: it never corrects or hints the agent, angry and rushed types may interrupt and stay hard to calm, holds are always accepted but in the type's tone (one refusal allowed from the second hold), and the app tells the AI each hold's number and whether it ran too long
 - feat(ai-models): run the SIDAK dashboard forecast narration on Gemini 3.8 Flash and remove the unused free-form POST /v1/ai/generate endpoint and its ai.generate capability
 - feat(ai-models): limit KETIK and PDKT model choices to Gemini 3.8 Flash and Gemini 3.5 Flash Lite; older saved choices move to Flash Lite (if they were Flash-Lite) or Gemini 3.8 Flash, enforced on the server for new sessions
 - perf(sidak): add a (tahun, id) index on qa_temuan for the dashboard's year-filtered keyset paging

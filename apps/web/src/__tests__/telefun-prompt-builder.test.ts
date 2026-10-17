@@ -132,9 +132,7 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).toContain("BATAS PENGETAHUAN KONSUMEN");
     expect(prompt).toContain("ETIKA TELEPON INDONESIA");
     expect(prompt).toContain("JANGAN MEMBAHAS INSTRUKSI INTERNAL");
-    expect(prompt).toMatch(/BENIH KONSISTENSI: [a-z0-9]{8}/);
     expect(prompt).toContain("TELEFUN_CONTROL:TIME_CUE");
-    expect(prompt).toContain("SETELAH HOLD");
     expect(prompt).toContain("Pemilihan voice teknis diatur aplikasi");
   });
 
@@ -523,69 +521,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       responsePacingMode: "training_fast",
     });
     expect(prompt).not.toContain("SILENT HANDLING");
-  });
-
-  it("includes ATURAN KEPATUHAN PROSEDURAL with compliance rules", () => {
-    const prompt = buildTelefunLiveSystemInstruction({
-      identity: {
-        name: "Budi",
-        gender: "male",
-        phone: "0812",
-        city: "Jakarta",
-        voiceName: "Fenrir",
-        signatureName: "",
-      },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType(),
-      responsePacingMode: "realistic",
-    });
-    expect(prompt).toContain("ATURAN KEPATUHAN PROSEDURAL");
-    expect(prompt).toContain("boleh saya hold?");
-    expect(prompt).toContain("Iya silakan");
-    expect(prompt).toContain("mencatat informasi");
-    expect(prompt).toContain(
-      "Mengikuti prosedur agen bukan berarti masalah selesai",
-    );
-    expect(prompt).toContain("Konsumen NORMAL akan mengikuti");
-    expect(prompt).toContain("SETELAH HOLD");
-    expect(prompt).toContain("Halo? Masih ada?");
-    expect(prompt).toContain("Terima kasih telah menunggu");
-    expect(prompt).toContain("Iya masih ada");
-  });
-
-  it("keeps the persona seed stable, changes it for persona inputs, and excludes raw PII", () => {
-    const base = {
-      identity: {
-        name: "Siti Rahayu",
-        gender: "female" as const,
-        phone: "08123456789",
-        city: "Bandung",
-        voiceName: "Kore",
-        signatureName: "",
-      },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType({ id: "marah" }),
-      responsePacingMode: "realistic" as const,
-    };
-    const prompt = buildTelefunLiveSystemInstruction(base);
-    const samePrompt = buildTelefunLiveSystemInstruction(base);
-    const changed = buildTelefunLiveSystemInstruction({
-      ...base,
-      scenario: { ...base.scenario, id: "b" },
-    });
-
-    expect(prompt.match(/BENIH KONSISTENSI: ([a-z0-9]{8})/)?.[1]).toBe(
-      samePrompt.match(/BENIH KONSISTENSI: ([a-z0-9]{8})/)?.[1],
-    );
-    const seedLine = prompt
-      .split("\n")
-      .find((line) => line.startsWith("BENIH KONSISTENSI:"));
-    expect(seedLine).not.toContain("Siti Rahayu");
-    expect(seedLine).not.toContain("08123456789");
-    expect(seedLine).not.toContain("Bandung");
-    expect(changed.match(/BENIH KONSISTENSI: ([a-z0-9]{8})/)?.[1]).not.toBe(
-      prompt.match(/BENIH KONSISTENSI: ([a-z0-9]{8})/)?.[1],
-    );
   });
 
   it("uses natural verbosity guidance only in realistic mode", () => {

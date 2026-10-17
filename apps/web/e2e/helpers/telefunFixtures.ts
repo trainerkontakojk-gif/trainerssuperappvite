@@ -460,7 +460,12 @@ export async function serveRecording(page: Page, seconds = 252) {
  * tangan Gemini Live secukupnya: autentikasi, konfigurasi, setup, dan akhir
  * sesi. Tidak ada audio model; agen berada di status "Giliran Anda".
  */
-export async function mockTelefunVoiceServer(page: Page, sessionId: string) {
+export async function mockTelefunVoiceServer(
+  page: Page,
+  sessionId: string,
+  /** Diisi setiap pesan JSON dari aplikasi, untuk memeriksa isi instruksi. */
+  messages: Record<string, unknown>[] = [],
+) {
   const received: string[] = [];
   await page.routeWebSocket(`${E2E_TELEFUN_WS_URL}/ws`, (ws) => {
     ws.onMessage((message) => {
@@ -473,6 +478,7 @@ export async function mockTelefunVoiceServer(page: Page, sessionId: string) {
       }
       const type = typeof parsed.type === "string" ? parsed.type : "setup";
       received.push(type);
+      messages.push(parsed);
       if (parsed.type === "authenticate") {
         ws.send(JSON.stringify({ type: "auth_ok", sessionId }));
       } else if (parsed.type === "telefun_session_configure") {

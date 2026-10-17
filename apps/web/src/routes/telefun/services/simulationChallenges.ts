@@ -30,7 +30,7 @@ export const SIMULATION_CHALLENGES: readonly SimulationChallengeDefinition[] = [
     id: "misunderstanding",
     label: "Salah Paham",
     promptInstruction:
-      "Salah pahami pernyataan ambigu secara wajar, lalu terima klarifikasi agen.",
+      "Salah pahami pernyataan ambigu secara wajar; terima klarifikasi hanya setelah agen menjelaskannya dengan jelas, bukan saat agen sekadar mengulang.",
   },
   {
     id: "interruption",
