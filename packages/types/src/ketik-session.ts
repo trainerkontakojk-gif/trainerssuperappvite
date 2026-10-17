@@ -18,6 +18,8 @@ export const ketikSessionTurnSchema = z.strictObject({
   requestId: z.uuid(),
   expectedVersion: z.number().int().min(0),
   text: z.string().trim().min(1).max(KETIK_PROMPT_LIMITS.chatMessageText),
+  // The agent has more messages queued: store this one without a consumer reply.
+  awaitMore: z.literal(true).optional(),
 });
 export const finishKetikSessionSchema = z.strictObject({});
 export type KetikSessionTurnRequest = z.infer<typeof ketikSessionTurnSchema>;
