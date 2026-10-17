@@ -46,6 +46,9 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
     { kind: "discard" } | { kind: "delete"; id: string } | null
   >(null);
 
+  // Panggilan butuh persona konsumen; karakter terakhir tidak bisa dihapus.
+  const isLastConsumer = consumerTypes.length <= 1;
+
   const confirmPending = () => {
     if (!pendingConfirm) return;
     if (pendingConfirm.kind === "delete") {
@@ -269,6 +272,10 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
                   onClick={() =>
                     setPendingConfirm({ kind: "delete", id: consumer.id })
                   }
+                  disabled={isLastConsumer}
+                  aria-describedby={
+                    isLastConsumer ? "telefun-last-consumer-note" : undefined
+                  }
                   aria-label={`Hapus ${consumer.name}`}
                   title="Hapus"
                   className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-destructive"
@@ -280,6 +287,14 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
           />
         ))}
       </ul>
+      {isLastConsumer && (
+        <p
+          id="telefun-last-consumer-note"
+          className="text-[13px] text-muted-foreground"
+        >
+          Minimal satu karakter konsumen harus ada.
+        </p>
+      )}
       {confirmDialog}
     </div>
   );

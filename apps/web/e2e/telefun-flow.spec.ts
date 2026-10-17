@@ -627,6 +627,103 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("catatan trainer: rekomendasi paling mendesak dulu, label momen, catatan tetap ada saat gagal simpan", async ({
+    page,
+  }) => {
+    const id = REVIEWED_ROW.id;
+    const audit = await openTelaah(page, REVIEWED_ROW, [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/annotations/${id}`,
+        body: {
+          success: true,
+          data: [
+            {
+              id: "anno-key",
+              session_id: id,
+              user_id: "user-1",
+              timestamp_ms: 12000,
+              category: "improvement_area",
+              moment: "missed_empathy",
+              text: "Belum mengakui kekesalan konsumen.",
+              is_manual: true,
+              created_at: REVIEWED_ROW.created_at,
+            },
+            {
+              id: "anno-free",
+              session_id: id,
+              user_id: "user-1",
+              timestamp_ms: 36000,
+              category: "improvement_area",
+              moment: "Jeda saat mencari aturan",
+              text: "Ganti eee dengan kalimat jeda.",
+              is_manual: true,
+              created_at: REVIEWED_ROW.created_at,
+            },
+          ],
+        },
+      },
+      {
+        method: "GET",
+        path: `/api/v1/telefun/coaching-summary/${id}`,
+        body: {
+          success: true,
+          data: {
+            id: "sum-1",
+            session_id: id,
+            user_id: "user-1",
+            // Prioritas 5 = paling mendesak (prompt coaching di API).
+            recommendations: [
+              { text: "Pertahankan salam pembuka.", priority: 1 },
+              { text: "Akui kekesalan konsumen sebelum menjelaskan.", priority: 5 },
+              { text: "Kurangi filler saat mencari data.", priority: 3 },
+            ],
+            generated_at: REVIEWED_ROW.created_at,
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: `/api/v1/telefun/annotations/${id}`,
+        status: 500,
+        body: {
+          success: false,
+          error: { code: "DATABASE_ERROR", message: "Gagal menyimpan." },
+        },
+      },
+    ]);
+
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result
+      .getByRole("tab", { name: "Catatan trainer" })
+      .click({ timeout: 20000 });
+
+    const recommendations = result
+      .getByRole("heading", { name: "Rekomendasi coaching" })
+      .locator("..")
+      .getByRole("listitem");
+    // Soft: tiap bug (urutan, label, catatan hilang) dilaporkan dalam satu run.
+    await expect.soft(recommendations).toHaveText([
+      "Akui kekesalan konsumen sebelum menjelaskan.",
+      "Kurangi filler saat mencari data.",
+      "Pertahankan salam pembuka.",
+    ]);
+
+    const first = result.getByRole("listitem", { name: /^Catatan 1 pada/ });
+    await expect.soft(first).toContainText("Empati terlewat");
+    await expect.soft(first).not.toContainText("missed_empathy");
+    await expect.soft(
+      result.getByRole("listitem", { name: /^Catatan 2 pada/ }),
+    ).toContainText("Jeda saat mencari aturan");
+
+    const note = result.getByRole("textbox", { name: "Catatan" });
+    await note.fill("Tawarkan ringkasan sebelum menutup.");
+    await result.getByRole("button", { name: "Simpan catatan" }).click();
+    await expect(page.getByText("Catatan belum tersimpan. Coba lagi.")).toBeVisible();
+    await expect.soft(note).toHaveValue("Tawarkan ringkasan sebelum menutup.");
+    expectHermetic(audit);
+  });
+
   test("Unduh rekaman di pemutar menghasilkan berkas bernama", async ({
     page,
   }) => {
@@ -1212,6 +1309,38 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
     await expect(dialog).toBeHidden();
     await waitForMockedApi(audit, ["PUT /api/v1/telefun/settings"]);
     expect(nativeDialog).toBe(false);
+    expectHermetic(audit);
+  });
+
+  test("karakter konsumen terakhir tidak bisa dihapus", async ({ page }) => {
+    const audit = await open(
+      page,
+      "/telefun",
+      telefunMocks([], {
+        consumerTypes: [
+          {
+            id: "only-consumer",
+            name: "Pak Budi",
+            gender: "random",
+            description: "Konsumen sabar yang ingin penjelasan rinci.",
+            difficulty: "Medium",
+          },
+        ],
+      }),
+    );
+    await page
+      .getByRole("navigation", { name: "Menu Telefun" })
+      .getByRole("button", { name: /^Pengaturan/ })
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog", { name: "Pengaturan Telefun" });
+    await dialog.getByRole("tab", { name: /^Karakter konsumen/ }).click();
+    // Tanpa karakter, panggilan berikutnya tidak punya persona konsumen.
+    await expect(
+      dialog.getByRole("button", { name: "Hapus Pak Budi" }),
+    ).toBeDisabled();
+    await expect(
+      dialog.getByText("Minimal satu karakter konsumen harus ada."),
+    ).toBeVisible();
     expectHermetic(audit);
   });
 
