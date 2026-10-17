@@ -379,8 +379,16 @@ export async function assertLocalDevOnlyTargetAt(
   } catch (error) {
     failures.push(`vite.config.ts tidak terbaca: ${(error as Error).message}`);
   }
+  // Target-nya `process.env.API_PROXY_TARGET` (config Playwright mengisinya
+  // dengan `E2E_API_PROXY_TARGET`) dengan default loopback. File ini tidak bisa
+  // melihat env proses Vite; bukti runtime-nya `e2e-target-isolation.spec.ts`
+  // (sentinel di :3001).
   const proxyBlock = viteConfig.match(/proxy:\s*\{[\s\S]*?\}/)?.[0] ?? "";
-  if (!/target:\s*"http:\/\/(localhost|127\.0\.0\.1):\d+"/.test(proxyBlock)) {
+  if (
+    !/target:\s*(process\.env\.API_PROXY_TARGET\s*\?\?\s*)?"http:\/\/(localhost|127\.0\.0\.1):\d+"/.test(
+      proxyBlock,
+    )
+  ) {
     failures.push(
       `proxy /api tidak terbukti menunjuk ke loopback: ${proxyBlock.trim() || "-"}`,
     );

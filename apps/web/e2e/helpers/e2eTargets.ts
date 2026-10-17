@@ -14,6 +14,8 @@ export const E2E_SUPABASE_STORAGE_KEY = `sb-${new URL(E2E_SUPABASE_URL).hostname
 
 export const E2E_TELEFUN_WS_URL = "ws://127.0.0.1:9";
 
+export const E2E_API_PROXY_TARGET = "http://127.0.0.1:9";
+
 export const E2E_WEB_SERVER_ENV: Record<string, string> = {
   VITE_SUPABASE_URL: E2E_SUPABASE_URL,
   VITE_SUPABASE_ANON_KEY: "e2e-anon-key",
@@ -21,4 +23,7 @@ export const E2E_WEB_SERVER_ENV: Record<string, string> = {
   VITE_APP_URL: "http://localhost:3005",
   // Empty means the app uses the `/api/v1` path behind the Vite proxy.
   VITE_API_URL: "",
+  // The proxy behind `/api/v1`: a dead port, never whatever listens on :3001
+  // (a developer API there runs with the production env).
+  API_PROXY_TARGET: E2E_API_PROXY_TARGET,
 };

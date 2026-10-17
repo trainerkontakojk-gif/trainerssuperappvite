@@ -9,16 +9,36 @@ import { test, expect } from "@playwright/test";
  * Butuh: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY di env.
  *
  * Di Pi: pi run --cwd ... 'E2E_TEST_EMAIL=test@muamalat.co.id npx playwright test auth-magic-link'
+ *
+ * SUPABASE_URL wajib loopback (Supabase lokal). Host lain ditolak (throw, bukan
+ * skip) sebelum request apa pun: generate_link dengan service-role menulis token
+ * auth di project tujuan. Lihat plans/markdown/e2e-webserver-isolation.md (G2).
  */
 const E2E_EMAIL = process.env.E2E_TEST_EMAIL;
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+function assertLoopbackSupabase(raw: string): void {
+  let host = "";
+  try {
+    host = new URL(raw).hostname;
+  } catch {
+    // An unparsable URL is refused below like any other non-loopback host.
+  }
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(host)) {
+    throw new Error(
+      `[e2e guard] auth-magic-link refuses non-loopback SUPABASE_URL host: ${host || "(invalid URL)"}`,
+    );
+  }
+}
+
 test.describe("Auth — Magic Link (real)", () => {
   test.skip(!E2E_EMAIL, "E2E_TEST_EMAIL not set — skip real magic link test (mock only)");
 
   test("should login via magic link and reach dashboard", async ({ page, request }) => {
-    test.skip(!SUPABASE_URL || !SERVICE_KEY, "SUPABASE_URL / SERVICE_ROLE_KEY not set");
+    test.skip(!SUPABASE_URL, "SUPABASE_URL not set");
+    assertLoopbackSupabase(SUPABASE_URL!);
+    test.skip(!SERVICE_KEY, "SUPABASE_SERVICE_ROLE_KEY not set");
 
     // 1. Generate magic link via Admin API (tidak kirim email beneran)
     const res = await request.post(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {

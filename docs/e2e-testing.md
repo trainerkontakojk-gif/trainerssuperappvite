@@ -22,9 +22,16 @@ real-backend specs forward `/api` to the in-process Hono app.
 - The server gets `E2E_WEB_SERVER_ENV` from `helpers/e2eTargets.ts`. It points Supabase and Telefun
   at `127.0.0.1:9`, where nothing listens, so a request a spec forgot to mock fails on this machine.
   Mock Supabase paths against `E2E_SUPABASE_URL` / `E2E_SUPABASE_STORAGE_KEY`, never a project URL.
+- The `/api` proxy target is `API_PROXY_TARGET` (default `http://localhost:3001`, no `VITE_` prefix,
+  so it stays out of the bundle). The E2E env sets it to `127.0.0.1:9`, so an `/api` request a spec
+  does not route never reaches a developer API on `:3001`, which runs with the production env.
 - `reuseExistingServer` is `false`. If `:3005` is busy (for example your own `pnpm dev`), the run
   fails instead of testing against a server whose env cannot be verified. Stop that server first.
-- `e2e-target-isolation.spec.ts` guards both properties.
+- `e2e-target-isolation.spec.ts` guards these properties: every URL in the served env is loopback,
+  the boot refresh stays on-machine, and a sentinel on `:3001` receives nothing through the proxy
+  (the test fails if `:3001` is busy).
+- `auth-magic-link.spec.ts` (skipped unless `E2E_TEST_EMAIL` is set) throws on a non-loopback
+  `SUPABASE_URL` before calling `generate_link`.
 - The browser configs ignore `*-api.spec.ts`. API specs run under `playwright.api.config.ts` or
   `playwright.access-api.config.ts`, one project per env, because a shared worker leaks one spec's
   API env stubs into the next. A new API spec needs a project in one of those configs, or it never runs.

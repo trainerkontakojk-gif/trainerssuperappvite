@@ -7,7 +7,33 @@ import {
   UPSTREAM_ERROR_SENTINEL,
   type StubWfm,
 } from "./helpers/sidakJadwalShiftingHarness";
-import { sidakJadwalShifting } from "../../api/src/routes/sidak/jadwal-shifting";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
+
+type JadwalShiftingModule =
+  typeof import("../../api/src/routes/sidak/jadwal-shifting");
+let sidakJadwalShifting: JadwalShiftingModule["sidakJadwalShifting"];
+
+/**
+ * The router is loaded with a dynamic `import()` while the Supabase URLs are
+ * pinned to the dead E2E target. A static import is hoisted above any pin; if
+ * its chain ever reached `apps/api/src/lib/env.ts`, that module would load the
+ * root `.env.local` (production) and bind the worker to it. See
+ * `docs/e2e-testing.md` ("never import `apps/api` statically").
+ */
+test.beforeAll(async () => {
+  const keys = ["VITE_SUPABASE_URL", "SUPABASE_URL"] as const;
+  const previous = keys.map((key) => [key, process.env[key]] as const);
+  for (const key of keys) process.env[key] = E2E_SUPABASE_URL;
+  try {
+    ({ sidakJadwalShifting } =
+      await import("../../api/src/routes/sidak/jadwal-shifting"));
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
 
 /**
  * E2E kontrak BACKEND untuk `GET /api/v1/sidak/jadwal-shifting`.

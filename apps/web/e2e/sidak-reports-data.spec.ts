@@ -1,6 +1,6 @@
 import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
 import { createServer } from "node:http";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import {
   selectValue,
 } from "./helpers/pickSelect";
 import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
+import { assertLocalDevOnlyTargetAt } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
  * E2E untuk workspace `/sidak/reports-data`.
@@ -820,51 +821,8 @@ function isLocalDevRequest(request: RequestShape): boolean {
  * Bukti "tidak ada backend yang tersentuh" datang dari log canary port dan
  * dari `audit.blockedApi` per test, bukan dari probe preflight.
  */
-async function assertLocalDevOnlyTarget(): Promise<void> {
-  const failures: string[] = [];
-
-  let documentBody: string;
-  try {
-    const response = await fetch(`${APP_ORIGIN}/`);
-    const client = await fetch(`${APP_ORIGIN}/@vite/client`);
-    if (!response.ok) failures.push(`GET / = ${response.status}`);
-    if (!client.ok || !(client.headers.get("content-type") ?? "").includes("javascript")) {
-      failures.push(
-        `GET /@vite/client = ${client.status} ${client.headers.get("content-type") ?? "-"}`,
-      );
-    }
-    documentBody = await response.text();
-  } catch (error) {
-    throw new Error(
-      `[preflight] tidak ada listener dev di ${APP_ORIGIN}: ${(error as Error).message}. ` +
-        `Jalankan dev server lokal apps/web (port 3005) sebelum E2E.`,
-      { cause: error },
-    );
-  }
-
-  if (!documentBody.includes("/@vite/client") || !documentBody.includes("/src/main.tsx")) {
-    failures.push("dokumen tidak memuat marker dev-server Vite (/@vite/client, /src/main.tsx)");
-  }
-
-  let viteConfig = "";
-  try {
-    viteConfig = readFileSync(path.join(REPO_ROOT, "apps/web/vite.config.ts"), "utf8");
-  } catch (error) {
-    failures.push(`vite.config.ts tidak terbaca: ${(error as Error).message}`);
-  }
-  const proxyBlock = viteConfig.match(/proxy:\s*\{[\s\S]*?\}/)?.[0] ?? "";
-  if (!/target:\s*"http:\/\/(localhost|127\.0\.0\.1):\d+"/.test(proxyBlock)) {
-    failures.push(`proxy /api tidak terbukti menunjuk ke loopback: ${proxyBlock.trim() || "-"}`);
-  }
-
-  if (failures.length > 0) {
-    throw new Error(
-      `[preflight] target E2E bukan dev-server lokal yang terbukti aman:\n- ${failures.join("\n- ")}`,
-    );
-  }
-  console.log(
-    `[preflight] OK: ${APP_ORIGIN} = Vite dev server repo ini; proxy /api = loopback; guard browser = fail-closed`,
-  );
+function assertLocalDevOnlyTarget(): Promise<void> {
+  return assertLocalDevOnlyTargetAt(APP_ORIGIN);
 }
 
 /**

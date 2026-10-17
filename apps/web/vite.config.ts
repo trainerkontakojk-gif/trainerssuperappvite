@@ -19,7 +19,9 @@ export default defineConfig({
     allowedHosts: [".trycloudflare.com", ".lhr.life"],
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        // No `VITE_` prefix, so it never enters the bundle. Browser E2E points
+        // it at a dead loopback port (`e2e/helpers/e2eTargets.ts`).
+        target: process.env.API_PROXY_TARGET ?? "http://localhost:3001",
         changeOrigin: true,
       },
     },
