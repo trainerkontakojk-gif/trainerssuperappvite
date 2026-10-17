@@ -187,3 +187,43 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     },
   };
 }
+
+export type KetikReviewWorker = ReturnType<typeof createKetikReviewWorker>;
+
+/**
+ * Embedded host for the API process (same contract as the Telefun embedded
+ * worker): disabled unless KETIK_REVIEW_WORKER_ENABLED === "true"; enabled but
+ * invalid config throws so the API refuses to start. Call before HTTP listen,
+ * then `start()` once listening. No health server: the loopback health port is
+ * a standalone-only diagnostic.
+ */
+export function prepareEmbeddedKetikReviewWorker(
+  env: NodeJS.ProcessEnv,
+  log: (line: string) => void,
+): { start: () => KetikReviewWorker | null } {
+  if (env.KETIK_REVIEW_WORKER_ENABLED !== "true") {
+    log(JSON.stringify({ event: "ketik_review_worker.disabled" }));
+    return { start: () => null };
+  }
+  let config: KetikWorkerConfig;
+  try {
+    config = parseKetikWorkerConfig(env);
+  } catch {
+    log(JSON.stringify({ event: "ketik_review_worker.config_rejected" }));
+    throw new Error("ketik_review_worker.config_rejected");
+  }
+  return {
+    start() {
+      const runtime = createKetikReviewWorker(config);
+      runtime.start();
+      log(
+        JSON.stringify({
+          event: "ketik_review_worker.started",
+          embedded: true,
+          intervalMs: config.intervalMs,
+        }),
+      );
+      return runtime;
+    },
+  };
+}

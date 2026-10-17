@@ -87,26 +87,32 @@ export async function generateGeminiContent(options: {
     const timeoutMs = modelInfo?.timeoutMs ?? 120_000;
 
     const generateWithTimeout = async () => {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(
           () =>
             reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)),
           timeoutMs,
-        ),
-      );
-      return await Promise.race([
-        ai.models.generateContent({
-          model: modelName,
-          contents,
-          config: {
-            systemInstruction,
-            responseMimeType: options.responseMimeType,
-            responseSchema: options.responseSchema,
-            responseModalities: options.responseModalities,
-          } as any,
-        }),
-        timeoutPromise,
-      ]);
+        );
+      });
+      try {
+        return await Promise.race([
+          ai.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              systemInstruction,
+              responseMimeType: options.responseMimeType,
+              responseSchema: options.responseSchema,
+              responseModalities: options.responseModalities,
+            } as any,
+          }),
+          timeoutPromise,
+        ]);
+      } finally {
+        // A settled call must not leave a live timer holding the process open.
+        clearTimeout(timer);
+      }
     };
 
     let response: any;

@@ -193,9 +193,12 @@ One spec per module flow under `apps/web/e2e/`. Shared fixtures and harnesses li
 
 ## KETIK — worker telaah persisten (paket E)
 
-`ketik-review-worker-api.spec.ts` / project `ketik-review-worker-real-backend`
-menggunakan JWT, Hono, Postgres/RLS asli pada loopback. Worker dijalankan sebagai
-child process entrypoint produk dengan `helpers/ketikWorkerTransport.mjs` preload
+`ketik-review-worker-api.spec.ts` berjalan di dua project: `ketik-review-worker-real-backend`
+(host standalone `ketik-review-worker-entrypoint.ts`) dan
+`ketik-review-worker-embedded-real-backend` (proses API asli `apps/api/src/index.ts`,
+`PORT=0`, worker embedded). Keduanya memakai JWT, Hono, Postgres/RLS asli pada
+loopback. Worker dijalankan sebagai child process entrypoint produk dengan
+`helpers/ketikWorkerTransport.mjs` preload
 **test-only**: HTTP SDK provider dialihkan ke server fixture loopback, egress lain
 ditolak, tidak ada service bisnis/penilaian yang di-stub. Coverage mencakup POST
 202 tanpa AI sebelum worker aktif, duplicate enqueue, usage pemilik, health,
@@ -203,7 +206,9 @@ SIGKILL/restart/reclaim, fencing worker lama yang masih hidup, lease NULL,
 tiga attempt maksimum, rollback persist tanpa kehilangan hasil lama, SIGTERM,
 role/assignment/revocation, RPC denial termasuk JWT admin/anon, token SELECT
 denial, serta migration rollback/reapply tanpa kehilangan skor. Disabled/invalid
-activation diuji lewat proses produk yang exit 1 sebelum claim/provider.
+activation diuji lewat proses produk: standalone exit 1 bila disabled/invalid; API
+tetap melayani tanpa claim bila disabled dan exit 1 sebelum listen bila invalid.
+Health loopback hanya diuji di host standalone (project embedded men-skip test itu).
 Preload test-only memakai SIGUSR2 untuk memajukan clock child dan membuktikan
 health memburuk saat task melampaui usia lease; produk tidak memiliki clock seam
 atau handler sinyal tersebut. Parameter claim/release NULL juga diuji terhadap
@@ -220,6 +225,7 @@ worker child-process/restart dibuktikan oleh suite API terpisah.
 
 ```bash
 pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-review-worker-real-backend --workers=1 --trace on
+pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-review-worker-embedded-real-backend --workers=1 --trace on
 E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-review-worker-browser.spec.ts ketik-flow.spec.ts ketik-session-browser.spec.ts --workers=1 --trace on
 ```
 

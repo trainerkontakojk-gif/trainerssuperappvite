@@ -865,13 +865,17 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 
 ## KETIK — worker telaah persisten
 
-Implementasi fase E tetap lokal sampai aktivasi remote diizinkan secara terpisah. API baru hanya mengantrekan permintaan manual; API tidak menjalankan worker otomatis. Jangan mengalihkan traffic ke API enqueue-only sebelum migration E tersedia dan worker menunjukkan health sehat.
+Implementasi fase E tetap lokal sampai aktivasi remote diizinkan secara terpisah. Route API hanya mengantrekan permintaan manual. Sejak 2026-10-17 worker berjalan **di dalam proses API** (seperti worker scoring Telefun, tanpa service Railway tambahan) dan hanya aktif bila `KETIK_REVIEW_WORKER_ENABLED=true` di service API; tanpa env itu API tidak memproses antrean. Jangan mengalihkan traffic ke API enqueue-only sebelum migration E tersedia dan worker menunjukkan health sehat.
 
 Prasyarat aktivasi yang direview operator:
 
 1. Pause pemicu telaah selama pergantian versi dan drain request telaah sinkron D yang masih berjalan, atau hentikan proses API lama setelah traffic dipause. Jangan menjalankan worker E bersama proses D yang masih bisa menulis hasil tanpa token. Simpan build API sebelumnya untuk rollback.
 2. Terapkan migration `20261016000935_ketik_durable_review_worker.sql` setelah migration sesi/history KETIK. RPC hanya service_role; browser tidak menerima credential worker.
-3. Jalankan satu proses backend persisten dari artifact versi yang sama:
+3. Set `KETIK_REVIEW_WORKER_ENABLED=true` pada service Railway API lalu redeploy.
+   Log API harus menampilkan `{"event":"ketik_review_worker.started","embedded":true,...}`;
+   tanpa env itu log menampilkan `ketik_review_worker.disabled`. Config invalid membuat
+   API menolak start (exit 1) sebelum menerima traffic. Lebih dari satu replica API
+   aman: claim memakai `SKIP LOCKED` dan token lease. Host standalone cadangan tetap ada:
 
    ```bash
    KETIK_REVIEW_WORKER_ENABLED=true pnpm --filter @trainers/api start:ketik-review-worker
@@ -879,7 +883,7 @@ Prasyarat aktivasi yang direview operator:
 
    Gunakan env backend yang sudah tersedia (`VITE_SUPABASE_URL`, anon/service-role keys, Gemini/OpenAI keys); jangan menyalinnya ke env frontend. Tidak perlu dependency atau layanan antrean baru.
 
-4. Health internal `GET http://127.0.0.1:3014/health` harus HTTP 200 dan `healthy=true`, dengan `lastSuccessfulPollAt` terisi. Health bind loopback, tidak diekspos sebagai endpoint publik. Payload hanya health, loop/admission dan kelas error; tidak membawa identitas sesi, token lease, prompt, atau credential. DB poll gagal menghasilkan 503, bukan antrean kosong palsu.
+4. (Host standalone saja; worker embedded tidak membuka port health dan diamati lewat log event.) Health internal `GET http://127.0.0.1:3014/health` harus HTTP 200 dan `healthy=true`, dengan `lastSuccessfulPollAt` terisi. Health bind loopback, tidak diekspos sebagai endpoint publik. Payload hanya health, loop/admission dan kelas error; tidak membawa identitas sesi, token lease, prompt, atau credential. DB poll gagal menghasilkan 503, bukan antrean kosong palsu.
 5. Setelah worker sehat, aktifkan build API E dan buka kembali pemicu manual. Verifikasi satu sesi test yang memang diizinkan untuk AI berbayar; jangan menjalankan regrade massal. Implementasi lokal tidak mengizinkan smoke/provider berbayar atau deploy remote dengan sendirinya.
 
 Konfigurasi worker:
@@ -889,10 +893,10 @@ Konfigurasi worker:
 | `KETIK_REVIEW_WORKER_ENABLED`     | Tidak aktif | Harus tepat `true`; proses standalone lain ditolak exit 1 |
 | `KETIK_REVIEW_WORKER_INTERVAL_MS` | 5000        | Integer 250–60000                                         |
 | `KETIK_REVIEW_WORKER_SHUTDOWN_MS` | 10000       | Integer 250–30000                                         |
-| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014        | Integer 0–65535; 0 untuk port ephemeral tes               |
+| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014        | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja |
 
 Concurrency per proses = 1. Lease dihitung dari registry timeout: dua percobaan kompatibilitas Gemini + satu fallback OpenAI + 120 detik grace, minimum 600 detik. Tiga claim maksimum per permintaan manual. Crash/timeout dapat mengulangi panggilan provider; tidak ada jaminan exactly-once billing. SDK yang terlambat selesai tidak boleh memublikasikan hasil setelah token lease hilang/kedaluwarsa.
 
-SIGTERM/SIGINT menutup admission dan menunggu pekerjaan aktif sampai deadline shutdown. Bila belum selesai, claim dilepas memakai token sebelum proses keluar; bila DB tidak merespons, expiry lease menjadi jalur pemulihan dan log `shutdown_recovery_deferred` harus diinvestigasi. Restart worker memulihkan queued atau lease expired tanpa pemicu browser. Endpoint GET `/api/v1/ketik/worker` retired (410), sehingga browser/request HTTP tidak menjadi worker kedua.
+SIGTERM/SIGINT menutup admission dan menunggu pekerjaan aktif sampai deadline shutdown. Bila belum selesai, claim dilepas memakai token sebelum proses keluar; bila DB tidak merespons, expiry lease menjadi jalur pemulihan dan log `shutdown_recovery_deferred` harus diinvestigasi. Restart worker memulihkan queued atau lease expired tanpa pemicu browser. Endpoint GET `/api/v1/ketik/worker` retired (410), sehingga browser/request HTTP tidak menjadi worker kedua. Di proses API, SIGTERM menghentikan worker KETIK dan Telefun secara paralel, lalu menutup HTTP dan keluar (exit 1 bila klaim KETIK tidak sempat dilepas). Mematikan worker embedded cukup dengan menghapus `KETIK_REVIEW_WORKER_ENABLED` lalu redeploy API.
 
 Rollback: pause pemicu → drain queued/processing dengan worker sehat → stop worker → kembalikan artifact API D selama traffic masih dipause → jalankan rollback migration E yang direview → buka kembali traffic sesuai build lama. Rollback SQL menolak job queued/processing dan tidak menghapus review, typo, atau skor yang sudah dipublikasikan. Jangan memaksa rollback dengan mengubah job aktif di database remote. Hasil rerun lama dipertahankan sampai publikasi pengganti berhasil; failure job tidak menghapusnya.

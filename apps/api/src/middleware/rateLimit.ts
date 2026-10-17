@@ -188,6 +188,7 @@ export const aiRateLimitMiddleware = async (c: Context, next: Next) => {
   await next();
 };
 
+// Cache sweep only: unref so it never keeps the process alive after SIGTERM.
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of globalStore) {
@@ -196,4 +197,4 @@ setInterval(() => {
   for (const [key, entry] of aiStore) {
     if (now >= entry.resetAt) aiStore.delete(key);
   }
-}, 60_000);
+}, 60_000).unref();

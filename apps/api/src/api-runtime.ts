@@ -1,15 +1,17 @@
 /**
- * API runtime — owns the HTTP server AND the embedded Telefun scoring worker
- * in a single process (option B: no standalone scoring-worker service).
+ * API runtime — owns the HTTP server AND the embedded Telefun scoring and
+ * KETIK review workers in a single process (no standalone worker services).
  *
  * Startup order: HTTP listen first (after `env` was validated by the
- * entrypoint), then the embedded worker once iff
- * TELEFUN_SCORING_WORKER_ENABLED === "true". Disabled/unset worker config
- * keeps the API alive and only logs. Explicitly-enabled-but-invalid worker
- * config throws before traffic is accepted.
+ * entrypoint), then each embedded worker once iff its
+ * TELEFUN_SCORING_WORKER_ENABLED / KETIK_REVIEW_WORKER_ENABLED === "true".
+ * Disabled/unset worker config keeps the API alive and only logs.
+ * Explicitly-enabled-but-invalid worker config throws before traffic is
+ * accepted.
  *
- * Shutdown order: worker shutdown first, then HTTP close, then exit code 0.
- * A second signal never double-shuts-down.
+ * Shutdown order: both workers shut down (in parallel), then HTTP close, then
+ * exit code 0 — or 1 when the KETIK worker could not fence its active claim
+ * (lease expiry then recovers it). A second signal never double-shuts-down.
  */
 
 import { serve } from "@hono/node-server";
@@ -19,6 +21,7 @@ import {
   type ScoringWorkerBoundary,
   type ScoringWorkerRuntime,
 } from "./workers/telefun-scoring-worker-runtime";
+import { prepareEmbeddedKetikReviewWorker } from "./workers/ketik-review-worker-runtime";
 import {
   startPdktMailboxSubjectIntentCleanup,
   type PdktMailboxSubjectIntentCleanupHandle,
@@ -60,6 +63,7 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
       `telefun_scoring_worker.config_rejected: ${workerConfig.code} — ${workerConfig.detail}`,
     );
   }
+  const ketikWorkerHost = prepareEmbeddedKetikReviewWorker(processEnv, log);
   const listen =
     options.listen ??
     ((fetch: ServeFetch, port: number, onListening: (info: { port: number }) => void) =>
@@ -80,6 +84,7 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
     now: options.now,
   });
   const worker = handle.started ? handle.runtime : null;
+  const ketikWorker = ketikWorkerHost.start();
 
   const setExitCode =
     options.setExitCode ??
@@ -91,14 +96,21 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
   let shutdownStarted = false;
   async function shutdown(): Promise<void> {
     subjectIntentCleanup.stop();
-    if (worker) await worker.shutdown();
+    let exitCode = 0;
+    await Promise.all([
+      worker?.shutdown(),
+      ketikWorker?.shutdown().catch(() => {
+        log(JSON.stringify({ event: "ketik_review_worker.shutdown_recovery_deferred" }));
+        exitCode = 1;
+      }),
+    ]);
     await new Promise<void>((resolve, reject) => {
       server.close((err?: Error) => {
         if (err) reject(err);
         else resolve();
       });
     });
-    setExitCode(0);
+    setExitCode(exitCode);
   }
   function trigger(): Promise<void> {
     if (!shutdownStarted) {

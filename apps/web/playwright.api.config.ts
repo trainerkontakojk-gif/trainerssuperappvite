@@ -29,6 +29,11 @@ export default defineConfig({
       testMatch: "ketik-review-worker-api.spec.ts",
     },
     {
+      // Same spec, worker embedded in the real API process (see the spec header).
+      name: "ketik-review-worker-embedded-real-backend",
+      testMatch: "ketik-review-worker-api.spec.ts",
+    },
+    {
       name: "ketik-history-real-backend",
       testMatch: "ketik-history-api.spec.ts",
     },

@@ -219,9 +219,15 @@ async function job(id: string) {
   expect(result.error).toBeNull();
   return result.data;
 }
-async function startWorker() {
-  workerLog = "";
-  worker = spawn(
+// One lifecycle contract, two hosts: the standalone worker entrypoint and the
+// API process with the embedded worker (playwright.api.config.ts projects).
+const EMBEDDED_PROJECT = "ketik-review-worker-embedded-real-backend";
+const embedded = () => test.info().project.name === EMBEDDED_PROJECT;
+function spawnWorkerHost(overrides: Record<string, string>) {
+  const entry = embedded()
+    ? "../../api/src/index.ts"
+    : "../../api/src/workers/ketik-review-worker-entrypoint.ts";
+  return spawn(
     process.execPath,
     [
       "--import",
@@ -230,26 +236,29 @@ async function startWorker() {
       fileURLToPath(
         new URL("./helpers/ketikWorkerTransport.mjs", import.meta.url),
       ),
-      fileURLToPath(
-        new URL(
-          "../../api/src/workers/ketik-review-worker-entrypoint.ts",
-          import.meta.url,
-        ),
-      ),
+      fileURLToPath(new URL(entry, import.meta.url)),
     ],
     {
       cwd: fileURLToPath(new URL("../../../", import.meta.url)),
       env: {
         ...process.env,
-        KETIK_REVIEW_WORKER_ENABLED: "true",
-        KETIK_REVIEW_WORKER_INTERVAL_MS: "250",
-        KETIK_REVIEW_WORKER_SHUTDOWN_MS: "500",
-        KETIK_REVIEW_WORKER_HEALTH_PORT: "0",
+        // Embedded host: ephemeral HTTP port, never the dev API's :3001.
+        PORT: "0",
         KETIK_E2E_PROVIDER_ORIGIN: providerOrigin,
+        ...overrides,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
+}
+async function startWorker() {
+  workerLog = "";
+  worker = spawnWorkerHost({
+    KETIK_REVIEW_WORKER_ENABLED: "true",
+    KETIK_REVIEW_WORKER_INTERVAL_MS: "250",
+    KETIK_REVIEW_WORKER_SHUTDOWN_MS: "500",
+    KETIK_REVIEW_WORKER_HEALTH_PORT: "0",
+  });
   worker.stdout?.on("data", (data) => {
     workerLog += String(data);
   });
@@ -469,21 +478,24 @@ test("a real worker claims once, publishes scores/review atomically and never re
       action: "coaching_review",
     }),
   );
-  const port = Number(workerLog.match(/"healthPort":(\d+)/)?.[1]);
-  const health = await guarded(`http://127.0.0.1:${port}/health`);
-  expect(health.status).toBe(200);
-  const payload = await health.json();
-  expect(payload.healthy).toBe(true);
-  expect(Object.keys(payload).sort()).toEqual(
-    [
-      "active",
-      "errorClass",
-      "healthy",
-      "lastSuccessfulPollAt",
-      "loopAlive",
-      "stopping",
-    ].sort(),
-  );
+  // The loopback health server exists only on the standalone host.
+  if (!embedded()) {
+    const port = Number(workerLog.match(/"healthPort":(\d+)/)?.[1]);
+    const health = await guarded(`http://127.0.0.1:${port}/health`);
+    expect(health.status).toBe(200);
+    const payload = await health.json();
+    expect(payload.healthy).toBe(true);
+    expect(Object.keys(payload).sort()).toEqual(
+      [
+        "active",
+        "errorClass",
+        "healthy",
+        "lastSuccessfulPollAt",
+        "loopAlive",
+        "stopping",
+      ].sort(),
+    );
+  }
   expect(await job(untouched)).toBeNull();
   expect(
     (
@@ -844,7 +856,10 @@ test("polling is read-only for missing jobs, old queues, expired leases, and mis
   expect((await job(id)).status).toBe("queued");
 });
 
-test("standalone worker refuses disabled or invalid activation before claiming or calling AI", async () => {
+test("worker host refuses invalid activation and stays idle when disabled", async () => {
+  // Disabled: the standalone entrypoint exits 1; the API keeps serving and claims nothing.
+  const id = await seedSession();
+  await request("/review", trainer, { sessionId: id });
   for (const overrides of [
     { KETIK_REVIEW_WORKER_ENABLED: "false" },
     {
@@ -852,32 +867,7 @@ test("standalone worker refuses disabled or invalid activation before claiming o
       KETIK_REVIEW_WORKER_INTERVAL_MS: "-1",
     },
   ]) {
-    const child = spawn(
-      process.execPath,
-      [
-        "--import",
-        "tsx",
-        "--import",
-        fileURLToPath(
-          new URL("./helpers/ketikWorkerTransport.mjs", import.meta.url),
-        ),
-        fileURLToPath(
-          new URL(
-            "../../api/src/workers/ketik-review-worker-entrypoint.ts",
-            import.meta.url,
-          ),
-        ),
-      ],
-      {
-        cwd: fileURLToPath(new URL("../../../", import.meta.url)),
-        env: {
-          ...process.env,
-          KETIK_E2E_PROVIDER_ORIGIN: providerOrigin,
-          ...overrides,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    const child = spawnWorkerHost(overrides);
     let log = "";
     child.stdout.on("data", (data) => {
       log += String(data);
@@ -885,19 +875,36 @@ test("standalone worker refuses disabled or invalid activation before claiming o
     child.stderr.on("data", (data) => {
       log += String(data);
     });
+    const exit = new Promise<number | null>((resolve) =>
+      child.once("exit", resolve),
+    );
     try {
-      const code = await Promise.race([
-        new Promise<number | null>((resolve) => child.once("exit", resolve)),
-        new Promise<never>((_, reject) => {
-          const timer = setTimeout(
-            () => reject(new Error("Disabled worker failed to stop")),
-            6000,
-          );
-          timer.unref();
-        }),
-      ]);
-      expect(code).toBe(1);
-      expect(log).toContain("ketik_review_worker.config_rejected");
+      if (embedded() && overrides.KETIK_REVIEW_WORKER_ENABLED === "false") {
+        await expect
+          .poll(() => log, { timeout: 15_000 })
+          .toContain("[API] Server running");
+        expect(log).toContain('"event":"ketik_review_worker.disabled"');
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        expect((await job(id)).status).toBe("queued");
+        expect((await job(id)).attempt_count).toBe(0);
+        child.kill("SIGTERM");
+        expect(await exit).toBe(0);
+      } else {
+        const code = await Promise.race([
+          exit,
+          new Promise<never>((_, reject) => {
+            const timer = setTimeout(
+              () => reject(new Error("Worker host failed to stop")),
+              15_000,
+            );
+            timer.unref();
+          }),
+        ]);
+        expect(code).toBe(1);
+        expect(log).toContain("ketik_review_worker.config_rejected");
+        // Invalid config never reaches traffic in the API host.
+        expect(log).not.toContain("[API] Server running");
+      }
       expect(providerCalls).toBe(0);
     } finally {
       if (child.exitCode === null && child.signalCode === null)
@@ -961,6 +968,10 @@ test("competing real database claims admit only one worker and release invalidat
 });
 
 test("health becomes degraded when active work exceeds its lease-age bound", async () => {
+  test.skip(
+    embedded(),
+    "The embedded worker has no loopback health server; the API's /health covers the process.",
+  );
   const id = await seedSession();
   await request("/review", trainer, { sessionId: id });
   await startWorker();
