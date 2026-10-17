@@ -130,6 +130,7 @@ Yang dicatat pada setiap row `ai_usage_logs`:
 - `status`: `'success'`, `'failed'`, atau `'timeout'`
 - `error_message`: pesan error jika gagal/timeout (maks 1000 char); `null` jika sukses
 - `input_tokens`, `output_tokens`, `total_tokens` (0 jika gagal/timeout)
+  - Untuk teks Gemini, `output_tokens` = `candidatesTokenCount` + `thoughtsTokenCount`, karena Google menagih token berpikir (thinking) sebagai output.
 - `input_price_usd_per_million`, `output_price_usd_per_million`
 - `usd_to_idr_rate`, `estimated_cost_usd`, `estimated_cost_idr` (0 jika gagal/timeout)
 - Telefun Live only: `session_duration_ms`, `per_minute_cost_usd`, `per_minute_cost_idr`, `final_cost_usd`, `final_cost_idr`

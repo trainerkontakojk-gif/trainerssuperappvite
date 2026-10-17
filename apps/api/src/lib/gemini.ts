@@ -166,10 +166,14 @@ export async function generateGeminiContent(options: {
           typeof usage.promptTokenCount === "number"
             ? usage.promptTokenCount
             : 0;
+        // Google bills thinking tokens as output; candidatesTokenCount excludes them.
         const outputTokens =
-          typeof usage.candidatesTokenCount === "number"
+          (typeof usage.candidatesTokenCount === "number"
             ? usage.candidatesTokenCount
-            : 0;
+            : 0) +
+          (typeof usage.thoughtsTokenCount === "number"
+            ? usage.thoughtsTokenCount
+            : 0);
         const totalTokens =
           typeof usage.totalTokenCount === "number"
             ? usage.totalTokenCount
