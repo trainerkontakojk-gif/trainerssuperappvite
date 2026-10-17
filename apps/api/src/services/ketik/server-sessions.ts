@@ -230,6 +230,19 @@ export async function sendServerKetikTurn(
   if (claimed.replay) return rowToSession(claimed.session);
   const s = claimed.session;
   try {
+    // The consumer reads the agent's back-to-back messages and answers once,
+    // on the last one; earlier ones are stored without an AI call.
+    if (request.awaitMore) {
+      const stored = await rpc<SessionRow>("publish_ketik_session_turn", {
+        p_user_id: userId,
+        p_session_id: id,
+        p_request_id: request.requestId,
+        p_lease: claimed.lease,
+        p_messages: [],
+        p_closed: false,
+      });
+      return rowToSession(stored);
+    }
     const elapsedSeconds = Math.max(
       0,
       Math.floor((Date.now() - Date.parse(s.started_at)) / 1000),

@@ -8,11 +8,25 @@ import { ketikApi } from "../ketikApi";
 import {
   boundedRandom,
   classifyTextBand,
-  isAgentGivingSolution,
+  consumerSpeedFactor,
   isSlowEligible,
+  QUIET_WINDOW_MS,
+  readingMs,
   REALISTIC_RANGES,
   TRAINING_FAST_RANGES,
 } from "../lib/pacing";
+
+/** Agent messages since the consumer's last reply, without the turn being sent. */
+function pendingAgentTexts(session: KetikServerSession, excludeId: string) {
+  const texts: string[] = [];
+  for (let i = session.messages.length - 1; i >= 0; i--) {
+    const message = session.messages[i];
+    if (message.sender === "consumer") break;
+    if (message.sender === "agent" && message.id !== excludeId)
+      texts.unshift(message.text);
+  }
+  return texts;
+}
 
 /** One ordered queue; typing/send stays available while a turn is in flight. */
 export function useServerKetikChat(initial: KetikServerSession) {
@@ -44,6 +58,9 @@ export function useServerKetikChat(initial: KetikServerSession) {
     timer: ReturnType<typeof setTimeout>;
     resolve: () => void;
   } | null>(null);
+  const lastSendAt = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typing, setTyping] = useState(false);
   const [messages, setMessages] = useState(initial.messages);
   const [loading, setLoading] = useState(
     initial.pendingTurn?.status === "processing",
@@ -64,6 +81,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
     return () => {
       mounted.current = false;
       clearInterval(tick);
+      if (typingTimer.current) clearTimeout(typingTimer.current);
       if (delay.current) {
         clearTimeout(delay.current.timer);
         delay.current.resolve();
@@ -73,6 +91,24 @@ export function useServerKetikChat(initial: KetikServerSession) {
   const expired = now >= Date.parse(initial.expiresAt);
   const process = useCallback(async () => {
     if (busy.current || blocked.current || !mounted.current) return;
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        delay.current = {
+          timer: setTimeout(
+            () => {
+              delay.current = null;
+              resolve();
+            },
+            Math.max(0, ms),
+          ),
+          resolve,
+        };
+      });
+    const stopTyping = () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      typingTimer.current = null;
+      if (mounted.current) setTyping(false);
+    };
     busy.current = true;
     setLoading(true);
     setError("");
@@ -90,10 +126,19 @@ export function useServerKetikChat(initial: KetikServerSession) {
           );
           break;
         }
+        // Wait until the agent pauses so back-to-back messages are answered once.
+        const mode = session.config.responsePacingMode;
+        const quietUntil = lastSendAt.current + QUIET_WINDOW_MS[mode];
+        if (!request.current && Date.now() < quietUntil) {
+          await wait(quietUntil - Date.now());
+          if (!mounted.current) return;
+          continue;
+        }
         const next = queue.current[0];
         request.current ??= {
           ...next,
-          expectedVersion: current.current.version,
+          expectedVersion: session.version,
+          ...(queue.current.length > 1 ? { awaitMore: true as const } : {}),
         };
         const active = request.current;
         setMessages((prev) =>
@@ -109,6 +154,21 @@ export function useServerKetikChat(initial: KetikServerSession) {
                 },
               ],
         );
+        // The consumer reads every agent message since its last reply, then types.
+        const factor = consumerSpeedFactor(session.config.consumerType.id);
+        const readEnd =
+          lastSendAt.current +
+          readingMs(
+            [...pendingAgentTexts(session, active.requestId), active.text],
+            mode,
+          ) *
+            factor;
+        if (!active.awaitMore) {
+          typingTimer.current = setTimeout(
+            () => mounted.current && setTyping(true),
+            Math.max(0, readEnd - Date.now()),
+          );
+        }
         try {
           const result = await ketikApi.sendTurn(initial.id, active);
           if (!mounted.current) return;
@@ -118,25 +178,26 @@ export function useServerKetikChat(initial: KetikServerSession) {
           );
           setMessages(result.messages.slice(0, agentIndex + 1));
           const ranges =
-            result.config.responsePacingMode === "training_fast"
-              ? TRAINING_FAST_RANGES
-              : REALISTIC_RANGES;
-          const solution = isAgentGivingSolution(active.text);
+            mode === "training_fast" ? TRAINING_FAST_RANGES : REALISTIC_RANGES;
           const remaining = Math.max(
             0,
             (Date.parse(result.expiresAt) - Date.now()) / 1000,
           );
+          const earlier = result.messages.slice(0, agentIndex);
+          const consumerReplies = earlier.filter(
+            (m) => m.sender === "consumer",
+          ).length;
           let firstBand =
-            result.version === 2
+            consumerReplies === 0
               ? "greeting_reply"
               : classifyTextBand(
                   result.messages[agentIndex + 1]?.text.length ?? 0,
                 );
           if (
-            result.config.responsePacingMode !== "training_fast" &&
-            !solution &&
+            !active.awaitMore &&
+            mode !== "training_fast" &&
             isSlowEligible({
-              consumerTurnIndex: Math.floor(result.version / 2),
+              consumerTurnIndex: consumerReplies,
               consecutiveSlowCount: slow.current.consecutive,
               totalSlowCount: slow.current.total,
               sessionDurationMinutes: result.config.simulationDuration,
@@ -149,9 +210,10 @@ export function useServerKetikChat(initial: KetikServerSession) {
             firstBand = "slow";
             slow.current.total++;
             slow.current.consecutive++;
-          } else {
+          } else if (!active.awaitMore) {
             slow.current.consecutive = 0;
           }
+          let showAt = readEnd;
           for (
             let index = agentIndex + 1;
             index < result.messages.length;
@@ -159,26 +221,22 @@ export function useServerKetikChat(initial: KetikServerSession) {
           ) {
             const first = index === agentIndex + 1;
             const range = ranges[first ? firstBand : "follow_up"];
-            let planned = boundedRandom(range.minMs, range.maxMs);
+            showAt += boundedRandom(range.minMs, range.maxMs) * factor;
+            let planned = Math.max(0, showAt - Date.now());
             if (remaining < 20) planned = boundedRandom(1000, 3000);
-            else if (first && solution && planned < 10000)
-              planned = boundedRandom(10000, Math.max(10000, range.maxMs));
             else if (planned > remaining * 1000 - 5000)
               planned = boundedRandom(
                 1000,
                 Math.max(1000, remaining * 1000 - 5000),
               );
-            const wait = Math.max(
-              0,
+            await wait(
               Math.min(planned, Date.parse(result.expiresAt) - Date.now()),
             );
-            await new Promise<void>((resolve) => {
-              delay.current = { timer: setTimeout(resolve, wait), resolve };
-            });
-            delay.current = null;
             if (!mounted.current) return;
             setMessages(result.messages.slice(0, index + 1));
+            showAt = Math.max(showAt, Date.now());
           }
+          stopTyping();
           setMessages(result.messages);
           setClosed(result.consumerClosed || result.state !== "active");
           queue.current.shift();
@@ -192,6 +250,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
             break;
           }
         } catch {
+          stopTyping();
           if (mounted.current) {
             blocked.current = true;
             setError(KETIK_SESSION_ERRORS.SESSION_AI_FAILED);
@@ -262,6 +321,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
       );
       return false;
     }
+    lastSendAt.current = Date.now();
     queue.current.push({ requestId: crypto.randomUUID(), text });
     setCount(queue.current.length);
     void process();
@@ -274,6 +334,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
   return {
     messages,
     isLoading: loading,
+    isConsumerTyping: typing,
     queuedCount: count,
     error,
     retry,
