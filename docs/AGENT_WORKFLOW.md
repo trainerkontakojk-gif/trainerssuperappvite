@@ -117,6 +117,12 @@ Documentation-instruction-only work is limited to `docs/`, `AGENTS.md`, `GEMINI.
 
 Keep summaries in their owning document. Do not copy a test matrix, route inventory, model registry, phase history, or detailed lane/tool policy into `AGENTS.md`, `GEMINI.md`, or `docs/README.md`.
 
+### Changelog gate
+
+Every commit in every lane, Lane A included, adds one entry to the root [`CHANGELOG.md`](../CHANGELOG.md) in the same commit. Put it under a `## YYYY-MM-DD` heading for the commit date (create the heading at the top if it is missing) as `- type(scope): summary`, matching the commit subject. Do not add the commit's own hash; backfilled entries carry one only because they predate the policy. Merge commits need no entry of their own.
+
+Enforcement: `.githooks/pre-commit` rejects a commit whose staged diff adds no changelog bullet (`pnpm install` sets `core.hooksPath`; run `git config core.hooksPath .githooks` in an existing clone), and the CI `changelog` job runs `node scripts/check-changelog.mjs <base>` over every non-merge commit in the push or PR. Never bypass the hook with `--no-verify`.
+
 ### Wiki gate
 
 Inspect or synchronize the Wiki only when the task affects a Wiki-mirrored summary, navigation, contributor workflow, feature/public contract, deployment/operations, auth/role flow, database/RLS contract, or other public information that the Wiki actually contains. If the Wiki only links to canonical docs, no update is required. Wiki discovery is never a mandatory pre-implementation step.
@@ -216,6 +222,7 @@ Any verification failure is unresolved until independently explained; do not wea
 - [ ] Only owned/planned files changed.
 - [ ] Required TDD, specialist, skill, documentation, and Wiki gates completed or explicitly not applicable.
 - [ ] Applicable checks actually ran and their exit codes are recorded.
+- [ ] Each commit adds its `CHANGELOG.md` entry (Changelog gate).
 - [ ] Formatting and `git diff --check` pass.
 - [ ] No secrets, credentials, raw provider responses, or generated graph artifacts were added by a docs/config task.
 - [ ] The report states blockers instead of weakening a gate.

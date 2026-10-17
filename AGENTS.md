@@ -22,6 +22,7 @@ High-salience guardrails for every harness. Detailed policy belongs in [`docs/AG
 - Ask Fajar before adding or running any non-E2E test; explain the exact contract E2E cannot prove and the smallest proposed alternative. For an approved isolated test, list all failure modes before coding.
 - Only after equivalent E2E coverage is verified, remove a superseded unit test and its stale suite-list entry; do not mass-delete unrelated tests. Existing unit-suite scripts/manifests are legacy inventory, not permission to run them. Never add unit tests to `scripts/test-core.json` or `scripts/test-fast.json`.
 - **Standing authorization (Fajar, this repo):** committing, pushing to this repo's own configured remote, merging, branching, and running local terminal/build/test commands are pre-authorized — do them without asking. Everything else still needs explicit authorization: production deploys (Vercel `--prod`/promote, Railway prod), remote Supabase mutations or `db push`/migrations against any non-local project, and any other change to a remote system. Never point E2E at production. Do not claim checks that did not run; report exact commands/evidence.
+- **Changelog:** every commit adds a `- type(scope): summary` entry under today's date in root `CHANGELOG.md`, in the same commit (Changelog gate in `docs/AGENT_WORKFLOW.md` §4; enforced by `.githooks/pre-commit` and CI).
 
 ## Skills and knowledge tools
 

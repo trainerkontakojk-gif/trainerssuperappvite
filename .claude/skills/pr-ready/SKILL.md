@@ -11,6 +11,7 @@ Canonical gates live in `docs/AGENT_WORKFLOW.md` §7–8. This skill runs them i
 
 - `git status --short` and `git diff --stat <base>...HEAD`: confirm only owned or planned paths changed and no `.env*`, credentials, or `graphify-out/` artifacts slipped in.
 - Restate the lane (A/B/C/D) and which gates apply.
+- `node scripts/check-changelog.mjs <base>`: every commit in the range adds a `CHANGELOG.md` entry (Changelog gate). Uncommitted work still needs its entry before committing.
 
 ## 2. Checks (stop at the first unexplained failure)
 

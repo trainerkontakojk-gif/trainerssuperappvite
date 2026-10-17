@@ -43,6 +43,24 @@ jobs:
       - name: Dependency audit (prod)
         run: pnpm audit --prod
 
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Every non-merge commit in the push/PR must add a CHANGELOG.md entry
+      # (docs/AGENT_WORKFLOW.md §4 "Changelog gate").
+      - name: Every commit adds a changelog entry
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE=HEAD~1
+          fi
+          node scripts/check-changelog.mjs "$BASE"
+
   migrations:
     runs-on: ubuntu-latest
     steps:

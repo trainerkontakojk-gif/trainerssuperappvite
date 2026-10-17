@@ -22,4 +22,5 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 - `one-test-run.sh` refuses a second concurrent Playwright run.
 - `block-superpowers.sh` refuses `superpowers:*` skills.
 - `format-changed.sh` runs Prettier on a touched `.ts`/`.tsx`/`.md` file only when that file is new or was already Prettier-clean, so legacy files are not reformatted wholesale.
+- `.githooks/pre-commit` (a Git hook, not a Claude hook) rejects commits that add no `CHANGELOG.md` entry; CI runs `scripts/check-changelog.mjs`.
 - `migration-rollback.sh` warns when a migration has no `supabase/rollbacks/rollback_<name>.sql`; CI enforces the same rule for new migrations.

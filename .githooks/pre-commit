@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Every commit must add a CHANGELOG.md entry (docs/AGENT_WORKFLOW.md §4).
+# Enabled by `git config core.hooksPath .githooks` (pnpm install does it).
+staged=$(git diff --cached --name-only)
+[[ -z "$staged" ]] && exit 0
+# Merge commits carry the entries of the commits they merge.
+[[ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]] && exit 0
+if ! git diff --cached --unified=0 -- CHANGELOG.md | grep -qE '^\+- \S'; then
+  echo "pre-commit: add a '- type(scope): summary' entry under today's" >&2
+  echo "'## YYYY-MM-DD' heading in CHANGELOG.md and stage it." >&2
+  exit 1
+fi

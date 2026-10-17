@@ -5,6 +5,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "build": "turbo build",
     "dev": "turbo dev",
     "start": "pnpm run start:web",
