@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- refactor(monitoring): move the history table cell renderers and session-count cards out of the 1,121-line HistoryTab without changing its markup
 - refactor(telefun): split the 1,291-line usage logger into live Gemini, retired OpenAI and shared store modules behind the same `usage.js` entry, without changing behavior
 - refactor(sidak): move the agent HTML report stylesheet and SVG chart builders into their own modules without changing the generated report
 - refactor(pdkt): split the 1,361-line simulation workspace into review-polling and delete hooks, a replay mapper and workspace state views without changing behavior
