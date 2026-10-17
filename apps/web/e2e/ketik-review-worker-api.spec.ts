@@ -88,7 +88,8 @@ const server = createServer(async (req, res) => {
       usageMetadata: {
         promptTokenCount: 10,
         candidatesTokenCount: 5,
-        totalTokenCount: 15,
+        thoughtsTokenCount: 20,
+        totalTokenCount: 35,
       },
     }),
   );
@@ -468,14 +469,16 @@ test("a real worker claims once, publishes scores/review atomically and never re
   expect(providerCalls).toBe(1);
   const usage = await db
     .from("ai_usage_logs")
-    .select("user_id,module,action")
+    .select("user_id,module,action,output_tokens")
     .eq("user_id", trainer.userId);
   expect(usage.error).toBeNull();
+  // Google bills thinking tokens as output, so they are logged with the answer tokens.
   expect(usage.data).toContainEqual(
     expect.objectContaining({
       user_id: trainer.userId,
       module: "ketik",
       action: "coaching_review",
+      output_tokens: 25,
     }),
   );
   // The loopback health server exists only on the standalone host.
