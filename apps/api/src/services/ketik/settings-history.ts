@@ -278,27 +278,6 @@ export async function persistSession(
     throw new Error(error?.message || "Gagal menyimpan sesi.");
   }
 
-  // Dual-write to results table for legacy compatibility
-  try {
-    await adminClient.from("results").insert({
-      user_id: userId,
-      module: "ketik",
-      session_id: data.id,
-      created_at: new Date().toISOString(),
-      metadata: {
-        scenario_title: params.scenarioTitle,
-        consumer_name: params.consumerName,
-        simulation_duration: params.simulationDuration,
-        simulation_subject: params.simulationSubjectSnapshot ?? null,
-      },
-    });
-  } catch (err) {
-    console.error(
-      `[KETIK] Failed to dual-write to results table for session ${data.id}:`,
-      err,
-    );
-  }
-
   return {
     id: data.id,
     date: data.date || data.created_at,
@@ -325,17 +304,6 @@ export async function deleteSession(
     .eq("user_id", userId);
 
   if (error) throw new Error(`Gagal menghapus sesi: ${error.message}`);
-
-  // Dual-delete from results
-  try {
-    await adminClient
-      .from("results")
-      .delete()
-      .eq("session_id", sessionId)
-      .eq("module", "ketik");
-  } catch (e) {
-    console.error(e);
-  }
 }
 
 export async function clearHistory(userId: string): Promise<void> {

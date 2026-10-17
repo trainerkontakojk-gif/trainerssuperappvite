@@ -68,6 +68,14 @@ export default defineConfig({
       testMatch: "sidak-temuan-tahun-trigger-api.spec.ts",
     },
     {
+      name: "prod-parity-triggers-real-backend",
+      testMatch: "prod-parity-triggers-api.spec.ts",
+    },
+    {
+      name: "monitoring-legacy-results-real-backend",
+      testMatch: "monitoring-legacy-results-api.spec.ts",
+    },
+    {
       name: "home-attention-real-backend",
       testMatch: "home-attention-api.spec.ts",
     },

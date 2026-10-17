@@ -157,3 +157,15 @@ done
   `trg_fill_tahun` and `public.fill_tahun_from_period()`. No data loss: filled
   `tahun` values stay. On prod it also removes the trigger that existed there
   before the migration, so inserts that omit `tahun` store NULL again.
+- `rollback_20261017130000_profiles_self_role_guard.sql` drops
+  `guard_profile_sensitive_columns` and `prevent_self_role_status_change()`.
+  No data loss. Column grants on `profiles` still block direct self-updates.
+- `rollback_20261017130100_simulation_activity_log_triggers.sql` drops the
+  three `on_*_history_insert` triggers and `log_*_activity()` functions.
+  Logged rows stay; new simulation sessions are no longer logged.
+- `rollback_20261017130200_updated_at_triggers_mailbox_review_jobs.sql` drops
+  the `updated_at` triggers on `pdkt_mailbox_items` and `ketik_review_jobs`
+  and `handle_pdkt_mailbox_updated_at()`. No data loss.
+- `rollback_20261017130300_results_legacy_table.sql` drops `results`.
+  **Data loss: local/E2E only.** On prod the table predates the repo and holds
+  legacy Telefun sessions; revert its grant/policy changes by hand instead.
