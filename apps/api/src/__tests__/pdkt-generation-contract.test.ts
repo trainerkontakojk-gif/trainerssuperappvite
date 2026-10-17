@@ -133,23 +133,6 @@ describe("PDKT generation output contracts", () => {
 });
 
 describe("PDKT generation length and budget contracts", () => {
-  it("accepts a 300-word rushed template without retrying", async () => {
-    const body = buildBody(300);
-    mockGeminiContent.mockResolvedValue({ success: true, text: "{}" });
-    mockParseJson.mockReturnValue({ subject: "Cepat", body });
-
-    const result = await generateScenarioEmailTemplate(
-      scenario,
-      buildConfig({ consumerType: { ...consumerType, id: "terburu-buru" } }),
-    );
-
-    expect(result.success).toBe(true);
-    expect(mockGeminiContent).toHaveBeenCalledTimes(1);
-    const call = mockGeminiContent.mock.calls[0][0];
-    expect(call.systemInstruction).toContain("250-500 kata");
-    expect(call.contents[0]?.parts?.[0]?.text).toContain("3-5 paragraf");
-  });
-
   it("reserves provider-adapter overhead below the hard ceiling", async () => {
     const body = buildBody(600);
     mockGeminiContent.mockResolvedValue({ success: true, text: "{}" });

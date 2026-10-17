@@ -107,6 +107,12 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
   token retry tetap bisa disimpan; evaluasi gagal langsung bisa diulang tanpa
   duplikasi attempt; hapus riwayat menjaga email; mailbox 110/history 1.001
   baris lengkap dan kegagalan halaman tidak menjadi sukses parsial.
+- `pdkt-consumer-email-api.spec.ts` / project `pdkt-consumer-email-stub` memakai
+  route PDKT Hono asli dengan Supabase stub lokal dan provider Gemini yang
+  dijawab di worker. Kontraknya: nama "Agus" yang menulis "Agustus" tidak
+  menggagalkan email, nama pola awal/akhir mendarat setelah salam/di tanda
+  tangan tanpa ganda, dan instruksi AI memuat kepribadian, aturan orang awam,
+  tantangan membaca, serta panjang 500-1000 kata untuk semua tipe.
 - `pdkt-resilience.spec.ts` memakai browser hermetic untuk retry detail/settings,
   retry gagal berulang tanpa default/auto-create, skor lama tetap tampil saat
   re-review ditolak, serta status terminal riwayat dihapus. Error/retry diuji
@@ -118,6 +124,7 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
 
 ```bash
 pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project pdkt-resilience-real-backend --project pdkt-evaluation-errors-real-backend --project pdkt-privacy-real-backend --project pdkt-review-evidence-real-backend --workers=1 --trace on
+pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project pdkt-consumer-email-stub --workers=1
 pnpm --dir apps/web exec playwright test pdkt-flow.spec.ts pdkt-resilience.spec.ts --workers=1 --trace on
 ```
 
