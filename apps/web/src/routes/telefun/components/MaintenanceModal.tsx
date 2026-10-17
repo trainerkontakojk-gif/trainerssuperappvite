@@ -1,7 +1,7 @@
 import { can, normalizeRole } from "@trainers/types";
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Home, ArrowRight } from "lucide-react";
+import { Lock, Home } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTelefunWarning } from "../../../context/TelefunWarningContext";
 
@@ -12,17 +12,11 @@ interface MaintenanceModalProps {
 
 export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
   const navigate = useNavigate();
-  const { closeMaintenance, grantTelefunAccess } = useTelefunWarning();
+  const { closeMaintenance } = useTelefunWarning();
 
   const handleRedirect = () => {
     closeMaintenance();
     navigate({ to: "/dashboard" });
-  };
-
-  const handleEnterTelefun = () => {
-    grantTelefunAccess();
-    closeMaintenance();
-    navigate({ to: "/telefun" });
   };
 
   const normalizedRole = role?.toLowerCase().trim();

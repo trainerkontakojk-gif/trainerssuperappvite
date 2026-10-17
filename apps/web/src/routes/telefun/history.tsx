@@ -18,6 +18,7 @@ import { useTelefunHistory } from "./hooks/useTelefunHistory";
 import { fetchTelefunRecordingUrl } from "./hooks/useTelefunRecordingUrl";
 import type { CallRecord } from "./types";
 import { downloadTelefunHistory } from "./utils/historyCsv";
+import { downloadRecording } from "./utils/recordingDownload";
 import {
   formatCallDuration,
   formatTelefunDate,
@@ -444,12 +445,10 @@ function HistoryRow({
         notify.error("Rekaman tidak tersedia untuk diunduh.");
         return;
       }
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.click();
+      await downloadRecording(
+        url,
+        `Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`,
+      );
     } catch {
       notify.error("Rekaman belum bisa diunduh. Coba lagi.");
     } finally {

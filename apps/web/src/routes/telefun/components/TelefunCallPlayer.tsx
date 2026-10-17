@@ -10,9 +10,11 @@ import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import type { TelefunHoldInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
+import { notify } from "../../../lib/toast";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
 import { waveformBars, windowsInRecording } from "../utils/recordingAudio";
+import { downloadRecording } from "../utils/recordingDownload";
 import { formatClock } from "../utils/reviewDisplay";
 
 export interface TelefunCallPlayerHandle {
@@ -143,6 +145,7 @@ export function TelefunCallPlayer({
   const [currentMs, setCurrentMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const [downloading, setDownloading] = useState(false);
   const totalMs = durationMs > 0 ? durationMs : fallbackDurationMs;
   const ready = source.status === "ready";
   const holdWindows = useMemo(
@@ -204,14 +207,16 @@ export function TelefunCallPlayer({
     if (audioRef.current) audioRef.current.playbackRate = next;
   };
 
-  const download = () => {
+  const download = async () => {
     if (source.status !== "ready") return;
-    const link = document.createElement("a");
-    link.href = source.url;
-    link.download = downloadName;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.click();
+    setDownloading(true);
+    try {
+      await downloadRecording(source.url, downloadName);
+    } catch {
+      notify.error("Rekaman belum bisa diunduh. Coba lagi.");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -374,11 +379,12 @@ export function TelefunCallPlayer({
           <Button
             type="button"
             variant="link"
-            onClick={download}
+            onClick={() => void download()}
+            disabled={downloading}
             className="ml-auto h-auto min-h-[44px] gap-1.5 px-0 text-xs text-fg2"
           >
             <Download data-icon="inline-start" />
-            Unduh rekaman
+            {downloading ? "Mengunduh…" : "Unduh rekaman"}
           </Button>
         )}
       </div>

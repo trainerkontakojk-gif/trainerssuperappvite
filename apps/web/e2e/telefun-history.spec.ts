@@ -7,6 +7,7 @@ import {
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import {
@@ -233,6 +234,124 @@ test.describe("Telefun Riwayat (hermetic)", () => {
       .click();
     await expect(page.getByText("Belum ada panggilan")).toBeVisible();
     expect(nativeDialog).toBe(false);
+    expectHermetic(audit);
+  });
+
+  test("sesi lokal yang sudah tidak ada di server tetap bisa dihapus", async ({
+    page,
+  }) => {
+    // Salinan lokal panggilan yang tidak pernah tersimpan di server.
+    const local = {
+      id: "telefun-local-only-1",
+      date: new Date().toISOString(),
+      url: "",
+      consumerName: "Sari Wulandari",
+      scenarioTitle: "Panggilan Offline",
+      duration: 95,
+      syncStatus: "unsynced",
+    };
+    await page.addInitScript((records) => {
+      try {
+        if (!localStorage.getItem("telefun_history"))
+          localStorage.setItem("telefun_history", JSON.stringify(records));
+      } catch {
+        // about:blank tidak punya localStorage.
+      }
+    }, [local]);
+    const { audit, table } = await openHistory(page, [REVIEWED_ROW], [
+      {
+        method: "DELETE",
+        path: `/api/v1/telefun/history/${local.id}`,
+        status: 404,
+        body: {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
+        },
+      },
+    ]);
+
+    await table
+      .getByRole("button", { name: "Aksi lain untuk Panggilan Offline" })
+      .click({ timeout: 20000 });
+    await page.getByRole("menuitem", { name: "Hapus" }).click();
+    await page
+      .getByRole("dialog", { name: "Hapus panggilan ini?" })
+      .getByRole("button", { name: "Hapus panggilan" })
+      .click();
+    await expect(table).not.toContainText("Panggilan Offline");
+    await expect(table).toContainText("Klaim Asuransi Ditolak");
+    await expect(page.getByText("Panggilan belum terhapus")).toHaveCount(0);
+    expect(
+      await page.evaluate(() => localStorage.getItem("telefun_history")),
+    ).not.toContain("telefun-local-only-1");
+    expectHermetic(audit);
+  });
+
+  test("hapus tetap berhasil walau penyimpanan lokal penuh", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key === "telefun_history")
+          throw new DOMException("quota", "QuotaExceededError");
+        return setItem.call(this, key, value);
+      };
+    });
+    const { audit, table } = await openHistory(page, FULL_HISTORY, [
+      {
+        method: "DELETE",
+        path: `/api/v1/telefun/history/${PENDING_ROW.id}`,
+        body: { success: true, data: null },
+      },
+    ]);
+
+    await table
+      .getByRole("button", { name: "Aksi lain untuk Tagihan Kartu Kredit" })
+      .click({ timeout: 20000 });
+    await page.getByRole("menuitem", { name: "Hapus" }).click();
+    await page
+      .getByRole("dialog", { name: "Hapus panggilan ini?" })
+      .getByRole("button", { name: "Hapus panggilan" })
+      .click();
+    await expect(table).not.toContainText("Tagihan Kartu Kredit");
+    await expect(page.getByText("Panggilan belum terhapus")).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("unduh rekaman dari tautan bertanda tangan beda origin menghasilkan berkas", async ({
+    page,
+  }) => {
+    // Tautan Supabase Storage berada di origin lain: atribut `download` diabaikan browser.
+    const signedUrl = `${E2E_SUPABASE_URL}/storage/v1/object/sign/telefun-recordings/telefun-reviewed-1.webm?token=e2e`;
+    const { audit, table } = await openHistory(page, [REVIEWED_ROW], [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/recording/${REVIEWED_ROW.id}`,
+        body: { success: true, data: { url: signedUrl } },
+      },
+    ]);
+    await page.route(signedUrl, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "audio/webm",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: Buffer.from("e2e-telefun-recording"),
+      }),
+    );
+
+    await table
+      .getByRole("button", { name: "Aksi lain untuk Klaim Asuransi Ditolak" })
+      .click({ timeout: 20000 });
+    const downloadEvent = page.waitForEvent("download", { timeout: 10000 });
+    await page.getByRole("menuitem", { name: "Unduh rekaman" }).click();
+    const download = await downloadEvent;
+    expect(download.suggestedFilename()).toBe(
+      "Telefun_Rina Susanti_telefun-reviewed-1.webm",
+    );
+    expect(readFileSync(await download.path(), "utf8")).toBe(
+      "e2e-telefun-recording",
+    );
     expectHermetic(audit);
   });
 

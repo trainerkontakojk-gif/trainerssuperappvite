@@ -527,6 +527,21 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("Unduh rekaman di pemutar menghasilkan berkas bernama", async ({
+    page,
+  }) => {
+    const audit = await openTelaah(page, REVIEWED_ROW, ANNOTATIONS_MOCKS, [
+      REVIEWED_ROW,
+    ]);
+    const downloadEvent = page.waitForEvent("download", { timeout: 20000 });
+    await page.getByRole("button", { name: "Unduh rekaman" }).click();
+    const download = await downloadEvent;
+    expect(download.suggestedFilename()).toBe(
+      "Telefun_Rina Susanti_telefun-reviewed-1.webm",
+    );
+    expectHermetic(audit);
+  });
+
   test("rekaman tetap bersuara selama mute; hanya hold yang senyap", async ({
     page,
   }) => {

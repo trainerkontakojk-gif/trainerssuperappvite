@@ -153,6 +153,10 @@ export function useTelefunSettingsDraft({
       consumerForm.close();
       setSaveError(null);
     }
+    // Hanya saat modal dibuka atau pengaturan berganti. `close` dari
+    // `useCrudForm` berubah tiap render (`defaultValues` inline); memasukkannya
+    // akan mereset draft terus-menerus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, settings]);
 
   const setSelectedTelefunTransport = (

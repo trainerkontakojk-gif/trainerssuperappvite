@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 import {
   clearTelefunHistory,
@@ -16,6 +17,18 @@ import type { CallRecord } from "../types";
 export type TelefunHistoryLoadState = "loading" | "ready" | "error";
 
 const STORAGE_KEY = "telefun_history";
+
+/**
+ * Salinan lokal hanya cadangan. Penyimpanan penuh atau diblokir tidak boleh
+ * menggagalkan riwayat, simpan panggilan, atau hapus.
+ */
+function writeLocalHistory(records: CallRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  } catch (error) {
+    console.warn("[Telefun] Local history copy not saved", error);
+  }
+}
 
 function newestFirst(records: CallRecord[]): CallRecord[] {
   return records.sort(
@@ -38,7 +51,7 @@ export function useTelefunHistory() {
     historyRef.current = next;
     setHistory(next);
     if (persist && canOverwriteTelefunLocalHistory(localIsCorruptRef.current)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      writeLocalHistory(next);
     }
   }, []);
 
@@ -89,7 +102,14 @@ export function useTelefunHistory() {
 
   const remove = useCallback(
     async (id: string) => {
-      await deleteTelefunSession(id);
+      try {
+        await deleteTelefunSession(id);
+      } catch (error) {
+        // Sesi yang sudah tidak ada di server (mis. salinan lokal) cukup dihapus di sini.
+        if (!(error instanceof ApiError && error.code === "NOT_FOUND")) {
+          throw error;
+        }
+      }
       commit(historyRef.current.filter((record) => record.id !== id));
     },
     [commit],

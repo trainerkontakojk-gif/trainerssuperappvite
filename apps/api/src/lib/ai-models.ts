@@ -33,6 +33,10 @@ export const KETIK_REVIEW_MODELS = {
   fallback: "gpt-5.4-mini",
 } as const;
 
+// Telefun voice scoring, content review, coaching summary, and annotation
+// assistance all run on one Gemini model.
+export const TELEFUN_ASSESSMENT_MODEL = "gemini-3.8-flash";
+
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (model) => model.provider === "gemini",
 );
