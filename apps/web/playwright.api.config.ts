@@ -42,6 +42,10 @@ export default defineConfig({
       testMatch: "telefun-month-count-api.spec.ts",
     },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
+    {
+      name: "pdkt-consumer-email-stub",
+      testMatch: "pdkt-consumer-email-api.spec.ts",
+    },
     { name: "rate-limit-stub", testMatch: "rate-limit-client-ip-api.spec.ts" },
     {
       name: "ketik-integrity-real-backend",
