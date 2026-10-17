@@ -60,6 +60,26 @@ const GROUP_B = [
   "upsert_telefun_coaching_summary(uuid,jsonb,integer,text)",
 ] as const;
 
+// KETIK backend RPCs are service_role-only by design (docs/architecture.md,
+// "Batas snapshot D5.1"): they were added after D5.1, keep EXECUTE revoked from
+// anon/authenticated, and ketik-*-api specs prove their own denial matrix. On
+// local Postgres 17.6.1.121 a revoked call returns 42501 without a crash.
+// Exact signatures only: any other revoked function still fails D5.1, and an
+// entry that stops being revoked-from-both must be removed here.
+const SERVICE_ROLE_ONLY_BY_DESIGN = [
+  "public.assign_ketik_configuration(uuid,uuid,text,text,uuid,jsonb)",
+  "public.can_access_ketik_review(uuid,uuid)",
+  "public.claim_ketik_review(text,integer,uuid)",
+  "public.claim_ketik_session_turn(uuid,uuid,uuid,integer,text,integer)",
+  "public.enqueue_ketik_review(uuid,uuid,uuid,boolean)",
+  "public.finish_ketik_session(uuid,uuid)",
+  "public.ketik_history_page(uuid,integer,text,text,timestamp with time zone,uuid)",
+  "public.publish_ketik_session_turn(uuid,uuid,uuid,uuid,jsonb,boolean)",
+  "public.read_ketik_review(uuid,uuid)",
+  "public.settle_ketik_review(uuid,uuid,jsonb,boolean)",
+  "public.start_ketik_session(uuid,uuid,jsonb,text,uuid)",
+] as const;
+
 let env: LoopbackEnv;
 test.beforeAll(() => {
   env = readLoopbackEnv();
@@ -92,24 +112,49 @@ function readRevoked() {
     ) f`);
 }
 
+type RevokedRow = ReturnType<typeof readRevoked>[number];
+
+// Splits the catalog into unexpected revocations and the by-design allowlist,
+// which must still be present and revoked from both client roles.
+function partitionRevoked(revoked: RevokedRow[]) {
+  const allowed = new Set<string>(SERVICE_ROLE_ONLY_BY_DESIGN);
+  const unexpected = revoked.filter((f) => !allowed.has(f.signature));
+  const byDesign = revoked
+    .filter((f) => allowed.has(f.signature) && !f.anon && !f.authenticated)
+    .map((f) => f.signature);
+  return { unexpected, byDesign };
+}
+
 function assertGlobalPrecondition(): void {
+  const { unexpected, byDesign } = partitionRevoked(readRevoked());
+  expect(unexpected, "STOP S1: global D5.1 must be green before RPC").toEqual(
+    [],
+  );
   expect(
-    readRevoked(),
-    "STOP S1: global D5.1 must be green before RPC",
-  ).toEqual([]);
+    byDesign,
+    "STOP S1: by-design allowlist must match the catalog",
+  ).toEqual([...SERVICE_ROLE_ONLY_BY_DESIGN]);
 }
 
 test("D5.1 catalog invariant: no revoked exposed non-trigger functions", async () => {
   const revoked = readRevoked();
+  const { unexpected, byDesign } = partitionRevoked(revoked);
   const summary = {
     total: revoked.length,
-    groupA: revoked.filter((f) => !f.anon && !f.authenticated).length,
-    groupB: revoked.filter((f) => !f.anon && f.authenticated).length,
+    groupA: unexpected.filter((f) => !f.anon && !f.authenticated).length,
+    groupB: unexpected.filter((f) => !f.anon && f.authenticated).length,
+    serviceRoleOnlyByDesign: byDesign.length,
     revoked,
   };
   console.log("D5.1", JSON.stringify(summary));
   await attachJson("catalog-invariant.json", summary);
-  expect(revoked, "STOP S1: catalog must be green before any RPC").toEqual([]);
+  expect(unexpected, "STOP S1: catalog must be green before any RPC").toEqual(
+    [],
+  );
+  expect(
+    byDesign,
+    "STOP S1: every by-design entry must still be revoked from anon and authenticated",
+  ).toEqual([...SERVICE_ROLE_ONLY_BY_DESIGN]);
 });
 
 type GroupARow = {
