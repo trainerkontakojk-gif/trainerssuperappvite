@@ -255,7 +255,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 ## AI Integration Pattern
 
 - Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openai.ts`).
-- Pemilihan model mengikuti canonical mapping. Telefun realtime registry aktif hanya berisi dua Gemini Live model; historical GPT realtime metadata is separate read-only compatibility and never derived from env or used for admission. Direct text IDs (`gpt-5.6-luna`, `gpt-5.4-mini`) remain supported.
+- Pemilihan model mengikuti canonical mapping. Telefun realtime registry aktif hanya berisi dua Gemini Live model; historical GPT realtime metadata is separate read-only compatibility and never derived from env or used for admission. Direct text IDs (`gpt-5.6-luna`, `gpt-5.4-mini`) remain supported. KETIK and PDKT users can only pick `KETIK_PDKT_MODEL_IDS` (`gemini-3.8-flash`, `gemini-3.5-flash-lite`); `coerceKetikPdktModelId` in `packages/types` maps any other saved or requested choice to Flash-Lite when it was a Flash-Lite model and to `gemini-3.8-flash` otherwise. Sessions created before the change keep the model stored in their snapshot.
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
 - `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
 - `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup. Provider aktif hanya `gemini` dan `openai`.

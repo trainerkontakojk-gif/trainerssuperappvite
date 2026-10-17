@@ -1,3 +1,4 @@
+import { coerceKetikPdktModelId } from "@trainers/types";
 import type {
   PdktConsumerType,
   PdktIdentity,
@@ -87,20 +88,8 @@ import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../lib/aiModels";
 export { TEXT_MODELS };
 
 
-const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
-
 export function coercePdktModelId(modelId?: string | null): string {
-  if (TEXT_MODELS.some((model) => model.id === modelId)) {
-    return modelId as string;
-  }
-
-  if (typeof modelId === "string") {
-    if (LEGACY_MODEL_IDS.has(modelId) || modelId.includes("/")) {
-      return "gpt-5.4-mini";
-    }
-  }
-
-  return DEFAULT_PDKT_MODEL_ID;
+  return coerceKetikPdktModelId(modelId);
 }
 
 export function coerceWritingStyleMode(

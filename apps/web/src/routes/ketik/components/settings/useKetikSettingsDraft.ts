@@ -6,10 +6,10 @@ import type {
   KetikQuickTemplate,
 } from "@trainers/types";
 import {
+  coerceKetikPdktModelId,
   DEFAULT_KETIK_SETTINGS,
   mergeKetikQuickTemplates,
 } from "@trainers/types";
-import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { getSettingsSaveErrorMessage } from "../../../../lib/settings-contract";
@@ -41,20 +41,8 @@ function toKetikDraft(settings: KetikAppSettings): KetikAppSettings {
   };
 }
 
-const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
-
 export function coerceKetikModelId(modelId?: string | null): string {
-  if (TEXT_MODELS.some((model) => model.id === modelId)) {
-    return modelId as string;
-  }
-
-  if (typeof modelId === "string") {
-    if (LEGACY_MODEL_IDS.has(modelId) || modelId.includes("/")) {
-      return "gpt-5.4-mini";
-    }
-  }
-
-  return DEFAULT_KETIK_SETTINGS.selectedModel;
+  return coerceKetikPdktModelId(modelId);
 }
 
 export function buildKetikSettingsForSave(params: {

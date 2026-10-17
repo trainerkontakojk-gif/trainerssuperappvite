@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(ai-models): limit KETIK and PDKT model choices to Gemini 3.8 Flash and Gemini 3.5 Flash Lite; older saved choices move to Flash Lite (if they were Flash-Lite) or Gemini 3.8 Flash, enforced on the server for new sessions
 - refactor(api): move the Telefun voice-scoring handler and its helpers out of the 1,054-line recordings route into recording-scoring.ts without changing responses
 - refactor(monitoring): move the history table cell renderers and session-count cards out of the 1,121-line HistoryTab without changing its markup
 - refactor(api): split the 1,054-line profiler service into folder, team and participant modules behind the same import path, without changing behavior

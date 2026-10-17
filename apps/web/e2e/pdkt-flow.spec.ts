@@ -2883,6 +2883,51 @@ async function requestNewEmail(page: Page) {
   return (await request).postDataJSON();
 }
 
+test.describe("PDKT pilihan model AI (hermetic)", () => {
+  test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
+
+  test("hanya Gemini 3.8 Flash dan 3.5 Flash Lite; Flash Lite lama tetap Flash Lite", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: [
+        {
+          method: "GET",
+          path: "/api/v1/pdkt/settings",
+          body: {
+            success: true,
+            data: { ...SAVED_SETTINGS, selectedModel: "gemini-3.1-flash-lite" },
+          },
+          headers: { "x-settings-version": "absent" },
+        },
+        ...pdktMocks([]).filter(
+          (mock) => mock.path !== "/api/v1/pdkt/settings",
+        ),
+      ],
+    });
+    await waitForMockedApi(audit, ["GET /api/v1/pdkt/settings"]);
+    await page
+      .getByRole("navigation", { name: "Menu PDKT" })
+      .getByRole("button", { name: /^Pengaturan/ })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Pengaturan PDKT" });
+    await expect(dialog).toBeVisible({ timeout: 20000 });
+    await dialog.getByRole("tab", { name: /^Gaya & AI/ }).click();
+    const models = dialog
+      .getByRole("radiogroup", { name: "Model AI" })
+      .getByRole("radio");
+    await expect(models).toHaveCount(2);
+    await expect(
+      models.filter({ hasText: "Gemini 3.8 Flash" }),
+    ).toHaveAttribute("aria-checked", "false");
+    await expect(
+      models.filter({ hasText: "Gemini 3.5 Flash Lite" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expectHermetic(audit);
+  });
+});
+
 test.describe("PDKT navigation acceptance", () => {
   test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
 

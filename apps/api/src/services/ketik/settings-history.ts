@@ -10,6 +10,7 @@ import {
   KetikSessionReview,
   KetikTypoFinding,
   ChatMessage,
+  coerceKetikPdktModelId,
   DEFAULT_KETIK_SETTINGS,
   ketikQuickTemplateSchema,
   mergeKetikQuickTemplates,
@@ -17,23 +18,11 @@ import {
 import { createAdminClient } from "../../lib/supabase";
 import { buildKetikEducation } from "./review-policy";
 import {
-  DEFAULT_AI_MODEL_ID,
-  KETIK_PDKT_MODELS,
-  normalizeModelId,
-} from "../../lib/ai-models";
-import {
   ABSENT_SETTINGS_VERSION,
   guardedUserSettingsWrite,
   isSettingsConflictError,
 } from "../../lib/guarded-user-settings";
 import { getGlobalKetikQuickTemplatesSnapshot } from "./global-templates";
-
-const coerceKetikModelId = (modelId?: string) => {
-  const normalized = normalizeModelId(modelId);
-  return KETIK_PDKT_MODELS.some((model) => model.id === normalized)
-    ? normalized
-    : DEFAULT_AI_MODEL_ID;
-};
 
 const coerceDuration = (duration?: number) => {
   if (typeof duration !== "number" || isNaN(duration)) return 5;
@@ -109,7 +98,7 @@ function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
       phoneNumber: stored.identitySettings?.phoneNumber || "",
       city: stored.identitySettings?.city || "",
     },
-    selectedModel: coerceKetikModelId(stored.selectedModel),
+    selectedModel: coerceKetikPdktModelId(stored.selectedModel),
     simulationDuration: coerceDuration(stored.simulationDuration),
     responsePacingMode: stored.responsePacingMode || "realistic",
   };
