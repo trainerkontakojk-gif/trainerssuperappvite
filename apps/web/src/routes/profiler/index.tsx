@@ -17,6 +17,9 @@ import {
 import { cleanYearLabel } from "./components/workspace/workspace-utils";
 import DuplicateFolderModal from "./components/DuplicateFolderModal";
 import AddMemberPicker from "./components/AddMemberPicker";
+import ProfilerTeamsDialog from "./components/ProfilerTeamsDialog";
+import ProfilerAddForm from "./components/forms/ProfilerAddForm";
+import ProfilerImportFlow from "./components/import/ProfilerImportFlow";
 import { Cake, Loader2, PanelLeft, Trash2 } from "lucide-react";
 import { useProfilerAccess } from "../../hooks/useProfilerAccess";
 import { useQueryParams } from "../../hooks/useQueryParams";
@@ -49,6 +52,7 @@ export default function ProfilerLanding() {
   const queryParams = useQueryParams();
   const selectedBatch = queryParams.batch ?? "";
   const activeView = parseProfilerBatchView(queryParams.view);
+  const showTeams = queryParams.tim === "1";
 
   const [years, setYears] = useState<ProfilerYear[]>([]);
   const [folders, setFolders] = useState<ProfilerFolder[]>([]);
@@ -273,6 +277,27 @@ export default function ProfilerLanding() {
 
   const batchPeserta = activeFolder ? pesertaMap[activeFolder.name] : undefined;
 
+  // Tambah dan Impor dibuka di area utama; leader tidak punya keduanya, dan
+  // Impor butuh folder yang sudah dipilih.
+  const task = isReadOnly
+    ? null
+    : queryParams.view === "tambah"
+      ? "tambah"
+      : queryParams.view === "impor" && activeFolder
+        ? "impor"
+        : null;
+
+  /** URL sekarang dengan `extra`, tanpa dialog tim. */
+  const searchWith = (extra: Record<string, string | number>) => {
+    const next: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(queryParams)) {
+      if (key === "tim") continue;
+      // `edit` harus angka; string "1" diserialisasi TanStack menjadi "%221%22".
+      next[key] = key === "edit" ? 1 : value;
+    }
+    return { ...next, ...extra };
+  };
+
   const handlePesertaChange = useCallback(
     (batchName: string, next: ProfilerPeserta[]) => {
       setPesertaMap((prev) => ({ ...prev, [batchName]: next }));
@@ -384,6 +409,45 @@ export default function ProfilerLanding() {
                 />
                 Memuat Profiler…
               </div>
+            ) : task === "tambah" ? (
+              <ProfilerAddForm
+                key={selectedBatch}
+                initialBatch={activeFolder?.name ?? ""}
+                years={years}
+                folders={folders}
+                onCancel={() => selectBatch(activeFolder?.name ?? "")}
+                onSaved={(batchName, created) => {
+                  setPesertaMap((prev) =>
+                    prev[batchName]
+                      ? { ...prev, [batchName]: [...prev[batchName], created] }
+                      : prev,
+                  );
+                  setCounts((prev) => ({
+                    ...prev,
+                    [batchName]: (prev[batchName] ?? 0) + 1,
+                  }));
+                  selectBatch(batchName);
+                }}
+              />
+            ) : task === "impor" && activeFolder ? (
+              <ProfilerImportFlow
+                key={activeFolder.name}
+                batchName={activeFolder.name}
+                onCancel={() => selectBatch(activeFolder.name)}
+                onImported={(count) => {
+                  // Muat ulang daftar folder ini supaya urutan dan id dari server.
+                  setPesertaMap((prev) => {
+                    const next = { ...prev };
+                    delete next[activeFolder.name];
+                    return next;
+                  });
+                  setCounts((prev) => ({
+                    ...prev,
+                    [activeFolder.name]: (prev[activeFolder.name] ?? 0) + count,
+                  }));
+                }}
+                onFinish={() => selectBatch(activeFolder.name)}
+              />
             ) : activeFolder ? (
               <ProfilerBatchWorkspace
                 key={activeFolder.name}
@@ -412,6 +476,9 @@ export default function ProfilerLanding() {
                 upcomingBirthdays={upcomingBirthdays}
                 onShowBirthdays={() => setShowBirthdayModal(true)}
                 onPickPeserta={() => setShowPicker(true)}
+                onOpenTeams={() =>
+                  navigate({ to: "/profiler", search: searchWith({ tim: 1 }) })
+                }
               />
             ) : (
               <ProfilerYearOverview
@@ -661,6 +728,14 @@ export default function ProfilerLanding() {
             }}
           />
         )}
+
+        <ProfilerTeamsDialog
+          open={showTeams}
+          isReadOnly={isReadOnly}
+          onClose={() =>
+            navigate({ to: "/profiler", search: searchWith({}), replace: true })
+          }
+        />
 
         <AddMemberPicker
           isOpen={showPicker}

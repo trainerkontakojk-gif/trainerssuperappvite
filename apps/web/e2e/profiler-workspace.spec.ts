@@ -231,13 +231,13 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await workspace.getByRole("button", { name: "Tambah peserta" }).click();
     const menu = page.getByRole("menu");
     await expect(
-      menu.getByRole("menuitem", { name: /Pilih dari daftar/ }),
+      menu.getByRole("menuitem", { name: /Pilih dari folder lain/ }),
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: /Input manual/ }),
+      menu.getByRole("menuitem", { name: /Isi manual/ }),
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: /Impor Excel/ }),
+      menu.getByRole("menuitem", { name: /Impor dari Excel/ }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
 

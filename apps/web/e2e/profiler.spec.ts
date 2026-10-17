@@ -69,7 +69,8 @@ test.describe("Profiler (hermetic)", () => {
     page,
   }) => {
     const audit = await openHermeticShell(page, {
-      path: "/profiler/import?batch=Batch%20Pagi",
+      path: "/profiler?batch=Batch%20Pagi&view=impor",
+      waitForUrl: /\/profiler/,
       apiMocks: [
         ...PROFILER_MOCKS,
         {
@@ -82,9 +83,9 @@ test.describe("Profiler (hermetic)", () => {
         },
       ],
     });
-    // Label grup kolom template (mis. "Identitas Utama") adalah teks kecil
-    // yang dulu text-[10px]; pastikan sudah tampil sebelum dipindai.
-    await expect(page.getByText("Identitas Utama")).toBeVisible({
+    // Label grup kolom template (mis. "Identitas utama") dulu text-[10px];
+    // pastikan sudah tampil sebelum dipindai.
+    await expect(page.getByText("Identitas utama")).toBeVisible({
       timeout: 20000,
     });
 

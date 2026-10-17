@@ -71,6 +71,7 @@ interface ProfilerBatchWorkspaceProps {
   upcomingBirthdays: BirthdayEntry[];
   onShowBirthdays: () => void;
   onPickPeserta: () => void;
+  onOpenTeams: () => void;
 }
 
 export default function ProfilerBatchWorkspace({
@@ -92,6 +93,7 @@ export default function ProfilerBatchWorkspace({
   upcomingBirthdays,
   onShowBirthdays,
   onPickPeserta,
+  onOpenTeams,
 }: ProfilerBatchWorkspaceProps) {
   const navigate = useNavigate();
   const search = { batch: batchName };
@@ -183,29 +185,36 @@ export default function ProfilerBatchWorkspace({
               <DropdownMenuContent align="end" className="w-60">
                 <DropdownMenuItem onClick={onPickPeserta} className="min-h-11">
                   <ListPlus aria-hidden="true" />
-                  Pilih dari daftar
+                  Pilih dari folder lain
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => navigate({ to: "/profiler/add", search })}
+                  onClick={() =>
+                    navigate({
+                      to: "/profiler",
+                      search: { ...search, view: "tambah" },
+                    })
+                  }
                   className="min-h-11"
                 >
                   <PenLine aria-hidden="true" />
-                  Input manual
+                  Isi manual
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => navigate({ to: "/profiler/import", search })}
+                  onClick={() =>
+                    navigate({
+                      to: "/profiler",
+                      search: { ...search, view: "impor" },
+                    })
+                  }
                   className="min-h-11"
                 >
                   <FileSpreadsheet aria-hidden="true" />
-                  Impor Excel
+                  Impor dari Excel
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => navigate({ to: "/profiler/teams" })}
-                  className="min-h-11"
-                >
+                <DropdownMenuItem onClick={onOpenTeams} className="min-h-11">
                   <Settings2 aria-hidden="true" />
-                  Manajemen tim
+                  Kelola daftar tim
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -123,19 +123,20 @@ test.describe("Profiler tahap 1: perbaikan bug", () => {
   }) => {
     const bodies = collectCreateBodies(page);
     const audit = await openHermeticShell(page, {
-      path: "/profiler/add",
+      path: "/profiler?view=tambah",
+      waitForUrl: /\/profiler/,
       apiMocks: [TEAMS_MOCK, CREATE_MOCK, ...PROFILER_MOCKS],
     });
 
     await page.getByLabel("Nama lengkap *").fill("Peserta Baru");
-    await page.getByRole("button", { name: "Simpan peserta" }).click();
+    await page.getByRole("button", { name: "Simpan peserta" }).first().click();
     await expect(page.getByText("Pilih folder tujuan dulu.")).toBeVisible();
     await page.waitForTimeout(500);
     expect(bodies).toHaveLength(0);
 
     await page.getByRole("combobox", { name: "Folder tujuan" }).click();
     await page.getByRole("option", { name: "Batch Pagi" }).click();
-    await page.getByRole("button", { name: "Simpan peserta" }).click();
+    await page.getByRole("button", { name: "Simpan peserta" }).first().click();
     await expect.poll(() => bodies.length).toBe(1);
     expect(bodies[0]).toMatchObject({
       nama: "Peserta Baru",
@@ -151,8 +152,8 @@ test.describe("Profiler tahap 1: perbaikan bug", () => {
   }) => {
     const bodies = collectCreateBodies(page);
     const audit = await openHermeticShell(page, {
-      path: "/profiler/add?batch=Batch%20Pagi",
-      waitForUrl: /\/profiler\/add/,
+      path: "/profiler?batch=Batch%20Pagi&view=tambah",
+      waitForUrl: /\/profiler/,
       apiMocks: [TEAMS_MOCK, CREATE_MOCK, ...PROFILER_MOCKS],
     });
 
@@ -166,7 +167,7 @@ test.describe("Profiler tahap 1: perbaikan bug", () => {
     await expect(page.getByText(/tidak tampil di slide/)).toHaveCount(0);
 
     await page.getByLabel("Nama lengkap *").fill("Peserta Kedua");
-    await page.getByRole("button", { name: "Simpan peserta" }).click();
+    await page.getByRole("button", { name: "Simpan peserta" }).first().click();
     await expect.poll(() => bodies.length).toBe(1);
     expect(bodies[0]).toMatchObject({ batch_name: "Batch Pagi" });
 
@@ -176,8 +177,8 @@ test.describe("Profiler tahap 1: perbaikan bug", () => {
 
   test("edit peserta: jabatan tampil sebagai label", async ({ page }) => {
     const audit = await openHermeticShell(page, {
-      path: "/profiler/table?batch=Batch%20Pagi",
-      waitForUrl: /\/profiler\/table/,
+      path: "/profiler?batch=Batch%20Pagi&layout=tabel",
+      waitForUrl: /\/profiler/,
       apiMocks: [FULL_BATCH_MOCK, TEAMS_MOCK, ...PROFILER_MOCKS],
     });
 
@@ -196,7 +197,8 @@ test.describe("Profiler tahap 1: perbaikan bug", () => {
     page,
   }) => {
     const audit = await openHermeticShell(page, {
-      path: "/profiler/teams",
+      path: "/profiler?tim=1",
+      waitForUrl: /\/profiler/,
       apiMocks: [TEAMS_MOCK, ...PROFILER_MOCKS],
     });
 

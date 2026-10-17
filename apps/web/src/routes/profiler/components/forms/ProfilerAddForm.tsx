@@ -1,29 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Lock, Plus, Save, Trash2, Upload, UserPlus } from "lucide-react";
+import { Lock, Plus, Save, Upload } from "lucide-react";
 import type {
   ProfilerFolder,
   ProfilerPeserta,
   ProfilerYear,
 } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
-import { profilerApi } from "../../lib/profilerService";
-import { supabase } from "../../lib/supabase";
-import { useQueryParams } from "../../hooks/useQueryParams";
-import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
-import { ProfilerFolderSelect } from "./components/ProfilerFolderSelect";
-import { Button } from "../../components/ui/button";
+import { profilerApi } from "../../../../lib/profilerService";
+import { supabase } from "../../../../lib/supabase";
+import { notify } from "../../../../lib/toast";
+import { ProfilerFolderSelect } from "../ProfilerFolderSelect";
+import { Button } from "../../../../components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
-import { Label } from "../../components/ui/label";
-import { Textarea } from "../../components/ui/textarea";
-import { Alert, AlertDescription } from "../../components/ui/alert";
+} from "../../../../components/ui/card";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import { Textarea } from "../../../../components/ui/textarea";
+import { Alert, AlertDescription } from "../../../../components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -31,7 +29,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select";
+} from "../../../../components/ui/select";
 
 const DEFAULT_TIMS = ["Telepon", "Chat", "Email"];
 
@@ -121,15 +119,28 @@ function Section({
   );
 }
 
-export default function ProfilerAdd() {
-  const navigate = useNavigate();
-  const { batch } = useQueryParams();
+interface ProfilerAddFormProps {
+  /** Folder asal (`?batch=`); kosong berarti pengguna wajib memilih. */
+  initialBatch: string;
+  years: ProfilerYear[];
+  folders: ProfilerFolder[];
+  onCancel: () => void;
+  onSaved: (batchName: string, created: ProfilerPeserta) => void;
+}
+
+/** Form Tambah peserta di area utama workspace (`?view=tambah`). */
+export default function ProfilerAddForm({
+  initialBatch,
+  years,
+  folders,
+  onCancel,
+  onSaved,
+}: ProfilerAddFormProps) {
   // Folder tujuan wajib dipilih; tanpa `?batch=` peserta tidak boleh jatuh
   // diam-diam ke folder tebakan.
-  const [batchName, setBatchName] = useState(batch || "");
+  const [batchName, setBatchName] = useState(initialBatch);
   const [batchError, setBatchError] = useState(false);
-  const [years, setYears] = useState<ProfilerYear[]>([]);
-  const [folders, setFolders] = useState<ProfilerFolder[]>([]);
+  const [namaError, setNamaError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState("");
@@ -146,15 +157,6 @@ export default function ProfilerAdd() {
 
   const set = (key: keyof ProfilerPeserta, value: any) =>
     setForm((previous) => ({ ...previous, [key]: value }));
-
-  useEffect(() => {
-    Promise.all([profilerApi.getYears(), profilerApi.getFolders()])
-      .then(([nextYears, nextFolders]) => {
-        setYears(nextYears);
-        setFolders(nextFolders);
-      })
-      .catch((error) => console.error("Gagal memuat folder", error));
-  }, []);
 
   useEffect(() => {
     profilerApi
@@ -185,24 +187,7 @@ export default function ProfilerAdd() {
       setNewTimName("");
       setShowAddTim(false);
     } catch (error: any) {
-      alert("Gagal tambah tim: " + error.message);
-    } finally {
-      setTimLoading(false);
-    }
-  };
-  const handleRemoveTim = async (tim: string) => {
-    if (DEFAULT_TIMS.includes(tim)) return;
-    if (!confirm(`Hapus tim "${tim}"?`)) return;
-    setTimLoading(true);
-    try {
-      const teams = await profilerApi.getTeams();
-      const team = teams.find((item) => item.nama === tim);
-      if (team) await profilerApi.deleteTeam(team.id);
-      const updated = timList.filter((item) => item !== tim);
-      setTimList(updated);
-      if (selectedTim === tim) handleSelectTim(updated[0] || "Telepon");
-    } catch (error: any) {
-      alert("Gagal hapus tim: " + error.message);
+      notify.error("Gagal menambah tim", error.message);
     } finally {
       setTimLoading(false);
     }
@@ -214,14 +199,11 @@ export default function ProfilerAdd() {
     setFotoPreview(URL.createObjectURL(file));
   };
   const handleSubmit = async () => {
-    if (!batchName) {
-      setBatchError(true);
-      return;
-    }
-    if (!form.nama?.trim()) {
-      alert("Nama wajib diisi.");
-      return;
-    }
+    const missingBatch = !batchName;
+    const missingNama = !form.nama?.trim();
+    setBatchError(missingBatch);
+    setNamaError(missingNama);
+    if (missingBatch || missingNama) return;
     setLoading(true);
     try {
       const newId = crypto.randomUUID();
@@ -229,32 +211,45 @@ export default function ProfilerAdd() {
         ? await profilerApi.uploadFoto(fotoFile, newId)
         : "";
       const { data: userData } = await supabase.auth.getUser();
-      await profilerApi.createPeserta({
+      const created = await profilerApi.createPeserta({
         ...form,
         batch_name: batchName,
         id: newId,
         foto_url,
         trainer_id: userData?.user?.id || undefined,
       } as Partial<ProfilerPeserta>);
-      navigate({ to: "/profiler/table", search: { batch: batchName } });
+      notify.success(`${form.nama?.trim()} ditambahkan ke ${batchName}`);
+      onSaved(batchName, created);
     } catch (error: any) {
-      alert("Gagal menyimpan: " + error.message);
+      notify.error("Gagal menyimpan peserta", error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const heroAction = (
-    <Button
-      type="button"
-      size="lg"
-      className="min-h-11"
-      onClick={handleSubmit}
-      disabled={loading}
-    >
-      <Save data-icon="inline-start" aria-hidden="true" />
-      {loading ? "Menyimpan..." : "Simpan peserta"}
-    </Button>
+  const actions = (
+    <div className="flex shrink-0 gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="min-h-11"
+        onClick={onCancel}
+        disabled={loading}
+      >
+        Batal
+      </Button>
+      <Button
+        type="button"
+        size="lg"
+        className="min-h-11"
+        onClick={handleSubmit}
+        disabled={loading}
+      >
+        <Save data-icon="inline-start" aria-hidden="true" />
+        {loading ? "Menyimpan..." : "Simpan peserta"}
+      </Button>
+    </div>
   );
   const jabatanOptions = Object.entries(labelJabatan).map(([value, label]) => ({
     value,
@@ -262,24 +257,34 @@ export default function ProfilerAdd() {
   }));
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <ProfilerPageHeader
-        backHref={
-          batchName
-            ? `/profiler/table?batch=${encodeURIComponent(batchName)}`
-            : "/profiler"
-        }
-        backLabel={batchName ? "Kembali ke tabel batch" : "Kembali ke Profiler"}
-        eyebrow="Profiler add"
-        title="Tambah data peserta ke batch aktif."
-        description="Lengkapi identitas, tim, dan data kerja menggunakan formulir yang konsisten dengan workspace Profiler."
-        icon={<UserPlus className="size-3.5" aria-hidden="true" />}
-        actions={heroAction}
-      />
-      <div className="flex-1">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <Card size="sm" className="shadow-none">
-            <CardContent className="grid gap-2 p-4">
+    <section
+      aria-labelledby="profiler-add-title"
+      className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8"
+    >
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="truncate text-sm text-muted-foreground">
+            {initialBatch || "KTP"}
+          </p>
+          <h1
+            id="profiler-add-title"
+            className="font-outfit text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+          >
+            Tambah peserta
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Hanya kolom bertanda * yang wajib. Sisanya bisa dilengkapi nanti.
+          </p>
+        </div>
+        {actions}
+      </header>
+
+      <div className="flex flex-col gap-5">
+          <Section
+            title="Identitas utama"
+            description="Data wajib untuk mengenali peserta."
+          >
+            <div className="grid gap-2">
               <Label className="text-xs font-medium text-muted-foreground">
                 Folder tujuan *
               </Label>
@@ -299,13 +304,7 @@ export default function ProfilerAdd() {
                   Pilih folder tujuan dulu.
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
-
-          <Section
-            title="Identitas utama"
-            description="Data wajib untuk mengenali peserta di dalam batch."
-          >
+            </div>
             <div className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-[7rem_1fr]">
               <div className="grid place-items-center gap-2">
                 <div className="grid size-24 place-items-center overflow-hidden rounded-lg border border-border bg-background sm:size-28">
@@ -356,29 +355,51 @@ export default function ProfilerAdd() {
                 id="add-nama"
                 placeholder="Nama lengkap peserta"
                 value={form.nama || ""}
-                onChange={(event) => set("nama", event.target.value)}
+                onChange={(event) => {
+                  set("nama", event.target.value);
+                  if (event.target.value.trim()) setNamaError(false);
+                }}
+                aria-invalid={namaError || undefined}
               />
+              {namaError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  Nama lengkap wajib diisi.
+                </p>
+              ) : null}
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    Tim *
-                  </Label>
+              <div className="grid content-start gap-2">
+                <Label className="text-xs font-medium text-muted-foreground">
+                  Tim *
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {timList.map((tim) => (
+                    <Button
+                      key={tim}
+                      type="button"
+                      variant={selectedTim === tim ? "default" : "outline"}
+                      size="lg"
+                      className="min-h-11"
+                      aria-pressed={selectedTim === tim}
+                      onClick={() => handleSelectTim(tim)}
+                    >
+                      {tim}
+                    </Button>
+                  ))}
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="min-h-9"
+                    size="lg"
+                    className="min-h-11"
                     onClick={() => setShowAddTim((value) => !value)}
                     disabled={timLoading}
                   >
-                    <Plus data-icon="inline-start" aria-hidden="true" /> Tim
-                    baru
+                    <Plus data-icon="inline-start" aria-hidden="true" />
+                    Tim baru
                   </Button>
                 </div>
                 {showAddTim ? (
-                  <div className="mb-3 flex gap-2">
+                  <div className="flex gap-2">
                     <Input
                       autoFocus
                       value={newTimName}
@@ -400,33 +421,6 @@ export default function ProfilerAdd() {
                     </Button>
                   </div>
                 ) : null}
-                <div className="flex flex-wrap gap-2">
-                  {timList.map((tim) => (
-                    <div key={tim} className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant={selectedTim === tim ? "default" : "outline"}
-                        size="lg"
-                        className="min-h-11"
-                        onClick={() => handleSelectTim(tim)}
-                      >
-                        {tim}
-                      </Button>
-                      {!DEFAULT_TIMS.includes(tim) ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="size-8 text-muted-foreground hover:text-destructive"
-                          aria-label={`Hapus tim ${tim}`}
-                          onClick={() => void handleRemoveTim(tim)}
-                        >
-                          <Trash2 aria-hidden="true" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
               </div>
               <SelectField
                 label="Jabatan *"
@@ -707,18 +701,10 @@ export default function ProfilerAdd() {
               onChange={(event) => set("keterangan", event.target.value)}
             />
           </Section>
-          <Button
-            type="button"
-            size="lg"
-            className="min-h-12 w-full"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            <Save data-icon="inline-start" aria-hidden="true" />
-            {loading ? "Menyimpan..." : "Simpan data peserta"}
-          </Button>
-        </div>
       </div>
-    </div>
+      <div className="flex justify-end border-t border-border pt-5">
+        {actions}
+      </div>
+    </section>
   );
 }
