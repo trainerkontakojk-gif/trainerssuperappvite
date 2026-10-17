@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(pdkt): make the AI consumer email feel written by a real person and harder to skim: per-type personality outside the data block, a layperson rule (no correct solution or legal basis), scattered facts, pasted chat/SMS "attachments", a request hidden mid-email, random distractors and self-corrections, 500-1000 words for every type including rushed; fix name checks so "Agus" no longer fails on "Agustus" and place fallback names after the greeting or in the signature
 - refactor(telefun): remove the conversation challenges feature (settings section, prompt block and the session's disruption_config); saved challenge choices are ignored and dropped on the next save
 - feat(telefun): make the AI consumer behave like a real caller: it never corrects or hints the agent, angry and rushed types may interrupt and stay hard to calm, holds are always accepted but in the type's tone (one refusal allowed from the second hold), and the app tells the AI each hold's number and whether it ran too long
 - fix(ai-usage): cost PDKT attachment images at Google's image-output rate ($60 per 1M tokens for Nano Banana 2) instead of the $3 text rate, so Monitoring matches the bill
