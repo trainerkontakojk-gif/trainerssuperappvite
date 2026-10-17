@@ -1396,7 +1396,7 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("isi tiap kategori mengikuti KETIK: judul, filter, baris karakter, grup radio, tantangan", async ({
+  test("isi tiap kategori mengikuti KETIK: judul, filter, baris karakter, grup radio, tanpa tantangan", async ({
     page,
   }) => {
     const audit = await open(page, "/telefun", telefunMocks([]));
@@ -1459,7 +1459,7 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
       dialog.getByRole("heading", { name: "Identitas konsumen", exact: true }),
     ).toBeVisible();
 
-    // Sesi & AI: durasi, tempo, model sebagai grup radio; tantangan maks 3.
+    // Sesi & AI: durasi, tempo, model sebagai grup radio; tantangan percakapan sudah dihapus.
     await dialog.getByRole("tab", { name: /^Sesi & AI/ }).click();
     await expect(
       dialog.getByRole("heading", { name: "Sesi & AI", exact: true }),
@@ -1480,14 +1480,8 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
         .getByRole("radio", { checked: true }),
     ).toHaveCount(1);
 
-    const challenges = dialog.getByRole("group", {
-      name: "Tantangan percakapan",
-    });
-    const boxes = challenges.getByRole("checkbox");
-    for (let index = 0; index < 3; index += 1) await boxes.nth(index).click();
-    await expect(boxes.nth(0)).toHaveAttribute("aria-checked", "true");
-    await expect(boxes.nth(3)).toBeDisabled();
-    await expect(dialog.getByText("3 dari 3 dipilih")).toBeVisible();
+    await expect(dialog.getByText("Tantangan percakapan")).toHaveCount(0);
+    await expect(dialog.getByRole("checkbox")).toHaveCount(0);
 
     const offenders = await findTextBelowFloor(dialog);
     expect(offenders, offenders.join("\n")).toEqual([]);
