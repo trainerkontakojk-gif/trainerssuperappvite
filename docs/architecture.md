@@ -56,7 +56,7 @@ graph TD
 - **Baseline produksi**: `LiveSession`/`GeminiLiveAdapter` adalah satu-satunya Telefun live runtime; historical `openai-audio`/`openai-webrtc` values are normalized before browser start.
 - **Historical WebRTC cleanup only**: `apps/web/src/routes/telefun/services/openaiWebRtc/` tidak menyediakan POST/SDP/start. DELETE owner-bound tetap tersedia untuk already-bound historical calls.
 - **Single-flight session creation**: landing Telefun coalesces overlapping Gemini session creation before `POST /telefun/sessions`; startup never consults an OpenAI capability.
-- **Archived internal extraction**: old OpenAI observer/tool/sideband material is retained only as historical implementation evidence. It is unwired from active Telefun runtime.
+- **Removed dead OpenAI code (2026-10-17)**: the unwired OpenAI WebSocket adapter, tool coordinator, voice assessment, scoring-audio, rollout gate and the browser WebRTC session/recording/interruption modules were deleted; git history holds them. The observer/sideband code still imported by the cleanup path stays. It is unwired from active Telefun runtime.
 - **Retired data plane**: browser WebRTC media, SDP POST, sideband, and OpenAI scoring are permanently disabled; no new provider call is possible.
 - **Prompt/context authority**: the Gemini context builder is the active browser/runtime path. Historical WebRTC prompt metadata is readable evidence only and is never used to construct a provider session.
 - **Permanent guardrail**: all `TELEFUN_OPENAI*` rollout/cohort/model inputs are retired no-ops. POST remains 404; authenticated owner-bound DELETE is the narrow cleanup exception. No paid/manual provider smoke is evidence for this change.

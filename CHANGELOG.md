@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- chore(telefun): delete the retired OpenAI Telefun code no production entrypoint imports (WebSocket adapter, tool coordinator, voice assessment, scoring-audio, rollout gate, browser WebRTC session/recording/interruption modules) and their unit tests; the owner-bound DELETE cleanup path is untouched
 - fix(telefun): keep only unsynced calls in the local history copy so deleted sessions stop reappearing, refresh the Telaah recording link on every expiry with a visible retry when it keeps failing, and show hold times on the recording clock
 - chore(workflow): exempt Dependabot-authored commits from the changelog gate so its update PRs can pass CI and be merged directly
 - chore(deps): apply the pending Dependabot minor/patch updates (genai, hono node-server, supabase-js, zod, TanStack, base-ui, framer-motion, lucide, Playwright, Vite, Prettier, typescript-eslint and more) and supabase/setup-cli v3 in CI
