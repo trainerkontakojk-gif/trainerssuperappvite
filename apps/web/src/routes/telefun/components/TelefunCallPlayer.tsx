@@ -12,7 +12,7 @@ import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
-import { waveformBars } from "../utils/recordingAudio";
+import { holdWindowsInRecording, waveformBars } from "../utils/recordingAudio";
 import { formatClock } from "../utils/reviewDisplay";
 
 export interface TelefunCallPlayerHandle {
@@ -35,6 +35,8 @@ interface TelefunCallPlayerProps {
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
   holds: readonly TelefunHoldInterval[];
+  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dengan rekaman. */
+  sessionDurationMs?: number;
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
   onTimeChange?: (ms: number) => void;
@@ -117,7 +119,8 @@ function percent(ms: number, total: number): string {
 /**
  * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: gelombang
  * dari rekaman itu sendiri, posisi putar, jeda hold dari metrik sesi, dan
- * catatan trainer.
+ * catatan trainer. Rekaman disenyapkan selama hold: sesi lama ikut merekam
+ * suara agen saat hold, padahal konsumen tidak mendengarnya.
  */
 export function TelefunCallPlayer({
   ref,
@@ -126,6 +129,7 @@ export function TelefunCallPlayer({
   onRetry,
   fallbackDurationMs,
   holds,
+  sessionDurationMs,
   notes,
   downloadName,
   onTimeChange,
@@ -140,6 +144,29 @@ export function TelefunCallPlayer({
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const totalMs = durationMs > 0 ? durationMs : fallbackDurationMs;
   const ready = source.status === "ready";
+  const holdWindows = useMemo(
+    () => holdWindowsInRecording(holds, durationMs, sessionDurationMs),
+    [holds, durationMs, sessionDurationMs],
+  );
+
+  const syncHoldMute = (audio: HTMLAudioElement) => {
+    const ms = audio.currentTime * 1000;
+    audio.muted = holdWindows.some(
+      (hold) => ms >= hold.startMs && ms < hold.endMs,
+    );
+  };
+  const syncHoldMuteRef = useRef(syncHoldMute);
+  syncHoldMuteRef.current = syncHoldMute;
+
+  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold tepat.
+  useEffect(() => {
+    if (!playing) return;
+    let frame = requestAnimationFrame(function tick() {
+      if (audioRef.current) syncHoldMuteRef.current(audioRef.current);
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
 
   const updateTime = (ms: number) => {
     setCurrentMs(ms);
@@ -204,12 +231,14 @@ export function TelefunCallPlayer({
               pendingSeekRef.current = null;
             }
           }}
-          onTimeUpdate={(event) =>
-            updateTime(event.currentTarget.currentTime * 1000)
-          }
-          onSeeked={(event) =>
-            updateTime(event.currentTarget.currentTime * 1000)
-          }
+          onTimeUpdate={(event) => {
+            syncHoldMute(event.currentTarget);
+            updateTime(event.currentTarget.currentTime * 1000);
+          }}
+          onSeeked={(event) => {
+            syncHoldMute(event.currentTarget);
+            updateTime(event.currentTarget.currentTime * 1000);
+          }}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
@@ -245,14 +274,14 @@ export function TelefunCallPlayer({
             analysis={analysis}
             progress={totalMs > 0 ? Math.min(1, currentMs / totalMs) : 0}
           />
-          {holds.map((hold) => (
+          {holdWindows.map((hold) => (
             <span
               key={hold.sequence}
               aria-hidden="true"
               className="absolute inset-y-0 border-x border-dashed border-chart-orange bg-chart-orange/15"
               style={{
-                left: percent(hold.startedAtMs, totalMs),
-                width: percent(hold.durationMs, totalMs),
+                left: percent(hold.startMs, totalMs),
+                width: percent(hold.endMs - hold.startMs, totalMs),
               }}
             />
           ))}

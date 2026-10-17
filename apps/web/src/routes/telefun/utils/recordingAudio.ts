@@ -1,4 +1,7 @@
-import type { TelefunTranscriptEntry } from "@trainers/types";
+import type {
+  TelefunHoldInterval,
+  TelefunTranscriptEntry,
+} from "@trainers/types";
 
 /**
  * Analisis rekaman Telaah di browser: selubung kekerasan suara per 20 ms
@@ -180,6 +183,43 @@ export function speechOnsets(
     onsets.set(entry.startMs, Math.max(0, span.startMs - PRE_ROLL_MS));
   }
   return onsets;
+}
+
+/** Metrik sesi ditulis sekian setelah perekam berhenti (`LiveSession.stopRecording`). */
+const METRICS_AFTER_STOP_MS = 500;
+/** Selisih jam lebih besar dari ini tidak andal; pakai jam sesi apa adanya. */
+const MAX_CLOCK_SKEW_MS = 3_000;
+
+export interface RecordingHoldWindow {
+  sequence: number;
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * Jendela hold dalam waktu rekaman. Hold diukur dengan jam sesi (mulai saat
+ * autentikasi), rekaman dengan jamnya sendiri; selisihnya diperkirakan dari
+ * panjang rekaman dibanding panjang sesi tercatat. Rekaman berhenti di akhir
+ * yang sama, jadi selisih panjang = selisih awal.
+ */
+export function holdWindowsInRecording(
+  holds: readonly Pick<
+    TelefunHoldInterval,
+    "sequence" | "startedAtMs" | "endedAtMs"
+  >[],
+  recordingMs: number,
+  sessionDurationMs: number | undefined,
+): RecordingHoldWindow[] {
+  const skew =
+    recordingMs > 0 && sessionDurationMs && sessionDurationMs > 0
+      ? recordingMs - (sessionDurationMs - METRICS_AFTER_STOP_MS)
+      : 0;
+  const shift = Math.abs(skew) <= MAX_CLOCK_SKEW_MS ? skew : 0;
+  return holds.map((hold) => ({
+    sequence: hold.sequence,
+    startMs: Math.max(0, hold.startedAtMs + shift),
+    endMs: Math.max(0, hold.endedAtMs + shift),
+  }));
 }
 
 /** Tinggi batang gelombang 0–1 untuk `count` batang. */
