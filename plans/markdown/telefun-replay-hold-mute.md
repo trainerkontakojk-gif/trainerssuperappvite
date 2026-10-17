@@ -25,3 +25,21 @@ Lane C (perubahan perilaku web lintas file, tanpa backend/skema).
 1. E2E RED di `apps/web/e2e/telefun-flow.spec.ts`: hold 121–148 dtk, selisih −1 dtk. Senyap di dalam jendela (digeser dan diputar melewati batas), bersuara di luar.
 2. Implementasikan helper dan pemutar; teruskan `sessionDurationMs` dari `TelefunReviewStage`.
 3. GREEN, lalu typecheck/lint web, `thermo-nuclear`, `git diff --check`.
+
+## Tambahan: mute
+
+### Requirement
+
+- Mute juga menyenyapkan replay Telaah, seperti hold. Interval mute belum pernah disimpan, jadi ini hanya berlaku untuk sesi baru. Sesi sebelum 21 Agustus 2026 (sebelum `17c5dcbb`) yang ikut merekam suara mute tidak bisa diperbaiki.
+
+### Design
+
+- `SessionMetrics.mutes?: TelefunMuteInterval[]` (`startedAtMs`, `endedAtMs` di jam sesi). Field ini opsional dan ditambahkan ke jsonb `session_metrics` yang sudah `z.any()` di API, jadi tidak perlu migrasi atau perubahan backend.
+- `LiveSession.setMute` mencatat awal dan akhir mute. Mute yang masih aktif ditutup di `buildSessionMetrics`. Mute yang dimulai sebelum `auth_ok` dicatat dari 0.
+- Pemutar menyenyapkan audio selama gabungan interval hold dan mute, dengan geser jam yang sama. Pita oranye tetap hanya untuk hold.
+
+### Tasklist
+
+1. E2E RED (`telefun-call.spec.ts`): Bisukan lalu Bunyikan menghasilkan satu interval di `session_metrics.mutes` pada PATCH sesi.
+2. E2E RED (`telefun-flow.spec.ts`): replay senyap di dalam interval mute.
+3. Implementasi, GREEN, typecheck/lint, `thermo-nuclear`.

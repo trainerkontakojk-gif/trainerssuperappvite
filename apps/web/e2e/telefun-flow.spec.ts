@@ -527,6 +527,39 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("rekaman senyap selama mute, sama seperti hold", async ({ page }) => {
+    // Sesi 252,5 dtk untuk rekaman 252 dtk: jam rekaman sama dengan jam sesi.
+    const row: TelefunRow = {
+      ...REVIEWED_ROW,
+      session_metrics: {
+        ...REVIEWED_ROW.session_metrics!,
+        sessionDurationMs: 252_500,
+        mutes: [{ startedAtMs: 60_000, endedAtMs: 70_000 }],
+      },
+    };
+    const audit = await openTelaah(page, row, ANNOTATIONS_MOCKS, [row]);
+    const audio = page.locator("audio");
+    await expect
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .toBe(252);
+    const mutedAt = async (seconds: number) => {
+      await audio.evaluate(
+        (el: HTMLAudioElement, at) =>
+          new Promise<void>((resolve) => {
+            el.addEventListener("seeked", () => resolve(), { once: true });
+            el.currentTime = at;
+          }),
+        seconds,
+      );
+      return audio.evaluate((el: HTMLAudioElement) => el.muted);
+    };
+    expect(await mutedAt(59.5)).toBe(false);
+    expect(await mutedAt(65)).toBe(true);
+    expect(await mutedAt(70.5)).toBe(false);
+    expect(await mutedAt(130)).toBe(true);
+    expectHermetic(audit);
+  });
+
   test("menunggu analisis: status jujur, Periksa status memuat hasil", async ({
     page,
   }) => {

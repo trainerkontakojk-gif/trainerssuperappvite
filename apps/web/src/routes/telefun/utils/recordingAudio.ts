@@ -1,7 +1,4 @@
-import type {
-  TelefunHoldInterval,
-  TelefunTranscriptEntry,
-} from "@trainers/types";
+import type { TelefunTranscriptEntry } from "@trainers/types";
 
 /**
  * Analisis rekaman Telaah di browser: selubung kekerasan suara per 20 ms
@@ -190,35 +187,30 @@ const METRICS_AFTER_STOP_MS = 500;
 /** Selisih jam lebih besar dari ini tidak andal; pakai jam sesi apa adanya. */
 const MAX_CLOCK_SKEW_MS = 3_000;
 
-export interface RecordingHoldWindow {
-  sequence: number;
+export interface RecordingWindow {
   startMs: number;
   endMs: number;
 }
 
 /**
- * Jendela hold dalam waktu rekaman. Hold diukur dengan jam sesi (mulai saat
- * autentikasi), rekaman dengan jamnya sendiri; selisihnya diperkirakan dari
- * panjang rekaman dibanding panjang sesi tercatat. Rekaman berhenti di akhir
- * yang sama, jadi selisih panjang = selisih awal.
+ * Rentang hold/mute dalam waktu rekaman. Rentang diukur dengan jam sesi
+ * (mulai saat autentikasi), rekaman dengan jamnya sendiri; selisihnya
+ * diperkirakan dari panjang rekaman dibanding panjang sesi tercatat. Rekaman
+ * berhenti di akhir yang sama, jadi selisih panjang = selisih awal.
  */
-export function holdWindowsInRecording(
-  holds: readonly Pick<
-    TelefunHoldInterval,
-    "sequence" | "startedAtMs" | "endedAtMs"
-  >[],
+export function windowsInRecording(
+  intervals: readonly { startedAtMs: number; endedAtMs: number }[],
   recordingMs: number,
   sessionDurationMs: number | undefined,
-): RecordingHoldWindow[] {
+): RecordingWindow[] {
   const skew =
     recordingMs > 0 && sessionDurationMs && sessionDurationMs > 0
       ? recordingMs - (sessionDurationMs - METRICS_AFTER_STOP_MS)
       : 0;
   const shift = Math.abs(skew) <= MAX_CLOCK_SKEW_MS ? skew : 0;
-  return holds.map((hold) => ({
-    sequence: hold.sequence,
-    startMs: Math.max(0, hold.startedAtMs + shift),
-    endMs: Math.max(0, hold.endedAtMs + shift),
+  return intervals.map((interval) => ({
+    startMs: Math.max(0, interval.startedAtMs + shift),
+    endMs: Math.max(0, interval.endedAtMs + shift),
   }));
 }
 

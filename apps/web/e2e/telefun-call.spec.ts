@@ -167,6 +167,20 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await call.getByRole("button", { name: "Lanjutkan" }).click();
     await expect(call.getByText("Panggilan ditahan")).toHaveCount(0);
 
+    // Bisukan dicatat sebagai interval, supaya replay Telaah ikut senyap.
+    const patchBodies: unknown[] = [];
+    page.on("request", (request) => {
+      if (
+        request.method() === "PATCH" &&
+        request.url().endsWith(`/api/v1/telefun/sessions/${NEW_ID}`)
+      )
+        patchBodies.push(request.postDataJSON());
+    });
+    await call.getByRole("button", { name: "Bisukan" }).click();
+    await expect(call.getByText("Mikrofon dibisukan")).toBeVisible();
+    await page.waitForTimeout(300);
+    await call.getByRole("button", { name: "Bunyikan" }).click();
+
     // Akhiri meminta konfirmasi aplikasi.
     await call.getByRole("button", { name: "Akhiri" }).click();
     const confirm = page.getByRole("dialog", { name: "Akhiri panggilan?" });
@@ -201,6 +215,24 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
       "POST /api/v1/telefun/sessions",
       `PATCH /api/v1/telefun/sessions/${NEW_ID}`,
     ]);
+    const metrics = patchBodies
+      .map(
+        (body) =>
+          (body as { session_metrics?: { mutes?: unknown } }).session_metrics,
+      )
+      .find(Boolean);
+    expect(metrics?.mutes).toEqual([
+      {
+        startedAtMs: expect.any(Number),
+        endedAtMs: expect.any(Number),
+      },
+    ]);
+    const [mute] = metrics!.mutes as {
+      startedAtMs: number;
+      endedAtMs: number;
+    }[];
+    expect(mute.startedAtMs).toBeGreaterThan(0);
+    expect(mute.endedAtMs - mute.startedAtMs).toBeGreaterThanOrEqual(300);
     expectHermetic(audit);
   });
 

@@ -7,12 +7,12 @@ import {
   type Ref,
 } from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
-import type { TelefunHoldInterval } from "@trainers/types";
+import type { TelefunHoldInterval, TelefunMuteInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
-import { holdWindowsInRecording, waveformBars } from "../utils/recordingAudio";
+import { waveformBars, windowsInRecording } from "../utils/recordingAudio";
 import { formatClock } from "../utils/reviewDisplay";
 
 export interface TelefunCallPlayerHandle {
@@ -35,7 +35,8 @@ interface TelefunCallPlayerProps {
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
   holds: readonly TelefunHoldInterval[];
-  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dengan rekaman. */
+  mutes: readonly TelefunMuteInterval[];
+  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dan mute dengan rekaman. */
   sessionDurationMs?: number;
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
@@ -119,8 +120,8 @@ function percent(ms: number, total: number): string {
 /**
  * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: gelombang
  * dari rekaman itu sendiri, posisi putar, jeda hold dari metrik sesi, dan
- * catatan trainer. Rekaman disenyapkan selama hold: sesi lama ikut merekam
- * suara agen saat hold, padahal konsumen tidak mendengarnya.
+ * catatan trainer. Rekaman disenyapkan selama hold dan mute: sesi lama ikut
+ * merekam suara agen saat itu, padahal konsumen tidak mendengarnya.
  */
 export function TelefunCallPlayer({
   ref,
@@ -129,6 +130,7 @@ export function TelefunCallPlayer({
   onRetry,
   fallbackDurationMs,
   holds,
+  mutes,
   sessionDurationMs,
   notes,
   downloadName,
@@ -145,24 +147,31 @@ export function TelefunCallPlayer({
   const totalMs = durationMs > 0 ? durationMs : fallbackDurationMs;
   const ready = source.status === "ready";
   const holdWindows = useMemo(
-    () => holdWindowsInRecording(holds, durationMs, sessionDurationMs),
+    () => windowsInRecording(holds, durationMs, sessionDurationMs),
     [holds, durationMs, sessionDurationMs],
   );
+  const silentWindows = useMemo(
+    () => [
+      ...holdWindows,
+      ...windowsInRecording(mutes, durationMs, sessionDurationMs),
+    ],
+    [holdWindows, mutes, durationMs, sessionDurationMs],
+  );
 
-  const syncHoldMute = (audio: HTMLAudioElement) => {
+  const syncSilence = (audio: HTMLAudioElement) => {
     const ms = audio.currentTime * 1000;
-    audio.muted = holdWindows.some(
-      (hold) => ms >= hold.startMs && ms < hold.endMs,
+    audio.muted = silentWindows.some(
+      (span) => ms >= span.startMs && ms < span.endMs,
     );
   };
-  const syncHoldMuteRef = useRef(syncHoldMute);
-  syncHoldMuteRef.current = syncHoldMute;
+  const syncSilenceRef = useRef(syncSilence);
+  syncSilenceRef.current = syncSilence;
 
-  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold tepat.
+  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold dan mute tepat.
   useEffect(() => {
     if (!playing) return;
     let frame = requestAnimationFrame(function tick() {
-      if (audioRef.current) syncHoldMuteRef.current(audioRef.current);
+      if (audioRef.current) syncSilenceRef.current(audioRef.current);
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
@@ -232,11 +241,11 @@ export function TelefunCallPlayer({
             }
           }}
           onTimeUpdate={(event) => {
-            syncHoldMute(event.currentTarget);
+            syncSilence(event.currentTarget);
             updateTime(event.currentTarget.currentTime * 1000);
           }}
           onSeeked={(event) => {
-            syncHoldMute(event.currentTarget);
+            syncSilence(event.currentTarget);
             updateTime(event.currentTarget.currentTime * 1000);
           }}
           onPlay={() => setPlaying(true)}
@@ -274,9 +283,9 @@ export function TelefunCallPlayer({
             analysis={analysis}
             progress={totalMs > 0 ? Math.min(1, currentMs / totalMs) : 0}
           />
-          {holdWindows.map((hold) => (
+          {holdWindows.map((hold, index) => (
             <span
-              key={hold.sequence}
+              key={index}
               aria-hidden="true"
               className="absolute inset-y-0 border-x border-dashed border-chart-orange bg-chart-orange/15"
               style={{
