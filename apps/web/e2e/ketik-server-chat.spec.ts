@@ -642,3 +642,78 @@ for (const { label, identity, portrait } of [
     expectHermetic(audit);
   });
 }
+
+test("agent messages sent back to back are read first and answered once", async ({
+  page,
+}) => {
+  let live = session();
+  const audit = await openHermeticShell(page, {
+    path: "/ketik",
+    apiMocks: base,
+    expectedThirdPartyHosts: ["randomuser.me"],
+  });
+  await page.route(`**/api/v1/ketik/sessions/${id}`, (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  await page.route("**/api/v1/ketik/sessions", (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  const calls: KetikSessionTurnRequest[] = [];
+  await page.route(`**/api/v1/ketik/sessions/${id}/turns`, async (route) => {
+    const body = route.request().postDataJSON() as KetikSessionTurnRequest;
+    calls.push(body);
+    expect(body.expectedVersion).toBe(live.version);
+    const agent = {
+      id: body.requestId,
+      sender: "agent" as const,
+      text: body.text,
+      timestamp: new Date().toISOString(),
+    };
+    live = body.awaitMore
+      ? { ...live, version: live.version + 2, messages: [...live.messages, agent] }
+      : {
+          ...live,
+          version: live.version + 2,
+          messages: [
+            ...live.messages,
+            agent,
+            {
+              id: `reply-${calls.length}`,
+              sender: "consumer",
+              text: "Bentar kak, saya baca dulu",
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+  await page.getByRole("button", { name: /^Mulai simulasi/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Mulai|Lanjutkan/ })
+    .click();
+  const room = page.getByRole("region", { name: "Ruang chat" });
+  const input = room.getByRole("textbox", { name: "Tulis balasan" });
+  const typing = room.getByLabel("Konsumen sedang mengetik");
+  const explanation =
+    "Baik Bapak, untuk laporan pinjol ilegal silakan simpan semua bukti ancaman, tangkapan layar pesan, dan nomor penagih. Jangan transfer dana apa pun, lalu laporkan melalui kanal resmi agar dapat ditindaklanjuti oleh satgas terkait. Kami juga sarankan Bapak memblokir nomor penagih tersebut.";
+  await input.fill(explanation);
+  await input.press("Enter");
+  await input.fill("Apakah informasinya sudah cukup jelas, Bapak?");
+  await input.press("Enter");
+  await expect.poll(() => calls.length).toBe(2);
+  // Konsumen masih membaca: belum ada tanda mengetik.
+  await expect(typing).toHaveCount(0);
+  expect(calls[0]).toMatchObject({ text: explanation, awaitMore: true });
+  expect(Object.keys(calls[1]).sort()).toEqual([
+    "expectedVersion",
+    "requestId",
+    "text",
+  ]);
+  await expect(typing).toBeVisible({ timeout: 15000 });
+  await expect(
+    room.getByText("Bentar kak, saya baca dulu", { exact: true }),
+  ).toHaveCount(1, { timeout: 15000 });
+  expect(calls).toHaveLength(2);
+  expectHermetic(audit);
+});

@@ -1,7 +1,23 @@
-import React, { useRef, useImperativeHandle, forwardRef } from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ProfilerPeserta } from "@trainers/types";
 
 export type SlideMode = "original" | "portraitA4";
+
+/**
+ * Slide selalu ditata pada ukuran desain tetap lalu diperkecil (`scale`) agar
+ * muat di layar mana pun. Dengan begitu isi slide tidak terpotong di layar
+ * sempit dan hasil simpan PNG/PDF selalu berukuran sama.
+ */
+const DESIGN_SIZE: Record<SlideMode, { width: number; height: number }> = {
+  original: { width: 1000, height: 562.5 },
+  portraitA4: { width: 820, height: (820 * 297) / 210 },
+};
 
 export interface SlideCanvasRef {
   saveAsImage: (batchName: string, participant: ProfilerPeserta) => Promise<void>;
@@ -22,7 +38,21 @@ interface SlideCanvasProps {
 export const SlideCanvas = forwardRef<SlideCanvasRef, SlideCanvasProps>(
   ({ slideMode, fade, theme, children }, ref) => {
     const slideRef = useRef<HTMLDivElement>(null);
+    const frameRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
     const isA4Portrait = slideMode === "portraitA4";
+    const design = DESIGN_SIZE[slideMode];
+
+    useLayoutEffect(() => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      const update = () =>
+        setScale(Math.min(1, frame.clientWidth / design.width));
+      update();
+      const observer = new ResizeObserver(update);
+      observer.observe(frame);
+      return () => observer.disconnect();
+    }, [design.width]);
 
     const captureElementCanvas = async (target: HTMLElement | null) => {
       if (!target) return null;
@@ -38,6 +68,16 @@ export const SlideCanvas = forwardRef<SlideCanvasRef, SlideCanvasProps>(
         foreignObjectRendering: true,
         onclone: (_clonedDoc: Document, clonedRoot: HTMLElement) => {
           prepareHtml2CanvasClone(_clonedDoc, clonedRoot, target);
+          // Tangkapan memakai ukuran desain penuh, bukan ukuran pratinjau.
+          const scaler = clonedRoot.closest<HTMLElement>("[data-slide-scaler]");
+          if (scaler) {
+            scaler.style.transform = "none";
+            const viewport = scaler.parentElement;
+            if (viewport) {
+              viewport.style.width = "auto";
+              viewport.style.height = "auto";
+            }
+          }
         },
       });
     };
@@ -82,26 +122,35 @@ export const SlideCanvas = forwardRef<SlideCanvasRef, SlideCanvasProps>(
     }));
 
     return (
-      <div
-        className={`relative duration-300 transition-all ${
-          isA4Portrait
-            ? "aspect-[210/297] w-full max-w-[820px]"
-            : "aspect-video max-h-full w-full max-w-[1000px]"
-        }`}
-        style={{
-          opacity: fade ? 1 : 0,
-          transform: fade ? "translateY(0)" : "translateY(4px)",
-        }}
-      >
+      <div ref={frameRef} className="w-full">
         <div
-          ref={slideRef}
-          className={`bg-surface border border-border flex h-full w-full flex-col rounded-2xl ${
-            isA4Portrait ? "overflow-y-auto" : "overflow-hidden"
-          }`}
+          className="mx-auto overflow-hidden"
+          style={{
+            width: design.width * scale,
+            height: design.height * scale,
+          }}
         >
-          {children}
+          <div
+            data-slide-scaler
+            className="relative origin-top-left transition-opacity duration-300"
+            style={{
+              width: design.width,
+              height: design.height,
+              opacity: fade ? 1 : 0,
+              transform: `scale(${scale})`,
+            }}
+          >
+            <div
+              ref={slideRef}
+              className={`bg-surface border border-border flex h-full w-full flex-col rounded-2xl ${
+                isA4Portrait ? "overflow-y-auto" : "overflow-hidden"
+              }`}
+            >
+              {children}
 
-          <div className="h-6 shrink-0" />
+              <div className="h-6 shrink-0" />
+            </div>
+          </div>
         </div>
       </div>
     );

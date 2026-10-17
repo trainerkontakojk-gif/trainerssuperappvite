@@ -146,8 +146,6 @@ export default function ProfilerSlidesPanel({
     );
   }
 
-  const isA4Portrait = slideMode === "portraitA4";
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -245,32 +243,21 @@ export default function ProfilerSlidesPanel({
         />
       </div>
 
-      {/* Slide punya lebar minimum agar tetap terbaca; di layar sempit frame
-          digulir ke samping (justify-center + overflow-hidden memotong sisi kiri). */}
+      {/* Slide diperkecil otomatis agar muat utuh di lebar layar. */}
       <div
         tabIndex={0}
         role="region"
         aria-label={`Slide ${current.nama || "peserta"}`}
-        className={`flex min-h-[24rem] w-full overflow-auto rounded-xl border border-border bg-card p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5 ${
-          isA4Portrait ? "items-start" : "items-center"
-        }`}
+        className="w-full rounded-xl border border-border bg-card p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5"
       >
-        <div
-          className={`mx-auto w-full ${
-            isA4Portrait
-              ? "min-w-[30rem] max-w-[820px]"
-              : "min-w-[40rem] max-w-[1000px]"
-          }`}
+        <SlideCanvas
+          ref={canvasRef}
+          slideMode={slideMode}
+          fade={fade}
+          theme={timTheme(current.tim || "")}
         >
-          <SlideCanvas
-            ref={canvasRef}
-            slideMode={slideMode}
-            fade={fade}
-            theme={timTheme(current.tim || "")}
-          >
-            <ParticipantSlide participant={current} slideMode={slideMode} />
-          </SlideCanvas>
-        </div>
+          <ParticipantSlide participant={current} slideMode={slideMode} />
+        </SlideCanvas>
       </div>
 
       <div className="flex items-center justify-center gap-3">
