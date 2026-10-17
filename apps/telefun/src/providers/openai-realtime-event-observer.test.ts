@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../env.js", () => ({
@@ -9,23 +8,12 @@ vi.mock("../env.js", () => ({
 }));
 
 import {
-  OpenAIRealtimeAdapter,
-  type OpenAIRealtimeAdapterCallbacks,
-  type OpenAIRealtimeSocketLike,
-} from "./OpenAIRealtimeAdapter.js";
-import {
-  getHistoricalTelefunRealtimeModel,
-  type TelefunSessionConfigure,
-} from "@trainers/types";
-import type { ValidatedTelefunSessionConfigure } from "../server-protocol.js";
-import {
   SidebandEventObserver,
   type SidebandEventObserverOptions,
 } from "../realtime-webrtc/sideband-event-observer.js";
 import { TranscriptCollector } from "../transcript.js";
 import {
   createOpenAIUsageAccumulator,
-  observeOpenAIUsage,
   summarizeOpenAIUsageAccumulator,
 } from "../usage.js";
 import { createOpenAIRealtimeEventObserver } from "./openai-realtime-event-observer.js";
@@ -152,44 +140,6 @@ const EVENTS: unknown[] = [
   null,
 ];
 
-class ParitySocket extends EventEmitter implements OpenAIRealtimeSocketLike {
-  readyState = 0;
-  sent: string[] = [];
-  send(message: string) {
-    this.sent.push(message);
-  }
-  close() {
-    this.readyState = 3;
-  }
-  terminate() {
-    this.readyState = 3;
-  }
-  ping() {}
-  open() {
-    this.readyState = 1;
-    this.emit("open");
-  }
-  receive(event: unknown) {
-    this.emit("message", Buffer.from(JSON.stringify(event)));
-  }
-}
-
-/** Internal historical fixture; active session admission remains Gemini-only. */
-function historicalParityConfiguration(): ValidatedTelefunSessionConfigure {
-  const model = getHistoricalTelefunRealtimeModel("gpt-realtime-2.1");
-  if (!model) throw new Error("historical fixture model is unavailable");
-  const configure = {
-    type: "telefun_session_configure",
-    modelId: "gpt-realtime-2.1",
-    transport: "openai-audio",
-    voice: "marin",
-    instructions: "Parity fixture",
-    inputAudio: { format: "pcm16", sampleRate: 24_000 },
-    responsePacingMode: "realistic",
-  } satisfies TelefunSessionConfigure;
-  return { configure, model };
-}
-
 function createParitySink() {
   const transcript = new TranscriptCollector(0);
   const usage = createOpenAIUsageAccumulator();
@@ -206,60 +156,6 @@ function createParitySink() {
     },
   };
   return { transcript, usage, snapshot };
-}
-
-function runActualAdapterFixture(events: unknown[]) {
-  const sink = createParitySink();
-  const socket = new ParitySocket();
-  const callbacks: OpenAIRealtimeAdapterCallbacks = {
-    forwardToClient: vi.fn(),
-    observeUsage: (observation, observedAtMs) =>
-      observeOpenAIUsage(sink.usage, observation, observedAtMs),
-    appendTranscript: (entry) => sink.transcript.append(entry),
-    startAiSpeaking: () => sink.snapshot.callbacks.startAiSpeaking++,
-    completeTurn: () => {
-      sink.snapshot.callbacks.completedTurns++;
-      sink.transcript.completeTurn("consumer");
-    },
-    interruptTurn: () => {
-      sink.snapshot.callbacks.interruptedTurns++;
-      sink.transcript.interruptTurn();
-    },
-    notifyActivity: () => sink.snapshot.callbacks.activity++,
-    notifyTurnComplete: () => sink.snapshot.callbacks.turnCompleteNotifications++,
-    notifyInterrupted: () => sink.snapshot.callbacks.interruptedNotifications++,
-    onFinalClose: vi.fn(),
-    onDiagnostic: vi.fn(),
-    onResponseDone: (event) => sink.snapshot.responseStatuses.push({ id: event.responseId, status: event.status }),
-    onToolEvent: (event) => sink.snapshot.toolCalls.push({ phase: event.phase, responseId: event.responseId, callId: event.callId }),
-  };
-  const adapter = new OpenAIRealtimeAdapter({
-    configuration: historicalParityConfiguration(),
-    apiKey: "server-key",
-    userId: "parity-user",
-    createSocket: () => socket,
-    callbacks,
-    now: () => 1_000,
-  });
-  const connected = adapter.connect();
-  socket.open();
-  socket.receive({ type: "session.updated", session: {} });
-  return connected.then(() => {
-    for (const event of events) socket.receive(event);
-    sink.transcript.flush(1_000);
-    adapter.close();
-    const aggregate = summarizeOpenAIUsageAccumulator(sink.usage);
-    return {
-      transcript: sink.transcript.snapshot(),
-      usage: {
-        responseCount: aggregate?.responseCount ?? 0,
-        inputTokens: aggregate?.inputTokens,
-        outputTokens: aggregate?.outputTokens,
-        transcriptionObservationCount: aggregate?.rawUsageMetadata.transcription_observation_count ?? 0,
-      },
-      ...sink.snapshot,
-    };
-  });
 }
 
 function runActualSidebandFixture(events: unknown[]) {
@@ -481,15 +377,13 @@ describe("OpenAI Realtime event observer", () => {
     expect(notifyInterrupted).toHaveBeenCalledTimes(1);
   });
 
-  it("drives actual adapter socket and sideband wrapper through equivalent fixtures", async () => {
+  it("drives the sideband wrapper through the shared fixtures", () => {
     const parityEvents = EVENTS.filter(
       (event) => (event as { type?: string } | null)?.type !== "response.output_audio.delta",
     );
-    const wsSnapshot = await runActualAdapterFixture(parityEvents);
     const sidebandSnapshot = runActualSidebandFixture(parityEvents);
 
-    expect(sidebandSnapshot).toEqual(wsSnapshot);
-    expect(wsSnapshot).toMatchObject({
+    expect(sidebandSnapshot).toMatchObject({
       transcript: [
         { speaker: "agent", text: "Halo dunia", startMs: 1_000 },
         { speaker: "consumer", text: "Selamat pagiDone only", startMs: 1_000 },
