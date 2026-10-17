@@ -5,15 +5,11 @@ import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import {
   AI_MODELS,
-  DEFAULT_AI_MODEL_ID,
   TELEFUN_LIVE_MODELS,
   getHistoricalTelefunRealtimeModel,
   getModelsForModule,
-  resolveModelProvider,
 } from "../lib/ai-models";
 import type { AiModelModule } from "@trainers/types";
-import { generateGeminiContent } from "../lib/gemini";
-import { generateOpenAIContent } from "../lib/openai";
 import { requireCapability } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
@@ -53,59 +49,6 @@ ai.get("/models", requireCapability("ai.models.read"), (c) => {
   const models = module ? getModelsForModule(module) : AI_MODELS;
   return c.json({ success: true, data: models });
 });
-
-const generateSchema = z.object({
-  model: z.string().optional(),
-  systemInstruction: z.string().optional(),
-  prompt: z.string(),
-  temperature: z.number().optional(),
-  responseMimeType: z.string().optional(),
-});
-
-ai.post(
-  "/generate",
-  requireCapability("ai.generate"),
-  zValidator("json", generateSchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    const user = c.get("user");
-    const userId = user?.id;
-
-    const { modelId, provider } = resolveModelProvider(
-      body.model || DEFAULT_AI_MODEL_ID,
-    );
-
-    const callPayload = {
-      model: modelId,
-      systemInstruction: body.systemInstruction,
-      contents: [{ role: "user" as const, parts: [{ text: body.prompt }] }],
-      temperature: body.temperature ?? 0.7,
-      responseMimeType: body.responseMimeType,
-      usageContext: { module: "ketik" as const, action: "ai_generate" },
-      userId,
-    };
-
-    const response =
-      provider === "openai"
-        ? await generateOpenAIContent(callPayload)
-        : await generateGeminiContent(callPayload);
-
-    if (!response.success) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "AI_ERROR",
-            message: response.error || "AI tidak tersedia.",
-          },
-        },
-        502,
-      );
-    }
-
-    return c.json({ success: true, data: { text: response.text } });
-  },
-);
 
 // ── My Usage (own logs) ─────────────────────────────────
 ai.get("/usage", requireCapability("usage.read"), async (c) => {

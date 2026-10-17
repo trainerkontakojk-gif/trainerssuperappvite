@@ -457,7 +457,29 @@ export const TEXT_MODELS: AiModelInfo[] = [
   GEMINI_31_FLASH_LIVE_MODEL,
 ];
 
-export const KETIK_PDKT_MODELS: AiModelInfo[] = [...TEXT_MODELS];
+/** The only models KETIK and PDKT users may pick (newest Gemini Flash and Flash-Lite). */
+export const KETIK_PDKT_MODEL_IDS = [
+  "gemini-3.8-flash",
+  "gemini-3.5-flash-lite",
+] as const;
+
+export const KETIK_PDKT_MODELS: AiModelInfo[] = TEXT_MODELS.filter((model) =>
+  (KETIK_PDKT_MODEL_IDS as readonly string[]).includes(model.id),
+);
+
+/**
+ * Maps a stored or requested KETIK/PDKT model to an allowed one. Older
+ * Flash-Lite choices stay on Flash-Lite; everything else uses the default.
+ */
+export function coerceKetikPdktModelId(modelId: unknown): string {
+  if (typeof modelId === "string") {
+    if ((KETIK_PDKT_MODEL_IDS as readonly string[]).includes(modelId)) {
+      return modelId;
+    }
+    if (modelId.includes("flash-lite")) return "gemini-3.5-flash-lite";
+  }
+  return DEFAULT_AI_MODEL_ID;
+}
 
 export const IMAGE_GENERATION_MODELS: AiModelInfo[] = [
   {

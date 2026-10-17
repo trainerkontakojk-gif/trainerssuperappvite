@@ -1545,9 +1545,12 @@ const SETTINGS_FOR_DIALOG: KetikAppSettings = {
 };
 const [SCRIPTED_SCENARIO, INACTIVE_SCENARIO] = SETTINGS_FOR_DIALOG.scenarios;
 
-async function openKetikSettings(page: Page) {
+async function openKetikSettings(
+  page: Page,
+  settings: KetikAppSettings = SETTINGS_FOR_DIALOG,
+) {
   const audit = await open(page, "/ketik", [
-    ...ketikMocks([], SETTINGS_FOR_DIALOG),
+    ...ketikMocks([], settings),
     {
       method: "PUT",
       path: "/api/v1/ketik/settings",
@@ -1716,6 +1719,41 @@ test.describe("KETIK Pengaturan (hermetic)", () => {
         ?.isActive,
     ).toBe(false);
     await expect(page.getByRole("dialog", { name: "Pengaturan KETIK" })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+});
+
+test.describe("KETIK pilihan model AI (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
+  });
+
+  test("hanya Gemini 3.8 Flash dan 3.5 Flash Lite; model lama tersimpan pindah ke bawaan", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openKetikSettings(page, {
+      ...SETTINGS_FOR_DIALOG,
+      selectedModel: "gpt-5.4-mini",
+    });
+    await dialog.getByRole("tab", { name: /^Sesi & AI/ }).click();
+    const models = dialog
+      .getByRole("radiogroup", { name: "Model AI" })
+      .getByRole("radio");
+    await expect(models).toHaveCount(2);
+    const flash = models.filter({ hasText: "Gemini 3.8 Flash" });
+    const lite = models.filter({ hasText: "Gemini 3.5 Flash Lite" });
+    await expect(flash).toHaveAttribute("aria-checked", "true");
+    await expect(lite).toHaveAttribute("aria-checked", "false");
+
+    await lite.click();
+    const saveRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" &&
+        new URL(request.url()).pathname === "/api/v1/ketik/settings",
+    );
+    await dialog.getByRole("button", { name: "Simpan", exact: true }).click();
+    const saved = (await saveRequest).postDataJSON() as KetikAppSettings;
+    expect(saved.selectedModel).toBe("gemini-3.5-flash-lite");
     expectHermetic(audit);
   });
 });

@@ -113,7 +113,6 @@ Notasi scope:
 | `POST /v1/admin/users/:id/reset-password`                           | `admin.users`                  | Ya    | Ya      | Tidak  | Tidak | all; batas trainer terhadap admin + larangan mutasi diri tetap berlaku         | —                                      | `apps/api/src/routes/admin.ts:390`                   |
 | `GET /v1/admin/activity-logs`                                       | `admin.activityLogs.read`      | Ya    | Ya      | Tidak  | Tidak | all; batas trainer terhadap admin + larangan mutasi diri tetap berlaku         | —                                      | `apps/api/src/routes/admin.ts:414`                   |
 | `GET /v1/ai/models`                                                 | `ai.models.read`               | Ya    | Ya      | Ya     | Ya    | all                                                                            | —                                      | `apps/api/src/routes/ai.ts:52`                       |
-| `POST /v1/ai/generate`                                              | `ai.generate`                  | Ya    | Ya      | Tidak  | Tidak | all                                                                            | —                                      | `apps/api/src/routes/ai.ts:66`                       |
 | `GET /v1/ai/usage`                                                  | `usage.read`                   | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ai.ts:112`                      |
 | `GET /v1/ai/usage/summary`                                          | `usage.read`                   | Ya    | Ya      | Ya     | Ya    | self (akun)                                                                    | —                                      | `apps/api/src/routes/ai.ts:138`                      |
 | `GET /v1/ai/monitoring/history`                                     | `monitoring.read`              | Ya    | Ya      | Ya     | Tidak | all                                                                            | —                                      | `apps/api/src/routes/ai.ts:202`                      |
@@ -351,7 +350,6 @@ Perbedaan UI/API yang wajib dipertahankan atau diputuskan eksplisit:
 
 | Gate terdampak                       | Hak empat role setelah penghapusan saja | Dampak nilai lama       | Keputusan |
 | ------------------------------------ | --------------------------------------- | ----------------------- | --------- |
-| `POST /v1/ai/generate`               | admin, trainer                          | qa ditolak              | D1        |
 | `POST /v1/ketik/generate`            | admin, trainer, leader, agent           | qa, tl, spv, om ditolak | D1        |
 | `POST /v1/ketik/review`              | `ketik.review`                          | Ya                      | Ya        | Ya  | Ya  | self/admin/trainer assignment; enqueue manual | —   | `apps/api/src/routes/ketik-reviews.ts` |
 | `GET /v1/ketik/worker`               | admin, trainer                          | qa ditolak              | D1        |

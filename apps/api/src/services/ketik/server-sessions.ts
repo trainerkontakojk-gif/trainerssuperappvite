@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  coerceKetikPdktModelId,
   KETIK_PROMPT_LIMITS,
   KETIK_SESSION_ERRORS,
   normalizeGeneratedParts,
@@ -188,7 +189,7 @@ export async function startServerKetikSession(
       source.settings.identitySettings,
       randomInt(1_000_000),
     ),
-    selectedModel: resolveModelProvider(source.settings.selectedModel).modelId,
+    selectedModel: coerceKetikPdktModelId(source.settings.selectedModel),
     simulationDuration: Math.round(source.settings.simulationDuration),
     responsePacingMode: source.settings.responsePacingMode,
   };

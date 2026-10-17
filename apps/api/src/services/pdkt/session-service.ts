@@ -1,4 +1,5 @@
 import {
+  coerceKetikPdktModelId,
   PdktScenario,
   PdktConsumerType,
   PdktIdentity,
@@ -508,7 +509,7 @@ export function resolvePdktGenerationConfig(body: {
       ojkRequestInBody: scenario.ojkRequestInBody,
     }),
     enableImageGeneration: body.enableImageGeneration ?? true,
-    selectedModel: body.selectedModel || DEFAULT_AI_MODEL_ID,
+    selectedModel: coerceKetikPdktModelId(body.selectedModel),
     resolvedConsumerNameMentionPattern: body.resolvedConsumerNameMentionPattern || "none",
     writingStyleMode: body.writingStyleMode || "training",
   };

@@ -37,6 +37,9 @@ export const KETIK_REVIEW_MODELS = {
 // assistance all run on one Gemini model.
 export const TELEFUN_ASSESSMENT_MODEL = "gemini-3.8-flash";
 
+// SIDAK dashboard forecast narration ("Perbarui Prediksi").
+export const SIDAK_FORECAST_MODEL = "gemini-3.8-flash";
+
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (model) => model.provider === "gemini",
 );

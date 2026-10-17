@@ -143,7 +143,8 @@ test("server creates an immutable owner-scoped session, and strict input rejects
     version: 0,
     provenance: "server_v1",
     config: {
-      selectedModel: "gpt-5.4-mini",
+      // The saved gpt-5.4-mini is no longer a KETIK choice; sessions use the default.
+      selectedModel: "gemini-3.8-flash",
       identity: { name: "Konsumen server" },
     },
   });
@@ -195,7 +196,7 @@ test("unassigned agents cannot start; explicit assignment enables a private serv
     expectedAssignmentVersion: null,
   });
   expect(assigned.status).toBe(200);
-  expect((await start(agent)).config.selectedModel).toBe("gpt-5.4-mini");
+  expect((await start(agent)).config.selectedModel).toBe("gemini-3.8-flash");
 });
 test("messages, time, model and finalized history come from the server and duplicates spend no extra AI", async () => {
   const session = await start();
