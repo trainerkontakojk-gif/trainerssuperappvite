@@ -48,7 +48,8 @@ export function buildTnaNarrative(args: {
   if (s.auditStatus === "no_audit") {
     opening = `Belum ada audit untuk parameter ${s.parameterName} (${SERVICE_LABELS[s.serviceType]}) pada ${periodLabel}, sehingga tingkat dan sebaran belum dapat dihitung.`;
   } else {
-    let trend: string;
+    // null: no trend clause (running period); the rate is stated as interim.
+    let trend: string | null;
     switch (s.trendStatus) {
       case "computed": {
         if (s.trendPct === null || s.comparisonRatePer100 === null)
@@ -70,12 +71,15 @@ export function buildTnaNarrative(args: {
       case "no_comparison_data":
         trend = "belum memiliki periode pembanding";
         break;
+      case "period_in_progress":
+        trend = null;
+        break;
       case "no_current_audit":
         throw new Error("Audited snapshot cannot have no_current_audit trend");
     }
     if (s.ratePer100 === null || s.spreadPct === null)
       throw new Error("Audited snapshot requires rates");
-    opening = `Tingkat ketidaksesuaian parameter ${s.parameterName} (${SERVICE_LABELS[s.serviceType]}) ${trend} dan mencapai ${number(s.ratePer100)} per 100 sesi sampel pada ${periodLabel}, terjadi pada ${number(s.spreadPct)}% agent yang diaudit (${s.affectedAgents} dari ${s.auditedAgents}).`;
+    opening = `Tingkat ketidaksesuaian parameter ${s.parameterName} (${SERVICE_LABELS[s.serviceType]}) ${trend === null ? "sementara" : `${trend} dan`} mencapai ${number(s.ratePer100)} per 100 sesi sampel pada ${periodLabel}, terjadi pada ${number(s.spreadPct)}% agent yang diaudit (${s.affectedAgents} dari ${s.auditedAgents}).${trend === null ? " Periode ini masih berjalan, sehingga tren belum dihitung." : ""}`;
   }
   const conclusion = `Penyebab dominan (divalidasi trainer): ${need.validated_cluster_id.replaceAll("_", " ")} — ${need.cause_note}. Direkomendasikan ${program.name} dalam format ${interventions[plan.intervention_type]}, dengan target tingkat ≤ ${number(plan.target_max_rate_per_100)} per 100 sesi dan sebaran ≤ ${number(plan.target_max_spread_pct)}% pada evaluasi ${new Date(`${plan.evaluation_due_date}T00:00:00Z`).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}.`;
   return `${args.preview ? "Pratinjau: " : ""}${opening} ${conclusion}${s.insufficientData ? " Catatan: data periode ini belum cukup untuk kesimpulan kuat." : ""}`;

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(tna): mark the current Asia/Jakarta month as "berjalan" — no trend percentage or candidates from it, a running-period banner, and /tna defaults to the latest completed period via GET /tna/periods
 - docs(ketik): record the prod activation of the embedded KETIK review worker
 - feat(ketik): run the review worker inside the API process behind KETIK_REVIEW_WORKER_ENABLED, and let the API exit after SIGTERM
 - docs(db): record the prod rollout of 20261017150000 (settle_ketik_review no longer writes results)

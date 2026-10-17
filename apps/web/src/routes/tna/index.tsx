@@ -2,8 +2,8 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import {
   VALID_SERVICE_TYPES,
   type ServiceType,
-  type QAPeriod,
   type TnaParametersResponse,
+  type TnaPeriodOption,
   type TnaNeed,
   type TnaPlan,
 } from "@trainers/types";
@@ -15,6 +15,7 @@ import {
   trend,
   interventionLabels,
   planStatusLabels,
+  runningPeriodNotice,
   selectClass,
 } from "./utils";
 import { SERVICE_LABELS } from "../../lib/scoring";
@@ -22,8 +23,9 @@ import { SERVICE_LABELS } from "../../lib/scoring";
 export default function TnaIndex() {
   const search = useSearch({ from: "/tna" });
   const navigate = useNavigate();
-  const periods = useApi<QAPeriod[]>("/sidak/periods");
-  const period = search.period || periods.data?.[0]?.id || "";
+  const periods = useApi<TnaPeriodOption[]>("/tna/periods");
+  const period =
+    search.period || periods.data?.find((p) => p.is_default)?.id || "";
   const query = new URLSearchParams({
     service_type: search.service,
     period_id: period,
@@ -83,6 +85,7 @@ export default function TnaIndex() {
                     month: "long",
                     year: "numeric",
                   })}
+                  {p.status === "berjalan" ? " — berjalan" : ""}
                 </option>
               ))}
             </select>
@@ -128,6 +131,13 @@ export default function TnaIndex() {
       )}
       {!parameters.loading && !parameters.error && parameters.data && (
         <section className="space-y-4" aria-label="Daftar parameter">
+          {parameters.data.selected_period_status === "berjalan" && (
+            <QaStatePanel
+              className="text-foreground!"
+              type="warning"
+              {...runningPeriodNotice}
+            />
+          )}
           {parameters.data.selected_audit_status === "no_audit" && (
             <QaStatePanel
               className="text-foreground!"

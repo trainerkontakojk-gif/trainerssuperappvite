@@ -1,9 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { tnaPeriodOptionSchema } from "@trainers/types";
 import type {
   Category,
   ServiceType,
   TnaMetricsSnapshot,
   TnaParametersResponse,
+  TnaPeriodOption,
+  TnaPeriodStatus,
 } from "@trainers/types";
 import type { DataScope } from "../access/scope";
 import {
@@ -11,6 +14,7 @@ import {
   buildSnapshot,
   fetchPeriodRows,
   fetchPeriods,
+  periodStatus,
   resolveIndicatorMetadata,
   sortPeriodsChronologically,
   TnaPeriodNotFoundError,
@@ -47,7 +51,7 @@ export interface ListTnaParametersArgs {
 export async function listTnaParameters(
   args: ListTnaParametersArgs,
 ): Promise<TnaParametersResponse> {
-  const { selectedBucket, comparisonBuckets } =
+  const { selectedBucket, comparisonBuckets, selectedPeriodStatus } =
     await loadTnaParameterContext(args);
 
   const metadataRows: TnaTemuanRow[] = [];
@@ -84,6 +88,7 @@ export async function listTnaParameters(
       serviceType: args.serviceType,
       parameterName: metadata.name,
       category: metadata.category,
+      periodStatus: selectedPeriodStatus,
       computedAt,
     });
   });
@@ -97,6 +102,7 @@ export async function listTnaParameters(
     compare_period_ids: comparisonBuckets.map((bucket) => bucket.period.id),
     selected_audit_status:
       selectedBucket.auditedAgentIds.size > 0 ? "audited" : "no_audit",
+    selected_period_status: selectedPeriodStatus,
     insufficientData:
       visible.length === 0 || visible.every((entry) => entry.insufficientData),
   };
@@ -108,6 +114,7 @@ export async function loadTnaParameterContext(
 ): Promise<{
   selectedBucket: TnaPeriodBucket;
   comparisonBuckets: TnaPeriodBucket[];
+  selectedPeriodStatus: TnaPeriodStatus;
 }> {
   const periods = sortPeriodsChronologically(await fetchPeriods(args.supabase));
   const selectedIndex = periods.findIndex((p) => p.id === args.periodId);
@@ -139,7 +146,31 @@ export async function loadTnaParameterContext(
   });
   const selectedBucket = buildPeriodBucket(selectedPeriod, selectedRows);
 
-  return { selectedBucket, comparisonBuckets };
+  return {
+    selectedBucket,
+    comparisonBuckets,
+    selectedPeriodStatus: periodStatus(selectedPeriod, args.now ?? new Date()),
+  };
+}
+
+/** Period selector: newest first; default is the newest completed period. */
+export async function listTnaPeriodOptions(
+  supabase: SupabaseClient,
+  now: Date = new Date(),
+): Promise<TnaPeriodOption[]> {
+  const periods = sortPeriodsChronologically(
+    await fetchPeriods(supabase),
+  ).reverse();
+  const statuses = periods.map((period) => periodStatus(period, now));
+  const completed = statuses.indexOf("selesai");
+  const defaultIndex = completed === -1 ? 0 : completed;
+  return tnaPeriodOptionSchema.array().parse(
+    periods.map((period, i) => ({
+      ...period,
+      status: statuses[i]!,
+      is_default: i === defaultIndex,
+    })),
+  );
 }
 
 /** D1: kritikal dulu, lalu sebaran, tingkat, nama parameter. */

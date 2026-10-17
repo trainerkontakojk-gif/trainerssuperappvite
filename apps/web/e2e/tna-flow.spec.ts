@@ -27,6 +27,7 @@ test("trainer: semua parameter → validasi → rencana → edit peserta → akt
           items: [metrics],
           compare_period_ids: [],
           selected_audit_status: "audited",
+          selected_period_status: "selesai",
           insufficientData: true,
         },
       },
@@ -173,6 +174,7 @@ test("no_audit tampil sebagai banner, bukan angka nol; nol temuan tidak bisa div
             },
           ],
           selected_audit_status: "no_audit",
+          selected_period_status: "selesai",
           compare_period_ids: [],
           insufficientData: true,
         },
@@ -219,6 +221,7 @@ test("kosong dan gagal dapat dicoba lagi", async ({ page }) => {
   response.data = {
     items: [],
     selected_audit_status: "audited",
+    selected_period_status: "selesai",
     compare_period_ids: [],
     insufficientData: true,
   };

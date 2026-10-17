@@ -165,11 +165,25 @@ export const defaults: ApiMock[] = [
   },
   {
     method: "GET",
+    path: "/api/v1/tna/periods",
+    body: ok([
+      {
+        id: ids.period,
+        month: 10,
+        year: 2026,
+        status: "selesai",
+        is_default: true,
+      },
+    ]),
+  },
+  {
+    method: "GET",
     path: /^\/api\/v1\/tna\/parameters\?/,
     body: ok({
       items: [],
       compare_period_ids: [],
       selected_audit_status: "audited",
+      selected_period_status: "selesai",
       insufficientData: true,
     }),
   },

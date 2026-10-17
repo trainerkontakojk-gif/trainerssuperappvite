@@ -19,7 +19,7 @@ export async function getTnaParameterAnalysis(
     .maybeSingle();
   if (error) throw error;
   if (!indicator) throw new TnaIndicatorNotFoundError();
-  const { selectedBucket, comparisonBuckets } =
+  const { selectedBucket, comparisonBuckets, selectedPeriodStatus } =
     await loadTnaParameterContext(args);
   const { master, rules } = await loadIndicatorMetadata({
     supabase: args.supabase,
@@ -39,6 +39,7 @@ export async function getTnaParameterAnalysis(
     serviceType: args.serviceType,
     parameterName: metadata.name,
     category: metadata.category,
+    periodStatus: selectedPeriodStatus,
     computedAt: (args.now ?? new Date()).toISOString(),
   });
   const findings = selectedBucket.auditedRows.filter(

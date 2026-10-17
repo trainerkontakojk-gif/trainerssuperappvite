@@ -34,13 +34,17 @@ export const tnaTrendStatusSchema = z.enum([
   "new_from_zero",
   "no_findings_both",
   "no_comparison_data",
+  "period_in_progress",
 ]);
+/** `berjalan`: the period is the current Asia/Jakarta month or later. */
+export const tnaPeriodStatusSchema = z.enum(["berjalan", "selesai"]);
 export type TnaGapType = z.infer<typeof tnaGapTypeSchema>;
 export type TnaOutcome = z.infer<typeof tnaOutcomeSchema>;
 export type TnaInterventionType = z.infer<typeof tnaInterventionTypeSchema>;
 export type TnaPlanStatus = z.infer<typeof tnaPlanStatusSchema>;
 export type TnaAuditStatus = z.infer<typeof tnaAuditStatusSchema>;
 export type TnaTrendStatus = z.infer<typeof tnaTrendStatusSchema>;
+export type TnaPeriodStatus = z.infer<typeof tnaPeriodStatusSchema>;
 
 export const tnaProgramSchema = z.object({
   id: z.string().uuid(),
@@ -77,6 +81,8 @@ export const tnaMetricsSnapshotSchema = tnaPeriodMetricsSchema.extend({
   indicatorId: z.string().uuid(),
   parameterName: z.string(),
   category: categorySchema,
+  // Optional: snapshots frozen before the in-progress rule have no status.
+  periodStatus: tnaPeriodStatusSchema.optional(),
   comparePeriods: z.array(tnaPeriodMetricsSchema),
   comparisonRatePer100: finiteRate.nullable(),
   trendStatus: tnaTrendStatusSchema,
@@ -172,6 +178,16 @@ export const tnaEvaluationPeriodOptionSchema = z
 export type TnaEvaluationPeriodOption = z.infer<
   typeof tnaEvaluationPeriodOptionSchema
 >;
+export const tnaPeriodOptionSchema = z
+  .object({
+    id: z.string().uuid(),
+    month: z.number().int().min(1).max(12),
+    year: z.number().int(),
+    status: tnaPeriodStatusSchema,
+    is_default: z.boolean(),
+  })
+  .strict();
+export type TnaPeriodOption = z.infer<typeof tnaPeriodOptionSchema>;
 
 export const tnaParametersQuerySchema = z.object({
   service_type: serviceTypeSchema,
@@ -344,6 +360,7 @@ export const tnaParametersResponseSchema = z.object({
   items: z.array(tnaMetricsSnapshotSchema),
   compare_period_ids: z.array(z.string().uuid()),
   selected_audit_status: tnaAuditStatusSchema,
+  selected_period_status: tnaPeriodStatusSchema,
   insufficientData: z.boolean(),
 });
 export type TnaParametersResponse = z.infer<typeof tnaParametersResponseSchema>;

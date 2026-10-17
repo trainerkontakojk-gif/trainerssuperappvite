@@ -75,12 +75,19 @@ export function trend(m: TnaMetricsSnapshot) {
       return "Baru muncul; periode pembanding tidak punya temuan";
     case "no_findings_both":
       return "Tidak ada temuan, baik pada periode ini maupun periode pembanding";
+    case "period_in_progress":
+      return "Tren belum dihitung; periode masih berjalan";
     case "computed":
       return Math.abs(m.trendPct ?? 0) < 5
         ? "Stabil dari rata-rata periode pembanding"
         : `${(m.trendPct ?? 0) > 0 ? "Naik" : "Turun"} ${number(Math.abs(m.trendPct ?? 0))}% dari rata-rata periode pembanding`;
   }
 }
+export const runningPeriodNotice = {
+  title: "Periode ini masih berjalan",
+  description:
+    "Data audit belum lengkap. Tren dan kandidat belum dihitung sampai periode selesai.",
+};
 export const selectClass =
   "h-[44px] w-full min-w-0 rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-foreground";
 export function useTnaMutation() {

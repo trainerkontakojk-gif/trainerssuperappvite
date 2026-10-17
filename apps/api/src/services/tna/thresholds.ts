@@ -8,3 +8,5 @@ export const SIGNAL_SPREAD_PCT = 10;
 export const SIGNAL_TREND_PCT = 25;
 export const CLASS_SPREAD_PCT = 30;
 export const STABLE_TREND_PCT = 5;
+/** Asia/Jakarta (no DST): a period is `berjalan` from its first Jakarta day. */
+export const PERIOD_TIMEZONE_OFFSET_HOURS = 7;

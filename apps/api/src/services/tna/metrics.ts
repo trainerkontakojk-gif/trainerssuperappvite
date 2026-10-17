@@ -5,6 +5,7 @@ import type {
   TnaInterventionType,
   TnaMetricsSnapshot,
   TnaPeriodMetrics,
+  TnaPeriodStatus,
   TnaTrendStatus,
 } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
@@ -20,6 +21,7 @@ import {
   CLASS_SPREAD_PCT,
   MIN_AUDITED_AGENTS,
   MIN_FINDINGS,
+  PERIOD_TIMEZONE_OFFSET_HOURS,
   SIGNAL_SPREAD_PCT,
   SIGNAL_TREND_PCT,
 } from "./thresholds";
@@ -104,6 +106,24 @@ export function sortPeriodsChronologically(periods: TnaPeriod[]): TnaPeriod[] {
   return [...periods].sort(
     (a, b) => a.year - b.year || a.month - b.month || a.id.localeCompare(b.id),
   );
+}
+
+/**
+ * `berjalan` bila periode adalah bulan kalender Asia/Jakarta saat ini atau
+ * sesudahnya: auditnya belum lengkap, jadi tren dan kandidat tidak dihitung.
+ */
+export function periodStatus(
+  period: Pick<TnaPeriod, "month" | "year">,
+  now: Date,
+): TnaPeriodStatus {
+  const jakarta = new Date(
+    now.getTime() + PERIOD_TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000,
+  );
+  const currentMonth =
+    jakarta.getUTCFullYear() * 12 + jakarta.getUTCMonth() + 1;
+  return period.year * 12 + period.month >= currentMonth
+    ? "berjalan"
+    : "selesai";
 }
 
 export async function fetchPeriodRows(args: {
@@ -275,6 +295,7 @@ export function periodMetrics(
 export function computeTrend(args: {
   current: TnaPeriodMetrics;
   comparisons: TnaPeriodMetrics[];
+  periodStatus: TnaPeriodStatus;
 }): {
   trendStatus: TnaTrendStatus;
   trendPct: number | null;
@@ -291,6 +312,14 @@ export function computeTrend(args: {
   if (args.current.auditStatus === "no_audit") {
     return {
       trendStatus: "no_current_audit",
+      trendPct: null,
+      comparisonRatePer100,
+    };
+  }
+  // Periode berjalan dibandingkan dengan bulan penuh akan menyesatkan.
+  if (args.periodStatus === "berjalan") {
+    return {
+      trendStatus: "period_in_progress",
       trendPct: null,
       comparisonRatePer100,
     };
@@ -355,13 +384,18 @@ export function buildSnapshot(args: {
   serviceType: ServiceType;
   parameterName: string;
   category: Category;
+  periodStatus: TnaPeriodStatus;
   computedAt: string;
 }): TnaMetricsSnapshot {
   const current = periodMetrics(args.bucket, args.indicatorId);
   const comparePeriods = args.comparisonBuckets.map((bucket) =>
     periodMetrics(bucket, args.indicatorId),
   );
-  const trend = computeTrend({ current, comparisons: comparePeriods });
+  const trend = computeTrend({
+    current,
+    comparisons: comparePeriods,
+    periodStatus: args.periodStatus,
+  });
   const signals = computeSignals({
     category: args.category,
     spreadPct: current.spreadPct,
@@ -376,12 +410,14 @@ export function buildSnapshot(args: {
     indicatorId: args.indicatorId,
     parameterName: args.parameterName,
     category: args.category,
+    periodStatus: args.periodStatus,
     ...current,
     comparePeriods,
     comparisonRatePer100: trend.comparisonRatePer100,
     trendStatus: trend.trendStatus,
     trendPct: trend.trendPct,
     isCandidate:
+      args.periodStatus === "selesai" &&
       !current.insufficientData &&
       current.findings >= MIN_FINDINGS &&
       signals.length > 0,

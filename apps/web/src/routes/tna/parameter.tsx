@@ -18,6 +18,7 @@ import {
   useTnaMutation,
   parameterQuery,
   interventionLabels,
+  runningPeriodNotice,
   tnaResponse,
 } from "./utils";
 
@@ -61,13 +62,21 @@ function ParameterContent({ detail: d }: { detail: TnaParameterDetail }) {
           ditautkan setelah validasi server.
         </p>
       )}
-      {!d.metrics.isCandidate && (
+      {d.metrics.periodStatus === "berjalan" ? (
         <QaStatePanel
           className="text-foreground!"
           type="warning"
-          title="Parameter ini bukan kandidat otomatis"
-          description="Trainer tetap dapat memvalidasi bila ada temuan yang perlu ditindaklanjuti."
+          {...runningPeriodNotice}
         />
+      ) : (
+        !d.metrics.isCandidate && (
+          <QaStatePanel
+            className="text-foreground!"
+            type="warning"
+            title="Parameter ini bukan kandidat otomatis"
+            description="Trainer tetap dapat memvalidasi bila ada temuan yang perlu ditindaklanjuti."
+          />
+        )
       )}
       <section className="space-y-4">
         <Metrics metrics={d.metrics} />

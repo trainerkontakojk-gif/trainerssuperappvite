@@ -18,7 +18,10 @@ import {
 import type { AuthVariables } from "../middleware/auth";
 import { requireCapability } from "../middleware/role";
 import { createUserClient } from "../lib/supabase";
-import { listTnaParameters } from "../services/tna/parameters";
+import {
+  listTnaParameters,
+  listTnaPeriodOptions,
+} from "../services/tna/parameters";
 import {
   getTnaParameterDetail,
   TnaIndicatorNotFoundError,
@@ -146,6 +149,23 @@ const tna = new Hono<{ Variables: AuthVariables }>()
           error: {
             code: "TNA_PROGRAMS_UNAVAILABLE",
             message: "Katalog program belum dapat dimuat. Silakan coba lagi.",
+          },
+        },
+        503,
+      );
+    }
+  })
+  .get("/periods", requireCapability("tna.read"), async (c) => {
+    try {
+      const data = await listTnaPeriodOptions(createUserClient(c.get("token")));
+      return c.json({ success: true as const, data });
+    } catch {
+      return c.json<ApiResponse<never>>(
+        {
+          success: false,
+          error: {
+            code: "TNA_PERIODS_UNAVAILABLE",
+            message: "Daftar periode belum dapat dimuat. Silakan coba lagi.",
           },
         },
         503,
