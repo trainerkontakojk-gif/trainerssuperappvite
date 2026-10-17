@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- fix(telefun): match content-review quotes on whole words only, so a short quote no longer anchors inside another word on the wrong line
 - fix(telefun): delete sessions the server no longer has, keep history working when localStorage is full, download recordings as real files, and resolve the assessment model from ai-models.ts
 - fix(telefun): keep Telaah replay audible during mute — only the agent mic is off then, so muting playback dropped the consumer's voice; holds stay silent
 - feat(tna): mark the current Asia/Jakarta month as "berjalan" — no trend percentage or candidates from it, a running-period banner, and /tna defaults to the latest completed period via GET /tna/periods

@@ -135,16 +135,31 @@ function fold(value: string): { text: string; index: number[] } {
   return { text, index };
 }
 
-/** Potongan teks asli yang cocok dengan kutipan, atau `null`. */
+/**
+ * Potongan teks asli yang cocok dengan kutipan pada kata utuh, atau `null`.
+ * Teks lipatan hanya memuat huruf, angka, dan satu spasi pemisah, jadi batas
+ * kata adalah tepi teks atau spasi.
+ */
 function findQuote(text: string, quote: string): string | null {
   const needle = fold(quote).text;
   if (!needle) return null;
   const haystack = fold(text);
-  const at = haystack.text.indexOf(needle);
-  if (at < 0) return null;
-  const start = haystack.index[at]!;
-  const end = haystack.index[at + needle.length - 1]! + 1;
-  return text.slice(start, end);
+  for (
+    let at = haystack.text.indexOf(needle);
+    at >= 0;
+    at = haystack.text.indexOf(needle, at + 1)
+  ) {
+    const after = at + needle.length;
+    if (
+      (at === 0 || haystack.text[at - 1] === " ") &&
+      (after === haystack.text.length || haystack.text[after] === " ")
+    ) {
+      const start = haystack.index[at]!;
+      const end = haystack.index[after - 1]! + 1;
+      return text.slice(start, end);
+    }
+  }
+  return null;
 }
 
 function readText(value: unknown, max: number): string | null {
