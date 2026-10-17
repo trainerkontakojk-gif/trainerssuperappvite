@@ -194,11 +194,10 @@ sidakDashboard.get(
       : undefined;
     const showArchived = c.req.query("show_archived") === "true";
 
-    const accessibleIds = await sidakService.getAccessibleAgentIds(
-      user.id,
-      profile?.role ?? "",
-    );
-    const filterScope = await resolveSidakFilterScope(c);
+    const [accessibleIds, filterScope] = await Promise.all([
+      sidakService.getAccessibleAgentIds(user.id, profile?.role ?? ""),
+      resolveSidakFilterScope(c),
+    ]);
     const effectiveServiceType = sidakService.resolveScopedServiceType(
       service_type,
       filterScope,

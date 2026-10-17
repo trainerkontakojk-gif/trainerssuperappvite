@@ -9,21 +9,24 @@ export interface EffectiveRuleVersion {
   scoring_mode: "weighted" | "flat" | "no_category";
 }
 
-export async function resolveEffectiveRuleVersionForPeriod(
+type PeriodRef = { month: number; year: number };
+
+export type PublishedRuleVersionRow = {
+  id: string;
+  service_type: string;
+  effective_period_id: string;
+  critical_weight: number | string;
+  non_critical_weight: number | string;
+  scoring_mode: EffectiveRuleVersion["scoring_mode"];
+  version_number: number;
+  published_at?: string | null;
+  created_at: string;
+  qa_periods: PeriodRef | null;
+};
+
+export async function fetchPublishedRuleVersions(
   serviceType: string,
-  periodId: string,
-): Promise<EffectiveRuleVersion | null> {
-  // 1. Get target period details
-  const { data: targetPeriod, error: pErr } = await supabaseAdmin
-    .from("qa_periods")
-    .select("id, month, year")
-    .eq("id", periodId)
-    .maybeSingle();
-
-  if (pErr) throw new Error(`Gagal memuat periode target: ${pErr.message}`);
-  if (!targetPeriod) return null;
-
-  // 2. Get all published versions for this service type
+): Promise<PublishedRuleVersionRow[]> {
   const { data: versions, error: vErr } = await supabaseAdmin
     .from("qa_service_rule_versions")
     .select("*, qa_periods(id, month, year)")
@@ -31,10 +34,19 @@ export async function resolveEffectiveRuleVersionForPeriod(
     .eq("status", "published");
 
   if (vErr) throw new Error(`Gagal memuat versi aturan: ${vErr.message}`);
-  if (!versions || versions.length === 0) return null;
+  return (versions ?? []) as PublishedRuleVersionRow[];
+}
 
-  // 3. Filter to versions whose effective period is before or equal to target period
-  const eligibleVersions = versions.filter((v: any) => {
+/**
+ * Pick the published version in effect for `targetPeriod`: the newest
+ * effective period at or before it, then the highest version number, then the
+ * latest publish time.
+ */
+export function pickEffectiveRuleVersion(
+  targetPeriod: PeriodRef,
+  versions: PublishedRuleVersionRow[],
+): EffectiveRuleVersion | null {
+  const eligibleVersions = versions.filter((v) => {
     const effPeriod = v.qa_periods;
     if (!effPeriod) return false;
     if (effPeriod.year < targetPeriod.year) return true;
@@ -44,10 +56,9 @@ export async function resolveEffectiveRuleVersionForPeriod(
 
   if (eligibleVersions.length === 0) return null;
 
-  // 4. Sort: newest effective period first, version_number desc, published_at/created_at desc
-  eligibleVersions.sort((a: any, b: any) => {
-    const aPeriod = a.qa_periods;
-    const bPeriod = b.qa_periods;
+  eligibleVersions.sort((a, b) => {
+    const aPeriod = a.qa_periods!;
+    const bPeriod = b.qa_periods!;
 
     const yearDiff = bPeriod.year - aPeriod.year;
     if (yearDiff !== 0) return yearDiff;
@@ -64,7 +75,7 @@ export async function resolveEffectiveRuleVersionForPeriod(
     return bTime - aTime;
   });
 
-  const bestVersion = eligibleVersions[0];
+  const bestVersion = eligibleVersions[0]!;
 
   return {
     id: bestVersion.id,
@@ -74,4 +85,23 @@ export async function resolveEffectiveRuleVersionForPeriod(
     non_critical_weight: Number(bestVersion.non_critical_weight),
     scoring_mode: bestVersion.scoring_mode,
   };
+}
+
+export async function resolveEffectiveRuleVersionForPeriod(
+  serviceType: string,
+  periodId: string,
+): Promise<EffectiveRuleVersion | null> {
+  const { data: targetPeriod, error: pErr } = await supabaseAdmin
+    .from("qa_periods")
+    .select("id, month, year")
+    .eq("id", periodId)
+    .maybeSingle();
+
+  if (pErr) throw new Error(`Gagal memuat periode target: ${pErr.message}`);
+  if (!targetPeriod) return null;
+
+  const versions = await fetchPublishedRuleVersions(serviceType);
+  if (versions.length === 0) return null;
+
+  return pickEffectiveRuleVersion(targetPeriod, versions);
 }

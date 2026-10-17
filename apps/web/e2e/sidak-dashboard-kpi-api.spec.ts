@@ -22,6 +22,10 @@ import {
  * - baris tanpa nomor tiket = satu tiket per baris;
  * - sparkline per periode; total rentang = jumlah per periode.
  *
+ * Rentang bulan juga mempersempit tabel agen dan Pareto, bukan hanya KPI;
+ * staf yang dikecualikan SIDAK (mis. jabatan Trainer) tidak ikut dihitung
+ * (`plans/markdown/sidak-dashboard-speed.md`).
+ *
  * Fixture memakai tahun 2098 dan folder unik per run supaya tidak tercampur
  * data lokal lain, lalu dibersihkan di `afterAll`.
  */
@@ -41,11 +45,14 @@ const created = {
   yearId: null as string | null,
   yearCreated: false,
   pesertaId: null as string | null,
+  excludedPesertaId: null as string | null,
   periodIds: {} as Record<1 | 2, string>,
 };
 
 type DashboardBody = {
   summary: Record<string, number>;
+  topAgents: Array<{ agentId: string; defects: number }>;
+  paretoData: Array<{ count: number }>;
   periodMetrics: Array<Record<string, unknown>>;
   sparklines: Record<string, Array<{ label: string; value: number }>>;
 };
@@ -128,6 +135,13 @@ test.beforeAll(async () => {
      RETURNING id;`,
   );
 
+  created.excludedPesertaId = sqlOne(
+    env,
+    `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
+     VALUES (${quoted(created.folderName)}, ${quoted(`Trainer KPI ${ns}`)}, 'Tim Uji', 'Trainer', 2)
+     RETURNING id;`,
+  );
+
   const ticket = (name: string) => quoted(`E2E-${ns}-${name}`);
   const row = (
     month: 1 | 2,
@@ -151,6 +165,10 @@ test.beforeAll(async () => {
     row(2, 0, ticket("D"), 0, finding),
     row(2, 1, ticket("D"), 0, finding),
   ];
+  // Staf yang dikecualikan SIDAK: temuannya tidak boleh terhitung di mana pun.
+  rows.push(
+    `(${quoted(created.excludedPesertaId!)},${quoted(created.periodIds[1])},${quoted(indicators[0]!)},'call',${ticket("X")},false,0,${finding},${YEAR})`,
+  );
   runSql(
     env,
     `INSERT INTO qa_temuan (peserta_id, period_id, indicator_id, service_type, no_tiket, is_phantom_padding, nilai, ketidaksesuaian, tahun) VALUES ${rows.join(",")};`,
@@ -160,6 +178,12 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  if (created.excludedPesertaId)
+    runSql(
+      env,
+      `DELETE FROM qa_temuan WHERE peserta_id=${quoted(created.excludedPesertaId)};
+       DELETE FROM profiler_peserta WHERE id=${quoted(created.excludedPesertaId)};`,
+    );
   if (created.pesertaId)
     runSql(
       env,
@@ -214,4 +238,29 @@ test("satu periode: tiket unik, tanpa nomor dihitung per baris, complies tidak d
 
   expect(data.summary.totalDefects).toBe(6);
   expect(data.summary.totalTickets).toBe(4);
+});
+
+test("rentang satu bulan: tabel agen dan Pareto hanya bulan itu", async () => {
+  const data = await dashboard({ startMonth: "2", endMonth: "2" });
+
+  expect(data.summary.totalDefects).toBe(2);
+  expect(data.topAgents).toEqual([
+    expect.objectContaining({ agentId: created.pesertaId, defects: 2 }),
+  ]);
+  expect(data.paretoData.reduce((sum, p) => sum + p.count, 0)).toBe(2);
+});
+
+test("staf yang dikecualikan SIDAK tidak muncul di tabel agen", async () => {
+  const data = await dashboard({ startMonth: "1", endMonth: "2" });
+
+  expect(data.topAgents.map((a) => a.agentId)).toEqual([created.pesertaId]);
+  expect(data.topAgents[0]!.defects).toBe(8);
+});
+
+test("index tahun untuk baca dashboard per halaman ada", () => {
+  const index = runSql(
+    env,
+    `SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND indexname='idx_qa_temuan_tahun_id';`,
+  );
+  expect(index).toContain("(tahun, id)");
 });

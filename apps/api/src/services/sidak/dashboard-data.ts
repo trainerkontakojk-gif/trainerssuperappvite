@@ -35,17 +35,20 @@ import {
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
+import { getSoftDeletedPesertaIds, isAgentExcluded } from "./agent-directory";
 import {
-  getSidakExcludedPesertaIds,
-  getSoftDeletedPesertaIds,
-} from "./agent-directory";
-import {
+  createPeriodScoringLoaders,
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
   type PeriodScoringContext,
 } from "./period-scoring-context";
 
 const PAGINATION_STEP = 1000;
+
+// Only the columns the dashboard reads; the joined peserta columns also drive
+// the SIDAK exclusion check.
+const DASHBOARD_TEMUAN_COLUMNS =
+  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)";
 
 async function fetchAllTemuan(opts: {
   service_type?: string;
@@ -56,25 +59,30 @@ async function fetchAllTemuan(opts: {
   folderNames?: string[] | null;
   excludedIds: string[];
   allowedSvcs?: ServiceType[] | null;
-}): Promise<any[]> {
-  const allData: any[] = [];
-  let from = 0;
-  let hasMore = true;
+}): Promise<DashboardTemuanRow[]> {
+  if (opts.service_type && opts.service_type !== "all") {
+    if (
+      opts.allowedSvcs &&
+      !opts.allowedSvcs.includes(opts.service_type as ServiceType)
+    ) {
+      return [];
+    }
+  }
 
-  while (hasMore) {
+  const allData: DashboardTemuanRow[] = [];
+  let lastId: string | null = null;
+
+  // Keyset pagination: each page starts after the last id, so later pages do
+  // not rescan the rows earlier pages already returned (OFFSET does).
+  while (true) {
     let query = supabaseAdmin
       .from("qa_temuan")
-      .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)")
+      .select(DASHBOARD_TEMUAN_COLUMNS)
       .order("id", { ascending: true })
-      .range(from, from + PAGINATION_STEP - 1);
+      .limit(PAGINATION_STEP);
+    if (lastId) query = query.gt("id", lastId);
 
     if (opts.service_type && opts.service_type !== "all") {
-      if (
-        opts.allowedSvcs &&
-        !opts.allowedSvcs.includes(opts.service_type as ServiceType)
-      ) {
-        return [];
-      }
       query = query.eq("service_type", opts.service_type);
     } else if (opts.allowedSvcs) {
       query = query.in("service_type", opts.allowedSvcs);
@@ -102,14 +110,17 @@ async function fetchAllTemuan(opts: {
 
     const { data, error } = await query;
     if (error) throw error;
+    const page = (data ?? []) as unknown as DashboardTemuanRow[];
 
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData.push(...data);
-      hasMore = data.length === PAGINATION_STEP;
-      from += PAGINATION_STEP;
+    for (const row of page) {
+      const p = row.profiler_peserta;
+      if (!isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan)) {
+        allData.push(row);
+      }
     }
+    if (page.length < PAGINATION_STEP) break;
+    lastId = page[page.length - 1]!.id ?? null;
+    if (!lastId) break;
   }
 
   return allData;
@@ -134,11 +145,11 @@ export async function getDashboardData(params: {
     supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
-  const [excludedIds, sidakExcludedIds] = await Promise.all([
-    params.showArchived ? Promise.resolve([]) : getSoftDeletedPesertaIds(),
-    getSidakExcludedPesertaIds(),
-  ]);
-  const allExcludedIds = [...new Set([...excludedIds, ...sidakExcludedIds])];
+  // SIDAK-excluded staff are dropped in fetchAllTemuan from the joined
+  // peserta columns; only soft-deleted ids go to the database filter.
+  const excludedIds = params.showArchived
+    ? []
+    : await getSoftDeletedPesertaIds();
 
   const allowedSvcs =
     params.allowedServiceTypes && params.allowedServiceTypes.length > 0
@@ -161,18 +172,37 @@ export async function getDashboardData(params: {
     }
   }
 
+  // A month range narrows every panel (top agents, Pareto, donut), not only
+  // the trend, so resolve it to that year's periods before fetching.
+  const hasMonthRange =
+    params.startMonth !== undefined || params.endMonth !== undefined;
+  let periodIds = params.period_ids;
+  if (!periodIds?.length && params.year !== undefined && hasMonthRange) {
+    periodIds = periods
+      .filter(
+        (p) =>
+          p.year === params.year &&
+          (params.startMonth === undefined || p.month >= params.startMonth) &&
+          (params.endMonth === undefined || p.month <= params.endMonth),
+      )
+      .map((p) => p.id);
+  }
+
   // Service options come from the active SIDAK master/scope, not from rows in
   // the currently selected period, folder, or service.
-  const allTemuan = await fetchAllTemuan({
-    service_type: params.service_type,
-    period_ids: params.period_ids,
-    year: params.year,
-    peserta_id: params.peserta_id,
-    agent_ids: params.agent_ids,
-    folderNames,
-    excludedIds: allExcludedIds,
-    allowedSvcs,
-  });
+  const allTemuan =
+    periodIds && periodIds.length === 0
+      ? []
+      : await fetchAllTemuan({
+          service_type: params.service_type,
+          period_ids: periodIds,
+          year: params.year,
+          peserta_id: params.peserta_id,
+          agent_ids: params.agent_ids,
+          folderNames,
+          excludedIds,
+          allowedSvcs,
+        });
   const rows = toDashboardTemuanRows(allTemuan);
 
   const weightMap = toDashboardWeightMap(weights?.data);
@@ -187,6 +217,7 @@ export async function getDashboardData(params: {
 
   // 2. Resolve one canonical scoring context per (service_type, period_id).
   const scoringContextMap = new Map<string, PeriodScoringContext>();
+  const scoringLoaders = createPeriodScoringLoaders(periods);
   await Promise.all(
     Array.from(uniqueCombos).map(async (combo) => {
       const separator = combo.lastIndexOf(":");
@@ -202,6 +233,7 @@ export async function getDashboardData(params: {
         periodId,
         indicators,
         fallbackWeight,
+        scoringLoaders,
       );
       scoringContextMap.set(combo, context);
     }),
