@@ -7,6 +7,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 ## 2026-10-17
 
 - feat(ketik): make the AI chat consumer behave like a real person: it never helps, corrects or hints the agent, reveals details only when asked (with or without a script), follows per-type behavior with chat-style examples, and the angry type stays hard to calm with template empathy; default scenarios get a short backstory and the unused /ketik/simulation page file is removed
+- fix(profiler): require a target folder in the add form instead of saving into "Batch 1", scale the participant slide to fit laptop and phone screens without clipping (exports stay full size), count system teams in Kelola tim, show jabatan labels in selects, and say that sensitive data appears on slides and exports
 - refactor(telefun): remove the conversation challenges feature (settings section, prompt block and the session's disruption_config); saved challenge choices are ignored and dropped on the next save
 - feat(telefun): make the AI consumer behave like a real caller: it never corrects or hints the agent, angry and rushed types may interrupt and stay hard to calm, holds are always accepted but in the type's tone (one refusal allowed from the second hold), and the app tells the AI each hold's number and whether it ran too long
 - fix(ai-usage): cost PDKT attachment images at Google's image-output rate ($60 per 1M tokens for Nano Banana 2) instead of the $3 text rate, so Monitoring matches the bill

@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Lock, Plus, Save, Trash2, Upload, UserPlus } from "lucide-react";
-import type { ProfilerPeserta } from "@trainers/types";
+import type {
+  ProfilerFolder,
+  ProfilerPeserta,
+  ProfilerYear,
+} from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
 import { profilerApi } from "../../lib/profilerService";
 import { supabase } from "../../lib/supabase";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { ProfilerPageHeader } from "./components/ProfilerPageHeader";
+import { ProfilerFolderSelect } from "./components/ProfilerFolderSelect";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -18,7 +23,6 @@ import {
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
-import { Badge } from "../../components/ui/badge";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import {
   Select,
@@ -70,6 +74,7 @@ function SelectField({
   return (
     <Field label={label} id={id}>
       <Select
+        items={options}
         value={value || null}
         onValueChange={(nextValue) => {
           if (nextValue === "__empty__") onChange("");
@@ -119,7 +124,12 @@ function Section({
 export default function ProfilerAdd() {
   const navigate = useNavigate();
   const { batch } = useQueryParams();
-  const batchName = batch || "Batch 1";
+  // Folder tujuan wajib dipilih; tanpa `?batch=` peserta tidak boleh jatuh
+  // diam-diam ke folder tebakan.
+  const [batchName, setBatchName] = useState(batch || "");
+  const [batchError, setBatchError] = useState(false);
+  const [years, setYears] = useState<ProfilerYear[]>([]);
+  const [folders, setFolders] = useState<ProfilerFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState("");
@@ -130,13 +140,21 @@ export default function ProfilerAdd() {
   const [timLoading, setTimLoading] = useState(false);
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Partial<ProfilerPeserta>>({
-    batch_name: batchName,
     tim: selectedTim,
     jabatan: "cca",
   });
 
   const set = (key: keyof ProfilerPeserta, value: any) =>
     setForm((previous) => ({ ...previous, [key]: value }));
+
+  useEffect(() => {
+    Promise.all([profilerApi.getYears(), profilerApi.getFolders()])
+      .then(([nextYears, nextFolders]) => {
+        setYears(nextYears);
+        setFolders(nextFolders);
+      })
+      .catch((error) => console.error("Gagal memuat folder", error));
+  }, []);
 
   useEffect(() => {
     profilerApi
@@ -196,6 +214,10 @@ export default function ProfilerAdd() {
     setFotoPreview(URL.createObjectURL(file));
   };
   const handleSubmit = async () => {
+    if (!batchName) {
+      setBatchError(true);
+      return;
+    }
     if (!form.nama?.trim()) {
       alert("Nama wajib diisi.");
       return;
@@ -209,6 +231,7 @@ export default function ProfilerAdd() {
       const { data: userData } = await supabase.auth.getUser();
       await profilerApi.createPeserta({
         ...form,
+        batch_name: batchName,
         id: newId,
         foto_url,
         trainer_id: userData?.user?.id || undefined,
@@ -241,8 +264,12 @@ export default function ProfilerAdd() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <ProfilerPageHeader
-        backHref={`/profiler/table?batch=${encodeURIComponent(batchName)}`}
-        backLabel="Kembali ke tabel batch"
+        backHref={
+          batchName
+            ? `/profiler/table?batch=${encodeURIComponent(batchName)}`
+            : "/profiler"
+        }
+        backLabel={batchName ? "Kembali ke tabel batch" : "Kembali ke Profiler"}
         eyebrow="Profiler add"
         title="Tambah data peserta ke batch aktif."
         description="Lengkapi identitas, tim, dan data kerja menggunakan formulir yang konsisten dengan workspace Profiler."
@@ -252,9 +279,26 @@ export default function ProfilerAdd() {
       <div className="flex-1">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <Card size="sm" className="shadow-none">
-            <CardContent className="flex flex-wrap items-center gap-2 p-4">
-              <Badge variant="secondary">Batch aktif</Badge>
-              <span className="font-medium">{batchName}</span>
+            <CardContent className="grid gap-2 p-4">
+              <Label className="text-xs font-medium text-muted-foreground">
+                Folder tujuan *
+              </Label>
+              <ProfilerFolderSelect
+                years={years}
+                folders={folders}
+                value={batchName}
+                onChange={(value) => {
+                  setBatchName(value);
+                  setBatchError(false);
+                }}
+                label="Folder tujuan"
+                hideLabel
+              />
+              {batchError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  Pilih folder tujuan dulu.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -528,7 +572,7 @@ export default function ProfilerAdd() {
 
           <Section
             title="Data sensitif"
-            description="Data ini tidak tampil di slide secara default."
+            description="Data ini ikut tampil di profil, slide, dan file ekspor."
           >
             <Alert>
               <Lock aria-hidden="true" />
