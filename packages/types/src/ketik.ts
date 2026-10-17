@@ -94,7 +94,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "Pinjol",
     title: "Pinjol Ilegal",
     description:
-      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
+      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam. Sudah dua minggu penagih menelepon dan mengirim pesan ancaman, dan sejak kemarin teman serta rekan kerjanya ikut dihubungi. Konsumen malu dan takut, dan belum tahu harus melapor ke mana.",
     isActive: true,
   },
   {
@@ -102,7 +102,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "Penipuan",
     title: "Penipuan Undian",
     description:
-      "Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.",
+      "Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang. Konsumen sudah mentransfer satu kali, lalu diminta transfer lagi untuk biaya administrasi, dan mulai curiga tertipu.",
     isActive: true,
   },
   {
@@ -110,7 +110,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "SLIK",
     title: "Pengecekan SLIK",
     description:
-      "Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.",
+      "Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak. Konsumen merasa selalu membayar cicilan tepat waktu, dan uang muka rumah sudah disiapkan sehingga ia khawatir kehilangan rumah incarannya.",
     isActive: true,
   },
   {
@@ -118,7 +118,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "Asuransi",
     title: "Klaim Asuransi Ditolak",
     description:
-      "Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.",
+      "Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas. Biaya rawat inap sudah dibayar sendiri, dan pihak asuransi hanya menjawab bahwa klaim tidak sesuai ketentuan polis.",
     isActive: true,
   },
   {
@@ -126,7 +126,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "Investasi",
     title: "Investasi Bodong",
     description:
-      "Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).",
+      "Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi). Konsumen sudah menyetor sebagian tabungannya karena diajak kerabat, dan sebulan terakhir imbal hasil yang dijanjikan berhenti dibayar.",
     isActive: true,
   },
   {
@@ -134,7 +134,7 @@ export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
     category: "Perbankan",
     title: "Tagihan Kartu Kredit",
     description:
-      "Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.",
+      "Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya. Tagihan itu muncul di lembar tagihan bulan ini, dan konsumen merasa tidak pernah melakukan transaksi tersebut.",
     isActive: true,
   },
 ];
@@ -144,7 +144,7 @@ export const DEFAULT_KETIK_CONSUMER_TYPES: KetikConsumerType[] = [
     id: "marah",
     name: "Marah & Emosional",
     description:
-      "Konsumen sedang sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, dan mudah terpancing bila jawaban agen terasa normatif.",
+      "Konsumen sedang sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, tidak sabar dengan penjelasan panjang, dan makin kesal bila jawaban agen terasa normatif atau template.",
     difficulty: "Sulit",
   },
   {
@@ -158,7 +158,7 @@ export const DEFAULT_KETIK_CONSUMER_TYPES: KetikConsumerType[] = [
     id: "kritis",
     name: "Kritis & Detail",
     description:
-      "Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template.",
+      "Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template atau berubah-ubah. Suka menanyakan dasar dan bukti.",
     difficulty: "Sulit",
   },
   {
