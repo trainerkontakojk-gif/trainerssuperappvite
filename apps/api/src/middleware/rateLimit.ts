@@ -101,19 +101,33 @@ const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 200;
 const MAX_AI_REQUESTS = 50;
 
+const MAX_CLIENT_IP_LENGTH = 64;
+
+/**
+ * Client address for per-IP buckets. Railway's edge appends the real peer as
+ * the rightmost X-Forwarded-For hop; every hop to its left is caller-supplied,
+ * so keying on those lets a caller mint a fresh bucket per request.
+ */
+function resolveClientIp(c: Context): string {
+  const hops = c.req.header("x-forwarded-for")?.split(",") ?? [];
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const hop = hops[i].trim();
+    if (hop) return hop.slice(0, MAX_CLIENT_IP_LENGTH);
+  }
+  return "local";
+}
+
 function getKey(c: Context): string {
   const profile = c.get("profile") as
     | { role?: string; full_name?: string }
     | undefined;
   const user = c.get("user") as { id?: string } | undefined;
   if (profile && user?.id) return `user:${user.id}`;
-  const forwarded = c.req.header("x-forwarded-for");
-  return `ip:${forwarded?.split(",")[0]?.trim() || "local"}`;
+  return `ip:${resolveClientIp(c)}`;
 }
 
 export const rateLimitMiddleware = async (c: Context, next: Next) => {
-  const forwarded = c.req.header("x-forwarded-for");
-  const key = `ip:${forwarded?.split(",")[0]?.trim() || "local"}`;
+  const key = `ip:${resolveClientIp(c)}`;
   const now = Date.now();
   let entry = globalStore.get(key);
 

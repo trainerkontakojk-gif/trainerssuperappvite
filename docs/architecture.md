@@ -394,6 +394,7 @@ Keamanan aplikasi dijaga di beberapa sisi:
 4. **Admin Server Boundary**: Service role hanya dipakai di backend (Hono) untuk operasi yang membutuhkan akses lintas akun.
 5. **Hono RPC Type Safety**: `hc<AppType>` memastikan frontend tidak bisa mengirim payload yang tidak sesuai dengan validasi Zod di backend.
 6. **Fungsi di schema yang diekspos**: kontrol akses fungsi Postgres ada di dalam body fungsi, bukan di GRANT/REVOKE (lihat di bawah).
+7. **Rate limit API**: rate limit umum API (`apps/api/src/middleware/rateLimit.ts`, 200 request/menit per IP di `/api/v1/*`, dan fallback IP limiter AI) memakai hop **paling kanan** `X-Forwarded-For`, yaitu alamat yang ditambahkan edge Railway; hop di kirinya bisa diisi pemanggil sehingga tidak dipakai. Penyimpanannya in-memory per proses; menjalankan API lebih dari satu replica butuh store bersama.
 
 ### Kontrak: fungsi di schema yang diekspos (`public`, `graphql_public`)
 
