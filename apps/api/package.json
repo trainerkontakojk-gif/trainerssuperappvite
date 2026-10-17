@@ -26,14 +26,14 @@
     "start:ketik-review-worker": "tsx src/workers/ketik-review-worker-entrypoint.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.27.0",
-    "@hono/node-server": "^2.1.3",
+    "@google/genai": "^2.29.0",
+    "@hono/node-server": "^2.1.5",
     "@hono/zod-validator": "^0.9.1",
-    "@supabase/supabase-js": "^2.117.2",
+    "@supabase/supabase-js": "^2.117.3",
     "@trainers/types": "workspace:*",
     "hono": "^4.13.13",
     "tsx": "^4.23.15",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
