@@ -107,3 +107,15 @@ export const formatTanggal = (date: string): string => {
     year: "numeric",
   });
 };
+
+/** Tanggal ringkas untuk kolom tabel, mis. "17 Okt 1995". */
+export const formatShortDate = (date: string): string => {
+  if (!date) return "-";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(profiler): merge the participant list into the workspace Peserta tab with Kartu/Tabel modes, search by NIK/email and a team filter, open the profile and edit form in the main area with previous/next, move Pilih banyak/Pindah folder/Atur urutan into the tab, and redirect /profiler/table to the Tabel mode
 - feat(ketik): make the AI chat consumer behave like a real person: it never helps, corrects or hints the agent, reveals details only when asked (with or without a script), follows per-type behavior with chat-style examples, and the angry type stays hard to calm with template empathy; default scenarios get a short backstory and the unused /ketik/simulation page file is removed
 - fix(profiler): require a target folder in the add form instead of saving into "Batch 1", scale the participant slide to fit laptop and phone screens without clipping (exports stay full size), count system teams in Kelola tim, show jabatan labels in selects, and say that sensitive data appears on slides and exports
 - refactor(telefun): remove the conversation challenges feature (settings section, prompt block and the session's disruption_config); saved challenge choices are ignored and dropped on the next save

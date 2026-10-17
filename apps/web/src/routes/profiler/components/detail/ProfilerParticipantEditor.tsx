@@ -1,11 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Check,
-  FileText,
-  Lock,
   Upload,
-  User,
-  Briefcase,
   Loader2,
   Trash2,
 } from "lucide-react";
@@ -27,14 +23,6 @@ import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
 import { Textarea } from "../../../../components/ui/textarea";
 import { Badge } from "../../../../components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../../../../components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -122,7 +110,7 @@ function SelectField({
   );
 }
 
-interface EditPesertaModalProps {
+interface ProfilerParticipantEditorProps {
   peserta: ProfilerPeserta;
   timList: string[];
   onClose: () => void;
@@ -133,7 +121,13 @@ interface EditPesertaModalProps {
   isReadOnly?: boolean;
 }
 
-export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
+/**
+ * Form edit peserta yang tampil di area utama workspace (bukan jendela
+ * melayang). `onClose` kembali ke profil; `onDeleted` kembali ke daftar.
+ */
+export const ProfilerParticipantEditor: React.FC<
+  ProfilerParticipantEditorProps
+> = ({
   peserta,
   timList,
   onClose,
@@ -262,15 +256,14 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
     if (!confirm(`Hapus ${form.nama}?`)) return;
     await profilerApi.deletePeserta(form.id!);
     onDeleted(form.id!);
-    onClose();
     notify.success("Peserta berhasil dihapus");
   };
 
   const tabs = [
-    { id: "profil" as const, label: "Profil & foto", icon: User },
-    { id: "kontak" as const, label: "Kontak & karir", icon: Briefcase },
-    { id: "personal" as const, label: "Pribadi & sensitif", icon: Lock },
-    { id: "catatan" as const, label: "Catatan & memo", icon: FileText },
+    { id: "profil" as const, label: "Profil & foto" },
+    { id: "kontak" as const, label: "Kontak & karir" },
+    { id: "personal" as const, label: "Pribadi & sensitif" },
+    { id: "catatan" as const, label: "Catatan & memo" },
   ];
   const jabatanOptions = Object.entries(labelJabatan).map(([value, label]) => ({
     value,
@@ -279,40 +272,45 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
   const timOptions = timList.map((value) => ({ value, label: value }));
 
   return (
-    <Dialog open onOpenChange={(open) => !open && void handleClose()}>
-      <DialogContent
-        initialFocus={() =>
-          document.getElementById("edit-peserta-dialog-title")
-        }
-        className="!w-[calc(100vw-2rem)] !max-w-4xl flex h-[min(92dvh,52rem)] max-h-[calc(100dvh-2rem)] min-h-0 flex-col gap-0 overflow-hidden p-0"
-      >
-        <DialogHeader className="shrink-0 border-b border-border px-5 py-5 sm:px-7">
-          <div className="flex items-start justify-between gap-4 pr-8">
-            <div>
-              <DialogTitle
-                id="edit-peserta-dialog-title"
-                tabIndex={-1}
-                className="text-lg"
-              >
-                Profil peserta
-              </DialogTitle>
-              <DialogDescription className="mt-1">
-                Kelola identitas, kontak, data personal, dan catatan
-                administrasi.
-              </DialogDescription>
-            </div>
-            {!isReadOnly ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-              >
-                <Trash2 data-icon="inline-start" aria-hidden="true" /> Hapus
-              </Button>
-            ) : null}
-          </div>
-        </DialogHeader>
+    <section
+      aria-labelledby="profiler-editor-title"
+      className="flex min-w-0 flex-col gap-5"
+    >
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1
+          id="profiler-editor-title"
+          className="min-w-0 break-words font-outfit text-2xl font-bold tracking-tight text-foreground sm:text-3xl"
+        >
+          Edit {peserta.nama || "peserta"}
+        </h1>
+        <div className="flex shrink-0 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="min-h-11"
+            onClick={() => void handleClose()}
+          >
+            Batal
+          </Button>
+          {!isReadOnly ? (
+            <Button
+              type="button"
+              size="lg"
+              className="min-h-11"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Check aria-hidden="true" />
+              )}
+              {saving ? "Menyimpan..." : "Simpan perubahan"}
+            </Button>
+          ) : null}
+        </div>
+      </header>
 
         <Tabs
           value={activeTab}
@@ -325,19 +323,17 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
             )
               setActiveTab(value);
           }}
-          className="min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          className="min-w-0 flex-col"
         >
-          <div className="shrink-0 overflow-x-auto border-b border-border px-5 sm:px-7">
+          <div className="overflow-x-auto border-b border-border">
             <TabsList variant="line" className="min-w-max">
               {tabs.map((tab) => {
-                const Icon = tab.icon;
                 return (
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="min-h-11 gap-2 px-3 text-xs sm:px-4"
+                    className="min-h-11 px-3 text-sm sm:px-4"
                   >
-                    <Icon data-icon="inline-start" aria-hidden="true" />
                     {tab.label}
                   </TabsTrigger>
                 );
@@ -348,7 +344,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
           <div
             role="region"
             aria-label="Konten profil peserta"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6"
+            className="pt-5"
           >
             <TabsContent value="profil" className="mt-0 grid gap-6">
               <div className="grid gap-5 rounded-xl border border-border bg-card p-4 sm:grid-cols-[10rem_1fr] sm:p-5">
@@ -399,7 +395,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                 </div>
                 <div className="grid content-start gap-5">
                   <div className="flex items-center justify-between border-b border-border pb-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <p className="text-sm font-medium text-foreground">
                       Bingkai & posisi foto
                     </p>
                     <Badge variant="secondary">
@@ -614,7 +610,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                 disabled={isReadOnly}
               />
               <div className="sm:col-span-2 border-t border-border pt-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="text-sm font-medium text-foreground">
                   Pendidikan & karir
                 </p>
               </div>
@@ -727,11 +723,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                 />
               </div>
               <div className="sm:col-span-2 flex items-center gap-2 border-t border-border pt-5">
-                <Lock
-                  className="size-4 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="text-sm font-medium text-foreground">
                   Informasi sensitif
                 </p>
               </div>
@@ -830,34 +822,23 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
           </div>
         </Tabs>
 
-        <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none p-4 sm:p-5">
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="min-h-11"
-            onClick={onClose}
-          >
-            Batal
-          </Button>
-          {!isReadOnly ? (
+        {!isReadOnly ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+            <p className="text-sm text-muted-foreground">
+              Menghapus peserta tidak bisa dibatalkan.
+            </p>
             <Button
               type="button"
+              variant="destructive"
               size="lg"
               className="min-h-11"
-              onClick={handleSave}
-              disabled={saving}
+              onClick={handleDelete}
             >
-              {saving ? (
-                <Loader2 className="animate-spin" aria-hidden="true" />
-              ) : (
-                <Check aria-hidden="true" />
-              )}
-              {saving ? "Menyimpan..." : "Simpan perubahan"}
+              <Trash2 data-icon="inline-start" aria-hidden="true" />
+              Hapus peserta
             </Button>
-          ) : null}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </div>
+        ) : null}
+    </section>
   );
 };

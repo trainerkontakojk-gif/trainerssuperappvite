@@ -272,6 +272,36 @@ export default function ProfilerLanding() {
   };
 
   const batchPeserta = activeFolder ? pesertaMap[activeFolder.name] : undefined;
+
+  const handlePesertaChange = useCallback(
+    (batchName: string, next: ProfilerPeserta[]) => {
+      setPesertaMap((prev) => ({ ...prev, [batchName]: next }));
+      setCounts((prev) => ({ ...prev, [batchName]: next.length }));
+    },
+    [],
+  );
+
+  // Peserta yang dipindah keluar dari folder aktif; daftar folder tujuan
+  // dimuat ulang saat dibuka supaya urutannya mengikuti server.
+  const handleMoved = useCallback(
+    (batchName: string, ids: string[], targetFolder: string) => {
+      const moved = new Set(ids);
+      setPesertaMap((prev) => {
+        const next = { ...prev };
+        delete next[targetFolder];
+        next[batchName] = (prev[batchName] ?? []).filter(
+          (p) => !p.id || !moved.has(p.id),
+        );
+        return next;
+      });
+      setCounts((prev) => ({
+        ...prev,
+        [batchName]: Math.max(0, (prev[batchName] ?? 0) - ids.length),
+        [targetFolder]: (prev[targetFolder] ?? 0) + ids.length,
+      }));
+    },
+    [],
+  );
   const upcomingBirthdays = useMemo(
     () => getUpcomingBirthdays(batchPeserta ?? []),
     [batchPeserta],
@@ -361,7 +391,17 @@ export default function ProfilerLanding() {
                 teamName={activeTeamName}
                 view={activeView}
                 participantId={queryParams.participant ?? null}
+                layout={queryParams.layout === "tabel" ? "tabel" : "kartu"}
+                editing={queryParams.edit === "1"}
                 peserta={batchPeserta ?? []}
+                folders={folders}
+                years={years}
+                onPesertaChange={(next) =>
+                  handlePesertaChange(activeFolder.name, next)
+                }
+                onMoved={(ids, target) =>
+                  handleMoved(activeFolder.name, ids, target)
+                }
                 loading={!batchPeserta && !pesertaError}
                 error={pesertaError}
                 onRetry={() => {

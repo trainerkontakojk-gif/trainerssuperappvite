@@ -13,7 +13,6 @@
 
 import { expect, test } from "@playwright/test";
 import { openHermeticShell, type ApiMock } from "./helpers/hermeticShell";
-import { PROFILER_MOCKS, TEAM_ID } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 type ShellRoute =
@@ -33,19 +32,6 @@ const SHELL_ROUTES: readonly ShellRoute[] = [
   "/monitoring",
   "/pdkt/history",
   "/profiler",
-  // Tanpa batch dan data, tabel hanya merender state kosong/loading.
-  {
-    path: "/profiler/table?batch=Batch%20Pagi",
-    apiMocks: [
-      ...PROFILER_MOCKS,
-      {
-        method: "GET",
-        path: "/api/v1/profiler/teams",
-        body: { success: true, data: [{ id: TEAM_ID, nama: "Tim Call" }] },
-      },
-    ],
-    readyText: "Rina Kartika",
-  },
   "/profiler/add",
   "/profiler/import",
   "/profiler/teams",

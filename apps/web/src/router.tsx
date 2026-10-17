@@ -61,7 +61,6 @@ const UnauthorizedPage = lazy(() => import("./routes/unauthorized"));
 const WaitingApprovalPage = lazy(() => import("./routes/waiting-approval"));
 const ResetPasswordPage = lazy(() => import("./routes/reset-password"));
 const ProfilerLanding = lazy(() => import("./routes/profiler/index"));
-const ProfilerTable = lazy(() => import("./routes/profiler/table"));
 const ProfilerAdd = lazy(() => import("./routes/profiler/add"));
 const ProfilerImport = lazy(() => import("./routes/profiler/import"));
 const ProfilerTeams = lazy(() => import("./routes/profiler/teams"));
@@ -140,11 +139,18 @@ const profilerRoute = createRoute({
   beforeLoad: requireCapability("profiler.landing"),
 });
 
+/** Daftar peserta kini satu: tab Peserta di workspace, mode Tabel. */
 const profilerTableRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/table",
-  component: ProfilerTable,
-  beforeLoad: requireCapability("profiler.view"),
+  beforeLoad: ({ location }: { location: { searchStr: string } }) => {
+    const batch = new URLSearchParams(location.searchStr).get("batch");
+    throw redirect({
+      to: "/profiler",
+      search: batch ? { batch, layout: "tabel" } : {},
+      replace: true,
+    });
+  },
 });
 
 const profilerSlidesRoute = createRoute({

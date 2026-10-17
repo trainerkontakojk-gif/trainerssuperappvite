@@ -25,7 +25,9 @@ interface ProfilerParticipantGridProps {
   isReadOnly: boolean;
   hasActiveFilters: boolean;
   resetFilters: () => void;
-  setSelectedPeserta: (p: ProfilerPeserta) => void;
+  onOpenProfile: (p: ProfilerPeserta) => void;
+  onEdit: (p: ProfilerPeserta) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
   onViewAnalysis: (id: string) => void;
   onAddPeserta: () => void;
   dragIndex: number | null;
@@ -48,7 +50,9 @@ export const ProfilerParticipantGrid: React.FC<
   isReadOnly,
   hasActiveFilters,
   resetFilters,
-  setSelectedPeserta,
+  onOpenProfile,
+  onEdit,
+  onMove,
   onViewAnalysis,
   onAddPeserta,
   dragIndex,
@@ -74,7 +78,7 @@ export const ProfilerParticipantGrid: React.FC<
             <EmptyDescription>
               {hasActiveFilters
                 ? "Sesuaikan pencarian atau filter tim untuk melanjutkan."
-                : "Tambahkan peserta pertama untuk mulai menyusun profil batch."}
+                : "Tambahkan peserta pertama ke folder ini."}
             </EmptyDescription>
           </EmptyHeader>
           {hasActiveFilters ? (
@@ -120,7 +124,11 @@ export const ProfilerParticipantGrid: React.FC<
             isDragOver={dragOverIndex === index}
             density={density}
             toggleSelect={toggleSelect}
-            setSelectedPeserta={setSelectedPeserta}
+            isReadOnly={isReadOnly}
+            lastIndex={displayList.length - 1}
+            onOpenProfile={onOpenProfile}
+            onEdit={onEdit}
+            onMove={onMove}
             onViewAnalysis={onViewAnalysis}
             handleDragStart={handleDragStart}
             handleDragOver={handleDragOver}

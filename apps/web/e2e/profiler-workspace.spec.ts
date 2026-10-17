@@ -54,7 +54,7 @@ const PESERTA_LENGKAP: readonly ApiMock[] = [
     (mock) =>
       !(mock.path instanceof RegExp && String(mock.path).includes("Pagi")),
   ),
-  // Halaman /profiler/table memuat daftar tim bersama peserta dan folder.
+  // Form edit peserta memuat daftar tim.
   {
     method: "GET",
     path: "/api/v1/profiler/teams",
@@ -216,7 +216,6 @@ test.describe("Workspace Profiler (hermetic)", () => {
       ["Statistik", `^/profiler\\?${BATCH_QS}&view=statistik$`],
       ["Slide", `^/profiler\\?${BATCH_QS}&view=slide$`],
       ["Ekspor", `^/profiler\\?${BATCH_QS}&view=ekspor$`],
-      ["Tabel lengkap", `^/profiler/table\\?${BATCH_QS}$`],
     ] as const) {
       await expect(views.getByRole("link", { name })).toHaveAttribute(
         "href",
@@ -506,18 +505,18 @@ test.describe("Workspace Profiler (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test(`teks halaman tabel Profiler (pilih batch + kartu) minimal ${MIN_TEXT_PX}px`, async ({
+  test(`teks tab Peserta mode Tabel minimal ${MIN_TEXT_PX}px`, async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
-      path: "/profiler/table?batch=Batch%20Pagi",
+      path: "/profiler?batch=Batch%20Pagi&layout=tabel",
+      waitForUrl: /\/profiler/,
       apiMocks: PESERTA_LENGKAP,
     });
-    await expect(page.getByText("Rina Kartika").first()).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText("Batch", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("#OJK-001")).toBeVisible();
+    await expect(
+      page.getByRole("table", { name: "Daftar peserta" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText("OJK-001")).toBeVisible();
 
     const offenders = await findTextBelowFloor(page.locator("main").first());
     expect(offenders, offenders.join("\n")).toEqual([]);
