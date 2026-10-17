@@ -1,5 +1,11 @@
 import { supabaseAdmin } from "../../lib/supabase";
-import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
+import {
+  fetchPublishedRuleVersions,
+  pickEffectiveRuleVersion,
+  resolveEffectiveRuleVersionForPeriod,
+  type EffectiveRuleVersion,
+  type PublishedRuleVersionRow,
+} from "./rule-version-resolver";
 import { isServiceType } from "../../lib/scoring";
 import type {
   QAIndicator,
@@ -43,33 +49,89 @@ export type ServiceWeightOverride = {
   scoring_mode?: ScoringMode | null;
 };
 
+/** How a scoring context reads its rule version and snapshot indicators. */
+export type PeriodScoringLoaders = {
+  resolveVersion: (
+    serviceType: ServiceType,
+    periodId: string,
+  ) => Promise<EffectiveRuleVersion | null>;
+  loadSnapshot: (versionId: string) => Promise<RuleIndicatorSnapshotRow[]>;
+};
+
+async function fetchRuleIndicatorSnapshot(
+  versionId: string,
+): Promise<RuleIndicatorSnapshotRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("qa_service_rule_indicators")
+    .select("*")
+    .eq("rule_version_id", versionId);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []) as RuleIndicatorSnapshotRow[];
+}
+
+const directLoaders: PeriodScoringLoaders = {
+  resolveVersion: resolveEffectiveRuleVersionForPeriod,
+  loadSnapshot: fetchRuleIndicatorSnapshot,
+};
+
+function memoize<T>(load: (key: string) => Promise<T>) {
+  const cache = new Map<string, Promise<T>>();
+  return (key: string): Promise<T> => {
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = load(key);
+      cache.set(key, pending);
+    }
+    return pending;
+  };
+}
+
+/**
+ * Loaders for one request that scores many (service, period) pairs. Published
+ * versions are read once per service and each snapshot once per version,
+ * instead of three queries per pair. `periods` must be the full period list.
+ */
+export function createPeriodScoringLoaders(
+  periods: ReadonlyArray<{ id: string; month: number; year: number }>,
+): PeriodScoringLoaders {
+  const periodById = new Map(periods.map((p) => [p.id, p]));
+  const versionsFor = memoize<PublishedRuleVersionRow[]>(
+    fetchPublishedRuleVersions,
+  );
+  return {
+    resolveVersion: async (serviceType, periodId) => {
+      const target = periodById.get(periodId);
+      if (!target) return null;
+      return pickEffectiveRuleVersion(target, await versionsFor(serviceType));
+    },
+    loadSnapshot: memoize(fetchRuleIndicatorSnapshot),
+  };
+}
+
 export async function loadPeriodScoringContext(
   serviceType: ServiceType,
   periodId: string,
   fallbackIndicators: QAIndicator[],
   fallbackWeight: ServiceWeight,
+  loaders: PeriodScoringLoaders = directLoaders,
 ): Promise<PeriodScoringContext> {
-  const activeVersion = await resolveEffectiveRuleVersionForPeriod(
-    serviceType,
-    periodId,
-  );
+  const activeVersion = await loaders.resolveVersion(serviceType, periodId);
 
   if (activeVersion) {
-    const { data: snapshotInds, error: snapshotError } = await supabaseAdmin
-      .from("qa_service_rule_indicators")
-      .select("*")
-      .eq("rule_version_id", activeVersion.id);
-
-    if (snapshotError) {
+    let snapshotInds: RuleIndicatorSnapshotRow[];
+    try {
+      snapshotInds = await loaders.loadSnapshot(activeVersion.id);
+    } catch (error) {
       throw new Error(
-        `Gagal memuat snapshot indikator ${serviceType}:${periodId}: ${snapshotError.message}`,
+        `Gagal memuat snapshot indikator ${serviceType}:${periodId}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
 
     if (snapshotInds && snapshotInds.length > 0) {
-      const indicators: QAIndicator[] = (
-        snapshotInds as RuleIndicatorSnapshotRow[]
-      ).map((ri) => ({
+      const indicators: QAIndicator[] = snapshotInds.map((ri) => ({
         id: ri.id,
         service_type: isServiceType(ri.service_type)
           ? ri.service_type
@@ -83,7 +145,7 @@ export async function loadPeriodScoringContext(
       }));
 
       const scoreIdByAnyId = new Map<string, string>();
-      for (const snap of snapshotInds as RuleIndicatorSnapshotRow[]) {
+      for (const snap of snapshotInds) {
         scoreIdByAnyId.set(snap.id, snap.id);
         if (snap.indicator_id) scoreIdByAnyId.set(snap.indicator_id, snap.id);
         if (snap.legacy_indicator_id)
