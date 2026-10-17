@@ -119,7 +119,7 @@ Keep summaries in their owning document. Do not copy a test matrix, route invent
 
 ### Changelog gate
 
-Every commit in every lane, Lane A included, adds one entry to the root [`CHANGELOG.md`](../CHANGELOG.md) in the same commit. Put it under a `## YYYY-MM-DD` heading for the commit date (create the heading at the top if it is missing) as `- type(scope): summary`, matching the commit subject. Do not add the commit's own hash; backfilled entries carry one only because they predate the policy. Merge commits need no entry of their own.
+Every commit in every lane, Lane A included, adds one entry to the root [`CHANGELOG.md`](../CHANGELOG.md) in the same commit. Put it under a `## YYYY-MM-DD` heading for the commit date (create the heading at the top if it is missing) as `- type(scope): summary`, matching the commit subject. Do not add the commit's own hash; backfilled entries carry one only because they predate the policy. Merge commits need no entry of their own. Commits authored by Dependabot (including squash-merges of its PRs) are exempt, because Dependabot cannot write an entry and its PR title already names each bump.
 
 Enforcement: `.githooks/pre-commit` rejects a commit whose staged diff adds no changelog bullet (`pnpm install` sets `core.hooksPath`; run `git config core.hooksPath .githooks` in an existing clone), and the CI `changelog` job runs `node scripts/check-changelog.mjs <base>` over every non-merge commit in the push or PR. Never bypass the hook with `--no-verify`.
 
