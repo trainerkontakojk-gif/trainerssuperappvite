@@ -860,13 +860,14 @@ test("worker host refuses invalid activation and stays idle when disabled", asyn
   // Disabled: the standalone entrypoint exits 1; the API keeps serving and claims nothing.
   const id = await seedSession();
   await request("/review", trainer, { sessionId: id });
-  for (const overrides of [
+  const cases: Record<string, string>[] = [
     { KETIK_REVIEW_WORKER_ENABLED: "false" },
     {
       KETIK_REVIEW_WORKER_ENABLED: "true",
       KETIK_REVIEW_WORKER_INTERVAL_MS: "-1",
     },
-  ]) {
+  ];
+  for (const overrides of cases) {
     const child = spawnWorkerHost(overrides);
     let log = "";
     child.stdout.on("data", (data) => {
