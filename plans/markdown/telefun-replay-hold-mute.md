@@ -11,7 +11,12 @@ Lane C (perubahan perilaku web lintas file, tanpa backend/skema).
 
 ## Design
 
-- Interval hold diukur dari jam sesi `LiveSession.sessionStartTime` (saat `auth_ok`), bukan dari awal rekaman. Bukti sesi `447f3435`: rekaman 904,5 dtk, `sessionDurationMs` 906.161, dan metrik ditulis ±500 ms setelah perekam berhenti. Di hold ke-4, suara AI konsumen (yang diblokir selama hold) mulai ±1,1 dtk sebelum `endedAtMs`. Jadi jam rekaman tertinggal ±1,16 dtk.
+- Interval hold diukur dari jam sesi `LiveSession.sessionStartTime` (saat `auth_ok`), bukan dari awal rekaman. Perekam mulai lebih dulu, jadi jam rekaman mendahului jam sesi.
+- Sesi `447f3435`: durasi pemutar 906,22 dtk dan `sessionDurationMs` 906.161, sehingga selisihnya +0,56 dtk.
+  - Diukur pada timeline elemen `<audio>` di produksi setelah deploy, hold ke-4 (jendela senyap berakhir 848,0 dtk): suara agen selama hold berhenti di 847,5 dtk dan konsumen mulai di 848,3 dtk.
+  - Hold ke-3: agen menyapa lagi di 572,5 dtk, sesudah jendela berakhir di 571,4 dtk.
+  - Awal hold ke-4 (735,2 dtk): ucapan agen sebelum hold selesai di 734,8 dtk, jadi tidak terpotong.
+  - Hasil `decodeAudioData` lebih pendek 1,7 dtk (904,5 dtk) karena mengabaikan celah timestamp WebM. Karena itu timeline hasil decode tidak bisa dipakai untuk menyelaraskan.
 - Selisih jam = `durasiRekaman − (sessionDurationMs − 500)`. Selisih ini dibatasi; lebih dari ±3 dtk dianggap tidak andal dan menjadi 0. Helper murni `holdWindowsInRecording` ada di `utils/recordingAudio.ts`.
 - `TelefunCallPlayer` menerima `sessionDurationMs` dan mengatur `audio.muted` saat `timeupdate`, `seeked`, dan di loop `requestAnimationFrame` selama diputar, supaya batas hold presisi. Pita hold di garis waktu memakai jendela yang sama.
 
