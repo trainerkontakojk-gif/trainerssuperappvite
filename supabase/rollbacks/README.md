@@ -153,3 +153,7 @@ done
   forward migration only fills NULL `qa_temuan.tahun` from the period year;
   nulling them again would re-hide batch findings from score readers, and
   backfilled rows cannot be told apart from rows written later.
+- `rollback_20261017120000_qa_temuan_fill_tahun_trigger.sql` drops
+  `trg_fill_tahun` and `public.fill_tahun_from_period()`. No data loss: filled
+  `tahun` values stay. On prod it also removes the trigger that existed there
+  before the migration, so inserts that omit `tahun` store NULL again.
