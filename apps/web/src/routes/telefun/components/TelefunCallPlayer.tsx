@@ -7,13 +7,12 @@ import {
   type Ref,
 } from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
-import type { TelefunHoldInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
 import { notify } from "../../../lib/toast";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
-import { waveformBars, windowsInRecording } from "../utils/recordingAudio";
+import { waveformBars, type RecordingWindow } from "../utils/recordingAudio";
 import { downloadRecording } from "../utils/recordingDownload";
 import { formatClock } from "../utils/reviewDisplay";
 
@@ -36,9 +35,10 @@ interface TelefunCallPlayerProps {
   onRetry: () => void;
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
-  holds: readonly TelefunHoldInterval[];
-  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dengan rekaman. */
-  sessionDurationMs?: number;
+  /** Rentang hold dalam waktu rekaman (`windowsInRecording`). */
+  holdWindows: readonly RecordingWindow[];
+  /** Panjang rekaman dari metadata audio, untuk menyelaraskan jam hold. */
+  onDurationChange?: (ms: number) => void;
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
   onTimeChange?: (ms: number) => void;
@@ -131,8 +131,8 @@ export function TelefunCallPlayer({
   analysis,
   onRetry,
   fallbackDurationMs,
-  holds,
-  sessionDurationMs,
+  holdWindows,
+  onDurationChange,
   notes,
   downloadName,
   onTimeChange,
@@ -146,12 +146,10 @@ export function TelefunCallPlayer({
   const [durationMs, setDurationMs] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const [downloading, setDownloading] = useState(false);
+  // Tautan baru pun gagal diputar: tampilkan pesan dan Coba lagi, jangan diam.
+  const [playbackFailed, setPlaybackFailed] = useState(false);
   const totalMs = durationMs > 0 ? durationMs : fallbackDurationMs;
   const ready = source.status === "ready";
-  const holdWindows = useMemo(
-    () => windowsInRecording(holds, durationMs, sessionDurationMs),
-    [holds, durationMs, sessionDurationMs],
-  );
   const syncSilence = (audio: HTMLAudioElement) => {
     const ms = audio.currentTime * 1000;
     audio.muted = holdWindows.some(
@@ -228,8 +226,14 @@ export function TelefunCallPlayer({
           preload="metadata"
           className="hidden"
           onLoadedMetadata={(event) => {
+            // Termuat: tautan berikutnya yang kedaluwarsa boleh diperbarui lagi.
+            refreshedRef.current = false;
+            setPlaybackFailed(false);
             const seconds = event.currentTarget.duration;
-            if (Number.isFinite(seconds)) setDurationMs(seconds * 1000);
+            if (Number.isFinite(seconds)) {
+              setDurationMs(seconds * 1000);
+              onDurationChange?.(seconds * 1000);
+            }
             event.currentTarget.playbackRate = speed;
             if (pendingSeekRef.current !== null) {
               event.currentTarget.currentTime = pendingSeekRef.current / 1000;
@@ -248,9 +252,14 @@ export function TelefunCallPlayer({
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
           onError={() => {
-            // Tautan bertanda tangan bisa kedaluwarsa; minta sekali lagi.
-            if (refreshedRef.current) return;
+            // Tautan bertanda tangan bisa kedaluwarsa; minta sekali lagi dan
+            // lanjutkan dari posisi yang sama.
+            if (refreshedRef.current) {
+              setPlaybackFailed(true);
+              return;
+            }
             refreshedRef.current = true;
+            pendingSeekRef.current = currentMs;
             onRetry();
           }}
         />
@@ -334,7 +343,7 @@ export function TelefunCallPlayer({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {holds.length > 0 && (
+        {holdWindows.length > 0 && (
           <span className="inline-flex items-center gap-1.5">
             <span
               aria-hidden="true"
@@ -358,7 +367,7 @@ export function TelefunCallPlayer({
         {source.status === "unavailable" && (
           <span>Rekaman tidak tersedia untuk panggilan ini.</span>
         )}
-        {source.status === "error" && (
+        {(source.status === "error" || playbackFailed) && (
           <span className="inline-flex items-center gap-2" role="alert">
             Rekaman belum bisa dimuat.
             <Button
@@ -366,6 +375,7 @@ export function TelefunCallPlayer({
               variant="link"
               onClick={() => {
                 refreshedRef.current = false;
+                setPlaybackFailed(false);
                 onRetry();
               }}
               className="h-auto min-h-[44px] gap-1 px-0 text-xs"

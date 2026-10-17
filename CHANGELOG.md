@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- fix(telefun): keep only unsynced calls in the local history copy so deleted sessions stop reappearing, refresh the Telaah recording link on every expiry with a visible retry when it keeps failing, and show hold times on the recording clock
 - chore(workflow): exempt Dependabot-authored commits from the changelog gate so its update PRs can pass CI and be merged directly
 - chore(deps): apply the pending Dependabot minor/patch updates (genai, hono node-server, supabase-js, zod, TanStack, base-ui, framer-motion, lucide, Playwright, Vite, Prettier, typescript-eslint and more) and supabase/setup-cli v3 in CI
 - fix(api): key the per-IP rate limit on the rightmost X-Forwarded-For hop Railway appends, so a caller rotating a fake leftmost value can no longer bypass the 200/min limit

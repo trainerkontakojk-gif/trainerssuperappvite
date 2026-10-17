@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   canOverwriteTelefunLocalHistory,
   parseTelefunLocalHistory,
-  shouldPersistTelefunLocalHistory,
 } from "../routes/telefun/telefunLocalHistory";
 import { upsertTelefunSessionRecord } from "../routes/telefun/telefunApi";
 import {
@@ -83,12 +82,6 @@ describe("Telefun local history parsing", () => {
       isCorrupt: false,
     });
     expect(warn).not.toHaveBeenCalled();
-  });
-
-  it("preserves corrupt local payloads instead of overwriting them with server rows", () => {
-    expect(shouldPersistTelefunLocalHistory([localRecord], true)).toBe(false);
-    expect(shouldPersistTelefunLocalHistory([localRecord], false)).toBe(true);
-    expect(shouldPersistTelefunLocalHistory([], false)).toBe(false);
   });
 
   it("blocks later automatic writes until the user explicitly clears corrupt history", () => {

@@ -75,6 +75,12 @@ export type HermeticShellOptions = {
   expectedThirdPartyHosts?: readonly string[];
   /** Pola URL yang ditunggu setelah navigasi. Default: string `options.path`. */
   waitForUrl?: string | RegExp;
+  /**
+   * Dipanggil setelah guard terpasang dan sebelum halaman dibuka. Route yang
+   * didaftarkan di sini mendahului guard (Playwright memakai route terakhir
+   * lebih dulu) dan sudah aktif untuk permintaan pertama halaman.
+   */
+  beforeNavigate?: (page: Page) => Promise<void>;
 };
 
 export function startAudit(): ShellAudit {
@@ -217,6 +223,7 @@ export async function openHermeticShell(
     await route.abort();
   });
 
+  await options.beforeNavigate?.(page);
   await page.goto(options.path);
   const waitFor = options.waitForUrl ?? options.path;
   await page.waitForURL(typeof waitFor === "string" ? `**${waitFor}` : waitFor);

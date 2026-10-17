@@ -21,6 +21,7 @@ import {
   recordingMock,
   serveRecording,
   serveSpeechRecordings,
+  speechWav,
   telefunMocks,
   voiceAssessment,
   annotatedAssessment,
@@ -37,11 +38,17 @@ function telaahPath(id: string) {
   return `/telefun?sesi=${id}&tahap=telaah`;
 }
 
-async function open(page: Page, path: string, apiMocks: ApiMock[]) {
+async function open(
+  page: Page,
+  path: string,
+  apiMocks: ApiMock[],
+  beforeNavigate?: (page: Page) => Promise<void>,
+) {
   const audit = await openHermeticShell(page, {
     path,
     apiMocks,
     waitForUrl: /\/telefun/,
+    beforeNavigate,
   });
   console.log("[audit]", formatAudit(audit));
   return audit;
@@ -243,13 +250,13 @@ async function openTelaah(
   extra: ApiMock[] = [],
   history: readonly TelefunRow[] = FULL_HISTORY,
 ) {
-  const audit = await open(page, telaahPath(row.id), [
-    ...telefunMocks(history),
-    recordingMock(row.id),
-    ...extra,
-  ]);
-  await serveRecording(page);
-  return audit;
+  // Rekaman dilayani sebelum halaman dibuka: permintaan pertama <audio> tidak boleh lolos.
+  return open(
+    page,
+    telaahPath(row.id),
+    [...telefunMocks(history), recordingMock(row.id), ...extra],
+    (page) => serveRecording(page),
+  );
 }
 
 test.describe("Telefun Telaah (hermetic)", () => {
@@ -482,7 +489,9 @@ test.describe("Telefun Telaah (hermetic)", () => {
     const audit = await openTelaah(page, row, ANNOTATIONS_MOCKS, [row]);
     const audio = page.locator("audio");
     await expect
-      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration), {
+        timeout: 20000,
+      })
       .toBe(252);
 
     const mutedAt = async (seconds: number) => {
@@ -496,6 +505,10 @@ test.describe("Telefun Telaah (hermetic)", () => {
       );
       return audio.evaluate((el: HTMLAudioElement) => el.muted);
     };
+    // Label hold di transkrip memakai jam rekaman yang sama dengan pemutar.
+    await expect(
+      page.getByText("Hold 02.00 – 02.27 · 27 detik · dalam batas"),
+    ).toBeVisible();
     expect(await mutedAt(119.5)).toBe(false);
     expect(await mutedAt(120.5)).toBe(true);
     expect(await mutedAt(135)).toBe(true);
@@ -524,6 +537,93 @@ test.describe("Telefun Telaah (hermetic)", () => {
         })),
       )
       .toEqual({ past: true, muted: false });
+    expectHermetic(audit);
+  });
+
+  test("tautan rekaman yang kedaluwarsa lagi diperbarui; gagal terus tampil Coba lagi", async ({
+    page,
+  }) => {
+    const row = REVIEWED_ROW;
+    // Tiap permintaan tautan memberi URL baru. URL yang "kedaluwarsa" menjawab
+    // 403; sesudah `expireNew`, URL yang baru diberikan pun langsung 403.
+    const wav = speechWav(252, []);
+    const expired = new Set<number>([0]);
+    let expireNew = false;
+    let issued = 0;
+    const audit = await open(
+      page,
+      telaahPath(row.id),
+      [...telefunMocks([row]), ...ANNOTATIONS_MOCKS],
+      async (target) => {
+        await target.route(
+          new RegExp(`/api/v1/telefun/recording/${row.id}(\\?.*)?$`),
+          async (route) => {
+            if (route.request().url().includes("type=agent_only")) {
+              await route.fulfill({ json: { success: true, data: { url: null } } });
+              return;
+            }
+            const n = issued++;
+            if (expireNew) expired.add(n);
+            await route.fulfill({
+              json: {
+                success: true,
+                data: { url: `${APP_ORIGIN}/e2e-telefun-expiring-${n}.wav` },
+              },
+            });
+          },
+        );
+        await target.route(/\/e2e-telefun-expiring-(\d+)\.wav$/, async (route) => {
+          const n = Number(/expiring-(\d+)/.exec(route.request().url())![1]);
+          if (expired.has(n)) {
+            await route.fulfill({ status: 403, body: "expired" });
+            return;
+          }
+          await route.fulfill({ status: 200, contentType: "audio/wav", body: wav });
+        });
+      },
+    );
+    const audio = page.locator("audio");
+    /** Nomor tautan yang sedang dipakai pemutar, bila rekaman sudah termuat. */
+    const loaded = () =>
+      audio.evaluate((el: HTMLAudioElement) =>
+        el.duration === 252
+          ? Number(/expiring-(\d+)/.exec(el.currentSrc)?.[1])
+          : null,
+      );
+    const expireCurrent = async () => {
+      const current = await loaded();
+      expect(current).not.toBeNull();
+      expired.add(current!);
+      await audio.evaluate((el: HTMLAudioElement) => el.load());
+      return current!;
+    };
+
+    // Tautan pertama sudah kedaluwarsa: diperbarui, lalu rekaman termuat.
+    await expect.poll(loaded, { timeout: 20000 }).not.toBeNull();
+    expect(await loaded()).not.toBe(0);
+
+    // Halaman dibiarkan lama: tautan kedaluwarsa dua kali lagi, tiap kali diperbarui.
+    for (let round = 0; round < 2; round += 1) {
+      const previous = await expireCurrent();
+      await expect
+        .poll(async () => {
+          const current = await loaded();
+          return current !== null && current > previous;
+        })
+        .toBe(true);
+    }
+
+    // Tautan baru pun gagal: pemutar tidak diam, ada pesan dan Coba lagi.
+    expireNew = true;
+    await expireCurrent();
+    const alert = page.getByRole("alert").filter({
+      hasText: "Rekaman belum bisa dimuat.",
+    });
+    await expect(alert).toBeVisible();
+    expireNew = false;
+    await alert.getByRole("button", { name: "Coba lagi" }).click();
+    await expect.poll(loaded).not.toBeNull();
+    await expect(alert).toHaveCount(0);
     expectHermetic(audit);
   });
 
@@ -558,7 +658,9 @@ test.describe("Telefun Telaah (hermetic)", () => {
     const audit = await openTelaah(page, row, ANNOTATIONS_MOCKS, [row]);
     const audio = page.locator("audio");
     await expect
-      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration), {
+        timeout: 20000,
+      })
       .toBe(252);
     const mutedAt = async (seconds: number) => {
       await audio.evaluate(

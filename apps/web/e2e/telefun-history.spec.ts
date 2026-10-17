@@ -287,6 +287,58 @@ test.describe("Telefun Riwayat (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("salinan lokal hanya menyimpan panggilan yang belum tersinkron", async ({
+    page,
+  }) => {
+    // Salinan lama berisi baris server yang sudah dihapus di perangkat lain.
+    const deletedElsewhere = {
+      id: "telefun-deleted-elsewhere-1",
+      date: new Date().toISOString(),
+      url: "",
+      consumerName: "Hendra Wijaya",
+      scenarioTitle: "Sudah Dihapus di Server",
+      duration: 120,
+    };
+    const unsynced = {
+      id: "telefun-local-only-2",
+      date: new Date().toISOString(),
+      url: "",
+      consumerName: "Sari Wulandari",
+      scenarioTitle: "Panggilan Offline",
+      duration: 95,
+      syncStatus: "unsynced",
+    };
+    await page.addInitScript((records) => {
+      try {
+        if (!sessionStorage.getItem("e2e-seeded")) {
+          sessionStorage.setItem("e2e-seeded", "1");
+          localStorage.setItem("telefun_history", JSON.stringify(records));
+        }
+      } catch {
+        // about:blank tidak punya penyimpanan.
+      }
+    }, [deletedElsewhere, unsynced]);
+    const { audit, table } = await openHistory(page, [REVIEWED_ROW]);
+
+    await expect(table).toContainText("Klaim Asuransi Ditolak", {
+      timeout: 20000,
+    });
+    await expect(table).toContainText("Panggilan Offline");
+    await expect(table).not.toContainText("Sudah Dihapus di Server");
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (
+            JSON.parse(localStorage.getItem("telefun_history") ?? "[]") as {
+              id: string;
+            }[]
+          ).map((record) => record.id),
+        ),
+      )
+      .toEqual(["telefun-local-only-2"]);
+    expectHermetic(audit);
+  });
+
   test("hapus tetap berhasil walau penyimpanan lokal penuh", async ({
     page,
   }) => {

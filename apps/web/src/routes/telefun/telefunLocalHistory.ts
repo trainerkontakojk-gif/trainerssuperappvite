@@ -50,11 +50,13 @@ export function parseTelefunLocalHistory(
   }
 }
 
-export function shouldPersistTelefunLocalHistory(
-  records: CallRecord[],
-  isCorrupt: boolean,
-): boolean {
-  return records.length > 0 && !isCorrupt;
+/**
+ * Hanya panggilan yang belum ada di server disimpan di perangkat. Baris server
+ * selalu dimuat ulang dari server; salinannya bisa basi (mis. dihapus dari
+ * perangkat lain) dan akan muncul lagi bila ikut disimpan.
+ */
+export function isTelefunLocalOnlyRecord(record: CallRecord): boolean {
+  return record.syncStatus === "unsynced" || record.syncStatus === "offline";
 }
 
 export function canOverwriteTelefunLocalHistory(isCorrupt: boolean): boolean {

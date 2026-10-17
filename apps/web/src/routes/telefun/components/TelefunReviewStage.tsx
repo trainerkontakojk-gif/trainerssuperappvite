@@ -33,6 +33,7 @@ import {
   contentItemId,
 } from "../utils/contentMarks";
 import { buildFillerPattern, withFillerMarks } from "../utils/fillerMarks";
+import { windowsInRecording } from "../utils/recordingAudio";
 import {
   formatCallDuration,
   formatClock,
@@ -178,6 +179,13 @@ export function TelefunReviewStage({
     [lineStart],
   );
   const holds = holdIntervals(record);
+  // Jam hold digeser ke jam rekaman, sama untuk pemutar dan label transkrip.
+  const [recordingMs, setRecordingMs] = useState(0);
+  const sessionDurationMs = record.sessionMetrics?.sessionDurationMs;
+  const holdWindows = useMemo(
+    () => windowsInRecording(holds, recordingMs, sessionDurationMs),
+    [holds, recordingMs, sessionDurationMs],
+  );
   const assessment = state === "scored" ? record.voiceAssessment : null;
   const fillerPattern = useMemo(
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
@@ -473,8 +481,8 @@ export function TelefunReviewStage({
               analysis={analysis}
               onRetry={recording.retry}
               fallbackDurationMs={record.duration * 1000}
-              holds={holds}
-              sessionDurationMs={record.sessionMetrics?.sessionDurationMs}
+              holdWindows={holdWindows}
+              onDurationChange={setRecordingMs}
               notes={notes}
               downloadName={`Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`}
               onTimeChange={setCurrentMs}
@@ -493,10 +501,13 @@ export function TelefunReviewStage({
                 const isAgent = entry.speaker === "agent";
                 const nextStart =
                   transcript[index + 1]?.startMs ?? Number.POSITIVE_INFINITY;
-                const holdsAfter = holds.filter(
-                  (hold) =>
-                    hold.startedAtMs >= entry.startMs &&
-                    hold.startedAtMs < nextStart,
+                // Penempatan di antara baris memakai jam sesi (sama dengan
+                // `startMs`); labelnya jam rekaman, sama dengan pemutar.
+                const holdsAfter = holds.flatMap((hold, holdIndex) =>
+                  hold.startedAtMs >= entry.startMs &&
+                  hold.startedAtMs < nextStart
+                    ? [{ hold, window: holdWindows[holdIndex] }]
+                    : [],
                 );
                 return (
                   <Fragment key={`${entry.startMs}-${index}`}>
@@ -542,13 +553,13 @@ export function TelefunReviewStage({
                         )}
                       </span>
                     </li>
-                    {holdsAfter.map((hold) => (
+                    {holdsAfter.map(({ hold, window }) => (
                       <li
                         key={`hold-${hold.sequence}`}
                         className="mx-2 rounded-lg border border-dashed border-chart-orange px-3 py-1.5 text-xs text-fg2"
                       >
-                        Hold {formatClock(hold.startedAtMs)} –{" "}
-                        {formatClock(hold.endedAtMs)} ·{" "}
+                        Hold {formatClock(window.startMs)} –{" "}
+                        {formatClock(window.endMs)} ·{" "}
                         {Math.round(hold.durationMs / 1000)} detik ·{" "}
                         {hold.exceededByMs > 0
                           ? `lewat ${Math.round(hold.exceededByMs / 1000)} detik dari batas`

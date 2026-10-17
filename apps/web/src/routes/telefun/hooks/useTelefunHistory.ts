@@ -9,8 +9,8 @@ import {
 } from "../telefunApi";
 import {
   canOverwriteTelefunLocalHistory,
+  isTelefunLocalOnlyRecord,
   parseTelefunLocalHistory,
-  shouldPersistTelefunLocalHistory,
 } from "../telefunLocalHistory";
 import type { CallRecord } from "../types";
 
@@ -24,7 +24,10 @@ const STORAGE_KEY = "telefun_history";
  */
 function writeLocalHistory(records: CallRecord[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(records.filter(isTelefunLocalOnlyRecord)),
+    );
   } catch (error) {
     console.warn("[Telefun] Local history copy not saved", error);
   }
@@ -37,9 +40,9 @@ function newestFirst(records: CallRecord[]): CallRecord[] {
 }
 
 /**
- * Riwayat Telefun: baris server digabung dengan salinan lokal yang belum
- * tersinkron (sesi offline atau rekaman yang gagal terkirim). Salinan lokal
- * yang rusak tidak pernah ditimpa, supaya tidak ada data yang hilang diam-diam.
+ * Riwayat Telefun: baris server digabung dengan panggilan yang belum
+ * tersinkron, yang hanya ada di perangkat ini. Salinan lokal yang rusak tidak
+ * pernah ditimpa, supaya tidak ada data yang hilang diam-diam.
  */
 export function useTelefunHistory() {
   const [history, setHistory] = useState<CallRecord[]>([]);
@@ -65,14 +68,20 @@ export function useTelefunHistory() {
     try {
       const dbRecords = (await getTelefunSessions()).map(mapTelefunSessionRow);
       const dbIds = new Set(dbRecords.map((record) => record.id));
-      // Rekaman lokal yang sudah ada di memori (mis. panggilan barusan) ikut dipertahankan.
-      const extras = [...historyRef.current, ...localRecords].filter(
+      // Panggilan di memori (mis. panggilan barusan) ikut dipertahankan. Dari
+      // salinan lokal hanya yang belum tersinkron; salinan lama baris server
+      // (sebelum aturan ini) bisa sudah dihapus dan tidak boleh muncul lagi.
+      const extras = [
+        ...historyRef.current,
+        ...localRecords.filter(isTelefunLocalOnlyRecord),
+      ].filter(
         (record, index, all) =>
           !dbIds.has(record.id) &&
           all.findIndex((other) => other.id === record.id) === index,
       );
       const merged = newestFirst([...dbRecords, ...extras]);
-      commit(merged, shouldPersistTelefunLocalHistory(merged, isCorrupt));
+      // Selalu ditulis ulang (bila tidak rusak) supaya salinan lama terbersihkan.
+      commit(merged);
       setState("ready");
     } catch (error) {
       console.warn("[Telefun] Failed to load history", error);
