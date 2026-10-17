@@ -4,7 +4,11 @@ import {
 } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
-import type { SessionMetrics, SpeechSegment } from "@trainers/types";
+import type {
+  SessionMetrics,
+  SpeechSegment,
+  TelefunMuteInterval,
+} from "@trainers/types";
 import {
   createHoldTrackerState,
   startHold,
@@ -135,6 +139,8 @@ export class LiveSession {
   private interruptionCount: number = 0;
   private deadAirCount: number = 0;
   private holdTracker: HoldTrackerState = createHoldTrackerState();
+  private muteStartedAtMs: number | null = null;
+  private muteIntervals: TelefunMuteInterval[] = [];
 
   constructor(config: TelefunAppSettings) {
     const selection = normalizeTelefunBrowserSelection(
@@ -753,8 +759,23 @@ export class LiveSession {
     });
   }
 
+  /** Waktu sejak autentikasi; mute sebelum autentikasi dihitung dari 0. */
+  private sessionRelativeNow(): number {
+    return this.sessionStartTime > 0
+      ? Math.max(0, Date.now() - this.sessionStartTime)
+      : 0;
+  }
+
+  private endMuteInterval(endedAtMs: number) {
+    if (this.muteStartedAtMs === null) return;
+    this.muteIntervals.push({ startedAtMs: this.muteStartedAtMs, endedAtMs });
+    this.muteStartedAtMs = null;
+  }
+
   public setMute(muted: boolean) {
     this.isMuted = muted;
+    if (muted) this.muteStartedAtMs ??= this.sessionRelativeNow();
+    else this.endMuteInterval(this.sessionRelativeNow());
     this.emitTimelineEvent("mute_changed", { muted });
     this.applyMicrophoneCaptureStateToTracks();
   }
@@ -908,6 +929,7 @@ export class LiveSession {
   private buildSessionMetrics(): SessionMetrics {
     const sessionEndMs = Math.max(0, Date.now() - this.sessionStartTime);
     this.holdTracker = finalizeActiveHold(this.holdTracker, sessionEndMs);
+    this.endMuteInterval(sessionEndMs);
     return {
       speechSegments: this.speechSegments,
       totalSpeakingMs: this.totalSpeakingMs,
@@ -922,6 +944,7 @@ export class LiveSession {
       inputTranscriptionChunks: [],
       sessionDurationMs: Date.now() - this.sessionStartTime,
       hold: summarizeHoldMetrics(this.holdTracker),
+      mutes: this.muteIntervals,
     };
   }
 

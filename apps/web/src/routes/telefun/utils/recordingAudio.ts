@@ -182,6 +182,38 @@ export function speechOnsets(
   return onsets;
 }
 
+/** Metrik sesi ditulis sekian setelah perekam berhenti (`LiveSession.stopRecording`). */
+const METRICS_AFTER_STOP_MS = 500;
+/** Selisih jam lebih besar dari ini tidak andal; pakai jam sesi apa adanya. */
+const MAX_CLOCK_SKEW_MS = 3_000;
+
+export interface RecordingWindow {
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * Rentang hold/mute dalam waktu rekaman. Rentang diukur dengan jam sesi
+ * (mulai saat autentikasi), rekaman dengan jamnya sendiri; selisihnya
+ * diperkirakan dari panjang rekaman dibanding panjang sesi tercatat. Rekaman
+ * berhenti di akhir yang sama, jadi selisih panjang = selisih awal.
+ */
+export function windowsInRecording(
+  intervals: readonly { startedAtMs: number; endedAtMs: number }[],
+  recordingMs: number,
+  sessionDurationMs: number | undefined,
+): RecordingWindow[] {
+  const skew =
+    recordingMs > 0 && sessionDurationMs && sessionDurationMs > 0
+      ? recordingMs - (sessionDurationMs - METRICS_AFTER_STOP_MS)
+      : 0;
+  const shift = Math.abs(skew) <= MAX_CLOCK_SKEW_MS ? skew : 0;
+  return intervals.map((interval) => ({
+    startMs: Math.max(0, interval.startedAtMs + shift),
+    endMs: Math.max(0, interval.endedAtMs + shift),
+  }));
+}
+
 /** Tinggi batang gelombang 0–1 untuk `count` batang. */
 export function waveformBars(envelope: AudioEnvelope, count: number): number[] {
   if (envelope.length === 0 || count <= 0) return [];

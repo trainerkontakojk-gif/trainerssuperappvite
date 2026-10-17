@@ -474,6 +474,8 @@ export function TelefunReviewStage({
               onRetry={recording.retry}
               fallbackDurationMs={record.duration * 1000}
               holds={holds}
+              mutes={record.sessionMetrics?.mutes ?? []}
+              sessionDurationMs={record.sessionMetrics?.sessionDurationMs}
               notes={notes}
               downloadName={`Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`}
               onTimeChange={setCurrentMs}

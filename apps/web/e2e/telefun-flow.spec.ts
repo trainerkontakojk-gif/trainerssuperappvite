@@ -466,6 +466,100 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("rekaman senyap selama hold: digeser ke dalam hold maupun diputar melewatinya", async ({
+    page,
+  }) => {
+    // Sesi lama merekam suara agen saat hold. Hold 02.01–02.28 di jam sesi;
+    // sesi tercatat 253,5 dtk (ditulis 0,5 dtk setelah perekam berhenti)
+    // untuk rekaman 252 dtk, jadi jam rekaman tertinggal 1 dtk: 02.00–02.27.
+    const row: TelefunRow = {
+      ...REVIEWED_ROW,
+      session_metrics: {
+        ...REVIEWED_ROW.session_metrics!,
+        sessionDurationMs: 253_500,
+      },
+    };
+    const audit = await openTelaah(page, row, ANNOTATIONS_MOCKS, [row]);
+    const audio = page.locator("audio");
+    await expect
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .toBe(252);
+
+    const mutedAt = async (seconds: number) => {
+      await audio.evaluate(
+        (el: HTMLAudioElement, at) =>
+          new Promise<void>((resolve) => {
+            el.addEventListener("seeked", () => resolve(), { once: true });
+            el.currentTime = at;
+          }),
+        seconds,
+      );
+      return audio.evaluate((el: HTMLAudioElement) => el.muted);
+    };
+    expect(await mutedAt(119.5)).toBe(false);
+    expect(await mutedAt(120.5)).toBe(true);
+    expect(await mutedAt(135)).toBe(true);
+    expect(await mutedAt(146.5)).toBe(true);
+    expect(await mutedAt(147.5)).toBe(false);
+
+    // Diputar dari luar hold: senyap begitu masuk hold, bersuara lagi sesudahnya.
+    await mutedAt(119.2);
+    await page.getByRole("button", { name: "Putar rekaman" }).click();
+    await expect
+      .poll(() =>
+        audio.evaluate((el: HTMLAudioElement) => ({
+          past: el.currentTime > 120.05,
+          muted: el.muted,
+        })),
+      )
+      .toEqual({ past: true, muted: true });
+    await page.getByRole("button", { name: "Jeda rekaman" }).click();
+    await mutedAt(146.6);
+    await page.getByRole("button", { name: "Putar rekaman" }).click();
+    await expect
+      .poll(() =>
+        audio.evaluate((el: HTMLAudioElement) => ({
+          past: el.currentTime > 147.05,
+          muted: el.muted,
+        })),
+      )
+      .toEqual({ past: true, muted: false });
+    expectHermetic(audit);
+  });
+
+  test("rekaman senyap selama mute, sama seperti hold", async ({ page }) => {
+    // Sesi 252,5 dtk untuk rekaman 252 dtk: jam rekaman sama dengan jam sesi.
+    const row: TelefunRow = {
+      ...REVIEWED_ROW,
+      session_metrics: {
+        ...REVIEWED_ROW.session_metrics!,
+        sessionDurationMs: 252_500,
+        mutes: [{ startedAtMs: 60_000, endedAtMs: 70_000 }],
+      },
+    };
+    const audit = await openTelaah(page, row, ANNOTATIONS_MOCKS, [row]);
+    const audio = page.locator("audio");
+    await expect
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .toBe(252);
+    const mutedAt = async (seconds: number) => {
+      await audio.evaluate(
+        (el: HTMLAudioElement, at) =>
+          new Promise<void>((resolve) => {
+            el.addEventListener("seeked", () => resolve(), { once: true });
+            el.currentTime = at;
+          }),
+        seconds,
+      );
+      return audio.evaluate((el: HTMLAudioElement) => el.muted);
+    };
+    expect(await mutedAt(59.5)).toBe(false);
+    expect(await mutedAt(65)).toBe(true);
+    expect(await mutedAt(70.5)).toBe(false);
+    expect(await mutedAt(130)).toBe(true);
+    expectHermetic(audit);
+  });
+
   test("menunggu analisis: status jujur, Periksa status memuat hasil", async ({
     page,
   }) => {

@@ -96,6 +96,12 @@ export interface TelefunHoldMetrics {
   intervals: TelefunHoldInterval[];
 }
 
+/** Rentang mikrofon dibisukan, dalam jam sesi (ms sejak autentikasi). */
+export interface TelefunMuteInterval {
+  startedAtMs: number;
+  endedAtMs: number;
+}
+
 export interface SessionMetrics {
   speechSegments: SpeechSegment[];
   totalSpeakingMs: number;
@@ -107,6 +113,7 @@ export interface SessionMetrics {
   inputTranscriptionChunks: string[];
   sessionDurationMs: number;
   hold?: TelefunHoldMetrics;
+  mutes?: TelefunMuteInterval[];
 }
 
 export * from "./telefun-assessment";

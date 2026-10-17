@@ -7,12 +7,12 @@ import {
   type Ref,
 } from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
-import type { TelefunHoldInterval } from "@trainers/types";
+import type { TelefunHoldInterval, TelefunMuteInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import type { TelefunRecordingSource } from "../hooks/useTelefunRecordingUrl";
-import { waveformBars } from "../utils/recordingAudio";
+import { waveformBars, windowsInRecording } from "../utils/recordingAudio";
 import { formatClock } from "../utils/reviewDisplay";
 
 export interface TelefunCallPlayerHandle {
@@ -35,6 +35,9 @@ interface TelefunCallPlayerProps {
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
   holds: readonly TelefunHoldInterval[];
+  mutes: readonly TelefunMuteInterval[];
+  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dan mute dengan rekaman. */
+  sessionDurationMs?: number;
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
   onTimeChange?: (ms: number) => void;
@@ -117,7 +120,8 @@ function percent(ms: number, total: number): string {
 /**
  * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: gelombang
  * dari rekaman itu sendiri, posisi putar, jeda hold dari metrik sesi, dan
- * catatan trainer.
+ * catatan trainer. Rekaman disenyapkan selama hold dan mute: sesi lama ikut
+ * merekam suara agen saat itu, padahal konsumen tidak mendengarnya.
  */
 export function TelefunCallPlayer({
   ref,
@@ -126,6 +130,8 @@ export function TelefunCallPlayer({
   onRetry,
   fallbackDurationMs,
   holds,
+  mutes,
+  sessionDurationMs,
   notes,
   downloadName,
   onTimeChange,
@@ -140,6 +146,36 @@ export function TelefunCallPlayer({
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const totalMs = durationMs > 0 ? durationMs : fallbackDurationMs;
   const ready = source.status === "ready";
+  const holdWindows = useMemo(
+    () => windowsInRecording(holds, durationMs, sessionDurationMs),
+    [holds, durationMs, sessionDurationMs],
+  );
+  const silentWindows = useMemo(
+    () => [
+      ...holdWindows,
+      ...windowsInRecording(mutes, durationMs, sessionDurationMs),
+    ],
+    [holdWindows, mutes, durationMs, sessionDurationMs],
+  );
+
+  const syncSilence = (audio: HTMLAudioElement) => {
+    const ms = audio.currentTime * 1000;
+    audio.muted = silentWindows.some(
+      (span) => ms >= span.startMs && ms < span.endMs,
+    );
+  };
+  const syncSilenceRef = useRef(syncSilence);
+  syncSilenceRef.current = syncSilence;
+
+  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold dan mute tepat.
+  useEffect(() => {
+    if (!playing) return;
+    let frame = requestAnimationFrame(function tick() {
+      if (audioRef.current) syncSilenceRef.current(audioRef.current);
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
 
   const updateTime = (ms: number) => {
     setCurrentMs(ms);
@@ -204,12 +240,14 @@ export function TelefunCallPlayer({
               pendingSeekRef.current = null;
             }
           }}
-          onTimeUpdate={(event) =>
-            updateTime(event.currentTarget.currentTime * 1000)
-          }
-          onSeeked={(event) =>
-            updateTime(event.currentTarget.currentTime * 1000)
-          }
+          onTimeUpdate={(event) => {
+            syncSilence(event.currentTarget);
+            updateTime(event.currentTarget.currentTime * 1000);
+          }}
+          onSeeked={(event) => {
+            syncSilence(event.currentTarget);
+            updateTime(event.currentTarget.currentTime * 1000);
+          }}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
@@ -245,14 +283,14 @@ export function TelefunCallPlayer({
             analysis={analysis}
             progress={totalMs > 0 ? Math.min(1, currentMs / totalMs) : 0}
           />
-          {holds.map((hold) => (
+          {holdWindows.map((hold, index) => (
             <span
-              key={hold.sequence}
+              key={index}
               aria-hidden="true"
               className="absolute inset-y-0 border-x border-dashed border-chart-orange bg-chart-orange/15"
               style={{
-                left: percent(hold.startedAtMs, totalMs),
-                width: percent(hold.durationMs, totalMs),
+                left: percent(hold.startMs, totalMs),
+                width: percent(hold.endMs - hold.startMs, totalMs),
               }}
             />
           ))}
