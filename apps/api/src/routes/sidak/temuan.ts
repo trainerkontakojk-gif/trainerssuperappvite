@@ -66,9 +66,23 @@ sidakTemuan.post(
         user.id,
         profile?.full_name ?? undefined,
       );
-      return c.json({ success: true, data: result }, 201);
+      // 201 hanya bila ada baris baru; semua-duplikat adalah hasil sah 200.
+      return c.json({ success: true, data: result }, result.inserted > 0 ? 201 : 200);
     } catch (e: any) {
       if (e instanceof ScopeUnavailableError) throw e;
+      if (e instanceof sidakService.TemuanBatchInvalidError) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INDICATORS",
+              message: e.message,
+              details: e.invalid,
+            },
+          },
+          422,
+        );
+      }
       return c.json(
         { success: false, error: { code: "INSERT_ERROR", message: e.message } },
         400,

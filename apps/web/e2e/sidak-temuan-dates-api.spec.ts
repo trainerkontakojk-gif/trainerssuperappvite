@@ -1108,7 +1108,9 @@ test.describe("Persistence tanggal (route nyata + DB disposable)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    expect(second.status).toBe(201);
+    // Semua duplikat: hasil sah tanpa baris baru → 200, bukan 201 (plan
+    // sidak-unmapped-indicator-findings, Opsi B).
+    expect(second.status).toBe(200);
     const data = second.body.data as any;
     expect(data.inserted).toBe(0);
     expect(data.skipped).toBe(4);

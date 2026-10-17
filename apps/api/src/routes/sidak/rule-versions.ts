@@ -366,6 +366,15 @@ sidakRuleVersions.post(
       );
       return c.json({ success: true, data: indicator }, 201);
     } catch (error: any) {
+      if (error instanceof sidakService.RuleIndicatorInputError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "VALIDATION_ERROR", message: error.message },
+          },
+          422,
+        );
+      }
       return c.json(
         {
           success: false,

@@ -6,7 +6,8 @@
  *   - admin service-role untuk fixture/cleanup lokal,
  *   - helper psql untuk membaca/membersihkan fixture milik run ini,
  *   - user JWT nyata (Supabase local) untuk RLS,
- *   - app Hono berisi router temuan + heatmap ASLI dengan identity/JWT disuntik,
+ *   - app Hono berisi router temuan, heatmap, core, dan rule-versions ASLI
+ *     dengan identity/JWT disuntik,
  *   - guard `globalThis.fetch` fail-closed untuk egress non-loopback.
  *
  * Bukan mock: request yang diteruskan dari browser benar-benar dieksekusi oleh
@@ -184,7 +185,7 @@ export async function createUserWithJwt(
 }
 
 /**
- * App Hono berisi router temuan + heatmap ASLI. Identity/JWT disuntik seperti
+ * App Hono berisi router temuan, heatmap, core, dan rule-versions ASLI. Identity/JWT disuntik seperti
  * authMiddleware produksi; heatmap tetap memakai JWT user sehingga RLS berlaku.
  */
 export async function createRealSidakApp(
@@ -204,12 +205,18 @@ export async function createRealSidakApp(
 
   let temuan: unknown;
   let heatmap: unknown;
+  let core: unknown;
+  let ruleVersions: unknown;
   try {
     ({ sidakTemuan: temuan } = await import(
       "../../../api/src/routes/sidak/temuan"
     ));
     ({ sidakHeatmap: heatmap } = await import(
       "../../../api/src/routes/sidak/heatmap"
+    ));
+    ({ sidakCore: core } = await import("../../../api/src/routes/sidak/core"));
+    ({ sidakRuleVersions: ruleVersions } = await import(
+      "../../../api/src/routes/sidak/rule-versions"
     ));
   } finally {
     for (const [key, value] of saved) {
@@ -228,7 +235,9 @@ export async function createRealSidakApp(
       await next();
     })
     .route("/v1/sidak", temuan as never)
-    .route("/v1/sidak", heatmap as never);
+    .route("/v1/sidak", heatmap as never)
+    .route("/v1/sidak", core as never)
+    .route("/v1/sidak", ruleVersions as never);
 
   return {
     request: async (pathAndQuery, init) => {

@@ -16,12 +16,15 @@ interface Props {
   scoringMode?: string;
   onChange: (id: string) => void;
   disabled?: boolean;
+  /** Parameter yang tampil tetapi belum bisa dicatat (belum punya master). */
+  unavailableIds?: ReadonlySet<string>;
 }
 
 interface IndicatorOptionProps {
   indicator: Indicator;
   selected: boolean;
   nested: boolean;
+  unavailable: boolean;
   onSelect: (id: string) => void;
 }
 
@@ -29,6 +32,7 @@ function IndicatorOption({
   indicator,
   selected,
   nested,
+  unavailable,
   onSelect,
 }: IndicatorOptionProps) {
   return (
@@ -36,16 +40,26 @@ function IndicatorOption({
       type="button"
       role="option"
       aria-selected={selected}
+      disabled={unavailable}
       onClick={() => onSelect(indicator.id)}
       className={`flex w-full items-center justify-between gap-3 border-b border-border px-4 py-2.5 text-left text-sm transition-colors ${
         nested ? "pl-7" : ""
       } ${
-        selected
-          ? "bg-primary text-primary-foreground"
-          : "text-foreground hover:bg-foreground/5"
+        unavailable
+          ? "cursor-not-allowed text-muted-foreground"
+          : selected
+            ? "bg-primary text-primary-foreground"
+            : "text-foreground hover:bg-foreground/5"
       }`}
     >
-      <span className="min-w-0">{indicator.name}</span>
+      <span className="min-w-0">
+        {indicator.name}
+        {unavailable && (
+          <span className="ml-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+            Belum terhubung
+          </span>
+        )}
+      </span>
       <span
         className={`ml-2 flex-shrink-0 text-xs font-bold tabular-nums ${
           selected ? "text-primary-foreground/70" : "text-muted-foreground"
@@ -60,10 +74,12 @@ function IndicatorOption({
 function GroupedOptions({
   indicators,
   value,
+  unavailableIds,
   onSelect,
 }: {
   indicators: Indicator[];
   value: string;
+  unavailableIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
 }) {
   const groups = new Map<string, Indicator[]>();
@@ -94,6 +110,7 @@ function GroupedOptions({
             indicator={indicator}
             selected={value === indicator.id}
             nested={!isStandalone}
+            unavailable={unavailableIds?.has(indicator.id) ?? false}
             onSelect={onSelect}
           />
         ))}
@@ -108,6 +125,7 @@ export default function IndicatorDropdown({
   scoringMode = "weighted",
   onChange,
   disabled = false,
+  unavailableIds,
 }: Props) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -204,6 +222,7 @@ export default function IndicatorDropdown({
               <GroupedOptions
                 indicators={indicators}
                 value={value}
+                unavailableIds={unavailableIds}
                 onSelect={handleSelect}
               />
             ) : (
@@ -216,6 +235,7 @@ export default function IndicatorDropdown({
                 <GroupedOptions
                   indicators={nonCritical}
                   value={value}
+                  unavailableIds={unavailableIds}
                   onSelect={handleSelect}
                 />
                 <div className="sticky top-0 z-10 border-y border-border bg-rose-500/10 px-3 py-2">
@@ -226,6 +246,7 @@ export default function IndicatorDropdown({
                 <GroupedOptions
                   indicators={critical}
                   value={value}
+                  unavailableIds={unavailableIds}
                   onSelect={handleSelect}
                 />
               </>

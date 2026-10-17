@@ -116,13 +116,27 @@ export async function createPerfectScoreSession(
   let rule_version_id: string | null = null;
 
   if (activeVersion) {
-    const { data: ruleIndicators } = await supabaseAdmin
-      .from("qa_service_rule_indicators")
-      .select("id, indicator_id")
-      .eq("rule_version_id", activeVersion.id);
+    const { data: ruleIndicators, error: ruleIndicatorsError } =
+      await supabaseAdmin
+        .from("qa_service_rule_indicators")
+        .select("id, name, legacy_indicator_id")
+        .eq("rule_version_id", activeVersion.id);
+    if (ruleIndicatorsError) {
+      throw new Error(
+        `Gagal memuat parameter versi aturan: ${ruleIndicatorsError.message}`,
+      );
+    }
     if (ruleIndicators && ruleIndicators.length > 0) {
+      const unlinked = ruleIndicators.filter(
+        (ri: any) => !ri.legacy_indicator_id,
+      );
+      if (unlinked.length > 0) {
+        throw new Error(
+          `Parameter ${unlinked.map((ri: any) => `"${ri.name}"`).join(", ")} belum terhubung ke parameter master, sehingga sesi tanpa temuan belum bisa dibuat. Hubungi admin untuk menautkan parameter tersebut.`,
+        );
+      }
       indicators = ruleIndicators.map((ri: any) => ({
-        id: ri.indicator_id,
+        id: ri.legacy_indicator_id,
         rule_indicator_id: ri.id,
       }));
       rule_version_id = activeVersion.id;
@@ -222,19 +236,25 @@ export async function validateTemuanBatch(
       ),
   );
 
+  // Bila versi aturan efektif ada, hanya master yang dipetakan versi itu yang
+  // sah — termasuk saat versi tidak punya satu pun parameter terpetakan.
   let validLegacyIds: Set<string> | null = null;
 
   if (activeVersion) {
-    const { data: ruleIndicators } = await supabaseAdmin
-      .from("qa_service_rule_indicators")
-      .select("legacy_indicator_id")
-      .eq("rule_version_id", activeVersion.id)
-      .not("legacy_indicator_id", "is", null);
-    if (ruleIndicators && ruleIndicators.length > 0) {
-      validLegacyIds = new Set(
-        ruleIndicators.map((ri: any) => ri.legacy_indicator_id),
+    const { data: ruleIndicators, error: ruleIndicatorsError } =
+      await supabaseAdmin
+        .from("qa_service_rule_indicators")
+        .select("legacy_indicator_id")
+        .eq("rule_version_id", activeVersion.id)
+        .not("legacy_indicator_id", "is", null);
+    if (ruleIndicatorsError) {
+      throw new Error(
+        `Gagal memuat parameter versi aturan: ${ruleIndicatorsError.message}`,
       );
     }
+    validLegacyIds = new Set(
+      (ruleIndicators ?? []).map((ri: any) => ri.legacy_indicator_id),
+    );
   }
 
   const valid: PreviewResult["valid"] = [];
@@ -293,12 +313,33 @@ export async function validateTemuanBatch(
   };
 }
 
+/**
+ * Batch ditolak utuh bila ada item invalid: tidak ada baris yang disimpan,
+ * sehingga kegagalan tidak pernah tampil sebagai sukses parsial (HTTP 422).
+ */
+export class TemuanBatchInvalidError extends Error {
+  constructor(readonly invalid: ValidationError[]) {
+    super(
+      `${invalid.length} parameter tidak valid, tidak ada temuan yang disimpan. ${invalid[0]?.error ?? ""}`.trim(),
+    );
+  }
+}
+
 export async function createTemuanBatch(
   items: CreateTemuanBatch,
   userId?: string,
   userName?: string,
-): Promise<{ inserted: number; skipped: number; total: number }> {
+): Promise<{
+  inserted: number;
+  skipped: number;
+  invalid: number;
+  total: number;
+}> {
   const validation = await validateTemuanBatch(items);
+
+  if (validation.invalid.length > 0) {
+    throw new TemuanBatchInvalidError(validation.invalid);
+  }
 
   if (validation.valid.length === 0) {
     if (userId) {
@@ -313,6 +354,7 @@ export async function createTemuanBatch(
     return {
       inserted: 0,
       skipped: validation.stats.skipped_count,
+      invalid: 0,
       total: items.items.length,
     };
   }
@@ -382,6 +424,7 @@ export async function createTemuanBatch(
   return {
     inserted: data?.length ?? 0,
     skipped: validation.stats.skipped_count,
+    invalid: 0,
     total: items.items.length,
   };
 }

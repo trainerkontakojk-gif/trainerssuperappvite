@@ -56,6 +56,10 @@ export default defineConfig({
     },
     { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
     {
+      name: "sidak-unmapped-indicator-real-backend",
+      testMatch: "sidak-unmapped-indicator-api.spec.ts",
+    },
+    {
       name: "sidak-dashboard-kpi-real-backend",
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },

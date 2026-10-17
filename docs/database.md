@@ -291,10 +291,10 @@ anon denial, dan Gemini/non-WebRTC aggregate boundary terverifikasi.
   - **Peringatan**: Kolom skor (`final_score`, `non_critical_score`, `critical_score`) pada tabel ini bersifat **non-authoritative** untuk aplikasi read path. Migration refresh awal mengisi literal `0` sebagai placeholder, sehingga skor cache bisa tidak merepresentasikan nilai sebenarnya. Agent detail menghitung skor dari `qa_temuan` melalui scoring engine aplikasi (`PeriodScoringContext`), bukan dari tabel cache ini.
 - **`qa_periods`**: Definisi periode audit kualitas.
 - **`qa_temuan`**: Data utama audit (Agent, Tim, Temuan, Status).
-- **`qa_indicators`**: Daftar parameter penilaian audit.
+- **`qa_indicators`**: Daftar parameter penilaian audit sekaligus **identitas parameter** yang dirujuk `qa_temuan.indicator_id` (FK) dan TNA. Parameter yang ditambahkan ke versi aturan lewat `POST /sidak/rule-versions/:id/indicators` tanpa `legacy_indicator_id` otomatis mendapat master: memakai ulang master dengan kunci unik `(service_type, coalesce(parameter_group, ''), name)` bila ada, atau membuat master baru `is_active = false` (identitas saja, tidak ikut daftar master global). Master `is_active = false` yang tidak lagi dirujuk snapshot maupun temuan dihapus saat snapshot terakhirnya dihapus. `legacy_indicator_id` eksplisit wajib menunjuk master layanan yang sama (422 bila tidak).
 - **`qa_service_weights`**: Bobot default per service type.
 - **`qa_service_rule_versions`**: Versi rule per service+periode dengan status `draft`, `published`, atau `superseded`.
-- **`qa_service_rule_indicators`**: Snapshot indikator per rule version.
+- **`qa_service_rule_indicators`**: Snapshot indikator per rule version. `legacy_indicator_id` (tanpa FK) memetakan snapshot ke master `qa_indicators`; snapshot lama yang masih `NULL` tidak bisa dicatat sebagai temuan dan ditandai "Belum terhubung" di Input Temuan sampai dipetakan (lihat `plans/markdown/sidak-unmapped-indicator-findings.md`).
 
 **Dashboard Summary Refresh**: Fungsi `refresh_qa_dashboard_summary_for_period(p_period_id, p_folder_key)` didesain ulang agar kompatibel dengan Vite schema — menggunakan `folder_id` dan `agent_id` pada cache tables. Fungsi ini juga diinvoke oleh `scripts/database-parity/sidak-post-sync-verify.mjs --refresh-summaries` untuk backfill summary seluruh periode.
 

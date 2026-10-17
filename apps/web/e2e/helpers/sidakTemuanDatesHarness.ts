@@ -212,6 +212,9 @@ export type HarnessFixture = {
     bobot: number;
     parameter_group: string | null;
     is_active: boolean;
+    /** Snapshot rule indicator; tanpa `legacyIndicatorId` berarti unmapped. */
+    ruleIndicatorId?: string;
+    legacyIndicatorId?: string | null;
   }>;
 };
 

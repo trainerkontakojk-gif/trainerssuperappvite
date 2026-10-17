@@ -9,6 +9,7 @@ import {
 } from "@trainers/types";
 import type { ParsedImportRow as ImportRowType } from "../../../components/sidak/SidakInputImportPanel";
 import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
+import { unlinkedIndicatorError } from "../../../lib/sidak-input-service";
 
 const MONTHS = [
   "Januari",
@@ -288,6 +289,8 @@ export function useTemuanImport({
         if (!paramName) error = "Parameter kosong";
         else if (!matched)
           error = `Parameter "${paramName}" tidak dikenali`;
+        else if (unlinkedIndicatorIds.has(matched.id))
+          error = unlinkedIndicatorError(matched.name);
         else indicator_id = matched.id;
 
         const nilaiNum = Number(nilaiRaw);
@@ -345,17 +348,6 @@ export function useTemuanImport({
     }
     if (importRows.some((r) => !r.indicator_id)) {
       setErrorMsg("Terdapat baris dengan parameter tidak valid.");
-      return;
-    }
-    if (
-      unlinkedIndicatorIds.size > 0 &&
-      importRows.some(
-        (r) => r.indicator_id && unlinkedIndicatorIds.has(r.indicator_id),
-      )
-    ) {
-      setErrorMsg(
-        "Terdapat parameter yang belum terhubung ke database global. Gunakan parameter yang sudah dilink di halaman Settings QA.",
-      );
       return;
     }
     setImporting(true);

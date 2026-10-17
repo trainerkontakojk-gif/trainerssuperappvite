@@ -716,6 +716,7 @@ export default function SidakInputPage() {
                       onSave={formHook.handleSave}
                       onCancel={formHook.resetForm}
                       activeIndicators={activeIndicators}
+                      unlinkedIndicatorIds={unlinkedIndicatorIds}
                       scoringMode={scoringMode}
                       serviceType={selectedService as ServiceType}
                       saving={formHook.saving}

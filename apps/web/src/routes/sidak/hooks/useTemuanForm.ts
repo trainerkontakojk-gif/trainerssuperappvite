@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
 import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
+import { unlinkedIndicatorError } from "../../../lib/sidak-input-service";
 
 interface AgentEntry {
   id: string;
@@ -101,12 +102,15 @@ export function useTemuanForm({
       setErrorMsg("Semua parameter wajib dipilih.");
       return;
     }
-    if (
-      unlinkedIndicatorIds.size > 0 &&
-      entries.some((e) => unlinkedIndicatorIds.has(e.indicator_id))
-    ) {
+    const unlinkedEntry = entries.find((e) =>
+      unlinkedIndicatorIds.has(e.indicator_id),
+    );
+    if (unlinkedEntry) {
       setErrorMsg(
-        "Beberapa parameter yang dipilih belum terhubung ke database global. Gunakan parameter yang sudah dilink di halaman Settings QA."
+        unlinkedIndicatorError(
+          activeIndicators.find((i) => i.id === unlinkedEntry.indicator_id)
+            ?.name ?? "yang dipilih",
+        ),
       );
       return;
     }

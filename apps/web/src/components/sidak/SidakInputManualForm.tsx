@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Check, Loader2, X, Trash2 } from "lucide-react";
 import IndicatorDropdown from "./IndicatorDropdown";
 import type { QAIndicator, ScoringMode } from "@trainers/types";
+import { UNLINKED_INDICATOR_NOTE } from "../../lib/sidak-input-service";
 
 const NILAI_OPTIONS = [
   {
@@ -60,6 +61,8 @@ interface Props {
   onSave: () => void;
   onCancel: () => void;
   activeIndicators: QAIndicator[];
+  /** Parameter lama tanpa master: tampil, tetapi belum bisa dicatat. */
+  unlinkedIndicatorIds?: ReadonlySet<string>;
   scoringMode: ScoringMode;
   serviceType: QAIndicator["service_type"];
   saving: boolean;
@@ -92,6 +95,7 @@ export default function SidakInputManualForm({
   onSave,
   onCancel,
   activeIndicators,
+  unlinkedIndicatorIds,
   scoringMode,
   saving,
   previewing,
@@ -199,10 +203,16 @@ export default function SidakInputManualForm({
                     indicators={activeIndicators}
                     scoringMode={scoringMode}
                     disabled={activeIndicators.length === 0}
+                    unavailableIds={unlinkedIndicatorIds}
                     onChange={(id) =>
                       onUpdateEntry(entry.uid, { indicator_id: id })
                     }
                   />
+                  {unlinkedIndicatorIds && unlinkedIndicatorIds.size > 0 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {UNLINKED_INDICATOR_NOTE}
+                    </p>
+                  )}
                   {activeIndicators.length === 0 && (
                     <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
                       Belum ada parameter untuk layanan dan periode ini.

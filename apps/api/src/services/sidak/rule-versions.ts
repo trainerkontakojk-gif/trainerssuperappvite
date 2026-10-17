@@ -482,6 +482,76 @@ export async function getRuleVersionIndicators(versionId: string) {
   return data ?? [];
 }
 
+/** Penolakan input parameter yang bisa diperbaiki pengguna (HTTP 422). */
+export class RuleIndicatorInputError extends Error {}
+
+type MasterIdentity = {
+  service_type: string;
+  name: string;
+  parameter_group?: string | null;
+  category: "critical" | "non_critical" | "none";
+  bobot: number;
+  has_na?: boolean;
+  threshold?: number;
+  sort_order?: number;
+};
+
+async function findMasterByIdentity(
+  identity: MasterIdentity,
+): Promise<string | null> {
+  // Kunci unik qa_indicators: (service_type, coalesce(parameter_group, ''), name).
+  let query = supabaseAdmin
+    .from("qa_indicators")
+    .select("id")
+    .eq("service_type", identity.service_type)
+    .eq("name", identity.name);
+  query = identity.parameter_group
+    ? query.eq("parameter_group", identity.parameter_group)
+    : query.or('parameter_group.is.null,parameter_group.eq.""');
+  const { data, error } = await query.maybeSingle();
+  if (error)
+    throw new Error(`Gagal memeriksa parameter master: ${error.message}`);
+  return data?.id ?? null;
+}
+
+/**
+ * Setiap rule indicator wajib punya master `qa_indicators`, karena
+ * `qa_temuan.indicator_id` (FK) dan TNA memakai ID master sebagai identitas
+ * parameter lintas versi. Master dengan kunci unik yang sama dipakai ulang;
+ * selain itu dibuat master baru `is_active = false` (identitas saja, tidak ikut
+ * daftar master global). Mengembalikan ID master dan apakah ia baru dibuat.
+ */
+async function resolveMasterForNewIndicator(
+  identity: MasterIdentity,
+): Promise<{ id: string; created: boolean }> {
+  const existing = await findMasterByIdentity(identity);
+  if (existing) return { id: existing, created: false };
+
+  const { data, error } = await supabaseAdmin
+    .from("qa_indicators")
+    .insert({
+      service_type: identity.service_type,
+      name: identity.name,
+      parameter_group: identity.parameter_group ?? null,
+      category: identity.category,
+      bobot: identity.bobot,
+      has_na: identity.has_na ?? false,
+      threshold: identity.threshold ?? null,
+      sort_order: identity.sort_order ?? 0,
+      is_active: false,
+    })
+    .select("id")
+    .single();
+  if (!error) return { id: data.id, created: true };
+
+  // Request paralel dengan identitas sama: pakai master yang menang.
+  if (error.code === "23505") {
+    const winner = await findMasterByIdentity(identity);
+    if (winner) return { id: winner, created: false };
+  }
+  throw new Error(`Gagal membuat parameter master: ${error.message}`);
+}
+
 export async function addRuleVersionIndicator(
   data: {
     rule_version_id: string;
@@ -497,23 +567,115 @@ export async function addRuleVersionIndicator(
   },
   userId: string,
 ) {
+  const { data: version, error: versionError } = await supabaseAdmin
+    .from("qa_service_rule_versions")
+    .select("id, service_type")
+    .eq("id", data.rule_version_id)
+    .maybeSingle();
+  if (versionError)
+    throw new Error(`Gagal memuat versi aturan: ${versionError.message}`);
+  if (!version) throw new RuleIndicatorInputError("Versi aturan tidak ditemukan");
+  if (version.service_type !== data.service_type) {
+    throw new RuleIndicatorInputError(
+      "Layanan parameter tidak sesuai dengan versi aturan",
+    );
+  }
+
+  let master: { id: string; created: boolean };
+  if (data.legacy_indicator_id) {
+    const { data: linked, error: linkedError } = await supabaseAdmin
+      .from("qa_indicators")
+      .select("id, service_type")
+      .eq("id", data.legacy_indicator_id)
+      .maybeSingle();
+    if (linkedError)
+      throw new Error(`Gagal memeriksa parameter master: ${linkedError.message}`);
+    if (!linked || linked.service_type !== version.service_type) {
+      throw new RuleIndicatorInputError(
+        "Parameter master yang ditautkan tidak ditemukan untuk layanan ini",
+      );
+    }
+    master = { id: linked.id, created: false };
+  } else {
+    master = await resolveMasterForNewIndicator(data);
+  }
+
+  const { count: duplicateCount, error: duplicateError } = await supabaseAdmin
+    .from("qa_service_rule_indicators")
+    .select("id", { count: "exact", head: true })
+    .eq("rule_version_id", data.rule_version_id)
+    .eq("legacy_indicator_id", master.id);
+  if (duplicateError)
+    throw new Error(`Gagal memeriksa parameter versi: ${duplicateError.message}`);
+  if ((duplicateCount ?? 0) > 0) {
+    throw new RuleIndicatorInputError(
+      `Parameter "${data.name}" sudah ada di versi aturan ini`,
+    );
+  }
+
   const { data: result, error } = await supabaseAdmin
     .from("qa_service_rule_indicators")
-    .insert({ ...data, created_by: userId })
+    .insert({ ...data, legacy_indicator_id: master.id, created_by: userId })
     .select()
     .single();
 
-  if (error) throw new Error(`Gagal menambah indikator: ${error.message}`);
+  if (error) {
+    if (master.created) await deleteMasterIfUnreferenced(master.id);
+    throw new Error(`Gagal menambah indikator: ${error.message}`);
+  }
   return result;
 }
 
+/**
+ * Hapus master identitas-saja (`is_active = false`) yang tidak lagi dirujuk
+ * snapshot mana pun maupun temuan. Gagal di sini tidak membatalkan operasi
+ * utama: sisa master nonaktif tidak memengaruhi input maupun skor.
+ */
+async function deleteMasterIfUnreferenced(masterId: string): Promise<void> {
+  const [snapshots, findings] = await Promise.all([
+    supabaseAdmin
+      .from("qa_service_rule_indicators")
+      .select("id", { count: "exact", head: true })
+      .eq("legacy_indicator_id", masterId),
+    supabaseAdmin
+      .from("qa_temuan")
+      .select("id", { count: "exact", head: true })
+      .eq("indicator_id", masterId),
+  ]);
+  if (snapshots.error || findings.error) {
+    console.error(
+      "Pemeriksaan master parameter gagal:",
+      snapshots.error?.message ?? findings.error?.message,
+    );
+    return;
+  }
+  if ((snapshots.count ?? 0) > 0 || (findings.count ?? 0) > 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("qa_indicators")
+    .delete()
+    .eq("id", masterId)
+    .eq("is_active", false);
+  if (error) console.error("Gagal menghapus master parameter:", error.message);
+}
+
 export async function deleteRuleVersionIndicator(id: string) {
+  const { data: snapshot, error: loadError } = await supabaseAdmin
+    .from("qa_service_rule_indicators")
+    .select("legacy_indicator_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (loadError)
+    throw new Error(`Gagal memuat indikator: ${loadError.message}`);
+
   const { error } = await supabaseAdmin
     .from("qa_service_rule_indicators")
     .delete()
     .eq("id", id);
 
   if (error) throw new Error(`Gagal menghapus indikator: ${error.message}`);
+  if (snapshot?.legacy_indicator_id)
+    await deleteMasterIfUnreferenced(snapshot.legacy_indicator_id);
 }
 
 export async function updateRuleVersionIndicator(
