@@ -168,21 +168,21 @@ export default function ProfilerLibraryNav({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cari tim atau batch"
-            aria-label="Cari tim atau batch"
+            placeholder="Cari tim atau folder"
+            aria-label="Cari tim atau folder"
             className="h-11 pl-9"
           />
         </div>
       </div>
 
       <nav
-        aria-label="Daftar tim dan batch"
+        aria-label="Daftar tim dan folder"
         className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar"
       >
         {!selectedYearId ? null : teams.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             {query.trim()
-              ? "Tidak ada tim atau batch yang cocok."
+              ? "Tidak ada tim atau folder yang cocok."
               : "Belum ada tim di tahun ini."}
           </p>
         ) : (
@@ -359,7 +359,7 @@ function RowMenu({
         {onAddBatch && (
           <DropdownMenuItem onClick={onAddBatch} className="min-h-11">
             <Plus aria-hidden="true" />
-            Tambah batch
+            Tambah folder
           </DropdownMenuItem>
         )}
         {onDuplicate && (

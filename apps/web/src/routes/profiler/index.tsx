@@ -164,7 +164,7 @@ export default function ProfilerLanding() {
       .catch((err) => {
         console.error("Failed to fetch peserta:", err);
         if (!cancelled)
-          setPesertaError("Gagal memuat peserta batch ini. Coba lagi.");
+          setPesertaError("Gagal memuat peserta folder ini. Coba lagi.");
       });
     return () => {
       cancelled = true;
@@ -388,7 +388,7 @@ export default function ProfilerLanding() {
             className="min-h-11 shrink-0"
           >
             <PanelLeft data-icon="inline-start" aria-hidden="true" />
-            Pilih batch
+            Pilih folder
           </Button>
         </div>
 
@@ -501,9 +501,9 @@ export default function ProfilerLanding() {
             className="inset-y-0 left-0 top-0 h-full w-[min(20rem,calc(100vw-2rem))] max-w-none translate-x-0 translate-y-0 rounded-none bg-card p-0 sm:max-w-none md:hidden"
           >
             <DialogHeader className="sr-only">
-              <DialogTitle>Pilih batch</DialogTitle>
+              <DialogTitle>Pilih folder</DialogTitle>
               <DialogDescription>
-                Pilih tahun, tim, dan batch Profiler.
+                Pilih tahun, tim, dan folder Profiler.
               </DialogDescription>
             </DialogHeader>
             <ProfilerLibraryNav {...libraryNavProps} />
@@ -516,7 +516,7 @@ export default function ProfilerLanding() {
             <DialogHeader>
               <DialogTitle>Tambah tahun</DialogTitle>
               <DialogDescription>
-                Buat arsip tahun baru untuk menyusun tim dan batch.
+                Buat arsip tahun baru untuk menyusun tim dan folder.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-2">
@@ -565,11 +565,11 @@ export default function ProfilerLanding() {
           <DialogContent className="bg-card sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                Tambah {showAddFolder?.parentId ? "batch" : "tim"}
+                Tambah {showAddFolder?.parentId ? "folder" : "tim"}
               </DialogTitle>
               <DialogDescription>
                 {showAddFolder?.parentId
-                  ? "Tambahkan batch baru di tim yang dipilih."
+                  ? "Tambahkan folder baru di tim yang dipilih."
                   : "Tambahkan tim baru di tahun yang dipilih."}
               </DialogDescription>
             </DialogHeader>
@@ -617,7 +617,7 @@ export default function ProfilerLanding() {
             <DialogHeader>
               <DialogTitle>Ubah nama</DialogTitle>
               <DialogDescription>
-                Perbarui nama tim atau batch tanpa mengubah data pesertanya.
+                Perbarui nama tim atau folder tanpa mengubah data pesertanya.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-2">
@@ -761,7 +761,7 @@ export default function ProfilerLanding() {
                 Ulang tahun
               </DialogTitle>
               <DialogDescription>
-                Acara mendatang di batch {selectedBatch}.
+                Acara mendatang di folder {selectedBatch}.
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[min(70vh,20rem)] overflow-y-auto p-4 custom-scrollbar sm:p-5">

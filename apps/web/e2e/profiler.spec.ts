@@ -33,7 +33,7 @@ test.describe("Profiler (hermetic)", () => {
     console.log("[audit]", formatAudit(audit));
 
     await expect(
-      page.getByRole("heading", { level: 1, name: /Batch tahun 2026/ }),
+      page.getByRole("heading", { level: 1, name: /Folder tahun 2026/ }),
     ).toBeVisible({ timeout: 20000 });
 
     // Buktikan fetch awal benar-benar terjadi DAN semuanya dilayani mock.
@@ -54,7 +54,7 @@ test.describe("Profiler (hermetic)", () => {
     });
 
     // Tim dan batch langsung tampil di satu navigasi; batch membuka workspace.
-    const nav = page.getByRole("navigation", { name: "Daftar tim dan batch" });
+    const nav = page.getByRole("navigation", { name: "Daftar tim dan folder" });
     await expect(nav.getByText("Tim Call")).toBeVisible({ timeout: 20000 });
     await nav.getByRole("button", { name: /^Batch Pagi/ }).click();
     await expect(

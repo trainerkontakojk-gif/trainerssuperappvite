@@ -109,7 +109,12 @@ export const ProfilerParticipantCard: React.FC<
           density === "compact" ? "p-3" : "p-4"
         }`}
       >
-        <div className="mb-3 flex items-start justify-between gap-2">
+        {/* Di HP kartu menjadi satu baris per orang; nomor dan aksi pindah ke baris itu. */}
+        <div
+          className={`mb-3 items-start justify-between gap-2 ${
+            sortMode || selectMode ? "flex" : "hidden sm:flex"
+          }`}
+        >
           <div className="flex items-center gap-2">
             {sortMode ? (
               <>
@@ -186,6 +191,11 @@ export const ProfilerParticipantCard: React.FC<
         </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {!sortMode && !selectMode ? (
+            <span className="w-5 shrink-0 text-xs tabular-nums text-muted-foreground sm:hidden">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+          ) : null}
           <Avatar
             size={density === "compact" ? "default" : "lg"}
             className={
@@ -212,15 +222,21 @@ export const ProfilerParticipantCard: React.FC<
             >
               {p.nama || "Tanpa nama"}
             </h3>
-            {p.jabatan ? (
+            {p.jabatan || p.tim ? (
               <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                {labelJabatan[p.jabatan] || p.jabatan}
+                {p.jabatan ? labelJabatan[p.jabatan] || p.jabatan : null}
+                {p.tim ? (
+                  <span className="sm:hidden">
+                    {p.jabatan ? " · " : ""}
+                    {p.tim}
+                  </span>
+                ) : null}
               </p>
             ) : null}
           </div>
         </div>
       </CardContent>
-      <CardFooter className="justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
+      <CardFooter className="hidden justify-between gap-2 px-4 py-3 text-xs text-muted-foreground sm:flex">
         <span className="min-w-0 truncate">{p.tim || "Tanpa tim"}</span>
         {p.nik_ojk ? (
           <span className="shrink-0 font-mono text-xs">
