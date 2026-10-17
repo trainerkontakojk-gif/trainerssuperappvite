@@ -383,8 +383,10 @@ export function TelefunReviewStage({
       await annotations.refetch();
       await summary.refetch();
       notify.success("Catatan tersimpan.");
-    } catch {
+    } catch (error) {
       notify.error("Catatan belum tersimpan. Coba lagi.");
+      // Form catatan tetap berisi teks yang belum tersimpan.
+      throw error;
     }
   };
 

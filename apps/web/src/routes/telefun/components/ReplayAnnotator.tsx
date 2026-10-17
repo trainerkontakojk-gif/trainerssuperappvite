@@ -75,6 +75,13 @@ const MOMENT_LABELS: Record<AnnotationMoment, string> = {
   technique_usage: "Penggunaan teknik",
 };
 
+/** Form menyimpan kunci momen; catatan lain bisa berisi teks bebas. */
+function momentLabel(moment: string): string {
+  return Object.hasOwn(MOMENT_LABELS, moment)
+    ? MOMENT_LABELS[moment as AnnotationMoment]
+    : moment;
+}
+
 const MAX_CHAR_COUNT = 500;
 
 const fieldLabel = "text-[13px] font-semibold text-foreground";
@@ -94,7 +101,8 @@ function RecommendationList({
 }) {
   const sorted = useMemo(
     () =>
-      [...recommendations].sort((a, b) => a.priority - b.priority).slice(0, 5),
+      // Prioritas 5 = paling mendesak (prompt coaching di API): tertinggi dulu.
+      [...recommendations].sort((a, b) => b.priority - a.priority).slice(0, 5),
     [recommendations],
   );
 
@@ -165,7 +173,7 @@ function AnnotationItem({
             />
             {CATEGORY_LABELS[annotation.category]}
           </span>
-          {annotation.moment && <span>{annotation.moment}</span>}
+          {annotation.moment && <span>{momentLabel(annotation.moment)}</span>}
           <span>{annotation.isManual ? "Trainer" : "AI"}</span>
         </p>
         <p className="text-sm leading-6 text-foreground">{annotation.text}</p>
