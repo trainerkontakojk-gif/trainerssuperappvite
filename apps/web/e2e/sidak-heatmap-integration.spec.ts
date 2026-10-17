@@ -449,10 +449,12 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
       "../../api/src/services/sidak/agent-directory"
     );
     // Skor agent dibaca per tahun PERIODE (bukan tahun tanggal temuan).
-    // Catatan: route batch belum mengisi `qa_temuan.tahun`, sedangkan
-    // `getAgentDetail` memfilter kolom itu, jadi baris batch belum terlihat di
-    // detail agent. Perbandingan di bawah baru bermakna setelah itu diperbaiki.
     const before = await getAgentDetail(pesertaId, slik!.year, "slik");
+    // Semua baris agent ini (termasuk 3 baris batch) harus terlihat di detail
+    // agent; tanpa ini perbandingan skor di bawah lolos secara hampa.
+    expect(
+      before.periodSummaries.find((s) => s.id === slik!.periodId)?.findingsCount,
+    ).toBe(rowsForPeserta().length);
     const beforeStable = JSON.stringify(stripVolatile(before));
 
     // Isi tanggal lewat route asli pada setiap baris.

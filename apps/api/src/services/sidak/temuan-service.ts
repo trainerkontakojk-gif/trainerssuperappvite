@@ -361,12 +361,31 @@ export async function createTemuanBatch(
 
   const ruleVersionId = validation.active_rule_version_id ?? null;
 
+  /**
+   * `tahun` wajib diisi dari tahun PERIODE: pembaca skor/ranking/detail agent
+   * memfilter `qa_temuan.tahun`, jadi baris tanpa tahun tidak pernah terhitung.
+   */
+  const { data: periodInfo, error: periodError } = await supabaseAdmin
+    .from("qa_periods")
+    .select("year")
+    .eq("id", items.period_id)
+    .maybeSingle();
+  if (periodError) {
+    throw new Error(`Gagal membaca periode: ${periodError.message}`);
+  }
+  if (!periodInfo) {
+    throw new Error(
+      "Data tidak valid: pastikan agent, periode, dan indikator sudah benar",
+    );
+  }
+
   const rows = validation.valid.map((item) => {
     const rawTicket = item.no_tiket ?? items.no_tiket ?? null;
     const trimmedTicket = rawTicket ? rawTicket.trim() : null;
     return {
       peserta_id: items.peserta_id,
       period_id: items.period_id,
+      tahun: periodInfo.year,
       indicator_id: item.indicator_id,
       service_type: items.service_type,
       no_tiket: trimmedTicket || null,

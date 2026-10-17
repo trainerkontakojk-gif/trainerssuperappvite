@@ -149,3 +149,7 @@ done
   `UPDATE` access for `authenticated`. It revokes `UPDATE (full_name)`, restores
   `UPDATE (role, is_deleted)` from migration `008_profile_admin_policies.sql`,
   and restores the original own/admin-trainer update policies.
+- `rollback_20261017090000_backfill_qa_temuan_tahun.sql` is a no-op. The
+  forward migration only fills NULL `qa_temuan.tahun` from the period year;
+  nulling them again would re-hide batch findings from score readers, and
+  backfilled rows cannot be told apart from rows written later.
