@@ -98,6 +98,8 @@ const HISTORY_ENTRIES = [
     scores: { final: 82, empathy: 80, probing: 75, typo: 90, compliance: 85 },
     consumer_name: "Bu Rina",
     simulationSubject: SUBJECT,
+    // Batas waktu yang dipilih (menit), seperti dikirim backend.
+    ketik_session: { simulation_duration: 5 },
   },
   {
     id: "pdkt-1",
@@ -145,7 +147,7 @@ const REVIEWS: Record<string, unknown> = {
       consumerName: "Bu Rina",
       consumerPhone: null,
       consumerCity: "Bandung",
-      simulationDuration: 300,
+      simulationDuration: 5,
       messages: [
         { id: "m1", sender: "consumer", text: "Tagihan saya dobel.", timestamp: CREATED_AT },
         { id: "m2", sender: "agent", text: "Baik Bu, saya cek tagihn Ibu.", timestamp: CREATED_AT },
@@ -230,9 +232,10 @@ const AGGREGATION = [
     total_input_tokens: 48000,
     total_output_tokens: 9000,
     total_tokens: 57000,
-    total_cost_idr: 4200,
+    total_cost_idr: 4700,
     simulation_cost_idr: 3000,
     review_cost_idr: 1200,
+    other_cost_idr: 500,
     models: [
       {
         model_id: "gemini-3.8-flash",
@@ -255,6 +258,17 @@ const AGGREGATION = [
         output_tokens: 2000,
         total_tokens: 10000,
         cost_idr: 1200,
+      },
+      {
+        model_id: "gemini-3.8-flash",
+        module: "qa-analyzer",
+        action: "generate-trend-forecast",
+        action_category: "other",
+        calls: 1,
+        input_tokens: 1000,
+        output_tokens: 500,
+        total_tokens: 1500,
+        cost_idr: 500,
       },
     ],
   },
@@ -529,6 +543,71 @@ test.describe("Monitoring (hermetic)", () => {
     ).toHaveAttribute("aria-selected", "true", { timeout: 20000 });
 
     await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
+    expectHermetic(audit);
+  });
+
+  test("filter penggunaan menampilkan nama bulan dan modul, dan bisa kembali ke semua modul", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/monitoring",
+      apiMocks: POPULATED_MOCKS,
+    });
+    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
+    await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
+
+    const monthName = new Date().toLocaleString("id-ID", { month: "long" });
+    await expect(page.getByRole("combobox", { name: "Bulan penggunaan" })).toContainText(
+      monthName,
+      { ignoreCase: true },
+    );
+    const moduleSelect = page.getByRole("combobox", { name: "Modul penggunaan" });
+    await expect(moduleSelect).toContainText("Semua modul");
+
+    await moduleSelect.click();
+    await page.getByRole("option", { name: "Analisis QA" }).click();
+    await expect(moduleSelect).toContainText("Analisis QA");
+    await expect
+      .poll(() => audit.mockedApi.some((e) => e.includes("module=qa-analyzer")))
+      .toBe(true);
+
+    await moduleSelect.click();
+    await page.getByRole("option", { name: "Semua modul" }).click();
+    await expect(moduleSelect).toContainText("Semua modul");
+    await expect
+      .poll(() => audit.mockedApi.at(-1) ?? "")
+      .toMatch(/\/aggregation\?year=\d+&month=\d+(&module=)?$/);
+    expectHermetic(audit);
+  });
+
+  test("ringkasan penggunaan menampilkan biaya Lainnya", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/monitoring",
+      apiMocks: POPULATED_MOCKS,
+    });
+    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
+    await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
+    const summary = page.getByRole("region", { name: "Ringkasan biaya" });
+    await expect(summary.getByText("Biaya Lainnya")).toBeVisible({ timeout: 20000 });
+    await expect(summary.getByText("Rp 500", { exact: true })).toBeVisible();
+    const row = page.getByRole("row", { name: /Andi/ });
+    await expect(row.getByRole("cell", { name: "Rp 500", exact: true })).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("detail KETIK menampilkan batas waktu dalam menit", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/monitoring",
+      apiMocks: POPULATED_MOCKS,
+    });
+    await waitForMockedApi(audit, ["/ai/monitoring/history"]);
+    await page.getByRole("button", { name: "Lihat Detail" }).first().click({ timeout: 20000 });
+    await waitForMockedApi(audit, ["/ketik-1/review"]);
+    const dialog = page.getByRole("dialog");
+    const info = dialog.getByLabel("Informasi konsumen");
+    await expect(info.getByText("Batas waktu", { exact: true })).toBeVisible({ timeout: 20000 });
+    await expect(info.getByText("5 menit", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/detik/)).toHaveCount(0);
     expectHermetic(audit);
   });
 

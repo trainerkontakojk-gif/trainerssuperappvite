@@ -1,6 +1,7 @@
 import {
   mapSimulationSubjectRowToSnapshot,
   chatMessageSchema,
+  ketikTranscriptDurationSeconds,
   emailMessageSchema,
   pdktEvaluationAiOutputSchema,
   pdktStoredReplyAnnotationsSchema,
@@ -220,9 +221,9 @@ function batches(values: string[]): string[][] {
 }
 
 function sourceError(table: string, error: { message?: string }): Error {
-  return new Error(
-    `Monitoring source ${table} failed: ${error.message || "database error"}`,
-  );
+  // Detail database hanya untuk log server; route mengirim pesan ramah.
+  console.error(`[monitoring] source ${table} failed`, error.message);
+  return new Error(`Monitoring source ${table} failed`);
 }
 
 async function readComplete(
@@ -417,7 +418,11 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       module: "ketik",
       scenario_title: string(row.scenario_title, "Simulasi Chat"),
       created_at: string(row.date),
-      duration_seconds: number(row.simulation_duration),
+      duration_seconds:
+        ketikTranscriptDurationSeconds(
+          messages[0]?.timestamp,
+          messages.at(-1)?.timestamp,
+        ) ?? 0,
       score: typeof row.final_score === "number" ? row.final_score : null,
       history: messages,
       ...userFields(row, profiles),

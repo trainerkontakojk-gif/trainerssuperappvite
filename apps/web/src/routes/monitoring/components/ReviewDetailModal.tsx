@@ -343,11 +343,12 @@ export function ReviewDetailModal({
               <>
                 <Metadata label="Telepon" value={consumerPhone} />
                 <Metadata label="Kota" value={consumerCity} />
+                {/* `simulationDuration` adalah batas waktu yang dipilih (menit), bukan lama sesi. */}
                 <Metadata
-                  label="Durasi simulasi"
+                  label="Batas waktu"
                   value={
                     simulationDuration != null
-                      ? `${simulationDuration} detik`
+                      ? `${simulationDuration} menit`
                       : null
                   }
                 />

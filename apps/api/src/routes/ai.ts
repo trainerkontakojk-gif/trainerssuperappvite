@@ -1,5 +1,5 @@
 import { can } from "@trainers/types";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
@@ -44,6 +44,25 @@ function canSignCrossUserRecording(profile: any): boolean {
   return can(profile?.role, "monitoring.recording.sign");
 }
 
+const DB_ERROR_MESSAGE = "Data belum bisa dimuat. Coba lagi beberapa saat lagi.";
+
+/** Detail database hanya masuk log server; pengguna menerima pesan yang ramah. */
+function dbErrorResponse(
+  c: Context,
+  scope: string,
+  error: unknown,
+  message = DB_ERROR_MESSAGE,
+) {
+  console.error(
+    `[ai] ${scope} failed`,
+    error instanceof Error ? error.message : (error as { message?: string })?.message,
+  );
+  return c.json(
+    { success: false as const, error: { code: "DB_ERROR", message } },
+    500,
+  );
+}
+
 ai.get("/models", requireCapability("ai.models.read"), (c) => {
   const module = c.req.query("module") as AiModelModule | undefined;
   const models = module ? getModelsForModule(module) : AI_MODELS;
@@ -69,11 +88,7 @@ ai.get("/usage", requireCapability("usage.read"), async (c) => {
   if (module) query = query.eq("module", module);
 
   const { data, error } = await query;
-  if (error)
-    return c.json(
-      { success: false, error: { code: "DB_ERROR", message: error.message } },
-      500,
-    );
+  if (error) return dbErrorResponse(c, "usage", error);
   return c.json({ success: true, data });
 });
 
@@ -126,17 +141,8 @@ ai.get("/usage/summary", requireCapability("usage.read"), async (c) => {
     });
 
     return c.json({ success: true, data: summary });
-  } catch (error: any) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "DATABASE_ERROR",
-          message: error?.message || "Database error.",
-        },
-      },
-      500,
-    );
+  } catch (error) {
+    return dbErrorResponse(c, "usage/summary", error);
   }
 });
 
@@ -148,16 +154,12 @@ ai.get(
     try {
       const data = await getMonitoringHistory();
       return c.json({ success: true, data });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "DB_ERROR",
-            message: error?.message || "Gagal memuat riwayat monitoring.",
-          },
-        },
-        500,
+    } catch (error) {
+      return dbErrorResponse(
+        c,
+        "monitoring/history",
+        error,
+        "Gagal memuat riwayat monitoring.",
       );
     }
   },
@@ -298,47 +300,81 @@ ai.delete(
 );
 
 // ── Usage Aggregation ──────────────────────────────────
+const AGGREGATION_PAGE_SIZE = 1000;
+const aggregationQuerySchema = z.object({
+  year: z.coerce.number().int().min(2020).max(2100).optional(),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  module: z
+    .enum(["ketik", "pdkt", "telefun", "qa-analyzer"])
+    .or(z.literal("").transform(() => undefined))
+    .optional(),
+  action_category: z.enum(["simulation", "review"]).optional(),
+});
+type AggregationLogRow = {
+  user_id: string;
+  model_id: string;
+  module: string;
+  action: string;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  estimated_cost_idr: number | null;
+  final_cost_idr: number | null;
+};
+
 ai.get(
   "/monitoring/aggregation",
   requireCapability("monitoring.read"),
   async (c) => {
-    const admin = createAdminClient();
-    const year = parseInt(
-      c.req.query("year") || String(new Date().getFullYear()),
-      10,
-    );
-    const month = parseInt(
-      c.req.query("month") || String(new Date().getMonth() + 1),
-      10,
-    );
-    const module = c.req.query("module");
-    const actionCategory = c.req.query("action_category") as
-      | "simulation"
-      | "review"
-      | undefined;
+    const parsedQuery = aggregationQuerySchema.safeParse(c.req.query());
+    if (!parsedQuery.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Periode atau filter penggunaan tidak valid.",
+          },
+        },
+        400,
+      );
+    }
+    const now = new Date();
+    const {
+      year = now.getFullYear(),
+      month = now.getMonth() + 1,
+      module,
+      action_category: actionCategory,
+    } = parsedQuery.data;
 
+    const admin = createAdminClient();
     const { start: monthStart, end: monthEnd } = getWibMonthBounds(year, month);
 
-    let query = admin
-      .from("ai_usage_logs")
-      .select(
-        "user_id, model_id, module, action, input_tokens, output_tokens, total_tokens, estimated_cost_idr, final_cost_idr",
-      )
-      .gte("created_at", monthStart)
-      .lte("created_at", monthEnd);
+    // Supabase memotong satu respons di batas baris (default 1000), jadi
+    // bulan yang ramai dibaca per halaman sampai habis. Urutan naik supaya
+    // baris baru yang masuk selama pembacaan jatuh di akhir, tidak menggeser
+    // halaman yang sudah dibaca.
+    const allLogs: AggregationLogRow[] = [];
+    for (let from = 0; ; from += AGGREGATION_PAGE_SIZE) {
+      let query = admin
+        .from("ai_usage_logs")
+        .select(
+          "user_id, model_id, module, action, input_tokens, output_tokens, total_tokens, estimated_cost_idr, final_cost_idr",
+        )
+        .gte("created_at", monthStart)
+        .lte("created_at", monthEnd);
+      if (module) query = query.eq("module", module);
 
-    if (module) query = query.eq("module", module);
+      const { data, error } = await query
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + AGGREGATION_PAGE_SIZE - 1);
+      if (error) return dbErrorResponse(c, "aggregation", error);
+      allLogs.push(...((data ?? []) as AggregationLogRow[]));
+      if (!data || data.length < AGGREGATION_PAGE_SIZE) break;
+    }
 
-    const { data: allLogs, error } = await query.order("created_at", {
-      ascending: false,
-    });
-    if (error)
-      return c.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
-        500,
-      );
-
-    let logs = allLogs || [];
+    let logs = allLogs;
 
     // Filter by action_category AFTER fetch (since action is a derived field)
     if (actionCategory === "simulation") {
@@ -374,6 +410,7 @@ ai.get(
           total_cost_idr: 0,
           simulation_cost_idr: 0,
           review_cost_idr: 0,
+          other_cost_idr: 0,
           models: {},
         };
       }
@@ -389,6 +426,8 @@ ai.get(
         agg.simulation_cost_idr += cost;
       } else if (isUsageActionInCategory(log.action, "review")) {
         agg.review_cost_idr += cost;
+      } else {
+        agg.other_cost_idr += cost;
       }
 
       const key = `${log.model_id}|${log.module}|${log.action}`;
@@ -438,6 +477,12 @@ type PricingDatabaseRow = {
   output_price_usd_per_million: number | null;
 } & Partial<Record<(typeof REALTIME_PRICING_COLUMNS)[number], number | null>>;
 
+const PRICING_MODELS = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
+  (model, index, models) =>
+    models.findIndex((candidate) => candidate.id === model.id) === index,
+);
+const PRICING_MODEL_IDS = new Set(PRICING_MODELS.map((model) => model.id));
+
 ai.get(
   "/monitoring/pricing",
   requireCapability("monitoring.pricing.read"),
@@ -465,11 +510,7 @@ ai.get(
 
     const { data, error } = pricingResult;
 
-    if (error)
-      return c.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
-        500,
-      );
+    if (error) return dbErrorResponse(c, "monitoring/pricing", error);
 
     const dbPricing: Array<
       PricingDatabaseRow & {
@@ -495,10 +536,7 @@ ai.get(
     );
 
     const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
-    const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
-      (model, index, models) =>
-        models.findIndex((candidate) => candidate.id === model.id) === index,
-    );
+    const pricingModels = PRICING_MODELS;
     const result: Array<{
       model_id: string;
       model_name: string;
@@ -584,6 +622,18 @@ ai.put(
         410,
       );
     }
+    if (!PRICING_MODEL_IDS.has(body.model_id)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "UNKNOWN_MODEL",
+            message: "Model ini tidak dikenal, jadi harganya tidak bisa disimpan.",
+          },
+        },
+        400,
+      );
+    }
 
     const admin = createAdminClient();
     const { error } = await admin
@@ -593,9 +643,11 @@ ai.put(
       });
 
     if (error)
-      return c.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
-        500,
+      return dbErrorResponse(
+        c,
+        "monitoring/pricing PUT",
+        error,
+        "Harga belum tersimpan. Coba lagi.",
       );
     return c.json({ success: true, data: null });
   },
@@ -613,14 +665,8 @@ ai.get(
         success: true,
         data: { usd_to_idr_rate: usdToIdrRate },
       });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "DB_ERROR", message: error?.message || "DB error." },
-        },
-        500,
-      );
+    } catch (error) {
+      return dbErrorResponse(c, "monitoring/billing", error);
     }
   },
 );
@@ -639,13 +685,12 @@ ai.post(
     const admin = createAdminClient();
     try {
       await upsertBillingRate(admin, body.usd_to_idr_rate);
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "DB_ERROR", message: error?.message || "DB error." },
-        },
-        500,
+    } catch (error) {
+      return dbErrorResponse(
+        c,
+        "monitoring/billing POST",
+        error,
+        "Kurs belum tersimpan. Coba lagi.",
       );
     }
     return c.json({ success: true, data: null });

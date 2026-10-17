@@ -48,3 +48,23 @@ export interface KetikLandingSummary {
     lowestAspect: string | null;
   }>;
 }
+
+/**
+ * Lama sesi KETIK dalam detik: selisih stempel waktu pesan pertama dan
+ * terakhir. `simulation_duration` di `ketik_history` adalah batas waktu yang
+ * dipilih (menit), bukan lama sesi. `null` bila stempel waktu tidak terbaca.
+ */
+export function ketikTranscriptDurationSeconds(
+  firstTimestamp: unknown,
+  lastTimestamp: unknown,
+): number | null {
+  if (typeof firstTimestamp !== "string" || typeof lastTimestamp !== "string") {
+    return null;
+  }
+  const start = Date.parse(firstTimestamp);
+  const end = Date.parse(lastTimestamp);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return null;
+  }
+  return Math.round((end - start) / 1000);
+}

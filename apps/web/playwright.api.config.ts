@@ -94,6 +94,10 @@ export default defineConfig({
       testMatch: "monitoring-legacy-results-api.spec.ts",
     },
     {
+      name: "monitoring-numbers-real-backend",
+      testMatch: "monitoring-numbers-api.spec.ts",
+    },
+    {
       name: "home-attention-real-backend",
       testMatch: "home-attention-api.spec.ts",
     },

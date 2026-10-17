@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ketikTranscriptDurationSeconds,
   mapSimulationSubjectRowToSnapshot,
   type MonitoringReviewStatus,
   type SidakSimulationCursor,
@@ -87,7 +88,8 @@ type RawSimulationRow = {
   timestamp?: unknown;
   created_at?: unknown;
   scenario_title?: unknown;
-  simulation_duration?: unknown;
+  first_message_at?: unknown;
+  last_message_at?: unknown;
   time_taken?: unknown;
   duration_seconds?: unknown;
   final_score?: unknown;
@@ -121,7 +123,7 @@ const SOURCE_CONFIG: Record<
     table: "ketik_history",
     timeColumn: "date",
     select:
-      "id, user_id, date, scenario_title, simulation_duration, final_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
+      "id, user_id, date, scenario_title, first_message_at:messages->0->>timestamp, last_message_at:messages->-1->>timestamp, final_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
   },
   pdkt: {
     table: "pdkt_history",
@@ -206,13 +208,11 @@ function getDuration(
   row: RawSimulationRow,
   module: SidakSimulationModule,
 ): number | null {
-  return asNumber(
-    module === "ketik"
-      ? row.simulation_duration
-      : module === "pdkt"
-        ? row.time_taken
-        : row.duration_seconds,
-  );
+  if (module === "ketik") {
+    // Hanya stempel waktu pesan pertama/terakhir yang dibaca, bukan transkrip.
+    return ketikTranscriptDurationSeconds(row.first_message_at, row.last_message_at);
+  }
+  return asNumber(module === "pdkt" ? row.time_taken : row.duration_seconds);
 }
 
 function getScenarioTitle(
