@@ -4,6 +4,8 @@ export interface AiModelCapabilities {
   supportsText: boolean;
   supportsImage: boolean;
   imageGenerationMode?: "native" | "none";
+  /** Google bills generated-image output tokens at their own rate (USD per 1M). */
+  imageOutputPriceUsdPerMillion?: number;
 }
 
 export type TelefunTransport = "gemini-live" | "openai-audio" | "openai-webrtc";
@@ -492,6 +494,8 @@ export const IMAGE_GENERATION_MODELS: AiModelInfo[] = [
       supportsText: false,
       supportsImage: true,
       imageGenerationMode: "native",
+      // ai.google.dev/gemini-api/docs/pricing, checked 2026-10-17.
+      imageOutputPriceUsdPerMillion: 60,
     },
   },
 ];
