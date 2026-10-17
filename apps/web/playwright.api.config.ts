@@ -59,6 +59,10 @@ export default defineConfig({
       name: "ketik-session-real-backend",
       testMatch: "ketik-session-api.spec.ts",
     },
+    {
+      name: "ketik-consumer-prompt-real-backend",
+      testMatch: "ketik-consumer-prompt-api.spec.ts",
+    },
     { name: "tna-real-backend", testMatch: "tna-*-api.spec.ts" },
     {
       name: "db-guard-real-backend",
