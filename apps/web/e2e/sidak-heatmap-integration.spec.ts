@@ -23,13 +23,11 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
-
-const PERIOD_ID = "32e01554-79f1-4b05-b007-d73f451be60c";
-const INDICATOR_IDS = [
-  "357b53bb-a7c2-4431-9c8f-76e824bcd2cb",
-  "8a856193-3aaf-433a-bb34-1fb72ba4c9f6",
-  "ba6ee170-ff66-47b4-afe7-17250d4708ff",
-];
+import {
+  cleanupSlikRuleFixture,
+  seedSlikRuleFixture,
+  type SlikRuleFixture,
+} from "./helpers/sidakSlikFixture";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -281,16 +279,18 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
   let trainerToken: string;
   let trainerUserId: string;
   let leaderUserId: string;
+  // Periode + master indikator + versi aturan SLIK published milik run ini.
+  let slik: SlikRuleFixture | undefined;
 
   const batchPayload = (dates: Record<string, unknown> = {}) => ({
     peserta_id: pesertaId,
-    period_id: PERIOD_ID,
+    period_id: slik!.periodId,
     service_type: "slik",
     no_tiket: `TKT-INT-${Date.now()}`,
     items: [
-      { indicator_id: INDICATOR_IDS[0], nilai: 1, ketidaksesuaian: "Telat respon", ...dates },
-      { indicator_id: INDICATOR_IDS[1], nilai: 1, ketidaksesuaian: "Data salah", ...dates },
-      { indicator_id: INDICATOR_IDS[2], nilai: 1, ketidaksesuaian: "Dokumen kurang", ...dates },
+      { indicator_id: slik!.indicators[0]!.id, nilai: 1, ketidaksesuaian: "Telat respon", ...dates },
+      { indicator_id: slik!.indicators[1]!.id, nilai: 1, ketidaksesuaian: "Data salah", ...dates },
+      { indicator_id: slik!.indicators[2]!.id, nilai: 1, ketidaksesuaian: "Dokumen kurang", ...dates },
     ],
   });
 
@@ -320,6 +320,10 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
   }
 
   test.beforeAll(async () => {
+    slik = seedSlikRuleFixture(sql, {
+      label: "e2e-heatmap-int",
+      indicatorCount: 3,
+    });
     folderName = `e2e-heatmap-int-${Date.now()}`;
     const yearId = sql(
       `INSERT INTO public.profiler_years (year, label) VALUES (2026,'E2E')
@@ -342,6 +346,7 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
       sql(`DELETE FROM public.profiler_peserta WHERE id='${pesertaId}';`);
       sql(`DELETE FROM public.profiler_folders WHERE name='${folderName}';`);
     }
+    cleanupSlikRuleFixture(sql, slik);
     for (const id of [trainerUserId, leaderUserId]) {
       if (id) await admin().auth.admin.deleteUser(id);
     }
@@ -427,18 +432,27 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
 
   test("skor/ranking tidak berubah karena tanggal tambahan (output backend nyata)", async () => {
     const call = await mountTemuanRouter("trainer");
+    const rowsBefore = rowsForPeserta().length;
     const created = await call("/temuan/batch", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(batchPayload()),
     });
     expect(created.status).toBe(201);
+    // Tanpa baris yang benar-benar tersimpan, perbandingan skor di bawah
+    // lolos secara hampa (dua detail kosong selalu identik).
+    expect(created.body.data.inserted).toBe(3);
+    expect(rowsForPeserta()).toHaveLength(rowsBefore + 3);
 
     // `supabaseAdmin` di `lib/env` sudah terikat loopback setelah `loadApiModules`.
     const { getAgentDetail } = await import(
       "../../api/src/services/sidak/agent-directory"
     );
-    const before = await getAgentDetail(pesertaId, 2026, "slik");
+    // Skor agent dibaca per tahun PERIODE (bukan tahun tanggal temuan).
+    // Catatan: route batch belum mengisi `qa_temuan.tahun`, sedangkan
+    // `getAgentDetail` memfilter kolom itu, jadi baris batch belum terlihat di
+    // detail agent. Perbandingan di bawah baru bermakna setelah itu diperbaiki.
+    const before = await getAgentDetail(pesertaId, slik!.year, "slik");
     const beforeStable = JSON.stringify(stripVolatile(before));
 
     // Isi tanggal lewat route asli pada setiap baris.
@@ -454,7 +468,7 @@ test.describe("Integrasi heatmap end-to-end (route nyata + JWT/RLS + DB lokal)",
       expect(res.status).toBe(200);
     }
 
-    const after = await getAgentDetail(pesertaId, 2026, "slik");
+    const after = await getAgentDetail(pesertaId, slik!.year, "slik");
     // Semua field non-tanggal (termasuk skor) harus identik.
     expect(JSON.stringify(stripVolatile(after))).toBe(beforeStable);
 

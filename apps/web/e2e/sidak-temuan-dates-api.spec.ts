@@ -36,6 +36,11 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Hono } from "hono";
 import * as sidakTypes from "@trainers/types";
+import {
+  cleanupSlikRuleFixture,
+  seedSlikRuleFixture,
+  type SlikRuleFixture,
+} from "./helpers/sidakSlikFixture";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -44,8 +49,9 @@ const REPO_ROOT = path.resolve(
 
 // ── Keamanan target ─────────────────────────────────────────────────────────
 // Spec ini memakai stack Supabase LOKAL yang disposable (`127.0.0.1:54321`,
-// ditulis oleh `scripts/integration/supabase-bootstrap.sh` lewat
-// `scratch/sidak-local-db/seed-slik-baseline.sh`), BUKAN project remote repo.
+// ditulis oleh `scripts/integration/supabase-bootstrap.sh`), BUKAN project
+// remote repo. Data SLIK yang dibutuhkan di-seed sendiri lewat
+// `helpers/sidakSlikFixture.ts`.
 //
 // Tiga lapis menjaga itu:
 //   1. Kredensial hanya dibaca dari `apps/api/.env.integration` (git-ignored) dan
@@ -74,7 +80,7 @@ function readLocalEnv(): LocalEnv {
   if (!existsSync(INTEGRATION_ENV_PATH)) {
     throw new Error(
       "apps/api/.env.integration tidak ada. Jalankan:\n" +
-        "  bash scratch/sidak-local-db/seed-slik-baseline.sh\n" +
+        "  bash scripts/integration/supabase-bootstrap.sh\n" +
         "Skrip itu hanya menyiapkan stack lokal yang disposable.",
     );
   }
@@ -739,12 +745,13 @@ test.describe("Migrasi tanggal_layanan / tanggal_sampel (DB lokal)", () => {
  * men-cascade ke `qa_temuan`, jadi menghapus peserta cukup untuk melapakan
  * semua baris temuan milik run ini.
  *
- * Layanan yang dipakai adalah `slik`: satu-satunya service type di stack lokal
- * yang punya versi aturan published beserta indikator active-nya, sehingga
- * jalur validasi batch (yang menolak indikator di luar rule aktif) bisa diuji
- * dengan data nyata.
+ * Layanan yang dipakai adalah `slik`. Fixture membuat periode, master indikator,
+ * dan versi aturan published miliknya sendiri, sehingga jalur validasi batch
+ * (yang menolak indikator di luar rule aktif) diuji dengan data nyata tanpa
+ * baseline yang di-seed manual.
  */
 type TemuanFixture = {
+  slik: SlikRuleFixture;
   periodId: string;
   pesertaId: string;
   folderName: string;
@@ -755,35 +762,14 @@ type TemuanFixture = {
 let fx: TemuanFixture;
 
 function fixtureSetup(): TemuanFixture {
-  const periodId = sqlUuid(
-    `SELECT id FROM public.qa_periods WHERE month = 1 AND year = 2026 LIMIT 1;`,
-  );
-  if (!periodId) {
-    throw new Error(
-      "Periode Januari 2026 tidak ada di DB lokal. Jalankan " +
-        "bash scratch/sidak-local-db/seed-slik-baseline.sh",
-    );
-  }
-
-  const indicators = sql(`
-    SELECT i.id FROM public.qa_indicators i
-    WHERE i.service_type = 'slik' AND i.is_active
-      AND EXISTS (
-        SELECT 1 FROM public.qa_service_rule_indicators r
-        WHERE r.legacy_indicator_id = i.id
-      )
-    ORDER BY i.sort_order LIMIT 4;
-  `)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (indicators.length < 4) {
-    throw new Error(
-      `Butuh ≥4 indikator SLIK aktif di rule, dapat ${indicators.length}. ` +
-        "Jalankan bash scratch/sidak-local-db/seed-slik-baseline.sh",
-    );
-  }
+  // Periode, master indikator, dan versi aturan published dibuat sendiri per
+  // run, jadi spec tidak bergantung pada baseline SLIK yang di-seed manual.
+  const slik = seedSlikRuleFixture(sql, {
+    label: "e2e-temuan-dates",
+    indicatorCount: 4,
+  });
+  const periodId = slik.periodId;
+  const indicators = slik.indicators.map((indicator) => indicator.id);
 
   // Nama unik per run supaya folder lama dari run sebelumnya tidak bentrok.
   const folderName = `e2e-temuan-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -803,6 +789,7 @@ function fixtureSetup(): TemuanFixture {
   );
 
   return {
+    slik,
     periodId,
     pesertaId,
     folderName,
@@ -882,6 +869,7 @@ test.describe("Persistence tanggal (route nyata + DB disposable)", () => {
     // ON DELETE CASCADE ikut menghapus qa_temuan milik peserta ini.
     sql(`DELETE FROM public.profiler_peserta WHERE id = '${fx.pesertaId}';`);
     sql(`DELETE FROM public.profiler_folders WHERE name = '${fx.folderName}';`);
+    cleanupSlikRuleFixture(sql, fx.slik);
   });
 
   test("create menyimpan kedua tanggal dan dapat dibaca ulang dari DB", async () => {
@@ -1353,6 +1341,7 @@ test.describe("Heatmap agregasi", () => {
     if (fx?.pesertaId) {
       sql(`DELETE FROM public.profiler_peserta WHERE id = '${fx.pesertaId}';`);
       sql(`DELETE FROM public.profiler_folders WHERE name = '${fx.folderName}';`);
+      cleanupSlikRuleFixture(sql, fx.slik);
     }
     if (leaderGroupIds.length > 0) {
       sql(

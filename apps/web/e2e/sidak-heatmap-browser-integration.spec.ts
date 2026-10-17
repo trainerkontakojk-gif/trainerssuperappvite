@@ -11,7 +11,8 @@
  * ASLI dengan JWT user nyata dan database Supabase LOKAL disposable. Mutasi
  * bisnis dan hitungan heatmap tidak pernah di-mock.
  *
- * Fixture: satu peserta + folder + periode + indikator unik per run; hari uji
+ * Fixture: satu peserta + folder + periode + indikator + versi aturan SLIK
+ * published unik per run (`helpers/sidakSlikFixture.ts`); hari uji
  * memakai November/Desember 2026 supaya tidak bertabrakan dengan spec lain.
  */
 
@@ -32,6 +33,11 @@ import {
   runSql,
   sqlOne,
 } from "./helpers/sidakRealBackend";
+import {
+  cleanupSlikRuleFixture,
+  seedSlikRuleFixture,
+  type SlikRuleFixture,
+} from "./helpers/sidakSlikFixture";
 
 const ENV = readLoopbackEnv();
 installLoopbackFetchGuard();
@@ -49,6 +55,7 @@ function displayName(indicator: HarnessFixture["indicators"][number]): string {
 }
 
 type Fixture = {
+  slik: SlikRuleFixture;
   fixture: HarnessFixture;
   periodId: string;
   pesertaId: string;
@@ -75,46 +82,19 @@ async function seedFixture(): Promise<Fixture> {
     `INSERT INTO public.profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
      VALUES ('${folderName}','Agen Browser','SLIK','Agent',1) RETURNING id;`,
   );
-  const periodId = sqlOne(
-    ENV,
-    `SELECT id FROM public.qa_periods WHERE month = 1 AND year = 2026 LIMIT 1;`,
-  );
-
-  const indicatorRows = runSql(
-    ENV,
-    `SELECT i.id || '|' || i.name || '|' || COALESCE(i.parameter_group,'') || '|' ||
-            i.category || '|' || COALESCE(i.bobot::text,'0')
-     FROM public.qa_indicators i
-     WHERE i.service_type = 'slik' AND i.is_active
-       AND EXISTS (SELECT 1 FROM public.qa_service_rule_indicators r
-                   WHERE r.legacy_indicator_id = i.id)
-     ORDER BY i.sort_order LIMIT 3;`,
-  )
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (indicatorRows.length < 3) {
-    throw new Error(
-      `Butuh 3 indikator SLIK aktif, dapat ${indicatorRows.length}`,
-    );
-  }
-  const indicators = indicatorRows.map((row) => {
-    const [id, name, parameter_group, category, bobot] = row.split("|");
-    return {
-      id: id!,
-      service_type: "slik",
-      name: name!,
-      parameter_group: parameter_group || null,
-      category: category!,
-      bobot: Number(bobot ?? "0"),
-      is_active: true,
-    };
+  // Periode, master indikator, dan versi aturan SLIK published milik run ini;
+  // tidak bergantung pada baseline SLIK yang di-seed manual.
+  const slik = seedSlikRuleFixture((query) => runSql(ENV, query), {
+    label: "e2e-browser",
+    indicatorCount: 3,
   });
+  const periodId = slik.periodId;
+  const indicators = slik.indicators;
 
   return {
     fixture: {
       folder: { id: folderId, name: folderName },
-      period: { id: periodId, month: 1, year: 2026 },
+      period: { id: periodId, month: slik.month, year: slik.year },
       agent: {
         id: pesertaId,
         nama: "Agen Browser",
@@ -124,6 +104,7 @@ async function seedFixture(): Promise<Fixture> {
       },
       indicators,
     },
+    slik,
     periodId,
     pesertaId,
     folderName,
@@ -202,6 +183,7 @@ test.describe
         `DELETE FROM public.profiler_folders WHERE name='${fx.folderName}';`,
       );
     }
+    cleanupSlikRuleFixture((query) => runSql(ENV, query), fx?.slik);
     if (trainerUserId) await admin.auth.admin.deleteUser(trainerUserId);
   });
 
@@ -285,7 +267,7 @@ test.describe
     // Halaman heatmap nyata menampilkan angka dari API nyata.
     await page.goto("/sidak/heatmap", { waitUntil: "domcontentloaded" });
     await expect(
-      page.getByRole("heading", { name: /Heatmap Ketidaksesuaian/ }),
+      page.getByRole("heading", { name: "Heatmap", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "17/11/2026: 1 temuan" }),
