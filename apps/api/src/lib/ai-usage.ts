@@ -1,6 +1,7 @@
 import { createAdminClient } from "./supabase";
 import { normalizeModelId } from "./ai-models";
 import {
+  IMAGE_GENERATION_MODELS,
   getTelefunLiveModel,
   resolveGeminiLiveFallbackPerMillion,
   type AIProvider,
@@ -27,6 +28,8 @@ interface TokenUsage {
   cachedInputAudioTokens?: number;
   outputTextTokens?: number;
   outputAudioTokens?: number;
+  /** Generated-image tokens; priced by the model's imageOutputPriceUsdPerMillion. */
+  outputImageTokens?: number;
 }
 
 function isPostgrestError(error: unknown): error is {
@@ -176,9 +179,18 @@ export async function logAiUsage(options: {
       options.tokens.inputTextTokens,
       options.tokens.inputAudioTokens,
     );
+    const imagePricePerMillion = IMAGE_GENERATION_MODELS.find(
+      (model) => model.id === normalizedModelId,
+    )?.capabilities?.imageOutputPriceUsdPerMillion;
+    // Image tokens leave the text/unspecified bucket only when the model has an image rate.
+    const outputImageTokens =
+      isFailure || imagePricePerMillion === undefined
+        ? 0
+        : Math.min(options.tokens.outputImageTokens ?? 0, outputTokens);
     const outputKnownTokens = getKnownTokenCount(
       options.tokens.outputTextTokens,
       options.tokens.outputAudioTokens,
+      outputImageTokens,
     );
     const inputUnspecifiedTokens = Math.max(inputTokens - inputKnownTokens, 0);
     const outputUnspecifiedTokens = Math.max(
@@ -216,6 +228,12 @@ export async function logAiUsage(options: {
       normalizedModelId,
     );
 
+    const imageCostUsd =
+      (outputImageTokens / 1_000_000) * (imagePricePerMillion ?? 0);
+    const estimatedCostUsd =
+      Math.round((modalityCost.costUsd + imageCostUsd) * 1_000_000) /
+      1_000_000;
+
     const payload = {
       request_id: options.requestId,
       user_id: options.userId,
@@ -251,8 +269,10 @@ export async function logAiUsage(options: {
       input_price_usd_per_million: inputPricePerMillion,
       output_price_usd_per_million: outputPricePerMillion,
       usd_to_idr_rate: usdToIdrRate,
-      estimated_cost_usd: modalityCost.costUsd,
-      estimated_cost_idr: modalityCost.costIdr,
+      estimated_cost_usd: estimatedCostUsd,
+      estimated_cost_idr: Math.round(
+        (modalityCost.costUsd + imageCostUsd) * usdToIdrRate,
+      ),
       status: requestStatus,
       error_message: errorMessageValue,
     };
