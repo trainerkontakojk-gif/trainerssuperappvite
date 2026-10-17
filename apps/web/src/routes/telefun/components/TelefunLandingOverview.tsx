@@ -95,7 +95,7 @@ export function TelefunLandingOverview({
   const latestReviewed = recent[0]?.record;
   const isNewUser =
     historyState === "ready" &&
-    callsThisMonth === 0 &&
+    (callsThisMonth ?? 0) === 0 &&
     followUps.length === 0 &&
     recent.length === 0 &&
     analyzing === 0;
@@ -139,7 +139,7 @@ export function TelefunLandingOverview({
             className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-fg2"
           >
             <SummaryItem
-              value={String(callsThisMonth)}
+              value={callsThisMonth === null ? "–" : String(callsThisMonth)}
               label="panggilan bulan ini"
             />
             {average ? (

@@ -40,6 +40,7 @@ import {
 } from "./services/telefun-recording-reconciliation";
 import {
   createTelefunSession,
+  getTelefunMonthCount,
   getTelefunSession,
   getTelefunSettings,
   mapTelefunSessionRow,
@@ -445,7 +446,29 @@ export default function TelefunLanding() {
       .finally(() => startUsagePolling(usageRunId, usageBaseline));
   };
 
-  const summary = useMemo(() => summarizeTelefunLanding(history), [history]);
+  // Panggilan bulan ini dari server; `null` = belum/gagal dihitung ("–").
+  // Dihitung ulang saat riwayat bertambah (mis. panggilan baru tersimpan).
+  const [serverMonthCount, setServerMonthCount] = useState<number | null>(
+    null,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    getTelefunMonthCount()
+      .then((count) => {
+        if (!cancelled) setServerMonthCount(count);
+      })
+      .catch((error) => {
+        console.warn("[Telefun] Month count unavailable", error);
+        if (!cancelled) setServerMonthCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [history.length]);
+  const summary = useMemo(
+    () => summarizeTelefunLanding(history, serverMonthCount),
+    [history, serverMonthCount],
+  );
   const hasSessionDelta = Boolean(
     sessionDelta &&
     (sessionDelta.costIdr > 0 ||

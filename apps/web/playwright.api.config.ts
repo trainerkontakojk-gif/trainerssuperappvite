@@ -37,6 +37,10 @@ export default defineConfig({
       name: "ketik-history-real-backend",
       testMatch: "ketik-history-api.spec.ts",
     },
+    {
+      name: "telefun-month-count-real-backend",
+      testMatch: "telefun-month-count-api.spec.ts",
+    },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     { name: "rate-limit-stub", testMatch: "rate-limit-client-ip-api.spec.ts" },
     {

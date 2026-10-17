@@ -319,12 +319,19 @@ export const FULL_HISTORY: readonly TelefunRow[] = [
 export function telefunMocks(
   history: readonly TelefunRow[],
   settings: unknown = {},
+  /** Jumlah panggilan bulan ini dari server (`GET /sessions/month-count`). */
+  monthCount: number = history.length,
 ): ApiMock[] {
   return [
     {
       method: "GET",
       path: "/api/v1/telefun/settings",
       body: { success: true, data: settings },
+    },
+    {
+      method: "GET",
+      path: "/api/v1/telefun/sessions/month-count",
+      body: { success: true, data: { count: monthCount } },
     },
     {
       method: "GET",

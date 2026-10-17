@@ -288,6 +288,19 @@ export const telefunSessionUpdatePayloadSchema = z
     }
   });
 
+/** Batas bulan Asia/Jakarta (UTC+7, tanpa DST) yang memuat `now`. */
+export function telefunWibMonthRange(now = Date.now()): {
+  from: string;
+  to: string;
+} {
+  const wib = new Date(now + 7 * 3600_000);
+  const from =
+    Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), 1) - 7 * 3600_000;
+  const to =
+    Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth() + 1, 1) - 7 * 3600_000;
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+}
+
 telefunSessions.get("/sessions", async (c) => {
   const user = c.get("user");
   const profile = c.get("profile");
@@ -318,6 +331,42 @@ telefunSessions.get("/sessions", async (c) => {
         error: {
           code: "DATABASE_ERROR",
           message: error?.message || "Database error.",
+        },
+      },
+      500,
+    );
+  }
+});
+
+/**
+ * Jumlah panggilan bulan Jakarta berjalan. Daftar sesi dibatasi 50 baris,
+ * jadi landing tidak bisa menghitungnya sendiri. Cakupannya sama dengan
+ * `GET /sessions`.
+ */
+telefunSessions.get("/sessions/month-count", async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const { from, to } = telefunWibMonthRange();
+
+  try {
+    let query = createAdminClient()
+      .from("telefun_history")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", from)
+      .lt("created_at", to);
+    if (!can(profile?.role, "telefun.manage")) {
+      query = query.eq("user_id", user.id);
+    }
+    const { count, error } = await query;
+    if (error) throw error;
+    return c.json({ success: true, data: { count: count ?? 0 } });
+  } catch {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "DATABASE_ERROR",
+          message: "Jumlah panggilan bulan ini belum bisa dihitung.",
         },
       },
       500,

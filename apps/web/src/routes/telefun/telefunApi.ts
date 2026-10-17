@@ -87,6 +87,15 @@ export async function saveTelefunSettings(
   await unwrapResponse(await telefunClient.settings.$put({ json: settings }));
 }
 
+/** Jumlah panggilan bulan Jakarta berjalan, dihitung server (daftar dibatasi 50). */
+export async function getTelefunMonthCount(): Promise<number> {
+  const data = (await unwrapResponse(
+    await telefunClient.sessions["month-count"].$get(),
+  )) as { count?: unknown };
+  if (typeof data?.count !== "number") throw new Error("invalid month count");
+  return data.count;
+}
+
 export async function getTelefunSessions(): Promise<TelefunSessionRow[]> {
   return (await unwrapResponse(
     await telefunClient.sessions.$get(),

@@ -255,7 +255,6 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   }, [isMuted]);
 
   useEffect(() => {
-    console.log("[Telefun] PhoneInterface mounted with config:", config);
     let isActive = true;
     mountedRef.current = true;
 

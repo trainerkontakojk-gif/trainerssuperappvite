@@ -127,6 +127,8 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
   }) => {
     // Soket tiruan wajib dipasang sebelum halaman dimuat.
     const socket = await mockTelefunVoiceServer(page, NEW_ID);
+    const consoleTexts: string[] = [];
+    page.on("console", (message) => consoleTexts.push(message.text()));
     const audit = await open(page, "/telefun", callMocks());
     const uploads = await mockRecordingUpload(page);
     await serveRecording(page);
@@ -148,6 +150,10 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await expect(call.getByRole("status")).toHaveText("Giliran Anda", {
       timeout: 20000,
     });
+    // Konfigurasi panggilan (instruksi skenario, identitas) tidak ditulis ke console.
+    expect(
+      consoleTexts.filter((text) => text.includes("mounted with config")),
+    ).toEqual([]);
     // Nama dan nomor penelepon besar di tengah layar, seperti layar telepon.
     const caller = call.getByRole("group", { name: "Data penelepon" });
     await expect(caller.getByRole("heading", { level: 2 })).not.toBeEmpty();
@@ -167,7 +173,7 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await call.getByRole("button", { name: "Lanjutkan" }).click();
     await expect(call.getByText("Panggilan ditahan")).toHaveCount(0);
 
-    // Bisukan dicatat sebagai interval, supaya replay Telaah ikut senyap.
+    // Bisukan dicatat sebagai interval di metrik sesi.
     const patchBodies: unknown[] = [];
     page.on("request", (request) => {
       if (

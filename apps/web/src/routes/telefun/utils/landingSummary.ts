@@ -29,23 +29,13 @@ export interface TelefunRecentReview {
 }
 
 export interface TelefunLandingSummary {
-  callsThisMonth: number;
+  /** `null` bila jumlah dari server belum/tidak tersedia. */
+  callsThisMonth: number | null;
   average: { score: number; calls: number } | null;
   analyzing: number;
   followUps: TelefunFollowUp[];
   focus: { label: string; score: number } | null;
   recent: TelefunRecentReview[];
-}
-
-const WIB_MONTH = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Jakarta",
-  year: "numeric",
-  month: "2-digit",
-});
-
-function wibMonth(value: string | number): string | null {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? WIB_MONTH.format(time) : null;
 }
 
 function round1(value: number): number {
@@ -79,16 +69,17 @@ function averageFocus(records: readonly CallRecord[]) {
  */
 export function summarizeTelefunLanding(
   history: readonly CallRecord[],
-  now: number = Date.now(),
+  /** Panggilan bulan ini di server (`GET /sessions/month-count`). */
+  serverMonthCount: number | null,
 ): TelefunLandingSummary {
   const sorted = sortTelefunNewestFirst(history);
   const scored = sorted.filter((record) => readTelefunScore(record) !== null);
   const window = scored.slice(0, TELEFUN_LANDING_REVIEW_WINDOW);
-  const month = wibMonth(now);
 
   return {
-    callsThisMonth: sorted.filter((record) => wibMonth(record.date) === month)
-      .length,
+    // Server menghitung semua panggilan (riwayat hanya 50 terbaru). Panggilan
+    // yang belum tersinkron pun sudah punya baris server sejak dimulai.
+    callsThisMonth: serverMonthCount,
     average: window.length
       ? {
           score: round1(

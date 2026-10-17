@@ -93,6 +93,58 @@ test.describe("Telefun landing (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("panggilan bulan ini dihitung server (tidak terpotong 50), panggilan lokal tidak dihitung ganda", async ({
+    page,
+  }) => {
+    // Panggilan yang belum tersinkron: barisnya sudah dibuat server saat
+    // panggilan dimulai, jadi sudah termasuk dalam hitungan server.
+    await page.addInitScript((record) => {
+      try {
+        if (!sessionStorage.getItem("e2e-seeded")) {
+          sessionStorage.setItem("e2e-seeded", "1");
+          localStorage.setItem("telefun_history", JSON.stringify([record]));
+        }
+      } catch {
+        // about:blank tidak punya penyimpanan.
+      }
+    }, {
+      id: "telefun-local-only-month",
+      date: new Date().toISOString(),
+      url: "",
+      consumerName: "Sari Wulandari",
+      scenarioTitle: "Panggilan Offline",
+      duration: 95,
+      syncStatus: "unsynced",
+    });
+    const audit = await open(page, "/telefun", telefunMocks(FULL_HISTORY, {}, 73));
+    const progress = page.getByTestId("telefun-progress-summary");
+    await expect(progress).toContainText("73 panggilan bulan ini", {
+      timeout: 20000,
+    });
+    expectHermetic(audit);
+  });
+
+  test("hitungan bulan ini gagal dimuat: tampil tanda kosong, bukan angka karangan", async ({
+    page,
+  }) => {
+    const audit = await open(page, "/telefun", [
+      {
+        method: "GET",
+        path: "/api/v1/telefun/sessions/month-count",
+        status: 500,
+        body: {
+          success: false,
+          error: { code: "DATABASE_ERROR", message: "Gagal." },
+        },
+      },
+      ...telefunMocks(FULL_HISTORY),
+    ]);
+    const progress = page.getByTestId("telefun-progress-summary");
+    await expect(progress).toContainText("rata-rata skor", { timeout: 20000 });
+    await expect(progress).toContainText("– panggilan bulan ini");
+    expectHermetic(audit);
+  });
+
   test("bagian data dihitung dari riwayat: progres, tindak lanjut, fokus, hasil terbaru", async ({
     page,
   }) => {
