@@ -9,6 +9,7 @@ import {
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { emptyUsageBreakdown } from "../src/lib/usage-snapshot";
+import { summarizeKetikLanding } from "../src/routes/ketik/utils/landingSummary";
 
 /**
  * Popover Pemakaian AI — rincian simulasi vs penilaian AI (hermetic).
@@ -39,6 +40,26 @@ breakdown.review = {
   costUsd: 1.3,
 };
 
+const USAGE_SUMMARY_MOCK: ApiMock = {
+  method: "GET",
+  path: "/api/v1/ai/usage/summary",
+  body: {
+    success: true,
+    data: {
+      totalCalls: 10,
+      totalInputTokens: 5000,
+      totalOutputTokens: 3000,
+      totalTokens: 8000,
+      totalCostIdr: 50000,
+      simulationCostIdr: 30000,
+      reviewCostIdr: 20000,
+      periodLabel: "Mei 2026",
+      breakdown,
+      breakdownItems: [],
+    },
+  },
+};
+
 const USAGE_MOCKS: readonly ApiMock[] = [
   {
     method: "GET",
@@ -55,24 +76,12 @@ const USAGE_MOCKS: readonly ApiMock[] = [
     body: { success: true, data: [] },
   },
   {
+    // Landing KETIK memuat ringkasan riwayat; dibangun dari riwayat kosong yang sama.
     method: "GET",
-    path: "/api/v1/ai/usage/summary",
-    body: {
-      success: true,
-      data: {
-        totalCalls: 10,
-        totalInputTokens: 5000,
-        totalOutputTokens: 3000,
-        totalTokens: 8000,
-        totalCostIdr: 50000,
-        simulationCostIdr: 30000,
-        reviewCostIdr: 20000,
-        periodLabel: "Mei 2026",
-        breakdown,
-        breakdownItems: [],
-      },
-    },
+    path: "/api/v1/ketik/history/summary",
+    body: { success: true, data: summarizeKetikLanding([]) },
   },
+  USAGE_SUMMARY_MOCK,
 ];
 
 test.describe("Pemakaian AI KETIK (hermetic)", () => {
@@ -127,7 +136,7 @@ test.describe("Pemakaian AI KETIK (hermetic)", () => {
           path: "/api/v1/telefun/sessions",
           body: { success: true, data: [] },
         },
-        USAGE_MOCKS[2],
+        USAGE_SUMMARY_MOCK,
       ],
     });
 

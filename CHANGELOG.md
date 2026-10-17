@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- test(e2e): mock the KETIK landing history summary in usage.spec so the hermetic guard passes
 - fix(e2e): keep the browser E2E /api proxy off :3001 and guard remaining production paths
 - chore(workflow): require a CHANGELOG.md entry in every commit, enforced by a pre-commit hook and CI
 - docs(db): record prod migration-history repair and closed parity gaps (`abe9862b`)
