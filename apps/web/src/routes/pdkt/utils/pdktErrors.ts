@@ -1,3 +1,4 @@
+import type { EmailMessage } from "@trainers/types";
 import { ApiError } from "../../../lib/api";
 
 /**
@@ -43,4 +44,55 @@ export function pdktSettingsSaveErrorMessage(error: unknown): string {
     return "Versi pengaturan belum termuat. Muat ulang halaman, lalu simpan lagi.";
   }
   return "Pengaturan belum tersimpan. Coba lagi.";
+}
+
+/** Consumer email the server generated but could not file in the mailbox. */
+export interface PdktMailboxRetryDraft {
+  token: string;
+  message: EmailMessage;
+  subjectLabel?: string;
+}
+
+/**
+ * The retry draft a failed session start carries in its error details, so the
+ * trainee can save that email again without generating a new one.
+ */
+export function extractMailboxRetryDraft(
+  err: unknown,
+): PdktMailboxRetryDraft | null {
+  const details =
+    err instanceof ApiError
+      ? err.details
+      : err && typeof err === "object" && "details" in err
+        ? (err as { details?: unknown }).details
+        : null;
+  const retryDraft =
+    details && typeof details === "object" && "retryDraft" in details
+      ? (details as { retryDraft?: unknown }).retryDraft
+      : null;
+  const retryToken =
+    retryDraft && typeof retryDraft === "object" && "token" in retryDraft
+      ? (retryDraft as { token?: unknown }).token
+      : null;
+  const retryMessage =
+    retryDraft &&
+    typeof retryDraft === "object" &&
+    "inbound_email" in retryDraft
+      ? (retryDraft as { inbound_email?: unknown }).inbound_email
+      : null;
+  if (
+    typeof retryToken !== "string" ||
+    !retryMessage ||
+    typeof retryMessage !== "object"
+  ) {
+    return null;
+  }
+  return {
+    token: retryToken,
+    message: retryMessage as EmailMessage,
+    subjectLabel:
+      typeof (retryMessage as { subject?: unknown }).subject === "string"
+        ? (retryMessage as { subject: string }).subject
+        : undefined,
+  };
 }
