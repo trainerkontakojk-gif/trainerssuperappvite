@@ -1,4 +1,8 @@
-import { formatQAIndicatorName, type QAIndicator } from "@trainers/types";
+import {
+  formatQAIndicatorName,
+  labelJabatan,
+  type QAIndicator,
+} from "@trainers/types";
 
 const TEMPLATE_COLUMNS = [
   { header: "No Tiket", key: "no_tiket", width: 20 },
@@ -459,12 +463,7 @@ export async function generateProfilerTemplate(
   // 2. Sheet Pilihan (Hidden)
   const choiceSheet = workbook.addWorksheet("_Pilihan");
 
-  const labelJabatan = {
-    cca: "Contact Center Agent (157)",
-    tl: "Team Leader",
-    qa: "Quality Assurance",
-    spv: "Supervisor",
-  };
+  // Label yang sama dengan pilihan jabatan di aplikasi; impor membaca label ini.
   const choices = {
     tim: timList,
     jabatan: Object.values(labelJabatan),

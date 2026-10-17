@@ -61,9 +61,6 @@ const UnauthorizedPage = lazy(() => import("./routes/unauthorized"));
 const WaitingApprovalPage = lazy(() => import("./routes/waiting-approval"));
 const ResetPasswordPage = lazy(() => import("./routes/reset-password"));
 const ProfilerLanding = lazy(() => import("./routes/profiler/index"));
-const ProfilerAdd = lazy(() => import("./routes/profiler/add"));
-const ProfilerImport = lazy(() => import("./routes/profiler/import"));
-const ProfilerTeams = lazy(() => import("./routes/profiler/teams"));
 
 const rootRoute = createRootRoute({
   component: DashboardLayout,
@@ -171,25 +168,39 @@ const profilerExportRoute = createRoute({
   beforeLoad: redirectToProfilerView("ekspor"),
 });
 
+/**
+ * Tambah, Impor, dan Kelola tim kini dibuka di dalam workspace `/profiler`
+ * (`?view=tambah`, `?view=impor`, `?tim=1`); route lama tetap jalan.
+ */
+const redirectToProfilerTask =
+  (task: "tambah" | "impor") =>
+  ({ location }: { location: { searchStr: string } }) => {
+    const batch = new URLSearchParams(location.searchStr).get("batch");
+    throw redirect({
+      to: "/profiler",
+      search: batch ? { batch, view: task } : { view: task },
+      replace: true,
+    });
+  };
+
 const profilerAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/add",
-  component: ProfilerAdd,
-  beforeLoad: requireCapability("profiler.view"),
+  beforeLoad: redirectToProfilerTask("tambah"),
 });
 
 const profilerImportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/import",
-  component: ProfilerImport,
-  beforeLoad: requireCapability("profiler.view"),
+  beforeLoad: redirectToProfilerTask("impor"),
 });
 
 const profilerTeamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/teams",
-  component: ProfilerTeams,
-  beforeLoad: requireCapability("profiler.view"),
+  beforeLoad: () => {
+    throw redirect({ to: "/profiler", search: { tim: 1 }, replace: true });
+  },
 });
 
 const sidakRoute = createRoute({
