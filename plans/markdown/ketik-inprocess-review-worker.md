@@ -35,9 +35,9 @@ runs in standalone mode only.
 
 ## Rollout (needs Fajar)
 
-1. Merge; the API deploys with the worker disabled (flag unset), no behavior change.
-2. Set `KETIK_REVIEW_WORKER_ENABLED=true` on the Railway API service; redeploy.
-3. Log shows `ketik_review_worker.started` (embedded); one authorized test review completes.
+1. [x] Merge; the API deployed `92e0cda4` with the worker disabled (log `ketik_review_worker.disabled`).
+2. [x] `KETIK_REVIEW_WORKER_ENABLED=true` set on the Railway API service (deployment `10d33c38…`), queue empty beforehand.
+3. [x] Log shows `ketik_review_worker.started` (`embedded:true`); one prod test review completed in 32 s, attempt 1, no error (2026-10-17 09:20:45 UTC).
 4. Rollback: unset the flag and redeploy.
 
 ## Tasklist
