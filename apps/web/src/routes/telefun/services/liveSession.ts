@@ -39,6 +39,7 @@ import {
 } from "./liveProtocol";
 import {
   buildTelefunLiveSystemInstruction,
+  getHoldEndInstruction,
   getTimeCueInstruction,
 } from "./promptBuilder";
 import { resolveVoiceForModel } from "../telefunVoiceRegistry";
@@ -782,6 +783,7 @@ export class LiveSession {
 
   public setHold(held: boolean) {
     const relativeNow = Math.max(0, Date.now() - this.sessionStartTime);
+    const wasHeld = this.holdTracker.active !== null;
     this.holdTracker = held
       ? startHold(this.holdTracker, relativeNow)
       : endHold(this.holdTracker, relativeNow);
@@ -793,6 +795,23 @@ export class LiveSession {
     this.emitTimelineEvent("hold_state_changed", {
       held: this.isHeld,
       ...getActiveHoldSnapshot(this.holdTracker, relativeNow),
+    });
+    if (!held && wasHeld) this.sendHoldEndCue();
+  }
+
+  /** Beri tahu konsumen AI urutan hold dan apakah lamanya melewati batas. */
+  private sendHoldEndCue() {
+    const hold = this.holdTracker.intervals.at(-1);
+    if (!hold) return;
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const text = getHoldEndInstruction(activeConsumer, hold);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(buildGeminiRealtimeTextMessage(text)));
+    }
+    this.emitTimelineEvent("hold_end_cue_sent", {
+      sequence: hold.sequence,
+      exceeded: hold.exceededByMs > 0,
     });
   }
 
