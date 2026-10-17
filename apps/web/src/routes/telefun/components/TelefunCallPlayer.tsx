@@ -7,7 +7,7 @@ import {
   type Ref,
 } from "react";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
-import type { TelefunHoldInterval, TelefunMuteInterval } from "@trainers/types";
+import type { TelefunHoldInterval } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import { cn } from "cn";
 import type { RecordingAnalysis } from "../hooks/useRecordingAnalysis";
@@ -35,8 +35,7 @@ interface TelefunCallPlayerProps {
   /** Durasi dari sesi, dipakai sampai metadata audio termuat. */
   fallbackDurationMs: number;
   holds: readonly TelefunHoldInterval[];
-  mutes: readonly TelefunMuteInterval[];
-  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dan mute dengan rekaman. */
+  /** Panjang sesi tercatat, untuk menyelaraskan jam hold dengan rekaman. */
   sessionDurationMs?: number;
   notes: readonly TelefunPlayerNote[];
   downloadName: string;
@@ -120,8 +119,9 @@ function percent(ms: number, total: number): string {
 /**
  * Pemutar rekaman Telaah. Garis waktunya hanya memuat data nyata: gelombang
  * dari rekaman itu sendiri, posisi putar, jeda hold dari metrik sesi, dan
- * catatan trainer. Rekaman disenyapkan selama hold dan mute: sesi lama ikut
- * merekam suara agen saat itu, padahal konsumen tidak mendengarnya.
+ * catatan trainer. Rekaman disenyapkan selama hold: sesi lama ikut merekam
+ * suara agen saat itu, padahal konsumen tidak mendengarnya. Mute tidak
+ * disenyapkan: hanya mikrofon agen yang mati, suara konsumen tetap terekam.
  */
 export function TelefunCallPlayer({
   ref,
@@ -130,7 +130,6 @@ export function TelefunCallPlayer({
   onRetry,
   fallbackDurationMs,
   holds,
-  mutes,
   sessionDurationMs,
   notes,
   downloadName,
@@ -150,24 +149,16 @@ export function TelefunCallPlayer({
     () => windowsInRecording(holds, durationMs, sessionDurationMs),
     [holds, durationMs, sessionDurationMs],
   );
-  const silentWindows = useMemo(
-    () => [
-      ...holdWindows,
-      ...windowsInRecording(mutes, durationMs, sessionDurationMs),
-    ],
-    [holdWindows, mutes, durationMs, sessionDurationMs],
-  );
-
   const syncSilence = (audio: HTMLAudioElement) => {
     const ms = audio.currentTime * 1000;
-    audio.muted = silentWindows.some(
+    audio.muted = holdWindows.some(
       (span) => ms >= span.startMs && ms < span.endMs,
     );
   };
   const syncSilenceRef = useRef(syncSilence);
   syncSilenceRef.current = syncSilence;
 
-  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold dan mute tepat.
+  // `timeupdate` hanya ±4 kali per detik; cek tiap bingkai supaya batas hold tepat.
   useEffect(() => {
     if (!playing) return;
     let frame = requestAnimationFrame(function tick() {

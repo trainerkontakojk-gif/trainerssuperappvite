@@ -527,7 +527,10 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("rekaman senyap selama mute, sama seperti hold", async ({ page }) => {
+  test("rekaman tetap bersuara selama mute; hanya hold yang senyap", async ({
+    page,
+  }) => {
+    // Mute hanya mematikan mikrofon agen; konsumen tetap bicara dan terekam.
     // Sesi 252,5 dtk untuk rekaman 252 dtk: jam rekaman sama dengan jam sesi.
     const row: TelefunRow = {
       ...REVIEWED_ROW,
@@ -554,7 +557,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
       return audio.evaluate((el: HTMLAudioElement) => el.muted);
     };
     expect(await mutedAt(59.5)).toBe(false);
-    expect(await mutedAt(65)).toBe(true);
+    expect(await mutedAt(65)).toBe(false);
     expect(await mutedAt(70.5)).toBe(false);
     expect(await mutedAt(130)).toBe(true);
     expectHermetic(audit);

@@ -43,3 +43,9 @@ Lane C (perubahan perilaku web lintas file, tanpa backend/skema).
 1. E2E RED (`telefun-call.spec.ts`): Bisukan lalu Bunyikan menghasilkan satu interval di `session_metrics.mutes` pada PATCH sesi.
 2. E2E RED (`telefun-flow.spec.ts`): replay senyap di dalam interval mute.
 3. Implementasi, GREEN, typecheck/lint, `thermo-nuclear`.
+
+## Revisi: mute tidak lagi disenyapkan (2026-10-17)
+
+- Audit: selama mute, `LiveSession` hanya mematikan track mikrofon agen (`applyMicrophoneCaptureStateToTracks`); `playPcm` tetap memutar dan merekam suara konsumen AI (hanya diblok saat hold). Menyenyapkan replay selama mute justru membuang suara konsumen yang benar-benar didengar agen, tanpa manfaat untuk suara agen (sudah senyap di rekaman).
+- Pemutar Telaah kembali hanya menyenyapkan interval hold. `session_metrics.mutes` tetap dicatat sebagai data sesi.
+- E2E `telefun-flow.spec.ts` ("rekaman tetap bersuara selama mute; hanya hold yang senyap") RED lebih dulu, lalu GREEN.

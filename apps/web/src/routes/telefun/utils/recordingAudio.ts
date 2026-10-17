@@ -193,7 +193,7 @@ export interface RecordingWindow {
 }
 
 /**
- * Rentang hold/mute dalam waktu rekaman. Rentang diukur dengan jam sesi
+ * Rentang hold dalam waktu rekaman. Rentang diukur dengan jam sesi
  * (mulai saat autentikasi), rekaman dengan jamnya sendiri; selisihnya
  * diperkirakan dari panjang rekaman dibanding panjang sesi tercatat. Rekaman
  * berhenti di akhir yang sama, jadi selisih panjang = selisih awal.
