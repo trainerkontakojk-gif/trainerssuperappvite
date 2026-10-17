@@ -94,6 +94,7 @@ function SelectField({
   return (
     <Field label={label} htmlFor={id}>
       <Select
+        items={options}
         value={value || null}
         onValueChange={(nextValue) => {
           if (nextValue === "__empty__") onChange("");

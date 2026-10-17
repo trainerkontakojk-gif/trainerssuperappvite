@@ -153,7 +153,7 @@ export default function ProfilerTeams() {
             <CardHeader>
               <CardTitle className="text-base">Daftar tim aktif</CardTitle>
               <CardDescription>
-                {teams.length} tim tersedia untuk dipilih.
+                {DEFAULT_TEAMS.length + customTeams.length} tim tersedia untuk dipilih.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2">
