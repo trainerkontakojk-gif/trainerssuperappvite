@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BarChart3, Search, Clock } from "lucide-react";
 import { formatIdr } from "../utils/formatting";
-import { MODULE_OPTIONS } from "./constants";
+import { ALL_MODULES, MODULE_OPTIONS, MONTH_OPTIONS } from "./constants";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 import { Input } from "../../../components/ui/input";
@@ -25,6 +25,7 @@ export type UsageAggregation = {
   total_cost_idr: number;
   simulation_cost_idr: number;
   review_cost_idr: number;
+  other_cost_idr?: number;
   models: Array<{
     model_id: string;
     module: string;
@@ -79,8 +80,16 @@ export function UsageTab({
       cost: acc.cost + a.total_cost_idr,
       simulationCost: acc.simulationCost + (a.simulation_cost_idr || 0),
       reviewCost: acc.reviewCost + (a.review_cost_idr || 0),
+      otherCost: acc.otherCost + (a.other_cost_idr || 0),
     }),
-    { calls: 0, tokens: 0, cost: 0, simulationCost: 0, reviewCost: 0 },
+    {
+      calls: 0,
+      tokens: 0,
+      cost: 0,
+      simulationCost: 0,
+      reviewCost: 0,
+      otherCost: 0,
+    },
   );
 
   const allModels = (() => {
@@ -120,8 +129,11 @@ export function UsageTab({
 
   return (
     <div className="space-y-6" aria-busy={loading}>
-      {/* KPI Summary - Unified 4 Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Summary */}
+      <section
+        aria-label="Ringkasan biaya"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+      >
         {/* Card 1: Aktivitas AI */}
         <Card className="flex flex-col justify-between border-border bg-card p-5">
           <div>
@@ -129,7 +141,7 @@ export function UsageTab({
               Aktivitas AI
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground">
-              {totalSummary.calls.toLocaleString()}{" "}
+              {totalSummary.calls.toLocaleString("id-ID")}{" "}
               <span className="text-xs text-muted-foreground font-normal">
                 Calls
               </span>
@@ -152,7 +164,7 @@ export function UsageTab({
               Konsumsi Token
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground">
-              {totalSummary.tokens.toLocaleString()}
+              {totalSummary.tokens.toLocaleString("id-ID")}
             </p>
           </div>
           <p className="text-xs text-muted-foreground/80 mt-2.5">
@@ -170,7 +182,7 @@ export function UsageTab({
               className="text-2xl font-bold tracking-tight"
               style={{ color: "var(--chart-green)" }}
             >
-              Rp {Math.round(totalSummary.simulationCost).toLocaleString()}
+              {formatIdr(totalSummary.simulationCost)}
             </p>
           </div>
           <p className="text-xs text-muted-foreground/75 mt-2.5 leading-snug font-medium">
@@ -188,14 +200,29 @@ export function UsageTab({
               className="text-2xl font-bold tracking-tight"
               style={{ color: "var(--chart-amber)" }}
             >
-              Rp {Math.round(totalSummary.reviewCost).toLocaleString()}
+              {formatIdr(totalSummary.reviewCost)}
             </p>
           </div>
           <p className="text-xs text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Evaluasi & analisis AI
           </p>
         </Card>
-      </div>
+
+        {/* Card 5: Biaya Lainnya */}
+        <Card className="flex flex-col justify-between border-border bg-card p-5">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+              Biaya Lainnya
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {formatIdr(totalSummary.otherCost)}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground/75 mt-2.5 leading-snug font-medium">
+            Analisis QA & aksi tanpa kategori
+          </p>
+        </Card>
+      </section>
 
       {/* Sleek Filter Bar */}
       <Card className="flex flex-col justify-between gap-4 rounded-xl border-border bg-muted/30 p-2 md:flex-row md:items-center">
@@ -204,8 +231,12 @@ export function UsageTab({
             Bulan
           </label>
           <Select
+            items={MONTH_OPTIONS}
             value={String(month)}
-            onValueChange={(value) => onMonthChange(Number(value))}
+            onValueChange={(value, details) => {
+              if (value === null || details.reason === "none") return;
+              onMonthChange(Number(value));
+            }}
           >
             <SelectTrigger
               id="monitoring-usage-month"
@@ -215,9 +246,9 @@ export function UsageTab({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>
-                  {new Date(0, i).toLocaleString("id", { month: "long" })}
+              {MONTH_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -248,9 +279,12 @@ export function UsageTab({
             Modul
           </label>
           <Select
-            value={module}
-            onValueChange={(value) => {
-              if (value) onModuleChange(value);
+            items={MODULE_OPTIONS}
+            value={module || ALL_MODULES}
+            onValueChange={(value, details) => {
+              // Base UI juga memanggil ini tanpa aksi pengguna (reason "none").
+              if (value === null || details.reason === "none") return;
+              onModuleChange(value === ALL_MODULES ? "" : value);
             }}
           >
             <SelectTrigger
@@ -330,6 +364,9 @@ export function UsageTab({
                   Penilaian AI (Rp)
                 </th>
                 <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                  Lainnya (Rp)
+                </th>
+                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
                   Total Biaya (Rp)
                 </th>
               </tr>
@@ -369,7 +406,7 @@ export function UsageTab({
                     {a.total_calls}
                   </td>
                   <td className="px-6 py-4 text-right font-medium text-foreground">
-                    {a.total_tokens.toLocaleString()}
+                    {a.total_tokens.toLocaleString("id-ID")}
                   </td>
                   <td
                     className="px-6 py-4 text-right font-semibold"
@@ -387,6 +424,11 @@ export function UsageTab({
                       ? formatIdr(a.review_cost_idr)
                       : "-"}
                   </td>
+                  <td className="px-6 py-4 text-right font-semibold text-foreground">
+                    {(a.other_cost_idr || 0) > 0
+                      ? formatIdr(a.other_cost_idr || 0)
+                      : "-"}
+                  </td>
                   <td className="px-6 py-4 text-right text-primary font-bold">
                     {formatIdr(a.total_cost_idr)}
                   </td>
@@ -394,7 +436,7 @@ export function UsageTab({
               ))}
               {loading && filteredAgg.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-16 text-center">
+                  <td colSpan={7} className="px-6 py-16 text-center">
                     <span
                       role="status"
                       className="text-sm text-muted-foreground"
@@ -407,7 +449,7 @@ export function UsageTab({
               {filteredAgg.length === 0 && !loading && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-6 py-16 text-center text-muted-foreground"
                   >
                     <BarChart3
@@ -515,7 +557,7 @@ export function UsageTab({
                         {m.calls}
                       </td>
                       <td className="px-6 py-3.5 text-right font-medium text-foreground">
-                        {m.total_tokens.toLocaleString()}
+                        {m.total_tokens.toLocaleString("id-ID")}
                       </td>
                       <td className="px-6 py-3.5 text-right text-primary font-bold">
                         {formatIdr(m.cost_idr)}
@@ -608,7 +650,7 @@ export function UsageTab({
                       {m.calls}
                     </td>
                     <td className="px-6 py-3.5 text-right font-medium text-foreground">
-                      {m.total_tokens.toLocaleString()}
+                      {m.total_tokens.toLocaleString("id-ID")}
                     </td>
                     <td className="px-6 py-3.5 text-right text-primary font-bold">
                       {formatIdr(m.cost_idr)}

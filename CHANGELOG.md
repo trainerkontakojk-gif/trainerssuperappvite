@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- fix(monitoring): show the real KETIK session length (first to last message) in Monitoring and SIDAK instead of the time limit, label the time limit as 'Batas waktu: N menit', count every AI call in a month (no 1000-row cap), add a Lainnya cost and an Analisis QA filter, show month and module names in the usage filters with a way back to Semua modul, categorise four uncounted PDKT/Telefun actions, hide raw database errors, and reject prices for unknown models
 - feat(profiler): show up to five upcoming birthdays in the year summary, replace statistik pie charts with bars labelled with number and percent, add a name strip to jump between slides, show one compact row per participant on phones, and rename the remaining 'batch' UI text to 'folder'
 - feat(profiler): open Tambah peserta and Impor inside the workspace and make Kelola daftar tim a dialog; Impor now checks every row with a reason (missing name, unknown jabatan, bad date, duplicate) before anything is saved, accepts the headers of the app's own template, and `/profiler/add`, `/profiler/import` and `/profiler/teams` redirect to the new views
 - feat(profiler): merge the participant list into the workspace Peserta tab with Kartu/Tabel modes, search by NIK/email and a team filter, open the profile and edit form in the main area with previous/next, move Pilih banyak/Pindah folder/Atur urutan into the tab, and redirect /profiler/table to the Tabel mode

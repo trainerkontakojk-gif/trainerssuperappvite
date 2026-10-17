@@ -31,7 +31,7 @@ export function getSimulationSubjectMeta(
 }
 
 export function formatIdr(value: number): string {
-  return `Rp ${Math.round(value).toLocaleString()}`;
+  return `Rp ${Math.round(value).toLocaleString("id-ID")}`;
 }
 
 export function formatDuration(seconds: number): string {
