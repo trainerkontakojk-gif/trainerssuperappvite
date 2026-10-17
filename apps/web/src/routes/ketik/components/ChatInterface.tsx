@@ -79,8 +79,16 @@ export function ChatInterface({
   templates = [],
 }: ChatInterfaceProps) {
   const { config, scenario } = session;
-  const { messages, isLoading, queuedCount, error, retry, send, sessionPhase } =
-    useServerKetikChat(session);
+  const {
+    messages,
+    isLoading,
+    isConsumerTyping,
+    queuedCount,
+    error,
+    retry,
+    send,
+    sessionPhase,
+  } = useServerKetikChat(session);
   const avatarUrl = getKetikConsumerAvatarUrl(config.identity);
   const [inputText, setInputText] = useState("");
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -100,7 +108,7 @@ export function ChatInterface({
   );
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+  }, [messages, isConsumerTyping]);
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
@@ -293,7 +301,7 @@ export function ChatInterface({
         </AnimatePresence>
 
         <AnimatePresence initial={false}>
-          {isLoading && (
+          {isConsumerTyping && (
             <motion.div
               key="consumer-typing"
               layout="position"
@@ -302,7 +310,8 @@ export function ChatInterface({
               exit={{ opacity: 0, y: -4, scale: 0.98 }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
               className="flex justify-start"
-              aria-live="polite"
+              role="status"
+              aria-label="Konsumen sedang mengetik"
             >
               <div className="module-clean-panel rounded-2xl rounded-tl-md px-4 py-3">
                 <div className="flex gap-1">

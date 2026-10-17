@@ -92,14 +92,11 @@ test.afterAll(async () => {
   expect((await admin.auth.admin.deleteUser(trainer.userId)).error).toBeNull();
 });
 
-/** Instruksi sistem untuk balasan pertama konsumen pada tipe ini. */
-async function firstTurnInstruction(consumerTypeId: string): Promise<string> {
-  const current = await api("/settings");
-  expect(current.status).toBe(200);
+/** Sesi baru dengan tipe konsumen ini dan satu skenario bawaan tanpa skrip. */
+async function startSession(consumerTypeId: string) {
   const saved = await api("/settings", "PUT", {
     ...DEFAULT_KETIK_SETTINGS,
     activeConsumerTypeId: consumerTypeId,
-    // Satu skenario bawaan tanpa skrip.
     scenarios: DEFAULT_KETIK_SETTINGS.scenarios.map((scenario) => ({
       ...scenario,
       isActive: scenario.id === "pinjol",
@@ -111,13 +108,34 @@ async function firstTurnInstruction(consumerTypeId: string): Promise<string> {
   expect(started.status).toBe(200);
   const session = (await started.json()).data;
   expect(session.config.consumerType.id).toBe(consumerTypeId);
-  instructions = [];
-  const turn = await api(`/sessions/${session.id}/turns`, "POST", {
+  return session;
+}
+
+async function sendTurn(
+  sessionId: string,
+  expectedVersion: number,
+  text: string,
+  awaitMore?: true,
+) {
+  const turn = await api(`/sessions/${sessionId}/turns`, "POST", {
     requestId: randomUUID(),
-    expectedVersion: 0,
-    text: "Selamat siang, dengan Kontak OJK 157, ada yang bisa dibantu?",
+    expectedVersion,
+    text,
+    ...(awaitMore ? { awaitMore } : {}),
   });
   expect(turn.status).toBe(200);
+  return (await turn.json()).data;
+}
+
+/** Instruksi untuk balasan pertama konsumen pada tipe ini. */
+async function firstTurnInstruction(consumerTypeId: string): Promise<string> {
+  const session = await startSession(consumerTypeId);
+  instructions = [];
+  await sendTurn(
+    session.id,
+    0,
+    "Selamat siang, dengan Kontak OJK 157, ada yang bisa dibantu?",
+  );
   expect(instructions).toHaveLength(1);
   return instructions[0];
 }
@@ -144,6 +162,9 @@ test("angry consumer: no helper role, no hints, gradual disclosure and hard de-e
   expect(prompt).not.toMatch(/terlalu teatrikal, dramatis/);
   // Skenario bawaan membawa latar belakang.
   expect(prompt).toContain("dua minggu");
+  // Cek pemahaman ("sudah jelas?") dijawab jujur sesuai tipe.
+  expect(prompt).toContain("CEK PEMAHAMAN");
+  expect(prompt).toContain("Kok buru-buru");
 });
 
 test("friendly consumer keeps calm etiquette and no anger rules", async () => {
@@ -154,4 +175,28 @@ test("friendly consumer keeps calm etiquette and no anger rules", async () => {
   expect(prompt).not.toContain("BATAS SATU-SATUNYA");
   expect(prompt).toMatch(/terlalu teatrikal, dramatis/);
   expect(prompt).toContain("CONTOH GAYA CHAT");
+});
+
+test("agent messages sent back to back get one consumer reply that reads them all", async () => {
+  const session = await startSession("ramah");
+  const explanation =
+    "Baik Ibu, untuk pinjol ilegal silakan simpan bukti ancaman dan jangan transfer apa pun.";
+  const checkIn = "Apakah informasinya sudah cukup jelas, Ibu?";
+  instructions = [];
+  const waiting = await sendTurn(session.id, 0, explanation, true);
+  // Pesan agen tersimpan tanpa balasan AI, dan chat tidak ditutup.
+  expect(instructions).toHaveLength(0);
+  expect(waiting.consumerClosed).toBe(false);
+  expect(waiting.messages.at(-1)).toMatchObject({
+    sender: "agent",
+    text: explanation,
+  });
+  const replied = await sendTurn(session.id, waiting.version, checkIn);
+  expect(instructions).toHaveLength(1);
+  expect(instructions[0]).toContain(explanation);
+  expect(instructions[0]).toContain(checkIn);
+  expect(instructions[0]).toContain("BEBERAPA PESAN AGEN");
+  expect(
+    replied.messages.map((m: { sender: string }) => m.sender).slice(-3),
+  ).toEqual(["agent", "agent", "consumer"]);
 });

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(ketik): pace the AI consumer like a person: back-to-back agent messages are read and answered once, the reply waits for reading then typing time (shown as typing only after reading), speed varies by consumer type, and "is this clear?" check-ins get an honest, type-specific answer
 - feat(ketik): make the AI chat consumer behave like a real person: it never helps, corrects or hints the agent, reveals details only when asked (with or without a script), follows per-type behavior with chat-style examples, and the angry type stays hard to calm with template empathy; default scenarios get a short backstory and the unused /ketik/simulation page file is removed
 - refactor(telefun): remove the conversation challenges feature (settings section, prompt block and the session's disruption_config); saved challenge choices are ignored and dropped on the next save
 - feat(telefun): make the AI consumer behave like a real caller: it never corrects or hints the agent, angry and rushed types may interrupt and stay hard to calm, holds are always accepted but in the type's tone (one refusal allowed from the second hold), and the app tells the AI each hold's number and whether it ran too long
