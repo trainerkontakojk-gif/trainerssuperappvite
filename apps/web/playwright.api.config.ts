@@ -38,6 +38,7 @@ export default defineConfig({
       testMatch: "ketik-history-api.spec.ts",
     },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
+    { name: "rate-limit-stub", testMatch: "rate-limit-client-ip-api.spec.ts" },
     {
       name: "ketik-integrity-real-backend",
       testMatch: "ketik-integrity-api.spec.ts",
