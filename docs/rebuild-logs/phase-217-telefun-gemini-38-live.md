@@ -20,6 +20,9 @@ Scope: menambahkan `gemini-3.8-live` sebagai pilihan dan default Telefun tanpa m
   `20260908093728` dan tiga migration lokal yang pernah diaplikasikan via REST
   tetapi belum tercatat di migration history. Karena itu `supabase db push`
   berhenti fail-closed; migration repair tidak dijalankan.
+  _Catatan 2026-10-17:_ repair sudah dijalankan. `20260921143009` dan tiga
+  versi lainnya ditandai `applied`, `20260908093728` ditandai `reverted`; lihat
+  `docs/deployment.md` (SIDAK business dates).
 - SQL migration diterapkan secara setara melalui PostgREST service-role ke
   project canonical. Row `gemini-3.8-live` berhasil dibuat dengan:
   - input audio: `$3.00 / 1M`

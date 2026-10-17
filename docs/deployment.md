@@ -521,6 +521,14 @@ Jalur aman (setelah gerbang menyetujui): link hanya ke
 lalu catat bookshelf history dengan `supabase migration repair --linked --status applied 20261001120000`.
 Tidak ada migrasi lain, DDL/DML remote, atau `db push`.
 
+**Status 2026-10-17:** drift riwayat di atas sudah dirapikan (izin Fajar).
+`20260823000000`, `20260903000000`, `20260904150000`, dan `20260921143009`
+ditandai `applied` (skema di prod sudah cocok, diverifikasi dengan readback
+hanya-baca), dan `20260908093728` ditandai `reverted` (isinya identik dengan
+`20260904150000`). `supabase migration list --linked` sekarang menunjukkan
+semua baris Local = Remote. Penerapan tetap per file lewat `db query --linked -f`
++ `migration repair` sampai diputuskan lain.
+
 1. `000_profiles_core.sql` — profiles table + auto-create trigger
 2. `001_sidak_core.sql` — SIDAK tables
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT + AI usage logging + pricing

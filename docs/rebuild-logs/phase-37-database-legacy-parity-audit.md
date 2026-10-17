@@ -5,6 +5,14 @@
 > **Plan:** `plan/markdown/database-legacy-parity-audit-ruosnjmtywcrghjgqugz.md`  
 > **Artifacts:** `local-backups/database-parity/20260524-192154/`
 
+> **Status 2026-10-17:** objek di §3.2 yang ada di prod tapi tidak dibuat repo
+> sekarang ditangkap migration `20261017120000` (`trg_fill_tahun`) dan
+> `20261017130000`–`20261017130300` (guard profil, trigger activity log, trigger
+> `updated_at`, tabel `results`), lalu diterapkan ke prod dan dicatat `applied`.
+> `update_results_updated_at` sengaja tidak dibuat (tabel `results` tidak punya
+> `updated_at`) dan dihapus dari prod. Rincian: `plans/markdown/qa-temuan-fill-tahun-trigger.md`
+> dan `plans/markdown/prod-parity-triggers-results.md`.
+
 ## Executive Summary
 
 **Verdict: BELUM PARITY**
