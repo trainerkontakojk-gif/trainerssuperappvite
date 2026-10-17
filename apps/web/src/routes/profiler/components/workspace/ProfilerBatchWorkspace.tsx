@@ -223,7 +223,7 @@ export default function ProfilerBatchWorkspace({
       </header>
 
       <nav
-        aria-label="Tampilan batch"
+        aria-label="Tampilan folder"
         className="-mx-4 overflow-x-auto border-b border-border px-4 sm:mx-0 sm:px-0"
       >
         <ul className="flex min-w-max gap-1">

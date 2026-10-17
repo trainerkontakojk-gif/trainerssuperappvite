@@ -101,7 +101,7 @@ const IMPORT_HEADER = [
 ];
 
 const libraryOf = (page: Page) =>
-  page.getByRole("navigation", { name: "Daftar tim dan batch" });
+  page.getByRole("navigation", { name: "Daftar tim dan folder" });
 
 test.describe("Profiler tahap 3: tambah, impor, dan tim di workspace", () => {
   test.beforeAll(async () => {

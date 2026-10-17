@@ -26,7 +26,7 @@ interface ProfilerYearOverviewProps {
 
 type BatchRow = { id: string; name: string; team: string };
 
-/** Isi kanan saat belum ada batch terpilih: semua batch di tahun aktif. */
+/** Isi kanan saat belum ada folder terpilih: semua folder di tahun aktif. */
 export default function ProfilerYearOverview({
   yearLabel,
   yearId,
@@ -60,7 +60,7 @@ export default function ProfilerYearOverview({
     (sum, row) => sum + (counts[row.name] ?? 0),
     0,
   );
-  const title = yearLabel ? `Batch tahun ${yearLabel}` : "Profiler";
+  const title = yearLabel ? `Folder tahun ${yearLabel}` : "Profiler";
 
   return (
     <section
@@ -76,12 +76,12 @@ export default function ProfilerYearOverview({
         </h1>
         {rows.length > 0 && (
           <p className="text-sm text-muted-foreground tabular-nums">
-            {rows.length} batch · {totalPeserta} peserta
+            {rows.length} folder · {totalPeserta} peserta
           </p>
         )}
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         {!yearId ? (
           <Empty className="min-h-56 border border-dashed border-border p-8">
             <EmptyHeader>
@@ -90,7 +90,7 @@ export default function ProfilerYearOverview({
               </EmptyMedia>
               <EmptyTitle>Belum ada arsip tahun</EmptyTitle>
               <EmptyDescription>
-                Arsip tahun menampung tim dan batch peserta.
+                Arsip tahun menampung tim dan folder peserta.
               </EmptyDescription>
             </EmptyHeader>
             {!isReadOnly && (
@@ -131,7 +131,7 @@ export default function ProfilerYearOverview({
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_1.5rem] gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground sm:grid">
-              <span>Batch</span>
+              <span>Folder</span>
               <span>Tim</span>
               <span className="text-right">Peserta</span>
               <span aria-hidden="true" />

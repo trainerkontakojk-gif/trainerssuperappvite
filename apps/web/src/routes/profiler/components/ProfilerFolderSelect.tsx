@@ -26,7 +26,7 @@ export function ProfilerFolderSelect({
   folders,
   value,
   onChange,
-  label = "Batch aktif",
+  label = "Folder aktif",
   hideLabel = false,
   disabled,
   className,

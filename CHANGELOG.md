@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-17
 
+- feat(profiler): show up to five upcoming birthdays in the year summary, replace statistik pie charts with bars labelled with number and percent, add a name strip to jump between slides, show one compact row per participant on phones, and rename the remaining 'batch' UI text to 'folder'
 - feat(profiler): open Tambah peserta and Impor inside the workspace and make Kelola daftar tim a dialog; Impor now checks every row with a reason (missing name, unknown jabatan, bad date, duplicate) before anything is saved, accepts the headers of the app's own template, and `/profiler/add`, `/profiler/import` and `/profiler/teams` redirect to the new views
 - feat(profiler): merge the participant list into the workspace Peserta tab with Kartu/Tabel modes, search by NIK/email and a team filter, open the profile and edit form in the main area with previous/next, move Pilih banyak/Pindah folder/Atur urutan into the tab, and redirect /profiler/table to the Tabel mode
 - feat(pdkt): make the AI consumer email feel written by a real person and harder to skim: per-type personality outside the data block, a layperson rule (no correct solution or legal basis), scattered facts, pasted chat/SMS "attachments", a request hidden mid-email, random distractors and self-corrections, 500-1000 words for every type including rushed; fix name checks so "Agus" no longer fails on "Agustus" and place fallback names after the greeting or in the signature

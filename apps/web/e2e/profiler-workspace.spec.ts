@@ -20,7 +20,7 @@ import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
  *   - batch aktif langsung menampilkan peserta + pencarian + baris ulang tahun;
  *   - tampilan lain berupa tautan ke route yang sudah ada dengan `?batch=`;
  *   - aksi tulis hilang untuk peran hanya-baca;
- *   - viewport sempit memakai sheet "Pilih batch" tanpa overflow horizontal.
+ *   - viewport sempit memakai sheet "Pilih folder" tanpa overflow horizontal.
  */
 
 const LEADER_APPROVED_MOCKS: readonly ApiMock[] = [
@@ -36,7 +36,7 @@ const LEADER_APPROVED_MOCKS: readonly ApiMock[] = [
 ];
 
 function batchNav(page: Page) {
-  return page.getByRole("navigation", { name: "Daftar tim dan batch" });
+  return page.getByRole("navigation", { name: "Daftar tim dan folder" });
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -117,7 +117,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
     ).toBeVisible();
     await expect(nav.getByRole("button", { name: /^Tim Email/ })).toBeVisible();
 
-    const overview = page.getByRole("region", { name: /Batch tahun 2026/ });
+    const overview = page.getByRole("region", { name: /Folder tahun 2026/ });
     await expect(overview).toBeVisible();
     await expect(
       overview.getByRole("button", { name: /Batch Pagi.*2 peserta/ }),
@@ -178,7 +178,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await page.goBack();
     await expect(page).not.toHaveURL(/batch=/);
     await expect(
-      page.getByRole("region", { name: /Batch tahun 2026/ }),
+      page.getByRole("region", { name: /Folder tahun 2026/ }),
     ).toBeVisible({ timeout: 20000 });
 
     console.log("[audit]", formatAudit(audit));
@@ -208,7 +208,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
     ).toHaveCount(0);
 
     const views = workspace.getByRole("navigation", {
-      name: "Tampilan batch",
+      name: "Tampilan folder",
     });
     const BATCH_QS = "batch=Batch(%20|\\+)Pagi";
     for (const [name, href] of [
@@ -255,7 +255,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
     });
 
     await expect(
-      page.getByRole("region", { name: /Batch tahun 2026/ }),
+      page.getByRole("region", { name: /Folder tahun 2026/ }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page).not.toHaveURL(/batch=/);
 
@@ -302,7 +302,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
       apiMocks: PROFILER_MOCKS,
     });
     const workspace = page.getByRole("region", { name: "Batch Pagi" });
-    const views = workspace.getByRole("navigation", { name: "Tampilan batch" });
+    const views = workspace.getByRole("navigation", { name: "Tampilan folder" });
     await expect(workspace.getByText("Rina Kartika").first()).toBeVisible({
       timeout: 20000,
     });
@@ -446,7 +446,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
       });
       await expect(
         page
-          .getByRole("navigation", { name: "Tampilan batch" })
+          .getByRole("navigation", { name: "Tampilan folder" })
           .getByRole("link", { name: /./ })
           .and(page.locator('[aria-current="page"]')),
       ).toHaveAttribute("href", new RegExp(`view=${view}`), { timeout: 20000 });
@@ -459,7 +459,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
   }
 
   for (const width of [320, 375, 768]) {
-    test(`viewport ${width}px: sheet "Pilih batch" dan tanpa overflow horizontal`, async ({
+    test(`viewport ${width}px: sheet "Pilih folder" dan tanpa overflow horizontal`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 });
@@ -475,7 +475,7 @@ test.describe("Workspace Profiler (hermetic)", () => {
       await expectNoHorizontalOverflow(page);
 
       if (width < 768) {
-        await page.getByRole("button", { name: "Pilih batch" }).click();
+        await page.getByRole("button", { name: "Pilih folder" }).click();
         const sheet = page.getByRole("dialog");
         await sheet.getByRole("button", { name: /^Tim Email/ }).click();
         await expect(page).toHaveURL(/[?&]batch=Tim(%20|\+)Email/);
@@ -534,25 +534,16 @@ test.describe("Workspace Profiler (hermetic)", () => {
     await expect(
       workspace.getByRole("heading", { name: "Tingkat pendidikan" }),
     ).toBeVisible({ timeout: 20000 });
-    // Label irisan pie gender dan tick sumbu harus sudah tergambar.
-    await expect(workspace.getByText(/^Perempuan \d+%$/)).toBeVisible();
-    await expect(workspace.locator(".recharts-cartesian-axis-tick-value").first()).toBeVisible();
+    // Label dan angka batang harus sudah tergambar sebelum dipindai.
+    await expect(
+      workspace.getByRole("button", { name: /^Perempuan: \d+ peserta/ }),
+    ).toBeVisible();
     await workspace.getByRole("heading", { name: "Tingkat pendidikan" }).scrollIntoViewIfNeeded();
 
-    // Teks legenda pie harus sudah tergambar, supaya scan legenda tidak kosong.
-    await expect(
-      workspace.locator(".recharts-legend-wrapper span").first(),
-    ).toBeVisible();
     const offenders: string[] = [];
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
-      const found = [
-        ...(await findLowContrastText(workspace)),
-        ...(await findLowContrastText(workspace, {
-          selector: ".recharts-legend-wrapper span",
-          leafOnly: true,
-        })),
-      ];
+      const found = await findLowContrastText(workspace);
       offenders.push(...new Set(found.map((o) => `[${theme}] ${o}`)));
     }
     expect(offenders, offenders.join("\n")).toEqual([]);

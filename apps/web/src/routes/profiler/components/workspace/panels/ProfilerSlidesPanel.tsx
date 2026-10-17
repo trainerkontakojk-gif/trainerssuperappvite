@@ -4,7 +4,6 @@ import type { ProfilerPeserta } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Combobox,
@@ -22,6 +21,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+
+import { cn } from "cn";
 
 import { timTheme } from "../../../utils/profilerFormatters";
 import { ParticipantSlide } from "../../slides/ParticipantSlide";
@@ -58,6 +59,7 @@ export default function ProfilerSlidesPanel({
   const [savingPdf, setSavingPdf] = useState(false);
   const [slideMode, setSlideMode] = useState<SlideMode>("original");
   const canvasRef = useRef<SlideCanvasRef>(null);
+  const stripRef = useRef<HTMLOListElement>(null);
 
   const foundIndex = participantId
     ? peserta.findIndex((p) => p.id === participantId)
@@ -71,6 +73,16 @@ export default function ProfilerSlidesPanel({
     if (hasStaleParticipant) onParticipantChange(null);
   }, [hasStaleParticipant, onParticipantChange]);
   const current = peserta[index];
+
+  // Nama yang sedang tampil selalu terlihat di deret slide. Hanya deretnya
+  // yang digeser, bukan halamannya.
+  useEffect(() => {
+    const strip = stripRef.current?.parentElement;
+    const active = stripRef.current?.querySelector<HTMLElement>("[data-active]");
+    if (!strip || !active) return;
+    strip.scrollLeft =
+      active.offsetLeft - (strip.clientWidth - active.offsetWidth) / 2;
+  }, [index]);
 
   const goTo = useCallback(
     (nextIndex: number) => {
@@ -139,7 +151,7 @@ export default function ProfilerSlidesPanel({
           </EmptyMedia>
           <EmptyTitle>Belum ada peserta</EmptyTitle>
           <EmptyDescription>
-            Tambahkan peserta pada batch ini untuk menampilkan slide.
+            Tambahkan peserta ke folder ini untuk menampilkan slide.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -260,32 +272,65 @@ export default function ProfilerSlidesPanel({
         </SlideCanvas>
       </div>
 
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="outline"
           size="icon-lg"
-          className="size-11"
+          className="size-11 shrink-0"
           onClick={prev}
           disabled={index === 0}
           aria-label="Peserta sebelumnya"
         >
           <ChevronLeft aria-hidden="true" />
         </Button>
-        <Badge variant="secondary" className="min-h-9 px-3 tabular-nums">
-          {index + 1} / {peserta.length}
-        </Badge>
+        <nav
+          aria-label="Daftar slide"
+          className="relative min-w-0 flex-1 overflow-x-auto custom-scrollbar"
+        >
+          <ol ref={stripRef} className="flex gap-2 py-1">
+            {peserta.map((p, itemIndex) => {
+              const active = itemIndex === index;
+              return (
+                <li key={p.id} className="shrink-0">
+                  <button
+                    type="button"
+                    data-active={active || undefined}
+                    aria-current={active ? "true" : undefined}
+                    onClick={() => goTo(itemIndex)}
+                    className={cn(
+                      "flex min-h-11 w-40 items-center gap-2 rounded-lg border px-3 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                      active
+                        ? "border-foreground bg-card font-medium text-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    )}
+                  >
+                    <span className="font-mono text-xs tabular-nums">
+                      {String(itemIndex + 1).padStart(2, "0")}
+                    </span>
+                    <span className="min-w-0 truncate">
+                      {p.nama || "Tanpa nama"}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
         <Button
           type="button"
           variant="outline"
           size="icon-lg"
-          className="size-11"
+          className="size-11 shrink-0"
           onClick={next}
           disabled={index === peserta.length - 1}
           aria-label="Peserta berikutnya"
         >
           <ChevronRight aria-hidden="true" />
         </Button>
+        <span className="hidden shrink-0 text-sm text-muted-foreground tabular-nums sm:inline">
+          {index + 1} / {peserta.length}
+        </span>
       </div>
     </div>
   );
