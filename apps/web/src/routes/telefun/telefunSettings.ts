@@ -12,8 +12,6 @@ import {
   resolveGeminiLiveVoice,
   resolveVoiceForModel,
 } from "./telefunVoiceRegistry";
-import type { TelefunSimulationChallengeType } from "./services/simulationChallenges";
-import { normalizeSimulationChallengeTypes } from "./services/simulationChallenges";
 
 export type { TelefunTransport } from "@trainers/types";
 
@@ -109,7 +107,6 @@ export interface TelefunSessionConfig {
   responsePacingMode: "realistic" | "training_fast";
   telefunTransport?: TelefunTransport;
   telefunModelId: string;
-  simulationChallengeTypes: TelefunSimulationChallengeType[];
 }
 
 export type TelefunAppSettings = {
@@ -122,7 +119,6 @@ export type TelefunAppSettings = {
   consumerTypes: TelefunConsumerType[];
   maxCallDuration: number; // in minutes, 0 means unlimited
   responsePacingMode: "realistic" | "training_fast";
-  simulationChallengeTypes: TelefunSimulationChallengeType[];
   preferredConsumerTypeId: string;
   identitySettings: TelefunIdentitySettings;
   telefunModelId: string;
@@ -449,10 +445,6 @@ export function parseTelefunSettings(
     }),
   };
 
-  const rawChallengeTypes =
-    parsed.simulationChallengeTypes ??
-    // Deprecated compatibility read for settings saved before prompt-first runtime.
-    parsed.realisticModeDisruptionTypes;
   const normalized: TelefunAppSettings = {
     ...DEFAULT_TELEFUN_SETTINGS,
     ...parsed,
@@ -464,8 +456,6 @@ export function parseTelefunSettings(
         ? parsed.maxCallDuration
         : DEFAULT_TELEFUN_SETTINGS.maxCallDuration,
     responsePacingMode: coerceResponsePacingMode(parsed.responsePacingMode),
-    simulationChallengeTypes:
-      normalizeSimulationChallengeTypes(rawChallengeTypes),
     selectedModel: normalizedLiveModel.model.id,
     voiceName:
       parsed.voiceName === undefined
@@ -484,6 +474,9 @@ export function parseTelefunSettings(
   delete (normalized as unknown as Record<string, unknown>)
     .realisticModeDisruptionTypes;
   delete (normalized as unknown as Record<string, unknown>).systemInstruction;
+  // Tantangan percakapan sudah dihapus; setelan lama tidak dibawa lagi.
+  delete (normalized as unknown as Record<string, unknown>)
+    .simulationChallengeTypes;
   return normalized;
 }
 
@@ -608,7 +601,6 @@ export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
   consumerTypes: DEFAULT_CONSUMER_TYPES,
   maxCallDuration: 5,
   responsePacingMode: "realistic",
-  simulationChallengeTypes: [],
   preferredConsumerTypeId: "marah",
   identitySettings: {
     displayName: "",

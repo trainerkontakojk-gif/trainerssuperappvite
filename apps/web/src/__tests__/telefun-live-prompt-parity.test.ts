@@ -25,9 +25,6 @@ describe("Telefun live prompt parity wiring", () => {
     expect(liveSessionSource).toContain(
       "this.config.responsePacingMode",
     );
-    expect(liveSessionSource).toContain(
-      "this.config.simulationChallengeTypes",
-    );
   });
 
   it("injects the prompt into both the configure payload and the setup message", () => {

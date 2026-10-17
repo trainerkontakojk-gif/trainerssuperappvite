@@ -15,7 +15,6 @@ import {
   normalizeTelefunConsumerDraft,
   normalizeTelefunScenarioDraft,
 } from "./telefunDraftNormalizers";
-import { normalizeSimulationChallengeTypes } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
 import type { TelefunWebRtcCapability } from "../../services/telefunWebRtcCapability";
 
@@ -65,9 +64,8 @@ export function buildTelefunSettingsForSave(params: {
     },
   };
   delete settingsToSave.telefunModelWarningReason;
-  settingsToSave.simulationChallengeTypes = normalizeSimulationChallengeTypes(
-    settingsToSave.simulationChallengeTypes,
-  );
+  delete (settingsToSave as unknown as Record<string, unknown>)
+    .simulationChallengeTypes;
   delete (settingsToSave as unknown as Record<string, unknown>)
     .realisticModeEnabled;
   delete (settingsToSave as unknown as Record<string, unknown>)
