@@ -48,7 +48,7 @@ test.beforeAll(async () => {
     participantIds.push(
       sqlOne(
         env,
-        `INSERT INTO profiler_peserta(batch_name,nama,tim,jabatan,nomor_urut,trainer_id)
+        `INSERT INTO profiler_peserta(batch_name,nama,tim,jabatan,nomor_urut,akun_id)
       VALUES ('${batch}','${name}','Chat','Agent',${participantIds.length + 1},${linkedUser ? `'${linkedUser}'` : "NULL"}) RETURNING id;`,
       ),
     );
@@ -324,7 +324,7 @@ test("agent without a linked participant sees an empty personal dashboard", asyn
   let cleanupError: unknown;
   const detached = await admin
     .from("profiler_peserta")
-    .update({ trainer_id: null })
+    .update({ akun_id: null })
     .eq("id", participantIds[0]!);
   if (detached.error) throw detached.error;
   try {
@@ -338,7 +338,7 @@ test("agent without a linked participant sees an empty personal dashboard", asyn
   } finally {
     const restored = await admin
       .from("profiler_peserta")
-      .update({ trainer_id: users.agent!.userId })
+      .update({ akun_id: users.agent!.userId })
       .eq("id", participantIds[0]!);
     cleanupError = restored.error;
   }

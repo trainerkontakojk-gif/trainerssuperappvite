@@ -305,7 +305,16 @@ export async function updatePeserta(
     }
   }
 
-  const cleaned = cleanEmptyStrings(updates);
+  // Identity and account-link columns are never editable through the KTP
+  // form; the account link changes only through the admin user endpoints.
+  const {
+    id: _id,
+    akun_id: _akunId,
+    trainer_id: _trainerId,
+    created_at: _createdAt,
+    ...editable
+  } = (updates ?? {}) as Partial<ProfilerPeserta> & { created_at?: unknown };
+  const cleaned = cleanEmptyStrings(editable);
 
   try {
     const { data, error } = await supabaseAdmin

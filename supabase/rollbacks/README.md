@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261018130000_profiler_peserta_akun_link.sql` | DATA LOSS: drops account-to-participant links and log targets; revert the API first |
 | New | `rollback_20261016153729_pdkt_history_integrity_privacy.sql` | SECURITY: restores owner inserts and private JSON reads; projected API remains compatible; no data loss |
 | New | `rollback_20261013120000_pdkt_mailbox_hide_snapshot_columns.sql`             | SECURITY: re-exposes PDKT scenario answer key and consumer character to every authenticated user |
 | New | `rollback_20261012150000_tna_need_previous_plan.sql` | Restore guard-first Phase 1 need writer; preserve existing links/data; disable API link feature first; apply before Phase 2 foundation rollback |

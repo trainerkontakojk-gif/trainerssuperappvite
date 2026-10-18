@@ -1,13 +1,17 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import * as adminService from "../services/admin-service";
+import * as adminUserService from "../services/admin-user-service";
+import { AdminUserError } from "../services/admin-user-service";
+import { allowedOrigins } from "../lib/allowed-origins";
 import { requireCapability } from "../middleware/role";
 import {
   type Role,
   updateUserStatusSchema,
   updateUserRoleSchema,
+  linkUserPesertaSchema,
   createAccessGroupSchema,
   updateAccessGroupSchema,
   addAccessGroupItemSchema,
@@ -28,6 +32,33 @@ type Variables = {
 
 const admin = new Hono<{ Variables: Variables }>();
 
+function actorOf(c: Context<{ Variables: Variables }>) {
+  return {
+    id: c.get("user").id,
+    email: c.get("user").email || "System",
+    role: c.get("profile").role,
+  };
+}
+
+function adminUserFailure(c: Context, error: unknown) {
+  if (error instanceof AdminUserError)
+    return c.json(
+      { success: false, error: { code: error.code, message: error.message } },
+      error.status,
+    );
+  console.error("[admin] user request failed", error);
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "SERVER_ERROR",
+        message: "Terjadi kesalahan pada server. Coba lagi.",
+      },
+    },
+    500,
+  );
+}
+
 // ── User Management Endpoints ──────────────────────────────
 admin.get("/users", requireCapability("admin.users"), async (c) => {
   try {
@@ -43,6 +74,74 @@ admin.get("/users", requireCapability("admin.users"), async (c) => {
     );
   }
 });
+
+admin.get(
+  "/users/:id",
+  requireCapability("admin.users"),
+  async (c) => {
+    try {
+      const data = await adminUserService.getUserDetail(c.req.param("id"));
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.get(
+  "/peserta-options",
+  requireCapability("admin.users"),
+  zValidator(
+    "query",
+    z.object({
+      q: z.string().max(80).optional(),
+      user_id: z.string().uuid().optional(),
+    }),
+  ),
+  async (c) => {
+    const query = c.req.valid("query");
+    try {
+      const data = await adminUserService.getPesertaLinkOptions(
+        query.q ?? "",
+        query.user_id ?? null,
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.put(
+  "/users/:id/peserta",
+  requireCapability("admin.users"),
+  zValidator("json", linkUserPesertaSchema),
+  async (c) => {
+    try {
+      await adminUserService.linkUserPeserta(
+        actorOf(c),
+        c.req.param("id"),
+        c.req.valid("json").peserta_id,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.delete(
+  "/users/:id/peserta",
+  requireCapability("admin.users"),
+  async (c) => {
+    try {
+      await adminUserService.unlinkUserPeserta(actorOf(c), c.req.param("id"));
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
 
 admin.put(
   "/users/:id/status",
@@ -420,27 +519,23 @@ admin.put(
 admin.post(
   "/users/:id/reset-password",
   requireCapability("admin.users"),
-  zValidator("json", z.object({ email: z.string().email() })),
   async (c) => {
-    const userId = c.req.param("id");
-    const body = c.req.valid("json");
-    const user = c.get("user");
+    // Only a trusted app origin becomes the link target; otherwise the
+    // project Site URL is used.
+    const origin = c.req.header("Origin");
+    const redirectTo =
+      origin && allowedOrigins.includes(origin)
+        ? `${origin}/reset-password`
+        : null;
     try {
-      await adminService.resetUserPassword(
-        userId,
-        body.email,
-        user.id,
-        user.email || "System",
+      const data = await adminUserService.sendPasswordReset(
+        actorOf(c),
+        c.req.param("id"),
+        redirectTo,
       );
-      return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
     }
   },
 );

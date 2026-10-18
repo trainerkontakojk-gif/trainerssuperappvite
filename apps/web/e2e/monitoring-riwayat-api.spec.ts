@@ -91,7 +91,7 @@ test.beforeAll(async () => {
   );
   otherPesertaId = sqlOne(
     env,
-    `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, trainer_id)
+    `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, akun_id)
      VALUES (${quoted(otherFolder)}, ${quoted(`Ayu ${ns}`)}, 'Tim Call', 'Agent',
        ${quoted(otherAgent.userId)})
      RETURNING id;`,

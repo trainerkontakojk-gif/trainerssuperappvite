@@ -9,6 +9,57 @@ export interface ManagedUser {
   status: "active" | "pending" | "inactive";
   is_deleted: boolean;
   created_at?: string;
+  /** KTP participant this account belongs to; null when unlinked. */
+  linked_peserta?: LinkedPesertaSummary | null;
+}
+
+export interface LinkedPesertaSummary {
+  id: string;
+  nama: string;
+  batch_name: string | null;
+  tim: string | null;
+}
+
+export interface UserHistoryEntry {
+  id: string;
+  created_at: string;
+  actor_name: string | null;
+  action: string;
+}
+
+export interface ManagedUserDetail {
+  user: ManagedUser & { last_sign_in_at: string | null };
+  peserta:
+    | (LinkedPesertaSummary & {
+        jabatan: string | null;
+        nik_ojk: string | null;
+      })
+    | null;
+  ketik_assignment: {
+    assigned_at: string;
+    assigned_by_name: string | null;
+  } | null;
+  leader_access: {
+    module: string;
+    approved_at: string | null;
+    group_names: string[];
+  }[];
+  history: UserHistoryEntry[];
+}
+
+export interface PesertaLinkOption extends LinkedPesertaSummary {
+  linked_user: { id: string; full_name: string | null; email: string } | null;
+  /** The participant's Email OJK equals the account email (suggestion only). */
+  email_match: boolean;
+}
+
+/** Account summary shown on a KTP profile. */
+export interface LinkedAccountSummary {
+  id: string;
+  full_name: string | null;
+  email: string;
+  role: Role;
+  status: ManagedUser["status"];
 }
 
 export interface PendingLeaderRequest {
@@ -76,6 +127,10 @@ export interface ActivityLog {
 
 export const updateUserStatusSchema = z.object({
   status: z.enum(["approved", "pending", "rejected"]),
+});
+
+export const linkUserPesertaSchema = z.object({
+  peserta_id: z.string().uuid(),
 });
 
 export const updateUserRoleSchema = z.object({

@@ -126,8 +126,14 @@ type AdminClient = {
       "reset-password": {
         $post(args: {
           param: { id: string };
-          json: { email: string };
+        }): Promise<RpcResponse<{ email: string }>>;
+      };
+      peserta: {
+        $put(args: {
+          param: { id: string };
+          json: { peserta_id: string };
         }): Promise<RpcResponse<null>>;
+        $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
       };
       $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
     };

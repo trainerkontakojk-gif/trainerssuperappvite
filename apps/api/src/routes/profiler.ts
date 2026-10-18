@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { requireCapability } from "../middleware/role";
 import * as profilerService from "../services/profiler-service";
 import { logActivity } from "../services/activity-log-service";
+import { getPesertaAccount } from "../services/admin-user-service";
 import { getUserClient } from "./pdkt/route-utils";
 
 type Variables = { user: User; profile: any };
@@ -317,6 +318,39 @@ profiler.get("/peserta/:id", requireCapability("profiler.read"), async (c) => {
     );
   }
 });
+
+profiler.get(
+  "/peserta/:id/account",
+  requireCapability("profiler.read"),
+  async (c) => {
+    const id = c.req.param("id");
+    const scope = await resolveKtpScope(c);
+    if (scope !== null && !scope.includes(id))
+      return c.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Peserta tidak ditemukan" },
+        },
+        404,
+      );
+    try {
+      const data = await getPesertaAccount(id);
+      return c.json({ success: true, data });
+    } catch (e) {
+      console.error("[profiler] linked account lookup failed", e);
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: "Gagal memuat akun aplikasi peserta.",
+          },
+        },
+        500,
+      );
+    }
+  },
+);
 
 profiler.post("/peserta", requireCapability("profiler.write"), async (c) => {
   const body = await c.req.json();
