@@ -10,7 +10,6 @@
       "src/__tests__/telefun-session-reconciliation.test.tsx",
       "src/__tests__/telefun-communication-profile.test.tsx",
       "src/__tests__/pdkt-mailbox.test.tsx",
-      "src/__tests__/monitoring-redesign.test.tsx",
       "src/__tests__/simulation-subject-picker.test.tsx",
       "src/__tests__/telefun-subject-merge.test.ts"
     ]

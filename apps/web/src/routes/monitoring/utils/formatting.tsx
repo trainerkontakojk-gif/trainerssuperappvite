@@ -79,6 +79,48 @@ export function formatSessionDuration(seconds: number | null): string {
   return secs > 0 ? `${mins} mnt ${secs} dtk` : `${mins} mnt`;
 }
 
+/** Tanggal lengkap WIB untuk kepala detail sesi, mis. "17 Okt 2026, 14.15 WIB". */
+export function formatSessionDateTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+  return `${day}, ${formatClock(iso)} WIB`;
+}
+
+/** Jam WIB, mis. "14.15". */
+export function formatClock(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
+/** Lama sesi ditulis penuh, mis. "6 menit 52 detik" atau "9 menit". */
+export function formatLongDuration(seconds: number | null | undefined): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
+  const total = Math.round(seconds);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins === 0) return `${secs} detik`;
+  return secs > 0 ? `${mins} menit ${secs} detik` : `${mins} menit`;
+}
+
+/** Posisi di rekaman, mis. "0.02" atau "12.40". */
+export function formatOffset(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(total / 60)}.${String(total % 60).padStart(2, "0")}`;
+}
+
 /** Skor dengan koma desimal, mis. "7,5". */
 export function formatScoreValue(score: number): string {
   return score.toLocaleString("id-ID", { maximumFractionDigits: 1 });

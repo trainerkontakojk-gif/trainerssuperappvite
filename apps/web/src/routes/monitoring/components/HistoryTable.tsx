@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import type { MonitoringSessionRow } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import {
@@ -36,11 +37,13 @@ function RowMenu({
   row,
   canDelete,
   onOpen,
+  onCopyLink,
   onDelete,
 }: {
   row: MonitoringSessionRow;
   canDelete: boolean;
   onOpen: () => void;
+  onCopyLink: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -63,6 +66,9 @@ function RowMenu({
         <DropdownMenuItem className="min-h-11" onClick={onOpen}>
           Buka detail
         </DropdownMenuItem>
+        <DropdownMenuItem className="min-h-11" onClick={onCopyLink}>
+          Salin tautan
+        </DropdownMenuItem>
         {canDelete ? (
           <>
             <DropdownMenuSeparator />
@@ -83,11 +89,13 @@ export function HistoryTable({
   rows,
   canDelete,
   onOpen,
+  onCopyLink,
   onDelete,
 }: {
   rows: MonitoringSessionRow[];
   canDelete: boolean;
   onOpen: (row: MonitoringSessionRow) => void;
+  onCopyLink: (row: MonitoringSessionRow) => void;
   onDelete: (row: MonitoringSessionRow) => void;
 }) {
   return (
@@ -143,16 +151,14 @@ export function HistoryTable({
                   {MODULE_LABELS[row.module]}
                 </td>
                 <td className="max-w-72 px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpen(row);
-                    }}
+                  <Link
+                    to="/monitoring/sesi/$modul/$id"
+                    params={{ modul: row.module, id: row.id }}
+                    onClick={(event) => event.stopPropagation()}
                     className="block max-w-full truncate text-left hover:underline focus-visible:underline"
                   >
                     {row.scenario_title}
-                  </button>
+                  </Link>
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
                   {formatSessionDuration(row.duration_seconds)}
@@ -168,6 +174,7 @@ export function HistoryTable({
                     row={row}
                     canDelete={canDelete}
                     onOpen={() => onOpen(row)}
+                    onCopyLink={() => onCopyLink(row)}
                     onDelete={() => onDelete(row)}
                   />
                 </td>
@@ -183,9 +190,9 @@ export function HistoryTable({
       >
         {rows.map((row) => (
           <li key={`${row.module}-${row.id}`}>
-            <button
-              type="button"
-              onClick={() => onOpen(row)}
+            <Link
+              to="/monitoring/sesi/$modul/$id"
+              params={{ modul: row.module, id: row.id }}
               className="flex w-full min-h-11 flex-col gap-1 px-4 py-3 text-left hover:bg-muted/40"
             >
               <span className="flex items-start justify-between gap-3">
@@ -207,7 +214,7 @@ export function HistoryTable({
                 {MODULE_LABELS[row.module]} ·{" "}
                 {formatSessionTime(row.occurred_at)}
               </span>
-            </button>
+            </Link>
           </li>
         ))}
       </ul>

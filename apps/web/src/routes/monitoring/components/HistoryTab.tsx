@@ -8,7 +8,6 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import {
   aiClient,
   unwrapResponse,
-  type MonitoringReviewByModule,
   type MonitoringSessionPage,
   type MonitoringSessionRow,
 } from "../../../lib/api";
@@ -18,39 +17,15 @@ import { ConfirmDialog } from "../../dashboard/components/management/ConfirmDial
 import {
   hasHistoryFilters,
   MODULE_LABELS,
+  rememberHistorySearch,
   STATUS_SLUGS,
   validateHistorySearch,
   type HistorySearch,
 } from "../history-search";
-import {
-  formatSessionTime,
-  mapError,
-  type UnifiedHistoryEntry,
-} from "../utils/formatting";
+import { copySessionLink } from "../session-link";
+import { formatSessionTime, mapError } from "../utils/formatting";
 import { HistoryFilters } from "./HistoryFilters";
 import { HistoryPager, HistoryTable } from "./HistoryTable";
-import { ReviewDetailModal } from "./ReviewDetailModal";
-
-type Review = MonitoringReviewByModule[MonitoringSessionRow["module"]];
-
-/** Modal detail lama masih memakai bentuk riwayat penuh. */
-function toEntry(row: MonitoringSessionRow): UnifiedHistoryEntry {
-  return {
-    id: row.id,
-    user_id: row.user_id ?? "",
-    module: row.module,
-    scenario_title: row.scenario_title,
-    created_at: row.occurred_at,
-    duration_seconds: row.duration_seconds ?? 0,
-    score: row.score,
-    history: null,
-    user_email: row.actor.email ?? undefined,
-    user_role: row.actor.role ?? undefined,
-    review_status: row.review_status,
-    simulationSubject: row.simulationSubject,
-    telefun_legacy: row.legacy || undefined,
-  };
-}
 
 function SummaryLine({ data }: { data: MonitoringSessionPage }) {
   const { counts } = data;
@@ -152,10 +127,6 @@ export function HistoryTab() {
   const [data, setData] = useState<MonitoringSessionPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<MonitoringSessionRow | null>(null);
-  const [review, setReview] = useState<Review | null>(null);
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<MonitoringSessionRow | null>(null);
   const [deletePending, setDeletePending] = useState(false);
 
@@ -185,6 +156,7 @@ export function HistoryTab() {
   };
 
   useEffect(() => {
+    rememberHistorySearch(search);
     void fetchPage();
   }, [searchKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -197,28 +169,11 @@ export function HistoryTab() {
     });
   };
 
-  const loadReview = async (row: MonitoringSessionRow) => {
-    setReview(null);
-    setReviewError(null);
-    setReviewLoading(true);
-    try {
-      setReview(
-        await unwrapResponse(
-          await aiClient["monitoring/history/:module/:id/review"].$get({
-            param: { module: row.module, id: row.id },
-          }),
-        ),
-      );
-    } catch (err) {
-      setReviewError(mapError(err));
-    } finally {
-      setReviewLoading(false);
-    }
-  };
-
   const openDetail = (row: MonitoringSessionRow) => {
-    setSelected(row);
-    void loadReview(row);
+    void navigate({
+      to: "/monitoring/sesi/$modul/$id",
+      params: { modul: row.module, id: row.id },
+    });
   };
 
   const confirmDelete = async () => {
@@ -286,6 +241,7 @@ export function HistoryTab() {
               rows={data.rows}
               canDelete={canDelete}
               onOpen={openDetail}
+              onCopyLink={(row) => void copySessionLink(row.module, row.id)}
               onDelete={setDeleting}
             />
             <HistoryPager
@@ -303,18 +259,6 @@ export function HistoryTab() {
           />
         ) : null}
       </section>
-
-      {selected ? (
-        <ReviewDetailModal
-          entry={toEntry(selected)}
-          durationSeconds={selected.duration_seconds}
-          reviewData={review}
-          reviewLoading={reviewLoading}
-          reviewError={reviewError}
-          onRetry={() => void loadReview(selected)}
-          onClose={() => setSelected(null)}
-        />
-      ) : null}
 
       <ConfirmDialog
         open={deleting !== null}

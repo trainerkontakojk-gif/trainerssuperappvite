@@ -332,7 +332,8 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 - `apps/web/src/routes/monitoring/components/HistoryTab.tsx` — Filter dan tabel riwayat
 - `apps/web/src/components/ui/tabs.tsx` — Primitive tabs dan variant line
 - `apps/web/src/__tests__/monitoring-unauthorized.test.tsx` — Route/RBAC/UI regression tests
-- `apps/web/src/__tests__/monitoring-redesign.test.tsx` — History UI regression tests
+- `apps/web/src/routes/monitoring/SessionPage.tsx` + `components/SessionReview.tsx` — Halaman detail sesi `/monitoring/sesi/:modul/:id`
+- `apps/web/e2e/monitoring-riwayat.spec.ts`, `apps/web/e2e/monitoring-sesi.spec.ts` — E2E Riwayat dan detail sesi
 - `docs/modules.md`
 - `docs/database.md`
 - `docs/auth-rbac.md`

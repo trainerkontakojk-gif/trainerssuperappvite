@@ -151,8 +151,18 @@ export interface MonitoringHistoryEntry extends MonitoringConsumerMetadata {
   simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
+/** Judul, waktu, dan pelaksana untuk kepala halaman detail sesi. */
+export interface MonitoringReviewHeader {
+  scenario_title: string;
+  occurred_at: string | null;
+  actor_name: string | null;
+  /** Lama sesi sebenarnya dalam detik (KETIK dihitung dari transkrip). */
+  duration_seconds: number | null;
+}
+
 export interface KetikMonitoringReview {
   module: "ketik";
+  header?: MonitoringReviewHeader;
   user_id?: string | null;
   user_email?: string | null;
   user_role?: string | null;
@@ -188,6 +198,7 @@ export interface KetikMonitoringReview {
 
 export interface PdktMonitoringReview {
   module: "pdkt";
+  header?: MonitoringReviewHeader;
   user_id: string | null;
   user_email: string | null;
   user_role: string | null;
@@ -214,6 +225,7 @@ export interface PdktMonitoringReview {
 
 export interface TelefunMonitoringReview {
   module: "telefun";
+  header?: MonitoringReviewHeader;
   user_id?: string | null;
   user_email?: string | null;
   user_role?: string | null;

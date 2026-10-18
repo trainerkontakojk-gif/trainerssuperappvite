@@ -1,9 +1,11 @@
 import {
+  ketikTranscriptDurationSeconds,
   mapSimulationSubjectRowToSnapshot,
   parseTelefunTranscript,
 } from "@trainers/types";
 import type {
   KetikMonitoringReview,
+  MonitoringReviewHeader,
   PdktMonitoringReview,
   TelefunMonitoringReview,
 } from "@trainers/types";
@@ -50,6 +52,32 @@ function normalizePersonaConfig(
   return typeof consumerType === "string" ? { consumerType } : null;
 }
 
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function timestampAt(messages: unknown, index: number): unknown {
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+  const message = messages.at(index);
+  return message && typeof message === "object"
+    ? (message as Record<string, unknown>).timestamp
+    : null;
+}
+
+/** Judul skenario PDKT, sama dengan aturan di tampilan `monitoring_sessions`. */
+function pdktScenarioTitle(config: unknown): string {
+  const scenarios =
+    config && typeof config === "object"
+      ? (config as Record<string, unknown>).scenarios
+      : null;
+  const first = Array.isArray(scenarios) ? scenarios[0] : null;
+  const title =
+    first && typeof first === "object"
+      ? (first as Record<string, unknown>).title
+      : null;
+  return text(title) ?? "Simulasi Email";
+}
+
 function isOwnedTelefunRecordingPath(
   path: unknown,
   userId: unknown,
@@ -66,17 +94,18 @@ function isOwnedTelefunRecordingPath(
 async function readActorProjection(
   admin: ReturnType<typeof createAdminClient>,
   userId: unknown,
-): Promise<{ email: string | null; role: string | null }> {
-  if (typeof userId !== "string") return { email: null, role: null };
+): Promise<{ email: string | null; role: string | null; name: string | null }> {
+  if (typeof userId !== "string") return { email: null, role: null, name: null };
   const { data, error } = await admin
     .from("profiles")
-    .select("email, role")
+    .select("email, role, full_name")
     .eq("id", userId)
     .maybeSingle();
   if (error) throw new MonitoringReviewDataError("Gagal membaca pelaksana sesi.");
   return {
     email: typeof data?.email === "string" ? data.email : null,
     role: typeof data?.role === "string" ? data.role : null,
+    name: typeof data?.full_name === "string" && data.full_name.trim() ? data.full_name : null,
   };
 }
 
@@ -110,7 +139,7 @@ export async function getMonitoringReviewDetail(params: {
     const { data: history, error: historyError } = await admin
       .from("ketik_history")
       .select(
-        "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, consumer_name, consumer_phone, consumer_city, simulation_duration, messages, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
+        "scenario_title, date, review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, consumer_name, consumer_phone, consumer_city, simulation_duration, messages, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
       )
       .eq("id", params.historyId)
       .single();
@@ -125,10 +154,20 @@ export async function getMonitoringReviewDetail(params: {
 
     const ketikActor = await readActorProjection(admin, history.user_id);
     const ketikSubject = mapSimulationSubjectRowToSnapshot(history);
+    const ketikHeader: MonitoringReviewHeader = {
+      scenario_title: text(history.scenario_title) ?? "Simulasi Chat",
+      occurred_at: text(history.date),
+      actor_name: ketikActor.name,
+      duration_seconds: ketikTranscriptDurationSeconds(
+        timestampAt(history.messages, 0),
+        timestampAt(history.messages, -1),
+      ),
+    };
 
     if (history.review_status !== "completed") {
       return {
         module: "ketik",
+        header: ketikHeader,
         user_id: history.user_id ?? null,
         user_email: ketikActor.email,
         user_role: ketikActor.role,
@@ -169,6 +208,7 @@ export async function getMonitoringReviewDetail(params: {
 
     return {
       module: "ketik",
+      header: ketikHeader,
       user_id: history.user_id ?? null,
       user_email: ketikActor.email,
       user_role: ketikActor.role,
@@ -245,6 +285,13 @@ export async function getMonitoringReviewDetail(params: {
 
     return {
       module: "pdkt",
+      header: {
+        scenario_title: pdktScenarioTitle(history.config),
+        occurred_at: text(history.timestamp) ?? text(history.created_at),
+        actor_name: actor.name,
+        duration_seconds:
+          typeof history.time_taken === "number" ? history.time_taken : null,
+      },
       user_id: history.user_id ?? null,
       user_email: actor.email,
       user_role: actor.role,
@@ -269,7 +316,7 @@ export async function getMonitoringReviewDetail(params: {
   const { data: history, error: historyError } = await admin
     .from("telefun_history")
     .select(
-      "id, user_id, score, status, scoring_status, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, session_metrics, ai_summary, strengths, weaknesses, coaching_focus, messages, consumer_name, consumer_phone, consumer_city, consumer_gender, persona_config, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
+      "id, user_id, created_at, score, status, scoring_status, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, session_metrics, ai_summary, strengths, weaknesses, coaching_focus, messages, consumer_name, consumer_phone, consumer_city, consumer_gender, persona_config, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
     )
     .eq("id", params.historyId)
     .single();
@@ -300,6 +347,7 @@ export async function getMonitoringReviewDetail(params: {
     telefunHistory = {
       id: params.historyId,
       user_id: null,
+      created_at: legacyRow.created_at,
       score: typeof legacyRow.score === "number" ? legacyRow.score : null,
       status: null,
       scoring_status: null,
@@ -387,6 +435,12 @@ export async function getMonitoringReviewDetail(params: {
 
   return {
     module: "telefun",
+    header: {
+      scenario_title: text(telefunHistory.scenario_title) ?? "Simulasi Telepon",
+      occurred_at: text(telefunHistory.created_at),
+      actor_name: telefunActor.name,
+      duration_seconds: telefunHistory.duration_seconds ?? null,
+    },
     user_id: telefunHistory.user_id ?? null,
     user_email: telefunActor.email,
     user_role: telefunActor.role,
