@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type {
   ProfilerFolder,
   ProfilerPeserta,
   ProfilerYear,
 } from "@trainers/types";
-import { labelJabatan } from "@trainers/types";
+import {
+  can,
+  labelJabatan,
+  normalizeRole,
+  type LinkedAccountSummary,
+} from "@trainers/types";
 import {
   Activity,
   ChevronLeft,
@@ -21,6 +26,13 @@ import { Button } from "@/components/ui/button";
 import { getPhotoFrame, getPhotoImageStyle } from "../../../../lib/photo-frame";
 import { profilerApi } from "../../../../lib/profilerService";
 import { notify } from "../../../../lib/toast";
+import { fetchApi } from "../../../../hooks/useApi";
+import { useAuthStore } from "../../../../store/authStore";
+import {
+  STATUS_PRESENTATION,
+  normalizeStatus,
+  roleLabel,
+} from "../../../dashboard/users-format";
 import { getDaysUntilBirthday } from "../../utils/birthday";
 import {
   formatTanggal,
@@ -256,7 +268,10 @@ export default function ProfilerParticipantDetail({
             </div>
           </header>
 
-          <ProfileFields p={participant} />
+          <ProfileFields
+            p={participant}
+            account={<LinkedAccount participant={participant} />}
+          />
         </>
       )}
 
@@ -293,9 +308,61 @@ function summaryLine(p: ProfilerPeserta) {
   return parts.filter(Boolean).join(" · ");
 }
 
-type FieldRow = [label: string, value: string | null | undefined];
+type FieldRow = [label: string, value: ReactNode];
 
-function ProfileFields({ p }: { p: ProfilerPeserta }) {
+/** The app account linked to this participant (set on the user page). */
+function LinkedAccount({ participant }: { participant: ProfilerPeserta }) {
+  const canOpenUser = can(
+    normalizeRole(useAuthStore((s) => s.profile?.role)),
+    "admin.users",
+  );
+  const [account, setAccount] = useState<
+    LinkedAccountSummary | null | "error"
+  >(null);
+
+  useEffect(() => {
+    setAccount(null);
+    if (!participant.akun_id) return;
+    let cancelled = false;
+    fetchApi<LinkedAccountSummary | null>(
+      `/profiler/peserta/${participant.id}/account`,
+    )
+      .then((data) => !cancelled && setAccount(data))
+      .catch(() => !cancelled && setAccount("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, [participant.id, participant.akun_id]);
+
+  if (!participant.akun_id) return <>Belum tertaut</>;
+  if (account === "error") return <>Gagal memuat akun</>;
+  if (!account) return <>…</>;
+  const meta = ` · ${roleLabel(account.role)} · ${STATUS_PRESENTATION[normalizeStatus(account.status)].label}`;
+  return (
+    <>
+      {canOpenUser ? (
+        <Link
+          to="/dashboard/users/$id"
+          params={{ id: account.id }}
+          className="font-medium underline-offset-4 hover:underline"
+        >
+          {account.email}
+        </Link>
+      ) : (
+        account.email
+      )}
+      <span className="text-muted-foreground">{meta}</span>
+    </>
+  );
+}
+
+function ProfileFields({
+  p,
+  account,
+}: {
+  p: ProfilerPeserta;
+  account: ReactNode;
+}) {
   const date = (value?: string | null) => (value ? formatTanggal(value) : null);
   const groups: { title: string; rows: FieldRow[] }[][] = [
     [
@@ -304,6 +371,7 @@ function ProfileFields({ p }: { p: ProfilerPeserta }) {
         rows: [
           ["NIK OJK", p.nik_ojk],
           ["Email OJK", p.email_ojk],
+          ["Akun aplikasi", account],
           ["No. telepon", p.no_telepon],
           ["Bergabung di 157", date(p.bergabung_date)],
           ["Telepon darurat", p.no_telepon_darurat],

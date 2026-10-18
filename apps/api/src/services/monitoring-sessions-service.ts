@@ -223,14 +223,14 @@ export async function listMonitoringSessions(
 async function readActorPeserta(): Promise<Map<string, string>> {
   const { data, error } = await createAdminClient()
     .from("profiler_peserta")
-    .select("id, trainer_id")
-    .not("trainer_id", "is", null)
+    .select("id, akun_id")
+    .not("akun_id", "is", null)
     .order("id");
   if (error) throw error;
   const map = new Map<string, string>();
   for (const row of data ?? []) {
-    if (row.trainer_id && !map.has(row.trainer_id))
-      map.set(row.trainer_id, row.id);
+    if (row.akun_id && !map.has(row.akun_id))
+      map.set(row.akun_id, row.id);
   }
   return map;
 }
@@ -385,7 +385,7 @@ export async function assertSessionInScope(
       const linked = await admin
         .from("profiler_peserta")
         .select("id")
-        .eq("trainer_id", row.user_id);
+        .eq("akun_id", row.user_id);
       if (linked.error) throw linked.error;
       if ((linked.data ?? []).some((peserta) => allowed.has(peserta.id)))
         return;

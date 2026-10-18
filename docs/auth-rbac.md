@@ -30,6 +30,14 @@ Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 
 > **SIDAK Heatmap** (`/sidak/heatmap` dan tab Heatmap di `/sidak/agents/$id`, endpoint `GET /api/v1/sidak/heatmap`): **admin dan trainer** melihat seluruh data; **leader** hanya agent dalam scope-nya (`getAccessibleSidakFilters` → `getLeaderScopeSnapshot`), dengan `service_type` dibatasi `allowedServices` bila `serviceTypeLocked`. Admin/trainer query memakai JWT user (`createUserClient`) sehingga RLS `read_admin_trainer` benar-benar berlaku; leader memakai service-role + filter scope app-side karena RLS memang menolak leader — jangan bergantung pada RLS untuk leader, dan jangan memberi leader akses penuh. Leader tetap harus punya modul SIDAK disetujui (tiga lapis: `nav-config`, `beforeLoad: requireCapability("sidak.view")`, dan backend `requireCapability("sidak.read")` beserta resolver scope). Nama mode `qa` di dalam API hanya menandai kolom tanggal `tanggal_sampel`; role `qa` **tidak** mendapat akses.
 
+## Tautan akun ke peserta KTP
+
+- `profiler_peserta.akun_id` (unik, nullable, FK `profiles.id`) adalah akun aplikasi milik peserta. Ini satu-satunya sumber scope `self` agen (`services/access/scope.ts`) dan peserta aktor di Monitoring. `trainer_id` hanya kolom lama "ditambahkan oleh" dan tidak dibaca untuk akses.
+- Satu akun paling banyak satu peserta, satu peserta paling banyak satu akun; akun boleh tidak tertaut. Kecocokan Email OJK dengan email akun hanya saran.
+- `PUT`/`DELETE /api/v1/admin/users/:id/peserta`, `GET /admin/users/:id`, dan `GET /admin/peserta-options` memakai `admin.users` (admin, trainer). Mutasi menolak akun sendiri dan, untuk trainer, akun admin. Penautan lewat RPC service-role-only `link_profiler_peserta_account` (satu transaksi, 409 bila peserta sudah milik akun lain) dan dicatat ke `activity_logs.target_user_id`.
+- `PUT /api/v1/profiler/peserta/:id` membuang `id`, `akun_id`, `trainer_id`, `created_at` dari body, jadi editor KTP tidak bisa menautkan akun. `GET /profiler/peserta/:id/account` (`profiler.read`, ikut scope KTP) menampilkan ringkasan akun di profil.
+- `POST /api/v1/admin/users/:id/reset-password` tidak menerima email dari browser: server memakai email akun dan mengirim email pemulihan (`resetPasswordForEmail`), dengan aturan akun sendiri/admin yang sama.
+
 ## KETIK — penugasan dan salinan pribadi
 
 - Agen/leader tetap boleh membaca dan mengubah skenario/model pada settings **akun sendiri**. Tidak ada izin mengubah sumber trainer atau settings peserta lain.

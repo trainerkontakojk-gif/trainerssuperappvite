@@ -10,7 +10,7 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
  * Halaman Management (Pengguna, Persetujuan Akses, Grup Akses) — hermetic.
  *
  * Kontrak redesain (`plans/markdown/management-pages-redesign.md`): satu shell
- * bersama dengan navigasi seksi, tabel pengguna + panel kelola, konfirmasi
+ * bersama dengan navigasi seksi, tabel pengguna + halaman pengguna, konfirmasi
  * in-app (bukan `confirm()` browser), dan alur persetujuan/grup yang tetap
  * memanggil endpoint yang sama. Semua `/api` dimock; mutasi hanya dibuktikan
  * sampai request terkirim dengan payload yang benar.
@@ -141,7 +141,7 @@ test.describe("Management pages (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("pengguna: tabel, filter status, setujui inline, dan panel kelola", async ({
+  test("pengguna: tabel, filter status, setujui inline, dan tautan ke halaman pengguna", async ({
     page,
   }) => {
     const mocks: ApiMock[] = [
@@ -189,34 +189,16 @@ test.describe("Management pages (hermetic)", () => {
       status: "approved",
     });
 
-    // Panel kelola: aksi destruktif memakai dialog in-app, bukan confirm().
+    // Baris membuka halaman pengguna (panel geser sudah diganti halaman).
     await page.getByRole("button", { name: "Semua" }).click();
-    let nativeDialog = false;
-    page.on("dialog", (dialog) => {
-      nativeDialog = true;
-      void dialog.dismiss();
-    });
-    await page
-      .getByRole("row", { name: /Sari Lestari/ })
-      .getByRole("button", { name: "Kelola" })
-      .click();
-    const panel = page.getByRole("dialog", { name: "Sari Lestari" });
-    await expect(panel).toBeVisible();
-    await panel.getByRole("button", { name: "Tangguhkan" }).click();
-    const confirm = page.getByRole("alertdialog", {
-      name: "Tangguhkan pengguna?",
-    });
-    await expect(confirm).toBeVisible();
-    await confirm.getByRole("button", { name: "Batal" }).click();
-    await expect(confirm).toHaveCount(0);
-    expect(nativeDialog).toBe(false);
-
-    // Pengguna tidak bisa mengelola akunnya sendiri dari panel.
     await expect(
-      page
-        .getByRole("row", { name: /Trainer Visual/ })
-        .getByRole("button", { name: "Kelola" }),
-    ).toHaveCount(0);
+      page.getByRole("row", { name: /Sari Lestari/ }).getByRole("link", {
+        name: "Sari Lestari",
+      }),
+    ).toHaveAttribute("href", "/dashboard/users/u-active");
+    await expect(
+      page.getByRole("row", { name: /Sari Lestari/ }),
+    ).toContainText("Belum tertaut");
 
     expectHermetic(audit);
   });

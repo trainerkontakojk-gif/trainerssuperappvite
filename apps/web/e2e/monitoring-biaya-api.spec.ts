@@ -76,7 +76,7 @@ test.beforeAll(async () => {
   runSql(
     env,
     `INSERT INTO profiler_folders (name) VALUES (${quoted(folderIn)}), (${quoted(folderOut)});
-     INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, trainer_id) VALUES
+     INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, akun_id) VALUES
        (${quoted(folderIn)}, ${quoted(`Rina ${ns}`)}, 'Tim Call', 'Agent', ${quoted(agentIn.userId)}),
        (${quoted(folderOut)}, ${quoted(`Ayu ${ns}`)}, 'Tim Call', 'Agent', ${quoted(agentOut.userId)});
      INSERT INTO ai_usage_logs (request_id, user_id, provider, model_id, module, action,

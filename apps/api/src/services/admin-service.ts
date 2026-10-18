@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../lib/supabase";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { logActivity } from "./activity-log-service";
+import { getLinkedPesertaByAccount } from "./admin-user-service";
 import {
   fetchLeaderModuleRequests,
   resolveEffectiveModuleStatus,
@@ -51,7 +52,26 @@ export async function getUsers(): Promise<ManagedUser[]> {
       from += PAGE_SIZE;
     }
   }
-  return allData;
+  const linked = await getLinkedPesertaByAccount();
+  return allData.map((user) => ({
+    ...user,
+    linked_peserta: linked.get(user.id) ?? null,
+  }));
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Aktif",
+  pending: "Menunggu",
+  inactive: "Nonaktif",
+};
+
+async function targetLabel(user_id: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", user_id)
+    .maybeSingle();
+  return data?.full_name?.trim() || data?.email || user_id;
 }
 
 export async function updateUserStatus(
@@ -91,9 +111,10 @@ export async function updateUserStatus(
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Mengubah status user ${user_id} menjadi ${dbStatus}`,
+    action: `Mengubah status ${await targetLabel(user_id)} menjadi ${STATUS_LABEL[dbStatus] ?? dbStatus}`,
     module: "USER_MGMT",
     type: "update_status",
+    target_user_id: user_id,
   });
 }
 
@@ -134,9 +155,10 @@ export async function updateUserRole(
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Mengubah role user ${user_id} menjadi ${role}`,
+    action: `Mengubah role ${await targetLabel(user_id)} menjadi ${normalizedRole}`,
     module: "USER_MGMT",
     type: "update_role",
+    target_user_id: user_id,
   });
 }
 
@@ -169,34 +191,20 @@ export async function deleteUser(
 
   if (error) throw new Error(error.message);
 
+  // A deleted account keeps no participant, so the participant can be relinked.
+  const { error: unlinkError } = await supabaseAdmin
+    .from("profiler_peserta")
+    .update({ akun_id: null })
+    .eq("akun_id", user_id);
+  if (unlinkError) throw new Error(unlinkError.message);
+
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Menonaktifkan Pengguna ID: ${user_id}`,
+    action: `Menghapus pengguna ${await targetLabel(user_id)}`,
     module: "USER_MGMT",
     type: "delete",
-  });
-}
-
-export async function resetUserPassword(
-  user_id: string,
-  email: string,
-  callerId: string,
-  callerEmail: string,
-): Promise<void> {
-  const { error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-  });
-  if (error)
-    throw new Error(`Gagal generate link reset password: ${error.message}`);
-
-  await logActivity({
-    user_id: callerId,
-    user_name: callerEmail,
-    action: `Generate reset password untuk user ${user_id} (${email})`,
-    module: "USER_MGMT",
-    type: "reset_password",
+    target_user_id: user_id,
   });
 }
 

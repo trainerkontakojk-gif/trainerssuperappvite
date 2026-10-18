@@ -387,6 +387,13 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
       { label: "Pengguna" },
     ];
   }
+  if (pathname.startsWith("/dashboard/users/")) {
+    return [
+      { label: "Beranda", href: "/dashboard" },
+      { label: "Pengguna", href: "/dashboard/users" },
+      { label: "Detail pengguna" },
+    ];
+  }
   if (pathname === "/dashboard/access-approval") {
     return [
       { label: "Beranda", href: "/dashboard" },

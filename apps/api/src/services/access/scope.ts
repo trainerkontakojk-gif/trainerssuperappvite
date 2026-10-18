@@ -20,14 +20,14 @@ export type DataScope =
 export { ScopeUnavailableError } from "./errors";
 import { ScopeUnavailableError } from "./errors";
 
-/** trainer_id is the account linked to a participant, not the trainer owner. */
+/** akun_id is the app account linked to a participant (1:1, set by admin/trainer). */
 export async function getLinkedPesertaId(
   userId: string,
 ): Promise<string | null> {
   const { data, error } = await supabaseAdmin
     .from("profiler_peserta")
     .select("id")
-    .eq("trainer_id", userId)
+    .eq("akun_id", userId)
     .maybeSingle();
   if (error) throw new ScopeUnavailableError();
   return data?.id ?? null;

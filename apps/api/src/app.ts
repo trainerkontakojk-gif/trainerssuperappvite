@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ApiResponse } from "@trainers/types";
 import { env } from "./lib/env";
+import { allowedOrigins } from "./lib/allowed-origins";
 import { authMiddleware, type AuthVariables } from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
@@ -24,14 +25,6 @@ import { telefun } from "./routes/telefun";
 import { getLeaderAccessStatus } from "./services/admin-service";
 import { revokeOwnSessions } from "./services/account-service";
 
-const allowedOrigins =
-  env.NODE_ENV === "production"
-    ? env.ALLOWED_ORIGINS?.split(",")
-        .map((o) => o.trim())
-        .filter(Boolean) || []
-    : env.ALLOWED_ORIGINS?.split(",")
-        .map((o) => o.trim())
-        .filter(Boolean) || ["http://localhost:3000", "http://localhost:3005"];
 
 if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn(

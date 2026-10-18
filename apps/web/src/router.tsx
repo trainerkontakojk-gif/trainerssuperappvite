@@ -26,6 +26,9 @@ import { validateAgentDetailSearch } from "./components/sidak/sidak-agent-detail
 const IndexPage = lazy(() => import("./routes/index"));
 const DashboardPage = lazy(() => import("./routes/dashboard"));
 const DashboardUsers = lazy(() => import("./routes/dashboard/users"));
+const DashboardUserDetail = lazy(
+  () => import("./routes/dashboard/user-detail"),
+);
 const DashboardAccessGroups = lazy(
   () => import("./routes/dashboard/access-groups"),
 );
@@ -92,6 +95,13 @@ const dashboardUsersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard/users",
   component: DashboardUsers,
+  beforeLoad: requireCapability("admin.users"),
+});
+
+const dashboardUserDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard/users/$id",
+  component: DashboardUserDetail,
   beforeLoad: requireCapability("admin.users"),
 });
 
@@ -740,6 +750,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
   dashboardUsersRoute,
+  dashboardUserDetailRoute,
   dashboardAccessGroupsRoute,
   dashboardAccessApprovalRoute,
   dashboardActivitiesRoute,

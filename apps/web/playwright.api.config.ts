@@ -69,6 +69,10 @@ export default defineConfig({
     },
     { name: "tna-real-backend", testMatch: "tna-*-api.spec.ts" },
     {
+      name: "user-peserta-link-real-backend",
+      testMatch: "user-peserta-link-api.spec.ts",
+    },
+    {
       name: "db-guard-real-backend",
       testMatch: "exposed-function-guard-api.spec.ts",
     },

@@ -23,6 +23,8 @@ export interface PhotoFrameValue {
 export interface ProfilerPeserta {
   id: string;
   trainer_id?: string | null;
+  /** App account linked to this participant; written only by the admin API. */
+  akun_id?: string | null;
   batch_name: string;
   nomor_urut: number;
   nama: string;
