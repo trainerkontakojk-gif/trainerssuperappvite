@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, History, RefreshCw } from "lucide-react";
 import type { SidakSimulationSummary } from "../../lib/api";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,7 @@ import {
   type SidakSimulationModuleFilter,
   useSidakAgentSimulations,
 } from "../../hooks/useSidakAgentSimulations";
-import { ReviewDetailModal } from "../../routes/monitoring/components/ReviewDetailModal";
-import { type UnifiedHistoryEntry } from "../../routes/monitoring/utils/formatting";
+import { SessionReviewDialog } from "../../routes/monitoring/components/SessionReviewDialog";
 import { cn } from "cn";
 import { SIDAK_SCORE_FILL } from "../../utils/sidakScoreStatus";
 
@@ -72,23 +71,6 @@ function formatWibDate(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function toMonitoringEntry(item: SidakSimulationSummary): UnifiedHistoryEntry {
-  return {
-    id: item.id,
-    user_id: item.actor.userId ?? "",
-    module: item.module,
-    scenario_title: item.scenarioTitle,
-    created_at: item.occurredAt,
-    duration_seconds: item.durationSeconds ?? 0,
-    score: item.score,
-    history: null,
-    user_email: item.actor.email ?? undefined,
-    user_role: item.actor.role ?? undefined,
-    review_status: item.reviewStatus,
-    simulationSubject: item.simulationSubject,
-  };
 }
 
 function HistoryRow({
@@ -176,11 +158,6 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
     closeDetail,
     retryDetail,
   } = useSidakAgentSimulations(agentId, module);
-
-  const selectedEntry = useMemo(
-    () => (selected ? toMonitoringEntry(selected) : null),
-    [selected],
-  );
 
   return (
     <>
@@ -343,15 +320,14 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
           ) : null}
       </section>
 
-      {selected && selectedEntry ? (
-        <ReviewDetailModal
-          entry={selectedEntry}
-          onClose={closeDetail}
-          durationSeconds={selected.durationSeconds}
-          reviewData={detail}
-          reviewLoading={detailLoading}
-          reviewError={detailError}
+      {selected ? (
+        <SessionReviewDialog
+          title={selected.scenarioTitle}
+          review={detail}
+          loading={detailLoading}
+          error={detailError}
           onRetry={retryDetail}
+          onClose={closeDetail}
         />
       ) : null}
     </>

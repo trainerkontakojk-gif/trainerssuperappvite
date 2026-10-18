@@ -273,6 +273,82 @@ test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
   });
 });
 
+test.describe("Simulasi: detail telaah", () => {
+  test("Lihat telaah membuka tampilan sesi yang sama dengan Monitoring", async ({
+    page,
+  }) => {
+    await open(page);
+    await page.route(
+      (url) =>
+        url.pathname === `/api/v1/sidak/agents/${AGENT_ID}/simulations/ketik/s-1`,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            success: true,
+            data: {
+              module: "ketik",
+              header: {
+                scenario_title: "Pinjol Ilegal",
+                occurred_at: "2026-10-14T02:12:00.000Z",
+                actor_name: "Trainer",
+                duration_seconds: 300,
+              },
+              user_email: "trainer@example.test",
+              user_role: "trainer",
+              simulationSubject: null,
+              review_status: "completed",
+              scores: { final: 82, empathy: 80, probing: 75, typo: 90, compliance: 85 },
+              session: {
+                consumerName: "Bu Sri",
+                consumerPhone: null,
+                consumerCity: null,
+                simulationDuration: 10,
+                messages: [
+                  {
+                    id: "m1",
+                    sender: "consumer",
+                    text: "Saya ditagih pinjol yang tidak saya kenal.",
+                    timestamp: "2026-10-14T02:12:00.000Z",
+                  },
+                ],
+              },
+              review: {
+                id: "r-1",
+                sessionId: "s-1",
+                aiSummary: "Agen tenang dan jelas.",
+                strengths: [],
+                weaknesses: [],
+                coachingFocus: [],
+                education: null,
+                createdAt: "2026-10-14T02:20:00.000Z",
+              },
+              typos: [],
+            },
+          }),
+        }),
+    );
+    await page.getByRole("tab", { name: "Simulasi" }).click();
+    const trigger = page
+      .getByRole("table", { name: "Riwayat simulasi" })
+      .getByRole("button", { name: "Lihat telaah Pinjol Ilegal" });
+    await trigger.click();
+
+    const dialog = page.getByRole("dialog", { name: "Pinjol Ilegal" });
+    await expect(dialog.getByRole("region", { name: "Penilaian AI" })).toContainText(
+      "82 / 100",
+    );
+    await expect(dialog.getByRole("region", { name: "Transkrip chat" })).toContainText(
+      "Saya ditagih pinjol yang tidak saya kenal.",
+    );
+    await expect(dialog).toContainText("Agen tenang dan jelas.");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+});
+
 test.describe("Heatmap detail agen ke tab Temuan", () => {
   test("tanggal terpilih menyebut tiketnya dan membuka grup tiket di tab Temuan", async ({
     page,

@@ -79,3 +79,14 @@ export const STATUS_LABELS: Record<
   failed: "Gagal",
   not_started: "Belum dinilai",
 };
+
+let rememberedSearch: HistorySearch = {};
+
+/** Filter Riwayat terakhir, supaya "Kembali ke Riwayat" dari detail menjaganya. */
+export function rememberHistorySearch(search: HistorySearch): void {
+  rememberedSearch = search;
+}
+
+export function lastHistorySearch(): HistorySearch {
+  return rememberedSearch;
+}

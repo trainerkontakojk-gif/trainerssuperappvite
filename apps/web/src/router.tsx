@@ -52,6 +52,9 @@ const KetikHistory = lazy(() => import("./routes/ketik/history"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
+const MonitoringSessionPage = lazy(
+  () => import("./routes/monitoring/SessionPage"),
+);
 import { validateHistorySearch } from "./routes/monitoring/history-search";
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
 const TelefunHistory = lazy(() => import("./routes/telefun/history"));
@@ -466,6 +469,13 @@ const monitoringUsageRoute = createRoute({
   component: () => <MonitoringPage section="usage" />,
 });
 
+const monitoringSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/monitoring/sesi/$modul/$id",
+  beforeLoad: requireCapability("monitoring.read"),
+  component: MonitoringSessionPage,
+});
+
 const monitoringPricingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/monitoring/harga",
@@ -754,6 +764,7 @@ const routeTree = rootRoute.addChildren([
   monitoringRoute,
   monitoringUsageRoute,
   monitoringPricingRoute,
+  monitoringSessionRoute,
   accountRoute,
   authCallbackRoute,
   waitingApprovalRoute,

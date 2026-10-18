@@ -48,6 +48,6 @@ Sesi `self`, legacy tanpa atribusi, participant yang FK-nya sudah `NULL`, dan hi
 
 ## Frontend behavior
 
-Quick list berada paling bawah halaman detail agent, setelah seluruh konten audit SIDAK. List memiliki filter modul dan pemuatan lima item berikutnya. Filter tahun, bulan, dan layanan audit tidak memengaruhi query ini. Popup memakai `ReviewDetailModal` dan panel Monitoring bersama, dengan transcript yang bergulir, focus trap, Escape, pengembalian fokus, skeleton, empty state, retry, dan layout vertikal pada layar kecil. Hook membatalkan request lama serta memberi setiap agent/filter generation token agar respons lama tidak ditampilkan pada konteks baru.
+Quick list berada paling bawah halaman detail agent, setelah seluruh konten audit SIDAK. List memiliki filter modul dan pemuatan lima item berikutnya. Filter tahun, bulan, dan layanan audit tidak memengaruhi query ini. Popup memakai `SessionReviewDialog`, yang menampilkan `SessionReview` yang sama dengan halaman detail sesi Monitoring (`/monitoring/sesi/:modul/:id`), dengan focus trap, Escape, pengembalian fokus, status memuat, retry, dan satu kolom bila jendela sempit. Hook membatalkan request lama serta memberi setiap agent/filter generation token agar respons lama tidak ditampilkan pada konteks baru.
 
 Fitur ini tidak menambah migration, backfill, perubahan rumus skor, atau kolom ekspor SIDAK. Migration atribusi `20260910000000_simulation_subject_attribution.sql` harus sudah diterapkan dan schema cache PostgREST harus memuat kolom atribusi sebelum rollout.

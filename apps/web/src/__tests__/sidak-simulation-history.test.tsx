@@ -14,10 +14,10 @@ vi.mock("../lib/api", () => ({
   unwrapResponse: async (response: unknown) => response,
 }));
 
-vi.mock("../routes/monitoring/components/ReviewDetailModal", () => ({
-  ReviewDetailModal: (props: any) => (
+vi.mock("../routes/monitoring/components/SessionReviewDialog", () => ({
+  SessionReviewDialog: (props: any) => (
     <div data-testid="sidak-review-modal">
-      {props.reviewLoading ? "detail-loading" : props.reviewData?.module ?? "detail-ready"}
+      {props.loading ? "detail-loading" : props.review?.module ?? "detail-ready"}
     </div>
   ),
 }));

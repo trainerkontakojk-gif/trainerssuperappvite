@@ -157,6 +157,13 @@ test("durasi KETIK di riwayat Monitoring adalah lama sesi sebenarnya", async () 
   const detail = await review.json();
   expect(review.status, JSON.stringify(detail).slice(0, 500)).toBe(200);
   expect(detail.data.session.simulationDuration).toBe(5);
+  // Kepala halaman detail sesi: judul, waktu, nama akun, dan lama sebenarnya.
+  expect(detail.data.header).toEqual({
+    scenario_title: `Durasi ${ns}`,
+    occurred_at: expect.stringMatching(/^2031-03-10T02:00:00/),
+    actor_name: "E2E agent",
+    duration_seconds: 412,
+  });
 });
 
 test("durasi KETIK di riwayat simulasi SIDAK adalah lama sesi sebenarnya", async () => {

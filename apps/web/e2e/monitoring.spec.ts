@@ -15,8 +15,8 @@ import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
  * Sebelum ini Monitoring punya 60 unit test tapi nol E2E. Semua `/api` dimock
  * lewat harness hermetic; lihat `docs/e2e-testing.md`.
  *
- * Yang TIDAK dibuktikan di sini: assertion appearance (class CSS, min-h) dan
- * kontrak di dalam modal detail review (butuh payload assessment berat).
+ * Yang TIDAK dibuktikan di sini: assertion appearance (class CSS, min-h).
+ * Detail sesi lengkap ada di `monitoring-sesi.spec.ts`.
  */
 
 /** Satu baris harga; semua rate numerik diisi supaya render tidak pecah. */
@@ -176,11 +176,11 @@ const SESSION_ROWS = HISTORY_ENTRIES.map((entry) => ({
   simulationSubject: entry.simulationSubject,
 }));
 
-/** Buka detail sesi ke-`index` dari tabel Riwayat. */
+/** Buka halaman detail sesi ke-`index` dari tabel Riwayat. */
 function openSession(page: Page, index: number) {
   return page
     .getByRole("table", { name: "Riwayat sesi" })
-    .getByRole("button", {
+    .getByRole("link", {
       name: HISTORY_ENTRIES[index].scenario_title,
       exact: true,
     })
@@ -364,10 +364,10 @@ test.describe("Monitoring (hermetic)", () => {
       await waitForMockedApi(audit, ["/ai/monitoring/history"]);
       await openSession(page, 1);
       await waitForMockedApi(audit, ["/ai/monitoring/history/pdkt/pdkt-1/review"]);
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByText("Evaluasi AI belum tersedia")).toBeVisible({ timeout: 20000 });
-      if (copy) await expect(dialog.getByText(copy, { exact: true })).toBeVisible();
-      else await expect(dialog.locator("p.text-destructive")).toHaveCount(0);
+      const detail = page.getByRole("region", { name: "Penilaian AI" });
+      await expect(detail.getByText("Penilaian AI belum tersedia")).toBeVisible({ timeout: 20000 });
+      if (copy) await expect(detail.getByText(copy, { exact: true })).toBeVisible();
+      else await expect(detail.locator("p.text-destructive")).toHaveCount(0);
       if (error) await expect(page.getByText(error, { exact: true })).toHaveCount(0);
       expectHermetic(audit);
     });
@@ -419,15 +419,16 @@ test.describe("Monitoring (hermetic)", () => {
 
     for (const [index, entry] of HISTORY_ENTRIES.entries()) {
       await openSession(page, index);
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByText(entry.scenario_title).first()).toBeVisible();
       await waitForMockedApi(audit, [`/${entry.id}/review`]);
-      await expect(dialog.getByText(/memuat/i)).toHaveCount(0, { timeout: 20000 });
+      const detail = page.locator("main").first();
+      await expect(detail.getByRole("region", { name: "Sesi", exact: true })).toBeVisible({
+        timeout: 20000,
+      });
       offenders.push(
-        ...(await findTextBelowFloor(dialog)).map((o) => `[${entry.module}] ${o}`),
+        ...(await findTextBelowFloor(detail)).map((o) => `[${entry.module}] ${o}`),
       );
-      await page.keyboard.press("Escape");
-      await expect(dialog).toHaveCount(0);
+      await page.goBack();
+      await expect(page.getByRole("table", { name: "Riwayat sesi" })).toBeVisible();
     }
 
     const unique = [...new Set(offenders)];
@@ -435,7 +436,7 @@ test.describe("Monitoring (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("detail Telefun menampilkan profil komunikasi sebagai diagram spider berbahasa Indonesia", async ({
+  test("detail Telefun menampilkan penilaian suara sebagai baris angka berbahasa Indonesia", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -447,17 +448,16 @@ test.describe("Monitoring (hermetic)", () => {
       (entry) => entry.module === "telefun",
     );
     await openSession(page, telefunIndex);
-    const dialog = page.getByRole("dialog");
-    const radar = dialog.getByRole("img", {
-      name: /^Diagram profil komunikasi/,
+    const rows = page
+      .getByRole("region", { name: "Penilaian suara" })
+      .getByRole("list", { name: "Skor per aspek" })
+      .getByRole("listitem");
+    await expect(rows.filter({ hasText: "Kecepatan bicara" })).toContainText("7,5", {
+      timeout: 20000,
     });
-    await expect(radar).toBeVisible({ timeout: 20000 });
-    await expect(radar.getByText("Kecepatan bicara", { exact: true })).toBeVisible();
-    await expect(radar.getByText("Nada emosi", { exact: true })).toBeVisible();
-    await expect(radar.getByText("Speaking Rate")).toHaveCount(0);
-    await expect(
-      dialog.getByRole("list", { name: "Target vs hasil" }),
-    ).toHaveCount(0);
+    await expect(rows.filter({ hasText: "Nada emosi" })).toContainText("Empati");
+    await expect(page.getByText("Speaking Rate")).toHaveCount(0);
+    await expect(page.getByRole("img", { name: /^Diagram profil komunikasi/ })).toHaveCount(0);
     expectHermetic(audit);
   });
 
@@ -522,9 +522,7 @@ test.describe("Monitoring (hermetic)", () => {
     await openSession(page, pdktIndex);
     await waitForMockedApi(audit, ["/pdkt-1/review"]);
 
-    const card = page
-      .getByRole("dialog")
-      .getByRole("region", { name: "Catatan di balasan agent" });
+    const card = page.getByRole("region", { name: "Catatan di balasan agent" });
     await expect(card).toBeVisible({ timeout: 20000 });
     await expect(card.locator("mark")).toHaveCount(1);
     await expect(card.locator("mark")).toHaveText(`${quote}1`);
@@ -650,11 +648,10 @@ test.describe("Monitoring (hermetic)", () => {
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
     await openSession(page, 0);
     await waitForMockedApi(audit, ["/ketik-1/review"]);
-    const dialog = page.getByRole("dialog");
-    const info = dialog.getByLabel("Informasi konsumen");
+    const info = page.getByRole("region", { name: "Sesi", exact: true });
     await expect(info.getByText("Batas waktu", { exact: true })).toBeVisible({ timeout: 20000 });
     await expect(info.getByText("5 menit", { exact: true })).toBeVisible();
-    await expect(dialog.getByText(/detik/)).toHaveCount(0);
+    await expect(info.getByText(/detik/)).toHaveCount(0);
     expectHermetic(audit);
   });
 
