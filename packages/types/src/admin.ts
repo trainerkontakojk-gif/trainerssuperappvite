@@ -1,4 +1,5 @@
 import { ROLES, type Role } from "./access";
+import type { PracticeModule, UserPracticeLimit } from "./practice-quota";
 import { z } from "zod";
 
 export interface ManagedUser {
@@ -11,6 +12,12 @@ export interface ManagedUser {
   created_at?: string;
   /** KTP participant this account belongs to; null when unlinked. */
   linked_peserta?: LinkedPesertaSummary | null;
+  /** Per-user practice exceptions still in force today. */
+  practice_overrides?: {
+    module: PracticeModule;
+    daily_limit: number | null;
+    ends_on: string | null;
+  }[];
 }
 
 export interface LinkedPesertaSummary {
@@ -45,6 +52,7 @@ export interface ManagedUserDetail {
     group_names: string[];
   }[];
   history: UserHistoryEntry[];
+  practice_limits: UserPracticeLimit[];
 }
 
 export interface PesertaLinkOption extends LinkedPesertaSummary {
@@ -127,6 +135,12 @@ export interface ActivityLog {
 
 export const updateUserStatusSchema = z.object({
   status: z.enum(["approved", "pending", "rejected"]),
+});
+
+/** Approve a pending account with its role and, optionally, its participant. */
+export const approveUserSchema = z.object({
+  role: z.enum(ROLES),
+  peserta_id: z.string().uuid().nullable(),
 });
 
 export const linkUserPesertaSchema = z.object({

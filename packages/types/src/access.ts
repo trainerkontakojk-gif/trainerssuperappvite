@@ -53,6 +53,7 @@ export const CAPABILITIES = {
   "pdkt.templates.generate": ["admin", "trainer", "leader"],
   "pdkt.use": ["admin", "trainer", "leader", "agent"],
   "participants.readAll": ["admin", "trainer"],
+  "practice.limits.manage": ["admin", "trainer"],
   "profiler.landing": ["admin", "trainer", "leader"],
   "profiler.read": ["admin", "trainer", "leader"],
   "profiler.view": ["admin", "trainer", "leader"],

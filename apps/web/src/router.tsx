@@ -36,6 +36,9 @@ const DashboardAccessApproval = lazy(
   () => import("./routes/dashboard/access-approval"),
 );
 const DashboardActivities = lazy(() => import("./routes/dashboard/activities"));
+const DashboardPracticeLimits = lazy(
+  () => import("./routes/dashboard/practice-limits"),
+);
 const SidakIndexRedirect = lazy(() => import("./routes/sidak/index"));
 const SidakDashboard = lazy(() => import("./routes/sidak/dashboard"));
 const SidakForecast = lazy(() => import("./routes/sidak/forecast"));
@@ -117,6 +120,13 @@ const dashboardAccessApprovalRoute = createRoute({
   path: "/dashboard/access-approval",
   component: DashboardAccessApproval,
   beforeLoad: requireCapability("admin.leaderAccess"),
+});
+
+const dashboardPracticeLimitsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard/batas-latihan",
+  component: DashboardPracticeLimits,
+  beforeLoad: requireCapability("practice.limits.manage"),
 });
 
 const dashboardActivitiesRoute = createRoute({
@@ -751,6 +761,7 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   dashboardUsersRoute,
   dashboardUserDetailRoute,
+  dashboardPracticeLimitsRoute,
   dashboardAccessGroupsRoute,
   dashboardAccessApprovalRoute,
   dashboardActivitiesRoute,

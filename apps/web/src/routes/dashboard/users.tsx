@@ -5,10 +5,15 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useApi } from "../../hooks/useApi";
-import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
-import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
 import { Button } from "../../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { Skeleton } from "../../components/ui/skeleton";
 import {
   Table,
@@ -23,6 +28,8 @@ import { SearchField } from "./components/management/SearchField";
 import { SegmentedFilter } from "./components/management/SegmentedFilter";
 import { StatusDot } from "./components/management/StatusDot";
 import { EmptyState } from "./components/management/EmptyState";
+import { ApproveDialog } from "./components/users/ApproveDialog";
+import { describeUserLimits } from "./components/users/practice-limit-format";
 import {
   STATUS_PRESENTATION,
   formatDate,
@@ -32,6 +39,19 @@ import {
 } from "./users-format";
 
 type StatusFilter = "all" | NormalizedStatus;
+type LinkFilter = "all" | "linked" | "unlinked";
+
+const LINK_FILTER_LABEL: Record<LinkFilter, string> = {
+  all: "Semua peserta KTP",
+  linked: "Sudah tertaut",
+  unlinked: "Belum tertaut",
+};
+
+function limitsLabel(entry: ManagedUser): string {
+  const role = normalizeRole(entry.role);
+  if (role === "admin" || role === "trainer") return "Tanpa batas";
+  return describeUserLimits(entry) ?? "Bawaan peran";
+}
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -48,33 +68,16 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [approving, setApproving] = useState<string | null>(null);
+  const [linkFilter, setLinkFilter] = useState<LinkFilter>("all");
+  const [approving, setApproving] = useState<ManagedUser | null>(null);
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, linkFilter]);
 
   const canManage = (entry: ManagedUser) =>
     entry.id !== currentProfile?.id &&
     (normalizeRole(entry.role) !== "admin" || canManageAdmins);
-
-  const approve = async (entry: ManagedUser) => {
-    setApproving(entry.id);
-    try {
-      await unwrapResponse(
-        await adminClient.users[":id"].status.$put({
-          param: { id: entry.id },
-          json: { status: "approved" },
-        }),
-      );
-      notify.success(`${entry.full_name || entry.email} disetujui`);
-      await refetch();
-    } catch (err: unknown) {
-      notify.error(getErrorMessage(err, "Gagal memperbarui status pengguna."));
-    } finally {
-      setApproving(null);
-    }
-  };
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredUsers = users.filter((entry) => {
@@ -83,8 +86,12 @@ export default function UsersPage() {
       entry.email?.toLowerCase().includes(normalizedSearch) ||
       entry.full_name?.toLowerCase().includes(normalizedSearch) ||
       entry.linked_peserta?.nama.toLowerCase().includes(normalizedSearch);
+    const matchesLink =
+      linkFilter === "all" ||
+      (linkFilter === "linked") === Boolean(entry.linked_peserta);
     return (
       matchesSearch &&
+      matchesLink &&
       (statusFilter === "all" || normalizeStatus(entry.status) === statusFilter)
     );
   });
@@ -111,6 +118,26 @@ export default function UsersPage() {
           onChange={setSearchTerm}
           className="lg:w-96"
         />
+        <Select
+          value={linkFilter}
+          onValueChange={(next) => {
+            if (next) setLinkFilter(next as LinkFilter);
+          }}
+        >
+          <SelectTrigger
+            aria-label="Filter peserta KTP"
+            className="h-11 w-full sm:h-9 lg:w-48"
+          >
+            <SelectValue>{LINK_FILTER_LABEL[linkFilter]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(LINK_FILTER_LABEL) as LinkFilter[]).map((option) => (
+              <SelectItem key={option} value={option}>
+                {LINK_FILTER_LABEL[option]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <SegmentedFilter
           label="Filter status pengguna"
           value={statusFilter}
@@ -153,6 +180,9 @@ export default function UsersPage() {
                   </TableHead>
                   <TableHead className="hidden px-4 text-xs text-muted-foreground lg:table-cell">
                     Peserta KTP
+                  </TableHead>
+                  <TableHead className="hidden px-4 text-xs text-muted-foreground xl:table-cell">
+                    Batas latihan
                   </TableHead>
                   <TableHead className="hidden px-4 text-xs text-muted-foreground md:table-cell">
                     Status
@@ -231,6 +261,17 @@ export default function UsersPage() {
                           </span>
                         )}
                       </TableCell>
+                      <TableCell className="hidden max-w-0 px-4 py-3 text-sm xl:table-cell">
+                        <span
+                          className={
+                            entry.practice_overrides?.length
+                              ? "block truncate text-foreground"
+                              : "block truncate text-muted-foreground"
+                          }
+                        >
+                          {limitsLabel(entry)}
+                        </span>
+                      </TableCell>
                       <TableCell className="hidden px-4 py-3 md:table-cell">
                         <StatusDot tone={status.tone} label={status.label} />
                       </TableCell>
@@ -242,10 +283,9 @@ export default function UsersPage() {
                           {canManage(entry) && isPending ? (
                             <Button
                               className="h-11 sm:h-8"
-                              disabled={approving === entry.id}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                void approve(entry);
+                                setApproving(entry);
                               }}
                             >
                               Setujui
@@ -281,6 +321,18 @@ export default function UsersPage() {
           </>
         )}
       </section>
+
+      {approving ? (
+        <ApproveDialog
+          user={approving}
+          canGrantAdmin={canManageAdmins}
+          onClose={() => setApproving(null)}
+          onDone={() => {
+            setApproving(null);
+            void refetch();
+          }}
+        />
+      ) : null}
     </ManagementShell>
   );
 }

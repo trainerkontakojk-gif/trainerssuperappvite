@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261018190000_practice_today_summary.sql` | No data loss: drops the today summary for the Batas latihan page; revert the API first |
 | New | `rollback_20261018170000_practice_quota_status.sql` | No data loss: drops the quota status and limit helpers, restores the earlier consume function; revert the API first |
 | New | `rollback_20261018150000_practice_quota.sql` | DATA LOSS: drops practice limit rules, overrides and usage; SECURITY: restores owner writes on telefun_history; revert API and Telefun first |
 | New | `rollback_20261018130000_profiler_peserta_akun_link.sql` | DATA LOSS: drops account-to-participant links and log targets; revert the API first |

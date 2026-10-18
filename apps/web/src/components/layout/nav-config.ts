@@ -5,6 +5,7 @@ import {
   Layers,
   Activity,
   History,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import { APP_MODULES, isCapabilityAllowed } from "../../lib/app-config";
@@ -88,6 +89,12 @@ export const MANAGEMENT_LINKS = [
     label: "Grup Akses",
     icon: Layers,
     capability: "admin.accessGroups" as const,
+  },
+  {
+    to: "/dashboard/batas-latihan",
+    label: "Batas latihan",
+    icon: Gauge,
+    capability: "practice.limits.manage" as const,
   },
   {
     to: "/monitoring",
@@ -404,6 +411,12 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     return [
       { label: "Beranda", href: "/dashboard" },
       { label: "Grup Akses" },
+    ];
+  }
+  if (pathname === "/dashboard/batas-latihan") {
+    return [
+      { label: "Beranda", href: "/dashboard" },
+      { label: "Batas latihan" },
     ];
   }
   if (pathname === "/dashboard/activities") {

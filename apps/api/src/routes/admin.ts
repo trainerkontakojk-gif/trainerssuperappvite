@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import * as adminService from "../services/admin-service";
 import * as adminUserService from "../services/admin-user-service";
+import * as practiceLimits from "../services/practice-limits-service";
 import { AdminUserError } from "../services/admin-user-service";
 import { allowedOrigins } from "../lib/allowed-origins";
 import { requireCapability } from "../middleware/role";
@@ -12,6 +13,10 @@ import {
   updateUserStatusSchema,
   updateUserRoleSchema,
   linkUserPesertaSchema,
+  approveUserSchema,
+  updatePracticeRulesSchema,
+  setPracticeOverrideSchema,
+  practiceModuleParamSchema,
   createAccessGroupSchema,
   updateAccessGroupSchema,
   addAccessGroupItemSchema,
@@ -80,7 +85,14 @@ admin.get(
   requireCapability("admin.users"),
   async (c) => {
     try {
-      const data = await adminUserService.getUserDetail(c.req.param("id"));
+      const detail = await adminUserService.getUserDetail(c.req.param("id"));
+      const data = {
+        ...detail,
+        practice_limits: await practiceLimits.getUserPracticeLimits(
+          detail.user.id,
+          detail.user.role,
+        ),
+      };
       return c.json({ success: true, data });
     } catch (error) {
       return adminUserFailure(c, error);
@@ -136,6 +148,93 @@ admin.delete(
   async (c) => {
     try {
       await adminUserService.unlinkUserPeserta(actorOf(c), c.req.param("id"));
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/:id/approve",
+  requireCapability("admin.users"),
+  zValidator("json", approveUserSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    try {
+      await adminService.approveUser(
+        actorOf(c),
+        c.req.param("id"),
+        body.role,
+        body.peserta_id,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+// ── Practice limits (plans/markdown/kontrol-user-fase-4.md) ──
+admin.get(
+  "/practice-limits",
+  requireCapability("practice.limits.manage"),
+  async (c) => {
+    try {
+      const data = await practiceLimits.getPracticeLimitsOverview();
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.put(
+  "/practice-limits/rules",
+  requireCapability("practice.limits.manage"),
+  zValidator("json", updatePracticeRulesSchema),
+  async (c) => {
+    try {
+      await practiceLimits.updatePracticeRules(
+        actorOf(c),
+        c.req.valid("json").rules,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.put(
+  "/users/:id/practice-limits/:module",
+  requireCapability("practice.limits.manage"),
+  zValidator("param", practiceModuleParamSchema),
+  zValidator("json", setPracticeOverrideSchema),
+  async (c) => {
+    const { id, module } = c.req.valid("param");
+    try {
+      await practiceLimits.setPracticeOverride(
+        actorOf(c),
+        id,
+        module,
+        c.req.valid("json"),
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.delete(
+  "/users/:id/practice-limits/:module",
+  requireCapability("practice.limits.manage"),
+  zValidator("param", practiceModuleParamSchema),
+  async (c) => {
+    const { id, module } = c.req.valid("param");
+    try {
+      await practiceLimits.clearPracticeOverride(actorOf(c), id, module);
       return c.json({ success: true, data: null });
     } catch (error) {
       return adminUserFailure(c, error);

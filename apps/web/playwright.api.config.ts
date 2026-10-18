@@ -77,6 +77,10 @@ export default defineConfig({
       testMatch: "practice-quota-api.spec.ts",
     },
     {
+      name: "practice-limits-real-backend",
+      testMatch: "practice-limits-admin-api.spec.ts",
+    },
+    {
       name: "db-guard-real-backend",
       testMatch: "exposed-function-guard-api.spec.ts",
     },
