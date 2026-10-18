@@ -55,6 +55,8 @@ export function ReviewResult({
   onShowMessage,
   rerunFailed,
   onRerun,
+  rerunsLeft,
+  rerunRefusal,
   target,
 }: {
   target: KetikReviewTarget | null;
@@ -67,7 +69,12 @@ export function ReviewResult({
   rerunFailed: boolean;
   /** `null` untuk peran tanpa izin menjalankan telaah. */
   onRerun: (() => void) | null;
+  /** 0 = jatah telaah ulang sesi ini sudah dipakai (agent dan leader). */
+  rerunsLeft?: number | null;
+  /** Alasan dari server saat telaah ulang ditolak. */
+  rerunRefusal?: string | null;
 }) {
+  const rerunUsed = rerunsLeft === 0;
   const finalScore = session.finalScore ?? 0;
   const change = scoreChange(finalScore, previousScore);
   const aspects = readAspectScores(session);
@@ -131,7 +138,7 @@ export function ReviewResult({
             <span className="text-[13px] text-muted-foreground">{change}</span>
           )}
         </p>
-        {onRerun && (
+        {onRerun && !rerunUsed && (
           <Button
             type="button"
             variant="outline"
@@ -143,6 +150,16 @@ export function ReviewResult({
           </Button>
         )}
       </div>
+
+      {rerunRefusal ? (
+        <p role="alert" className="text-[13px] leading-5 text-fg2">
+          {rerunRefusal}
+        </p>
+      ) : onRerun && rerunUsed ? (
+        <p className="text-[13px] leading-5 text-muted-foreground">
+          Telaah ulang sudah dipakai untuk sesi ini.
+        </p>
+      ) : null}
 
       {rerunFailed && (
         <p role="alert" className="text-[13px] leading-5 text-fg2">

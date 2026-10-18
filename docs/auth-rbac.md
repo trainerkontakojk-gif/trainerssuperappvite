@@ -635,3 +635,8 @@ Fase 4 (`plans/markdown/kontrol-user-fase-4.md`):
 - Capability baru `practice.limits.manage` (admin dan trainer, keputusan Fajar 2026-10-18) untuk `GET /v1/admin/practice-limits`, `PUT /v1/admin/practice-limits/rules`, `PUT` dan `DELETE /v1/admin/users/:id/practice-limits/:module`. Aturan peran hanya bisa diubah untuk agent dan leader; pengecualian hanya untuk akun agent/leader yang boleh dikelola aktor (`assertManageableTarget`: bukan diri sendiri, trainer tidak menyentuh admin). Tanggal berakhir tidak boleh sebelum hari ini (WIB). Setiap perubahan tercatat di Log Aktivitas.
 - `POST /v1/admin/users/:id/approve` (`admin.users`) menyetujui akun menunggu dengan role dan peserta KTP (opsional) sekaligus. Trainer tidak bisa memberi role admin; akun yang sudah tidak menunggu ditolak (409). Kecocokan email hanya saran di layar.
 - Ringkasan hari ini dari fungsi service-role `practice_today_summary()`.
+
+Fase 5a (`plans/markdown/kontrol-user-fase-5.md`):
+
+- Menangguhkan, menolak, menghapus, atau menurunkan role akun langsung mengakhiri semua login-nya lewat fungsi service-role `revoke_user_sessions` (hapus `auth.sessions`). Token lama ditolak Supabase Auth, jadi API membalas 401.
+- Agent dan leader hanya bisa menelaah ulang satu sesi KETIK 1 kali (`ketik_history.rerun_count`, diperiksa di `enqueue_ketik_review`). Trainer dan admin tanpa batas.

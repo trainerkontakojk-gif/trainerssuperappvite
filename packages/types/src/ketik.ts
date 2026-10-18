@@ -21,6 +21,8 @@ export const KETIK_ERROR_MESSAGES = {
   SESSION_SAVE_FAILED: "Percakapan belum bisa disimpan. Coba lagi.",
   REVIEW_LOAD_FAILED: "Hasil telaah belum bisa dimuat. Coba lagi.",
   REVIEW_FAILED: "Telaah belum bisa diproses. Coba lagi.",
+  RERUN_LIMIT:
+    "Telaah ulang untuk sesi ini sudah dipakai. Agent dan leader bisa menelaah ulang 1 kali per sesi.",
   AI_ERROR: "AI belum bisa membalas chat. Coba lagi.",
   NOT_FOUND: "Sesi tidak ditemukan.",
 } as const;

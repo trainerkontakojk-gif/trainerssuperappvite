@@ -226,14 +226,14 @@ export default function UserDetailPage() {
     reject: {
       title: "Tolak pendaftaran?",
       description:
-        "Akun menjadi nonaktif dan tidak bisa masuk sampai dipulihkan.",
+        "Akun menjadi nonaktif dan tidak bisa masuk sampai dipulihkan. Login yang masih terbuka di perangkat lain langsung berakhir.",
       label: "Tolak",
       danger: true,
     },
     suspend: {
       title: `Tangguhkan ${name}?`,
       description:
-        "Akun kembali ke antrean Menunggu dan tidak bisa masuk sampai disetujui lagi.",
+        "Akun kembali ke antrean Menunggu dan tidak bisa masuk sampai disetujui lagi. Login yang masih terbuka di perangkat lain langsung berakhir.",
       label: "Tangguhkan",
       danger: true,
     },
@@ -252,7 +252,7 @@ export default function UserDetailPage() {
     delete: {
       title: "Hapus pengguna?",
       description:
-        "Pengguna tidak akan bisa masuk lagi dan tautan pesertanya dilepas.",
+        "Pengguna tidak akan bisa masuk lagi dan tautan pesertanya dilepas. Login yang masih terbuka di perangkat lain langsung berakhir.",
       label: "Hapus pengguna",
       danger: true,
     },

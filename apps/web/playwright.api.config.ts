@@ -41,6 +41,10 @@ export default defineConfig({
       name: "telefun-month-count-real-backend",
       testMatch: "telefun-month-count-api.spec.ts",
     },
+    {
+      name: "user-controls-real-backend",
+      testMatch: "user-controls-api.spec.ts",
+    },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     {
       name: "pdkt-consumer-email-stub",

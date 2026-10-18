@@ -16,4 +16,9 @@ export interface KetikReviewStatus {
   scores: KetikReviewDetail["scores"] | null;
   previousKept: boolean;
   errorMessage?: string;
+  /** Re-scores the reader may still start; null = no limit (trainer, admin). */
+  rerunsLeft: number | null;
 }
+
+/** Re-scores per KETIK session for agent and leader (enforced in the database). */
+export const KETIK_RERUN_LIMIT = 1;

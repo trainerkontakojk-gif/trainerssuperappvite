@@ -157,6 +157,9 @@ test.describe("Halaman pengguna (hermetic)", () => {
       name: "Tangguhkan Rina Kartika?",
     });
     await expect(suspend).toBeVisible();
+    await expect(suspend).toContainText(
+      "Login yang masih terbuka di perangkat lain langsung berakhir.",
+    );
     await suspend.getByRole("button", { name: "Batal" }).click();
     await expect(suspend).toHaveCount(0);
     expect(nativeDialog).toBe(false);
