@@ -111,7 +111,18 @@ test("counts the whole Jakarta month beyond the 50-row list, for every user, wit
   expect((await countAs(otherTrainer)) - before).toBe(54);
 });
 
-test("agents have no Telefun access to the count", async () => {
-  const response = await monthCount(agent);
-  expect(response.status).toBe(403);
+test("an agent's count holds only their own calls", async () => {
+  // Telefun is open to agents (2026-10-18); the count is scoped to the caller.
+  const before = await countAs(agent);
+  const { error } = await createAdmin(env)
+    .from("telefun_history")
+    .insert({
+      user_id: agent.userId,
+      scenario_title: `${ns} agen`,
+      consumer_name: "Budi",
+      created_at: new Date().toISOString(),
+    });
+  expect(error).toBeNull();
+  expect((await countAs(agent)) - before).toBe(1);
+  expect(before).toBe(0);
 });

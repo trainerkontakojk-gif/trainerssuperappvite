@@ -14,8 +14,6 @@ interface MobileDrawerProps {
   theme: ThemeMode;
   setTheme: (t: ThemeMode) => void;
   handleLogout: () => void;
-  hasTelefunAccess: boolean;
-  openMaintenance: () => void;
 }
 
 /**
@@ -30,8 +28,6 @@ export function MobileDrawer({
   theme,
   setTheme,
   handleLogout,
-  hasTelefunAccess,
-  openMaintenance,
 }: MobileDrawerProps) {
   const { pathname } = useLocation();
   // Ditutup karena pindah halaman: fokus diatur `useRouteFocus`, bukan
@@ -72,8 +68,6 @@ export function MobileDrawer({
               model={buildNavModel(profile?.role)}
               pathname={pathname}
               idPrefix="drawer"
-              hasTelefunAccess={hasTelefunAccess}
-              openMaintenance={openMaintenance}
               onNavigate={handleNavigate}
             />
           </nav>

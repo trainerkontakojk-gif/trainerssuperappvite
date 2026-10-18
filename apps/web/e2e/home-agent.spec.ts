@@ -114,7 +114,10 @@ test.describe("Beranda agent", () => {
       "href",
       "/pdkt",
     );
-    await expect(practice.getByRole("link")).toHaveCount(2);
+    await expect(
+      practice.getByRole("link", { name: /^TELEFUN/i }),
+    ).toHaveAttribute("href", "/telefun");
+    await expect(practice.getByRole("link")).toHaveCount(3);
 
     for (const absent of ["Tren temuan QA", "Perlu tindakan"]) {
       await expect(main.getByRole("heading", { name: absent })).toHaveCount(0);

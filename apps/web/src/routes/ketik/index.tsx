@@ -34,6 +34,8 @@ import { useAuthStore } from "../../store/authStore";
 import { APP_MODULES } from "../../lib/app-config";
 import { notify } from "../../lib/toast";
 import { practiceQuotaMessage } from "../../lib/practice-quota";
+import { usePracticeQuota } from "../../hooks/usePracticeQuota";
+import { QuotaLine } from "../../components/simulation/QuotaLine";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
@@ -109,6 +111,7 @@ export default function KetikLanding() {
   const assignmentBlocked =
     needsAssignment &&
     (assignmentState !== "ready" || !assignment.data?.assignment);
+  const quota = usePracticeQuota("ketik");
   useEffect(() => {
     if (!needsAssignment) return;
     let cancelled = false;
@@ -250,7 +253,13 @@ export default function KetikLanding() {
   };
 
   const startSimulation = async (subject: SimulationSubjectSelection) => {
-    if (settingsState !== "ready" || assignmentBlocked || isStarting) return;
+    if (
+      settingsState !== "ready" ||
+      assignmentBlocked ||
+      quota.blocked ||
+      isStarting
+    )
+      return;
     const account = userId;
     setShowSubjectPicker(false);
     setIsStarting(true);
@@ -277,11 +286,18 @@ export default function KetikLanding() {
             "Sesi belum bisa dimulai. Periksa penugasan dan pengaturan, lalu coba lagi.",
         );
     } finally {
+      void quota.refetch();
       if (isCurrentAccount(account)) setIsStarting(false);
     }
   };
   const requestStartSimulation = () => {
-    if (settingsState !== "ready" || assignmentBlocked || isStarting) return;
+    if (
+      settingsState !== "ready" ||
+      assignmentBlocked ||
+      quota.blocked ||
+      isStarting
+    )
+      return;
     if (canPickParticipant) setShowSubjectPicker(true);
     else void startSimulation({ type: "self" });
   };
@@ -413,6 +429,7 @@ export default function KetikLanding() {
                       disabled={
                         settingsState !== "ready" ||
                         assignmentBlocked ||
+                        quota.blocked ||
                         isStarting
                       }
                       aria-describedby={
@@ -420,13 +437,16 @@ export default function KetikLanding() {
                           ? "ketik-settings-status"
                           : assignmentBlocked
                             ? "ketik-assignment-status"
-                            : undefined
+                            : quota.status?.limit != null
+                              ? "ketik-quota-status"
+                              : undefined
                       }
                       className="min-h-[44px] gap-2.5 px-5 text-sm font-semibold"
                     >
                       Mulai simulasi
                       <ArrowRight data-icon="inline-end" />
                     </Button>
+                    <QuotaLine id="ketik-quota-status" status={quota.status} />
                     {settingsState === "loading" && (
                       <p
                         id="ketik-settings-status"

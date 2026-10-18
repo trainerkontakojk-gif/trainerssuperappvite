@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { ArrowLeft, Download } from "lucide-react";
+import { can } from "@trainers/types";
 import type {
   TelefunCoachingSummary,
   TelefunReplayAnnotation,
@@ -22,6 +23,7 @@ import { useApi } from "../../../hooks/useApi";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { notify } from "../../../lib/toast";
+import { useAuthStore } from "../../../store/authStore";
 import { parseTelefunScoreResult } from "../../../lib/voiceAssessmentUtils";
 import { useRecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import { useTelefunRecordingUrl } from "../hooks/useTelefunRecordingUrl";
@@ -144,6 +146,11 @@ export function TelefunReviewStage({
   const [pointed, setPointed] = useState<{ id: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
+  // Telaah ulang memakai AI tanpa batas harian, jadi hanya trainer/admin.
+  const canRerun = can(
+    useAuthStore((s) => s.profile?.role),
+    "telefun.manage",
+  );
   const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
   const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(
     null,
@@ -595,7 +602,7 @@ export function TelefunReviewStage({
               clockOf={clockOf}
               rerunStartedAt={rerunStartedAt}
               rerunFailed={rerunFailed}
-              onRerun={() => setRerunOpen(true)}
+              onRerun={canRerun ? () => setRerunOpen(true) : undefined}
               notes={
                 <Suspense
                   fallback={

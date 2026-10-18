@@ -2,6 +2,7 @@ import {
   PRACTICE_MODULE_LABELS,
   type PracticeModule,
   type PracticeQuotaErrorCode,
+  type PracticeQuotaStatus,
 } from "@trainers/types";
 import { createAdminClient } from "../lib/supabase";
 
@@ -65,6 +66,18 @@ export async function consumePracticeQuota(
     429,
     `Batas latihan ${label} hari ini sudah habis (${result.used} dari ${result.limit}). Jatah baru mulai pukul 00.00 WIB.`,
   );
+}
+
+/** Today's limit, use and reset time for every practice module. */
+export async function getPracticeQuotaStatus(
+  userId: string,
+): Promise<PracticeQuotaStatus[]> {
+  const { data, error } = await createAdminClient().rpc(
+    "practice_quota_status",
+    { p_user_id: userId },
+  );
+  if (error) throw error;
+  return data as PracticeQuotaStatus[];
 }
 
 /** Gives back a start that failed before the person could use it. */

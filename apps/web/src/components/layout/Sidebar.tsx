@@ -28,8 +28,6 @@ interface SidebarProps {
   pathname: string;
   profile: any;
   session: any;
-  hasTelefunAccess: boolean;
-  openMaintenance: () => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
   handleLogout: () => void;
@@ -40,8 +38,6 @@ export function Sidebar({
   pathname,
   profile,
   session,
-  hasTelefunAccess,
-  openMaintenance,
   theme,
   setTheme,
   handleLogout,
@@ -79,8 +75,6 @@ export function Sidebar({
           pathname={pathname}
           idPrefix="sidebar"
           collapsed={collapsed}
-          hasTelefunAccess={hasTelefunAccess}
-          openMaintenance={openMaintenance}
         />
       </nav>
 

@@ -14,6 +14,9 @@ import { UsagePopover } from "../../components/simulation/UsagePopover";
 import { ApiError } from "../../lib/api";
 import { formatSimulationSubjectLabel } from "../../lib/simulation-subject-display";
 import { notify } from "../../lib/toast";
+import { practiceQuotaMessage } from "../../lib/practice-quota";
+import { usePracticeQuota } from "../../hooks/usePracticeQuota";
+import { QuotaLine } from "../../components/simulation/QuotaLine";
 import {
   formatUsageDeltaLabel,
   pollUsageDelta,
@@ -116,6 +119,7 @@ export default function TelefunLanding() {
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const startCallInFlightRef = useRef(false);
+  const quota = usePracticeQuota("telefun");
   // Panggilan aktif dibaca lewat ref: callback rekaman bisa selesai setelah render berikutnya.
   const activeCallRef = useRef<ActiveCall | null>(null);
   // ID sesi yang dikonfirmasi server suara; bisa berbeda dari ID awal.
@@ -286,8 +290,11 @@ export default function TelefunLanding() {
       config.sessionId = res.id;
       config.simulationSubject = res.simulationSubject ?? null;
       config.simulationSubjectSelection = selection;
-    } catch {
-      notify.error("Gagal membuat sesi panggilan. Silakan coba lagi.");
+    } catch (error) {
+      notify.error(
+        practiceQuotaMessage(error) ??
+          "Gagal membuat sesi panggilan. Silakan coba lagi.",
+      );
       return;
     }
 
@@ -318,10 +325,12 @@ export default function TelefunLanding() {
     } finally {
       startCallInFlightRef.current = false;
       setShowSubjectPicker(false);
+      void quota.refetch();
     }
   };
 
   const requestStartCall = () => {
+    if (quota.blocked) return;
     if (!canPickParticipant) {
       void startCall({ type: "self" });
       return;
@@ -518,12 +527,21 @@ export default function TelefunLanding() {
                       type="button"
                       size="lg"
                       onClick={requestStartCall}
-                      disabled={settingsLoading}
+                      disabled={settingsLoading || quota.blocked}
+                      aria-describedby={
+                        quota.status?.limit != null
+                          ? "telefun-quota-status"
+                          : undefined
+                      }
                       className="min-h-[44px] gap-2.5 px-5 text-sm font-semibold"
                     >
                       {settingsLoading ? "Menyiapkan…" : "Mulai simulasi"}
                       <ArrowRight data-icon="inline-end" />
                     </Button>
+                    <QuotaLine
+                      id="telefun-quota-status"
+                      status={quota.status}
+                    />
                     <nav
                       aria-label="Menu Telefun"
                       className="flex flex-wrap gap-2"

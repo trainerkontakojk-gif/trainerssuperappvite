@@ -2,7 +2,7 @@ import {
   resolveAccountScope,
   isAccountInScope,
 } from "../../services/access/scope";
-import { getActor } from "../../middleware/role";
+import { getActor, requireCapability } from "../../middleware/role";
 import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -332,86 +332,91 @@ export const REPLAY_ANNOTATION_SCHEMA = {
   required: ["annotations", "recommendations"],
 };
 
-telefunAnnotations.post("/annotations/generate/:id", async (c) => {
-  const sessionId = c.req.param("id");
-  const user = c.get("user");
-  const adminClient = createAdminClient();
+// Analisis AI penuh atas rekaman tanpa batas harian: hanya trainer/admin.
+telefunAnnotations.post(
+  "/annotations/generate/:id",
+  requireCapability("telefun.manage"),
+  async (c) => {
+    const sessionId = c.req.param("id");
+    const user = c.get("user");
+    const adminClient = createAdminClient();
 
-  try {
-    // 1. Validate session ownership
-    const { data: session, error: sessionError } = await adminClient
-      .from("telefun_history")
-      .select("*")
-      .eq("id", sessionId)
-      .maybeSingle();
+    try {
+      // 1. Validate session ownership
+      const { data: session, error: sessionError } = await adminClient
+        .from("telefun_history")
+        .select("*")
+        .eq("id", sessionId)
+        .maybeSingle();
 
-    if (sessionError) throw sessionError;
-    if (!session) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
-        },
-        404,
-      );
-    }
-
-    if (
-      !isAccountInScope(
-        resolveAccountScope(getActor(c), "telefun.manage"),
-        session.user_id,
-      )
-    ) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Anda tidak memiliki akses ke sesi ini.",
+      if (sessionError) throw sessionError;
+      if (!session) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
           },
-        },
-        403,
-      );
-    }
+          404,
+        );
+      }
 
-    // 2. Get recording
-    const recordingPath = session.agent_recording_path;
-    if (!recordingPath) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "NO_RECORDING",
-            message: "Tidak ada rekaman agen untuk sesi ini.",
+      if (
+        !isAccountInScope(
+          resolveAccountScope(getActor(c), "telefun.manage"),
+          session.user_id,
+        )
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Anda tidak memiliki akses ke sesi ini.",
+            },
           },
-        },
-        400,
-      );
-    }
+          403,
+        );
+      }
 
-    const { data: audioData, error: downloadError } = await adminClient.storage
-      .from("telefun-recordings")
-      .download(recordingPath);
-
-    if (downloadError || !audioData) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "DOWNLOAD_FAILED",
-            message: "Gagal mengunduh rekaman.",
+      // 2. Get recording
+      const recordingPath = session.agent_recording_path;
+      if (!recordingPath) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "NO_RECORDING",
+              message: "Tidak ada rekaman agen untuk sesi ini.",
+            },
           },
-        },
-        500,
+          400,
+        );
+      }
+
+      const { data: audioData, error: downloadError } =
+        await adminClient.storage
+          .from("telefun-recordings")
+          .download(recordingPath);
+
+      if (downloadError || !audioData) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "DOWNLOAD_FAILED",
+              message: "Gagal mengunduh rekaman.",
+            },
+          },
+          500,
+        );
+      }
+
+      const base64Audio = Buffer.from(await audioData.arrayBuffer()).toString(
+        "base64",
       );
-    }
 
-    const base64Audio = Buffer.from(await audioData.arrayBuffer()).toString(
-      "base64",
-    );
-
-    // 3. Call Gemini for annotations
-    const prompt = `Analisis rekaman telepon simulasi layanan konsumen berikut.
+      // 3. Call Gemini for annotations
+      const prompt = `Analisis rekaman telepon simulasi layanan konsumen berikut.
 Skenario: ${session.scenario_title || "Tidak diketahui"}
 Konsumen: ${session.consumer_name || "Tidak diketahui"}
 
@@ -430,123 +435,127 @@ Jenis momen (moment):
 
 Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 karakter.`;
 
-    const result = await generateGeminiContent({
-      model: TELEFUN_ASSESSMENT_MODEL,
-      systemInstruction:
-        "Anda adalah pelatih komunikasi profesional. Analisis rekaman telepon dan berikan catatan objektif dalam format JSON. Gunakan Bahasa Indonesia.",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: "audio/webm",
-                data: base64Audio,
+      const result = await generateGeminiContent({
+        model: TELEFUN_ASSESSMENT_MODEL,
+        systemInstruction:
+          "Anda adalah pelatih komunikasi profesional. Analisis rekaman telepon dan berikan catatan objektif dalam format JSON. Gunakan Bahasa Indonesia.",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: "audio/webm",
+                  data: base64Audio,
+                },
               },
-            },
-          ],
+            ],
+          },
+        ],
+        responseMimeType: "application/json",
+        responseSchema: REPLAY_ANNOTATION_SCHEMA,
+        usageContext: {
+          module: "telefun",
+          action: "replay-annotation-generation",
         },
-      ],
-      responseMimeType: "application/json",
-      responseSchema: REPLAY_ANNOTATION_SCHEMA,
-      usageContext: {
-        module: "telefun",
-        action: "replay-annotation-generation",
-      },
-      userId: user.id,
-    });
+        userId: user.id,
+      });
 
-    const resultText = result.text || "";
-    let parsed: { annotations?: any[]; recommendations?: any[] } = {};
-    try {
-      parsed = JSON.parse(resultText);
-    } catch {
-      const match = resultText.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-    }
+      const resultText = result.text || "";
+      let parsed: { annotations?: any[]; recommendations?: any[] } = {};
+      try {
+        parsed = JSON.parse(resultText);
+      } catch {
+        const match = resultText.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+      }
 
-    const annotations = (parsed.annotations || []).slice(0, 30);
-    const recommendations = (parsed.recommendations || []).slice(0, 5);
+      const annotations = (parsed.annotations || []).slice(0, 30);
+      const recommendations = (parsed.recommendations || []).slice(0, 5);
 
-    if (annotations.length === 0) {
+      if (annotations.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "NO_ANNOTATIONS",
+              message: "AI tidak menghasilkan anotasi.",
+            },
+          },
+          500,
+        );
+      }
+
+      // 4. Delete stale AI annotations
+      await adminClient
+        .from("telefun_replay_annotations")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("is_manual", false);
+
+      // 5. Insert new AI annotations
+      const annotationRows = annotations.map((a: any) => ({
+        session_id: sessionId,
+        user_id: session.user_id,
+        timestamp_ms: a.timestamp_ms,
+        category: a.category,
+        moment: a.moment ?? null,
+        text: (a.text || "").slice(0, 500),
+        is_manual: false,
+      }));
+
+      const { data: insertedAnnotations, error: insertError } =
+        await adminClient
+          .from("telefun_replay_annotations")
+          .insert(annotationRows)
+          .select("*");
+
+      if (insertError) throw insertError;
+
+      // 6. Update coaching summary
+      const checksum = createReplayAnnotationChecksum(annotationRows);
+
+      const { error: rpcError } = await adminClient.rpc(
+        "upsert_telefun_coaching_summary",
+        {
+          p_session_id: sessionId,
+          p_recommendations: recommendations.map((r: any) => ({
+            text: r.text,
+            priority: r.priority,
+          })),
+          p_ai_annotation_count: annotationRows.length,
+          p_ai_annotation_checksum: checksum,
+        },
+      );
+
+      if (rpcError) {
+        throw new Error(
+          `Gagal menyimpan coaching summary: ${rpcError.message}`,
+        );
+      }
+
+      return c.json({
+        success: true,
+        data: {
+          annotations: insertedAnnotations || [],
+          recommendations,
+        },
+      });
+    } catch (error: any) {
+      console.error("[Telefun] Annotation generation error:", error);
       return c.json(
         {
           success: false,
           error: {
-            code: "NO_ANNOTATIONS",
-            message: "AI tidak menghasilkan anotasi.",
+            code: "GENERATION_ERROR",
+            message: error?.message || "Gagal menghasilkan anotasi.",
           },
         },
         500,
       );
     }
-
-    // 4. Delete stale AI annotations
-    await adminClient
-      .from("telefun_replay_annotations")
-      .delete()
-      .eq("session_id", sessionId)
-      .eq("is_manual", false);
-
-    // 5. Insert new AI annotations
-    const annotationRows = annotations.map((a: any) => ({
-      session_id: sessionId,
-      user_id: session.user_id,
-      timestamp_ms: a.timestamp_ms,
-      category: a.category,
-      moment: a.moment ?? null,
-      text: (a.text || "").slice(0, 500),
-      is_manual: false,
-    }));
-
-    const { data: insertedAnnotations, error: insertError } = await adminClient
-      .from("telefun_replay_annotations")
-      .insert(annotationRows)
-      .select("*");
-
-    if (insertError) throw insertError;
-
-    // 6. Update coaching summary
-    const checksum = createReplayAnnotationChecksum(annotationRows);
-
-    const { error: rpcError } = await adminClient.rpc(
-      "upsert_telefun_coaching_summary",
-      {
-        p_session_id: sessionId,
-        p_recommendations: recommendations.map((r: any) => ({
-          text: r.text,
-          priority: r.priority,
-        })),
-        p_ai_annotation_count: annotationRows.length,
-        p_ai_annotation_checksum: checksum,
-      },
-    );
-
-    if (rpcError) {
-      throw new Error(`Gagal menyimpan coaching summary: ${rpcError.message}`);
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        annotations: insertedAnnotations || [],
-        recommendations,
-      },
-    });
-  } catch (error: any) {
-    console.error("[Telefun] Annotation generation error:", error);
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "GENERATION_ERROR",
-          message: error?.message || "Gagal menghasilkan anotasi.",
-        },
-      },
-      500,
-    );
-  }
-});
+  },
+);
 
 export { telefunAnnotations };

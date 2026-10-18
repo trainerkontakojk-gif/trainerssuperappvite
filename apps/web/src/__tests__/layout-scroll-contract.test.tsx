@@ -27,21 +27,6 @@ vi.mock("../hooks/useThemeMode", () => ({
   useThemeMode: () => ({ theme: "light", setTheme: vi.fn() }),
 }));
 
-vi.mock("../context/TelefunWarningContext", () => ({
-  TelefunWarningProvider: ({ children }: { children: ReactNode }) => children,
-  useTelefunWarning: () => ({
-    isMaintenanceOpen: false,
-    openMaintenance: vi.fn(),
-    hasTelefunAccess: true,
-    grantTelefunAccess: vi.fn(),
-    revokeTelefunAccess: vi.fn(),
-  }),
-}));
-
-vi.mock("../routes/telefun/components/MaintenanceModal", () => ({
-  MaintenanceModal: () => null,
-}));
-
 vi.mock("../components/layout/index", () => ({
   Sidebar: () => null,
   AppHeader: () => null,
@@ -68,12 +53,7 @@ describe("DashboardLayout workspace scroll contract", () => {
 
   it("places the mobile tab bar below modal overlays", () => {
     render(
-      <MobileTabBar
-        profile={{ role: "trainer" }}
-        hasTelefunAccess
-        openMaintenance={vi.fn()}
-        onOpenDrawer={vi.fn()}
-      />,
+      <MobileTabBar profile={{ role: "trainer" }} onOpenDrawer={vi.fn()} />,
     );
 
     expect(

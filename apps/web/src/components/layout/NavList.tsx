@@ -21,8 +21,6 @@ interface NavListProps {
   idPrefix: string;
   /** Mode rail: label disembunyikan secara visual dan tooltip aktif. */
   collapsed?: boolean;
-  hasTelefunAccess: boolean;
-  openMaintenance: () => void;
   onNavigate?: () => void;
 }
 
@@ -39,19 +37,8 @@ export function NavList({
   pathname,
   idPrefix,
   collapsed = false,
-  hasTelefunAccess,
-  openMaintenance,
   onNavigate,
 }: NavListProps) {
-  const handleClick = (item: NavItem) => (event: MouseEvent) => {
-    if (item.id === "telefun" && !hasTelefunAccess) {
-      event.preventDefault();
-      openMaintenance();
-      return;
-    }
-    onNavigate?.();
-  };
-
   return (
     <Tooltip.Provider delay={150}>
       {model.groups.map((group) => (
@@ -74,7 +61,7 @@ export function NavList({
                 item={item}
                 idPrefix={idPrefix}
                 collapsed={collapsed}
-                onClick={handleClick(item)}
+                onClick={() => onNavigate?.()}
               />
             ),
           )}

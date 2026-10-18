@@ -40,6 +40,8 @@ import type {
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { notify } from "../../lib/toast";
 import { practiceQuotaMessage } from "../../lib/practice-quota";
+import { usePracticeQuota } from "../../hooks/usePracticeQuota";
+import { QuotaLine } from "../../components/simulation/QuotaLine";
 import { usePdktMailboxDetail } from "./utils/usePdktMailboxDetail";
 import type { PdktSettingsResource } from "./utils/usePdktSettings";
 import { PdktSettingsNotice } from "./components/PdktSettingsNotice";
@@ -127,6 +129,7 @@ export default function PdktSimulation({
   // Settings state
   const { settings } = settingsResource;
   const canCreateEmail = settingsResource.status === "ready";
+  const quota = usePracticeQuota("pdkt");
 
   // History state
   const [history, setHistory] = useState<SessionHistory[]>(
@@ -465,6 +468,7 @@ export default function PdktSimulation({
       }
     } finally {
       setIsStartingNew(false);
+      void quota.refetch();
     }
   };
 
@@ -605,11 +609,13 @@ export default function PdktSimulation({
         : null;
   const practiceUnavailableReason = !canCreateEmail
     ? "Muat ulang pengaturan sebelum membuat email baru."
-    : repeatSubject
-      ? undefined
-      : reviewedSubject?.type === "participant"
-        ? "Latihan lagi tidak tersedia karena peserta ini sudah dihapus. Kembali ke halaman awal PDKT untuk memilih peserta aktif."
-        : "Latihan lagi tidak tersedia karena peserta sesi ini tidak tercatat. Kembali ke halaman awal PDKT untuk memilih peserta.";
+    : quota.blocked
+      ? "Jatah email baru PDKT hari ini sudah habis. Bisa mulai lagi besok pukul 00.00 WIB."
+      : repeatSubject
+        ? undefined
+        : reviewedSubject?.type === "participant"
+          ? "Latihan lagi tidak tersedia karena peserta ini sudah dihapus. Kembali ke halaman awal PDKT untuk memilih peserta aktif."
+          : "Latihan lagi tidak tersedia karena peserta sesi ini tidak tercatat. Kembali ke halaman awal PDKT untuk memilih peserta.";
 
   const detailPending = (
     <PdktDetailPending
@@ -675,6 +681,12 @@ export default function PdktSimulation({
         >
           <MailboxSidebar
             creationDisabled={!canCreateEmail}
+            newEmailBlocked={quota.blocked}
+            quotaLine={
+              quota.status?.limit != null && (
+                <QuotaLine id="pdkt-quota-status" status={quota.status} />
+              )
+            }
             items={filteredByTab}
             openCount={openCount}
             reviews={reviews}
@@ -717,7 +729,7 @@ export default function PdktSimulation({
             detailPending
           ) : (
             <PdktEmptyDetail
-              canCreateEmail={canCreateEmail}
+              canCreateEmail={canCreateEmail && !quota.blocked}
               onNew={() => {
                 setPracticeSubject(null);
                 setIsNewModalOpen(true);

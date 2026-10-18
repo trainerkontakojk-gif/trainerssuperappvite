@@ -7,6 +7,7 @@ import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import {
   openHermeticShell,
   expectHermetic,
+  practiceQuotaMock,
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
@@ -763,4 +764,52 @@ test("a start refused by the daily limit shows the server's reason", async ({
   await expect(page.getByText(message)).toBeVisible();
   await expect(page.getByRole("region", { name: "Ruang chat" })).toHaveCount(0);
   expectHermetic(audit);
+});
+
+test("the start button shows today's remaining KETIK quota and turns off when it is used up", async ({
+  page,
+}) => {
+  const assignment: ApiMock = {
+    method: "GET",
+    path: "/api/v1/ketik/assignments/self",
+    body: {
+      success: true,
+      data: {
+        assignment: {
+          recipientId: "user-1",
+          assignedBy: "trainer",
+          version: id,
+          sourceSettingsVersion: "absent",
+          sourceConfiguration: DEFAULT_KETIK_SETTINGS,
+          assignedAt: new Date().toISOString(),
+        },
+        recipientSettingsVersion: "absent",
+      },
+    },
+  };
+  const left = await openHermeticShell(page, {
+    path: "/ketik",
+    auth: { role: "agent" },
+    apiMocks: [practiceQuotaMock({ ketik: { limit: 3, used: 1 } }), assignment, ...base],
+  });
+  const start = page.getByRole("button", { name: /^Mulai simulasi/ });
+  await expect(
+    page.getByText(
+      "Sisa hari ini 2 dari 3 simulasi. Dihitung lagi besok pukul 00.00 WIB.",
+    ),
+  ).toBeVisible();
+  await expect(start).toBeEnabled();
+  expectHermetic(left);
+
+  const out = await openHermeticShell(page, {
+    path: "/ketik",
+    auth: { role: "agent" },
+    apiMocks: [practiceQuotaMock({ ketik: { limit: 3, used: 3 } }), assignment, ...base],
+  });
+  const reason =
+    "Jatah KETIK hari ini sudah habis (3 dari 3). Bisa mulai lagi besok pukul 00.00 WIB.";
+  await expect(page.getByText(reason)).toBeVisible();
+  await expect(start).toBeDisabled();
+  await expect(start).toHaveAccessibleDescription(reason);
+  expectHermetic(out);
 });

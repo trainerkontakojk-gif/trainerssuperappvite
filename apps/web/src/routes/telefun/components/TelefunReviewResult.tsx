@@ -132,7 +132,8 @@ export function ReviewResult({
   /** Saat Telaah ulang dimulai; `null` bila tidak berjalan. */
   rerunStartedAt: number | null;
   rerunFailed: boolean;
-  onRerun: () => void;
+  /** Tidak ada bila peran ini tidak boleh menilai ulang (hanya trainer/admin). */
+  onRerun?: () => void;
   notes: ReactNode;
   /** `id` butir anotasi isi yang ditunjuk dari transkrip. */
   highlightedId?: string | null;
@@ -155,16 +156,18 @@ export function ReviewResult({
         score={score}
         change={scoreChange(score, previous)}
         action={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={rerunStartedAt !== null}
-            onClick={onRerun}
-            className="ml-auto min-h-[44px] gap-2 px-3 text-[13px]"
-          >
-            <RotateCcw data-icon="inline-start" />
-            {rerunStartedAt !== null ? "Menelaah ulang…" : "Telaah ulang"}
-          </Button>
+          onRerun && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={rerunStartedAt !== null}
+              onClick={onRerun}
+              className="ml-auto min-h-[44px] gap-2 px-3 text-[13px]"
+            >
+              <RotateCcw data-icon="inline-start" />
+              {rerunStartedAt !== null ? "Menelaah ulang…" : "Telaah ulang"}
+            </Button>
+          )
         }
       />
 
@@ -300,7 +303,7 @@ export function ReviewResult({
 
         <TabsContent value="fix" className="flex flex-col gap-3">
           {!content ? (
-            <ContentNotAvailable review={content} canRerun />
+            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
           ) : toFix.length === 0 ? (
             <Empty>
               Tidak ada kalimat agen yang ditandai perlu diperbaiki.
@@ -325,7 +328,7 @@ export function ReviewResult({
 
         <TabsContent value="good" className="flex flex-col gap-3">
           {!content ? (
-            <ContentNotAvailable review={content} canRerun />
+            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
           ) : good.length === 0 ? (
             <Empty>
               Belum ada contoh ucapan agen yang ditandai sudah tepat.
@@ -364,7 +367,7 @@ export function ReviewResult({
 
         <TabsContent value="questions" className="flex flex-col gap-3">
           {!content ? (
-            <ContentNotAvailable review={content} canRerun />
+            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
           ) : content.consumerPoints.length === 0 ? (
             <Empty>
               AI tidak menemukan pertanyaan konsumen di panggilan ini.
@@ -381,7 +384,7 @@ export function ReviewResult({
 
         <TabsContent value="lines" className="flex flex-col gap-3">
           {!content ? (
-            <ContentNotAvailable review={content} canRerun />
+            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
           ) : content.agentNotes.length === 0 ? (
             <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
           ) : (

@@ -1,15 +1,9 @@
-import { can, normalizeRole } from "@trainers/types";
 import { Outlet, useLocation } from "@tanstack/react-router";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { signOutLocalSession } from "../lib/session-logout";
 import { useThemeMode } from "../hooks/useThemeMode";
-import {
-  TelefunWarningProvider,
-  useTelefunWarning,
-} from "../context/TelefunWarningContext";
-import { MaintenanceModal } from "../routes/telefun/components/MaintenanceModal";
 import { Sidebar, AppHeader, MobileTabBar, MobileDrawer } from "./layout/index";
 import { useRouteFocus } from "./layout/useRouteFocus";
 
@@ -19,59 +13,7 @@ function DashboardLayoutContent() {
   const { pathname } = useLocation();
   const { theme, setTheme } = useThemeMode();
 
-  const {
-    isMaintenanceOpen,
-    openMaintenance,
-    hasTelefunAccess,
-    grantTelefunAccess,
-    revokeTelefunAccess,
-  } = useTelefunWarning();
-  const prevPathnameRef = useRef(pathname);
   const contentRef = useRef<HTMLElement>(null);
-
-  // Auto-grant access to allowed roles immediately on profile load so they can bypass sidebar warning gates
-  useEffect(() => {
-    if (profile) {
-      const normalizedRole = profile.role?.toLowerCase().trim();
-      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
-      if (isAllowedRole && !hasTelefunAccess) {
-        grantTelefunAccess();
-      }
-    }
-  }, [profile, hasTelefunAccess, grantTelefunAccess]);
-
-  useEffect(() => {
-    if (pathname.startsWith("/telefun") && !hasTelefunAccess && profile) {
-      const normalizedRole = profile.role?.toLowerCase().trim();
-      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
-      if (isAllowedRole) {
-        // Tetap di alamat yang dibuka (mis. tahap Telaah atau Riwayat).
-        grantTelefunAccess();
-      } else {
-        openMaintenance();
-      }
-    }
-
-    if (
-      prevPathnameRef.current.startsWith("/telefun") &&
-      !pathname.startsWith("/telefun")
-    ) {
-      const normalizedRole = profile?.role?.toLowerCase().trim();
-      const isAllowedRole = can(normalizeRole(normalizedRole), "telefun.use");
-      if (!isAllowedRole) {
-        revokeTelefunAccess();
-      }
-    }
-
-    prevPathnameRef.current = pathname;
-  }, [
-    pathname,
-    hasTelefunAccess,
-    openMaintenance,
-    grantTelefunAccess,
-    revokeTelefunAccess,
-    profile,
-  ]);
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const isPublicRoute = [
@@ -129,8 +71,6 @@ function DashboardLayoutContent() {
         pathname={pathname}
         profile={profile}
         session={session}
-        hasTelefunAccess={hasTelefunAccess}
-        openMaintenance={openMaintenance}
         theme={theme}
         setTheme={setTheme}
         handleLogout={handleLogout}
@@ -152,29 +92,21 @@ function DashboardLayoutContent() {
           tabIndex={0}
           className={`min-h-0 min-w-0 flex-1 overscroll-contain ${pathname === "/profiler" || pathname === "/profiler/" ? "flex flex-col overflow-hidden" : "overflow-y-auto"}`}
         >
-          {pathname.startsWith("/telefun") && !hasTelefunAccess ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              }
-            >
-              <Outlet />
-            </Suspense>
-          )}
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </section>
       </main>
 
       {/* Bottom Tab Bar — Mobile Only */}
       <MobileTabBar
         profile={profile}
-        hasTelefunAccess={hasTelefunAccess}
-        openMaintenance={openMaintenance}
         onOpenDrawer={() => setMobileDrawerOpen(true)}
       />
 
@@ -187,19 +119,11 @@ function DashboardLayoutContent() {
         theme={theme}
         setTheme={setTheme}
         handleLogout={handleLogout}
-        hasTelefunAccess={hasTelefunAccess}
-        openMaintenance={openMaintenance}
       />
-
-      <MaintenanceModal isOpen={isMaintenanceOpen} role={profile?.role} />
     </div>
   );
 }
 
 export function DashboardLayout() {
-  return (
-    <TelefunWarningProvider>
-      <DashboardLayoutContent />
-    </TelefunWarningProvider>
-  );
+  return <DashboardLayoutContent />;
 }

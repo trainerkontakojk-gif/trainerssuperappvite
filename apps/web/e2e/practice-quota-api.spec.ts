@@ -507,3 +507,70 @@ test("the Telefun call server only admits a fresh, active session made by the AP
     reason: "Invalid Session",
   });
 });
+
+test("each person can read today's remaining quota, and agents can open Telefun but not start it at zero", async () => {
+  type Entry = {
+    module: string;
+    limit: number | null;
+    used: number;
+    source: string;
+    ends_on: string | null;
+    resets_at: string;
+  };
+  const status = async (who: Identity) => {
+    const response = await api(who, "/me/practice-quota");
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    return Object.fromEntries(
+      (response.body.data as Entry[]).map((entry) => [entry.module, entry]),
+    );
+  };
+
+  const agent = await status(users.agent);
+  expect(agent.ketik).toMatchObject({
+    limit: 3,
+    used: used(users.agent, "ketik"),
+    source: "role",
+    ends_on: null,
+  });
+  expect(agent.telefun).toMatchObject({ limit: 0, source: "role" });
+  // Reset is the next 00.00 WIB (17.00 UTC).
+  expect(new Date(agent.ketik.resets_at).getUTCHours()).toBe(17);
+  expect(new Date(agent.ketik.resets_at).getTime()).toBeGreaterThan(Date.now());
+
+  const trainer = await status(users.trainer);
+  expect(trainer.ketik.limit).toBeNull();
+  expect(trainer.pdkt.limit).toBeNull();
+
+  // An override is reported as such, with its end date.
+  runSql(
+    env,
+    `INSERT INTO practice_limit_overrides(user_id,module,daily_limit,ends_on)
+     VALUES ('${users.agent.userId}','pdkt',7,'2099-12-31')
+     ON CONFLICT (user_id,module) DO UPDATE SET daily_limit=7, ends_on='2099-12-31';`,
+  );
+  expect((await status(users.agent)).pdkt).toMatchObject({
+    limit: 7,
+    source: "override",
+    ends_on: "2099-12-31",
+  });
+  runSql(
+    env,
+    `DELETE FROM practice_limit_overrides WHERE user_id='${users.agent.userId}' AND module='pdkt';`,
+  );
+
+  // Telefun is open to agents: the page loads, but a zero limit refuses a start.
+  expect((await api(users.agent, "/telefun/sessions")).status).toBe(200);
+  const start = await api(users.agent, "/telefun/sessions", "POST", {
+    scenario_title: ns,
+    consumer_name: "Budi",
+  });
+  expect(start.status, JSON.stringify(start.body)).toBe(403);
+  expect(start.body.error.code).toBe("PRACTICE_NOT_ALLOWED");
+  // Re-scoring has no daily limit, so it stays with trainers and admins.
+  const rerun = await api(
+    users.agent,
+    `/telefun/score/${randomUUID()}/rerun`,
+    "POST",
+  );
+  expect(rerun.status).toBe(403);
+});

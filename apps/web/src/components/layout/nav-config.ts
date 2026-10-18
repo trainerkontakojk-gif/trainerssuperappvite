@@ -177,7 +177,7 @@ const MOBILE_TAB_IDS: Record<Role, readonly string[]> = {
   admin: ["dashboard", "qa-analyzer", "tna", "ketik"],
   trainer: ["dashboard", "qa-analyzer", "tna", "ketik"],
   leader: ["dashboard", "qa-analyzer", "profiler", "ketik"],
-  agent: ["dashboard", "ketik", "pdkt"],
+  agent: ["dashboard", "ketik", "pdkt", "telefun"],
 };
 
 /**
