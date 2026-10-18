@@ -640,3 +640,8 @@ Fase 5a (`plans/markdown/kontrol-user-fase-5.md`):
 
 - Menangguhkan, menolak, menghapus, atau menurunkan role akun langsung mengakhiri semua login-nya lewat fungsi service-role `revoke_user_sessions` (hapus `auth.sessions`). Token lama ditolak Supabase Auth, jadi API membalas 401.
 - Agent dan leader hanya bisa menelaah ulang satu sesi KETIK 1 kali (`ketik_history.rerun_count`, diperiksa di `enqueue_ketik_review`). Trainer dan admin tanpa batas.
+
+Fase 5b (`plans/markdown/kontrol-user-fase-5b.md`):
+
+- `profiles.active_until` adalah hari WIB terakhir akun boleh dipakai (null = tanpa batas). `authMiddleware` menolak akun yang lewat dengan 403 `ACCOUNT_EXPIRED` dan mengakhiri semua login-nya. Hanya API (service role) yang menulis kolom ini, lewat `PUT /admin/users/:id/active-until`, approve, atau aksi massal.
+- Aksi massal di `/admin/users/bulk-*` menerima 1 sampai 100 akun dan memproses setiap orang lewat fungsi satu akun yang sama, jadi aturan "bukan diri sendiri, trainer tidak menyentuh admin" tetap berlaku per orang.

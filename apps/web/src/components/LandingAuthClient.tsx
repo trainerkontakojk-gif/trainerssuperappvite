@@ -50,6 +50,11 @@ export function LandingAuthProvider({
       };
     if (msg === "deleted")
       return { type: "error" as const, text: "Akun Anda telah dinonaktifkan." };
+    if (msg === "expired")
+      return {
+        type: "error" as const,
+        text: "Masa aktif akun Anda sudah berakhir. Hubungi trainer Anda untuk memperpanjang.",
+      };
     if (msg === "profile-unavailable")
       return {
         type: "error" as const,

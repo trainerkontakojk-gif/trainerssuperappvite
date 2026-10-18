@@ -48,6 +48,17 @@ const rows = [
   ],
   ["POST", "/v1/admin/users/:id/reset-password", "admin.users", MANAGERS],
   ["POST", "/v1/admin/users/:id/approve", "admin.users", MANAGERS],
+  ["PUT", "/v1/admin/users/:id/active-until", "admin.users", MANAGERS],
+  ["POST", "/v1/admin/users/bulk-peserta-suggestions", "admin.users", MANAGERS],
+  ["POST", "/v1/admin/users/bulk-approve", "admin.users", MANAGERS],
+  ["POST", "/v1/admin/users/bulk-suspend", "admin.users", MANAGERS],
+  ["POST", "/v1/admin/users/bulk-active-until", "admin.users", MANAGERS],
+  [
+    "POST",
+    "/v1/admin/users/bulk-practice-limit",
+    "practice.limits.manage",
+    MANAGERS,
+  ],
   ["GET", "/v1/admin/practice-limits", "practice.limits.manage", MANAGERS],
   [
     "PUT",

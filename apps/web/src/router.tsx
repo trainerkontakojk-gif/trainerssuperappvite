@@ -9,6 +9,7 @@ import { lazy } from "react";
 import { DashboardLayout } from "./components/Layout";
 import {
   can,
+  isAccountExpired,
   LEADER_APPROVAL_MODULE,
   VALID_SERVICE_TYPES,
   type Capability,
@@ -16,6 +17,7 @@ import {
 } from "@trainers/types";
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
+import { signOutLocalSession } from "./lib/session-logout";
 import { fetchApi } from "./hooks/useApi";
 import {
   validateSidakScopeSearch,
@@ -568,6 +570,15 @@ const accountRoute = createRoute({
   beforeLoad: requireAuth(),
 });
 
+/** Past its masa aktif: sign out and say why on the login page. */
+async function endExpiredSession(): Promise<never> {
+  await signOutLocalSession({
+    markLoggedOut: false,
+    redirectTo: "/?auth=login&message=expired",
+  });
+  throw redirect({ to: "/" });
+}
+
 export function guardWaitingApproval() {
   return async () => {
     const {
@@ -579,6 +590,7 @@ export function guardWaitingApproval() {
     if (profile?.is_deleted || profile?.status === "inactive") {
       throw redirect({ to: "/" });
     }
+    if (isAccountExpired(profile?.active_until)) await endExpiredSession();
     if (profile?.status === "active") {
       throw redirect({ to: "/dashboard" });
     }
@@ -644,6 +656,7 @@ export function requireCapability(capability: Capability) {
       if (!profile) throw redirect({ to: "/" });
       if (profile.is_deleted || profile.status === "inactive")
         throw redirect({ to: "/waiting-approval" });
+      if (isAccountExpired(profile.active_until)) await endExpiredSession();
       if (!can(profile.role, capability))
         throw redirect({ to: "/unauthorized" });
       const module = LEADER_APPROVAL_MODULE[capability];

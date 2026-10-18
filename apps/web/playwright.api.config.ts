@@ -43,7 +43,7 @@ export default defineConfig({
     },
     {
       name: "user-controls-real-backend",
-      testMatch: "user-controls-api.spec.ts",
+      testMatch: ["user-controls-api.spec.ts", "account-controls-api.spec.ts"],
     },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     {

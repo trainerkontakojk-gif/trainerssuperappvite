@@ -1,16 +1,29 @@
-import { normalizeRole } from "@trainers/types";
+import { isAccountExpired, normalizeRole } from "@trainers/types";
 import type { StatusTone } from "./components/management/StatusDot";
 
 export type NormalizedStatus = "pending" | "active" | "inactive";
+/** What the pages show: an active account past its masa aktif is "expired". */
+export type DisplayStatus = NormalizedStatus | "expired";
 
 export const STATUS_PRESENTATION: Record<
-  NormalizedStatus,
+  DisplayStatus,
   { label: string; tone: StatusTone }
 > = {
   pending: { label: "Menunggu", tone: "warning" },
   active: { label: "Aktif", tone: "success" },
   inactive: { label: "Nonaktif", tone: "muted" },
+  expired: { label: "Masa aktif habis", tone: "warning" },
 };
+
+export function displayStatus(account: {
+  status?: string | null;
+  active_until?: string | null;
+}): DisplayStatus {
+  const status = normalizeStatus(account.status);
+  return status === "active" && isAccountExpired(account.active_until)
+    ? "expired"
+    : status;
+}
 
 export function roleLabel(role?: string | null) {
   const normalized = normalizeRole(role);

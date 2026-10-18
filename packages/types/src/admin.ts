@@ -10,6 +10,8 @@ export interface ManagedUser {
   status: "active" | "pending" | "inactive";
   is_deleted: boolean;
   created_at?: string;
+  /** Last WIB day the account may be used; null or absent = no limit. */
+  active_until?: string | null;
   /** KTP participant this account belongs to; null when unlinked. */
   linked_peserta?: LinkedPesertaSummary | null;
   /** Per-user practice exceptions still in force today. */
@@ -141,6 +143,12 @@ export const updateUserStatusSchema = z.object({
 export const approveUserSchema = z.object({
   role: z.enum(ROLES),
   peserta_id: z.string().uuid().nullable(),
+  /** Last WIB day; omitted or null = no limit. */
+  active_until: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
 });
 
 export const linkUserPesertaSchema = z.object({

@@ -2,7 +2,9 @@ import {
   LIMITED_PRACTICE_ROLES,
   PRACTICE_MODULE_LABELS,
   formatPracticeLimit,
+  formatWibDay,
   normalizeRole,
+  wibToday,
   type LimitedPracticeRole,
   type ManagedUser,
   type PracticeLimitOverride,
@@ -31,20 +33,6 @@ const ROLE_LABEL: Record<LimitedPracticeRole, string> = {
   agent: "Agent",
   leader: "Leader",
 };
-
-/** Today's Asia/Jakarta date as YYYY-MM-DD. */
-function wibToday(): string {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-}
-
-function formatDay(day: string): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 function nameOf(profile: { full_name: string | null; email: string } | null) {
   return profile ? profile.full_name?.trim() || profile.email : null;
@@ -229,7 +217,7 @@ export async function setPracticeOverride(
     user_id: actor.id,
     user_name: actor.email,
     target_user_id: userId,
-    action: `Mengubah batas ${PRACTICE_MODULE_LABELS[module]} ${nameOf(target)} menjadi ${formatPracticeLimit(input.daily_limit)}${input.ends_on ? ` sampai ${formatDay(input.ends_on)}` : ""}${note ? ` (${note})` : ""}`,
+    action: `Mengubah batas ${PRACTICE_MODULE_LABELS[module]} ${nameOf(target)} menjadi ${formatPracticeLimit(input.daily_limit)}${input.ends_on ? ` sampai ${formatWibDay(input.ends_on)}` : ""}${note ? ` (${note})` : ""}`,
     module: "USER_MGMT",
     type: "practice_override",
   });

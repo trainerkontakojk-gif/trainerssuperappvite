@@ -3,35 +3,17 @@ import { useAuthStore } from "../store/authStore";
 import { normalizeProfileStatus } from "./profile";
 import { normalizeRole, type UserProfile } from "@trainers/types";
 
-function isMissingIsDeletedColumn(
-  error: { code?: string; message?: string } | null | undefined,
-) {
-  const message = error?.message?.toLowerCase() ?? "";
-  return error?.code === "42703" || message.includes("is_deleted");
-}
-
 export async function fetchAuthProfile(
   userId: string,
 ): Promise<UserProfile | null> {
-  const primary = await supabase
+  // "*" so a database without a newer column (is_deleted, active_until)
+  // still loads the profile instead of failing the whole sign-in.
+  const { data } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, status, is_deleted")
+    .select("*")
     .eq("id", userId)
-    .maybeSingle();
-
-  let profile = primary.data;
-
-  if (!profile && primary.error && isMissingIsDeletedColumn(primary.error)) {
-    const fallback = await supabase
-      .from("profiles")
-      .select("id, email, full_name, role, status")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (fallback.data) {
-      profile = { ...fallback.data, is_deleted: false } as any;
-    }
-  }
+    .maybeSingle<UserProfile>();
+  let profile = data;
 
   const role = normalizeRole(profile?.role);
   if (profile && !role) profile = null;
