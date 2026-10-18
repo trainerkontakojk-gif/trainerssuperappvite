@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   KETIK_ERROR_MESSAGES,
+  KETIK_RERUN_LIMIT,
   type KetikReviewAccepted,
   type KetikReviewStatus,
   type KetikReviewDetail,
@@ -106,6 +107,7 @@ export async function processOldestQueuedJob(workerId = "backend-worker") {
 export async function getKetikReviewStatus(
   sessionId: string,
   actorId: string,
+  actorRole: string,
 ): Promise<KetikReviewStatus | null> {
   const { data, error } = await createAdminClient().rpc("read_ketik_review", {
     p_actor: actorId,
@@ -142,6 +144,10 @@ export async function getKetikReviewStatus(
     resultReady,
     scores,
     previousKept: resultReady && job?.status === "failed",
+    rerunsLeft:
+      actorRole === "agent" || actorRole === "leader"
+        ? Math.max(0, KETIK_RERUN_LIMIT - (history.rerun_count ?? 0))
+        : null,
     ...(job?.status === "failed" || missingResult
       ? { errorMessage: KETIK_ERROR_MESSAGES.REVIEW_FAILED }
       : {}),

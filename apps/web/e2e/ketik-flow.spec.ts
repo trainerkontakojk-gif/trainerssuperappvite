@@ -1174,6 +1174,71 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("agen yang sudah memakai telaah ulang tidak melihat tombolnya lagi", async ({ page }) => {
+    // kontrol-user-fase-5: agent dan leader menelaah ulang 1 kali per sesi.
+    const audit = await open(
+      page,
+      telaahPath(REVIEWED_SESSION.id),
+      [
+        {
+          method: "GET",
+          path: `/api/v1/ketik/review/status/${REVIEWED_SESSION.id}`,
+          body: { success: true, data: { status: "completed", resultReady: true, previousKept: false, scores: REVIEW_DETAIL.scores, rerunsLeft: 0 } },
+        },
+        ...ketikMocks(FULL_HISTORY),
+        reviewDetailMock,
+      ],
+      "agent",
+    );
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", { timeout: 20000 });
+    await expect(result).toContainText("Telaah ulang sudah dipakai untuk sesi ini.");
+    await expect(result.getByRole("button", { name: "Telaah ulang" })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("telaah ulang yang ditolak karena batas menampilkan alasannya", async ({ page }) => {
+    const audit = await open(
+      page,
+      telaahPath(REVIEWED_SESSION.id),
+      [
+        {
+          method: "GET",
+          path: `/api/v1/ketik/review/status/${REVIEWED_SESSION.id}`,
+          body: { success: true, data: { status: "completed", resultReady: true, previousKept: false, scores: REVIEW_DETAIL.scores, rerunsLeft: 1 } },
+        },
+        {
+          method: "POST",
+          path: "/api/v1/ketik/review",
+          status: 429,
+          body: {
+            success: false,
+            error: {
+              code: "RERUN_LIMIT",
+              message: "Telaah ulang untuk sesi ini sudah dipakai. Agent dan leader bisa menelaah ulang 1 kali per sesi.",
+            },
+          },
+        },
+        ...ketikMocks(FULL_HISTORY),
+        reviewDetailMock,
+      ],
+      "agent",
+    );
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", { timeout: 20000 });
+    await result.getByRole("button", { name: "Telaah ulang" }).click();
+    const confirm = page.getByRole("dialog", { name: "Telaah ulang sesi ini?" });
+    await expect(confirm).toContainText("Anda bisa menelaah ulang 1 kali untuk sesi ini.");
+    await confirm.getByRole("button", { name: "Telaah ulang" }).click();
+    await expect(result.getByRole("alert")).toContainText(
+      "Telaah ulang untuk sesi ini sudah dipakai. Agent dan leader bisa menelaah ulang 1 kali per sesi.",
+    );
+    // Hasil lama tetap tampil dan tombol hilang.
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    await expect(result.getByRole("button", { name: "Telaah ulang" })).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
   test("unduh transkrip memberi CSV ber-BOM yang aman dari formula", async ({
     page,
   }) => {

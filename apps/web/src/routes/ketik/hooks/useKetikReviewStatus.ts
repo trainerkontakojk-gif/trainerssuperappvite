@@ -5,6 +5,7 @@ import type {
   KetikSessionReview,
   KetikTypoFinding,
 } from "@trainers/types";
+import { ApiError } from "../../../lib/api";
 import { ketikApi } from "../ketikApi";
 
 const POLL_INTERVAL_MS = 3_000;
@@ -51,6 +52,9 @@ export function useKetikReviewStatus(
   onSessionChange: (session: KetikSessionHistoryItem) => void,
 ) {
   const [state, setState] = useState<KetikReviewState>(INITIAL);
+  // Re-scores left for this reader (undefined = not known yet, null = no limit).
+  const [rerunsLeft, setRerunsLeft] = useState<number | null | undefined>();
+  const [rerunRefusal, setRerunRefusal] = useState<string | null>(null);
   const sessionRef = useRef(session);
   const onChangeRef = useRef(onSessionChange);
   const runRef = useRef(0);
@@ -111,6 +115,7 @@ export function useKetikReviewStatus(
       try {
         const data = await ketikApi.getReviewStatus(current.id);
         if (run !== runRef.current) return;
+        setRerunsLeft(data.rerunsLeft);
         setState((prev) => ({ ...prev, pollFailed: false }));
         if (data.status === "failed" && data.previousKept && data.resultReady) {
           rerunFailedRun.current = run;
@@ -147,6 +152,8 @@ export function useKetikReviewStatus(
     const run = invalidate();
     requestRef.current = null;
     rerunFailedRun.current = -1;
+    setRerunsLeft(undefined);
+    setRerunRefusal(null);
     const current = sessionRef.current;
     if (!sessionId || !current) setState(INITIAL);
     else if (current.reviewStatus === "completed") void checkStatus(run, true);
@@ -215,7 +222,15 @@ export function useKetikReviewStatus(
           const queueStatus = result.status;
           setState((prev) => ({ ...prev, queueStatus }));
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "RERUN_LIMIT") {
+          // Refused before anything changed: keep showing the current result.
+          requestRef.current = null;
+          setRerunsLeft(0);
+          setRerunRefusal(error.message);
+          await loadResult(run);
+          return;
+        }
         // Acceptance may have succeeded despite a lost response; polling is the primary recovery path.
         if (run === runRef.current)
           setState((prev) => ({ ...prev, pollFailed: true }));
@@ -225,6 +240,8 @@ export function useKetikReviewStatus(
   );
   return {
     ...state,
+    rerunsLeft,
+    rerunRefusal,
     start: () => submit(false),
     rerun: () => submit(true),
     retryResult: () => {

@@ -70,6 +70,29 @@ export async function getUsers(): Promise<ManagedUser[]> {
   }));
 }
 
+const ROLE_RANK: Record<string, number> = {
+  agent: 0,
+  leader: 1,
+  trainer: 2,
+  admin: 3,
+};
+
+/**
+ * Ends every open login of an account, on every device. Used when it can no
+ * longer sign in (suspended, rejected, deleted) or loses access (lower role).
+ */
+async function endAllLogins(user_id: string): Promise<void> {
+  const { error } = await supabaseAdmin.rpc("revoke_user_sessions", {
+    p_user: user_id,
+  });
+  if (error)
+    throw new Error(
+      "Perubahan tersimpan, tetapi login yang masih terbuka belum bisa diakhiri. Coba simpan sekali lagi.",
+    );
+}
+
+const ENDED_LOGINS = "; semua login-nya diakhiri";
+
 const STATUS_LABEL: Record<string, string> = {
   active: "Aktif",
   pending: "Menunggu",
@@ -118,11 +141,13 @@ export async function updateUserStatus(
     .eq("id", user_id);
 
   if (error) throw new Error(error.message);
+  const endsLogins = dbStatus !== "active";
+  if (endsLogins) await endAllLogins(user_id);
 
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Mengubah status ${await targetLabel(user_id)} menjadi ${STATUS_LABEL[dbStatus] ?? dbStatus}`,
+    action: `Mengubah status ${await targetLabel(user_id)} menjadi ${STATUS_LABEL[dbStatus] ?? dbStatus}${endsLogins ? ENDED_LOGINS : ""}`,
     module: "USER_MGMT",
     type: "update_status",
     target_user_id: user_id,
@@ -149,11 +174,9 @@ export async function updateUserRole(
     throw new Error("Trainer tidak dapat memberikan role admin");
   }
 
-  if (callerRole === "trainer") {
-    const targetRole = await getTargetUserRole(user_id);
-    if (targetRole === "admin") {
-      throw new Error("Trainer tidak dapat mengubah akun admin");
-    }
+  const targetRole = await getTargetUserRole(user_id);
+  if (callerRole === "trainer" && targetRole === "admin") {
+    throw new Error("Trainer tidak dapat mengubah akun admin");
   }
 
   const { error } = await supabaseAdmin
@@ -162,11 +185,14 @@ export async function updateUserRole(
     .eq("id", user_id);
 
   if (error) throw new Error(error.message);
+  const demoted =
+    (ROLE_RANK[normalizedRole] ?? 0) < (ROLE_RANK[targetRole ?? ""] ?? 0);
+  if (demoted) await endAllLogins(user_id);
 
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Mengubah role ${await targetLabel(user_id)} menjadi ${normalizedRole}`,
+    action: `Mengubah role ${await targetLabel(user_id)} menjadi ${normalizedRole}${demoted ? ENDED_LOGINS : ""}`,
     module: "USER_MGMT",
     type: "update_role",
     target_user_id: user_id,
@@ -234,11 +260,12 @@ export async function deleteUser(
     .update({ akun_id: null })
     .eq("akun_id", user_id);
   if (unlinkError) throw new Error(unlinkError.message);
+  await endAllLogins(user_id);
 
   await logActivity({
     user_id: callerId,
     user_name: callerEmail,
-    action: `Menghapus pengguna ${await targetLabel(user_id)}`,
+    action: `Menghapus pengguna ${await targetLabel(user_id)}${ENDED_LOGINS}`,
     module: "USER_MGMT",
     type: "delete",
     target_user_id: user_id,

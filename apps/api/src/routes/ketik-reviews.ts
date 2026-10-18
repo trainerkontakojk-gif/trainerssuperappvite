@@ -48,6 +48,22 @@ export const ketikReviews = new Hono<{ Variables: Variables }>()
           error.message === "REVIEW_NOT_FOUND"
         )
           return c.json(missing, 404);
+        if (
+          error &&
+          typeof error === "object" &&
+          "message" in error &&
+          error.message === "RERUN_LIMIT"
+        )
+          return c.json(
+            {
+              success: false as const,
+              error: {
+                code: "RERUN_LIMIT",
+                message: KETIK_ERROR_MESSAGES.RERUN_LIMIT,
+              },
+            },
+            429,
+          );
         console.error("[KETIK] Review enqueue failed", {
           errorClass: error instanceof Error ? error.name : "DatabaseError",
         });
@@ -73,6 +89,7 @@ export const ketikReviews = new Hono<{ Variables: Variables }>()
         const data = await getKetikReviewStatus(
           c.req.valid("param").sessionId,
           getActor(c).id,
+          getActor(c).role,
         );
         return data
           ? c.json({ success: true as const, data })

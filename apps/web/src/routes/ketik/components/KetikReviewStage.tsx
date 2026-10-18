@@ -277,6 +277,8 @@ export function KetikReviewStage({
               target={target}
               rerunFailed={review.rerunFailed}
               onRerun={canStartReview ? () => setRerunOpen(true) : null}
+              rerunsLeft={review.rerunsLeft}
+              rerunRefusal={review.rerunRefusal}
             />
           ) : review.phase === "reviewing" ||
             review.phase === "loading-result" ? (
@@ -310,7 +312,7 @@ export function KetikReviewStage({
       <ConfirmDialog
         open={rerunOpen}
         title="Telaah ulang sesi ini?"
-        description="AI menilai percakapan ini sekali lagi dan hasil sekarang diganti dengan yang baru. Bila telaah ulang gagal, hasil sekarang tetap dipakai."
+        description={`AI menilai percakapan ini sekali lagi dan hasil sekarang diganti dengan yang baru. Bila telaah ulang gagal, hasil sekarang tetap dipakai.${review.rerunsLeft === 1 ? " Anda bisa menelaah ulang 1 kali untuk sesi ini." : ""}`}
         confirmLabel="Telaah ulang"
         confirmVariant="default"
         container={layer}

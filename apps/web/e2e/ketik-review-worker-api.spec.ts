@@ -1034,6 +1034,7 @@ test("migration rollback refuses live jobs, preserves published data, and reappl
   for (const migration of [
     "20261016000935_ketik_durable_review_worker.sql",
     "20261017150000_ketik_settle_review_drop_legacy_results.sql",
+    "20261018200000_user_controls.sql",
   ])
     runSql(
       env,
