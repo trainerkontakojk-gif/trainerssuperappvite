@@ -52,6 +52,38 @@ export function formatPricingDate(iso: string): string {
   });
 }
 
+/** Waktu sesi di WIB, mis. "17 Okt, 14.15". */
+export function formatSessionTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  const day = date.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Jakarta",
+  });
+  const time = date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  });
+  return `${day}, ${time}`;
+}
+
+/** Lama sesi, mis. "6 mnt 52 dtk", "9 mnt", atau "45 dtk". */
+export function formatSessionDuration(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return "-";
+  const total = Math.round(seconds);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins === 0) return `${secs} dtk`;
+  return secs > 0 ? `${mins} mnt ${secs} dtk` : `${mins} mnt`;
+}
+
+/** Skor dengan koma desimal, mis. "7,5". */
+export function formatScoreValue(score: number): string {
+  return score.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}d`;
   const mins = Math.floor(seconds / 60);

@@ -7,8 +7,9 @@ import type {
   ApiResponse,
   JadwalShiftingMonthResponse,
   JadwalShiftingResponse,
-  MonitoringHistoryEntry,
+  MonitoringHistoryStatusFilter,
   MonitoringReviewByModule,
+  MonitoringSessionPage,
   SidakSimulationDetail,
   SidakSimulationModule,
   SidakSimulationPage,
@@ -16,6 +17,8 @@ import type {
 
 export type {
   MonitoringHistoryEntry,
+  MonitoringSessionPage,
+  MonitoringSessionRow,
   KetikMonitoringReview,
   PdktMonitoringReview,
   TelefunMonitoringReview,
@@ -196,7 +199,16 @@ type AdminClient = {
 
 type AiClient = {
   "monitoring/history": {
-    $get(): Promise<RpcResponse<MonitoringHistoryEntry[]>>;
+    $get(args: {
+      query: {
+        module?: MonitoringModule;
+        status?: MonitoringHistoryStatusFilter;
+        from?: string;
+        to?: string;
+        q?: string;
+        page?: string;
+      };
+    }): Promise<RpcResponse<MonitoringSessionPage>>;
   };
   "monitoring/history/:module/:id/review": {
     $get<M extends MonitoringModule>(args: {

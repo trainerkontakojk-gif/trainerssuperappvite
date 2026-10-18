@@ -52,6 +52,7 @@ const KetikHistory = lazy(() => import("./routes/ketik/history"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
+import { validateHistorySearch } from "./routes/monitoring/history-search";
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
 const TelefunHistory = lazy(() => import("./routes/telefun/history"));
 const AccountPage = lazy(() => import("./routes/account"));
@@ -454,6 +455,7 @@ const monitoringRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/monitoring",
   beforeLoad: requireCapability("monitoring.read"),
+  validateSearch: validateHistorySearch,
   component: MonitoringPage,
 });
 

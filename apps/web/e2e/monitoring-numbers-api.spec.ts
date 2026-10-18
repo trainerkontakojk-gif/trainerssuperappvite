@@ -144,14 +144,19 @@ test.afterAll(async () => {
 });
 
 test("durasi KETIK di riwayat Monitoring adalah lama sesi sebenarnya", async () => {
-  const response = await get("/ai/monitoring/history");
+  const response = await get(
+    `/ai/monitoring/history?q=${encodeURIComponent(`Durasi ${ns}`)}`,
+  );
   const body = await response.json();
   expect(response.status, JSON.stringify(body).slice(0, 500)).toBe(200);
-  const entry = body.data.find((row: { id: string }) => row.id === ketikId);
+  const entry = body.data.rows.find((row: { id: string }) => row.id === ketikId);
   expect(entry).toBeTruthy();
   expect(entry.duration_seconds).toBe(412);
-  // Batas waktu tetap dikirim apa adanya (menit).
-  expect(entry.ketik_session.simulation_duration).toBe(5);
+  // Batas waktu tetap dikirim apa adanya (menit) di detail sesi.
+  const review = await get(`/ai/monitoring/history/ketik/${ketikId}/review`);
+  const detail = await review.json();
+  expect(review.status, JSON.stringify(detail).slice(0, 500)).toBe(200);
+  expect(detail.data.session.simulationDuration).toBe(5);
 });
 
 test("durasi KETIK di riwayat simulasi SIDAK adalah lama sesi sebenarnya", async () => {

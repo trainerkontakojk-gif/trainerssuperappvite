@@ -14,6 +14,8 @@ export {
 export type {
   KetikMonitoringReview,
   MonitoringHistoryEntry,
+  MonitoringSessionPage,
+  MonitoringSessionRow,
   PdktMonitoringReview,
   PricingEntry,
   TelefunMonitoringReview,

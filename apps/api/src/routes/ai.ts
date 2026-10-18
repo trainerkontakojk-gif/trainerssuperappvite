@@ -1,4 +1,4 @@
-import { can } from "@trainers/types";
+import { can, normalizeRole } from "@trainers/types";
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -8,7 +8,11 @@ import type { AiModelModule } from "@trainers/types";
 import { requireCapability } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
-import { getMonitoringHistory } from "../services/monitoring-history-service";
+import {
+  assertSessionInScope,
+  listMonitoringSessions,
+  resolveMonitoringScope,
+} from "../services/monitoring-sessions-service";
 import {
   getMonitoringReviewDetail,
   MonitoringReviewDataError,
@@ -35,6 +39,19 @@ type Variables = { user: User; profile: any };
 const ai = new Hono<{ Variables: Variables }>();
 const monitoringHistoryModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
 const monitoringHistoryIdSchema = z.string().uuid();
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const monitoringHistoryQuerySchema = z.object({
+  module: monitoringHistoryModuleSchema.optional(),
+  status: z.enum(["completed", "processing", "failed", "not_started"]).optional(),
+  from: isoDateSchema.optional(),
+  to: isoDateSchema.optional(),
+  q: z.string().max(100).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+});
+
+function monitoringActor(c: Context<{ Variables: Variables }>) {
+  return { id: c.get("user").id, role: normalizeRole(c.get("profile")?.role) };
+}
 
 function canSignCrossUserRecording(profile: any): boolean {
   return can(profile?.role, "monitoring.recording.sign");
@@ -146,9 +163,21 @@ ai.get("/usage/summary", requireCapability("usage.read"), async (c) => {
 ai.get(
   "/monitoring/history",
   requireCapability("monitoring.read"),
+  zValidator("query", monitoringHistoryQuerySchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        {
+          success: false as const,
+          error: { code: "BAD_REQUEST", message: "Filter riwayat tidak valid." },
+        },
+        400,
+      );
+    }
+  }),
   async (c) => {
     try {
-      const data = await getMonitoringHistory();
+      const scope = await resolveMonitoringScope(monitoringActor(c));
+      const data = await listMonitoringSessions(c.req.valid("query"), scope);
       return c.json({ success: true, data });
     } catch (error) {
       return dbErrorResponse(
@@ -187,6 +216,11 @@ ai.get(
     }
 
     try {
+      await assertSessionInScope(
+        parsedModule.data,
+        parsedId.data,
+        await resolveMonitoringScope(monitoringActor(c)),
+      );
       const data = await getMonitoringReviewDetail({
         module: parsedModule.data,
         historyId: parsedId.data,

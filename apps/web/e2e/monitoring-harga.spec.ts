@@ -114,7 +114,25 @@ function hargaMocks(extra: readonly ApiMock[] = []): readonly ApiMock[] {
     {
       method: "GET",
       path: "/api/v1/ai/monitoring/history",
-      body: { success: true, data: [] },
+      body: {
+        success: true,
+        data: {
+          rows: [],
+          total: 0,
+          page: 1,
+          page_size: 25,
+          counts: {
+            ketik: 0,
+            pdkt: 0,
+            telefun: 0,
+            completed: 0,
+            processing: 0,
+            failed: 0,
+            not_started: 0,
+          },
+          scope: { kind: "none" },
+        },
+      },
     },
   ];
 }
