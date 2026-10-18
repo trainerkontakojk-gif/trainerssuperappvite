@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
@@ -16,6 +17,12 @@ import {
   verifyPdktMailboxRetryToken,
 } from "../../services/pdkt/mailbox-retry";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
+import {
+  PracticeQuotaError,
+  consumePracticeQuota,
+  ensurePdktReplyCounted,
+  refundPracticeQuota,
+} from "../../services/practice-quota";
 import {
   Variables,
   getUserClient,
@@ -108,16 +115,27 @@ mailbox.post(
         c,
         body.simulationSubject,
       );
-      const data = await pdktService.createMailboxItem(
-        userClient,
-        {
-          ...body,
-          simulationSubjectSnapshot: simulationSubject,
-        },
-        user.id,
-      );
-      return c.json({ success: true, data });
+      // Saving an email the browser wrote itself counts as a new email.
+      const requestKey = body.client_request_id || `pdkt-${randomUUID()}`;
+      const counted = await consumePracticeQuota(user.id, "pdkt", requestKey);
+      try {
+        const data = await pdktService.createMailboxItem(
+          userClient,
+          {
+            ...body,
+            client_request_id: requestKey,
+            simulationSubjectSnapshot: simulationSubject,
+          },
+          user.id,
+        );
+        return c.json({ success: true, data });
+      } catch (error: unknown) {
+        if (counted) await refundPracticeQuota(user.id, "pdkt", requestKey);
+        throw error;
+      }
     } catch (error: unknown) {
+      if (error instanceof PracticeQuotaError)
+        return c.json(error.toBody(), error.status);
       if (error instanceof SimulationSubjectError) {
         return c.json(
           {
@@ -203,6 +221,7 @@ mailbox.post(
     const userClient = getUserClient(c);
 
     try {
+      await ensurePdktReplyCounted(c.get("user").id, body.mailboxId);
       const reply = await pdktService.submitMailboxReplyWithOutcome(
         userClient,
         body,
@@ -234,6 +253,8 @@ mailbox.post(
 
       return c.json({ success: true, data: { historyId } });
     } catch (error: unknown) {
+      if (error instanceof PracticeQuotaError)
+        return c.json(error.toBody(), error.status);
       console.error("[PDKT /mailbox/reply] Raw error:", error);
       console.error("[PDKT /mailbox/reply] Error detail:", {
         message: error instanceof Error ? error.message : String(error),

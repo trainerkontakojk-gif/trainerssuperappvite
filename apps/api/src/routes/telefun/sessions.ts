@@ -13,7 +13,13 @@ import {
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import { createAdminClient } from "../../lib/supabase";
+import {
+  PracticeQuotaError,
+  consumePracticeQuota,
+  refundPracticeQuota,
+} from "../../services/practice-quota";
 import { SimulationSubjectError } from "../../services/simulation-subject-service";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
@@ -451,16 +457,29 @@ telefunSessions.post(
         simulationSubjectSnapshot: snapshot,
         body,
       });
+      // The session id is the quota key, so the call server and later
+      // reconciliation can refer to the same counted start.
+      const sessionId = randomUUID();
+      const counted = await consumePracticeQuota(
+        user.id,
+        "telefun",
+        sessionId,
+      );
       const adminClient = createAdminClient();
       const { data, error } = await adminClient
         .from("telefun_history")
-        .insert(insertPayload)
+        .insert({ ...insertPayload, id: sessionId })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (counted) await refundPracticeQuota(user.id, "telefun", sessionId);
+        throw error;
+      }
       return c.json({ success: true, data: projectTelefunHistoryRow(data) });
     } catch (error: unknown) {
+      if (error instanceof PracticeQuotaError)
+        return c.json(error.toBody(), error.status);
       if (error instanceof SimulationSubjectError) {
         return c.json(
           {

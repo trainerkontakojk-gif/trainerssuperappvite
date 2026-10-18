@@ -17,6 +17,10 @@ import { createAdminClient } from "../../lib/supabase";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { getSettingsSnapshot } from "./settings-history";
 import { getKetikAssignment } from "./configuration-assignments";
+import {
+  consumePracticeQuota,
+  refundPracticeQuota,
+} from "../practice-quota";
 import { generateConsumerResponse } from "./consumer-response";
 
 const statuses = {
@@ -193,19 +197,25 @@ export async function startServerKetikSession(
     simulationDuration: Math.round(source.settings.simulationDuration),
     responsePacingMode: source.settings.responsePacingMode,
   };
-  const row = await rpc<SessionRow>("start_ketik_session", {
-    p_user_id: actor.id,
-    p_request_id: requestId,
-    p_snapshot: {
-      config,
-      scenario,
-      simulationSubject,
-      assignmentVersion: assignment?.version ?? null,
-    },
-    p_settings_version: source.version,
-    p_assignment_version: assignment?.version ?? null,
-  });
-  return rowToSession(row);
+  const counted = await consumePracticeQuota(actor.id, "ketik", requestId);
+  try {
+    const row = await rpc<SessionRow>("start_ketik_session", {
+      p_user_id: actor.id,
+      p_request_id: requestId,
+      p_snapshot: {
+        config,
+        scenario,
+        simulationSubject,
+        assignmentVersion: assignment?.version ?? null,
+      },
+      p_settings_version: source.version,
+      p_assignment_version: assignment?.version ?? null,
+    });
+    return rowToSession(row);
+  } catch (error) {
+    if (counted) await refundPracticeQuota(actor.id, "ketik", requestId);
+    throw error;
+  }
 }
 export async function sendServerKetikTurn(
   userId: string,

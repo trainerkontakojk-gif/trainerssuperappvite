@@ -244,6 +244,17 @@ test.beforeAll(async () => {
   };
   owner = await createUserWithJwt(env, "agent", ns);
   other = await createUserWithJwt(env, "agent", `${ns}-other`);
+  // The daily PDKT limit is covered by practice-quota-api.spec.ts.
+  const unlimited = await createAdmin(env)
+    .from("practice_limit_overrides")
+    .insert(
+      [owner, other].map((user) => ({
+        user_id: user.userId,
+        module: "pdkt",
+        daily_limit: null,
+      })),
+    );
+  expect(unlimited.error).toBeNull();
   app = (await import("../../api/src/app")).default as unknown as Hono;
   expect((await import("../../api/src/lib/env")).env.VITE_SUPABASE_URL).toBe(
     env.apiUrl,

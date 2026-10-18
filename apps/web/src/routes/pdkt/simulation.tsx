@@ -39,6 +39,7 @@ import type {
 } from "@trainers/types";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { notify } from "../../lib/toast";
+import { practiceQuotaMessage } from "../../lib/practice-quota";
 import { usePdktMailboxDetail } from "./utils/usePdktMailboxDetail";
 import type { PdktSettingsResource } from "./utils/usePdktSettings";
 import { PdktSettingsNotice } from "./components/PdktSettingsNotice";
@@ -458,7 +459,8 @@ export default function PdktSimulation({
         );
       } else {
         notify.error(
-          "Email konsumen belum bisa dibuat. Coba lagi dalam beberapa saat.",
+          practiceQuotaMessage(err) ??
+            "Email konsumen belum bisa dibuat. Coba lagi dalam beberapa saat.",
         );
       }
     } finally {
