@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   expectHermetic,
   formatAudit,
@@ -33,6 +33,28 @@ const PRICING_ROW = {
   output_audio_price_usd_per_million: 0,
 };
 
+/** Satu halaman Riwayat seperti dikirim `GET /ai/monitoring/history`. */
+function historyPage(rows: readonly Record<string, unknown>[]) {
+  const count = (key: string, value: string) =>
+    rows.filter((row) => row[key] === value).length;
+  return {
+    rows,
+    total: rows.length,
+    page: 1,
+    page_size: 25,
+    counts: {
+      ketik: count("module", "ketik"),
+      pdkt: count("module", "pdkt"),
+      telefun: count("module", "telefun"),
+      completed: count("review_status", "completed"),
+      processing: count("review_status", "processing"),
+      failed: count("review_status", "failed"),
+      not_started: count("review_status", "not_started"),
+    },
+    scope: { kind: "all" },
+  };
+}
+
 function monitoringMocks(
   overrides: readonly ApiMock[] = [],
 ): readonly ApiMock[] {
@@ -42,7 +64,7 @@ function monitoringMocks(
     {
       method: "GET",
       path: "/api/v1/ai/monitoring/history",
-      body: { success: true, data: [] },
+      body: { success: true, data: historyPage([]) },
     },
     {
       method: "GET",
@@ -137,6 +159,34 @@ const HISTORY_ENTRIES = [
     simulationSubject: SUBJECT,
   },
 ];
+const SESSION_ROWS = HISTORY_ENTRIES.map((entry) => ({
+  id: entry.id,
+  module: entry.module,
+  user_id: entry.user_id,
+  occurred_at: entry.created_at,
+  scenario_title: entry.scenario_title,
+  consumer_name: entry.consumer_name ?? null,
+  duration_seconds: entry.duration_seconds,
+  score: entry.score,
+  score_scale: entry.module === "telefun" ? 10 : 100,
+  review_status: entry.review_status,
+  legacy: false,
+  participant: { name: SUBJECT.displayName, batch: SUBJECT.batchName },
+  actor: { email: entry.user_email, name: null, role: entry.user_role },
+  simulationSubject: entry.simulationSubject,
+}));
+
+/** Buka detail sesi ke-`index` dari tabel Riwayat. */
+function openSession(page: Page, index: number) {
+  return page
+    .getByRole("table", { name: "Riwayat sesi" })
+    .getByRole("button", {
+      name: HISTORY_ENTRIES[index].scenario_title,
+      exact: true,
+    })
+    .click({ timeout: 20000 });
+}
+
 const REVIEWS: Record<string, unknown> = {
   "ketik-1": {
     module: "ketik",
@@ -277,7 +327,7 @@ const POPULATED_MOCKS = monitoringMocks([
   {
     method: "GET",
     path: "/api/v1/ai/monitoring/history",
-    body: { success: true, data: HISTORY_ENTRIES },
+    body: { success: true, data: historyPage(SESSION_ROWS) },
   },
   {
     method: "GET",
@@ -312,7 +362,7 @@ test.describe("Monitoring (hermetic)", () => {
         ]),
       });
       await waitForMockedApi(audit, ["/ai/monitoring/history"]);
-      await page.getByRole("button", { name: "Lihat Detail" }).nth(1).click({ timeout: 20000 });
+      await openSession(page, 1);
       await waitForMockedApi(audit, ["/ai/monitoring/history/pdkt/pdkt-1/review"]);
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByText("Evaluasi AI belum tersedia")).toBeVisible({ timeout: 20000 });
@@ -348,8 +398,8 @@ test.describe("Monitoring (hermetic)", () => {
     ).toHaveAttribute("aria-selected", "true");
 
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
-    // Riwayat kosong tetap merender KPI card dengan angka nol, bukan layar kosong.
-    await expect(page.getByText(/0 sesi KETIK/)).toBeVisible();
+    // Riwayat kosong menjelaskan kapan sesi muncul, bukan layar kosong.
+    await expect(page.getByText("Belum ada riwayat simulasi")).toBeVisible();
 
     expectHermetic(audit);
   });
@@ -368,7 +418,7 @@ test.describe("Monitoring (hermetic)", () => {
     const offenders = await findTextBelowFloor(page.locator("main").first());
 
     for (const [index, entry] of HISTORY_ENTRIES.entries()) {
-      await page.getByRole("button", { name: "Lihat Detail" }).nth(index).click();
+      await openSession(page, index);
       const dialog = page.getByRole("dialog");
       await expect(dialog.getByText(entry.scenario_title).first()).toBeVisible();
       await waitForMockedApi(audit, [`/${entry.id}/review`]);
@@ -396,10 +446,7 @@ test.describe("Monitoring (hermetic)", () => {
     const telefunIndex = HISTORY_ENTRIES.findIndex(
       (entry) => entry.module === "telefun",
     );
-    await page
-      .getByRole("button", { name: "Lihat Detail" })
-      .nth(telefunIndex)
-      .click({ timeout: 20000 });
+    await openSession(page, telefunIndex);
     const dialog = page.getByRole("dialog");
     const radar = dialog.getByRole("img", {
       name: /^Diagram profil komunikasi/,
@@ -472,7 +519,7 @@ test.describe("Monitoring (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
     const pdktIndex = HISTORY_ENTRIES.findIndex((entry) => entry.module === "pdkt");
-    await page.getByRole("button", { name: "Lihat Detail" }).nth(pdktIndex).click();
+    await openSession(page, pdktIndex);
     await waitForMockedApi(audit, ["/pdkt-1/review"]);
 
     const card = page
@@ -601,7 +648,7 @@ test.describe("Monitoring (hermetic)", () => {
       apiMocks: POPULATED_MOCKS,
     });
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
-    await page.getByRole("button", { name: "Lihat Detail" }).first().click({ timeout: 20000 });
+    await openSession(page, 0);
     await waitForMockedApi(audit, ["/ketik-1/review"]);
     const dialog = page.getByRole("dialog");
     const info = dialog.getByLabel("Informasi konsumen");

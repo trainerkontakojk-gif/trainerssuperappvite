@@ -8,7 +8,6 @@ import type {
   PdktMonitoringReview,
   TelefunMonitoringReview,
 } from "../lib/api";
-import { HistoryTab } from "../routes/monitoring/components/HistoryTab";
 import { ReviewDetailModal } from "../routes/monitoring/components/ReviewDetailModal";
 
 const mocks = vi.hoisted(() => ({
@@ -126,25 +125,6 @@ describe("monitoring completeness regressions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.unwrapResponse.mockImplementation(async (value: unknown) => value);
-  });
-
-  it("renders real Telefun metrics, including zero, without fabricated metrics", () => {
-    const entry: UnifiedHistoryEntry = {
-      ...baseEntry("telefun"),
-      telefun_assessment: _telefunAssessmentMustBeComplete,
-    };
-    render(<HistoryTab historyData={[entry]} loading={false} onViewDetail={vi.fn()} />);
-
-    expect(screen.getByText("WPM")).toBeInTheDocument();
-    expect(screen.getByText("Intonasi")).toBeInTheDocument();
-    expect(screen.getByText("Artikulasi")).toBeInTheDocument();
-    expect(screen.getByText("Filler")).toBeInTheDocument();
-    expect(screen.getByText("Tone")).toBeInTheDocument();
-    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(5);
-    expect(screen.queryByText("Kepatuhan")).not.toBeInTheDocument();
-    expect(screen.queryByText("Empati")).not.toBeInTheDocument();
-    expect(screen.queryByText("Kejelasan")).not.toBeInTheDocument();
-    expect(screen.queryByText("Solusi")).not.toBeInTheDocument();
   });
 
   it("renders the current PDKT session shape without dereferencing absent fields", async () => {

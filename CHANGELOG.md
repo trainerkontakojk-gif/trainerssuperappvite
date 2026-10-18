@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-18
 
+- feat(monitoring): load Riwayat one page at a time from the server (25 short rows, no transcripts) with module, status, WIB date and search filters kept in the address, a one-row-per-session table, a compact list on phones, a delete dialog that names the session, and leaders limited to sessions of their approved teams in the list and the session detail
 - feat(monitoring): schedule AI prices from a chosen date (00.00 WIB) with cancel before it starts, cost every AI call at the price in effect at that moment, seed Gemini 3.8 Flash at $1.50/$7.50 from 1 Jan 2027, and move Harga & kurs to its own page `/monitoring/harga` with prices grouped by provider, the next price, the image output rate, an edit dialog and collapsed legacy models
 
 ## 2026-10-17

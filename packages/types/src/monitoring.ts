@@ -246,3 +246,55 @@ export interface MonitoringReviewByModule {
   pdkt: PdktMonitoringReview;
   telefun: TelefunMonitoringReview;
 }
+
+/** Riwayat Monitoring: satu baris ringkas per sesi, tanpa isi transkrip. */
+export const MONITORING_HISTORY_PAGE_SIZE = 25;
+
+/** `processing` di filter juga mencakup sesi `pending`. */
+export type MonitoringHistoryStatusFilter =
+  | "completed"
+  | "processing"
+  | "failed"
+  | "not_started";
+
+export interface MonitoringSessionRow {
+  id: string;
+  module: "ketik" | "pdkt" | "telefun";
+  user_id: string | null;
+  occurred_at: string;
+  scenario_title: string;
+  consumer_name: string | null;
+  duration_seconds: number | null;
+  score: number | null;
+  score_scale: 10 | 100;
+  review_status: MonitoringReviewStatus;
+  legacy: boolean;
+  /** Peserta yang disimulasikan, atau akun pelaksana bila tidak ada. */
+  participant: { name: string | null; batch: string | null };
+  actor: { email: string | null; name: string | null; role: string | null };
+  simulationSubject: SimulationSubjectSnapshot;
+}
+
+export interface MonitoringSessionCounts {
+  ketik: number;
+  pdkt: number;
+  telefun: number;
+  completed: number;
+  processing: number;
+  failed: number;
+  not_started: number;
+}
+
+export type MonitoringHistoryScope =
+  | { kind: "all" }
+  | { kind: "team"; batches: string[]; teams: string[] }
+  | { kind: "none" };
+
+export interface MonitoringSessionPage {
+  rows: MonitoringSessionRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  counts: MonitoringSessionCounts;
+  scope: MonitoringHistoryScope;
+}

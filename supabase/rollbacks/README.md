@@ -178,3 +178,6 @@ done
   schedule. DATA LOSS: schedules not yet in effect (including Gemini 3.8 Flash
   from 2027-01-01) are lost; logged costs are unchanged. API and Telefun fall
   back to current prices when the table is missing.
+- `rollback_20261018090000_monitoring_sessions.sql` drops the Monitoring
+  session view, its paging function and the `profiler_peserta.trainer_id`
+  index. No data loss; the API falls back to reading every session.

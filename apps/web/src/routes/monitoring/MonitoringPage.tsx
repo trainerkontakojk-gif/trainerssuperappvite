@@ -13,11 +13,10 @@ import {
 } from "../../components/ui/tabs";
 import { useAuthStore } from "../../store/authStore";
 import { aiClient, unwrapResponse } from "../../lib/api";
-import { mapError, type UnifiedHistoryEntry } from "./utils/formatting";
+import { mapError } from "./utils/formatting";
 import { HistoryTab } from "./components/HistoryTab";
 import { UsageTab, type UsageAggregation } from "./components/UsageTab";
 import { PricingTab, type PricingEntry } from "./components/PricingTab";
-import { ReviewDetailModal } from "./components/ReviewDetailModal";
 
 export type MonitoringSection = "history" | "usage" | "pricing";
 
@@ -43,29 +42,9 @@ export default function MonitoringPage({
   const [aggregation, setAggregation] = useState<UsageAggregation[]>([]);
   const [pricing, setPricing] = useState<PricingEntry[]>([]);
   const [billingRate, setBillingRate] = useState(15000);
-  const [historyData, setHistoryData] = useState<UnifiedHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detailEntry, setDetailEntry] = useState<UnifiedHistoryEntry | null>(
-    null,
-  );
-  const [showDetail, setShowDetail] = useState(false);
   const [usageModule, setUsageModule] = useState("");
-
-  const fetchHistory = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await unwrapResponse(
-        await aiClient["monitoring/history"].$get(),
-      );
-      setHistoryData(data);
-    } catch (err) {
-      setError(mapError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchAggregation = async () => {
     setLoading(true);
@@ -104,15 +83,9 @@ export default function MonitoringPage({
   };
 
   useEffect(() => {
-    if (tab === "history") fetchHistory();
-    else if (tab === "usage") fetchAggregation();
+    if (tab === "usage") fetchAggregation();
     else if (tab === "pricing") fetchPricing();
   }, [tab, year, month, usageModule]);
-
-  const handleViewDetail = (entry: UnifiedHistoryEntry) => {
-    setDetailEntry(entry);
-    setShowDetail(true);
-  };
 
   return (
     <div className="mx-auto w-full max-w-[var(--content-max-width)] space-y-8 p-4 lg:p-8">
@@ -206,12 +179,7 @@ export default function MonitoringPage({
           aria-labelledby="monitoring-tab-history"
           tabIndex={0}
         >
-          <HistoryTab
-            historyData={historyData}
-            loading={loading}
-            onViewDetail={handleViewDetail}
-            onRefresh={fetchHistory}
-          />
+          <HistoryTab />
         </TabsContent>
         <TabsContent
           value="usage"
@@ -247,16 +215,6 @@ export default function MonitoringPage({
         )}
       </Tabs>
 
-      {/* Detail Modal */}
-      {showDetail && detailEntry && (
-        <ReviewDetailModal
-          entry={detailEntry}
-          onClose={() => {
-            setShowDetail(false);
-            setDetailEntry(null);
-          }}
-        />
-      )}
     </div>
   );
 }
