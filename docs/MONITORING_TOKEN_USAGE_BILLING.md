@@ -19,22 +19,20 @@ Tujuan utamanya:
 
 ### 1. Dashboard Monitoring
 
-Halaman monitoring dengan tiga tab:
+Halaman monitoring dengan tiga tab: `Riwayat` (`/monitoring`), `Biaya AI` (`/monitoring/biaya`), dan `Harga & kurs` (`/monitoring/harga`). Riwayat dibagi per halaman di server; detail sesi ada di `/monitoring/sesi/:modul/:id`.
 
-- `Riwayat Simulasi` (complete deterministic offset-range cross-module history for KETIK, PDKT, dan Telefun; backend terus membaca halaman sumber sampai habis, fail-closed dengan 500 jika source/page/profile/coaching read gagal, urutan equal timestamp memakai tie-breaker `id`, row Telefun canonical `telefun_history` selalu menang atas row legacy `results` dengan ID yang sama, dan detail menampilkan metadata served-consumer plus assessment native tanpa submetric Telefun fabrikasi)
-- `Penggunaan Token`
-- `Harga & Kurs`
+Tab `Biaya AI` (`/monitoring/biaya?bulan=YYYY-MM&modul=…&q=…`):
 
-Tab `Penggunaan Token`:
+- default ke bulan berjalan WIB / `Asia/Jakarta`; tombol bulan sebelumnya/berikutnya dan pilihan bulan sejak Januari 2025
+- filter modul: KETIK, PDKT, Telefun, Analisis QA (modul yang mencatat `ai_usage_logs`); bulan, modul, dan pencarian tersimpan di alamat
+- satu baris ringkas: Total biaya, Simulasi, Penilaian, Lainnya, Panggilan AI, Token; ketiga jenis biaya menjumlah ke Total
+- tabel per pengguna (termahal dulu) dan tabel per model + modul + jenis, masing-masing dengan baris Total; di HP per pengguna tampil sebagai daftar ringkas
+- pencarian `Cari pengguna` mencakup nama akun (`full_name`) dan email, disaring di browser
+- baris pengguna membuka `/monitoring/biaya/:pengguna` (UUID akun): ringkasan, tabel per model dengan token masuk/keluar terpisah, dan tautan "Lihat sesinya di Riwayat" (`?q=email&dari=…&sampai=…` bulan itu)
+- leader hanya melihat biaya akun yang tertaut (`profiler_peserta.trainer_id`) ke peserta di tim yang aksesnya disetujui (modul `sidak`/`all`), sama seperti Riwayat; leader tanpa persetujuan melihat daftar kosong
+- `GET /ai/monitoring/aggregation` menerima `year`, `month`, `module`, `action_category`, dan `user_id` (UUID)
 
-- default ke bulan berjalan WIB / `Asia/Jakarta`
-- mendukung filter `bulan`, `tahun`, dan `module`
-- pencarian `Cari pengguna...` mencakup nama akun (`full_name`) dan email
-- tabel utama menampilkan agregasi per akun: call sukses, input tokens, output tokens, total tokens, billing IDR
-- baris akun dapat diklik untuk menyeleksi pengguna di breakdown
-- tabel breakdown menampilkan data per pengguna, modul, dan model
-
-Tab `Harga & Kurs`:
+Tab `Harga & kurs`:
 
 - hanya tersedia untuk `trainer` dan `admin`
 - menampilkan editor harga input/output per model
@@ -266,7 +264,7 @@ Saat admin/trainer menyimpan kurs baru:
 
 ### Penghapusan Riwayat (Atomic Delete)
 
-Penghapusan riwayat simulasi dari tab `Riwayat Simulasi` dilakukan secara **atomik** untuk menjamin integritas data.
+Penghapusan riwayat simulasi dari tab `Riwayat` dilakukan secara **atomik** untuk menjamin integritas data.
 
 **Aturan Teknis:**
 
@@ -293,7 +291,7 @@ Catatan:
 - Jalankan satu sesi PDKT sukses, lalu cek quick-view `pdkt`
 - Jalankan flow Telefun yang memicu AI call, lalu cek usage muncul untuk modul `telefun`
 - Jalankan pembuatan narasi laporan QA Analyzer, lalu cek usage muncul untuk modul `qa-analyzer`
-- Login sebagai `leader`; pastikan tab `Penggunaan Token` ada, tetapi tab `Harga & Kurs` tidak ada
+- Login sebagai `leader`; pastikan tab `Biaya AI` ada dan hanya berisi akun tim yang disetujui, tetapi tab `Harga & kurs` tidak ada
 
 ## Transport Auth & Error Handling (v35 hardening)
 
@@ -331,7 +329,8 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 - `apps/web/src/routes/monitoring/MonitoringPage.tsx` — Monitoring page dan tiga tab
 - `apps/web/src/routes/monitoring/components/HistoryTab.tsx` — Filter dan tabel riwayat
 - `apps/web/src/components/ui/tabs.tsx` — Primitive tabs dan variant line
-- `apps/web/src/__tests__/monitoring-unauthorized.test.tsx` — Route/RBAC/UI regression tests
+- `apps/web/src/routes/monitoring/components/BiayaTab.tsx` + `BiayaUserPage.tsx` — Biaya AI dan rincian per orang
+- `apps/web/e2e/monitoring-biaya.spec.ts`, `apps/web/e2e/monitoring-biaya-api.spec.ts` — E2E Biaya AI (hermetic dan backend nyata)
 - `apps/web/src/routes/monitoring/SessionPage.tsx` + `components/SessionReview.tsx` — Halaman detail sesi `/monitoring/sesi/:modul/:id`
 - `apps/web/e2e/monitoring-riwayat.spec.ts`, `apps/web/e2e/monitoring-sesi.spec.ts` — E2E Riwayat dan detail sesi
 - `docs/modules.md`

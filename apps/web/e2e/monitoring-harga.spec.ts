@@ -154,7 +154,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
       "/ai/monitoring/billing",
     ]);
     await expect(
-      page.getByRole("tab", { name: "Harga & Kurs" }),
+      page.getByRole("tab", { name: "Harga & kurs" }),
     ).toHaveAttribute("aria-selected", "true", { timeout: 20000 });
     await expect(page.getByLabel("Kurs USD ke IDR")).toHaveValue("16250");
 
@@ -324,7 +324,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
     });
     await expect(page).toHaveURL(/\/monitoring$/, { timeout: 20000 });
     await expect(
-      page.getByRole("tab", { name: "Riwayat Simulasi" }),
+      page.getByRole("tab", { name: "Riwayat", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
     expectHermetic(audit);
   });

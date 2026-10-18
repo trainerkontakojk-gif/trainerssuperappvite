@@ -55,7 +55,11 @@ const MonitoringPage = lazy(() => import("./routes/monitoring"));
 const MonitoringSessionPage = lazy(
   () => import("./routes/monitoring/SessionPage"),
 );
+const MonitoringBiayaUserPage = lazy(
+  () => import("./routes/monitoring/BiayaUserPage"),
+);
 import { validateHistorySearch } from "./routes/monitoring/history-search";
+import { validateBiayaSearch } from "./routes/monitoring/biaya-search";
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
 const TelefunHistory = lazy(() => import("./routes/telefun/history"));
 const AccountPage = lazy(() => import("./routes/account"));
@@ -466,7 +470,16 @@ const monitoringUsageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/monitoring/biaya",
   beforeLoad: requireCapability("monitoring.read"),
+  validateSearch: validateBiayaSearch,
   component: () => <MonitoringPage section="usage" />,
+});
+
+const monitoringUsageUserRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/monitoring/biaya/$pengguna",
+  beforeLoad: requireCapability("monitoring.read"),
+  validateSearch: validateBiayaSearch,
+  component: MonitoringBiayaUserPage,
 });
 
 const monitoringSessionRoute = createRoute({
@@ -763,6 +776,7 @@ const routeTree = rootRoute.addChildren([
   telefunReplayRoute,
   monitoringRoute,
   monitoringUsageRoute,
+  monitoringUsageUserRoute,
   monitoringPricingRoute,
   monitoringSessionRoute,
   accountRoute,

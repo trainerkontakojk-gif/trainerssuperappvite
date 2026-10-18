@@ -12,6 +12,7 @@ import {
   assertSessionInScope,
   listMonitoringSessions,
   resolveMonitoringScope,
+  scopedUsageUserIds,
 } from "../services/monitoring-sessions-service";
 import {
   getMonitoringReviewDetail,
@@ -339,6 +340,8 @@ const aggregationQuerySchema = z.object({
     .or(z.literal("").transform(() => undefined))
     .optional(),
   action_category: z.enum(["simulation", "review"]).optional(),
+  /** Rincian satu orang (halaman Biaya AI per pengguna). */
+  user_id: z.string().uuid().optional(),
 });
 type AggregationLogRow = {
   user_id: string;
@@ -375,7 +378,23 @@ ai.get(
       month = now.getMonth() + 1,
       module,
       action_category: actionCategory,
+      user_id: userId,
     } = parsedQuery.data;
+
+    let allowedUserIds: string[] | null;
+    try {
+      allowedUserIds = await scopedUsageUserIds(
+        await resolveMonitoringScope(monitoringActor(c)),
+      );
+    } catch (error) {
+      return dbErrorResponse(c, "aggregation", error);
+    }
+    if (userId) {
+      if (allowedUserIds && !allowedUserIds.includes(userId))
+        return c.json({ success: true, data: [] });
+      allowedUserIds = [userId];
+    }
+    if (allowedUserIds?.length === 0) return c.json({ success: true, data: [] });
 
     const admin = createAdminClient();
     const { start: monthStart, end: monthEnd } = getWibMonthBounds(year, month);
@@ -394,6 +413,7 @@ ai.get(
         .gte("created_at", monthStart)
         .lte("created_at", monthEnd);
       if (module) query = query.eq("module", module);
+      if (allowedUserIds) query = query.in("user_id", allowedUserIds);
 
       const { data, error } = await query
         .order("created_at", { ascending: true })

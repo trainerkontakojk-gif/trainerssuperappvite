@@ -106,6 +106,10 @@ export default defineConfig({
       testMatch: "monitoring-riwayat-api.spec.ts",
     },
     {
+      name: "monitoring-biaya-real-backend",
+      testMatch: "monitoring-biaya-api.spec.ts",
+    },
+    {
       name: "home-attention-real-backend",
       testMatch: "home-attention-api.spec.ts",
     },

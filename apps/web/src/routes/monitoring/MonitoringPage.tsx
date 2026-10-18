@@ -4,7 +4,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
-import { Skeleton } from "../../components/ui/skeleton";
 import {
   Tabs,
   TabsContent,
@@ -15,7 +14,7 @@ import { useAuthStore } from "../../store/authStore";
 import { aiClient, unwrapResponse } from "../../lib/api";
 import { mapError } from "./utils/formatting";
 import { HistoryTab } from "./components/HistoryTab";
-import { UsageTab, type UsageAggregation } from "./components/UsageTab";
+import { BiayaTab } from "./components/BiayaTab";
 import { PricingTab, type PricingEntry } from "./components/PricingTab";
 
 export type MonitoringSection = "history" | "usage" | "pricing";
@@ -37,35 +36,9 @@ export default function MonitoringPage({
   const role = profile?.role?.toLowerCase() || "";
   const canEditPricing = can(normalizeRole(role), "monitoring.pricing.write");
 
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [aggregation, setAggregation] = useState<UsageAggregation[]>([]);
   const [pricing, setPricing] = useState<PricingEntry[]>([]);
   const [billingRate, setBillingRate] = useState(15000);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usageModule, setUsageModule] = useState("");
-
-  const fetchAggregation = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await unwrapResponse(
-        await aiClient["monitoring/aggregation"].$get({
-          query: {
-            year: String(year),
-            month: String(month),
-            module: usageModule,
-          },
-        }),
-      );
-      setAggregation(data);
-    } catch (err) {
-      setError(mapError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchPricing = async () => {
     if (!canEditPricing) return;
@@ -83,29 +56,18 @@ export default function MonitoringPage({
   };
 
   useEffect(() => {
-    if (tab === "usage") fetchAggregation();
-    else if (tab === "pricing") fetchPricing();
-  }, [tab, year, month, usageModule]);
+    if (tab === "pricing") fetchPricing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   return (
-    <div className="mx-auto w-full max-w-[var(--content-max-width)] space-y-8 p-4 lg:p-8">
-      {/* Test & Accessibility Compatibility Elements */}
-      <div className="sr-only">
-        <span>SIMULATION MONITORING</span>
-        <span>Pantau histori simulasi dari satu pusat observasi.</span>
-        <span>
-          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian
-          lintas modul tanpa kehilangan konteks platform.
-        </span>
-      </div>
-
-      {/* Page Header — breadcrumb is provided by the app header */}
+    <div className="mx-auto w-full max-w-[var(--content-max-width)] space-y-6 p-4 lg:p-8">
       <div className="flex flex-col gap-1">
         <h1 className="text-page-title font-display text-foreground">
-          Monitoring AI Usage
+          Monitoring
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Pantau dan analisis penggunaan modul AI oleh agen secara real-time.
+        <p className="text-sm text-muted-foreground">
+          Riwayat simulasi agen, biaya pemakaian AI, dan harga model.
         </p>
       </div>
 
@@ -126,14 +88,14 @@ export default function MonitoringPage({
             id="monitoring-tab-history"
             className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
           >
-            Riwayat Simulasi
+            Riwayat
           </TabsTrigger>
           <TabsTrigger
             value="usage"
             id="monitoring-tab-usage"
             className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
           >
-            Penggunaan Token
+            Biaya AI
           </TabsTrigger>
           {canEditPricing && (
             <TabsTrigger
@@ -141,7 +103,7 @@ export default function MonitoringPage({
               id="monitoring-tab-pricing"
               className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
             >
-              Harga &amp; Kurs
+              Harga &amp; kurs
             </TabsTrigger>
           )}
         </TabsList>
@@ -162,17 +124,6 @@ export default function MonitoringPage({
           </Alert>
         )}
 
-        {loading && (
-          <div
-            className="flex items-center gap-2 py-4 text-sm text-muted-foreground"
-            role="status"
-            aria-live="polite"
-          >
-            <Skeleton className="size-4 rounded-full" />
-            Memuat data...
-          </div>
-        )}
-
         <TabsContent
           value="history"
           id="monitoring-panel-history"
@@ -187,16 +138,7 @@ export default function MonitoringPage({
           aria-labelledby="monitoring-tab-usage"
           tabIndex={0}
         >
-          <UsageTab
-            aggregation={aggregation}
-            loading={loading}
-            year={year}
-            month={month}
-            onYearChange={setYear}
-            onMonthChange={setMonth}
-            module={usageModule}
-            onModuleChange={setUsageModule}
-          />
+          <BiayaTab />
         </TabsContent>
         {canEditPricing && (
           <TabsContent
