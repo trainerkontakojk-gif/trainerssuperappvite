@@ -74,7 +74,7 @@ export const CAPABILITIES = {
   "telefun.landing": ["admin", "trainer", "leader", "agent"],
   "telefun.manage": ["admin", "trainer"],
   "telefun.recording.read": ["admin", "trainer"],
-  "telefun.use": ["admin", "trainer"],
+  "telefun.use": ["admin", "trainer", "leader", "agent"],
   "tna.read": ["admin", "trainer"],
   "tna.write": ["admin", "trainer"],
   "usage.read": ["admin", "trainer", "leader", "agent"],

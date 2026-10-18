@@ -17,6 +17,7 @@ import type {
 import { enqueueScoring } from "../../services/telefun-scoring-service";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 import { scoreRecording } from "./recording-scoring";
+import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 
 export { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 
@@ -393,7 +394,7 @@ telefunRecordings.get("/recording/:id", async (c) => {
   }
 });
 
-telefunRecordings.post("/score/:id", scoreRecording);
+telefunRecordings.post("/score/:id", aiRateLimitMiddleware, scoreRecording);
 
 telefunRecordings.get("/coaching-summary/:id", async (c) => {
   const sessionId = c.req.param("id");

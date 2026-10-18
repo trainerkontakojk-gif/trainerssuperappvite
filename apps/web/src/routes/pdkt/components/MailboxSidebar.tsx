@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Check,
   Loader2,
@@ -44,6 +44,10 @@ interface MailboxSidebarProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   creationDisabled?: boolean;
+  /** Batas email baru hari ini habis; balasan dan pengaturan tetap jalan. */
+  newEmailBlocked?: boolean;
+  /** Baris sisa jatah di bawah tombol Email baru. */
+  quotaLine?: ReactNode;
   onSettings: () => void;
   onHistory: () => void;
 
@@ -139,6 +143,8 @@ export function MailboxSidebar({
   onSelect,
   onNew,
   creationDisabled = false,
+  newEmailBlocked = false,
+  quotaLine,
   onSettings,
   onHistory,
   filter,
@@ -200,7 +206,8 @@ export function MailboxSidebar({
               <Button
                 type="button"
                 onClick={onNew}
-                disabled={creationDisabled}
+                disabled={creationDisabled || newEmailBlocked}
+                aria-describedby={quotaLine ? "pdkt-quota-status" : undefined}
                 className="min-h-[44px] gap-1.5 px-3.5 text-xs font-semibold"
               >
                 <Plus aria-hidden="true" />
@@ -249,6 +256,7 @@ export function MailboxSidebar({
             </div>
           )}
         </div>
+        {quotaLine}
 
         <div className="relative">
           <Search

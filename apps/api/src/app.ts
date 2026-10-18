@@ -24,6 +24,7 @@ import { adminRouter } from "./routes/admin";
 import { telefun } from "./routes/telefun";
 import { getLeaderAccessStatus } from "./services/admin-service";
 import { revokeOwnSessions } from "./services/account-service";
+import { getPracticeQuotaStatus } from "./services/practice-quota";
 
 
 if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
@@ -159,6 +160,25 @@ const v1Api = new Hono<{ Variables: AuthVariables }>()
     const user = c.get("user");
     const profile = c.get("profile");
     return c.json({ success: true, data: { user, profile } });
+  })
+  .get("/me/practice-quota", requireCapability("account.read"), async (c) => {
+    try {
+      return c.json({
+        success: true,
+        data: await getPracticeQuotaStatus(c.get("user").id),
+      });
+    } catch {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "PRACTICE_QUOTA_FAILED",
+            message: "Sisa jatah latihan belum bisa dimuat.",
+          },
+        },
+        500,
+      );
+    }
   })
   .post(
     "/me/revoke-sessions",

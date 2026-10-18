@@ -4,6 +4,7 @@ import {
   expectHermetic,
   formatAudit,
   openHermeticShell,
+  practiceQuotaMock,
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
@@ -91,6 +92,52 @@ test.describe("Telefun landing (hermetic)", () => {
 
     await waitForMockedApi(audit, ["/telefun/settings", "/telefun/sessions"]);
     expectHermetic(audit);
+  });
+
+  test("agen membuka Telefun dari menu tanpa jendela Akses Terbatas; tombol mulai mengikuti jatah harian", async ({
+    page,
+  }) => {
+    const closed = await openHermeticShell(page, {
+      path: "/telefun",
+      auth: { role: "agent" },
+      waitForUrl: /\/telefun/,
+      apiMocks: [
+        practiceQuotaMock({ telefun: { limit: 0, used: 0 } }),
+        ...telefunMocks(FULL_HISTORY),
+      ],
+    });
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Dengarkan konsumennya/ }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Hanya dapat diakses/)).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: /^Telefun/i }).first(),
+    ).toBeVisible();
+    const start = page.getByRole("button", { name: /^Mulai simulasi/ });
+    const reason =
+      "Telefun belum dibuka untuk akunmu. Trainer bisa membukanya dari halaman Pengguna.";
+    await expect(page.getByText(reason)).toBeVisible();
+    await expect(start).toBeDisabled();
+    await expect(start).toHaveAccessibleDescription(reason);
+    expectHermetic(closed);
+
+    const allowed = await openHermeticShell(page, {
+      path: "/telefun",
+      auth: { role: "agent" },
+      waitForUrl: /\/telefun/,
+      apiMocks: [
+        practiceQuotaMock({ telefun: { limit: 2, used: 1 } }),
+        ...telefunMocks(FULL_HISTORY),
+      ],
+    });
+    await expect(
+      page.getByText(
+        "Sisa hari ini 1 dari 2 panggilan. Dihitung lagi besok pukul 00.00 WIB.",
+      ),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(start).toBeEnabled();
+    expectHermetic(allowed);
   });
 
   test("panggilan bulan ini dihitung server (tidak terpotong 50), panggilan lokal tidak dihitung ganda", async ({
@@ -1027,6 +1074,28 @@ test.describe("Telefun Telaah (hermetic)", () => {
     );
     await result.getByRole("tab", { name: "Pertanyaan konsumen" }).click();
     await expect(result.getByText(/Belum tersedia untuk hasil ini/)).toContainText(
+      "Telaah ulang",
+    );
+    expectHermetic(audit);
+  });
+
+  test("agen melihat hasil telaah tanpa tombol Telaah ulang (hanya trainer dan admin)", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: telaahPath(REVIEWED_ROW.id),
+      auth: { role: "agent" },
+      waitForUrl: /\/telefun/,
+      apiMocks: [...telefunMocks(FULL_HISTORY), recordingMock(REVIEWED_ROW.id)],
+      beforeNavigate: (page) => serveRecording(page),
+    });
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("7,6", {
+      timeout: 20000,
+    });
+    await expect(result.getByRole("button", { name: "Telaah ulang" })).toHaveCount(0);
+    await result.getByRole("tab", { name: "Pertanyaan konsumen" }).click();
+    await expect(result.getByText(/Belum tersedia untuk hasil ini/)).not.toContainText(
       "Telaah ulang",
     );
     expectHermetic(audit);

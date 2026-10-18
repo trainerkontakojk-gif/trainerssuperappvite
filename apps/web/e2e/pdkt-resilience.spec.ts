@@ -9,6 +9,7 @@ import {
   APP_ORIGIN,
   expectHermetic,
   openHermeticShell,
+  practiceQuotaMock,
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
@@ -406,4 +407,48 @@ test("a new email refused by the daily limit shows the server's reason", async (
   await expect(page.getByText(message)).toBeVisible();
   await waitForMockedApi(audit, ["POST /api/v1/pdkt/session/create"]);
   expectHermetic(audit);
+});
+
+test("the inbox shows today's remaining new emails and turns Email baru off when they are used up", async ({
+  page,
+}) => {
+  const left = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1",
+    auth: { role: "agent" },
+    apiMocks: [
+      practiceQuotaMock({ pdkt: { limit: 3, used: 2 } }),
+      ...mocks(null),
+    ],
+  });
+  const newEmail = page.getByRole("button", {
+    name: "Email baru",
+    exact: true,
+  });
+  await expect(
+    page.getByText(
+      "Sisa hari ini 1 dari 3 email baru. Dihitung lagi besok pukul 00.00 WIB.",
+    ),
+  ).toBeVisible();
+  await expect(newEmail).toBeEnabled();
+  expectHermetic(left);
+
+  const out = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1",
+    auth: { role: "agent" },
+    apiMocks: [
+      practiceQuotaMock({ pdkt: { limit: 3, used: 3 } }),
+      ...mocks(null),
+    ],
+  });
+  const reason =
+    "Jatah PDKT hari ini sudah habis (3 dari 3). Bisa mulai lagi besok pukul 00.00 WIB.";
+  await expect(page.getByText(reason)).toBeVisible();
+  await expect(newEmail).toBeDisabled();
+  await expect(newEmail).toHaveAccessibleDescription(reason);
+  // Settings stay usable; only creating a new email is limited.
+  await page.getByRole("button", { name: "Menu lainnya" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Pengaturan" }),
+  ).toBeEnabled();
+  expectHermetic(out);
 });

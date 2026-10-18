@@ -118,6 +118,31 @@ function toJson(
   };
 }
 
+type QuotaModule = "ketik" | "pdkt" | "telefun";
+
+/** GET /me/practice-quota; modules not given are unlimited. */
+export function practiceQuotaMock(
+  limits: Partial<Record<QuotaModule, { limit: number; used: number }>> = {},
+): ApiMock {
+  return {
+    method: "GET",
+    path: "/api/v1/me/practice-quota",
+    body: {
+      success: true,
+      data: (["ketik", "pdkt", "telefun"] as const).map((module) => ({
+        module,
+        limit: limits[module]?.limit ?? null,
+        used: limits[module]?.used ?? 0,
+        source: "role",
+        ends_on: null,
+        resets_at: "2099-01-01T17:00:00.000Z",
+      })),
+    },
+  };
+}
+
+const UNLIMITED_PRACTICE_QUOTA = practiceQuotaMock();
+
 function matchesApiMock(
   mock: ApiMock,
   method: string,
@@ -150,7 +175,9 @@ export async function openHermeticShell(
     options.auth === false
       ? null
       : await installMockAuthSession(page, options.auth);
-  const apiMocks = options.apiMocks ?? [];
+  // Spec yang tidak menguji batas latihan melihat akun tanpa batas. Mock milik
+  // spec dicocokkan lebih dulu, jadi spec batas latihan tetap bisa menggantinya.
+  const apiMocks = [...(options.apiMocks ?? []), UNLIMITED_PRACTICE_QUOTA];
   const expectedAssetHosts = new Set([
     ...DEFAULT_EXPECTED_ASSET_HOSTS,
     ...(options.expectedThirdPartyHosts ?? []),

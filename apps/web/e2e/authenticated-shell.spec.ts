@@ -109,7 +109,8 @@ test.describe("Shell terautentikasi (hermetic)", () => {
 /**
  * Satu sumber navigasi (`buildNavModel`). Sidebar, tab bar, dan drawer harus
  * memuat himpunan modul yang sama untuk tiap peran, sesuai `access.ts`:
- * TELEFUN dan TNA hanya admin/trainer; SIDAK dan KTP tidak untuk agent.
+ * TELEFUN untuk semua peran (mulai panggilan dibatasi jatah harian); TNA hanya
+ * admin/trainer; SIDAK dan KTP tidak untuk agent.
  */
 const ALL_MODULE_LABELS = [
   "Beranda",
@@ -134,12 +135,12 @@ const NAV_MATRIX: Record<
     tabs: ["Beranda", "SIDAK", "TNA", "KETIK"],
   },
   leader: {
-    modules: ["Beranda", "KETIK", "PDKT", "SIDAK", "KTP"],
+    modules: ["Beranda", "KETIK", "PDKT", "TELEFUN", "SIDAK", "KTP"],
     tabs: ["Beranda", "SIDAK", "KTP", "KETIK"],
   },
   agent: {
-    modules: ["Beranda", "KETIK", "PDKT"],
-    tabs: ["Beranda", "KETIK", "PDKT"],
+    modules: ["Beranda", "KETIK", "PDKT", "TELEFUN"],
+    tabs: ["Beranda", "KETIK", "PDKT", "TELEFUN"],
   },
 };
 

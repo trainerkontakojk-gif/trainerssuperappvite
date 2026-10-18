@@ -12,7 +12,8 @@ import { telefunRerun } from "./telefun/rerun";
 type Variables = { user: User; profile: any };
 const telefun = new Hono<{ Variables: Variables }>();
 
-// Semua route Telefun hanya untuk admin/trainer — agent & leader tidak diizinkan
+// Semua peran boleh membuka Telefun; mulai panggilan dibatasi kuota harian
+// (POST /sessions), dan analisis ulang AI hanya untuk telefun.manage.
 telefun.use("*", requireCapability("telefun.use"));
 
 telefun.route("/", telefunCapabilities);

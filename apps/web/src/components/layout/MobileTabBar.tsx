@@ -4,15 +4,11 @@ import { buildNavModel } from "./nav-config";
 
 interface MobileTabBarProps {
   profile: { role?: string } | null;
-  hasTelefunAccess: boolean;
-  openMaintenance: () => void;
   onOpenDrawer: () => void;
 }
 
 export function MobileTabBar({
   profile,
-  hasTelefunAccess,
-  openMaintenance,
   onOpenDrawer,
 }: MobileTabBarProps) {
   const { pathname } = useLocation();
@@ -36,12 +32,6 @@ export function MobileTabBar({
             <Link
               key={tab.id}
               to={tab.href as any}
-              onClick={(e) => {
-                if (tab.id === "telefun" && !hasTelefunAccess) {
-                  e.preventDefault();
-                  openMaintenance();
-                }
-              }}
               className="flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-1 transition-colors"
               style={{ color: active ? "var(--fg)" : "var(--fg3)" }}
             >
