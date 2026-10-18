@@ -1,5 +1,6 @@
 import { can, normalizeRole } from "@trainers/types";
 import { useState, useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
@@ -18,12 +19,25 @@ import { UsageTab, type UsageAggregation } from "./components/UsageTab";
 import { PricingTab, type PricingEntry } from "./components/PricingTab";
 import { ReviewDetailModal } from "./components/ReviewDetailModal";
 
-export default function MonitoringPage() {
+export type MonitoringSection = "history" | "usage" | "pricing";
+
+const SECTION_PATHS = {
+  history: "/monitoring",
+  usage: "/monitoring/biaya",
+  pricing: "/monitoring/harga",
+} as const satisfies Record<MonitoringSection, string>;
+
+export default function MonitoringPage({
+  section = "history",
+}: {
+  section?: MonitoringSection;
+}) {
+  const navigate = useNavigate();
+  const tab = section;
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role?.toLowerCase() || "";
   const canEditPricing = can(normalizeRole(role), "monitoring.pricing.write");
 
-  const [tab, setTab] = useState<"history" | "usage" | "pricing">("history");
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [aggregation, setAggregation] = useState<UsageAggregation[]>([]);
@@ -125,7 +139,7 @@ export default function MonitoringPage() {
       <Tabs
         value={tab}
         onValueChange={(value) =>
-          setTab(value as "history" | "usage" | "pricing")
+          navigate({ to: SECTION_PATHS[value as MonitoringSection] })
         }
         className="mt-2"
       >

@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-18
+
+- feat(monitoring): schedule AI prices from a chosen date (00.00 WIB) with cancel before it starts, cost every AI call at the price in effect at that moment, seed Gemini 3.8 Flash at $1.50/$7.50 from 1 Jan 2027, and move Harga & kurs to its own page `/monitoring/harga` with prices grouped by provider, the next price, the image output rate, an edit dialog and collapsed legacy models
+
 ## 2026-10-17
 
 - fix(monitoring): show the real KETIK session length (first to last message) in Monitoring and SIDAK instead of the time limit, label the time limit as 'Batas waktu: N menit', count every AI call in a month (no 1000-row cap), add a Lainnya cost and an Analisis QA filter, show month and module names in the usage filters with a way back to Semua modul, categorise four uncounted PDKT/Telefun actions, hide raw database errors, and reject prices for unknown models

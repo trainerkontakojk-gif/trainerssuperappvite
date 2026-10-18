@@ -45,3 +45,37 @@ export function resolveGeminiLiveFallbackPerMillion(
       }
     : { input: 0, output: 0 };
 }
+
+/** A price row and the moment it took effect (`null` = since forever). */
+export interface PricingInEffect {
+  effective_since: string | null;
+}
+
+/**
+ * The price that applies now: the newer of the current price
+ * (`ai_pricing_settings`, in effect since its `updated_at`) and the latest
+ * schedule row already due. Callers fetch both; this is the only rule.
+ */
+export function pickEffectivePricing<T extends PricingInEffect>(
+  current: T | null,
+  dueSchedule: T | null,
+): T | null {
+  if (!current) return dueSchedule;
+  if (!dueSchedule) return current;
+  const since = (row: T) =>
+    row.effective_since ? Date.parse(row.effective_since) : -Infinity;
+  return since(dueSchedule) > since(current) ? dueSchedule : current;
+}
+
+/**
+ * True when `ai_pricing_schedule` does not exist yet (migration
+ * 20261017220000 not applied): callers then use current prices only.
+ */
+export function isMissingPricingScheduleTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code, message } = error as { code?: string; message?: string };
+  return (
+    (code === "42P01" || code === "PGRST205") &&
+    String(message ?? "").includes("ai_pricing_schedule")
+  );
+}

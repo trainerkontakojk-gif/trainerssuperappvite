@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_USD_TO_IDR_RATE } from "@trainers/types";
+import { DEFAULT_USD_TO_IDR_RATE, pickEffectivePricing } from "@trainers/types";
 import { env } from "./env.js";
 
 export const admin = createClient(
@@ -99,4 +99,43 @@ export function readPricingRate(value: unknown): number | null {
         ? Number(value)
         : Number.NaN;
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+type LivePricingRow = {
+  input_price_usd_per_million: number | null;
+  output_price_usd_per_million: number | null;
+  effective_since: string | null;
+};
+
+/**
+ * Input/output price in effect now for a Telefun model: the newer of the
+ * current price and the latest due schedule (`pickEffectivePricing`). Read
+ * errors, including a missing schedule table, count as "no row" so the
+ * caller's fallback rate applies, as before schedules existed.
+ */
+export async function readEffectiveLivePricing(
+  modelId: string,
+): Promise<LivePricingRow | null> {
+  const columns = "input_price_usd_per_million, output_price_usd_per_million";
+  const [current, due] = await Promise.all([
+    admin
+      .from("ai_pricing_settings")
+      .select(`${columns}, updated_at`)
+      .eq("model_id", modelId)
+      .maybeSingle(),
+    admin
+      .from("ai_pricing_schedule")
+      .select(`${columns}, effective_from`)
+      .eq("model_id", modelId)
+      .lte("effective_from", new Date().toISOString())
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  return pickEffectivePricing<LivePricingRow>(
+    current.data
+      ? { ...current.data, effective_since: current.data.updated_at ?? null }
+      : null,
+    due.data ? { ...due.data, effective_since: due.data.effective_from } : null,
+  );
 }

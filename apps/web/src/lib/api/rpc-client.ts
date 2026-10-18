@@ -76,11 +76,7 @@ export type UsageAggregation = {
   }>;
 };
 
-export type PricingEntry = {
-  model_id: string;
-  model_name: string;
-  provider: string;
-  pricing_mode: "simple" | "realtime";
+export type PricingRates = {
   input_price_usd_per_million: number;
   output_price_usd_per_million: number;
   input_text_price_usd_per_million: number | null;
@@ -89,6 +85,22 @@ export type PricingEntry = {
   cached_input_audio_price_usd_per_million: number | null;
   output_text_price_usd_per_million: number | null;
   output_audio_price_usd_per_million: number | null;
+};
+
+export type PricingEntry = PricingRates & {
+  model_id: string;
+  model_name: string;
+  provider: string;
+  pricing_mode: "simple" | "realtime";
+  /** Read-only rate kept in code (image models only). */
+  image_output_price_usd_per_million?: number | null;
+  /** When the price shown took effect (ISO); null = unknown. */
+  effective_since?: string | null;
+  /** Earliest scheduled price not yet in effect. */
+  next_price?: (PricingRates & { id: string; effective_from: string }) | null;
+  /** Old model kept for history; prices cannot be edited. */
+  historical?: boolean;
+  editable?: boolean;
 };
 
 type AdminClient = {
@@ -220,8 +232,14 @@ type AiClient = {
             | "output_text_price_usd_per_million"
             | "output_audio_price_usd_per_million"
           >
-        >;
+        > & {
+          /** YYYY-MM-DD: schedule from 00.00 WIB that day instead of now. */
+          effective_from?: string;
+        };
     }): Promise<RpcResponse<null>>;
+  };
+  "monitoring/pricing/schedule/:id": {
+    $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
   };
   "monitoring/billing": {
     $get(): Promise<RpcResponse<{ usd_to_idr_rate: number }>>;

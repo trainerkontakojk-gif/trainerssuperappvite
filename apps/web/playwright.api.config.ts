@@ -98,6 +98,10 @@ export default defineConfig({
       testMatch: "monitoring-numbers-api.spec.ts",
     },
     {
+      name: "monitoring-pricing-schedule-real-backend",
+      testMatch: "monitoring-pricing-schedule-api.spec.ts",
+    },
+    {
       name: "home-attention-real-backend",
       testMatch: "home-attention-api.spec.ts",
     },

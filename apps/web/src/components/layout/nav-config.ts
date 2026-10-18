@@ -356,6 +356,12 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   if (pathname === "/monitoring") {
     return [{ label: "Monitoring" }];
   }
+  if (pathname === "/monitoring/biaya" || pathname === "/monitoring/harga") {
+    return [
+      { label: "Monitoring", href: "/monitoring" },
+      { label: pathname === "/monitoring/biaya" ? "Biaya AI" : "Harga & kurs" },
+    ];
+  }
   if (pathname === "/account") {
     return [{ label: "Akun" }];
   }

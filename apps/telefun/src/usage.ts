@@ -12,6 +12,7 @@ import {
   admin,
   getBillingRate,
   isMissingAiUsageModalityColumnError,
+  readEffectiveLivePricing,
 } from "./usage-store.js";
 
 export * from "./usage-live.js";
@@ -39,12 +40,8 @@ export async function flushLiveUsage(
   }
 
   try {
-    const [{ data: pricing }, usdToIdrRate] = await Promise.all([
-      admin
-        .from("ai_pricing_settings")
-        .select("input_price_usd_per_million, output_price_usd_per_million")
-        .eq("model_id", model.id)
-        .maybeSingle(),
+    const [pricing, usdToIdrRate] = await Promise.all([
+      readEffectiveLivePricing(model.id),
       getBillingRate(),
     ]);
 
