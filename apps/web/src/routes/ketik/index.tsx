@@ -33,6 +33,7 @@ import { Card } from "../../components/ui/card";
 import { useAuthStore } from "../../store/authStore";
 import { APP_MODULES } from "../../lib/app-config";
 import { notify } from "../../lib/toast";
+import { practiceQuotaMessage } from "../../lib/practice-quota";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
@@ -269,10 +270,11 @@ export default function KetikLanding() {
         to: "/ketik",
         search: { sesi: started.id, tahap: "chat" },
       });
-    } catch {
+    } catch (error) {
       if (isCurrentAccount(account))
         notify.error(
-          "Sesi belum bisa dimulai. Periksa penugasan dan pengaturan, lalu coba lagi.",
+          practiceQuotaMessage(error) ??
+            "Sesi belum bisa dimulai. Periksa penugasan dan pengaturan, lalu coba lagi.",
         );
     } finally {
       if (isCurrentAccount(account)) setIsStarting(false);

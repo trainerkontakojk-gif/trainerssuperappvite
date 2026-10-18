@@ -613,3 +613,13 @@ Temuan terpisah, di luar plan ini: remote tidak punya policy untuk `telefun_coac
 ### Rencana lanjutan RLS peserta
 
 Usulkan pekerjaan terpisah `can_access_peserta(auth.uid(), peserta_id, module)` sebagai policy SELECT bagi leader: memakai approval approved + access group peserta, fail closed pada scope kosong, indeks join terkait dan parity E2E untuk all/self/team/none. Audit dahulu policy service-role dan relasi `trainer_id`; migrasi bertahap per resource setelah parity terbukti. Rencana ini tidak menambahkan policy peserta baru atau mengubah shared mailbox.
+
+## Batas latihan harian (2026-10-18)
+
+Plan: `plans/markdown/kontrol-user-fase-2.md`. Mulai latihan dihitung di server, bukan di browser.
+
+- Aturan per peran ada di `practice_limit_rules` (agent/leader: KETIK 3, PDKT 3, Telefun 0; admin/trainer tanpa batas). Pengecualian per orang ada di `practice_limit_overrides` dan menang atas aturan peran sampai `ends_on`.
+- Setiap mulai yang dihitung menjadi satu baris `practice_usage` dengan kunci permintaannya: KETIK `requestId`, PDKT `client_request_id` email, Telefun id sesi. Hari = tanggal Asia/Jakarta. Gagal sebelum dipakai dikembalikan (`refunded_at`).
+- Ketiga tabel dan fungsi `consume_practice_quota` / `refund_practice_quota` hanya untuk service role. API memanggilnya lewat `apps/api/src/services/practice-quota.ts`.
+- PDKT: membalas gratis. Email yang masuk tanpa tercatat (lewat fungsi database yang bisa dipanggil browser) dihitung sekali saat dibalas.
+- Telefun: server panggilan hanya menerima sesi milik sendiri yang masih `active`, dibuat API dalam 30 menit terakhir, oleh akun aktif yang boleh memakai Telefun. Pemilik tidak lagi boleh insert/update `telefun_history` langsung.

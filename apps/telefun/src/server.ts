@@ -12,7 +12,6 @@ import {
   summarizeLiveUsageAccumulator,
 } from "./usage.js";
 import {
-  createSession,
   updateSession,
   createTelefunWebRtcDb,
   getOwnedSessionId,
@@ -263,7 +262,6 @@ wss.on("connection", async (ws, req) => {
   const authGate = new TelefunAuthGate({
     verifyToken,
     getOwnedSessionId,
-    createSession,
   });
 
   const flushUsage = (sessionDurationMs?: number): Promise<void> => {

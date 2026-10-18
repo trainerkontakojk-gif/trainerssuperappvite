@@ -377,3 +377,33 @@ test("deleted history is an honest terminal state rather than ongoing evaluation
   });
   expectHermetic(audit);
 });
+
+test("a new email refused by the daily limit shows the server's reason", async ({
+  page,
+}) => {
+  const message =
+    "Batas latihan PDKT hari ini sudah habis (3 dari 3). Jatah baru mulai pukul 00.00 WIB.";
+  const audit = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1",
+    apiMocks: [
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/session/create",
+        status: 429,
+        body: {
+          success: false,
+          error: { code: "PRACTICE_LIMIT_REACHED", message },
+        },
+      },
+      ...mocks(null),
+    ],
+  });
+  await page.getByRole("button", { name: "Email baru", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: new RegExp(scenario.title) })
+    .click();
+  await expect(page.getByText(message)).toBeVisible();
+  await waitForMockedApi(audit, ["POST /api/v1/pdkt/session/create"]);
+  expectHermetic(audit);
+});

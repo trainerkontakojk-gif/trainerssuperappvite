@@ -16,6 +16,11 @@ import { SimulationSubjectError } from "../../services/simulation-subject-servic
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import { createMailboxSession } from "../../services/pdkt/mailbox-session";
 import {
+  PracticeQuotaError,
+  consumePracticeQuota,
+  refundPracticeQuota,
+} from "../../services/practice-quota";
+import {
   Variables,
   getUserClient,
   jsonNotFound,
@@ -135,22 +140,30 @@ simulation.post(
     }
     const { scenario, config } = configInfo;
 
+    // A new email counts against the daily PDKT limit; replies are free.
+    const requestKey = body.client_request_id || `pdkt-${randomUUID()}`;
+    let counted: boolean;
+    try {
+      counted = await consumePracticeQuota(userId, "pdkt", requestKey);
+    } catch (error: unknown) {
+      if (error instanceof PracticeQuotaError)
+        return c.json(error.toBody(), error.status);
+      throw error;
+    }
+
     const result = await pdktService.initializeEmailSession(
       config,
       { module: "pdkt", action: "start_session" },
       userId,
     );
 
-    if (!result.success) {
+    if (!result.success || !result.message) {
+      if (counted) await refundPracticeQuota(userId, "pdkt", requestKey);
       return jsonAiError(c, result.error || pdktService.PDKT_SESSION_AI_ERROR);
-    }
-
-    if (!result.message) {
-      return jsonAiError(c, pdktService.PDKT_SESSION_AI_ERROR);
     }
     const initMessage: EmailMessage = result.message;
     const retryBatch: PdktMailboxBatch = {
-      client_request_id: body.client_request_id || `pdkt-${randomUUID()}`,
+      client_request_id: requestKey,
       sender_name: config.identity.name,
       sender_email: config.identity.email,
       subject: initMessage.subject,
@@ -216,14 +229,36 @@ simulation.post(
       throw error;
     }
 
-    const result = await createMailboxSession(
-      userClient,
-      {
-        ...body,
-        simulationSubjectSnapshot: simulationSubject,
-      },
-      userId,
-    );
+    // A new email counts against the daily PDKT limit; replies are free.
+    const requestKey = body.client_request_id || `pdkt-${randomUUID()}`;
+    let counted: boolean;
+    try {
+      counted = await consumePracticeQuota(userId, "pdkt", requestKey);
+    } catch (error: unknown) {
+      if (error instanceof PracticeQuotaError)
+        return c.json(error.toBody(), error.status);
+      throw error;
+    }
+
+    let result: Awaited<ReturnType<typeof createMailboxSession>>;
+    try {
+      result = await createMailboxSession(
+        userClient,
+        {
+          ...body,
+          client_request_id: requestKey,
+          simulationSubjectSnapshot: simulationSubject,
+        },
+        userId,
+      );
+    } catch (error: unknown) {
+      if (counted) await refundPracticeQuota(userId, "pdkt", requestKey);
+      throw error;
+    }
+    // A saved email, or one the browser can still save with its retry token,
+    // keeps its count; anything else never reached the person.
+    if (!result.success && !result.retryDraft && counted)
+      await refundPracticeQuota(userId, "pdkt", requestKey);
 
     if (!result.success) {
       if (result.code === "AI_ERROR") {

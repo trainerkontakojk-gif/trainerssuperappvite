@@ -74,7 +74,13 @@ async function startSession(input: {
 }
 
 test.beforeAll(async () => {
-  database = createServer((_req, res) => {
+  database = createServer((req, res) => {
+    // The daily PDKT limit is not under test here: every start is allowed.
+    if (req.url?.startsWith("/rest/v1/rpc/consume_practice_quota")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ allowed: true, reason: "counted" }));
+      return;
+    }
     res.writeHead(400, { "content-type": "application/json" });
     res.end(JSON.stringify({ code: "E2E_DB_UNAVAILABLE", message: "stub" }));
   });

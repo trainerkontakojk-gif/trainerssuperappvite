@@ -10,14 +10,12 @@ interface TelefunAuthDependencies {
     success: boolean;
     user?: AuthenticatedUser | null;
   }>;
+  // Sessions are created only by the API route, which checks the daily
+  // practice limit; the socket may only start one of those.
   getOwnedSessionId: (
     sessionId: string,
     userId: string,
   ) => Promise<string | null>;
-  // Subject-aware sessions are created by the authenticated HTTP route before
-  // the WebSocket connects. This one-argument fallback is legacy-only and
-  // intentionally creates a self session when no pre-created ID is supplied.
-  createSession: (userId: string) => Promise<string>;
 }
 
 export type TelefunAuthResult =
@@ -70,7 +68,7 @@ export class TelefunAuthGate {
       const userId = authResult.user.id;
       const sessionId = message.sessionId
         ? await this.dependencies.getOwnedSessionId(message.sessionId, userId)
-        : await this.dependencies.createSession(userId);
+        : null;
 
       if (!sessionId) {
         this.state = "idle";

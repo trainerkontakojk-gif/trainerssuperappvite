@@ -717,3 +717,50 @@ test("agent messages sent back to back are read first and answered once", async 
   expect(calls).toHaveLength(2);
   expectHermetic(audit);
 });
+
+test("a start refused by the daily limit shows the server's reason", async ({
+  page,
+}) => {
+  const message =
+    "Batas latihan KETIK hari ini sudah habis (3 dari 3). Jatah baru mulai pukul 00.00 WIB.";
+  const audit = await openHermeticShell(page, {
+    path: "/ketik",
+    auth: { role: "agent" },
+    apiMocks: [
+      ...base,
+      {
+        method: "GET",
+        path: "/api/v1/ketik/assignments/self",
+        body: {
+          success: true,
+          data: {
+            assignment: {
+              recipientId: "user-1",
+              assignedBy: "trainer",
+              version: id,
+              sourceSettingsVersion: "absent",
+              sourceConfiguration: DEFAULT_KETIK_SETTINGS,
+              assignedAt: new Date().toISOString(),
+            },
+            recipientSettingsVersion: "absent",
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/ketik/sessions",
+        status: 429,
+        body: {
+          success: false,
+          error: { code: "PRACTICE_LIMIT_REACHED", message },
+        },
+      },
+    ],
+  });
+  const start = page.getByRole("button", { name: /^Mulai simulasi/ });
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.getByText(message)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ruang chat" })).toHaveCount(0);
+  expectHermetic(audit);
+});

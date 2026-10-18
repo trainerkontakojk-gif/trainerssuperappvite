@@ -73,6 +73,10 @@ export default defineConfig({
       testMatch: "user-peserta-link-api.spec.ts",
     },
     {
+      name: "practice-quota-real-backend",
+      testMatch: "practice-quota-api.spec.ts",
+    },
+    {
       name: "db-guard-real-backend",
       testMatch: "exposed-function-guard-api.spec.ts",
     },

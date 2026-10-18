@@ -15,6 +15,7 @@ import {
   type Variables,
 } from "./pdkt/route-utils";
 import { SimulationSubjectError } from "../services/simulation-subject-service";
+import { PracticeQuotaError } from "../services/practice-quota";
 import {
   startServerKetikSession,
   getServerKetikSession,
@@ -24,6 +25,8 @@ import {
 } from "../services/ketik/server-sessions";
 
 function failure(c: Context<{ Variables: Variables }>, error: unknown) {
+  if (error instanceof PracticeQuotaError)
+    return c.json(error.toBody(), error.status);
   if (error instanceof KetikSessionError)
     return c.json(
       { success: false, error: { code: error.code, message: error.message } },
