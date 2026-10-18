@@ -1,4 +1,4 @@
-import { can, normalizeRole } from "@trainers/types";
+import { BULK_USER_MAX, can, normalizeRole } from "@trainers/types";
 import type { ManagedUser } from "@trainers/types";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -29,16 +29,21 @@ import { SegmentedFilter } from "./components/management/SegmentedFilter";
 import { StatusDot } from "./components/management/StatusDot";
 import { EmptyState } from "./components/management/EmptyState";
 import { ApproveDialog } from "./components/users/ApproveDialog";
+import { BulkUserActions } from "./components/users/BulkUserActions";
+import { notify } from "../../lib/toast";
 import { describeUserLimits } from "./components/users/practice-limit-format";
 import {
   STATUS_PRESENTATION,
+  displayStatus,
   formatDate,
   normalizeStatus,
   roleLabel,
-  type NormalizedStatus,
+  type DisplayStatus,
 } from "./users-format";
 
-type StatusFilter = "all" | NormalizedStatus;
+type StatusFilter = "all" | DisplayStatus;
+
+const TOO_MANY = `Paling banyak ${BULK_USER_MAX} orang dalam satu aksi.`;
 type LinkFilter = "all" | "linked" | "unlinked";
 
 const LINK_FILTER_LABEL: Record<LinkFilter, string> = {
@@ -60,6 +65,10 @@ export default function UsersPage() {
     normalizeRole(currentProfile?.role),
     "admin.users.manageAdmin",
   );
+  const canManageLimits = can(
+    normalizeRole(currentProfile?.role),
+    "practice.limits.manage",
+  );
 
   const { data, loading, refetch } = useApi<ManagedUser[]>("/admin/users");
   const users = data ?? [];
@@ -70,9 +79,12 @@ export default function UsersPage() {
   const [pageSize, setPageSize] = useState(10);
   const [linkFilter, setLinkFilter] = useState<LinkFilter>("all");
   const [approving, setApproving] = useState<ManagedUser | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // A new filter or search clears the selection, so no hidden row stays picked.
   useEffect(() => {
     setPage(1);
+    setSelected(new Set());
   }, [searchTerm, statusFilter, linkFilter]);
 
   const canManage = (entry: ManagedUser) =>
@@ -92,7 +104,7 @@ export default function UsersPage() {
     return (
       matchesSearch &&
       matchesLink &&
-      (statusFilter === "all" || normalizeStatus(entry.status) === statusFilter)
+      (statusFilter === "all" || displayStatus(entry) === statusFilter)
     );
   });
   const paginatedUsers = filteredUsers.slice(
@@ -100,8 +112,45 @@ export default function UsersPage() {
     page * pageSize,
   );
 
-  const countBy = (status: NormalizedStatus) =>
-    users.filter((entry) => normalizeStatus(entry.status) === status).length;
+  const countBy = (status: DisplayStatus) =>
+    users.filter((entry) => displayStatus(entry) === status).length;
+
+  // Only accounts this manager may change can be checked.
+  const pageSelectable = paginatedUsers.filter(canManage);
+  const filteredSelectable = filteredUsers.filter(canManage);
+  const pageChecked = pageSelectable.filter((entry) => selected.has(entry.id));
+  const selectedUsers = users.filter((entry) => selected.has(entry.id));
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else if (next.size >= BULK_USER_MAX) return notify.error(TOO_MANY);
+    else next.add(id);
+    setSelected(next);
+  };
+  const togglePage = () => {
+    const next = new Set(selected);
+    if (pageChecked.length === pageSelectable.length)
+      pageSelectable.forEach((entry) => next.delete(entry.id));
+    else
+      for (const entry of pageSelectable) {
+        if (next.size >= BULK_USER_MAX) {
+          notify.error(TOO_MANY);
+          break;
+        }
+        next.add(entry.id);
+      }
+    setSelected(next);
+  };
+  const selectAllFiltered = () => {
+    if (filteredSelectable.length > BULK_USER_MAX)
+      notify.info(`${TOO_MANY} ${BULK_USER_MAX} orang pertama dipilih.`);
+    setSelected(
+      new Set(
+        filteredSelectable.slice(0, BULK_USER_MAX).map((entry) => entry.id),
+      ),
+    );
+  };
 
   const openUser = (id: string) =>
     void navigate({ to: "/dashboard/users/$id", params: { id } });
@@ -147,6 +196,7 @@ export default function UsersPage() {
             { id: "pending", label: "Menunggu", count: countBy("pending") },
             { id: "active", label: "Aktif", count: countBy("active") },
             { id: "inactive", label: "Nonaktif", count: countBy("inactive") },
+            { id: "expired", label: "Habis", count: countBy("expired") },
           ]}
         />
       </div>
@@ -172,6 +222,25 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-10 pr-0 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label="Pilih semua di halaman ini"
+                      disabled={!pageSelectable.length}
+                      checked={
+                        pageSelectable.length > 0 &&
+                        pageChecked.length === pageSelectable.length
+                      }
+                      ref={(element) => {
+                        if (element)
+                          element.indeterminate =
+                            pageChecked.length > 0 &&
+                            pageChecked.length < pageSelectable.length;
+                      }}
+                      onChange={togglePage}
+                      className="size-4 accent-foreground"
+                    />
+                  </TableHead>
                   <TableHead className="px-4 text-xs text-muted-foreground">
                     Pengguna
                   </TableHead>
@@ -197,17 +266,32 @@ export default function UsersPage() {
               </TableHeader>
               <TableBody>
                 {paginatedUsers.map((entry) => {
-                  const status =
-                    STATUS_PRESENTATION[normalizeStatus(entry.status)];
+                  const status = STATUS_PRESENTATION[displayStatus(entry)];
                   const isSelf = entry.id === currentProfile?.id;
                   const isPending = normalizeStatus(entry.status) === "pending";
                   const name = entry.full_name || "Tanpa nama";
+                  const checked = selected.has(entry.id);
                   return (
                     <TableRow
                       key={entry.id}
                       className="cursor-pointer"
+                      data-state={checked ? "selected" : undefined}
                       onClick={() => openUser(entry.id)}
                     >
+                      <TableCell
+                        className="w-10 pr-0 pl-4"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {canManage(entry) ? (
+                          <input
+                            type="checkbox"
+                            aria-label={`Pilih ${name}`}
+                            checked={checked}
+                            onChange={() => toggle(entry.id)}
+                            className="size-4 accent-foreground"
+                          />
+                        ) : null}
+                      </TableCell>
                       <TableCell className="max-w-0 px-4 py-3 whitespace-normal">
                         <div className="flex min-w-0 flex-col">
                           <Link
@@ -303,6 +387,19 @@ export default function UsersPage() {
                 })}
               </TableBody>
             </Table>
+            {pageSelectable.length > 0 &&
+            pageChecked.length === pageSelectable.length &&
+            filteredSelectable.length > selected.size ? (
+              <div className="border-t border-border px-4 py-2 text-sm">
+                <Button
+                  variant="link"
+                  className="h-auto min-h-11 px-0 sm:min-h-8"
+                  onClick={selectAllFiltered}
+                >
+                  Pilih semua {filteredSelectable.length} hasil filter
+                </Button>
+              </div>
+            ) : null}
             {filteredUsers.length > pageSize ? (
               <div className="border-t border-border px-4 py-3">
                 <Pagination
@@ -321,6 +418,17 @@ export default function UsersPage() {
           </>
         )}
       </section>
+
+      <BulkUserActions
+        selected={selectedUsers}
+        canGrantAdmin={canManageAdmins}
+        canManageLimits={canManageLimits}
+        onClear={() => setSelected(new Set())}
+        onDone={(failedIds) => {
+          setSelected(new Set(failedIds));
+          void refetch();
+        }}
+      />
 
       {approving ? (
         <ApproveDialog

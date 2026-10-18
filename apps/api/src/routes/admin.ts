@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import * as adminService from "../services/admin-service";
 import * as adminUserService from "../services/admin-user-service";
 import * as practiceLimits from "../services/practice-limits-service";
+import * as accountControls from "../services/account-controls-service";
 import { AdminUserError } from "../services/admin-user-service";
 import { allowedOrigins } from "../lib/allowed-origins";
 import { requireCapability } from "../middleware/role";
@@ -17,6 +18,11 @@ import {
   updatePracticeRulesSchema,
   setPracticeOverrideSchema,
   practiceModuleParamSchema,
+  setActiveUntilSchema,
+  bulkUserIdsSchema,
+  bulkApproveSchema,
+  bulkActiveUntilSchema,
+  bulkPracticeLimitSchema,
   createAccessGroupSchema,
   updateAccessGroupSchema,
   addAccessGroupItemSchema,
@@ -167,8 +173,114 @@ admin.post(
         c.req.param("id"),
         body.role,
         body.peserta_id,
+        body.active_until ?? null,
       );
       return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+// ── Masa aktif and bulk actions (plans/markdown/kontrol-user-fase-5b.md) ──
+admin.put(
+  "/users/:id/active-until",
+  requireCapability("admin.users"),
+  zValidator("json", setActiveUntilSchema),
+  async (c) => {
+    try {
+      await adminUserService.setActiveUntil(
+        actorOf(c),
+        c.req.param("id"),
+        c.req.valid("json").active_until,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/bulk-peserta-suggestions",
+  requireCapability("admin.users"),
+  zValidator("json", bulkUserIdsSchema),
+  async (c) => {
+    try {
+      const data = await accountControls.pesertaSuggestions(
+        c.req.valid("json").user_ids,
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/bulk-approve",
+  requireCapability("admin.users"),
+  zValidator("json", bulkApproveSchema),
+  async (c) => {
+    try {
+      const data = await accountControls.bulkApprove(
+        actorOf(c),
+        c.req.valid("json"),
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/bulk-suspend",
+  requireCapability("admin.users"),
+  zValidator("json", bulkUserIdsSchema),
+  async (c) => {
+    try {
+      const data = await accountControls.bulkSuspend(
+        actorOf(c),
+        c.req.valid("json").user_ids,
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/bulk-active-until",
+  requireCapability("admin.users"),
+  zValidator("json", bulkActiveUntilSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    try {
+      const data = await accountControls.bulkActiveUntil(
+        actorOf(c),
+        body.user_ids,
+        body.active_until,
+      );
+      return c.json({ success: true, data });
+    } catch (error) {
+      return adminUserFailure(c, error);
+    }
+  },
+);
+
+admin.post(
+  "/users/bulk-practice-limit",
+  requireCapability("practice.limits.manage"),
+  zValidator("json", bulkPracticeLimitSchema),
+  async (c) => {
+    try {
+      const data = await accountControls.bulkPracticeLimit(
+        actorOf(c),
+        c.req.valid("json"),
+      );
+      return c.json({ success: true, data });
     } catch (error) {
       return adminUserFailure(c, error);
     }

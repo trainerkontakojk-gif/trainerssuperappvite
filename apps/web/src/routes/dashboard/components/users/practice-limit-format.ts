@@ -1,25 +1,40 @@
 import {
+  LIMITED_PRACTICE_ROLES,
+  PRACTICE_MODULES,
   PRACTICE_MODULE_LABELS,
   formatPracticeLimit,
+  formatWibDay,
+  wibToday,
   type ManagedUser,
+  type PracticeLimitsOverview,
   type PracticeModule,
 } from "@trainers/types";
 
 /** "31 Okt 2026" for a YYYY-MM-DD WIB date. */
-export function formatLimitDay(day: string, withYear = true): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    ...(withYear ? { year: "numeric" } : {}),
-    timeZone: "UTC",
-  });
-}
+export const formatLimitDay = formatWibDay;
 
 /** How a role rule reads in a sentence: "3 per hari", "tidak bisa mulai". */
 export function describeRule(limit: number | null): string {
   if (limit === 0) return "tidak bisa mulai";
   if (limit === null) return "tanpa batas";
   return `${limit} per hari`;
+}
+
+/** The approve dialogs' line: what limits the chosen role starts with. */
+export function roleRuleLine(
+  role: string,
+  rules: PracticeLimitsOverview["rules"],
+): string | null {
+  if (!(LIMITED_PRACTICE_ROLES as readonly string[]).includes(role))
+    return "Trainer dan admin tanpa batas latihan.";
+  if (!rules.length) return null;
+  return `Batas latihan mengikuti aturan ${role}: ${PRACTICE_MODULES.map(
+    (module) =>
+      `${PRACTICE_MODULE_LABELS[module]} ${describeRule(
+        rules.find((rule) => rule.module === module && rule.role === role)
+          ?.daily_limit ?? 0,
+      )}`,
+  ).join(", ")}.`;
 }
 
 /** Users list column: "Telefun 2 per hari s.d. 31 Okt", or the default. */
@@ -34,10 +49,7 @@ export function describeUserLimits(user: ManagedUser): string | null {
     .join(", ");
 }
 
-/** Today's Asia/Jakarta date as YYYY-MM-DD, for date inputs. */
-export function wibToday(): string {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-}
+export { wibToday };
 
 export const COUNTED_ACTION: Record<PracticeModule, string> = {
   ketik: "Mulai simulasi",

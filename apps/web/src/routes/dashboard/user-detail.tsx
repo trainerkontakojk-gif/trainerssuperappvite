@@ -4,6 +4,9 @@ import { AlertCircle, ChevronLeft } from "lucide-react";
 import {
   ROLES,
   can,
+  daysLeft,
+  formatWibDay,
+  isAccountExpired,
   normalizeRole,
   type ManagedUserDetail,
   type Role,
@@ -27,8 +30,10 @@ import { ConfirmDialog } from "./components/management/ConfirmDialog";
 import { LinkPesertaDialog } from "./components/users/LinkPesertaDialog";
 import { ApproveDialog } from "./components/users/ApproveDialog";
 import { UserPracticeLimits } from "./components/users/UserPracticeLimits";
+import { ActiveUntilDialog } from "./components/users/ActiveUntilDialog";
 import {
   STATUS_PRESENTATION,
+  displayStatus,
   formatDate,
   normalizeStatus,
   roleLabel,
@@ -112,6 +117,7 @@ export default function UserDetailPage() {
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
   const [linking, setLinking] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [editingUntil, setEditingUntil] = useState(false);
 
   const user = data?.user;
   useEffect(() => {
@@ -150,6 +156,7 @@ export default function UserDetailPage() {
   const account = data.user;
   const name = account.full_name || "Tanpa nama";
   const status = normalizeStatus(account.status);
+  const shownStatus = STATUS_PRESENTATION[displayStatus(account)];
   const isSelf = account.id === currentProfile?.id;
   const manageable =
     !isSelf && (normalizeRole(account.role) !== "admin" || canManageAdmins);
@@ -318,10 +325,7 @@ export default function UserDetailPage() {
             <span aria-hidden="true">·</span>
             <span>{roleLabel(account.role)}</span>
             <span aria-hidden="true">·</span>
-            <StatusDot
-              tone={STATUS_PRESENTATION[status].tone}
-              label={STATUS_PRESENTATION[status].label}
-            />
+            <StatusDot tone={shownStatus.tone} label={shownStatus.label} />
           </p>
         </div>
         {manageable ? (
@@ -406,6 +410,24 @@ export default function UserDetailPage() {
                   ) : (
                     roleLabel(account.role)
                   ),
+                ],
+                [
+                  "Masa aktif",
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <ActiveUntilText day={account.active_until ?? null} />
+                    {manageable ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11 sm:min-h-8"
+                        aria-label={`Ubah masa aktif ${name}`}
+                        disabled={busy}
+                        onClick={() => setEditingUntil(true)}
+                      >
+                        Ubah
+                      </Button>
+                    ) : null}
+                  </div>,
                 ],
                 ["Terdaftar", formatDate(account.created_at)],
                 ["Terakhir masuk", formatDateTime(account.last_sign_in_at)],
@@ -634,6 +656,27 @@ export default function UserDetailPage() {
         />
       ) : null}
 
+      {editingUntil ? (
+        <ActiveUntilDialog
+          title={`Masa aktif ${name}`}
+          current={account.active_until ?? null}
+          onClose={() => setEditingUntil(false)}
+          onSave={(day) =>
+            mutate(
+              () =>
+                adminClient.users[":id"]["active-until"].$put({
+                  param: { id: account.id },
+                  json: { active_until: day },
+                }),
+              day
+                ? `Masa aktif ${name} sampai ${formatWibDay(day)}`
+                : `Masa aktif ${name} tanpa batas waktu`,
+              "Masa aktif belum tersimpan.",
+            )
+          }
+        />
+      ) : null}
+
       {approving ? (
         <ApproveDialog
           user={account}
@@ -663,6 +706,30 @@ export default function UserDetailPage() {
         />
       ) : null}
     </div>
+  );
+}
+
+/** "Sampai 31 Des 2026 · 74 hari lagi"; amber when 7 days or fewer remain. */
+function ActiveUntilText({ day }: { day: string | null }) {
+  if (!day) return <span>Tanpa batas waktu</span>;
+  if (isAccountExpired(day))
+    return (
+      <span>
+        Berakhir <b className="font-medium">{formatWibDay(day)}</b>
+        <span className="text-chart-amber"> · masa aktif habis</span>
+      </span>
+    );
+  const left = daysLeft(day);
+  return (
+    <span>
+      Sampai <b className="font-medium">{formatWibDay(day)}</b>
+      <span
+        className={left <= 7 ? "text-chart-amber" : "text-muted-foreground"}
+      >
+        {" "}
+        · {left === 0 ? "hari terakhir" : `${left} hari lagi`}
+      </span>
+    </span>
   );
 }
 

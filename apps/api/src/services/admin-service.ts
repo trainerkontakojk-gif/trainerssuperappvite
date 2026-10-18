@@ -6,14 +6,17 @@ import {
   assertManageableTarget,
   getLinkedPesertaByAccount,
   linkUserPeserta,
+  setActiveUntil,
   type AdminActor,
 } from "./admin-user-service";
 import { getActiveOverridesByUser } from "./practice-limits-service";
+import { endAllLogins } from "./end-all-logins";
 import {
   fetchLeaderModuleRequests,
   resolveEffectiveModuleStatus,
   resolveEffectiveModuleCreatedAt,
 } from "./leader-access-service";
+import { wibToday } from "@trainers/types";
 import type {
   ManagedUser,
   PendingLeaderRequest,
@@ -76,20 +79,6 @@ const ROLE_RANK: Record<string, number> = {
   trainer: 2,
   admin: 3,
 };
-
-/**
- * Ends every open login of an account, on every device. Used when it can no
- * longer sign in (suspended, rejected, deleted) or loses access (lower role).
- */
-async function endAllLogins(user_id: string): Promise<void> {
-  const { error } = await supabaseAdmin.rpc("revoke_user_sessions", {
-    p_user: user_id,
-  });
-  if (error)
-    throw new Error(
-      "Perubahan tersimpan, tetapi login yang masih terbuka belum bisa diakhiri. Coba simpan sekali lagi.",
-    );
-}
 
 const ENDED_LOGINS = "; semua login-nya diakhiri";
 
@@ -201,14 +190,18 @@ export async function updateUserRole(
 
 /**
  * Approves a pending account in one step: role first (so a refused role
- * changes nothing), then the optional participant link, then the status.
+ * changes nothing), then the optional participant link and last day, then
+ * the status.
  */
 export async function approveUser(
   actor: AdminActor,
   userId: string,
   role: string,
   pesertaId: string | null,
+  activeUntil: string | null = null,
 ): Promise<void> {
+  if (activeUntil && activeUntil < wibToday())
+    throw new AdminUserError("PAST_END_DATE");
   const target = await assertManageableTarget(actor, userId);
   if (target.status !== "pending") throw new AdminUserError("NOT_PENDING");
   if (role === "admin" && actor.role !== "admin")
@@ -216,6 +209,8 @@ export async function approveUser(
   if (target.role !== role)
     await updateUserRole(userId, role, actor.id, actor.email, actor.role ?? "");
   if (pesertaId) await linkUserPeserta(actor, userId, pesertaId);
+  // Before the status, so the account is never active without its last day.
+  if (activeUntil) await setActiveUntil(actor, userId, activeUntil);
   await updateUserStatus(
     userId,
     "approved",

@@ -3,6 +3,8 @@ import type { ClientResponse } from "hono/client";
 import type { AppType, HealthRouteType } from "@trainers/api";
 import type {
   AccessGroupItemRow,
+  BulkUserResponse,
+  PesertaSuggestion,
   AccessGroupRow,
   ApiResponse,
   JadwalShiftingMonthResponse,
@@ -140,7 +142,17 @@ type AdminClient = {
       approve: {
         $post(args: {
           param: { id: string };
-          json: { role: string; peserta_id: string | null };
+          json: {
+            role: string;
+            peserta_id: string | null;
+            active_until?: string | null;
+          };
+        }): Promise<RpcResponse<null>>;
+      };
+      "active-until": {
+        $put(args: {
+          param: { id: string };
+          json: { active_until: string | null };
         }): Promise<RpcResponse<null>>;
       };
       "practice-limits": {
@@ -159,6 +171,44 @@ type AdminClient = {
         };
       };
       $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
+    };
+    "bulk-peserta-suggestions": {
+      $post(args: {
+        json: { user_ids: string[] };
+      }): Promise<RpcResponse<PesertaSuggestion[]>>;
+    };
+    "bulk-approve": {
+      $post(args: {
+        json: {
+          user_ids: string[];
+          role: string;
+          active_until: string | null;
+          links: { user_id: string; peserta_id: string }[];
+        };
+      }): Promise<RpcResponse<BulkUserResponse>>;
+    };
+    "bulk-suspend": {
+      $post(args: {
+        json: { user_ids: string[] };
+      }): Promise<RpcResponse<BulkUserResponse>>;
+    };
+    "bulk-active-until": {
+      $post(args: {
+        json: { user_ids: string[]; active_until: string | null };
+      }): Promise<RpcResponse<BulkUserResponse>>;
+    };
+    "bulk-practice-limit": {
+      $post(args: {
+        json: {
+          user_ids: string[];
+          module: PracticeModule;
+          limit: {
+            daily_limit: number | null;
+            ends_on: string | null;
+            note: string | null;
+          } | null;
+        };
+      }): Promise<RpcResponse<BulkUserResponse>>;
     };
   };
   "practice-limits": {

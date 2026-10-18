@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  LIMITED_PRACTICE_ROLES,
-  PRACTICE_MODULES,
-  PRACTICE_MODULE_LABELS,
   ROLES,
+  activeUntilValid,
   normalizeRole,
   type ManagedUser,
   type PesertaLinkOption,
@@ -34,7 +32,8 @@ import {
 import { notify } from "../../../../lib/toast";
 import { formatDate, roleLabel } from "../../users-format";
 import { LinkPesertaDialog } from "./LinkPesertaDialog";
-import { describeRule } from "./practice-limit-format";
+import { ActiveUntilField } from "./ActiveUntilDialog";
+import { roleRuleLine } from "./practice-limit-format";
 
 type Choice = "suggested" | "other" | "later";
 
@@ -68,6 +67,7 @@ export function ApproveDialog({
   const [rules, setRules] = useState<PracticeLimitsOverview["rules"]>([]);
   const [saving, setSaving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [activeUntil, setActiveUntil] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,17 +98,7 @@ export function ApproveDialog({
         ? (other?.id ?? null)
         : null;
 
-  const ruleLine = (LIMITED_PRACTICE_ROLES as readonly string[]).includes(role)
-    ? rules.length
-      ? `Batas latihan mengikuti aturan ${role}: ${PRACTICE_MODULES.map(
-          (module) =>
-            `${PRACTICE_MODULE_LABELS[module]} ${describeRule(
-              rules.find((rule) => rule.module === module && rule.role === role)
-                ?.daily_limit ?? 0,
-            )}`,
-        ).join(", ")}.`
-      : null
-    : "Trainer dan admin tanpa batas latihan.";
+  const ruleLine = roleRuleLine(role, rules);
 
   const run = async (
     action: () => Promise<Parameters<typeof unwrapResponse>[0]>,
@@ -132,7 +122,7 @@ export function ApproveDialog({
       () =>
         adminClient.users[":id"].approve.$post({
           param: { id: user.id },
-          json: { role, peserta_id: pesertaId },
+          json: { role, peserta_id: pesertaId, active_until: activeUntil },
         }),
       `${name} disetujui`,
       "Pendaftaran belum bisa disetujui.",
@@ -256,6 +246,14 @@ export function ApproveDialog({
               {radio("later", "Tautkan nanti")}
             </fieldset>
 
+            <div className="border-t border-dashed border-border pt-3">
+              <ActiveUntilField
+                value={activeUntil}
+                onChange={setActiveUntil}
+                hint="Pilih tanggal kalau akun ini hanya untuk satu batch pelatihan."
+              />
+            </div>
+
             {ruleLine ? (
               <p className="text-xs text-muted-foreground">{ruleLine}</p>
             ) : null}
@@ -303,7 +301,11 @@ export function ApproveDialog({
                 </Button>
                 <Button
                   className="min-h-11 sm:min-h-9"
-                  disabled={saving || (choice === "other" && !other)}
+                  disabled={
+                    saving ||
+                    (choice === "other" && !other) ||
+                    !activeUntilValid(activeUntil)
+                  }
                   onClick={() => void approve()}
                 >
                   {saving ? "Menyetujui…" : "Setujui"}

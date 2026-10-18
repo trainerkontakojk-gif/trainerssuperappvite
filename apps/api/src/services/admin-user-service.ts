@@ -6,7 +6,7 @@ import type {
   PesertaLinkOption,
   Role,
 } from "@trainers/types";
-import { normalizeRole } from "@trainers/types";
+import { formatWibDay, normalizeRole, wibToday } from "@trainers/types";
 import { supabaseAdmin } from "../lib/supabase";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { logActivity } from "./activity-log-service";
@@ -29,6 +29,7 @@ const errorStatus = {
   ADMIN_ROLE: 403,
   NOT_LIMITED_ROLE: 400,
   PAST_END_DATE: 400,
+  NOT_ACTIVE: 409,
 } as const;
 
 const errorMessage: Record<keyof typeof errorStatus, string> = {
@@ -45,6 +46,7 @@ const errorMessage: Record<keyof typeof errorStatus, string> = {
   NOT_LIMITED_ROLE:
     "Trainer dan admin selalu tanpa batas latihan, jadi tidak perlu pengecualian.",
   PAST_END_DATE: "Tanggal berakhir sudah lewat. Pilih hari ini atau sesudahnya.",
+  NOT_ACTIVE: "Hanya akun yang aktif yang bisa ditangguhkan.",
 };
 
 export class AdminUserError extends Error {
@@ -60,7 +62,7 @@ export type AdminActor = { id: string; email: string; role: Role | null };
 
 type TargetProfile = Pick<
   ManagedUser,
-  "id" | "email" | "full_name" | "role" | "status" | "created_at"
+  "id" | "email" | "full_name" | "role" | "status" | "created_at" | "active_until"
 >;
 
 const PESERTA_SUMMARY = "id, nama, batch_name, tim";
@@ -72,13 +74,24 @@ function displayName(profile: { full_name: string | null; email: string }) {
 async function getActiveProfile(userId: string): Promise<TargetProfile> {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, email, full_name, role, status, created_at")
+    // "*" so a database without active_until yet still loads the account.
+    .select("*")
     .eq("id", userId)
     .eq("is_deleted", false)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new AdminUserError("NOT_FOUND");
-  return data as TargetProfile;
+  const { id, email, full_name, role, status, created_at, active_until } =
+    data as TargetProfile;
+  return {
+    id,
+    email,
+    full_name,
+    role,
+    status,
+    created_at,
+    active_until: active_until ?? null,
+  };
 }
 
 /** Loads the target and enforces who may change it. */
@@ -299,6 +312,33 @@ export async function unlinkUserPeserta(
     action: `Melepas tautan akun ${displayName(target)} dari peserta ${data[0]!.nama}`,
     module: "USER_MGMT",
     type: "unlink_peserta",
+  });
+}
+
+/**
+ * Sets the last WIB day an account may be used (null = no limit). The auth
+ * middleware refuses the account after that day, so extending an expired
+ * account lets it back in without approving it again.
+ */
+export async function setActiveUntil(
+  actor: AdminActor,
+  userId: string,
+  day: string | null,
+): Promise<void> {
+  if (day && day < wibToday()) throw new AdminUserError("PAST_END_DATE");
+  const target = await assertManageableTarget(actor, userId);
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .update({ active_until: day })
+    .eq("id", userId);
+  if (error) throw error;
+  await logActivity({
+    user_id: actor.id,
+    user_name: actor.email,
+    target_user_id: userId,
+    action: `Mengubah masa aktif ${displayName(target)} menjadi ${day ? `sampai ${formatWibDay(day)}` : "tanpa batas waktu"}`,
+    module: "USER_MGMT",
+    type: "active_until",
   });
 }
 

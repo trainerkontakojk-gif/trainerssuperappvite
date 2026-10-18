@@ -205,6 +205,7 @@ test.describe("Management pages (hermetic)", () => {
     expect((await approveRequest).postDataJSON()).toEqual({
       role: "agent",
       peserta_id: null,
+      active_until: null,
     });
 
     // Baris membuka halaman pengguna (panel geser sudah diganti halaman).

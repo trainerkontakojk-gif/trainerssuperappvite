@@ -53,7 +53,24 @@ export interface LimitDialogProps {
   roleLimit: (role: string, module: PracticeModule) => number | null;
   onClose: () => void;
   onSaved: () => void;
+  /** Same limit for everyone selected on the users list. */
+  bulk?: {
+    /** Agents and leaders who will be changed. */
+    targets: LimitTarget[];
+    /** Selected but always unlimited (trainer, admin). */
+    skipped: LimitTarget[];
+    onSave: (
+      module: PracticeModule,
+      limit: LimitPayload | null,
+    ) => Promise<boolean>;
+  };
 }
+
+export type LimitPayload = {
+  daily_limit: number | null;
+  ends_on: string | null;
+  note: string | null;
+};
 
 function initialMode(current: LimitDialogProps["current"]): Mode {
   if (!current) return "role";
@@ -73,6 +90,7 @@ export function LimitDialog({
   roleLimit,
   onClose,
   onSaved,
+  bulk,
 }: LimitDialogProps) {
   const [targetId, setTargetId] = useState(fixedTarget?.id ?? "");
   const [module, setModule] = useState<PracticeModule>(initialModule);
@@ -96,14 +114,30 @@ export function LimitDialog({
     Number.isInteger(countValue) &&
     countValue >= 1 &&
     countValue <= PRACTICE_LIMIT_MAX;
-  const canSave = Boolean(target) && (mode !== "custom" || countValid);
+  const canSave =
+    (bulk ? bulk.targets.length > 0 : Boolean(target)) &&
+    (mode !== "custom" || countValid);
+  const payload: LimitPayload | null =
+    mode === "role"
+      ? null
+      : {
+          daily_limit:
+            mode === "unlimited" ? null : mode === "closed" ? 0 : countValue,
+          ends_on: endsOn || null,
+          note: note.trim() || null,
+        };
 
   const save = async () => {
+    if (bulk) {
+      setSaving(true);
+      if (!(await bulk.onSave(module, payload))) setSaving(false);
+      return;
+    }
     if (!target) return;
     setSaving(true);
     try {
       const param = { id: target.id, module };
-      if (mode === "role") {
+      if (!payload) {
         await unwrapResponse(
           await adminClient.users[":id"]["practice-limits"][":module"].$delete({
             param,
@@ -113,16 +147,7 @@ export function LimitDialog({
         await unwrapResponse(
           await adminClient.users[":id"]["practice-limits"][":module"].$put({
             param,
-            json: {
-              daily_limit:
-                mode === "unlimited"
-                  ? null
-                  : mode === "closed"
-                    ? 0
-                    : countValue,
-              ends_on: endsOn || null,
-              note: note.trim() || null,
-            },
+            json: payload,
           }),
         );
       }
@@ -164,40 +189,54 @@ export function LimitDialog({
       <DialogContent className="gap-4 sm:max-w-md">
         <div className="grid gap-1">
           <DialogTitle className="font-display text-lg font-semibold">
-            {target
-              ? `Batas ${label} untuk ${target.name}`
-              : "Tambah pengecualian"}
+            {bulk
+              ? `Batas latihan untuk ${bulk.targets.length + bulk.skipped.length} orang`
+              : target
+                ? `Batas ${label} untuk ${target.name}`
+                : "Tambah pengecualian"}
           </DialogTitle>
           <DialogDescription>
-            {target
-              ? `Aturan ${roleLabel(target.role).toLowerCase()}: ${describeRule(roleLimit(target.role, module))}`
-              : "Pilih pengguna dan modul, lalu tentukan batasnya."}
+            {bulk
+              ? "Pilih modul, lalu tentukan batas yang sama untuk semuanya."
+              : target
+                ? `Aturan ${roleLabel(target.role).toLowerCase()}: ${describeRule(roleLimit(target.role, module))}`
+                : "Pilih pengguna dan modul, lalu tentukan batasnya."}
           </DialogDescription>
         </div>
 
         {fixedTarget ? null : (
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
-            <label className="grid gap-1.5 text-sm">
-              <span className="text-muted-foreground">Pengguna</span>
-              <Select
-                value={targetId}
-                onValueChange={(next) => setTargetId(String(next ?? ""))}
-              >
-                <SelectTrigger
-                  aria-label="Pengguna"
-                  className="h-11 w-full sm:h-9"
+          <div
+            className={
+              bulk
+                ? "grid gap-3"
+                : "grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]"
+            }
+          >
+            {bulk ? null : (
+              <label className="grid gap-1.5 text-sm">
+                <span className="text-muted-foreground">Pengguna</span>
+                <Select
+                  value={targetId}
+                  onValueChange={(next) => setTargetId(String(next ?? ""))}
                 >
-                  <SelectValue>{target?.name ?? "Pilih pengguna"}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {candidates.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.name} · {roleLabel(candidate.role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
+                  <SelectTrigger
+                    aria-label="Pengguna"
+                    className="h-11 w-full sm:h-9"
+                  >
+                    <SelectValue>
+                      {target?.name ?? "Pilih pengguna"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {candidates.map((candidate) => (
+                      <SelectItem key={candidate.id} value={candidate.id}>
+                        {candidate.name} · {roleLabel(candidate.role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            )}
             <label className="grid gap-1.5 text-sm">
               <span className="text-muted-foreground">Modul</span>
               <Select
@@ -226,7 +265,11 @@ export function LimitDialog({
 
         <fieldset className="grid">
           <legend className="sr-only">Batas {label}</legend>
-          {option("role", "Ikuti aturan peran")}
+          {option(
+            "role",
+            "Ikuti aturan peran",
+            bulk ? `Menghapus pengecualian ${label} mereka.` : undefined,
+          )}
           {option(
             "custom",
             <span className="inline-flex flex-wrap items-center gap-2">
@@ -284,6 +327,19 @@ export function LimitDialog({
           />
         </label>
 
+        {bulk?.skipped.length ? (
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            {bulk.skipped.length} orang dilewati:{" "}
+            {bulk.skipped
+              .map(
+                (entry) =>
+                  `${entry.name} (${roleLabel(entry.role).toLowerCase()})`,
+              )
+              .join(", ")}{" "}
+            selalu tanpa batas.
+          </p>
+        ) : null}
+
         <DialogFooter>
           <Button
             variant="outline"
@@ -298,7 +354,11 @@ export function LimitDialog({
             disabled={!canSave || saving}
             onClick={() => void save()}
           >
-            {saving ? "Menyimpan…" : "Simpan"}
+            {saving
+              ? "Menyimpan…"
+              : bulk
+                ? `Simpan untuk ${bulk.targets.length} orang`
+                : "Simpan"}
           </Button>
         </DialogFooter>
       </DialogContent>

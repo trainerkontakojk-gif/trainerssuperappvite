@@ -13,6 +13,8 @@ export interface UserProfile {
   role: Role;
   status?: "pending" | "active" | "inactive";
   is_deleted?: boolean;
+  /** Last WIB day the account may be used; null or absent = no limit. */
+  active_until?: string | null;
 }
 
 export type ApiResponse<T> =

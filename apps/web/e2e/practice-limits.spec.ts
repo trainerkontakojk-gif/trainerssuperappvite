@@ -387,6 +387,7 @@ test.describe("Batas latihan (hermetic)", () => {
     expect((await approve).postDataJSON()).toEqual({
       role: "leader",
       peserta_id: BUDI_PESERTA,
+      active_until: null,
     });
     await expect(dialog).toHaveCount(0);
 

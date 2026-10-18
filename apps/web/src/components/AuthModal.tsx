@@ -7,6 +7,7 @@ import {
   clearLogoutGuestLock,
 } from "../lib/authLocalState";
 import { signOutLocalSession } from "../lib/session-logout";
+import { accountExpiredMessage, isAccountExpired } from "@trainers/types";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -123,6 +124,11 @@ export default function AuthModal({
       throw new Error(
         "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.",
       );
+    }
+
+    if (isAccountExpired(profile.active_until)) {
+      await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
+      throw new Error(accountExpiredMessage(profile.active_until!));
     }
 
     return "/dashboard";
