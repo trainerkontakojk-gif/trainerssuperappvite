@@ -37,6 +37,7 @@ const detail = (overrides: Record<string, unknown> = {}) => ({
   ketik_assignment: null,
   leader_access: [],
   history: [],
+  practice_limits: [],
   ...overrides,
 });
 

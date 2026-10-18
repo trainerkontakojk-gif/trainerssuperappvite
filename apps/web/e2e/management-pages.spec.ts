@@ -141,14 +141,24 @@ test.describe("Management pages (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("pengguna: tabel, filter status, setujui inline, dan tautan ke halaman pengguna", async ({
+  test("pengguna: tabel, filter status, dialog setujui, dan tautan ke halaman pengguna", async ({
     page,
   }) => {
     const mocks: ApiMock[] = [
       { method: "GET", path: "/api/v1/admin/users", body: ok(USERS) },
+      { method: "GET", path: "/api/v1/admin/peserta-options", body: ok([]) },
       {
-        method: "PUT",
-        path: "/api/v1/admin/users/u-pending/status",
+        method: "GET",
+        path: "/api/v1/admin/practice-limits",
+        body: ok({
+          rules: [],
+          overrides: [],
+          today: { started: { ketik: 0, pdkt: 0, telefun: 0 }, users_at_limit: 0 },
+        }),
+      },
+      {
+        method: "POST",
+        path: "/api/v1/admin/users/u-pending/approve",
         body: ok(null),
       },
     ];
@@ -175,18 +185,26 @@ test.describe("Management pages (hermetic)", () => {
       0,
     );
 
-    // Pending → setujui langsung dari baris, memanggil endpoint status lama.
-    const statusRequest = page.waitForRequest(
-      (req) =>
-        req.method() === "PUT" &&
-        req.url().endsWith("/admin/users/u-pending/status"),
-    );
+    // Pending → Setujui membuka dialog role + peserta (kontrol-user-fase-4).
     await page
       .getByRole("row", { name: /Budi Santoso/ })
       .getByRole("button", { name: "Setujui" })
       .click();
-    expect((await statusRequest).postDataJSON()).toEqual({
-      status: "approved",
+    const approveDialog = page.getByRole("dialog", {
+      name: "Setujui Budi Santoso?",
+    });
+    await expect(
+      approveDialog.getByRole("radio", { name: "Tautkan nanti" }),
+    ).toBeChecked();
+    const approveRequest = page.waitForRequest(
+      (req) =>
+        req.method() === "POST" &&
+        req.url().endsWith("/admin/users/u-pending/approve"),
+    );
+    await approveDialog.getByRole("button", { name: "Setujui" }).click();
+    expect((await approveRequest).postDataJSON()).toEqual({
+      role: "agent",
+      peserta_id: null,
     });
 
     // Baris membuka halaman pengguna (panel geser sudah diganti halaman).

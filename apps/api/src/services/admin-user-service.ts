@@ -25,6 +25,10 @@ const errorStatus = {
   PESERTA_TAKEN: 409,
   NO_EMAIL: 400,
   RESET_FAILED: 502,
+  NOT_PENDING: 409,
+  ADMIN_ROLE: 403,
+  NOT_LIMITED_ROLE: 400,
+  PAST_END_DATE: 400,
 } as const;
 
 const errorMessage: Record<keyof typeof errorStatus, string> = {
@@ -36,6 +40,11 @@ const errorMessage: Record<keyof typeof errorStatus, string> = {
     "Peserta ini sudah tertaut ke akun lain. Lepas tautannya dulu.",
   NO_EMAIL: "Akun ini tidak punya email.",
   RESET_FAILED: "Email reset password gagal dikirim. Coba lagi nanti.",
+  NOT_PENDING: "Akun ini sudah tidak menunggu persetujuan.",
+  ADMIN_ROLE: "Trainer tidak dapat memberikan role admin.",
+  NOT_LIMITED_ROLE:
+    "Trainer dan admin selalu tanpa batas latihan, jadi tidak perlu pengecualian.",
+  PAST_END_DATE: "Tanggal berakhir sudah lewat. Pilih hari ini atau sesudahnya.",
 };
 
 export class AdminUserError extends Error {
@@ -101,9 +110,10 @@ export async function getLinkedPesertaByAccount(): Promise<
   return new Map(rows.map(({ akun_id, ...peserta }) => [akun_id, peserta]));
 }
 
+/** Everything on the user page except practice limits (added by the route). */
 export async function getUserDetail(
   userId: string,
-): Promise<ManagedUserDetail> {
+): Promise<Omit<ManagedUserDetail, "practice_limits">> {
   const profile = await getActiveProfile(userId);
   const [authUser, peserta, assignment, leaderRequests, history] =
     await Promise.all([

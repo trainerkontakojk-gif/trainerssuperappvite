@@ -25,6 +25,8 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { StatusDot } from "./components/management/StatusDot";
 import { ConfirmDialog } from "./components/management/ConfirmDialog";
 import { LinkPesertaDialog } from "./components/users/LinkPesertaDialog";
+import { ApproveDialog } from "./components/users/ApproveDialog";
+import { UserPracticeLimits } from "./components/users/UserPracticeLimits";
 import {
   STATUS_PRESENTATION,
   formatDate,
@@ -100,6 +102,7 @@ export default function UserDetailPage() {
   const currentProfile = useAuthStore((s) => s.profile);
   const managerRole = normalizeRole(currentProfile?.role);
   const canManageAdmins = can(managerRole, "admin.users.manageAdmin");
+  const canManageLimits = can(managerRole, "practice.limits.manage");
 
   const { data, loading, error, refetch } = useApi<ManagedUserDetail>(
     id ? `/admin/users/${id}` : null,
@@ -108,6 +111,7 @@ export default function UserDetailPage() {
   const [busy, setBusy] = useState(false);
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
   const [linking, setLinking] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   const user = data?.user;
   useEffect(() => {
@@ -141,7 +145,8 @@ export default function UserDetailPage() {
     );
   }
 
-  const { peserta, ketik_assignment, leader_access, history } = data;
+  const { peserta, ketik_assignment, leader_access, history, practice_limits } =
+    data;
   const account = data.user;
   const name = account.full_name || "Tanpa nama";
   const status = normalizeStatus(account.status);
@@ -258,7 +263,7 @@ export default function UserDetailPage() {
       <Button
         className="min-h-11 sm:min-h-9"
         disabled={busy}
-        onClick={() => void setStatus("approved", `${name} disetujui`)}
+        onClick={() => setApproving(true)}
       >
         Setujui
       </Button>
@@ -485,6 +490,22 @@ export default function UserDetailPage() {
             )}
           </Panel>
 
+          {canManageLimits ? (
+            <Panel title="Batas latihan">
+              <UserPracticeLimits
+                account={{ id: account.id, name, role: account.role }}
+                limits={practice_limits}
+                editable={
+                  !isSelf &&
+                  ["agent", "leader"].includes(
+                    normalizeRole(account.role) ?? "",
+                  )
+                }
+                onSaved={() => void refetch()}
+              />
+            </Panel>
+          ) : null}
+
           <Panel title="Penugasan KETIK">
             <Rows
               rows={
@@ -609,6 +630,18 @@ export default function UserDetailPage() {
               "Gagal menautkan peserta.",
             );
             if (ok) setLinking(false);
+          }}
+        />
+      ) : null}
+
+      {approving ? (
+        <ApproveDialog
+          user={account}
+          canGrantAdmin={canManageAdmins}
+          onClose={() => setApproving(false)}
+          onDone={() => {
+            setApproving(false);
+            void refetch();
           }}
         />
       ) : null}

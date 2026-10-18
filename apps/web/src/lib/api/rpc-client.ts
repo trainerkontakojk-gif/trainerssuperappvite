@@ -10,6 +10,8 @@ import type {
   MonitoringHistoryStatusFilter,
   MonitoringReviewByModule,
   MonitoringSessionPage,
+  PracticeLimitsOverview,
+  PracticeModule,
   SidakSimulationDetail,
   SidakSimulationModule,
   SidakSimulationPage,
@@ -135,7 +137,42 @@ type AdminClient = {
         }): Promise<RpcResponse<null>>;
         $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
       };
+      approve: {
+        $post(args: {
+          param: { id: string };
+          json: { role: string; peserta_id: string | null };
+        }): Promise<RpcResponse<null>>;
+      };
+      "practice-limits": {
+        ":module": {
+          $put(args: {
+            param: { id: string; module: PracticeModule };
+            json: {
+              daily_limit: number | null;
+              ends_on: string | null;
+              note: string | null;
+            };
+          }): Promise<RpcResponse<null>>;
+          $delete(args: {
+            param: { id: string; module: PracticeModule };
+          }): Promise<RpcResponse<null>>;
+        };
+      };
       $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
+    };
+  };
+  "practice-limits": {
+    $get(): Promise<RpcResponse<PracticeLimitsOverview>>;
+    rules: {
+      $put(args: {
+        json: {
+          rules: Array<{
+            module: PracticeModule;
+            role: "agent" | "leader";
+            daily_limit: number | null;
+          }>;
+        };
+      }): Promise<RpcResponse<null>>;
     };
   };
   "access-groups": {

@@ -1,7 +1,14 @@
 import { supabaseAdmin } from "../lib/supabase";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { logActivity } from "./activity-log-service";
-import { getLinkedPesertaByAccount } from "./admin-user-service";
+import {
+  AdminUserError,
+  assertManageableTarget,
+  getLinkedPesertaByAccount,
+  linkUserPeserta,
+  type AdminActor,
+} from "./admin-user-service";
+import { getActiveOverridesByUser } from "./practice-limits-service";
 import {
   fetchLeaderModuleRequests,
   resolveEffectiveModuleStatus,
@@ -52,10 +59,14 @@ export async function getUsers(): Promise<ManagedUser[]> {
       from += PAGE_SIZE;
     }
   }
-  const linked = await getLinkedPesertaByAccount();
+  const [linked, overrides] = await Promise.all([
+    getLinkedPesertaByAccount(),
+    getActiveOverridesByUser(),
+  ]);
   return allData.map((user) => ({
     ...user,
     linked_peserta: linked.get(user.id) ?? null,
+    practice_overrides: overrides.get(user.id) ?? [],
   }));
 }
 
@@ -160,6 +171,32 @@ export async function updateUserRole(
     type: "update_role",
     target_user_id: user_id,
   });
+}
+
+/**
+ * Approves a pending account in one step: role first (so a refused role
+ * changes nothing), then the optional participant link, then the status.
+ */
+export async function approveUser(
+  actor: AdminActor,
+  userId: string,
+  role: string,
+  pesertaId: string | null,
+): Promise<void> {
+  const target = await assertManageableTarget(actor, userId);
+  if (target.status !== "pending") throw new AdminUserError("NOT_PENDING");
+  if (role === "admin" && actor.role !== "admin")
+    throw new AdminUserError("ADMIN_ROLE");
+  if (target.role !== role)
+    await updateUserRole(userId, role, actor.id, actor.email, actor.role ?? "");
+  if (pesertaId) await linkUserPeserta(actor, userId, pesertaId);
+  await updateUserStatus(
+    userId,
+    "approved",
+    actor.id,
+    actor.email,
+    actor.role ?? "",
+  );
 }
 
 export async function deleteUser(

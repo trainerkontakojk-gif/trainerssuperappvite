@@ -17,7 +17,8 @@ interface LinkPesertaDialogProps {
   currentPesertaId: string | null;
   saving: boolean;
   onClose: () => void;
-  onLink: (pesertaId: string) => void;
+  /** `option` is missing when a new search no longer lists the pick. */
+  onLink: (pesertaId: string, option?: PesertaLinkOption) => void;
 }
 
 /**
@@ -188,7 +189,13 @@ export function LinkPesertaDialog({
           <Button
             className="min-h-11 sm:min-h-9"
             disabled={!selected || saving}
-            onClick={() => selected && onLink(selected)}
+            onClick={() =>
+              selected &&
+              onLink(
+                selected,
+                options.find((entry) => entry.id === selected),
+              )
+            }
           >
             {saving ? "Menautkan…" : "Tautkan"}
           </Button>
