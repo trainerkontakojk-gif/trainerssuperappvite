@@ -457,6 +457,30 @@ const monitoringRoute = createRoute({
   component: MonitoringPage,
 });
 
+const monitoringUsageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/monitoring/biaya",
+  beforeLoad: requireCapability("monitoring.read"),
+  component: () => <MonitoringPage section="usage" />,
+});
+
+const monitoringPricingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/monitoring/harga",
+  beforeLoad: async () => {
+    await requireCapability("monitoring.read")();
+    // Leader boleh membuka Monitoring tetapi tidak halaman Harga.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const profile = session ? await fetchAuthProfile(session.user.id) : null;
+    if (!profile || !can(profile.role, "monitoring.pricing.read")) {
+      throw redirect({ to: "/monitoring", replace: true });
+    }
+  },
+  component: () => <MonitoringPage section="pricing" />,
+});
+
 const telefunRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun",
@@ -726,6 +750,8 @@ const routeTree = rootRoute.addChildren([
   telefunHistoryRoute,
   telefunReplayRoute,
   monitoringRoute,
+  monitoringUsageRoute,
+  monitoringPricingRoute,
   accountRoute,
   authCallbackRoute,
   waitingApprovalRoute,

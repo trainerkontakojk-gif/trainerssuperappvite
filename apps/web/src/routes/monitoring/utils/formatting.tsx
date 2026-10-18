@@ -34,6 +34,24 @@ export function formatIdr(value: number): string {
   return `Rp ${Math.round(value).toLocaleString("id-ID")}`;
 }
 
+/** USD per million tokens, e.g. "0,75" or "0,125". */
+export function formatUsdRate(value: number): string {
+  return value.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+}
+
+/** Date in WIB, e.g. "1 Jan 2027". */
+export function formatPricingDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}d`;
   const mins = Math.floor(seconds / 60);

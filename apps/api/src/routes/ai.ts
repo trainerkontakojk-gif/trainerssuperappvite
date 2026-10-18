@@ -3,12 +3,7 @@ import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import {
-  AI_MODELS,
-  TELEFUN_LIVE_MODELS,
-  getHistoricalTelefunRealtimeModel,
-  getModelsForModule,
-} from "../lib/ai-models";
+import { AI_MODELS, getModelsForModule } from "../lib/ai-models";
 import type { AiModelModule } from "@trainers/types";
 import { requireCapability } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
@@ -27,12 +22,13 @@ import {
 } from "../services/monitoring-history-delete-service";
 
 import { isUsageActionInCategory } from "../lib/ai-usage-categories";
+import { pricingUpsertSchema } from "../lib/pricing-contract";
 import {
-  buildPricingUpsertPayload,
-  isMissingRealtimePricingColumn,
-  pricingUpsertSchema,
-  REALTIME_PRICING_COLUMNS,
-} from "../lib/pricing-contract";
+  cancelPricingSchedule,
+  listPricing,
+  PricingError,
+  savePricing,
+} from "../services/ai-pricing-service";
 
 type Variables = { user: User; profile: any };
 
@@ -467,189 +463,92 @@ ai.get(
   },
 );
 
-// ── Pricing CRUD ──────────────────────────────────────
-const LEGACY_PRICING_SELECT =
-  "model_id, input_price_usd_per_million, output_price_usd_per_million";
-const EXPANDED_PRICING_SELECT = `${LEGACY_PRICING_SELECT}, ${REALTIME_PRICING_COLUMNS.join(", ")}`;
-type PricingDatabaseRow = {
-  model_id: string;
-  input_price_usd_per_million: number | null;
-  output_price_usd_per_million: number | null;
-} & Partial<Record<(typeof REALTIME_PRICING_COLUMNS)[number], number | null>>;
+// ── Pricing ───────────────────────────────────────────
+const pricingSaveSchema = pricingUpsertSchema.extend({
+  /** YYYY-MM-DD: schedule from 00.00 WIB that day instead of saving now. */
+  effective_from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
 
-const PRICING_MODELS = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
-  (model, index, models) =>
-    models.findIndex((candidate) => candidate.id === model.id) === index,
-);
-const PRICING_MODEL_IDS = new Set(PRICING_MODELS.map((model) => model.id));
+function pricingErrorResponse(c: Context, scope: string, error: unknown) {
+  if (error instanceof PricingError) {
+    return c.json(
+      {
+        success: false as const,
+        error: { code: error.code, message: error.message },
+      },
+      error.status,
+    );
+  }
+  return dbErrorResponse(c, scope, error, "Harga belum tersimpan. Coba lagi.");
+}
 
 ai.get(
   "/monitoring/pricing",
   requireCapability("monitoring.pricing.read"),
   async (c) => {
-    const admin = createAdminClient();
-    let pricingResult = (await admin
-      .from("ai_pricing_settings")
-      .select(EXPANDED_PRICING_SELECT)
-      .order("model_id", { ascending: true })) as unknown as {
-      data: PricingDatabaseRow[] | null;
-      error: { code?: string; message?: string } | null;
-    };
-
-    if (
-      pricingResult.error &&
-      isMissingRealtimePricingColumn(pricingResult.error)
-    ) {
-      pricingResult = (await admin
-        .from("ai_pricing_settings")
-        .select(LEGACY_PRICING_SELECT)
-        .order("model_id", {
-          ascending: true,
-        })) as unknown as typeof pricingResult;
+    try {
+      const data = await listPricing(createAdminClient());
+      return c.json({ success: true, data });
+    } catch (error) {
+      return dbErrorResponse(c, "monitoring/pricing", error);
     }
-
-    const { data, error } = pricingResult;
-
-    if (error) return dbErrorResponse(c, "monitoring/pricing", error);
-
-    const dbPricing: Array<
-      PricingDatabaseRow & {
-        input_price_usd_per_million: number;
-        output_price_usd_per_million: number;
-      }
-    > = (data || []).map(
-      (r) =>
-        ({
-          model_id: r.model_id,
-          input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
-          output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
-          ...Object.fromEntries(
-            REALTIME_PRICING_COLUMNS.map((column) => [
-              column,
-              r[column] ?? null,
-            ]),
-          ),
-        }) as PricingDatabaseRow & {
-          input_price_usd_per_million: number;
-          output_price_usd_per_million: number;
-        },
-    );
-
-    const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
-    const pricingModels = PRICING_MODELS;
-    const result: Array<{
-      model_id: string;
-      model_name: string;
-      provider: string;
-      pricing_mode: "simple" | "realtime";
-      input_price_usd_per_million: number;
-      output_price_usd_per_million: number;
-      [key: string]: unknown;
-    }> = pricingModels.map((m) => ({
-      model_id: m.id,
-      model_name: m.name,
-      provider: m.provider,
-      pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
-      input_price_usd_per_million:
-        pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
-      output_price_usd_per_million:
-        pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
-      ...Object.fromEntries(
-        REALTIME_PRICING_COLUMNS.map((column) => [
-          column,
-          pricingMap.get(m.id)?.[column] ?? null,
-        ]),
-      ),
-    }));
-
-    for (const p of dbPricing) {
-      if (result.some((r) => r.model_id === p.model_id)) continue;
-
-      const historicalModel = getHistoricalTelefunRealtimeModel(p.model_id);
-      if (historicalModel) {
-        result.push({
-          model_id: historicalModel.id,
-          model_name: historicalModel.name,
-          provider: historicalModel.provider,
-          pricing_mode: "realtime" as const,
-          historical: true,
-          editable: false,
-          input_price_usd_per_million: p.input_price_usd_per_million,
-          output_price_usd_per_million: p.output_price_usd_per_million,
-          ...Object.fromEntries(
-            REALTIME_PRICING_COLUMNS.map((column) => [
-              column,
-              p[column] ?? null,
-            ]),
-          ),
-        });
-        continue;
-      }
-
-      result.push({
-        model_id: p.model_id,
-        model_name: p.model_id,
-        provider: "unknown" as const,
-        pricing_mode: "simple" as const,
-        input_price_usd_per_million: p.input_price_usd_per_million,
-        output_price_usd_per_million: p.output_price_usd_per_million,
-        ...Object.fromEntries(
-          REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
-        ),
-      });
-    }
-
-    return c.json({ success: true, data: result });
   },
 );
 
 ai.put(
   "/monitoring/pricing",
   requireCapability("monitoring.pricing.write"),
-  zValidator("json", pricingUpsertSchema),
-  async (c) => {
-    const body = c.req.valid("json");
-    if (getHistoricalTelefunRealtimeModel(body.model_id)) {
+  zValidator("json", pricingSaveSchema, (result, c) => {
+    if (!result.success) {
       return c.json(
         {
           success: false,
           error: {
-            code: "TELEFUN_REALTIME_MODEL_RETIRED",
-            message:
-              "Harga model realtime OpenAI Telefun hanya tersedia untuk riwayat.",
-          },
-        },
-        410,
-      );
-    }
-    if (!PRICING_MODEL_IDS.has(body.model_id)) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "UNKNOWN_MODEL",
-            message: "Model ini tidak dikenal, jadi harganya tidak bisa disimpan.",
+            code: "VALIDATION_ERROR",
+            message: "Harga atau tanggal mulai tidak valid.",
           },
         },
         400,
       );
     }
-
-    const admin = createAdminClient();
-    const { error } = await admin
-      .from("ai_pricing_settings")
-      .upsert(buildPricingUpsertPayload(body, new Date().toISOString()), {
-        onConflict: "model_id",
+  }),
+  async (c) => {
+    const { effective_from: effectiveFrom, ...body } = c.req.valid("json");
+    try {
+      await savePricing(createAdminClient(), body, {
+        effectiveFrom,
+        userId: c.get("user").id,
       });
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return pricingErrorResponse(c, "monitoring/pricing PUT", error);
+    }
+  },
+);
 
-    if (error)
-      return dbErrorResponse(
-        c,
-        "monitoring/pricing PUT",
-        error,
-        "Harga belum tersimpan. Coba lagi.",
+ai.delete(
+  "/monitoring/pricing/schedule/:id",
+  requireCapability("monitoring.pricing.write"),
+  async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    if (!id.success) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "BAD_REQUEST", message: "ID jadwal tidak valid." },
+        },
+        400,
       );
-    return c.json({ success: true, data: null });
+    }
+    try {
+      await cancelPricingSchedule(createAdminClient(), id.data);
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return pricingErrorResponse(c, "monitoring/pricing/schedule DELETE", error);
+    }
   },
 );
 

@@ -174,3 +174,7 @@ done
   loss, but with `results` present every KETIK review publish fails again.
 - `rollback_20261017160000_qa_temuan_tahun_id_index.sql` drops the SIDAK
   dashboard year index. Independently reversible, no data loss.
+- `rollback_20261017220000_ai_pricing_schedule.sql` drops the AI price
+  schedule. DATA LOSS: schedules not yet in effect (including Gemini 3.8 Flash
+  from 2027-01-01) are lost; logged costs are unchanged. API and Telefun fall
+  back to current prices when the table is missing.

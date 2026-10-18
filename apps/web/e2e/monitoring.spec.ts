@@ -631,7 +631,7 @@ test.describe("Monitoring (hermetic)", () => {
     ]);
 
     await expect(
-      page.getByText("Harga per Model (USD / 1M tokens)"),
+      page.getByRole("table", { name: "Harga per model" }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.getByText("Kurs USD ke IDR").first()).toBeVisible();
     // Nilai kurs yang benar-benar dimuat. Diperiksa lewat nilai input, bukan

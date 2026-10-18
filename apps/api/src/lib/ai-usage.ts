@@ -11,7 +11,7 @@ import {
   getBillingRate,
 } from "./ai-billing-settings";
 import { calculateModalityCost } from "./modality-pricing";
-import { isMissingRealtimePricingColumn } from "./pricing-contract";
+import { readEffectivePricing } from "./ai-pricing-lookup";
 
 export interface UsageContext {
   module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
@@ -98,25 +98,7 @@ export async function logAiUsage(options: {
       }
     }
 
-    let pricingResult = await admin
-      .from("ai_pricing_settings")
-      .select(
-        "input_price_usd_per_million, output_price_usd_per_million, input_text_price_usd_per_million, cached_input_text_price_usd_per_million, input_audio_price_usd_per_million, cached_input_audio_price_usd_per_million, output_text_price_usd_per_million, output_audio_price_usd_per_million",
-      )
-      .eq("model_id", normalizedModelId)
-      .maybeSingle();
-    if (
-      pricingResult.error &&
-      isMissingRealtimePricingColumn(pricingResult.error)
-    ) {
-      pricingResult = await admin
-        .from("ai_pricing_settings")
-        .select("input_price_usd_per_million, output_price_usd_per_million")
-        .eq("model_id", normalizedModelId)
-        .maybeSingle();
-    }
-    if (pricingResult.error) throw pricingResult.error;
-    const pricing = pricingResult.data;
+    const pricing = await readEffectivePricing(admin, normalizedModelId);
     const billingRate = await getBillingRate(admin);
 
     let inputPricePerMillion = 0;
