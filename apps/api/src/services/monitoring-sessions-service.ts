@@ -235,6 +235,22 @@ async function readActorPeserta(): Promise<Map<string, string>> {
   return map;
 }
 
+/**
+ * Akun yang biayanya boleh dilihat: `null` berarti semua. Leader hanya melihat
+ * akun yang tertaut ke peserta di tim yang aksesnya disetujui.
+ */
+export async function scopedUsageUserIds(
+  scope: MonitoringActorScope,
+): Promise<string[] | null> {
+  if (scope.kind === "all") return null;
+  if (scope.kind === "none") return [];
+  const allowed = new Set(scope.pesertaIds);
+  const actorPeserta = await readActorPeserta();
+  return [...actorPeserta]
+    .filter(([, pesertaId]) => allowed.has(pesertaId))
+    .map(([userId]) => userId);
+}
+
 function subjectFields(subject: SimulationSubjectSnapshot | null | undefined) {
   return {
     subject_type: subject?.type === "unknown" ? null : (subject?.type ?? null),

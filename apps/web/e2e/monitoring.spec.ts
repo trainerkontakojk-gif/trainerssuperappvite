@@ -383,18 +383,18 @@ test.describe("Monitoring (hermetic)", () => {
     console.log("[audit]", formatAudit(audit));
 
     await expect(
-      page.getByRole("heading", { name: "Monitoring AI Usage" }),
+      page.getByRole("heading", { name: "Monitoring", exact: true }),
     ).toBeVisible({ timeout: 20000 });
     await expect(
-      page.getByText(/Pantau dan analisis penggunaan modul AI/),
+      page.getByText(/Riwayat simulasi agen, biaya pemakaian AI/),
     ).toBeVisible();
 
-    for (const label of ["Riwayat Simulasi", "Penggunaan Token"]) {
-      await expect(page.getByRole("tab", { name: label })).toBeVisible();
+    for (const label of ["Riwayat", "Biaya AI"]) {
+      await expect(page.getByRole("tab", { name: label, exact: true })).toBeVisible();
     }
     // Riwayat aktif secara default.
     await expect(
-      page.getByRole("tab", { name: "Riwayat Simulasi" }),
+      page.getByRole("tab", { name: "Riwayat" }),
     ).toHaveAttribute("aria-selected", "true");
 
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
@@ -533,12 +533,12 @@ test.describe("Monitoring (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test(`teks penggunaan token minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
+  test(`teks biaya AI minimal ${MIN_TEXT_PX}px`, async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/monitoring",
       apiMocks: POPULATED_MOCKS,
     });
-    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
+    await page.getByRole("tab", { name: "Biaya AI" }).click();
     await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
     await expect(page.getByText("agent@local.test").first()).toBeVisible({
       timeout: 20000,
@@ -556,7 +556,7 @@ test.describe("Monitoring (hermetic)", () => {
       path: "/monitoring",
       apiMocks: monitoringMocks(),
     });
-    await expect(page.getByRole("tab", { name: "Harga & Kurs" })).toBeVisible({
+    await expect(page.getByRole("tab", { name: "Harga & kurs" })).toBeVisible({
       timeout: 20000,
     });
     expectHermetic(trainerAudit);
@@ -568,76 +568,12 @@ test.describe("Monitoring (hermetic)", () => {
       auth: { role: "leader" },
     });
     await expect(
-      page.getByRole("heading", { name: "Monitoring AI Usage" }),
+      page.getByRole("heading", { name: "Monitoring", exact: true }),
     ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole("tab", { name: "Harga & Kurs" })).toHaveCount(
+    await expect(page.getByRole("tab", { name: "Harga & kurs" })).toHaveCount(
       0,
     );
     expectHermetic(leaderAudit);
-  });
-
-  test("tab penggunaan memuat agregasi", async ({ page }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/monitoring",
-      apiMocks: monitoringMocks(),
-    });
-
-    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
-    await expect(
-      page.getByRole("tab", { name: "Penggunaan Token" }),
-    ).toHaveAttribute("aria-selected", "true", { timeout: 20000 });
-
-    await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
-    expectHermetic(audit);
-  });
-
-  test("filter penggunaan menampilkan nama bulan dan modul, dan bisa kembali ke semua modul", async ({
-    page,
-  }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/monitoring",
-      apiMocks: POPULATED_MOCKS,
-    });
-    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
-    await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
-
-    const monthName = new Date().toLocaleString("id-ID", { month: "long" });
-    await expect(page.getByRole("combobox", { name: "Bulan penggunaan" })).toContainText(
-      monthName,
-      { ignoreCase: true },
-    );
-    const moduleSelect = page.getByRole("combobox", { name: "Modul penggunaan" });
-    await expect(moduleSelect).toContainText("Semua modul");
-
-    await moduleSelect.click();
-    await page.getByRole("option", { name: "Analisis QA" }).click();
-    await expect(moduleSelect).toContainText("Analisis QA");
-    await expect
-      .poll(() => audit.mockedApi.some((e) => e.includes("module=qa-analyzer")))
-      .toBe(true);
-
-    await moduleSelect.click();
-    await page.getByRole("option", { name: "Semua modul" }).click();
-    await expect(moduleSelect).toContainText("Semua modul");
-    await expect
-      .poll(() => audit.mockedApi.at(-1) ?? "")
-      .toMatch(/\/aggregation\?year=\d+&month=\d+(&module=)?$/);
-    expectHermetic(audit);
-  });
-
-  test("ringkasan penggunaan menampilkan biaya Lainnya", async ({ page }) => {
-    const audit = await openHermeticShell(page, {
-      path: "/monitoring",
-      apiMocks: POPULATED_MOCKS,
-    });
-    await page.getByRole("tab", { name: "Penggunaan Token" }).click();
-    await waitForMockedApi(audit, ["/ai/monitoring/aggregation"]);
-    const summary = page.getByRole("region", { name: "Ringkasan biaya" });
-    await expect(summary.getByText("Biaya Lainnya")).toBeVisible({ timeout: 20000 });
-    await expect(summary.getByText("Rp 500", { exact: true })).toBeVisible();
-    const row = page.getByRole("row", { name: /Andi/ });
-    await expect(row.getByRole("cell", { name: "Rp 500", exact: true })).toBeVisible();
-    expectHermetic(audit);
   });
 
   test("detail KETIK menampilkan batas waktu dalam menit", async ({ page }) => {
@@ -663,9 +599,9 @@ test.describe("Monitoring (hermetic)", () => {
       apiMocks: monitoringMocks(),
     });
 
-    await page.getByRole("tab", { name: "Harga & Kurs" }).click();
+    await page.getByRole("tab", { name: "Harga & kurs" }).click();
     await expect(
-      page.getByRole("tab", { name: "Harga & Kurs" }),
+      page.getByRole("tab", { name: "Harga & kurs" }),
     ).toHaveAttribute("aria-selected", "true", { timeout: 20000 });
 
     // Buktikan kedua request terjadi sebelum menuntut isinya.
@@ -712,7 +648,7 @@ test.describe("Monitoring (hermetic)", () => {
       page.getByRole("heading", { level: 1, name: "Trainers SuperApp" }),
     ).toBeVisible({ timeout: 20000 });
     await expect(
-      page.getByRole("heading", { name: "Monitoring AI Usage" }),
+      page.getByRole("heading", { name: "Monitoring", exact: true }),
     ).toHaveCount(0);
 
     expectHermetic(audit);

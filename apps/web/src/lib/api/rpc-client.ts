@@ -66,6 +66,7 @@ export type UsageAggregation = {
   total_cost_idr: number;
   simulation_cost_idr: number;
   review_cost_idr: number;
+  other_cost_idr: number;
   models: Array<{
     model_id: string;
     module: string;
@@ -222,7 +223,7 @@ type AiClient = {
   };
   "monitoring/aggregation": {
     $get(args: {
-      query: { year: string; month: string; module: string };
+      query: { year: string; month: string; module?: string; user_id?: string };
     }): Promise<RpcResponse<UsageAggregation[]>>;
   };
   "monitoring/pricing": {
