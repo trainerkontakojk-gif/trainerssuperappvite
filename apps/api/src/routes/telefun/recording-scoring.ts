@@ -522,8 +522,9 @@ export async function scoreRecording(
       );
     }
 
-    // Also trigger coaching summary generation in background/sequentially
-    await generateCoachingSummary(id, user.id);
+    // A second AI call; the score must not wait for it. Telaah reads the
+    // summary on its own when the notes tab opens.
+    void generateCoachingSummary(id, user.id).catch(() => null);
 
     return c.json({
       success: true,

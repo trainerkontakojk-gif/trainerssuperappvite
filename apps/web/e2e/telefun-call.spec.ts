@@ -6,6 +6,7 @@ import {
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import {
   PENDING_ROW,
@@ -317,6 +318,59 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
       { requested: 32000, actual: 32000 },
       { requested: 32000, actual: 32000 },
     ]);
+    expectHermetic(audit);
+  });
+
+  test("rekaman penuh dan rekaman agen diunggah bersamaan setelah panggilan", async ({
+    page,
+  }) => {
+    await mockTelefunVoiceServer(page, NEW_ID);
+    const audit = await open(page, "/telefun", callMocks());
+    // Tahan setiap unggahan sampai unggahan kedua datang (maks. 4 detik):
+    // unggahan berurutan tidak pernah berjalan bersamaan.
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let release: () => void = () => {};
+    const bothArrived = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      `${E2E_SUPABASE_URL}/storage/v1/object/telefun-recordings/**`,
+      async (route) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        if (inFlight === 2) release();
+        await Promise.race([
+          bothArrived,
+          new Promise((resolve) => setTimeout(resolve, 4000)),
+        ]);
+        const path = new URL(route.request().url()).pathname.replace(
+          "/storage/v1/object/telefun-recordings/",
+          "",
+        );
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ Key: `telefun-recordings/${path}`, Id: path }),
+        });
+        inFlight -= 1;
+      },
+    );
+    await serveRecording(page);
+    const picker = await openPicker(page);
+    const startCall = picker.getByRole("button", { name: "Mulai panggilan" });
+    await expect(startCall).toBeEnabled({ timeout: 15000 });
+    await startCall.click();
+    const call = page.getByRole("region", { name: "Panggilan" });
+    await expect(call.getByRole("status").first()).toHaveText("Giliran Anda", {
+      timeout: 20000,
+    });
+    await call.getByRole("button", { name: "Akhiri" }).click();
+    await page
+      .getByRole("dialog", { name: "Akhiri panggilan?" })
+      .getByRole("button", { name: "Akhiri panggilan" })
+      .click();
+    await expect(page).toHaveURL(/tahap=telaah/, { timeout: 30000 });
+
+    expect(maxInFlight).toBe(2);
     expectHermetic(audit);
   });
 

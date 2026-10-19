@@ -18,6 +18,8 @@ export interface KetikReviewStatus {
   errorMessage?: string;
   /** Re-scores the reader may still start; null = no limit (trainer, admin). */
   rerunsLeft: number | null;
+  /** The ready result, sent when the reader shows it next (not while a re-score runs). */
+  detail?: KetikReviewDetail;
 }
 
 /** Re-scores per KETIK session for agent and leader (enforced in the database). */

@@ -685,6 +685,43 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("telaah yang sudah selesai dibuka dari jawaban status, tanpa membaca telaah dua kali", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/status/${REVIEWED_SESSION.id}`,
+        body: {
+          success: true,
+          data: {
+            status: "completed",
+            resultReady: true,
+            previousKept: false,
+            scores: REVIEW_DETAIL.scores,
+            rerunsLeft: null,
+            detail: REVIEW_DETAIL,
+          },
+        },
+      },
+      // Tanpa `reviewDetailMock`: permintaan detail terpisah akan diblokir.
+      ...ketikMocks(FULL_HISTORY),
+    ]);
+
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
+      timeout: 20000,
+    });
+    await result.getByRole("tab", { name: /Ejaan/ }).click();
+    await expect(result.getByRole("button", { name: /Pesan 2/ })).toContainText(
+      "tagihn",
+    );
+    expect(audit.mockedApi).not.toContain(
+      `GET /api/v1/ketik/review/${REVIEWED_SESSION.id}`,
+    );
+    expectHermetic(audit);
+  });
+
   test("lampiran Telaah tampil dari detail sesi dan bisa dibuka dengan keyboard setelah reload", async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", error => pageErrors.push(error.message));
