@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { checkDevDatabaseTarget } from "@trainers/types";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,5 +37,16 @@ if (!parsed.success) {
   });
   process.exit(1);
 }
+
+const guard = checkDevDatabaseTarget(
+  "API",
+  parsed.data.VITE_SUPABASE_URL,
+  process.env,
+);
+if (guard.kind === "refused") {
+  console.error(guard.message);
+  process.exit(1);
+}
+if (guard.kind === "allowed") console.warn(guard.message);
 
 export const env = parsed.data;
