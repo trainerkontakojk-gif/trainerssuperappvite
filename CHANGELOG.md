@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- perf(practice): stop reloading the full PDKT history after saving settings, creating an email or re-saving a draft, and when someone else's finished review is first read; start a KETIK session without waiting for the monthly AI cost summary, wait 300 ms after typing before searching KETIK history, re-render the KETIK chat once at the deadline instead of every second, and record Telefun calls at 32 kbps instead of the browser's ~128 kbps
 - feat(dev): refuse to start the API and Telefun against the production Supabase project outside Railway or Vercel, with `ALLOW_PROD_DB_IN_DEV=1` to start anyway with a warning, so local and cloud dev runs stop writing to production and using its egress quota
 - fix(telefun): download a Telaah recording once per visit and play, seek, draw the waveform and save from that local copy, instead of pulling it from Supabase Storage again for the player and every seek; an expired link is replaced once
 

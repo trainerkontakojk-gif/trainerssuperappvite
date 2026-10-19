@@ -58,6 +58,7 @@ export default function KetikHistory() {
     state,
     filter,
     query,
+    searchTerm,
     setFilter,
     setQuery,
     page,
@@ -68,7 +69,7 @@ export default function KetikHistory() {
   } = useKetikHistoryPage();
   const { items: history, counts } = data;
   const visible = history;
-  const csv = useKetikHistoryExport(filter, query);
+  const csv = useKetikHistoryExport(filter, searchTerm);
   const [replay, setReplay] = useState<KetikSessionHistoryItem | null>(null);
   const [replayPending, setReplayPending] = useState<string | null>(null);
   const [replayError, setReplayError] = useState<string | null>(null);

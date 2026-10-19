@@ -43,6 +43,10 @@ export function usePdktEvaluations({
   const retryRequestHistoryIdsRef = useRef(new Set<string>());
   const retryStartDeadlinesRef = useRef(new Map<string, number>());
   const visibleMailboxItemsRef = useRef(visibleMailboxItems);
+  // Statuses guessed as "processing" without a history row (someone else's
+  // email, or our own before history loads). Their first poll answer only
+  // records the real status; it is not a finish that warrants a reload.
+  const guessedStatusIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     evaluationsRef.current = evaluations;
@@ -81,6 +85,8 @@ export function usePdktEvaluations({
 
         if (!historyItem && current) return;
 
+        if (historyItem) guessedStatusIdsRef.current.delete(item.id);
+        else guessedStatusIdsRef.current.add(item.id);
         const status =
           historyItem?.evaluationStatus ||
           (historyItem?.evaluation ? "completed" : "processing");
@@ -153,8 +159,10 @@ export function usePdktEvaluations({
               retryStartDeadlinesRef.current.delete(historyId);
             }
 
-            const previousStatus =
-              evaluationsRef.current[item.id]?.status ?? "processing";
+            const guessed = guessedStatusIdsRef.current.delete(item.id);
+            const previousStatus = guessed
+              ? undefined
+              : (evaluationsRef.current[item.id]?.status ?? "processing");
             const nextEvaluation = {
               result: response.evaluation || null,
               status: response.evaluation_status || "processing",

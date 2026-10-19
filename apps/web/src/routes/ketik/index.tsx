@@ -268,8 +268,9 @@ export default function KetikLanding() {
       startRequest.current = { id: crypto.randomUUID(), subjectKey };
     const request = startRequest.current;
     try {
-      await captureUsageBaseline();
-      if (!isCurrentAccount(account)) return;
+      // Starting makes no AI call, so the monthly usage baseline loads in the
+      // background instead of delaying the first message.
+      void captureUsageBaseline();
       const started = await ketikApi.startSession(request.id, subject);
       if (!isCurrentAccount(account)) return;
       startRequest.current = null;

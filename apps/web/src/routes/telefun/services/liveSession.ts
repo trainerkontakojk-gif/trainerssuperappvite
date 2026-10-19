@@ -44,6 +44,9 @@ import {
 } from "./promptBuilder";
 import { resolveVoiceForModel } from "../telefunVoiceRegistry";
 
+/** Opus at 32 kbps is clear for speech and ~4x smaller than the default. */
+const RECORDING_BITS_PER_SECOND = 32_000;
+
 interface WebkitAudioContextWindow extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
@@ -412,16 +415,23 @@ export class LiveSession {
       ? "audio/webm;codecs=opus"
       : "audio/webm";
 
-    this.mediaRecorder = new MediaRecorder(this.recordingDestination.stream, {
+    // Speech needs far less than Chrome's ~128 kbps default; every byte is
+    // uploaded, remuxed and downloaded again for scoring and Telaah.
+    const recorderOptions = {
       mimeType,
-    });
+      audioBitsPerSecond: RECORDING_BITS_PER_SECOND,
+    };
+    this.mediaRecorder = new MediaRecorder(
+      this.recordingDestination.stream,
+      recorderOptions,
+    );
     this.mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.recordedChunks.push(e.data);
     };
 
     this.agentMediaRecorder = new MediaRecorder(
       this.agentOnlyDestination.stream,
-      { mimeType },
+      recorderOptions,
     );
     this.agentMediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.agentRecordedChunks.push(e.data);

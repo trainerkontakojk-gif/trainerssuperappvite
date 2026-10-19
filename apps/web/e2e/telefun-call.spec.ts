@@ -277,6 +277,49 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     expectHermetic(audit);
   });
 
+  test("rekaman memakai bitrate suara (32 kbps), bukan bawaan browser", async ({
+    page,
+  }) => {
+    // Bitrate bawaan Chrome (~128 kbps) membuat rekaman ~4x lebih besar; tiap
+    // byte diunggah, diproses ulang, dan diunduh lagi saat penilaian dan Telaah.
+    await page.addInitScript(() => {
+      const Original = window.MediaRecorder;
+      const seen: Array<{ requested?: number; actual: number }> = [];
+      (window as unknown as { __recorders: typeof seen }).__recorders = seen;
+      class Spy extends Original {
+        constructor(stream: MediaStream, options?: MediaRecorderOptions) {
+          super(stream, options);
+          seen.push({
+            requested: options?.audioBitsPerSecond,
+            actual: this.audioBitsPerSecond,
+          });
+        }
+      }
+      window.MediaRecorder = Spy;
+    });
+    await mockTelefunVoiceServer(page, NEW_ID);
+    const audit = await open(page, "/telefun", callMocks());
+    const picker = await openPicker(page);
+    const startCall = picker.getByRole("button", { name: "Mulai panggilan" });
+    await expect(startCall).toBeEnabled({ timeout: 15000 });
+    await startCall.click();
+    const call = page.getByRole("region", { name: "Panggilan" });
+    await expect(call.getByRole("status").first()).toHaveText("Giliran Anda", {
+      timeout: 20000,
+    });
+
+    const recorders = await page.evaluate(
+      () =>
+        (window as unknown as { __recorders: unknown[] }).__recorders,
+    );
+    // Rekaman penuh dan rekaman agen.
+    expect(recorders).toEqual([
+      { requested: 32000, actual: 32000 },
+      { requested: 32000, actual: 32000 },
+    ]);
+    expectHermetic(audit);
+  });
+
   test("klik ganda Mulai panggilan hanya membuat satu sesi", async ({
     page,
   }) => {
