@@ -23,7 +23,8 @@
     "lint": "eslint .",
     "start": "tsx src/index.ts",
     "start:telefun-scoring-worker": "tsx src/workers/telefun-scoring-worker-entrypoint.ts",
-    "start:ketik-review-worker": "tsx src/workers/ketik-review-worker-entrypoint.ts"
+    "start:ketik-review-worker": "tsx src/workers/ketik-review-worker-entrypoint.ts",
+    "backfill:scenario-attachments": "tsx src/scripts/backfill-scenario-attachments.ts"
   },
   "dependencies": {
     "@google/genai": "^2.29.0",

@@ -76,6 +76,12 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.ketik_history_page(uuid,integer,text,text,timestamp with time zone,uuid)",
   "public.publish_ketik_session_turn(uuid,uuid,uuid,uuid,jsonb,boolean)",
   "public.read_ketik_review(uuid,uuid)",
+  "public.scenario_attachment_backfill_apply(text,uuid[],text[],text[])",
+  "public.scenario_attachment_backfill_columns(text)",
+  "public.scenario_attachment_backfill_fetch(text,uuid[],text[])",
+  "public.scenario_attachment_backfill_scan(text,uuid,integer)",
+  "public.scenario_attachment_literal_pattern()",
+  "public.scenario_attachment_swap(text,text[],text[])",
   "public.settle_ketik_review(uuid,uuid,jsonb,boolean)",
   "public.start_ketik_session(uuid,uuid,jsonb,text,uuid)",
 ] as const;

@@ -7,6 +7,7 @@ import {
   guardedUserSettingsWrite,
   isSettingsConflictError,
 } from "../../lib/guarded-user-settings";
+import { externalizeScenarioAttachments } from "../../lib/scenario-attachments";
 import { Variables, getUserClient, jsonServerError } from "./route-utils";
 
 const settings = new Hono<{ Variables: Variables }>();
@@ -42,10 +43,11 @@ settings.post("/", requireCapability("pdkt.settings.write"), async (c) => {
   const body = await c.req.json();
 
   try {
+    const incoming = await externalizeScenarioAttachments(body.settings);
     const data = await guardedUserSettingsWrite(
       userClient,
       user.id,
-      (existingSettings) => writePdktSettings(existingSettings, body.settings),
+      (existingSettings) => writePdktSettings(existingSettings, incoming),
       c.req.header("x-settings-version"),
     );
 
