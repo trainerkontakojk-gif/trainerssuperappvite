@@ -91,9 +91,19 @@ export function projectTelefunHistoryRow<
     status?: unknown;
     telefun_transport?: unknown;
     voice_assessment?: unknown;
+    scoring_claim_token_hash?: unknown;
+    scoring_claim_owner?: unknown;
   },
->(row: T): T & TelefunHistoryScoringView {
-  const enriched = enrichTelefunHistoryFeedback(row);
+>(
+  row: T,
+): Omit<T, "scoring_claim_token_hash" | "scoring_claim_owner"> &
+  TelefunHistoryScoringView {
+  // The scoring worker's claim stays on the server.
+  const {
+    scoring_claim_token_hash: _hash,
+    scoring_claim_owner: _owner,
+    ...enriched
+  } = enrichTelefunHistoryFeedback(row);
   return {
     ...enriched,
     ...buildTelefunHistoryScoringView(enriched),
@@ -307,42 +317,67 @@ export function telefunWibMonthRange(now = Date.now()): {
   return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
 }
 
-telefunSessions.get("/sessions", async (c) => {
-  const user = c.get("user");
-  const profile = c.get("profile");
-  const adminClient = createAdminClient();
+/**
+ * What the history list (landing and Riwayat) shows: no transcript, prompt or
+ * coaching text. Telaah reads one full session from `GET /history/:id`.
+ */
+const TELEFUN_HISTORY_LIST_COLUMNS =
+  "id,user_id,scenario_title,consumer_name,consumer_gender,consumer_phone," +
+  "consumer_city,duration_seconds,configured_duration,status,score,feedback," +
+  "created_at,recording_path,agent_recording_path,recording_status," +
+  "voice_assessment,voice_dashboard_metrics,persona_config,disruption_config," +
+  "realistic_mode_enabled,response_pacing_mode,telefun_model_id," +
+  "telefun_transport,scoring_status,scoring_ready_at,scoring_next_attempt_at," +
+  "scoring_attempt_count,simulation_subject_type,simulation_subject_peserta_id," +
+  "simulation_subject_name,simulation_subject_batch_name,simulation_subject_team";
 
-  try {
-    const isManager = can(profile?.role, "telefun.manage");
-    let query = adminClient
-      .from("telefun_history")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
+telefunSessions.get(
+  "/sessions",
+  zValidator("query", z.object({ view: z.enum(["list"]).optional() })),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const adminClient = createAdminClient();
+    const isList = c.req.valid("query").view === "list";
 
-    if (!isManager) {
-      query = query.eq("user_id", user.id);
-    }
+    try {
+      const isManager = can(profile?.role, "telefun.manage");
+      const columns: string = isList ? TELEFUN_HISTORY_LIST_COLUMNS : "*";
+      let query = adminClient
+        .from("telefun_history")
+        .select(columns)
+        .order("created_at", { ascending: false })
+        .limit(50);
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return c.json({
-      success: true,
-      data: (data ?? []).map(projectTelefunHistoryRow),
-    });
-  } catch (error: any) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "DATABASE_ERROR",
-          message: error?.message || "Database error.",
+      if (!isManager) {
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = ((data ?? []) as unknown as Record<string, unknown>[]).map(
+        projectTelefunHistoryRow,
+      );
+      return c.json({
+        success: true,
+        data: isList
+          ? rows.map((row) => ({ ...row, detail: "summary" as const }))
+          : rows,
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "DATABASE_ERROR",
+            message: error?.message || "Database error.",
+          },
         },
-      },
-      500,
-    );
-  }
-});
+        500,
+      );
+    }
+  },
+);
 
 /**
  * Jumlah panggilan bulan Jakarta berjalan. Daftar sesi dibatasi 50 baris,
@@ -460,11 +495,7 @@ telefunSessions.post(
       // The session id is the quota key, so the call server and later
       // reconciliation can refer to the same counted start.
       const sessionId = randomUUID();
-      const counted = await consumePracticeQuota(
-        user.id,
-        "telefun",
-        sessionId,
-      );
+      const counted = await consumePracticeQuota(user.id, "telefun", sessionId);
       const adminClient = createAdminClient();
       const { data, error } = await adminClient
         .from("telefun_history")

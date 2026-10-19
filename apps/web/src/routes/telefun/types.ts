@@ -8,6 +8,8 @@ import type {
 
 export interface CallRecord {
   id: string;
+  /** Baris daftar riwayat tanpa transkrip; Telaah memuat sesi penuh. */
+  detail?: "summary";
   date: string;
   url: string;
   consumerName: string;

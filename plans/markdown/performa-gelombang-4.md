@@ -10,7 +10,12 @@ Lane C (API contract + UI data loading). Sumber: audit `/mnt/project-files/audit
 - Pagination sengaja tidak dibuat: baris ringkas ~300 B, sehingga filter dan pencarian di klien tetap instan.
 - E2E: `pdkt-resilience-api` (kontrak list/detail) dan `pdkt-flow` describe "PDKT riwayat ringkas".
 
-## 4b. Daftar riwayat Telefun ringan (berikutnya)
+## 4b. Daftar riwayat Telefun ringan
+
+- `GET /api/v1/telefun/sessions?view=list` memilih kolom yang dipakai landing dan Riwayat saja (skor, penilaian suara, status, subjek) dan menandai baris `detail: "summary"`. Transkrip (`messages`), `session_metrics`, `disruption_results`, `live_prompt_instructions`, dan teks coaching tidak ikut.
+- Telaah (`/telefun?sesi=…&tahap=telaah`) memuat sesi penuh lewat `GET /telefun/history/:id` bila barisnya ringkas; gagal dimuat kembali ke landing dengan pesan.
+- `projectTelefunHistoryRow` tidak lagi mengirim `scoring_claim_token_hash` dan `scoring_claim_owner`.
+- E2E: `telefun-history-list-api` (kontrak) dan `telefun-flow` "riwayat ringkas" (2 tes).
 
 ## 4c. Koneksi Telefun saat nada dering (berikutnya)
 

@@ -42,6 +42,10 @@ export default defineConfig({
       testMatch: "telefun-month-count-api.spec.ts",
     },
     {
+      name: "telefun-history-list-real-backend",
+      testMatch: "telefun-history-list-api.spec.ts",
+    },
+    {
       name: "telefun-scoring-real-backend",
       testMatch: "telefun-scoring-api.spec.ts",
     },

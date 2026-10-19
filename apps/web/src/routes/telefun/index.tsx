@@ -186,22 +186,60 @@ export default function TelefunLanding() {
     sessionReconcilerRef.current?.watch(sessionId);
   }, []);
 
-  const reviewRecord = requestedSessionId
+  const listedRecord = requestedSessionId
     ? (history.find((record) => record.id === requestedSessionId) ?? null)
     : null;
+  // Daftar riwayat tidak membawa transkrip: Telaah memuat sesi penuh sekali.
+  const summaryId = listedRecord?.detail === "summary" ? listedRecord.id : null;
+  const reviewRecord = summaryId ? null : listedRecord;
+  const [detailFailedId, setDetailFailedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!summaryId) return;
+    let cancelled = false;
+    fetchDetail(summaryId)
+      .then((full) => {
+        if (cancelled) return;
+        if (full) upsert(full);
+        else setDetailFailedId(summaryId);
+      })
+      .catch((error) => {
+        console.warn("[Telefun] Session detail unavailable", error);
+        if (!cancelled) setDetailFailedId(summaryId);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [summaryId, upsert]);
 
   // Tautan valid tetap di URL. Hanya sesi hilang/gagal dimuat yang kembali ke landing.
   useEffect(() => {
-    if (!requestedSessionId || historyState === "loading" || reviewRecord) {
+    const detailFailed =
+      detailFailedId !== null && detailFailedId === requestedSessionId;
+    if (
+      !requestedSessionId ||
+      historyState === "loading" ||
+      reviewRecord ||
+      (summaryId && !detailFailed)
+    ) {
       return;
     }
     notify.error(
-      historyState === "error"
-        ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
-        : "Sesi itu tidak ada lagi di riwayat Anda.",
+      detailFailed
+        ? "Panggilan itu belum bisa dibuka. Coba lagi."
+        : historyState === "error"
+          ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
+          : "Sesi itu tidak ada lagi di riwayat Anda.",
     );
+    setDetailFailedId(null);
     void navigate({ to: "/telefun", search: {}, replace: true });
-  }, [requestedSessionId, historyState, reviewRecord, navigate]);
+  }, [
+    requestedSessionId,
+    historyState,
+    reviewRecord,
+    summaryId,
+    detailFailedId,
+    navigate,
+  ]);
 
   const openSession = (record: CallRecord) => {
     void navigate({
@@ -456,9 +494,7 @@ export default function TelefunLanding() {
 
   // Panggilan bulan ini dari server; `null` = belum/gagal dihitung ("–").
   // Dihitung ulang saat riwayat bertambah (mis. panggilan baru tersimpan).
-  const [serverMonthCount, setServerMonthCount] = useState<number | null>(
-    null,
-  );
+  const [serverMonthCount, setServerMonthCount] = useState<number | null>(null);
   useEffect(() => {
     let cancelled = false;
     getTelefunMonthCount()

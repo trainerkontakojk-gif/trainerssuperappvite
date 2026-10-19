@@ -244,6 +244,7 @@ test.describe("Telefun landing (hermetic)", () => {
   test("riwayat yang gagal dimuat bisa dicoba lagi", async ({ page }) => {
     const audit = await open(page, "/telefun", [
       telefunMocks([])[0],
+      telefunMocks([])[1],
       {
         method: "GET",
         path: "/api/v1/telefun/sessions",
@@ -1306,6 +1307,73 @@ test.describe("Telefun Telaah (hermetic)", () => {
     await expect(
       result.getByRole("button", { name: /Analisis|Unggah/ }),
     ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("riwayat ringkas: Telaah mengambil satu panggilan penuh dengan transkripnya", async ({
+    page,
+  }) => {
+    // Daftar riwayat tidak membawa transkrip dan metrik sesi.
+    const {
+      messages: _messages,
+      session_metrics: _metrics,
+      ...rest
+    } = REVIEWED_ROW;
+    const summary: TelefunRow = { ...rest, detail: "summary" };
+    const audit = await openTelaah(
+      page,
+      REVIEWED_ROW,
+      [
+        ...ANNOTATIONS_MOCKS,
+        {
+          method: "GET",
+          path: `/api/v1/telefun/history/${REVIEWED_ROW.id}`,
+          body: { success: true, data: REVIEWED_ROW },
+        },
+      ],
+      FULL_HISTORY.map((row) => (row.id === REVIEWED_ROW.id ? summary : row)),
+    );
+
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(transcript.getByTestId("telefun-line-00.36")).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(transcript).toContainText(
+      "Hold 02.01 – 02.28 · 27 detik · dalam batas",
+    );
+    await waitForMockedApi(audit, [
+      "/telefun/sessions?view=list",
+      `/telefun/history/${REVIEWED_ROW.id}`,
+    ]);
+    expectHermetic(audit);
+  });
+
+  test("riwayat ringkas: panggilan yang gagal dimuat kembali ke landing dengan pesan", async ({
+    page,
+  }) => {
+    const { messages: _messages, ...rest } = REVIEWED_ROW;
+    const audit = await openTelaah(
+      page,
+      REVIEWED_ROW,
+      [
+        {
+          method: "GET",
+          path: `/api/v1/telefun/history/${REVIEWED_ROW.id}`,
+          status: 500,
+          body: {
+            success: false,
+            error: { code: "DATABASE_ERROR", message: "gagal" },
+          },
+        },
+      ],
+      [{ ...rest, detail: "summary" }],
+    );
+    await expect(
+      page.getByText("Panggilan itu belum bisa dibuka. Coba lagi."),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page).not.toHaveURL(/sesi=/);
     expectHermetic(audit);
   });
 

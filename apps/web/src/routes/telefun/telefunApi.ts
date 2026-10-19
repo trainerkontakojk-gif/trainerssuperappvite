@@ -13,6 +13,8 @@ import {
 
 export interface TelefunSessionRow {
   id: string;
+  /** `GET /sessions?view=list`: tanpa transkrip dan metrik sesi. */
+  detail?: "summary";
   created_at?: string | null;
   date?: string | null;
   recording_url?: string | null;
@@ -96,9 +98,10 @@ export async function getTelefunMonthCount(): Promise<number> {
   return data.count;
 }
 
+/** Daftar riwayat ringkas; satu sesi penuh dibaca lewat `getTelefunSession`. */
 export async function getTelefunSessions(): Promise<TelefunSessionRow[]> {
   return (await unwrapResponse(
-    await telefunClient.sessions.$get(),
+    await telefunClient.sessions.$get({ query: { view: "list" } }),
   )) as TelefunSessionRow[];
 }
 
@@ -152,6 +155,7 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
 
   return {
     id: row.id,
+    ...(row.detail === "summary" ? { detail: "summary" as const } : {}),
     date: row.created_at ?? row.date ?? "",
     url: row.recording_url ?? "",
     consumerName: row.consumer_name || "",

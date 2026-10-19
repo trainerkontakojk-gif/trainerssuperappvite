@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- perf(telefun): load the Telefun history list (landing and Riwayat) without transcripts, session metrics, prompts or coaching text (`GET /telefun/sessions?view=list`), and fetch the one full call only when its Telaah opens; never send the scoring worker's claim token hash or owner to the browser
 - perf(pdkt): load the PDKT history list (Riwayat, workspace, landing) as short rows with only the score, scenario title and last subject (`GET /pdkt/history?view=list`), and fetch one full session (`GET /pdkt/history/:id`) only to replay it or its full Telaah only when Telaah opens, instead of downloading every email and evaluation up front
 - perf(practice): store KETIK scenario images and PDKT attachments once in a Supabase Storage bucket and keep only their links in settings, sessions, mailbox and history, with a one-off backfill (`pnpm --filter @trainers/api backfill:scenario-attachments`) that moves existing base64 attachments; PDKT shows and opens image and PDF links
 - perf(practice): open a finished KETIK Telaah with one read (the review status now carries the ready result), return the Telefun score without waiting for the coaching summary AI call, and upload both Telefun recordings at once after a call
