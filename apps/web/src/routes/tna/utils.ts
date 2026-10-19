@@ -65,6 +65,10 @@ export const calendarDate = (value: string) =>
     year: "numeric",
     timeZone: "UTC",
   });
+export const sessionDates = (s: { start_date: string; end_date: string }) =>
+  s.start_date === s.end_date
+    ? calendarDate(s.start_date)
+    : `${calendarDate(s.start_date)} – ${calendarDate(s.end_date)}`;
 export function trend(m: TnaMetricsSnapshot) {
   switch (m.trendStatus) {
     case "no_current_audit":

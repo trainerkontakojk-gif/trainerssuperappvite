@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- feat(tna): add EFEK (Evaluasi Efektivitas dan Kinerja) phase 1 under TNA: training programs KETIK/PDKT/Telefun/CERIWIS (CERIWIS measured on CSO), training sessions with participants from Profiler (create, edit, delete), and Excel/CSV participant import with name matching, behind `tna.read`/`tna.write` with RLS read-only tables and service-role write functions; production needs migration `20261019160000_efek_training_sessions.sql`
 - fix(pdkt): keep the scenario editor visible after choosing an attachment and cover the file-picker focus flow on mobile and desktop
 - docs(codex-cloud): add the Codex cloud environment guide and the setup/maintenance scripts that install the Supabase, Vercel and Railway CLIs, render `.env`, and republish the setup-phase tokens into `~/.codex-cloud-env.sh` so the agent phase still has them, with the network allowlist and the deliberate absence of `SUPABASE_SERVICE_ROLE_KEY`
 - perf(db): add list indexes for the Telefun history (owner, newest first), the PDKT history (owner, newest first) and the PDKT mailbox (latest activity first), with a rollback; production applies them with `supabase db push`

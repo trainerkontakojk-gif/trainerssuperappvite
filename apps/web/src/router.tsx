@@ -765,8 +765,45 @@ const tnaPlanRoute = createRoute({
   beforeLoad: requireCapability("tna.read"),
 });
 
+const programSearch = (search: Record<string, unknown>) =>
+  typeof search.program === "string" && /^[a-z][a-z0-9_-]{1,31}$/.test(search.program)
+    ? { program: search.program }
+    : {};
+const efekRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/efek",
+  component: lazy(() => import("./routes/tna/efek")),
+  validateSearch: (search: Record<string, unknown>): { program?: string } =>
+    programSearch(search),
+  beforeLoad: requireCapability("tna.read"),
+});
+const efekNewSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/efek/sesi/baru",
+  component: lazy(() => import("./routes/tna/efek-session")),
+  validateSearch: (search: Record<string, unknown>): { program?: string } =>
+    programSearch(search),
+  beforeLoad: requireCapability("tna.write"),
+});
+const efekSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/efek/sesi/$id",
+  component: lazy(() => import("./routes/tna/efek-session")),
+  beforeLoad: requireCapability("tna.write"),
+});
+const efekImportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/efek/impor",
+  component: lazy(() => import("./routes/tna/efek-import")),
+  beforeLoad: requireCapability("tna.write"),
+});
+
 const routeTree = rootRoute.addChildren([
   tnaRoute,
+  efekRoute,
+  efekNewSessionRoute,
+  efekSessionRoute,
+  efekImportRoute,
   tnaParameterRoute,
   tnaNeedRoute,
   tnaPlanRoute,
