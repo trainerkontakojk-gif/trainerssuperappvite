@@ -78,6 +78,12 @@ export class LiveSession {
   private isAiSpeaking: boolean = false;
   private sessionState: TelefunSessionState = "idle";
   private isSetupComplete: boolean = false;
+  /**
+   * The connection is prepared while the phone rings. Until the agent picks
+   * up, nothing is recorded, no microphone audio is sent and the call is not
+   * reported as connected.
+   */
+  private isPickedUp: boolean = true;
   private hasAuthenticated: boolean = false;
   private hasConfigured: boolean = false;
   private pendingGeminiSetup: ReturnType<
@@ -161,7 +167,14 @@ export class LiveSession {
     );
   }
 
-  public async connect(accessToken: string) {
+  public async connect(
+    accessToken: string,
+    options: { pickUp?: Promise<void> } = {},
+  ) {
+    if (options.pickUp) {
+      this.isPickedUp = false;
+      void options.pickUp.then(() => this.pickUp());
+    }
     try {
       this.setSessionState("connecting");
       this.onStatusChange("Menghubungkan...");
@@ -180,6 +193,11 @@ export class LiveSession {
           sampleRate: this.audioConfiguration.inputSampleRateHz,
         },
       });
+      // Closed while the microphone was opening (e.g. left during the ring).
+      if (this.intentionalClose) {
+        this.stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       this.applyMicrophoneCaptureStateToTracks();
       this.onLocalStream(this.stream);
 
@@ -199,6 +217,8 @@ export class LiveSession {
 
       // 4. Setup Input Processing
       await this.setupInputProcessing();
+      // disconnect() already released the microphone and audio context.
+      if (this.intentionalClose) return;
 
       // 5. Connect WebSocket
       const wsBase = normalizeTelefunWebSocketUrl(
@@ -316,7 +336,7 @@ export class LiveSession {
       this.config.sessionId = msg.sessionId;
       this.onSessionCreated(msg.sessionId);
       this.onStatusChange("Menyiapkan sesi suara...");
-      this.sessionStartTime = Date.now();
+      if (this.isPickedUp) this.sessionStartTime = Date.now();
       this.sendConfigure();
       this.emitTimelineEvent("auth_complete");
       return;
@@ -437,8 +457,23 @@ export class LiveSession {
       if (e.data.size > 0) this.agentRecordedChunks.push(e.data);
     };
 
-    this.mediaRecorder.start(1000);
-    this.agentMediaRecorder.start(1000);
+    if (this.isPickedUp) this.startRecorders();
+  }
+
+  private startRecorders() {
+    if (this.mediaRecorder?.state === "inactive") this.mediaRecorder.start(1000);
+    if (this.agentMediaRecorder?.state === "inactive")
+      this.agentMediaRecorder.start(1000);
+  }
+
+  /** The ring ended: start the call on the connection prepared meanwhile. */
+  private pickUp() {
+    if (this.isPickedUp || this.intentionalClose || this.hasStoppedRecording)
+      return;
+    this.isPickedUp = true;
+    this.sessionStartTime = Date.now();
+    this.startRecorders();
+    if (this.isSetupComplete) this.announceReady();
   }
 
   private async setupInputProcessing() {
@@ -490,6 +525,7 @@ export class LiveSession {
   }
 
   private handleInputAudioFrame(inputData: Float32Array) {
+    if (!this.isPickedUp) return;
     const now = Date.now();
     const frame = processInputAudioFrame(inputData);
 
@@ -624,8 +660,12 @@ export class LiveSession {
 
   private completeSetup() {
     this.isSetupComplete = true;
-    this.lastModelActivityMs = Date.now();
     this.clearSetupTimeout();
+    if (this.isPickedUp) this.announceReady();
+  }
+
+  private announceReady() {
+    this.lastModelActivityMs = Date.now();
     this.setSessionState("ready");
     this.onStatusChange("Tersambung");
     this.emitTimelineEvent("setup_complete");
@@ -929,6 +969,8 @@ export class LiveSession {
   private stopRecordingOnce() {
     if (this.hasStoppedRecording) return;
     this.hasStoppedRecording = true;
+    // Ended before pickup: there is no call to record or save.
+    if (!this.isPickedUp) return;
     this.stopRecording();
   }
 

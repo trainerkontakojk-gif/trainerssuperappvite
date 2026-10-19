@@ -258,6 +258,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     let isActive = true;
     mountedRef.current = true;
 
+    let ringing = true;
+    let latestStatus = "Menghubungkan...";
+
     const startCallSequence = async () => {
       sentTimeCues.current = new Set();
       terminalFailureRef.current = false;
@@ -282,7 +285,10 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               terminalFailureRef.current = true;
               if (isActive) setTerminalFailure(true);
             }
-            if (isActive) setConnectionState(s);
+            // Selama berdering layar tetap "Memanggil…"; status terakhir
+            // dipakai begitu telepon diangkat.
+            latestStatus = s;
+            if (isActive && !ringing) setConnectionState(s);
           };
           session.onStateChange = (state) => {
             if (!isActive) return;
@@ -345,39 +351,41 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           };
         };
 
-        if (isActive) {
-          console.log("[Telefun] Starting ringtone sequence");
-          setIsRinging(true);
-          setConnectionState("Memanggil...");
-          await playIncomingRing();
-        }
+        if (!isActive) return;
+        console.log("[Telefun] Starting ringtone sequence");
+        setIsRinging(true);
+        setConnectionState("Memanggil...");
+        const ring = playIncomingRing();
 
+        // Sambungan disiapkan selama berdering. Sesi baru merekam dan
+        // mengirim suara setelah diangkat; ditutup sebelum itu tidak
+        // menghasilkan rekaman kosong.
+        session = createTelefunTransport(config, { accessToken });
+        sessionRef.current = session;
+        bindSession(session);
+        void session
+          .connect(accessToken, { pickUp: ring.then(() => undefined) })
+          .catch((connectError: unknown) => {
+            if (terminalFailureRef.current) return;
+            terminalFailureRef.current = true;
+            if (isActive) {
+              setTerminalFailure(true);
+              setError(mapTelefunTransportError(connectError));
+            }
+          });
+
+        await ring;
+        ringing = false;
         if (!isActive || endCallStartedRef.current) {
           console.log(
-            "[Telefun] Call ended or component unmounted during ringtone, aborting connection",
+            "[Telefun] Call ended or component unmounted during ringtone",
           );
           return;
         }
 
-        if (!session) {
-          // Legacy transports are intentionally constructed after the ringtone.
-          // Cancelling during the ringtone must not create an empty recording.
-          session = createTelefunTransport(config, { accessToken });
-          sessionRef.current = session;
-          bindSession(session);
-        }
-
-        console.log("[Telefun] Ringtone finished, connecting to AI...");
+        console.log("[Telefun] Ringtone finished");
         setIsRinging(false);
-        setConnectionState("Menghubungkan...");
-        void session.connect(accessToken).catch((connectError: unknown) => {
-          if (terminalFailureRef.current) return;
-          terminalFailureRef.current = true;
-          if (isActive) {
-            setTerminalFailure(true);
-            setError(mapTelefunTransportError(connectError));
-          }
-        });
+        setConnectionState(latestStatus);
       } catch (err: unknown) {
         const failureAlreadyReported = terminalFailureRef.current;
         if (!failureAlreadyReported) {
