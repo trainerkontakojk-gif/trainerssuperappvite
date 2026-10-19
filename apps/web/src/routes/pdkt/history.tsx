@@ -82,7 +82,7 @@ export default function PdktHistory() {
     setState("loading");
     try {
       const data = (await unwrapResponse(
-        await pdktClient.history.$get(),
+        await pdktClient.history.$get({ query: { view: "list" } }),
       )) as unknown;
       setHistory(Array.isArray(data) ? data.map(mapHistoryRow) : []);
       setState("ready");

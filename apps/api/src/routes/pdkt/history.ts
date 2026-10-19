@@ -1,6 +1,8 @@
 import { resolveAccountScope } from "../../services/access/scope";
 import { getActor } from "../../middleware/role";
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import {
   PdktPublicSessionHistory,
   mapSimulationSubjectRowToSnapshot,
@@ -9,30 +11,72 @@ import * as pdktService from "../../services/pdkt-service";
 import { requireCapability } from "../../middleware/role";
 import { createAdminClient } from "../../lib/supabase";
 import { Variables, getUserClient, jsonServerError } from "./route-utils";
-import { fetchPdktHistory } from "../../services/pdkt/history-service";
+import {
+  fetchPdktHistory,
+  fetchPdktHistoryItem,
+} from "../../services/pdkt/history-service";
 
 const history = new Hono<{ Variables: Variables }>();
 
-history.get("/", requireCapability("pdkt.history.read"), async (c) => {
+history.get(
+  "/",
+  requireCapability("pdkt.history.read"),
+  zValidator("query", z.object({ view: z.enum(["list"]).optional() })),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const userClient = getUserClient(c);
+
+    try {
+      const data = await fetchPdktHistory(
+        userClient,
+        resolveAccountScope(getActor(c)).userId,
+        c.req.valid("query").view ?? "full",
+      );
+
+      return c.json({
+        success: true,
+        data: (data || []).map((row: any) => ({
+          ...row,
+          user_id: row.user_id ?? user.id,
+          user_email: user.email ?? null,
+          user_role: profile?.role ?? null,
+          simulationSubject: mapSimulationSubjectRowToSnapshot(row),
+        })) as PdktPublicSessionHistory[],
+      });
+    } catch (error: unknown) {
+      return jsonServerError(c, error);
+    }
+  },
+);
+
+history.get("/:id", requireCapability("pdkt.history.read"), async (c) => {
   const user = c.get("user");
   const profile = c.get("profile");
-  const userClient = getUserClient(c);
-
   try {
-    const data = await fetchPdktHistory(
-      userClient,
+    const row: any = await fetchPdktHistoryItem(
+      getUserClient(c),
       resolveAccountScope(getActor(c)).userId,
+      c.req.param("id"),
     );
-
+    if (!row) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
+        },
+        404,
+      );
+    }
     return c.json({
       success: true,
-      data: (data || []).map((row: any) => ({
+      data: {
         ...row,
         user_id: row.user_id ?? user.id,
         user_email: user.email ?? null,
         user_role: profile?.role ?? null,
         simulationSubject: mapSimulationSubjectRowToSnapshot(row),
-      })) as PdktPublicSessionHistory[],
+      } as PdktPublicSessionHistory,
     });
   } catch (error: unknown) {
     return jsonServerError(c, error);

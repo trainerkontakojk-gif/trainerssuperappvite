@@ -98,7 +98,7 @@ export default function PdktLanding() {
     setHistoryError(false);
     try {
       const res = (await unwrapResponse(
-        await pdktClient.history.$get(),
+        await pdktClient.history.$get({ query: { view: "list" } }),
       )) as any[];
       if (res) {
         setHistory(res.map(mapHistoryRow));
@@ -120,9 +120,51 @@ export default function PdktLanding() {
     await settingsResource.save(newSettings);
   };
 
-  const replaySession = requestedSessionId
+  const listedSession = requestedSessionId
     ? (history.find((item) => item.id === requestedSessionId) ?? null)
     : null;
+  // The list holds summaries; a replay needs the full session first.
+  const [replayDetail, setReplayDetail] = useState<{
+    id: string;
+    session: SessionHistory | null;
+    failed: boolean;
+  } | null>(null);
+  const summaryId =
+    listedSession?.detail === "summary" ? listedSession.id : null;
+  useEffect(() => {
+    if (!summaryId) return;
+    let cancelled = false;
+    setReplayDetail({ id: summaryId, session: null, failed: false });
+    void (async () => {
+      try {
+        const row = await unwrapResponse(
+          await pdktClient.history[":id"].$get({ param: { id: summaryId } }),
+        );
+        if (!cancelled)
+          setReplayDetail({
+            id: summaryId,
+            session: row ? mapHistoryRow(row) : null,
+            failed: !row,
+          });
+      } catch (err) {
+        console.error("[PDKT] Failed to load session:", err);
+        if (!cancelled)
+          setReplayDetail({ id: summaryId, session: null, failed: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [summaryId]);
+  const replayDetailFailed =
+    Boolean(summaryId) &&
+    replayDetail?.id === summaryId &&
+    replayDetail.failed;
+  const replaySession = summaryId
+    ? replayDetail?.id === summaryId
+      ? replayDetail.session
+      : null
+    : listedSession;
   const selectedId =
     email ??
     (replaySession
@@ -137,14 +179,21 @@ export default function PdktLanding() {
   // Tautan valid tetap di URL. Hanya sesi hilang/gagal yang kembali ke landing.
   useEffect(() => {
     if (!requestedSessionId || (!historyError && !historyReady)) return;
-    if (!historyError && replaySession) return;
+    if (!historyError && listedSession && !replayDetailFailed) return;
     notify.error(
-      historyError
+      historyError || replayDetailFailed
         ? "Riwayat belum bisa dimuat, jadi sesi itu belum bisa dibuka."
         : "Sesi itu tidak ada lagi di riwayat Anda.",
     );
     void navigate({ to: "/pdkt", search: {}, replace: true });
-  }, [requestedSessionId, historyReady, historyError, replaySession, navigate]);
+  }, [
+    requestedSessionId,
+    historyReady,
+    historyError,
+    listedSession,
+    replayDetailFailed,
+    navigate,
+  ]);
 
   // Berpindah Pahami/Telaah pada email yang sama mempertahankan asal Riwayat.
   const handleSelectedIdChange = useCallback(

@@ -504,3 +504,36 @@ test("history includes every page and never returns partial success", async () =
     failHistoryPage = false;
   }
 });
+
+test("the history list carries only what the list shows, and one session opens in full", async () => {
+  const id = await insertHistory({ evaluation_status: "completed", evaluation });
+  const list = await api("/history?view=list");
+  expect(list.status).toBe(200);
+  const row = (await list.json()).data.find(
+    (entry: { id: string }) => entry.id === id,
+  );
+  expect(row).toMatchObject({
+    detail: "summary",
+    evaluation_status: "completed",
+    evaluation: { score: evaluation.score },
+    emails: [{ subject: reply.subject }],
+    config: { scenarios: [{ id: scenario.id, title: scenario.title }] },
+  });
+  const listed = JSON.stringify(row);
+  for (const hidden of [inbound.body, reply.body, evaluation.feedback, privateAnswer])
+    expect(listed).not.toContain(hidden);
+
+  const opened = await api(`/history/${id}`);
+  expect(opened.status).toBe(200);
+  const session = (await opened.json()).data;
+  expect(session.id).toBe(id);
+  expect(session.detail).toBeUndefined();
+  expect(session.emails.map((email: { body: string }) => email.body)).toEqual([
+    inbound.body,
+    reply.body,
+  ]);
+  expect(session.emails[0].to).toBe("");
+  expect(session.evaluation.feedback).toBe(evaluation.feedback);
+  expect(JSON.stringify(session)).not.toContain(privateAnswer);
+  expect((await api(`/history/${id}`, "GET", undefined, other)).status).toBe(404);
+});
