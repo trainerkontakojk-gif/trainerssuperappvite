@@ -269,6 +269,8 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   if (pathname.startsWith("/tna/efek/")) {
     const label = pathname === "/tna/efek/impor"
       ? "Impor peserta"
+      : pathname.startsWith("/tna/efek/program/")
+        ? "Rincian program"
       : pathname === "/tna/efek/sesi/baru"
         ? "Sesi baru"
         : "Sesi pelatihan";

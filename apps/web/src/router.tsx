@@ -769,12 +769,37 @@ const programSearch = (search: Record<string, unknown>) =>
   typeof search.program === "string" && /^[a-z][a-z0-9_-]{1,31}$/.test(search.program)
     ? { program: search.program }
     : {};
+export interface EfekReportSearch {
+  program?: string;
+  window?: number;
+  year?: number;
+  tim?: string;
+  session?: string;
+}
+const efekReportSearch = (search: Record<string, unknown>): EfekReportSearch => {
+  const out: EfekReportSearch = programSearch(search);
+  const window = Number(search.window);
+  if (Number.isInteger(window) && window >= 1 && window <= 6) out.window = window;
+  const year = Number(search.year);
+  if (Number.isInteger(year) && year >= 2000 && year <= 2100) out.year = year;
+  if (typeof search.tim === "string" && search.tim.trim() && search.tim.length <= 100)
+    out.tim = search.tim;
+  if (typeof search.session === "string" && /^[0-9a-f-]{36}$/i.test(search.session))
+    out.session = search.session;
+  return out;
+};
 const efekRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tna/efek",
   component: lazy(() => import("./routes/tna/efek")),
-  validateSearch: (search: Record<string, unknown>): { program?: string } =>
-    programSearch(search),
+  validateSearch: efekReportSearch,
+  beforeLoad: requireCapability("tna.read"),
+});
+const efekProgramRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/efek/program/$code",
+  component: lazy(() => import("./routes/tna/efek-program")),
+  validateSearch: efekReportSearch,
   beforeLoad: requireCapability("tna.read"),
 });
 const efekNewSessionRoute = createRoute({
@@ -801,6 +826,7 @@ const efekImportRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   tnaRoute,
   efekRoute,
+  efekProgramRoute,
   efekNewSessionRoute,
   efekSessionRoute,
   efekImportRoute,

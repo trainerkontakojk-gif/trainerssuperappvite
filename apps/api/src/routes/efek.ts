@@ -4,6 +4,7 @@ import {
   efekImportInputSchema,
   efekMatchInputSchema,
   efekProgramCodeSchema,
+  efekReportQuerySchema,
   efekSessionInputSchema,
 } from "@trainers/types";
 import type { AuthVariables } from "../middleware/auth";
@@ -20,6 +21,10 @@ import {
   matchEfekNames,
   updateEfekSession,
 } from "../services/efek/sessions";
+import {
+  getEfekProgramReport,
+  getEfekReport,
+} from "../services/efek/report";
 
 type EfekContext = Context<{ Variables: AuthVariables }>;
 
@@ -153,6 +158,31 @@ export const efek = new Hono<{ Variables: AuthVariables }>()
     try {
       const data = await importEfekSessions(writeContext(c), parsed.data);
       return c.json({ success: true as const, data }, 201);
+    } catch (error) {
+      return efekFailure(c, error);
+    }
+  })
+  .get("/report", requireCapability("tna.read"), async (c) => {
+    const parsed = efekReportQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) return invalidInput(c);
+    try {
+      const data = await getEfekReport(readClient(c), parsed.data);
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return efekFailure(c, error);
+    }
+  })
+  .get("/report/:program", requireCapability("tna.read"), async (c) => {
+    const code = efekProgramCodeSchema.safeParse(c.req.param("program"));
+    const parsed = efekReportQuerySchema.safeParse(c.req.query());
+    if (!code.success || !parsed.success) return invalidInput(c);
+    try {
+      const data = await getEfekProgramReport(
+        readClient(c),
+        code.data,
+        parsed.data,
+      );
+      return c.json({ success: true as const, data });
     } catch (error) {
       return efekFailure(c, error);
     }
