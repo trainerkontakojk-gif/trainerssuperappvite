@@ -19,6 +19,7 @@ import {
   selectClass,
 } from "./utils";
 import { SERVICE_LABELS } from "../../lib/scoring";
+import { TnaTabs } from "./TnaTabs";
 
 export default function TnaIndex() {
   const search = useSearch({ from: "/tna" });
@@ -53,6 +54,7 @@ export default function TnaIndex() {
       title="TNA"
       description="Temukan parameter yang perlu ditindaklanjuti, validasi penyebab, lalu susun rencana pelatihan. Tingkat dihitung per 100 sesi sampel, bukan persentase tiket."
     >
+      <TnaTabs current="kebutuhan" />
       <section aria-label="Filter parameter" className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Layanan">

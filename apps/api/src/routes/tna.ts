@@ -46,6 +46,7 @@ import {
 } from "../services/tna/read-service";
 import { TnaServiceError } from "../services/tna/errors";
 import { TnaPeriodNotFoundError } from "../services/tna/metrics";
+import { efek } from "./efek";
 
 function tnaFailure(c: Context<{ Variables: AuthVariables }>, error: unknown) {
   if (error instanceof TnaServiceError)
@@ -461,6 +462,7 @@ const tna = new Hono<{ Variables: AuthVariables }>()
     } catch (error) {
       return tnaFailure(c, error);
     }
-  });
+  })
+  .route("/efek", efek);
 
 export { tna };

@@ -265,6 +265,19 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
   }
 
   if (pathname === "/tna") return [{ label: "TNA" }];
+  if (pathname === "/tna/efek") return [{ label: "TNA", href: "/tna" }, { label: "EFEK" }];
+  if (pathname.startsWith("/tna/efek/")) {
+    const label = pathname === "/tna/efek/impor"
+      ? "Impor peserta"
+      : pathname === "/tna/efek/sesi/baru"
+        ? "Sesi baru"
+        : "Sesi pelatihan";
+    return [
+      { label: "TNA", href: "/tna" },
+      { label: "EFEK", href: "/tna/efek" },
+      { label },
+    ];
+  }
   if (pathname.startsWith("/tna/")) {
     const label =
       pathname === "/tna/parameter"
