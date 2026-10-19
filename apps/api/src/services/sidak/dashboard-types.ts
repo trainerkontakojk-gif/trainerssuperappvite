@@ -15,6 +15,8 @@ export type DashboardTemuanRow = {
   service_type?: ServiceType | string | null;
   tahun?: number | null;
   nilai?: number | null;
+  ketidaksesuaian?: string | null;
+  sebaiknya?: string | null;
   no_tiket?: string | null;
   created_at?: string;
   is_phantom_padding?: boolean | null;

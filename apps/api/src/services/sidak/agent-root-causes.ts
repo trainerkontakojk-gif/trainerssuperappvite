@@ -224,13 +224,15 @@ const ROOT_CAUSE_REGISTRY: RegistryEntry[] = [
   },
 ];
 
+export const FALLBACK_ROOT_CAUSE_RECOMMENDATION =
+  "Review contoh temuan secara manual untuk menentukan pola coaching yang paling tepat.";
+
 const FALLBACK_ROOT_CAUSE: RegistryEntry = {
   clusterId: "lainnya",
   priority: 0,
   label: "Lainnya",
   keywords: [],
-  recommendation:
-    "Review contoh temuan secara manual untuk menentukan pola coaching yang paling tepat.",
+  recommendation: FALLBACK_ROOT_CAUSE_RECOMMENDATION,
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

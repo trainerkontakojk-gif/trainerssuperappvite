@@ -111,6 +111,10 @@ export default defineConfig({
       testMatch: "sidak-heatmap-filter-api.spec.ts",
     },
     {
+      name: "sidak-dashboard-brief-real-backend",
+      testMatch: "sidak-dashboard-brief-api.spec.ts",
+    },
+    {
       name: "sidak-dashboard-kpi-real-backend",
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },

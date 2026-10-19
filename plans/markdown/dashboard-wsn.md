@@ -1,6 +1,6 @@
 # Dashboard What / So what / Now what — spec untuk agen coding
 
-Status: **siap dikerjakan** oleh agen coding (Codex, DeepSeek, Claude) tanpa riwayat proyek. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
+Status: **tahap 1 selesai** (`40629898`); **tahap 2 diimplementasikan dan diverifikasi**; tahap 3 siap dikerjakan, tahap 4 tetap opsional. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
 
 > Mockup belum disetujui eksplisit oleh Fajar saat spec ini ditulis. Fajar meminta spec ini untuk dikerjakan agen lain, jadi kerjakan sesuai spec; bila Fajar mengubah sesuatu di mockup, ikuti perubahan itu.
 
@@ -207,6 +207,43 @@ Gunakan validator bersama, resolver folder yang ada, irisan ID peserta dengan sc
 - Hermetic browser: di spec SIDAK dashboard yang ada (cari dengan `rg "sidak/dashboard" apps/web/e2e`) atau spec baru, mock `/sidak/dashboard` dan `/sidak/heatmap`; buktikan request heatmap membawa `folder_ids`, `start_month`, `end_month` saat filter dipilih, dan pil "di bawah target 95" tampil dengan angka yang benar.
 
 **Selesai bila:** semua E2E di atas hijau, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git diff --check` bersih, CHANGELOG diisi.
+
+## Requirement — eksekusi tahap 2
+
+Lane D: tambah kontrak `insights` dari baris dashboard yang sudah dibatasi scope, tanpa query data atau panggilan AI baru. Tahap 3–4 tidak termasuk.
+
+## Design — eksekusi tahap 2
+
+Fungsi murni menghasilkan kalimat Indonesia deterministik, fokus kenaikan minimal +5, dan maksimal 10 agen terbaru. Gunakan target server bersama, registry saran coaching yang ada, dan nama parameter tren sebagai kunci. UI Operate mempertahankan token/komponen Dashboard: Kesimpulan → KPI → ringkasan lama; tiga kolom desktop/satu kolom mobile, disclosure native yang bisa dipakai keyboard, tautan TNA tersaring capability. Tanpa insight tidak mengarang ringkasan; tanpa pembanding/penyebut tampilkan keterbatasan data. Fokus tren hanya berlaku saat state seri belum diubah pengguna.
+
+## Tasklist — eksekusi tahap 2
+
+- [x] E2E API nyata dan browser hermetic RED.
+- [x] Kontrak bersama dan komputasi insight scoped tanpa I/O baru.
+- [x] Brief, disclosure agen bersama, perubahan parameter, dan fokus grafik.
+- [x] E2E GREEN, review keamanan/Impeccable/thermo-nuclear, typecheck/lint/build.
+- [x] Dokumentasi, CHANGELOG, bukti dan cleanup proses lokal.
+
+### Bukti eksekusi tahap 2 — 2026-10-19
+
+- RED API: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project=sidak-dashboard-brief-real-backend --workers=1 --trace on` → exit 1, tiga tes gagal karena `insights` belum tersedia. Fixture memakai tahun 2095, folder unik, JWT trainer/leader, backend dan PostgREST/RLS lokal nyata.
+- RED browser: `pnpm --dir apps/web exec playwright test e2e/sidak-dashboard-brief.spec.ts --workers=1 --trace on` → exit 1 karena Kesimpulan belum tersedia. Fixture leader awalnya belum memasang approval SIDAK; setelah fixture diperbaiki, run `--grep 'leader has'` tetap RED pada Kesimpulan yang belum ada, bukan pada gate akses.
+- Dua regresi tambahan dibuktikan RED lalu diperbaiki: `Sembunyikan Semua` sempat menyalakan kembali fokus; fokus di peringkat 14 sempat hilang karena batas 12 baris view-model chart lama. Pemilik daftar tetap membatasi tampilan ke delapan baris, termasuk fokus, tanpa mengubah helper Pareto untuk pemanggil lain.
+- GREEN API final: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project=sidak-dashboard-brief-real-backend --project=sidak-heatmap-filter-real-backend --project=sidak-dashboard-kpi-real-backend --workers=1 --trace on` → exit 0, **13 passed**. Empat tes insight mencakup fokus +6, saran registry, periode terbaru, urutan/maksimal 10 agen, irisan leader, audit bertambah dua kali lipat, satu periode, kosong, stabil, turun nyata/ikut volume, baseline nol, dan tanpa temuan. Sembilan regresi tahap 1 (termasuk indeks) lulus.
+- GREEN browser final: `pnpm --dir apps/web exec playwright test e2e/sidak-dashboard-brief.spec.ts e2e/sidak-dashboard-insights.spec.ts e2e/sidak-scope.spec.ts --workers=1 --trace on` → exit 0, **21 passed**. Mencakup keyboard disclosure, href detail/ranking/TNA, capability leader, insight null, parameter fokus di luar batas chart lama, saran otomatis terlihat, seri Total + fokus, dan kontrol chip lama.
+- `pnpm typecheck --concurrency=1` → exit 0 (empat workspace, termasuk tipe E2E). Fixture legacy `sidak-ranking-route.test.ts` hanya ditambah `insights: null` di empat return value agar kontrak wajib tetap terkompilasi; tidak menambah atau menjalankan unit test.
+- `pnpm lint --concurrency=1` → exit 0 (74 warning lama di luar perubahan, tanpa error).
+- `pnpm build --concurrency=1` → exit 0 (tiga task).
+- `git diff --check` dan pemeriksaan Prettier terscope → exit 0. File legacy yang hanya mendapat pembaruan fixture/konstanta tidak direformat massal.
+- Artefak browser repeatable: trace dan `brief-{390,1280}-{light,dark}.png` di `apps/web/test-results/` (ignored, jangan commit auth lokal). Log API final sesi ini ada di `/tmp/dashboard-wsn2-api-final.log`; perintah API di atas menghasilkan ulang trace saat dijalankan.
+- Supabase dijalankan dengan `supabase start -x logflare,vector`; env integration/guard membatasi request ke loopback. Tidak ada migrasi baru/diterapkan pada tahap 2, tidak ada akses remote/provider. Fixture dibersihkan oleh `afterAll`; `supabase stop` selesai setelah tes API. Tidak ada dev server/worker tambahan tersisa.
+
+### Review tahap 2
+
+- Impeccable **PASS**: detector atas Brief, disclosure, ParameterRanking, dan route menghasilkan `[]`. E2E memeriksa kontras teks Brief ≥4,5:1 dan tanpa overflow pada 390/1280px, terang/gelap; screenshot mobile terang dan desktop gelap dibaca langsung. Native `details/summary` menjaga state dan keyboard tanpa custom focus manager. Tidak ada redesign/token/dependency baru.
+- Thermo-nuclear dan review scope dalam sesi **PASS** (bukan reviewer independen): data baru berasal dari `countableFindingRows` yang sudah terfilter; pengelompokan hanya periode terbaru, memakai kunci nama indikator yang sama dengan tren; tidak ada query baru atau I/O dalam builder. Target server dan saran fallback registry dipakai ulang; metadata kosong tidak ditebak; label pembanding, penyebut nol, urutan/cap, state chip, dan capability TNA diperiksa. Dua temuan UI di atas sudah diperbaiki dan E2E final hijau.
+- Graphify query `buildDashboardTrends` membantu penelusuran; `GRAPHIFY_MAX_WORKERS=1 graphify update .` selesai sekali (exit 0). Context7 tidak diperlukan: perubahan memakai API internal/pola library yang sudah ada, tanpa dependency atau integrasi eksternal baru.
+- Beranda, status agen, migrasi, AI, dan tahap 3–4 tidak diubah. File audit egress untracked pengguna tetap tidak disentuh. Commit tahap 2 diminta Fajar; push/deploy tidak termasuk.
 
 ## 6. Tahap 2 — Kesimpulan SIDAK (1 PR)
 

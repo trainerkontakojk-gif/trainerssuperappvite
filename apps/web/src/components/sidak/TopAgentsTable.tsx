@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import SidakDashboardPanel from "./SidakDashboardPanel";
+import { sidakRankingUrl } from "../../lib/sidak-ranking-url";
 
 interface Agent {
   agentId: string;
@@ -23,13 +24,7 @@ export default function TopAgentsTable({
   serviceType,
   selectedYear,
 }: Props) {
-  const rankingParams = new URLSearchParams();
-  if (serviceType) rankingParams.set("service_type", serviceType);
-  if (selectedYear) rankingParams.set("year", String(selectedYear));
-  const rankingQuery = rankingParams.toString();
-  const rankingUrl = rankingQuery
-    ? `/sidak/ranking?${rankingQuery}`
-    : "/sidak/ranking";
+  const rankingUrl = sidakRankingUrl(serviceType, selectedYear);
   const visible = agents.slice(0, 5);
   const maxDefects = Math.max(1, ...visible.map((agent) => agent.defects));
 

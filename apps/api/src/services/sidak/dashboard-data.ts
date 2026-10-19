@@ -13,6 +13,7 @@ import {
 } from "./dashboard-types";
 import { groupTemuanByAgent, getScoreRows } from "./dashboard-aggregation";
 import { buildDashboardTrends } from "./dashboard-trends";
+import { buildDashboardInsights } from "./dashboard-insights";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
@@ -25,12 +26,14 @@ import type {
   DashboardSummary,
   TopAgentData,
   ParetoData,
+  DashboardInsightAgent,
 } from "@trainers/types";
 import { formatQAIndicatorName } from "@trainers/types";
 import {
   countFindingTickets,
   emptyDashboardResponse,
   isCountableFinding,
+  SIDAK_COMPLIANCE_TARGET,
 } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
@@ -273,7 +276,6 @@ export async function getDashboardData(params: {
   let totalScore = 0;
   let zeroErrorCount = 0;
   let complianceCount = 0;
-  const complianceThreshold = 95;
 
   const serviceDefects: Record<string, number> = {};
   const paretoMap = new Map<
@@ -369,7 +371,7 @@ export async function getDashboardData(params: {
     totalScore += finalAgentScore;
 
     if (agentFindings === 0) zeroErrorCount++;
-    if (finalAgentScore >= complianceThreshold) complianceCount++;
+    if (finalAgentScore >= SIDAK_COMPLIANCE_TARGET) complianceCount++;
   }
 
   const trends = buildDashboardTrends({
@@ -488,6 +490,45 @@ export async function getDashboardData(params: {
     }))
     .sort((a, b) => b.count - a.count);
 
+  // Reuse the already scoped countable rows. Only latest-period rows contribute
+  // names/counts; raw indicator names match the keys used by paramTrend exactly.
+  const latestPeriodId = trends.periodMetrics.at(-1)?.periodId;
+  const indicatorById = new Map(
+    indicators.map((indicator) => [indicator.id, indicator]),
+  );
+  const parameterAgents = new Map<string, Map<string, DashboardInsightAgent>>();
+  const parameterRows = new Map<string, DashboardTemuanRow[]>();
+  for (const row of countableFindingRows) {
+    if (row.period_id !== latestPeriodId) continue;
+    const indicator = indicatorById.get(row.indicator_id);
+    if (!indicator) continue;
+    const name = formatQAIndicatorName(indicator);
+    const agents =
+      parameterAgents.get(name) ?? new Map<string, DashboardInsightAgent>();
+    const agent = agents.get(row.peserta_id) ?? {
+      agentId: row.peserta_id,
+      nama: row.profiler_peserta?.nama ?? "Agen tanpa nama",
+      tim: row.profiler_peserta?.tim ?? null,
+      count: 0,
+    };
+    agent.count++;
+    agents.set(row.peserta_id, agent);
+    parameterAgents.set(name, agents);
+    const findings = parameterRows.get(name) ?? [];
+    findings.push(row);
+    parameterRows.set(name, findings);
+  }
+  const insights = buildDashboardInsights({
+    periodMetrics: trends.periodMetrics,
+    paramTrend: trends.paramTrend,
+    paretoData: paretoArray,
+    parameterAgents,
+    parameterRows,
+    indicators,
+    periodById: new Map(periods.map((period) => [period.id, period])),
+    hasFindings: totalFindings > 0,
+  });
+
   let cumulative = 0;
   for (const p of paretoArray) {
     cumulative += p.count;
@@ -518,6 +559,7 @@ export async function getDashboardData(params: {
     periods,
     folders: folderIds,
     summary,
+    insights,
     serviceData: Object.entries(serviceDefects).map(([svc, total]) => ({
       name: getDashboardServiceLabel(svc),
       serviceType: svc,

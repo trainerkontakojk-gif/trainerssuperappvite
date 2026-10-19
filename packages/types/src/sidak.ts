@@ -416,7 +416,52 @@ export interface DashboardSparklinePoint {
   totalAudited?: number;
 }
 
+export type DashboardInsightTone = "good" | "bad" | "neutral";
+
+export interface DashboardInsightAgent {
+  agentId: string;
+  nama: string;
+  tim: string | null;
+  count: number;
+}
+
+export interface DashboardInsights {
+  latestLabel: string | null;
+  previousLabel: string | null;
+  what: {
+    text: string;
+    tone: DashboardInsightTone;
+    findingsChangePct: number | null;
+    perAuditedLatest: number | null;
+    perAuditedPrevious: number | null;
+  };
+  soWhat: {
+    text: string;
+    tone: DashboardInsightTone;
+    scoreGapToTarget: number | null;
+    belowTargetCount: number | null;
+  };
+  focusParameter: {
+    name: string;
+    category: "critical" | "non_critical" | string;
+    latestCount: number;
+    change: number;
+    recommendation: string;
+    agents: DashboardInsightAgent[];
+  } | null;
+  nowWhat: {
+    text: string;
+    action: "coach_focus_agents" | "open_ranking" | "none";
+  };
+  parameterChanges: Array<{
+    name: string;
+    latestCount: number;
+    change: number | null;
+  }>;
+}
+
 export interface DashboardData {
+  insights: DashboardInsights | null;
   periods: QAPeriod[];
   folders: { id: string; name: string; parent_id?: string | null }[];
   summary: DashboardSummary | null;

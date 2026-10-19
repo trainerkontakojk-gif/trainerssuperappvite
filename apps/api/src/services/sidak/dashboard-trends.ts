@@ -6,7 +6,10 @@ import {
   type DashboardSparklinePoint,
 } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
-import { countFindingTickets } from "./shared-constants";
+import {
+  countFindingTickets,
+  SIDAK_COMPLIANCE_TARGET,
+} from "./shared-constants";
 import { getScoreRows } from "./dashboard-aggregation";
 
 export const MONTHS_SHORT = [
@@ -108,7 +111,7 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
           params.isCountableFinding(r),
         );
         if (findingRows.length === 0) zeroCount++;
-        if (finalScore >= 95) complianceCount++;
+        if (finalScore >= SIDAK_COMPLIANCE_TARGET) complianceCount++;
         totalScore += finalScore;
       }
 

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- feat(sidak): add deterministic dashboard conclusions, the fastest-rising focus parameter, and scoped coaching-agent disclosures with QA-target context and capability-gated TNA navigation
 - fix(sidak): make the dashboard weekly pattern follow team and month filters without widening leader scope, and add QA-target and per-audited-agent comparison badges to its KPI strip
 - fix(tna): score the EFEK report from raw SIDAK temuan the same way the SIDAK agent page does, instead of the dashboard cache table that holds score 0 from the SQL refresh and is never refreshed by imports, which showed impossible averages (a PDKT average of 35) and KETIK agents without data; QA, team leaders and trainers no longer count as comparison peers
 - docs(plans): add the What / So what / Now what dashboard spec for coding agents (SIDAK weekly pattern follows team and month filters, score-vs-target pills, a deterministic dashboard summary with focus parameter and coaching agents, and Beranda comparisons with filtered links), in three phases with E2E checks

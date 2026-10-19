@@ -166,6 +166,19 @@ Badge di strip KPI Dashboard melengkapi delta (bukan menggantinya):
 - Kepatuhan memakai `totalAudited - count` dari titik sparkline **terakhir**, bukan rata-rata jumlah agen pada rentang. Untuk rentang multi-bulan, badge menyebut label periode terakhir. Tanpa titik lengkap, badge disembunyikan.
 - Temuan per agen diaudit = `total / totalAudited` dari dua `periodMetrics` terakhir; arah naik/turun/tetap membandingkan rasio tersebut, bukan total temuan. Badge disembunyikan bila hanya satu periode atau salah satu penyebut nol.
 
+### Kesimpulan Dashboard (What / So what / Now what)
+
+`GET /sidak/dashboard` mengembalikan `insights: DashboardInsights | null`. Komputasi murni `buildDashboardInsights()` menggunakan tren, Pareto, dan baris countable **yang sudah dibatasi scope/filter** oleh dashboard; tidak ada query atau panggilan AI tambahan. Tanpa periode berdata, nilainya `null`.
+
+- **Apa yang terjadi:** bandingkan total dua periode terakhir dengan ambang ±5%, lalu bandingkan `total / totalAudited` agar perubahan volume audit tidak dianggap perbaikan/perburukan. Pembagi nol tidak dihitung; satu periode dijelaskan tanpa pembanding.
+- **Artinya:** skor rata-rata dan jumlah agen belum memenuhi target 95 memakai periode terakhir, bukan rata-rata rentang. Target server dipakai bersama oleh summary, tren, dan insight.
+- **Fokus:** parameter non-total dengan kenaikan absolut terbesar, minimal +5; seri dipecah menurut nama (`localeCompare("id")`). Kunci nama mengikuti `formatQAIndicatorName` yang dipakai tren. Saran berasal dari `deriveAgentRootCauses`, termasuk fallback registry `lainnya`.
+- **Lakukan ini:** maksimal 10 agen dengan temuan parameter fokus di periode terakhir saja, urut jumlah turun lalu nama; tidak pernah mengambil nama dari data di luar scope. Tanpa fokus/agen fokus, tautkan ranking bila masih ada temuan; tanpa temuan, tidak ada tindakan.
+
+UI menempatkan **Kesimpulan** sebelum KPI: tiga kolom desktop, satu kolom mobile. Disclosure agen dapat dipakai keyboard dan menaut ke detail; `Buka TNA` hanya untuk capability `tna.read`. Parameter fokus tetap terlihat meskipun di luar delapan peringkat pertama, membuka saran coaching otomatis, dan memakai disclosure agen yang sama. Grafik awal menampilkan Total + fokus; pilihan chip pengguna dan `Sembunyikan Semua` tetap berlaku. Tanpa insight, tidak ada kesimpulan buatan di frontend.
+
+Bukti: `sidak-dashboard-brief-api.spec.ts` (JWT/backend/database lokal; scope, batas 10, urutan, periode terbaru, perubahan volume, baseline nol, kosong) dan `sidak-dashboard-brief.spec.ts` (browser hermetic; keyboard, link/capability, fokus grafik/parameter, kontras serta responsif).
+
 ### Filter heatmap Dashboard
 
 `GET /sidak/heatmap` menerima parameter opsional `folder_ids` (UUID dipisah koma), `start_month`, dan `end_month` (1–12, harus berpasangan dan awal ≤ akhir). Input tidak valid menghasilkan 400 `VALIDATION_ERROR`. Tanpa bulan, rentang tetap setahun penuh. Bentuk respons tetap sama (hari setahun, jumlah nol di luar rentang).

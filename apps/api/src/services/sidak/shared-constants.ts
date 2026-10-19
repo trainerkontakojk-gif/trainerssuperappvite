@@ -64,9 +64,12 @@ export function countFindingTickets(
   return tickets.size + withoutTicket;
 }
 
+export const SIDAK_COMPLIANCE_TARGET = 95;
+
 export function emptyDashboardResponse(periods: QAPeriod[]): DashboardData {
   return {
     periods,
+    insights: null,
     folders: [],
     summary: {
       totalDefects: 0,

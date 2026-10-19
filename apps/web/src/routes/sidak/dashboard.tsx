@@ -27,6 +27,7 @@ import TopAgentsTable from "../../components/sidak/TopAgentsTable";
 import DashboardFilters from "../../components/sidak/DashboardFilters";
 import SidakConditionSummary from "../../components/sidak/SidakConditionSummary";
 import SidakDashboardHeatmap from "../../components/sidak/SidakDashboardHeatmap";
+import SidakDashboardBrief from "../../components/sidak/SidakDashboardBrief";
 import SidakDashboardPanel from "../../components/sidak/SidakDashboardPanel";
 import SidakParameterRanking from "../../components/sidak/SidakParameterRanking";
 import {
@@ -148,10 +149,11 @@ export default function SidakDashboardPage() {
   const defaultHiddenParams = useMemo(() => {
     const next = new Set<string>();
     for (const ds of paramTrendDatasets ?? []) {
-      if (!ds.isTotal) next.add(ds.label);
+      if (!ds.isTotal && ds.label !== data?.insights?.focusParameter?.name)
+        next.add(ds.label);
     }
     return next;
-  }, [paramTrendDatasets]);
+  }, [paramTrendDatasets, data?.insights?.focusParameter?.name]);
 
   const activeHiddenParams = hiddenParams ?? defaultHiddenParams;
 
@@ -392,7 +394,12 @@ export default function SidakDashboardPage() {
   const hasNoPeriods = data && !hasSummary && !loading;
 
   const paretoViewModel = useMemo(
-    () => buildParetoViewModel(data?.paretoData),
+    // The ranked list owns its eight-row limit and must still find a focus
+    // parameter below the old chart's twelve-row cap.
+    () =>
+      buildParetoViewModel(data?.paretoData, {
+        displayLimit: data?.paretoData.length ?? 0,
+      }),
     [data?.paretoData],
   );
 
@@ -688,6 +695,11 @@ export default function SidakDashboardPage() {
               </p>
             )}
 
+            <SidakDashboardBrief
+              insights={data.insights ?? null}
+              serviceType={selectedService}
+              selectedYear={selectedYear}
+            />
             <section
               aria-labelledby="sidak-kpi-title"
               className="rounded-xl border border-border bg-surface-elevated"
@@ -727,6 +739,14 @@ export default function SidakDashboardPage() {
               <SidakDashboardPanel
                 id="sidak-trend-title"
                 title="Tren temuan"
+                action={
+                  data.insights?.focusParameter ? (
+                    <span className="max-w-full rounded-full bg-rose-50 px-2 py-1 text-xs font-medium break-words text-rose-700 dark:bg-rose-950 dark:text-rose-400">
+                      {data.insights.focusParameter.name} +
+                      {data.insights.focusParameter.change}
+                    </span>
+                  ) : undefined
+                }
                 description="Jumlah temuan per periode, maksimal dua seri sekaligus"
                 busy={forecastLoading}
               >
@@ -809,7 +829,13 @@ export default function SidakDashboardPage() {
                         type="button"
                         onClick={() => {
                           if (visibleSeriesCount > 0) {
-                            setHiddenParams(defaultHiddenParams);
+                            setHiddenParams(
+                              new Set(
+                                (paramTrendDatasets ?? [])
+                                  .filter((ds) => !ds.isTotal)
+                                  .map((ds) => ds.label),
+                              ),
+                            );
                             setShowTotalTrend(false);
                             return;
                           }
@@ -875,6 +901,13 @@ export default function SidakDashboardPage() {
                         forecastResults={selectedForecastSeriesList}
                       />
                     </div>
+                    {data.insights?.focusParameter && (
+                      <p className="mt-3 text-sm leading-relaxed text-fg2">
+                        Kenaikan {data.insights.latestLabel} terutama dari{" "}
+                        {data.insights.focusParameter.name} (+
+                        {data.insights.focusParameter.change}).
+                      </p>
+                    )}
                   </>
                 )}
               </SidakDashboardPanel>
@@ -889,6 +922,7 @@ export default function SidakDashboardPage() {
               <SidakParameterRanking
                 viewModel={paretoViewModel}
                 serviceLabel={serviceLabel}
+                insights={data.insights}
               />
               <SidakDashboardHeatmap
                 year={selectedYear}

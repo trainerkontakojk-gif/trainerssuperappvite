@@ -165,6 +165,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           periods: [],
           folders: [],
           summary: {} as any,
+          insights: null,
           serviceData: [],
           topAgents: [
             { agentId: "agent-a", nama: "Agent A", defects: 10, score: 90, hasCritical: false, batch: "Batch 1" },
@@ -185,6 +186,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
         periods: [],
         folders: [],
         summary: {} as any,
+        insights: null,
         serviceData: [],
         topAgents: [
           { agentId: "agent-b", nama: "Agent B", defects: 12, score: 78, hasCritical: false, batch: "Batch 1" }, // rank 1 now
@@ -230,6 +232,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           periods: [],
           folders: [],
           summary: {} as any,
+          insights: null,
           serviceData: [],
           topAgents: [
             { agentId: "agent-a", nama: "Agent A", defects: 4, score: 95, hasCritical: false, batch: "Batch 1" },
@@ -250,6 +253,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
         periods: [],
         folders: [],
         summary: {} as any,
+        insights: null,
         serviceData: [],
         topAgents: [
           { agentId: "agent-b", nama: "Agent B", defects: 6, score: 80, hasCritical: false, batch: "Batch 1" }, // rank 1 now
