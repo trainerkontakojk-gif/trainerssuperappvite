@@ -31,6 +31,8 @@ export type TelefunRow = {
   voice_assessment?: unknown;
   session_metrics?: unknown;
   messages?: unknown;
+  /** `GET /sessions?view=list`: no transcript, Telaah reads the full row. */
+  detail?: "summary";
 };
 
 /** Tanggal relatif ke hari ini, supaya "panggilan bulan ini" tidak basi. */
