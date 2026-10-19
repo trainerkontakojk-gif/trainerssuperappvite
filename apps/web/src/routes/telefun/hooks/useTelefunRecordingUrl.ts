@@ -23,6 +23,25 @@ export async function fetchTelefunRecordingUrl(
 }
 
 /**
+ * Unduh rekaman sekali ke tautan blob lokal. Gelombang, pemutar, geser, dan
+ * tombol unduh memakai salinan ini, sehingga tiap buka Telaah hanya sekali
+ * menarik rekaman dari storage (egress Supabase). Tautan bertanda tangan yang
+ * sudah kedaluwarsa diganti sekali dengan tautan baru.
+ */
+async function downloadServerRecording(
+  sessionId: string,
+  signal: AbortSignal,
+): Promise<string | null> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const url = await fetchTelefunRecordingUrl(sessionId);
+    if (!url) return null;
+    const response = await fetch(url, { signal });
+    if (response.ok) return URL.createObjectURL(await response.blob());
+  }
+  throw new Error("recording download failed");
+}
+
+/**
  * Sumber rekaman untuk Telaah. Rekaman di server didahulukan (tautan blob
  * lokal bisa basi setelah muat ulang); blob lokal hanya dipakai bila sesi
  * belum punya rekaman di server.
@@ -50,23 +69,30 @@ export function useTelefunRecordingUrl(
       );
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
     setSource({ status: "loading" });
-    fetchTelefunRecordingUrl(record.id)
+    downloadServerRecording(record.id, controller.signal)
       .then((url) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) {
+          if (url) URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
         setSource(url ? { status: "ready", url } : { status: "unavailable" });
       })
       .catch((error) => {
-        console.warn("[Telefun] Failed to load recording URL", error);
-        if (!cancelled) setSource({ status: "error" });
+        if (controller.signal.aborted) return;
+        console.warn("[Telefun] Failed to load recording", error);
+        setSource({ status: "error" });
       });
     return () => {
-      cancelled = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [record.id, record.url, hasServerRecording, attempt]);
 
-  /** Minta tautan baru, mis. setelah tautan bertanda tangan kedaluwarsa. */
+  /** Unduh ulang, mis. setelah rekaman gagal dimuat. */
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
   return { source, retry };

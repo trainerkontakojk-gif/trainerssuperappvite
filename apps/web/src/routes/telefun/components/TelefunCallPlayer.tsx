@@ -252,8 +252,8 @@ export function TelefunCallPlayer({
           onPause={() => setPlaying(false)}
           onEnded={() => setPlaying(false)}
           onError={() => {
-            // Tautan bertanda tangan bisa kedaluwarsa; minta sekali lagi dan
-            // lanjutkan dari posisi yang sama.
+            // Rekaman gagal dimuat: unduh ulang sekali dan lanjutkan dari
+            // posisi yang sama.
             if (refreshedRef.current) {
               setPlaybackFailed(true);
               return;
