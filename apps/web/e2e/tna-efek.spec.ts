@@ -1,10 +1,18 @@
 import { expect, test } from "@playwright/test";
-import type { EfekProgram, EfekSession } from "@trainers/types";
+import type {
+  EfekParticipantResult,
+  EfekProgram,
+  EfekProgramReport,
+  EfekProgramSummary,
+  EfekReport,
+  EfekSession,
+  EfekSessionSummary,
+} from "@trainers/types";
 import { expectHermetic, waitForMockedApi } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { ids, openTna } from "./helpers/tnaHarness";
 
-// EFEK phase 1 screens (plans/markdown/efek.md): TNA tab, session form, import.
+// EFEK screens (plans/markdown/efek.md): TNA tab, report, session form, import.
 test.beforeAll(() => assertLocalDevOnlyTarget());
 
 const ok = (data: unknown) => ({ success: true, data });
@@ -47,6 +55,138 @@ const sessions: EfekSession[] = [
     updated_at: "2026-10-19T10:00:00.000Z",
   },
 ];
+const summary = (
+  p: EfekProgram,
+  patch: Partial<EfekProgramSummary> = {},
+): EfekProgramSummary => ({
+  code: p.code,
+  name: p.name,
+  service_type: p.default_service_type,
+  participants: 0,
+  evaluated: 0,
+  pending: 0,
+  naik: 0,
+  stabil: 0,
+  turun: 0,
+  avg_delta: null,
+  avg_relative_delta: null,
+  findings_per_session_before: null,
+  findings_per_session_after: null,
+  ...patch,
+});
+const sessionSummaries: EfekSessionSummary[] = [
+  {
+    ...sessions[0]!,
+    participants: 2,
+    evaluated: 2,
+    avg_delta: 1.75,
+    status: "terukur",
+    months_after_closed: 3,
+    first_after: { year: 2026, month: 6 },
+  },
+  {
+    ...sessions[1]!,
+    participants: 4,
+    evaluated: 0,
+    avg_delta: null,
+    status: "menunggu",
+    months_after_closed: 0,
+    first_after: { year: 2026, month: 11 },
+  },
+];
+const ketikSummary = summary(programs[0]!, {
+  participants: 2,
+  evaluated: 2,
+  naik: 1,
+  stabil: 1,
+  avg_delta: 1.75,
+  avg_relative_delta: 0.75,
+  findings_per_session_before: 1.45,
+  findings_per_session_after: 0.64,
+});
+const report: EfekReport = {
+  data_until: { year: 2026, month: 9 },
+  window: 3,
+  teams: ["Tim A", "Tim B"],
+  years: [2026],
+  programs: [
+    ketikSummary,
+    summary(programs[1]!, { participants: 4, pending: 4 }),
+    summary(programs[2]!),
+    summary(programs[3]!),
+  ],
+  sessions: sessionSummaries,
+};
+const months = (scores: (number | null)[]) =>
+  scores.map((score, i) => ({
+    year: 2026,
+    month: i + 2,
+    offset: i - 3,
+    score,
+    sessions: score === null ? 0 : 3,
+    findings: score === null ? 0 : 2,
+    comparison_score: 82,
+  }));
+const participant = (
+  patch: Partial<EfekParticipantResult>,
+): EfekParticipantResult => ({
+  session_id: sessionId,
+  peserta_id: ids.ana,
+  nama: "Ana Contoh",
+  tim: "Tim A",
+  session_title: "Level Up Week Mei",
+  service_type: "chat",
+  start_date: "2026-05-12",
+  end_date: "2026-05-16",
+  months_before: 3,
+  months_after: 3,
+  sessions_before: 9,
+  sessions_after: 9,
+  findings_before: 12,
+  findings_after: 3,
+  score_before: 91,
+  score_after: 95,
+  findings_per_session_before: 1.33,
+  findings_per_session_after: 0.33,
+  delta: 4,
+  comparison_delta: 1,
+  relative_delta: 3,
+  status: "naik",
+  thin: false,
+  months: months([90, 91, 92, 50, 94, 95, 96]),
+  ...patch,
+});
+const programReport: EfekProgramReport = {
+  data_until: report.data_until,
+  window: 3,
+  teams: report.teams,
+  years: report.years,
+  program: ketikSummary,
+  sessions: [sessionSummaries[0]!],
+  chart: [-3, -2, -1, 0, 1, 2, 3].map((offset) => ({
+    offset,
+    score: 90 + offset,
+    comparison_score: 82,
+    findings_per_session: 1.4,
+    comparison_findings_per_session: 1,
+  })),
+  participants: [
+    participant({
+      peserta_id: ids.budi,
+      nama: "Budi Contoh",
+      months_before: 1,
+      months_after: 1,
+      score_before: 90,
+      score_after: 89.5,
+      delta: -0.5,
+      relative_delta: -1.5,
+      status: "stabil",
+      thin: true,
+      months: months([null, null, 90, null, 89.5, null, null]),
+    }),
+    participant({}),
+  ],
+};
 const efekMocks = [
   {
     method: "GET" as const,
@@ -55,8 +195,13 @@ const efekMocks = [
   },
   {
     method: "GET" as const,
-    path: "/api/v1/tna/efek/sessions",
-    body: ok({ items: sessions }),
+    path: "/api/v1/tna/efek/report/ketik",
+    body: ok(programReport),
+  },
+  {
+    method: "GET" as const,
+    path: "/api/v1/tna/efek/report",
+    body: ok(report),
   },
   {
     method: "GET" as const,
@@ -112,6 +257,7 @@ test("trainer membuka EFEK dari TNA dan membuat sesi CERIWIS yang diukur dari CS
   await table.getByLabel("Program").selectOption("pdkt");
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Level Up Week Juli");
+  await expect(table).toContainText("Menunggu November 2026");
 
   await cards.getByRole("link", { name: "+ Sesi CERIWIS" }).click();
   await expect(page).toHaveURL(/\/tna\/efek\/sesi\/baru\?program=ceriwis/);
@@ -164,7 +310,9 @@ test("trainer mengubah peserta sesi lalu menghapusnya setelah konfirmasi", async
   });
   await expect(page).toHaveURL(/\/tna\/efek\?program=ketik/);
 
-  await page.getByRole("link", { name: "Level Up Week Mei" }).click();
+  await page
+    .getByRole("link", { name: "Level Up Week Mei", exact: true })
+    .click();
   await page.getByRole("button", { name: "Hapus sesi" }).click();
   await expect(page.getByText('Hapus sesi "Level Up Week Mei"?')).toBeVisible();
   await page.getByRole("button", { name: "Batal" }).click();
@@ -285,4 +433,90 @@ test("leader tidak bisa membuka EFEK", async ({ page }) => {
   await openTna(page, "/tna/efek", efekMocks, "leader");
   await expect(page).not.toHaveURL(/\/tna\/efek/);
   await expect(page.getByRole("heading", { name: /EFEK/ })).toHaveCount(0);
+});
+
+test("ringkasan EFEK menampilkan efek per program dan rincian peserta KETIK", async ({
+  page,
+}) => {
+  const audit = await openTna(page, "/tna/efek", efekMocks);
+  await expect(page.getByText("Data SIDAK sampai September 2026")).toBeVisible();
+  const ketik = page
+    .getByRole("region", { name: "Program pelatihan" })
+    .getByRole("article")
+    .first();
+  await expect(ketik).toContainText("+1,8");
+  await expect(ketik).toContainText("1 / 1 / 0");
+  await expect(ketik).toContainText("2 dari 2");
+  await expect(ketik).toContainText("1,5 → 0,6");
+  await expect(
+    page.getByText("4 peserta belum bisa dinilai", { exact: false }),
+  ).toBeVisible();
+  const table = page.getByRole("region", { name: "Sesi pelatihan" });
+  await expect(table.getByRole("row").nth(1)).toContainText("Terukur");
+
+  const widened = page.waitForRequest((r) =>
+    r.url().includes("/tna/efek/report?window=6"),
+  );
+  await page.getByLabel("Jendela banding").selectOption("6");
+  await widened;
+  await expect(page).toHaveURL(/window=6/);
+
+  await ketik.getByRole("link", { name: "Rincian KETIK" }).click();
+  await expect(page).toHaveURL(/\/tna\/efek\/program\/ketik\?window=6/);
+  await expect(
+    page.getByRole("heading", { name: "KETIK · layanan Chat" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(
+    page.getByText("Skor QA rata-rata, dihitung dari bulan pelatihan").first(),
+  ).toBeVisible();
+  const people = page.getByRole("region", { name: "Peserta" });
+  const rows = people.locator("tbody > tr");
+  await expect(rows.first()).toContainText("Ana Contoh");
+  await expect(rows.first()).toContainText("+4,0");
+  await expect(rows.first()).toContainText("Naik");
+  await expect(rows.nth(1)).toContainText("Data tipis");
+  await expect(rows.nth(1)).toContainText("−0,5");
+  await people.getByRole("button", { name: "Δ skor" }).click();
+  await expect(rows.first()).toContainText("Budi Contoh");
+
+  await people.getByRole("button", { name: /Ana Contoh/ }).click();
+  const monthly = people.getByRole("table", {
+    name: "Rincian bulanan Ana Contoh",
+  });
+  await expect(monthly).toBeVisible();
+  await expect(monthly.getByRole("row").nth(1)).toContainText("Februari 2026");
+  await expect(monthly.getByRole("row").nth(4)).toContainText(
+    "Bulan pelatihan",
+  );
+
+  const scoped = page.waitForResponse((r) =>
+    r.url().includes(`/tna/efek/report/ketik?window=6&session=${sessionId}`),
+  );
+  await page.getByLabel(/^Sesi/).selectOption(sessionId);
+  await expect(page).toHaveURL(new RegExp(`session=${sessionId}`));
+  await scoped;
+  await waitForMockedApi(audit, [
+    "GET /api/v1/tna/efek/report",
+    "GET /api/v1/tna/efek/report/ketik",
+  ]);
+  expectHermetic(audit);
+});
+
+test("rincian program di ponsel menampilkan peserta sebagai kartu tanpa geser samping", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const audit = await openTna(page, "/tna/efek/program/ketik", efekMocks);
+  await expect(
+    page.getByRole("heading", { name: "KETIK · layanan Chat" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(
+    page.getByRole("region", { name: "Peserta" }).getByText("Ana Contoh"),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expectHermetic(audit);
 });

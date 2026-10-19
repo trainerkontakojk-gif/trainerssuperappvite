@@ -31,16 +31,36 @@ Phase 1 (data + input):
   `/tna/efek/sesi/baru`, `/tna/efek/sesi/$id` edit; `/tna/efek/impor` parses the file in the
   browser (exceljs/CSV), sends only names to `import/match`, then commits.
 
-Phase 2 (report): read `qa_dashboard_agent_period_summary` (official score, sessions, findings per
-agent per period). Window 3 completed months before/after (1–6), training month and running month
-excluded; status naik/turun at ±1 point; "data tipis" when one month on a side or < 5 sessions;
-comparison = non-participants with the same service in the same months.
+Phase 2 (report, no schema change):
+
+- Source: `qa_dashboard_agent_period_summary` rows with `session_count > 0` (official monthly
+  `final_score`, `session_count`, `findings_count`), read with the caller JWT (RLS admin/trainer).
+- One row per participation (session × peserta), measured on the session's `service_type`.
+  Training months = start month..end month (offset 0, excluded). Before = the `window` months
+  before the start month (offset −1..−W); after = the `window` months after the end month
+  (+1..+W), only months before the current Asia/Jakarta month (`data_until` = last closed month).
+- Score per side = mean of monthly `final_score` over months with data. Findings per side =
+  Σ findings / Σ sessions ("temuan per sesi"), raw totals kept alongside.
+- Status: `menunggu` (no after month has closed), `tanpa_data` (a side has no data), else
+  Δ = after − before → `naik` (≥ +1), `turun` (≤ −1), `stabil`. `thin` when a side has one month
+  or fewer than 5 audit sessions. Evaluated = naik/stabil/turun.
+- Comparison: per month, mean `final_score` and Σfindings/Σsessions of agents in the same service
+  who never joined a session of that program. Δ relatif = Δ − (comparison after − before, over the
+  participant's own months with data).
+- Program card: participants, evaluated, pending, mean Δ, mean Δ relatif, naik/stabil/turun,
+  findings per session before → after (evaluated only). Session row: participants, evaluated,
+  mean Δ, status `terukur` (all W after months closed), `sebagian` (some), `menunggu` (none).
+- Chart by relative month −W..+W: participants vs comparison (mean score, findings per session).
+- API: `GET /tna/efek/report?window=&year=&tim=` (summary) and
+  `GET /tna/efek/report/:program?window=&year=&tim=&session=` (detail with participants and monthly
+  breakdown). Both `tna.read`. Web: `/tna/efek` gains filters and metrics; new
+  `/tna/efek/program/$code` with charts (plain SVG) and a sortable participant table.
 
 Phase 3: printable HTML export and an "Ikut pelatihan" line on SIDAK agent detail (admin/trainer).
 
 ## Tasklist
 
-- [ ] P1 RED: `apps/web/e2e/tna-efek-api.spec.ts` (real backend) and `tna-efek.spec.ts` (hermetic).
-- [ ] P1 migration + rollback, types, API, web, CHANGELOG, docs.
-- [ ] P2 report service + UI + E2E.
+- [x] P1 RED: `apps/web/e2e/tna-efek-api.spec.ts` (real backend) and `tna-efek.spec.ts` (hermetic).
+- [x] P1 migration + rollback, types, API, web, CHANGELOG, docs.
+- [x] P2 report service + UI + E2E.
 - [ ] P3 export + SIDAK link + E2E.
