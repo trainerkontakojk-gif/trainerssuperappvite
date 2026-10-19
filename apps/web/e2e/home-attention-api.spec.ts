@@ -21,6 +21,10 @@ import {
  * - permintaan akses leader dihitung dari sumber `/admin/leader-requests/pending`;
  * - satu sumber gagal → 200 dengan `partial: true`, item lain tetap ada.
  *
+ * Tahap 3 `plans/markdown/dashboard-wsn.md` §7 menambah `worstAgents` pada item
+ * `agents_below_target`: maksimal tiga agen berisiko dengan skor terendah
+ * (seri diurutkan nama), hanya dari direktori yang sudah dibatasi scope.
+ *
  * Fixture memakai nama unik per run dan dibersihkan di `afterAll`. Kegagalan
  * sumber disuntikkan di batas jaringan Supabase (fetch ke `qa_periods`), bukan
  * dengan mengubah kode produk.
@@ -68,13 +72,28 @@ async function get(path: string, token: string) {
   });
 }
 
+type DirectoryAgent = {
+  id: string;
+  nama: string;
+  avgScore: number | null;
+  atRisk: boolean;
+};
+
+type AttentionItem = {
+  kind: string;
+  count: number;
+  scope: string;
+  period?: unknown;
+  worstAgents?: { agentId: string; nama: string; score: number }[];
+};
+
 async function attention(token: string) {
   const response = await get("/home/attention", token);
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body.success).toBe(true);
   return body.data as {
-    items: { kind: string; count: number; scope: string; period?: unknown }[];
+    items: AttentionItem[];
     partial: boolean;
   };
 }
@@ -84,9 +103,25 @@ async function directoryAtRisk(token: string, year: number) {
   const response = await get(`/sidak/agents?year=${year}`, token);
   expect(response.status).toBe(200);
   const { data } = await response.json();
-  return (data.agents as { id: string; atRisk: boolean }[]).filter(
-    (a) => a.atRisk,
-  );
+  return (data.agents as DirectoryAgent[]).filter((a) => a.atRisk);
+}
+
+/**
+ * Oracle `worstAgents`: agen berisiko paling jauh dari target, maksimal
+ * `max`, seri diurutkan nama seperti urutan direktori.
+ */
+function worstOf(atRisk: DirectoryAgent[], max = 3) {
+  return atRisk
+    .filter((agent) => agent.avgScore !== null)
+    .sort(
+      (a, b) => a.avgScore! - b.avgScore! || a.nama.localeCompare(b.nama, "id"),
+    )
+    .slice(0, max)
+    .map((agent) => ({
+      agentId: agent.id,
+      nama: agent.nama,
+      score: agent.avgScore!,
+    }));
 }
 
 test.beforeAll(async () => {
@@ -155,7 +190,13 @@ test.beforeAll(async () => {
     env,
     `INSERT INTO profiler_folders (name, year_id) VALUES (${quoted(created.folderName)}, ${quoted(yearId)});`,
   );
-  for (const [index, name] of ["Agen Dalam Tim", "Agen Luar Tim"].entries()) {
+  for (const [index, name] of [
+    "Agen Dalam Tim A",
+    "Agen Dalam Tim B",
+    "Agen Dalam Tim C",
+    "Agen Dalam Tim D",
+    "Agen Luar Tim",
+  ].entries()) {
     const pesertaId = sqlOne(
       env,
       `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
@@ -163,11 +204,13 @@ test.beforeAll(async () => {
        RETURNING id;`,
     );
     created.pesertaIds.push(pesertaId);
-    // Satu sesi dengan semua indikator chat bernilai 0 → skor jauh di bawah 95.
+    // Empat agen dalam scope berskor berbeda dan satu agen luar scope.
+    // Urutan skor sengaja berbeda dari urutan nama agar sorting benar-benar diuji.
+    const nilai = [2, 0, 1, 1, 0][index]!;
     const rows = indicatorIds
       .map(
         (indicatorId) =>
-          `(${quoted(pesertaId)},${quoted(created.periodId!)},${quoted(indicatorId)},'chat',${quoted(`e2e-home-${ns}-${index}`)},false,0,'E2E temuan',${year})`,
+          `(${quoted(pesertaId)},${quoted(created.periodId!)},${quoted(indicatorId)},'chat',${quoted(`e2e-home-${ns}-${index}`)},false,${nilai},'E2E temuan',${year})`,
       )
       .join(",");
     runSql(
@@ -176,17 +219,18 @@ test.beforeAll(async () => {
     );
   }
 
-  // Leader hanya punya scope SIDAK atas agen pertama (rantai produksi:
+  // Leader hanya punya scope SIDAK atas empat agen pertama (rantai produksi:
   // request approved → request_groups → access_group_items).
   created.groupId = sqlOne(
     env,
     `INSERT INTO access_groups (name, description, is_active) VALUES (${quoted(`e2e-home-${ns}`)}, 'e2e', true) RETURNING id;`,
   );
-  runSql(
-    env,
-    `INSERT INTO access_group_items (access_group_id, field_name, field_value, is_active)
-     VALUES (${quoted(created.groupId)}, 'peserta_id', ${quoted(created.pesertaIds[0]!)}, true);`,
-  );
+  for (const pesertaId of created.pesertaIds.slice(0, 4))
+    runSql(
+      env,
+      `INSERT INTO access_group_items (access_group_id, field_name, field_value, is_active)
+     VALUES (${quoted(created.groupId)}, 'peserta_id', ${quoted(pesertaId)}, true);`,
+    );
   const approvedId = sqlOne(
     env,
     `INSERT INTO leader_access_requests (leader_user_id, module, status) VALUES (${quoted(leader.userId)}, 'sidak', 'approved') RETURNING id;`,
@@ -267,16 +311,26 @@ test("trainer: item mengikuti sumber aslinya", async () => {
     scope: "all",
   });
 
-  // Agen di bawah target: definisi direktori agen, kedua agen fixture ikut.
+  // Agen di bawah target: definisi direktori agen, seluruh fixture ikut.
   const atRisk = await directoryAtRisk(trainer.token, year);
   expect(atRisk.map((a) => a.id)).toEqual(
     expect.arrayContaining(created.pesertaIds),
   );
+  const expectedWorst = worstOf(atRisk);
   expect(byKind.get("agents_below_target")).toEqual({
     kind: "agents_below_target",
     count: atRisk.length,
     scope: "all",
+    worstAgents: expectedWorst,
   });
+  // Tiga agen terendah saja, urut skor naik, semuanya memang di bawah target.
+  expect(expectedWorst).toHaveLength(Math.min(3, atRisk.length));
+  const scores = expectedWorst.map((agent) => agent.score);
+  expect(scores).toEqual([...scores].sort((a, b) => a - b));
+  const atRiskIds = new Set(atRisk.map((a) => a.id));
+  for (const agent of expectedWorst) {
+    expect(atRiskIds.has(agent.agentId)).toBe(true);
+  }
 
   // Periode bulan berjalan: ada item hanya bila periodenya belum dibuat.
   const hasCurrentPeriod =
@@ -302,12 +356,29 @@ test("leader: hanya agen di scope timnya, tanpa item admin/konfigurasi", async (
   const { year } = jakartaYearMonth();
   const data = await attention(leader.token);
   expect(data.partial).toBe(false);
-  expect(data.items).toEqual([
-    { kind: "agents_below_target", count: 1, scope: "team" },
-  ]);
   // Sama dengan direktori agen leader, yang hanya berisi agen dalam tim.
   const atRisk = await directoryAtRisk(leader.token, year);
-  expect(atRisk.map((a) => a.id)).toEqual([created.pesertaIds[0]]);
+  expect(atRisk.map((a) => a.id)).toHaveLength(4);
+  expect(atRisk.map((a) => a.id)).toEqual(
+    expect.arrayContaining(created.pesertaIds.slice(0, 4)),
+  );
+  expect(new Set(atRisk.map((a) => a.avgScore)).size).toBeGreaterThan(1);
+  const expectedWorst = worstOf(atRisk);
+  expect(data.items).toEqual([
+    {
+      kind: "agents_below_target",
+      count: 4,
+      scope: "team",
+      worstAgents: expectedWorst,
+    },
+  ]);
+  // Nama agen di luar tim leader tidak pernah keluar.
+  expect(expectedWorst).toHaveLength(3);
+  expect(data.items[0]!.worstAgents!.map((a) => a.agentId)).not.toContain(
+    created.pesertaIds[4],
+  );
+  expect(data.items[0]!.worstAgents).toEqual(expectedWorst);
+  expect(expectedWorst[0]!.agentId).toBe(created.pesertaIds[1]);
 });
 
 test("leader tanpa persetujuan: tidak ada item", async () => {

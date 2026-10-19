@@ -15,6 +15,14 @@ export const HOME_ATTENTION_KINDS = [
 
 export type HomeAttentionKind = (typeof HOME_ATTENTION_KINDS)[number];
 
+/** Agen berisiko yang skornya paling jauh dari target. */
+export interface HomeAttentionWorstAgent {
+  agentId: string;
+  nama: string;
+  /** Rata-rata skor periode audit terakhir agen itu, 0–100. */
+  score: number;
+}
+
 export interface HomeAttentionItem {
   kind: HomeAttentionKind;
   count: number;
@@ -22,6 +30,12 @@ export interface HomeAttentionItem {
   scope: "all" | "team";
   /** Periode yang dimaksud, mis. bulan yang belum punya periode QA. */
   period?: { year: number; month: number };
+  /**
+   * Maksimal tiga agen dengan skor terendah (urut skor naik, seri diurutkan
+   * nama), hanya pada `agents_below_target` dan hanya dari direktori yang sudah
+   * dibatasi scope pemanggil.
+   */
+  worstAgents?: HomeAttentionWorstAgent[];
 }
 
 export interface HomeAttentionResponse {

@@ -980,9 +980,9 @@
   }
   .home-bar-row {
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr) 40px;
+    grid-template-columns: 88px minmax(0, 1fr) 40px 40px 48px;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-height: 32px;
     font-size: 13px;
   }
@@ -1010,6 +1010,43 @@
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--fg);
+  }
+  .home-bar-share,
+  .home-bar-change {
+    text-align: right;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--fg2);
+  }
+  .home-bar-change.home-bad {
+    color: var(--home-bad);
+  }
+  .home-bar-change.home-good {
+    color: var(--home-good);
+  }
+  .home-trend-note,
+  .home-bars-note {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--fg2);
+    text-wrap: pretty;
+  }
+  .home-trend-note[data-tone="bad"] {
+    color: var(--home-bad);
+  }
+  .home-trend-note[data-tone="good"] {
+    color: var(--home-good);
+  }
+  .home-stat-trend {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: normal;
+  }
+  .home-trend-link {
+    margin-top: 6px;
   }
   .home-bars-link {
     align-self: flex-start;

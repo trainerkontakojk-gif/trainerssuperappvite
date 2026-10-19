@@ -23,6 +23,7 @@ import {
   validateSidakScopeSearch,
   type SidakScopeSearch,
 } from "./hooks/useSidakScope";
+import { validateSidakAgentsSearch } from "./utils/sidakAgentList";
 import { validateAgentDetailSearch } from "./components/sidak/sidak-agent-detail-tabs.constants";
 
 const IndexPage = lazy(() => import("./routes/index"));
@@ -369,7 +370,8 @@ const sidakAgentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents",
   component: SidakAgents,
-  validateSearch: validateSidakScopeSearch,
+  // Cakupan bersama SIDAK + `status` (mis. `?status=below` dari Beranda).
+  validateSearch: validateSidakAgentsSearch,
   beforeLoad: requireCapability("sidak.view"),
 });
 

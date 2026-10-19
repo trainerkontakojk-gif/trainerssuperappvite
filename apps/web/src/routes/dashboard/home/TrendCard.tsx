@@ -1,7 +1,14 @@
 import type { SidakForecastLookupResult } from "@trainers/types";
-import { ChevronDown } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
+import {
+  formatTrendNumber,
+  homeTrendSentence,
+  perAudited,
+  type TrendPeriod,
+} from "./homeTrendSentence";
 import { TrendChart, type ChartPoint } from "./TrendChart";
 import {
   serviceLabel,
@@ -80,12 +87,13 @@ function useCachedProjection(service: string, enabled: boolean) {
 function Delta({ last, prev }: { last: number; prev: number }) {
   const pct = Math.round(((last - prev) / prev) * 100);
   if (pct === 0) return <>Tetap</>;
-  // Temuan turun = membaik.
+  // Perubahan volume saja bukan penilaian kualitas; laju per agen dan
+  // kalimat di bawah grafik menjelaskan arah yang sudah dinormalisasi.
   return (
-    <span className={pct < 0 ? "home-good" : "home-bad"}>
+    <>
       {pct > 0 ? "+" : "−"}
       {Math.abs(pct)}% {pct < 0 ? "turun" : "naik"}
-    </span>
+    </>
   );
 }
 
@@ -174,6 +182,49 @@ export function TrendCard({
       ? trend.totalSummary.auditedAgents
       : trend.serviceSummary[service]?.auditedAgents;
 
+  // Angka dan kalimat memakai seri yang sama dengan grafik; jumlah agen
+  // diaudit per periode diambil dari `periodStats` (per layanan bila dipilih).
+  const periodStats = trend.periodStats ?? [];
+  const periods: TrendPeriod[] = trend.labels.map((label, i) => ({
+    label,
+    total: values[i] ?? 0,
+    audited:
+      service === "all"
+        ? (periodStats[i]?.auditedAgents ?? 0)
+        : (periodStats[i]?.serviceStats?.[service]?.auditedAgents ?? 0),
+  }));
+  const sentence = homeTrendSentence(periods.at(-1), periods.at(-2));
+  const latestRate = periods.at(-1) ? perAudited(periods.at(-1)!) : null;
+  const previousRate = periods.at(-2) ? perAudited(periods.at(-2)!) : null;
+  const rateDirection =
+    latestRate === null || previousRate === null
+      ? null
+      : latestRate > previousRate
+        ? "naik"
+        : latestRate < previousRate
+          ? "turun"
+          : "tetap";
+  const rateTone =
+    rateDirection === "naik"
+      ? "home-bad"
+      : rateDirection === "turun"
+        ? "home-good"
+        : undefined;
+  // API tren memberi label bulan, bukan metadata month. Terima kedua ejaan
+  // Agustus yang dipakai produk; jangan menebak bulan bila label tak dikenal.
+  const latestMonthIndex = MONTHS.indexOf(
+    last?.label.split(" ")[0]?.replace(/^Agt$/, "Agu") ?? "",
+  );
+  const latestMonth = latestMonthIndex >= 0 ? latestMonthIndex + 1 : null;
+  // Buka bulan periode terakhir yang ditampilkan, bukan seluruh rentang atau
+  // bulan kalender berjalan yang belum tentu sudah memiliki audit.
+  const causeSearch = {
+    ...(service === "all" ? {} : { layanan: service }),
+    tahun: year,
+    dari: latestMonth,
+    sampai: latestMonth,
+  };
+
   return (
     <section
       aria-labelledby="home-trend-title"
@@ -250,6 +301,20 @@ export function TrendCard({
             </dd>
           </div>
         )}
+        {latestRate !== null && (
+          <div>
+            <dt>Per agen diaudit</dt>
+            <dd>
+              {formatTrendNumber(latestRate)}
+              {rateDirection && (
+                <span className={`home-stat-trend ${rateTone ?? ""}`.trim()}>
+                  {" "}
+                  {rateDirection}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Agen diaudit</dt>
           <dd>{typeof summary === "number" ? NUMBER.format(summary) : "—"}</dd>
@@ -280,6 +345,23 @@ export function TrendCard({
             )}
           </div>
         </>
+      )}
+
+      {sentence && (
+        <p className="home-trend-note" data-tone={sentence.tone}>
+          {sentence.text}
+        </p>
+      )}
+
+      {latestMonth !== null && (
+        <Link
+          to={"/sidak" as any}
+          search={causeSearch as any}
+          className="home-link home-trend-link"
+        >
+          Lihat penyebab di SIDAK
+          <ArrowRight aria-hidden="true" />
+        </Link>
       )}
     </section>
   );

@@ -51,10 +51,27 @@ export async function getHomeAttention(
           false,
           filterScope?.allowedServices ?? undefined,
         );
+        const atRisk = agents.filter(
+          (agent) => agent.atRisk && agent.avgScore !== null,
+        );
+        // Tiga yang paling jauh dari target; seri dipecah nama seperti urutan
+        // direktori, jadi Beranda dan halaman Agen menyebut orang yang sama.
+        const worstAgents = [...atRisk]
+          .sort(
+            (a, b) =>
+              a.avgScore! - b.avgScore! || a.nama.localeCompare(b.nama, "id"),
+          )
+          .slice(0, 3)
+          .map((agent) => ({
+            agentId: agent.id,
+            nama: agent.nama,
+            score: agent.avgScore!,
+          }));
         return {
           kind: "agents_below_target",
-          count: agents.filter((agent) => agent.atRisk).length,
+          count: atRisk.length,
           scope: accessibleIds === null ? "all" : "team",
+          worstAgents,
         };
       },
     });

@@ -5,6 +5,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 
 /**
  * Beranda staff (admin/trainer/leader) — hermetic.
@@ -21,17 +22,77 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 const NOW = new Date("2026-10-05T05:00:00Z");
 
 // Periode QA ada April–September; label mengikuti format API tren
-// (`MONTHS_SHORT` + tahun dua digit).
-const PERIODS = [
-  { month: 4, label: "Apr 26", call: 30, chat: 20 },
-  { month: 5, label: "Mei 26", call: 28, chat: 19 },
-  { month: 6, label: "Jun 26", call: 26, chat: 18 },
-  { month: 7, label: "Jul 26", call: 27, chat: 16 },
-  { month: 8, label: "Agu 26", call: 25, chat: 15 },
-  { month: 9, label: "Sep 26", call: 18, chat: 12 },
+// (`MONTHS_SHORT` + tahun dua digit). `audited` adalah jumlah agen diaudit per
+// periode (dipakai periode terakhir: per agen diaudit dan kalimat tren).
+type PeriodRow = {
+  month: number;
+  label: string;
+  call: number;
+  chat: number;
+  audited: number;
+  callAudited: number;
+  chatAudited: number;
+};
+
+const PERIODS: PeriodRow[] = [
+  {
+    month: 4,
+    label: "Apr 26",
+    call: 30,
+    chat: 20,
+    audited: 30,
+    callAudited: 20,
+    chatAudited: 10,
+  },
+  {
+    month: 5,
+    label: "Mei 26",
+    call: 28,
+    chat: 19,
+    audited: 30,
+    callAudited: 20,
+    chatAudited: 10,
+  },
+  {
+    month: 6,
+    label: "Jun 26",
+    call: 26,
+    chat: 18,
+    audited: 30,
+    callAudited: 20,
+    chatAudited: 10,
+  },
+  {
+    month: 7,
+    label: "Jul 26",
+    call: 27,
+    chat: 16,
+    audited: 30,
+    callAudited: 20,
+    chatAudited: 10,
+  },
+  {
+    month: 8,
+    label: "Agu 26",
+    call: 25,
+    chat: 15,
+    audited: 20,
+    callAudited: 18,
+    chatAudited: 15,
+  },
+  {
+    month: 9,
+    label: "Sep 26",
+    call: 18,
+    chat: 12,
+    audited: 28,
+    callAudited: 26,
+    chatAudited: 6,
+  },
 ];
-const series = (start: number, end: number) => {
-  const rows = PERIODS.filter((p) => p.month >= start && p.month <= end);
+
+/** Bentuk respons `GET /sidak/dashboard/trend` yang dipakai Beranda. */
+function seriesFrom(rows: PeriodRow[]) {
   return {
     labels: rows.map((p) => p.label),
     totalData: rows.map((p) => p.call + p.chat),
@@ -49,8 +110,21 @@ const series = (start: number, end: number) => {
       auditedAgents: 32,
       activeServiceCount: 2,
     },
+    periodStats: rows.map((p) => ({
+      id: `period-${p.month}`,
+      label: p.label,
+      totalDefects: p.call + p.chat,
+      auditedAgents: p.audited,
+      serviceStats: {
+        call: { totalDefects: p.call, auditedAgents: p.callAudited },
+        chat: { totalDefects: p.chat, auditedAgents: p.chatAudited },
+      },
+    })),
   };
-};
+}
+
+const series = (start: number, end: number) =>
+  seriesFrom(PERIODS.filter((p) => p.month >= start && p.month <= end));
 /** Rentang yang dijawab mock; rentang lain di-abort oleh harness. */
 const RANGES: [number, number][] = [
   [1, 10],
@@ -64,7 +138,16 @@ const trendQuery = (start: number, end: number) =>
 
 const ATTENTION_ITEMS = [
   { kind: "leader_access_pending", count: 3, scope: "all" },
-  { kind: "agents_below_target", count: 12, scope: "all" },
+  {
+    kind: "agents_below_target",
+    count: 12,
+    scope: "all",
+    worstAgents: [
+      { agentId: "a-1", nama: "Rina Kusuma", score: 81.4 },
+      { agentId: "a-2", nama: "Dimas Prakoso", score: 84 },
+      { agentId: "a-3", nama: "Sari Wulandari", score: 85.2 },
+    ],
+  },
   {
     kind: "qa_period_missing",
     count: 1,
@@ -73,12 +156,39 @@ const ATTENTION_ITEMS = [
   },
 ];
 
-function mocks(attention: ApiMock["body"], status = 200): ApiMock[] {
+/** Fixture khusus: satu layanan naik tajam di periode terakhir. */
+const RISING_PERIODS: PeriodRow[] = [
+  {
+    month: 8,
+    label: "Agu 26",
+    call: 10,
+    chat: 10,
+    audited: 10,
+    callAudited: 10,
+    chatAudited: 10,
+  },
+  {
+    month: 9,
+    label: "Sep 26",
+    call: 9,
+    chat: 20,
+    audited: 10,
+    callAudited: 10,
+    chatAudited: 10,
+  },
+];
+
+function mocks(
+  attention: ApiMock["body"],
+  status = 200,
+  /** Pengganti badan respons tren; bawaan memakai `PERIODS`. */
+  trendSeries: (start: number, end: number) => unknown = series,
+): ApiMock[] {
   return [
     ...RANGES.map(([start, end]): ApiMock => ({
       method: "GET",
       path: trendQuery(start, end),
-      body: { success: true, data: series(start, end) },
+      body: { success: true, data: trendSeries(start, end) },
     })),
     {
       method: "GET",
@@ -126,7 +236,7 @@ function trendCard(page: Page) {
 function stat(list: Locator, label: string) {
   return list
     .locator("div")
-    .filter({ has: list.page().locator("dt", { hasText: label }) })
+    .filter({ has: list.page().getByText(label, { exact: true }) })
     .locator("dd");
 }
 
@@ -181,7 +291,7 @@ test.describe("Beranda staff", () => {
     await expect(main.getByRole("button", { name: /hapus log/i })).toHaveCount(
       0,
     );
-    await expect(main.getByText("Rina Kusuma")).toBeVisible();
+    await expect(main.getByText("Rina Kusuma", { exact: true })).toBeVisible();
     await expect(
       main.getByRole("link", { name: "Lihat semua aktivitas" }),
     ).toHaveAttribute("href", "/dashboard/activities");
@@ -205,9 +315,13 @@ test.describe("Beranda staff", () => {
 
     await expect(rows.nth(1)).toContainText("12");
     await expect(rows.nth(1)).toContainText("Agen di bawah target skor 95");
+    // Tahap 3: tiga agen terjauh (satu desimal, koma) plus sisa hitungannya.
+    await expect(rows.nth(1)).toContainText(
+      "Terjauh: Rina Kusuma (81,4), Dimas Prakoso (84,0), Sari Wulandari (85,2) dan 9 lainnya",
+    );
     await expect(
-      rows.nth(1).getByRole("link", { name: /Lihat agen/ }),
-    ).toHaveAttribute("href", "/sidak/agents");
+      rows.nth(1).getByRole("link", { name: /Lihat 12 agen/ }),
+    ).toHaveAttribute("href", "/sidak/agents?status=below");
 
     await expect(rows.nth(2)).toContainText(
       "Periode QA Oktober 2026 belum dibuat",
@@ -304,6 +418,8 @@ test.describe("Beranda staff", () => {
     const stats = card.locator("dl");
     await expect(stat(stats, "Temuan 6 bulan")).toHaveText("254");
     await expect(stat(stats, "Sep 26 vs Agu 26")).toHaveText("−25% turun");
+    // Tahap 3: temuan per agen diaudit periode terakhir, arah vs sebelumnya.
+    await expect(stat(stats, "Per agen diaudit")).toHaveText("1,1 turun");
     await expect(stat(stats, "Agen diaudit")).toHaveText("32");
     await expect(stat(stats, "Layanan aktif")).toHaveText("2");
     await expect(chartRows(card)).toHaveCount(6);
@@ -321,6 +437,12 @@ test.describe("Beranda staff", () => {
       .selectOption({ label: "Layanan Chat" });
     await expect(stat(stats, "Temuan 3 bulan")).toHaveText("43");
     await expect(stat(stats, "Sep 26 vs Agu 26")).toHaveText("−20% turun");
+    // Volume turun tidak otomatis berarti baik: laju per agen justru naik.
+    await expect(
+      stat(stats, "Sep 26 vs Agu 26").locator(".home-good, .home-bad"),
+    ).toHaveCount(0);
+    // Layanan terpilih memakai agen diaudit layanan itu: 12/6 vs 15/15.
+    await expect(stat(stats, "Per agen diaudit")).toHaveText("2 naik");
     expect(audit.mockedApi).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/startMonth=1&endMonth=10/),
@@ -330,7 +452,76 @@ test.describe("Beranda staff", () => {
     expectHermetic(audit);
   });
 
-  test("temuan per layanan: jumlah atas rentang tren, urut terbanyak, tautan SIDAK", async ({
+  test("tren temuan: kalimat apa yang terjadi dan tautan penyebab membawa filter", async ({
+    page,
+  }, testInfo) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([]), 200),
+    });
+    const card = trendCard(page);
+    const range = card.getByRole("group", { name: "Rentang" });
+    const link = card.getByRole("link", { name: "Lihat penyebab di SIDAK" });
+
+    // Turun ≥5% dan per agen diaudit juga turun (40/20 → 30/28).
+    await expect(card).toContainText(
+      "Temuan Sep 26 turun 25% dan temuan per agen diaudit juga turun (2 → 1,1).",
+      { timeout: 20000 },
+    );
+    // "Semua layanan" tidak mengirim `layanan`; buka periode terakhir berdata,
+    // bukan Januari–Oktober (September adalah periode terakhir pada fixture).
+    expect(await link.getAttribute("href")).toMatch(/^\/sidak\?tahun=2026/);
+    expect(await link.getAttribute("href")).not.toContain("layanan=");
+    expect(await link.getAttribute("href")).toContain("dari=9");
+    expect(await link.getAttribute("href")).toContain("sampai=9");
+
+    // Turun 20% tetapi per agen diaudit naik (15/15 → 12/6): ikut jumlah audit.
+    await card
+      .getByRole("combobox", { name: "Layanan" })
+      .selectOption({ label: "Layanan Chat" });
+    await expect(card).toContainText(
+      "Temuan Sep 26 turun 20%, tetapi temuan per agen diaudit tidak turun (1 → 2). Penurunan ikut jumlah audit.",
+    );
+    expect(await link.getAttribute("href")).toContain("layanan=chat");
+
+    await range
+      .getByRole("combobox", { name: "Bulan awal" })
+      .selectOption({ label: "Jul" });
+    await expect(card).toContainText("Jul–Okt 2026");
+    expect(await link.getAttribute("href")).toContain("dari=9");
+    await range
+      .getByRole("combobox", { name: "Bulan akhir" })
+      .selectOption({ label: "Agu" });
+    await expect(card).toContainText("Jul–Agu 2026");
+    expect(await link.getAttribute("href")).toContain("dari=8");
+    expect(await link.getAttribute("href")).toContain("sampai=8");
+
+    // Kalimat dan angka baru tetap terbaca di terang/gelap dan tanpa overflow.
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const theme of ["light", "dark"] as const) {
+        await setDocumentTheme(page, theme);
+        await card.scrollIntoViewIfNeeded();
+        expect(
+          await findLowContrastText(card, {
+            selector: "p,span,dd,dt,a",
+            leafOnly: true,
+          }),
+        ).toEqual([]);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        await page.screenshot({
+          path: testInfo.outputPath(`trend-${width}-${theme}.png`),
+        });
+      }
+    }
+    expectHermetic(audit);
+  });
+
+  test("temuan per layanan: periode terakhir, porsi, perubahan, tautan SIDAK", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -338,13 +529,15 @@ test.describe("Beranda staff", () => {
       apiMocks: mocks(ok([])),
     });
     const card = page.getByRole("region", { name: "Temuan per layanan" });
-    await expect(card).toContainText("Apr 26 – Sep 26 · 254 temuan", {
+    // Hanya periode terakhir di rentang, bukan jumlah seluruh rentang.
+    await expect(card).toContainText("Sep 26 · 30 temuan", {
       timeout: 20000,
     });
     const rows = card.getByRole("listitem");
     await expect(rows).toHaveCount(2);
-    await expect(rows.nth(0)).toHaveText(/Call\s*154/);
-    await expect(rows.nth(1)).toHaveText(/Chat\s*100/);
+    // Porsi dari 30 temuan; perubahan vs Agu 26 (25/15).
+    await expect(rows.nth(0)).toHaveText(/Call\s*18\s*60%\s*−28%/);
+    await expect(rows.nth(1)).toHaveText(/Chat\s*12\s*40%\s*−20%/);
     await expect(
       card.getByRole("link", { name: "Buka Dashboard SIDAK" }),
     ).toHaveAttribute("href", "/sidak");
@@ -354,19 +547,140 @@ test.describe("Beranda staff", () => {
     await range
       .getByRole("combobox", { name: "Bulan awal" })
       .selectOption({ label: "Jul" });
-    await expect(card).toContainText("Jul 26 – Sep 26 · 113 temuan");
-    await expect(rows.nth(0)).toHaveText(/Call\s*70/);
-    await expect(rows.nth(1)).toHaveText(/Chat\s*43/);
+    // Juli–Okt: periode terakhirnya tetap September.
+    await expect(card).toContainText("Sep 26 · 30 temuan");
 
     await range
       .getByRole("combobox", { name: "Bulan akhir" })
       .selectOption({ label: "Agu" });
-    await expect(card).toContainText("Jul 26 – Agu 26 · 83 temuan");
-    await expect(rows.nth(0)).toHaveText(/Call\s*52/);
-    await expect(rows.nth(1)).toHaveText(/Chat\s*31/);
+    await expect(card).toContainText("Agu 26 · 40 temuan");
+    await expect(rows.nth(0)).toHaveText(/Call\s*25\s*63%\s*−7%/);
+    await expect(rows.nth(1)).toHaveText(/Chat\s*15\s*38%\s*−6%/);
     // Periode terakhir di header tidak ikut menyempit bersama filter.
     await expect(content(page)).toContainText("Periode QA terakhir: Sep 26");
     expectHermetic(audit);
+  });
+
+  test("temuan per layanan: yang naik paling tajam memimpin kalimat dan tautan", async ({
+    page,
+  }, testInfo) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([]), 200, () => seriesFrom(RISING_PERIODS)),
+    });
+    const card = page.getByRole("region", { name: "Temuan per layanan" });
+    await expect(card).toContainText("Sep 26 · 29 temuan", {
+      timeout: 20000,
+    });
+    const rows = card.getByRole("listitem");
+    await expect(rows.nth(0)).toHaveText(/Chat\s*20\s*69%\s*\+100%/);
+    await expect(rows.nth(1)).toHaveText(/Call\s*9\s*31%\s*−10%/);
+    const changeColor = (row: Locator) =>
+      row
+        .locator(".home-bar-change")
+        .evaluate((el) => getComputedStyle(el).color);
+    const shareColor = (row: Locator) =>
+      row
+        .locator(".home-bar-share")
+        .evaluate((el) => getComputedStyle(el).color);
+    expect(await changeColor(rows.nth(0))).not.toBe(
+      await shareColor(rows.nth(0)),
+    );
+    expect(await changeColor(rows.nth(1))).not.toBe(
+      await shareColor(rows.nth(1)),
+    );
+    await expect(card).toContainText("Chat naik paling tajam.");
+    await expect(
+      card.getByRole("link", { name: "Buka SIDAK untuk Chat" }),
+    ).toHaveAttribute("href", /\/sidak\?layanan=chat$/);
+    // Kenaikan nyata (per agen diaudit ikut naik) tetap dilaporkan di tren.
+    await expect(trendCard(page)).toContainText("Kenaikan ini nyata.");
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const theme of ["light", "dark"] as const) {
+        await setDocumentTheme(page, theme);
+        await card.scrollIntoViewIfNeeded();
+        expect(
+          await findLowContrastText(card, {
+            selector: "p,span,a,h2",
+            leafOnly: true,
+          }),
+        ).toEqual([]);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        await page.screenshot({
+          path: testInfo.outputPath(`services-${width}-${theme}.png`),
+        });
+      }
+    }
+    expectHermetic(audit);
+  });
+
+  test("layanan yang turun menjadi nol tetap menjelaskan penurunan 100%", async ({
+    page,
+  }) => {
+    const zero = [
+      { ...RISING_PERIODS[0] },
+      { ...RISING_PERIODS[1], call: 0, chat: 0 },
+    ];
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([]), 200, () => seriesFrom(zero)),
+    });
+    const card = page.getByRole("region", { name: "Temuan per layanan" });
+    await expect(card).toContainText("Sep 26 · 0 temuan", { timeout: 20000 });
+    const rows = card.getByRole("listitem");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: "Call" })).toHaveText(
+      /Call\s*0\s*0%\s*−100%/,
+    );
+    await expect(rows.filter({ hasText: "Chat" })).toHaveText(
+      /Chat\s*0\s*0%\s*−100%/,
+    );
+    await expect(
+      card.getByRole("link", { name: "Buka Dashboard SIDAK" }),
+    ).toHaveAttribute("href", "/sidak");
+    expectHermetic(audit);
+  });
+
+  test("kalimat tren tidak mengarang pembanding atau penyebut audit", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    for (const scenario of [
+      {
+        rows: [RISING_PERIODS[1]],
+        text: "Belum ada periode pembanding untuk filter ini.",
+      },
+      {
+        rows: [{ ...RISING_PERIODS[0], call: 0, chat: 0 }, RISING_PERIODS[1]],
+        text: "29 temuan di Sep 26; Agu 26 tanpa temuan, jadi persentase tidak dihitung.",
+      },
+      {
+        rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], audited: 0 }],
+        text: "jumlah agen diaudit belum tersedia",
+      },
+      {
+        rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], audited: 20 }],
+        text: "Kenaikan ikut jumlah audit, belum tentu memburuk.",
+      },
+      {
+        rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], call: 10, chat: 10 }],
+        text: "relatif tetap (+0%)",
+      },
+    ]) {
+      const audit = await openHermeticShell(page, {
+        path: "/dashboard",
+        apiMocks: mocks(ok([]), 200, () => seriesFrom(scenario.rows)),
+      });
+      await expect(trendCard(page)).toContainText(scenario.text, {
+        timeout: 20000,
+      });
+      expectHermetic(audit);
+    }
   });
 
   test("aktivitas dan pintasan sejajar di desktop", async ({ page }) => {
@@ -399,7 +713,7 @@ test.describe("Beranda staff", () => {
 
   test("mobile: aksi selebar layar dan CTA tindakan di bawah teks", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const audit = await openHermeticShell(page, {
       path: "/dashboard",
@@ -432,6 +746,9 @@ test.describe("Beranda staff", () => {
       () => document.documentElement.scrollWidth - window.innerWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+    await page.screenshot({
+      path: testInfo.outputPath("attention-mobile.png"),
+    });
     expectHermetic(audit);
   });
 
@@ -442,7 +759,18 @@ test.describe("Beranda staff", () => {
       path: "/dashboard",
       auth: { role: "leader" },
       apiMocks: mocks(
-        ok([{ kind: "agents_below_target", count: 4, scope: "team" }]),
+        ok([
+          {
+            kind: "agents_below_target",
+            count: 4,
+            scope: "team",
+            worstAgents: [
+              { agentId: "t-1", nama: "Yudi Hartono", score: 78 },
+              { agentId: "t-2", nama: "Lestari Puspita", score: 88.5 },
+              { agentId: "t-3", nama: "Bagas Nugroho", score: 90 },
+            ],
+          },
+        ]),
       ),
     });
     const main = content(page);
@@ -450,6 +778,13 @@ test.describe("Beranda staff", () => {
       main.getByRole("link", { name: "Ranking tim", exact: true }),
     ).toHaveAttribute("href", "/sidak/ranking", { timeout: 20000 });
     await expect(attentionSection(page)).toContainText("Tim Anda");
+    // Sisa hitungan dihitung dari jumlah item, bukan dari panjang daftar.
+    await expect(attentionSection(page)).toContainText(
+      "Terjauh: Yudi Hartono (78,0), Lestari Puspita (88,5), Bagas Nugroho (90,0) dan 1 lainnya",
+    );
+    await expect(
+      attentionSection(page).getByRole("link", { name: /Lihat 4 agen/ }),
+    ).toHaveAttribute("href", "/sidak/agents?status=below");
     await expect(
       main.getByRole("heading", { name: "Aktivitas terakhir" }),
     ).toHaveCount(0);

@@ -2,6 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import { SERVICE_LABELS } from "../../../lib/scoring";
 
+/** Temuan dan agen diaudit pada satu periode (per layanan dan total). */
+export interface TrendServiceStat {
+  totalDefects: number;
+  auditedAgents: number;
+}
+
+export interface TrendPeriodStat {
+  id: string;
+  label: string;
+  totalDefects: number;
+  auditedAgents: number;
+  serviceStats: Record<string, TrendServiceStat>;
+}
+
 export interface TrendData {
   /** Label periode dari API, mis. "Sep 26" (urut lama → baru). */
   labels: string[];
@@ -19,6 +33,8 @@ export interface TrendData {
     auditedAgents: number;
     activeServiceCount: number;
   };
+  /** Per periode (selaras `labels`): temuan dan agen diaudit. */
+  periodStats: TrendPeriodStat[];
 }
 
 /** Rentang bulan (1–12) dalam tahun berjalan. */

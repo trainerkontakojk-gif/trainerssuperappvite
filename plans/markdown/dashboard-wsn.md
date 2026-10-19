@@ -1,6 +1,6 @@
 # Dashboard What / So what / Now what — spec untuk agen coding
 
-Status: **tahap 1 selesai** (`40629898`); **tahap 2 diimplementasikan dan diverifikasi**; tahap 3 siap dikerjakan, tahap 4 tetap opsional. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
+Status: **tahap 1 selesai** (`40629898`), **tahap 2 selesai** (`cbceff0b`), dan **tahap 3 diimplementasikan serta diverifikasi**. Tahap 4 tetap opsional. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
 
 > Mockup belum disetujui eksplisit oleh Fajar saat spec ini ditulis. Fajar meminta spec ini untuk dikerjakan agen lain, jadi kerjakan sesuai spec; bila Fajar mengubah sesuatu di mockup, ikuti perubahan itu.
 
@@ -271,6 +271,43 @@ Fungsi murni menghasilkan kalimat Indonesia deterministik, fokus kenaikan minima
 
 - Backend nyata (`sidak-dashboard-kpi-api.spec.ts` atau spec baru `sidak-dashboard-insights-api.spec.ts`): fixture dua periode, parameter X naik +6 dan agen diaudit tetap. Buktikan `insights.what.tone = "bad"`, teks berisi "Kenaikan ini nyata", `focusParameter.name = X`, `agents` urut dan maks 10, `recommendation` tidak kosong, dan leader hanya melihat agen timnya di `agents`. Kasus kedua: agen diaudit naik dua kali lipat → teks "Kenaikan ikut jumlah audit". Kasus ketiga: satu periode → teks "Belum ada periode pembanding".
 - Hermetic browser: mock respons dengan `insights`; buktikan tiga kolom tampil, tombol "Lihat N agen" membuka daftar dan tautan ke detail agent, baris parameter fokus menampilkan saran, grafik default menyalakan parameter fokus.
+
+## Requirement — eksekusi tahap 3
+
+Telaah dan selesaikan perubahan fase 3 yang sudah ada di working tree, sesuai izin Fajar. Lane D karena kontrak `/home/attention` menambah nama agen scoped; perilaku Beranda/filter tetap §7. Tidak mengubah AI, skema, scope backend tren, atau tahap 4. Audit egress untracked tidak termasuk.
+
+## Design — eksekusi tahap 3
+
+Pertahankan implementasi yang benar: worstAgents dari direktori scoped, status awal URL yang divalidasi, periode-statistik dari endpoint yang ada, dan kalimat deterministik di web. Lengkapi tautan penyebab ke **bulan periode terakhir yang ditampilkan**, delta volume netral (warna baik/buruk hanya untuk laju per agen), layanan turun ke nol tetap tampil, dan bukti batas tiga agen dengan fixture ≥4 agen berisiko. Gunakan layout/token Beranda yang ada; tidak menambah dependency atau query baru. Native link/select tetap keyboard-accessible dan teks menjelaskan arah tanpa bergantung pada warna.
+
+## Tasklist — eksekusi tahap 3
+
+- [x] Capture dirty scope dan telaah perubahan yang sudah ada; proses startup sebelumnya sudah selesai, tidak ada worker/dev server aktif.
+- [x] Tulis/jalankan E2E RED untuk kekurangan, tanpa mengklaim RED implementasi awal yang dikerjakan sesi lain.
+- [x] Perbaiki hanya kekurangan dalam §7, pertahankan pekerjaan yang benar.
+- [x] E2E browser/API lokal GREEN, review keamanan/Impeccable/thermo-nuclear, root typecheck/lint/build dan diff check.
+- [x] Dokumentasi, CHANGELOG, bukti perintah, cleanup proses lokal.
+
+### Hasil telaah dan bukti tahap 3 — 2026-10-19
+
+- Perubahan awal yang benar dipertahankan: worstAgents dari direktori yang sudah scoped, salinan helper kalimat deterministik di web (tanpa import server), statistik per agen dari `periodStats`, CTA/status `below`, dan isi kartu layanan dari periode terakhir. Tidak membatalkan atau menulis ulang pekerjaan sesi sebelumnya.
+- RED: `pnpm --dir apps/web exec playwright test e2e/home-staff.spec.ts --grep 'default YTD|kalimat apa|yang naik paling|menjadi nol' --workers=1 --trace on` → exit 1, empat tes gagal. Tiga bukti perilaku: tautan masih `dari=1&sampai=10` bukan bulan 9; warna delta layanan sama dengan teks netral karena tertimpa CSS; layanan turun ke nol hilang (0 baris, diharapkan 2). Tes default YTD tertahan oleh locator substring `Agen diaudit` yang juga cocok dengan stat baru `Per agen diaudit`; locator diperketat menjadi exact. Delta volume mentah diubah netral dan dibuktikan GREEN, tanpa mengklaim RED assertion itu sempat tercapai pada run awal.
+- Perbaikan tautan mengenali kedua ejaan Agustus (`Agt` pada API, `Agu` pada UI); bila label periode tidak dikenali, CTA penyebab tidak menebak bulan. Bar layanan nol tidak membagi dengan maksimum nol.
+- Regresi browser berikutnya menemukan nilai status tak dikenal tetap muncul karena hasil validasi digabung dengan query mentah. Validator mengembalikan `status: undefined` secara eksplisit; `pnpm --dir apps/web exec playwright test e2e/sidak-agents-list.spec.ts --grep 'status=below' --workers=1 --trace on` → exit 0. Nilai valid, fallback status, dan pelestarian layanan/tahun/rentang diuji.
+- GREEN browser final: `pnpm --dir apps/web exec playwright test e2e/home-staff.spec.ts e2e/sidak-agents-list.spec.ts e2e/sidak-scope.spec.ts --workers=1 --trace on` → exit 0, **25 passed**. Termasuk worst-agent copy/href, laju per layanan, kalimat naik/turun/volume/stabil/baseline nol/satu periode/penyebut nol, tujuan bulan terakhir, porsi/delta layanan, warna computed, layanan turun 100%, scope/status URL, dan state kosong/error/partial yang sudah ada. Locator aktivitas `Rina Kusuma` juga diperketat menjadi exact karena nama kini muncul di dua section.
+- GREEN API: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project=home-attention-real-backend --workers=1 --trace on` → exit 0, **6 passed**. Fixture diperkuat menjadi lima agen berskor berbeda: empat dalam scope leader dan satu di luar. Batas maksimal tiga, urutan skor/nama, eksklusi agen luar, tanpa token, role agent, leader belum disetujui, dan kegagalan sebagian dibuktikan lewat JWT/Hono/PostgREST lokal nyata. Tidak mengklaim RED backend sebelum implementasi awal dari sesi lain.
+- `pnpm typecheck --concurrency=1` → exit 0 (empat workspace, termasuk tipe E2E).
+- `pnpm lint --concurrency=1` → exit 0 (74 warning lama, tanpa error).
+- `pnpm build --concurrency=1` → exit 0 (tiga task).
+- `git diff --check` → exit 0. Prettier file TS/CSS yang berubah → exit 0 dengan pengecualian router: pemeriksaan penuh `router.tsx` memberi warning; `git show HEAD:apps/web/src/router.tsx` dibandingkan dengan hasil Prettier membuktikan baseline juga tidak clean. Tidak mereformat router massal untuk perubahan empat baris.
+- Artefak browser repeatable ada di `apps/web/test-results/` (ignored): trace, `trend-{390,1280}-{light,dark}.png`, `services-{390,1280}-{light,dark}.png`, dan `attention-mobile.png`. Log API sesi ini ada di `/tmp/dashboard-wsn3-api.log`; perintah API di atas menghasilkan ulang trace. Jangan commit trace karena berisi auth lokal.
+
+### Review tahap 3
+
+- Impeccable **PASS**: detector atas AttentionList, TrendCard, ServiceBreakdown, halaman Agen, dan CSS menghasilkan `[]`. E2E kontras teks ≥4,5:1 dan tanpa overflow di 390/1280px, terang/gelap; screenshot layanan mobile terang, desktop gelap, dan perhatian mobile dibaca langsung. Tidak ada redesign atau kontrol custom baru.
+- Thermo-nuclear dan review keamanan dalam sesi **PASS** (bukan reviewer independen): worstAgents tidak membuat query baru dan tidak mengambil nama di luar direktori scoped; tren backend/scope tidak diubah; state/error lama dipertahankan; perbandingan tidak membagi nol atau menyimpulkan kualitas dari jumlah mentah. Seluruh temuan di atas sudah diperbaiki dengan bukti E2E.
+- Context7 `/tanstack/router` ditelusuri untuk perilaku search/undefined; bukti runtime invalid-status RED → GREEN menjadi penentu. Graphify query `getHomeAttention` dipakai saat discovery; `GRAPHIFY_MAX_WORKERS=1 graphify update .` → exit 0, satu update cache lokal.
+- Supabase startup sebelumnya meninggalkan container berhenti tanpa proses CLI aktif. `supabase stop` lalu `supabase start -x logflare,vector` memulihkan stack **lokal**; setelah E2E, `supabase stop` selesai. Tidak ada migrasi/remote/provider/AI baru, unit test, atau dependency baru. Commit tahap 3 diminta Fajar pada 2026-10-20; push/deploy tidak termasuk. Audit egress untracked tetap di luar scope.
 
 ## 7. Tahap 3 — Beranda (1 PR)
 

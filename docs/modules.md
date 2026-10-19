@@ -17,8 +17,10 @@ Dashboard tunggal yang berfungsi sebagai pusat informasi bagi semua tingkatan us
 - **Fungsi**: Menampilkan KPI ringkasan, grafik tren, dan log aktivitas terbaru.
 - **Route**: `/dashboard`
 - **Fitur Utama**:
-  - **Tren Performa Kualitas**: Grafik temuan QA per bulan dengan filter layanan, tahun, dan rentang bulan; legenda teks membedakan total, tiap layanan, dan prediksi. Ringkasan metrik mengikuti cakupan layanan yang dipilih.
-  - **Pintasan Cepat & Workspace Terpadu**: Navigasi role-aware memakai kartu modul dengan ikon, judul, deskripsi singkat, dan panah; seluruh kartu dapat dibuka.
+  - **Perlu tindakan (staff)**: Agen di bawah target menampilkan maksimal tiga nama dengan skor terendah dan jumlah sisanya, hanya dari scope pengguna. Tombol `Lihat N agen` membuka `/sidak/agents?status=below`, dengan filter **Di bawah target 95** aktif; nilai status tak dikenal diabaikan tanpa membuang cakupan SIDAK.
+  - **Tren Performa Kualitas (staff)**: Grafik temuan QA tahun berjalan dengan filter layanan dan rentang bulan. Stat **Per agen diaudit** memakai jumlah agen pada periode terakhir (per layanan bila dipilih); kalimat deterministik membedakan perubahan laju dari perubahan volume audit. Delta jumlah mentah netral. Tautan **Lihat penyebab di SIDAK** membawa layanan (kecuali Semua layanan), tahun, dan **bulan periode terakhir berdata**, bukan seluruh rentang.
+  - **Temuan per layanan (staff)**: Jumlah dan porsi dari periode terakhir, dengan perubahan versus periode sebelumnya. Layanan yang turun menjadi nol tetap terlihat dengan −100%; baseline nol tidak menghasilkan persentase buatan. Layanan dengan kenaikan terbesar ≥5% ditandai dalam kalimat dan menjadi filter tautan SIDAK.
+  - **Pintasan Cepat**: Navigasi role-aware menuju pekerjaan modul, dengan target klik dan label yang jelas.
   - **Monitoring**: (Trainer/Leader/Admin) Memantau histori simulasi lintas akun yang dipaginasi penuh dari source canonical KETIK/PDKT/Telefun tanpa cap tersembunyi, agregasi penggunaan token bulanan, dan editor harga/kurs untuk role yang diizinkan; detail menampilkan metadata served-consumer dan assessment native per modul, sedangkan row Telefun legacy hanya kompatibilitas bila tidak ada row canonical.
   - **User Management**: (Hanya Admin) Menyetujui pendaftaran, mengubah role, atau menghapus akun.
 - **Sub-pages**:

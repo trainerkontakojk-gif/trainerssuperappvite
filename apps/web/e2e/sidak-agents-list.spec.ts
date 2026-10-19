@@ -160,6 +160,47 @@ test.describe("Daftar agen SIDAK (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("?status=below membuka daftar dengan filter Di bawah target 95 aktif", async ({
+    page,
+  }) => {
+    // Tautan "Lihat N agen" di Beranda membawa filter ini di alamat.
+    const audit = await openHermeticShell(page, {
+      path: "/sidak/agents?status=below",
+      apiMocks: MOCKS,
+    });
+    await waitForMockedApi(audit, ["/sidak/agents"]);
+    await expect(selectTrigger(page, "Status")).toContainText(
+      "Di bawah target 95",
+    );
+    await expect(page.getByTestId("sidak-agents-count")).toHaveText(
+      "2 dari 5 agen · 2 di bawah target",
+    );
+    // Hanya agen berskor di bawah 95, urut skor terendah.
+    expect(await cardNames(page)).toEqual(["Andi Wijaya", "Bayu Saputra"]);
+
+    // Validator status tidak boleh membuang cakupan SIDAK yang sudah ada.
+    const year = new Date().getFullYear();
+    await page.goto(
+      `/sidak/agents?status=below&layanan=chat&tahun=${year}&dari=3&sampai=6`,
+    );
+    await expect(selectTrigger(page, "Status")).toContainText(
+      "Di bawah target 95",
+    );
+    for (const [key, value] of Object.entries({
+      layanan: "chat",
+      tahun: String(year),
+      dari: "3",
+      sampai: "6",
+    })) {
+      expect(new URL(page.url()).searchParams.get(key)).toBe(value);
+    }
+    // Nilai status lain diabaikan, bukan error: kembali ke "Semua status".
+    await page.goto("/sidak/agents?status=tidak-dikenal");
+    await expect(selectTrigger(page, "Status")).toContainText("Semua status");
+    expect(await cardNames(page)).toHaveLength(5);
+    expectHermetic(audit);
+  });
+
   test("di desktop, Cari, Batch, Status, dan agen tambahan satu baris", async ({
     page,
   }) => {

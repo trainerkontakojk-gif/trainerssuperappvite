@@ -12,6 +12,12 @@ const MONTH = new Intl.DateTimeFormat("id-ID", {
   timeZone: "UTC",
 });
 
+/** Skor agen selalu satu desimal, mis. "81,4" (lihat contoh di rancangan). */
+const SCORE = new Intl.NumberFormat("id-ID", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 type Copy = {
   title: string;
   meta: string;
@@ -19,7 +25,23 @@ type Copy = {
   moduleColor: string;
   cta: string;
   href: string;
+  /** Query tambahan pada tautan CTA (mis. filter status daftar agen). */
+  search?: Record<string, string>;
 };
+
+/**
+ * Baris kedua item "agen di bawah target": tiga agen terjauh beserta sisanya.
+ * `count` adalah jumlah seluruh agen berisiko, jadi sisa = count − daftar.
+ */
+function worstAgentsLine(item: HomeAttentionItem): string | null {
+  const agents = item.worstAgents ?? [];
+  if (agents.length === 0) return null;
+  const names = agents
+    .map((agent) => `${agent.nama} (${SCORE.format(agent.score)})`)
+    .join(", ");
+  const rest = item.count - agents.length;
+  return `Terjauh: ${names}${rest > 0 ? ` dan ${rest} lainnya` : ""}`;
+}
 
 /** Label dan tujuan tiap jenis item; backend hanya mengirim `kind`. */
 const COPY: Record<HomeAttentionKind, (item: HomeAttentionItem) => Copy> = {
@@ -36,8 +58,10 @@ const COPY: Record<HomeAttentionKind, (item: HomeAttentionItem) => Copy> = {
     meta: `${item.scope === "team" ? "Tim Anda" : "Semua layanan"} · periode audit terakhir tiap agen`,
     module: "SIDAK",
     moduleColor: "var(--module-sidak)",
-    cta: "Lihat agen",
+    cta: `Lihat ${item.count} agen`,
     href: "/sidak/agents",
+    // Daftar agen membuka filter "Di bawah target 95" yang sama.
+    search: { status: "below" },
   }),
   qa_period_missing: (item) => ({
     title: item.period
@@ -146,6 +170,7 @@ export function AttentionList() {
           <ul className="home-attention">
             {state.items.map((item) => {
               const copy = COPY[item.kind](item);
+              const worst = worstAgentsLine(item);
               return (
                 <li key={item.kind} className="home-attention-row">
                   <span className="home-attention-count">{item.count}</span>
@@ -164,9 +189,13 @@ export function AttentionList() {
                       </span>
                       <span>{copy.meta}</span>
                     </p>
+                    {worst && (
+                      <p className="mt-1 text-[12px] text-fg2">{worst}</p>
+                    )}
                   </div>
                   <Link
                     to={copy.href as any}
+                    search={copy.search as any}
                     className={buttonVariants({
                       variant: "outline",
                       className: "min-h-[44px] shrink-0",

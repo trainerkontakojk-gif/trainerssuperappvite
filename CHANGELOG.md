@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-20
+
+- feat(home): add scoped lowest-score agents, audited-agent trend comparisons, latest-period service shares, and filtered SIDAK links to the staff home
+
 ## 2026-10-19
 
 - feat(sidak): add deterministic dashboard conclusions, the fastest-rising focus parameter, and scoped coaching-agent disclosures with QA-target context and capability-gated TNA navigation

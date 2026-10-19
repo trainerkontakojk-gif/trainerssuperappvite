@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSearch } from "@tanstack/react-router";
 import { useApi } from "../../hooks/useApi";
 import { Eye, EyeOff, RotateCcw, Search } from "lucide-react";
 import type { AgentDirectoryResponse } from "@trainers/types";
@@ -14,8 +15,8 @@ import { useSidakScope } from "../../hooks/useSidakScope";
 import {
   AGENT_SORT_OPTIONS,
   AGENT_STATUS_OPTIONS,
-  agentStatus,
   isBelowTarget,
+  matchesStatusFilter,
   sortAgents,
   type AgentSort,
   type AgentStatusFilter,
@@ -63,7 +64,12 @@ const ALL_BATCHES = "__all__";
 export default function SidakAgentsPage() {
   const [search, setSearch] = useState("");
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
-  const [status, setStatus] = useState<AgentStatusFilter>("all");
+  // Tautan dari Beranda membawa `?status=below`; URL hanya menentukan state
+  // awal, perubahan filter setelah itu tidak menulis ulang alamat.
+  const routeSearch = useSearch({ from: "/sidak/agents" });
+  const [status, setStatus] = useState<AgentStatusFilter>(
+    routeSearch.status ?? "all",
+  );
   const [sort, setSort] = useState<AgentSort>("score-asc");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [showAll, setShowAll] = useState(false);
@@ -97,7 +103,7 @@ export default function SidakAgentsPage() {
           return false;
       }
       if (selectedBatch && a.batch_name !== selectedBatch) return false;
-      if (status !== "all" && agentStatus(a) !== status) return false;
+      if (!matchesStatusFilter(a, status)) return false;
       return true;
     });
     return sortAgents(matches, sort);
