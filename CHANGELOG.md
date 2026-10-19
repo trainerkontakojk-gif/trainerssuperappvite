@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- docs(codex-cloud): add the Codex cloud environment guide and the setup/maintenance scripts that install the Supabase, Vercel and Railway CLIs, render `.env`, and republish the setup-phase tokens into `~/.codex-cloud-env.sh` so the agent phase still has them, with the network allowlist and the deliberate absence of `SUPABASE_SERVICE_ROLE_KEY`
 - perf(db): add list indexes for the Telefun history (owner, newest first), the PDKT history (owner, newest first) and the PDKT mailbox (latest activity first), with a rollback; production applies them with `supabase db push`
 - perf(telefun): prepare the Telefun connection (microphone, call server, voice AI setup) while the 2.5 s ringtone plays instead of after it, so the call is ready when the ring ends; recording, microphone audio and "Tersambung" still start only at pickup, and leaving during the ring opens no further connection or microphone
 - perf(telefun): load the Telefun history list (landing and Riwayat) without transcripts, session metrics, prompts or coaching text (`GET /telefun/sessions?view=list`), and fetch the one full call only when its Telaah opens; never send the scoring worker's claim token hash or owner to the browser
