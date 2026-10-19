@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261020090000_access_groups_view_security_invoker.sql` | No data loss: reopens every access group to any signed-in user; the API reads the view as service_role and is unaffected |
 | New | `rollback_20261018210000_account_active_until.sql` | DATA LOSS: drops every account end date (accounts become unlimited); revert API and web first |
 | New | `rollback_20261018200000_user_controls.sql` | Loses the per-session KETIK re-score counts (agents could re-score again); revert the API first |
 | New | `rollback_20261018190000_practice_today_summary.sql` | No data loss: drops the today summary for the Batas latihan page; revert the API first |

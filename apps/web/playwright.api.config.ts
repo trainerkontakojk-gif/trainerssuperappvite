@@ -119,6 +119,10 @@ export default defineConfig({
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },
     {
+      name: "access-groups-view-guard-real-backend",
+      testMatch: "access-groups-view-guard-api.spec.ts",
+    },
+    {
       name: "sidak-temuan-tahun-trigger-real-backend",
       testMatch: "sidak-temuan-tahun-trigger-api.spec.ts",
     },

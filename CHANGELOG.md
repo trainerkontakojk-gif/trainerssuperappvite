@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(db): make the access groups count view honor caller RLS and revoke it from signed-in users (Supabase security_definer_view advisor)
 - feat(tna): add reversible EFEK agent exclusions with reasons and report comparisons
 
 - docs(plans): draft the optional phase 4 agent home scope (current state, candidate blocks, decisions K1–K5, draft contract, sentences, and E2E) pending Fajar's decisions
