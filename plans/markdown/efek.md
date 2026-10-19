@@ -33,8 +33,12 @@ Phase 1 (data + input):
 
 Phase 2 (report, no schema change):
 
-- Source: `qa_dashboard_agent_period_summary` rows with `session_count > 0` (official monthly
-  `final_score`, `session_count`, `findings_count`), read with the caller JWT (RLS admin/trainer).
+- Source: raw `qa_temuan` of the session's service, read with the caller JWT (RLS
+  admin/trainer), scored per agent and month exactly like the SIDAK agent page (rule version
+  per period, worst five sessions, `isCountableFinding`). Not `qa_dashboard_agent_period_summary`:
+  that cache holds final_score 0 from the SQL refresh and imports never refresh it (fix
+  2026-10-19: a PDKT average of 35 and KETIK agents shown without data). Excluded staff (QA,
+  TL, trainer) are never comparison peers.
 - One row per participation (session × peserta), measured on the session's `service_type`.
   Training months = start month..end month (offset 0, excluded). Before = the `window` months
   before the start month (offset −1..−W); after = the `window` months after the end month
@@ -69,3 +73,5 @@ Phase 3: printable HTML export and an "Ikut pelatihan" line on SIDAK agent detai
 - [x] P1 migration + rollback, types, API, web, CHANGELOG, docs.
 - [x] P2 report service + UI + E2E.
 - [x] P3 export + SIDAK link + E2E.
+- [x] Fix: score from raw temuan instead of the dashboard cache (E2E seeds temuan plus a stale
+      cache row).
