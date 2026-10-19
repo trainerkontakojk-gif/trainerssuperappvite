@@ -10,6 +10,7 @@ interface Props {
   delta: KpiDeltaViewModel | null;
   desc?: string;
   sparklineData?: { value: number }[];
+  badge?: { text: string; tone: "good" | "bad" | "warn" };
 }
 
 /**
@@ -22,6 +23,7 @@ export default function KpiCard({
   delta,
   desc,
   sparklineData,
+  badge,
 }: Props) {
   let DeltaIcon: LucideIcon | null = null;
   let deltaColorClass = "text-muted-foreground";
@@ -89,6 +91,19 @@ export default function KpiCard({
           <span className="text-muted-foreground">Belum ada pembanding</span>
         )}
       </div>
+      {badge && (
+        <p
+          className={`mt-1 w-fit max-w-full rounded-full px-2 py-1 text-xs leading-5 font-medium tabular-nums ${
+            badge.tone === "good"
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+              : badge.tone === "bad"
+                ? "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+                : "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+          }`}
+        >
+          {badge.text}
+        </p>
+      )}
       {desc && (
         <p className="text-xs leading-5 text-muted-foreground">{desc}</p>
       )}

@@ -3,7 +3,11 @@ import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
 import { requireCapability } from "../../middleware/role";
 import { createUserClient, supabaseAdmin } from "../../lib/supabase";
-import { getAccessibleSidakFilters } from "../../services/sidak/access-scope";
+import {
+  getAccessibleSidakFilters,
+  resolveFolderFiltersByIds,
+} from "../../services/sidak/access-scope";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSidakHeatmap } from "../../services/sidak/heatmap-service";
 import { sidakHeatmapQuerySchema } from "@trainers/types";
 
@@ -33,6 +37,9 @@ sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
     service_type: c.req.query("service_type") ?? undefined,
     count_by: c.req.query("count_by") ?? undefined,
     agent_id: c.req.query("agent_id") ?? undefined,
+    folder_ids: c.req.query("folder_ids") ?? undefined,
+    start_month: c.req.query("start_month") ?? undefined,
+    end_month: c.req.query("end_month") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -52,7 +59,16 @@ sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
     );
   }
 
-  const { mode, year, service_type, count_by, agent_id } = parsed.data;
+  const {
+    mode,
+    year,
+    service_type,
+    count_by,
+    agent_id,
+    folder_ids,
+    start_month,
+    end_month,
+  } = parsed.data;
   const token = c.get("token");
   const user = c.get("user");
   const profile = c.get("profile");
@@ -108,7 +124,7 @@ sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
       );
     }
 
-    const scope = filterScope
+    let scope = filterScope
       ? {
           agentIds: filterScope.agentIds,
           serviceTypes:
@@ -121,10 +137,35 @@ sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
     // Admin/trainer lewat JWT (RLS). Leader lewat service-role + scope app-side.
     const supabase = filterScope ? supabaseAdmin : createUserClient(token);
 
+    if (folder_ids) {
+      const { filterNames } = await resolveFolderFiltersByIds(folder_ids);
+      const participants =
+        filterNames.length === 0
+          ? []
+          : await fetchAllPages<{ id: string }>({
+              build: ({ from, to }) =>
+                supabase
+                  .from("profiler_peserta")
+                  .select("id")
+                  .in("batch_name", filterNames)
+                  .order("id", { ascending: true })
+                  .range(from, to),
+            });
+      const allowedIds = filterScope ? new Set(filterScope.agentIds) : null;
+      scope = {
+        agentIds: participants
+          .map((row) => row.id)
+          .filter((id) => !allowedIds || allowedIds.has(id)),
+        serviceTypes: scope?.serviceTypes ?? null,
+      };
+    }
+
     const data = await getSidakHeatmap({
       supabase,
       mode,
       year,
+      startMonth: start_month,
+      endMonth: end_month,
       serviceType: service_type,
       countBy: count_by,
       agentId: agent_id,

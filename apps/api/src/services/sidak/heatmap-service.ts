@@ -118,11 +118,22 @@ async function fetchCountableRows(args: {
   supabase: SupabaseClient;
   mode: SidakHeatmapMode;
   year: number;
+  startMonth?: number;
+  endMonth?: number;
   serviceType?: ServiceType;
   agentId?: string;
   scope?: HeatmapScope;
 }): Promise<TemuanRow[]> {
-  const { supabase, mode, year, serviceType, agentId, scope } = args;
+  const {
+    supabase,
+    mode,
+    year,
+    serviceType,
+    agentId,
+    scope,
+    startMonth = 1,
+    endMonth = 12,
+  } = args;
   const column = HEATMAP_DATE_COLUMN[mode];
   // Heatmap satu agen ikut membaca bulan periode QA supaya tanggal bisa
   // membuka tiketnya di tab Temuan (dikelompokkan per periode).
@@ -136,8 +147,11 @@ async function fetchCountableRows(args: {
         // bergantung pada mode. PostgREST mengembalikan key sesuai nama kolom.
         .select(`${SELECT_COLUMNS}, tanggal:${column}${periodJoin}`)
         .eq("is_phantom_padding", false)
-        .gte(column, `${year}-01-01`)
-        .lte(column, `${year}-12-31`)
+        .gte(column, `${year}-${String(startMonth).padStart(2, "0")}-01`)
+        .lte(
+          column,
+          `${year}-${String(endMonth).padStart(2, "0")}-${new Date(Date.UTC(year, endMonth, 0)).getUTCDate()}`,
+        )
         .order("id", { ascending: true })
         .range(from, to);
       if (serviceType) query = query.eq("service_type", serviceType);
@@ -223,7 +237,8 @@ function ticketsByDay(rows: TemuanRow[]): Map<string, SidakHeatmapTicketRef[]> {
     if (!hasTicketNumber(row.no_tiket)) continue;
     const noTiket = row.no_tiket.trim().toUpperCase();
     const key = `${noTiket}|${row.period.year}-${row.period.month}`;
-    const day = byDay.get(row.tanggal) ?? new Map<string, SidakHeatmapTicketRef>();
+    const day =
+      byDay.get(row.tanggal) ?? new Map<string, SidakHeatmapTicketRef>();
     day.set(key, { noTiket, month: row.period.month, year: row.period.year });
     byDay.set(row.tanggal, day);
   }
@@ -270,6 +285,8 @@ export async function getSidakHeatmap(args: {
   supabase: SupabaseClient;
   mode: SidakHeatmapMode;
   year: number;
+  startMonth?: number;
+  endMonth?: number;
   serviceType?: ServiceType;
   countBy?: SidakHeatmapCountBy;
   agentId?: string;
@@ -292,7 +309,16 @@ export async function getSidakHeatmap(args: {
   }
 
   const [rows, missingRows] = await Promise.all([
-    fetchCountableRows({ supabase, mode, year, serviceType, agentId, scope }),
+    fetchCountableRows({
+      supabase,
+      mode,
+      year,
+      serviceType,
+      agentId,
+      scope,
+      startMonth: args.startMonth,
+      endMonth: args.endMonth,
+    }),
     fetchMissingDateRows({ supabase, mode, serviceType, agentId, scope }),
   ]);
 

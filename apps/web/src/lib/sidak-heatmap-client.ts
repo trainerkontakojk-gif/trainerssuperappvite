@@ -32,6 +32,9 @@ type HeatmapClient = {
         service_type?: ServiceType;
         count_by: SidakHeatmapCountBy;
         agent_id?: string;
+        folder_ids?: string;
+        start_month?: string;
+        end_month?: string;
       };
       signal?: AbortSignal;
     }): Promise<HeatmapRpcResponse>;
@@ -45,6 +48,9 @@ export async function fetchSidakHeatmap(params: {
   countBy: SidakHeatmapCountBy;
   serviceType?: ServiceType;
   agentId?: string;
+  folderIds?: string[];
+  startMonth?: number;
+  endMonth?: number;
   signal?: AbortSignal;
 }): Promise<SidakHeatmapResponse> {
   const query: {
@@ -53,6 +59,9 @@ export async function fetchSidakHeatmap(params: {
     count_by: SidakHeatmapCountBy;
     service_type?: ServiceType;
     agent_id?: string;
+    folder_ids?: string;
+    start_month?: string;
+    end_month?: string;
   } = {
     mode: params.mode,
     year: String(params.year),
@@ -60,6 +69,10 @@ export async function fetchSidakHeatmap(params: {
   };
   if (params.serviceType) query.service_type = params.serviceType;
   if (params.agentId) query.agent_id = params.agentId;
+  if (params.folderIds?.length) query.folder_ids = params.folderIds.join(",");
+  if (params.startMonth !== undefined)
+    query.start_month = String(params.startMonth);
+  if (params.endMonth !== undefined) query.end_month = String(params.endMonth);
 
   // `unwrapResponse` membuka envelope `{ success, data }` dan melempar
   // `ApiError` untuk `{ success: false }`, jadi pemanggil tidak pernah
