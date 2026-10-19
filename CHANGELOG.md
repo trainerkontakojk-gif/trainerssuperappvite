@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- perf(telefun): prepare the Telefun connection (microphone, call server, voice AI setup) while the 2.5 s ringtone plays instead of after it, so the call is ready when the ring ends; recording, microphone audio and "Tersambung" still start only at pickup, and leaving during the ring opens no further connection or microphone
 - perf(telefun): load the Telefun history list (landing and Riwayat) without transcripts, session metrics, prompts or coaching text (`GET /telefun/sessions?view=list`), and fetch the one full call only when its Telaah opens; never send the scoring worker's claim token hash or owner to the browser
 - perf(pdkt): load the PDKT history list (Riwayat, workspace, landing) as short rows with only the score, scenario title and last subject (`GET /pdkt/history?view=list`), and fetch one full session (`GET /pdkt/history/:id`) only to replay it or its full Telaah only when Telaah opens, instead of downloading every email and evaluation up front
 - perf(practice): store KETIK scenario images and PDKT attachments once in a Supabase Storage bucket and keep only their links in settings, sessions, mailbox and history, with a one-off backfill (`pnpm --filter @trainers/api backfill:scenario-attachments`) that moves existing base64 attachments; PDKT shows and opens image and PDF links

@@ -374,6 +374,33 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     expectHermetic(audit);
   });
 
+  test("sambungan disiapkan selama nada dering; suara agen baru dikirim setelah diangkat", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    const socket = await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await open(page, "/telefun", callMocks());
+    const picker = await openPicker(page);
+    const startCall = picker.getByRole("button", { name: "Mulai panggilan" });
+    await expect(startCall).toBeEnabled({ timeout: 15000 });
+    await startCall.click();
+
+    const status = page
+      .getByRole("region", { name: "Panggilan" })
+      .getByRole("status");
+    await expect(status).toHaveText("Memanggil…");
+    // Jabat tangan selesai saat telepon masih berdering (dering 2,5 detik).
+    await expect.poll(() => socket, { timeout: 2000 }).toContain("setup");
+    await expect(status).toHaveText("Memanggil…");
+    expect(messages.some((message) => "realtimeInput" in message)).toBe(false);
+
+    await expect(status).toHaveText("Giliran Anda", { timeout: 5000 });
+    await expect
+      .poll(() => messages.some((message) => "realtimeInput" in message))
+      .toBe(true);
+    expectHermetic(audit);
+  });
+
   test("klik ganda Mulai panggilan hanya membuat satu sesi", async ({
     page,
   }) => {

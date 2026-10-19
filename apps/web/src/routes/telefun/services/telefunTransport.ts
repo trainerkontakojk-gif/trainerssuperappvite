@@ -17,7 +17,11 @@ export type GeminiRecordingCompleteCallback = (
 
 /** Explicit active transport surface implemented by the Gemini Live session. */
 export interface GeminiTelefunTransportSession {
-  connect(accessToken: string): Promise<void>;
+  /** `pickUp` resolves when the ring ends; the call starts then. */
+  connect(
+    accessToken: string,
+    options?: { pickUp?: Promise<void> },
+  ): Promise<void>;
   setMute(muted: boolean): void;
   setHold(held: boolean): void;
   sendTimeCue(remainingSeconds: number): void;

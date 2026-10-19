@@ -17,6 +17,10 @@ Lane C (API contract + UI data loading). Sumber: audit `/mnt/project-files/audit
 - `projectTelefunHistoryRow` tidak lagi mengirim `scoring_claim_token_hash` dan `scoring_claim_owner`.
 - E2E: `telefun-history-list-api` (kontrak) dan `telefun-flow` "riwayat ringkas" (2 tes).
 
-## 4c. Koneksi Telefun saat nada dering (berikutnya)
+## 4c. Koneksi Telefun saat nada dering
+
+- `PhoneInterface` membuat sesi dan memanggil `connect(token, { pickUp: ring })` saat dering mulai. Mikrofon, WebSocket, autentikasi, konfigurasi, dan setup Gemini berjalan selama dering.
+- `LiveSession` menahan hal yang menandai panggilan dimulai sampai `pickUp`: MediaRecorder start, `sessionStartTime`, kiriman suara mikrofon, dan status "Tersambung". Ditutup sebelum diangkat tidak menghasilkan rekaman, dan `connect` berhenti bila ditutup saat mikrofon atau audio sedang disiapkan.
+- E2E: `telefun-call` "sambungan disiapkan selama nada dering" (setup terkirim saat masih "Memanggil…", tanpa `realtimeInput` sebelum diangkat).
 
 ## 4d. Indeks DB (migrasi + langkah untuk Fajar)
