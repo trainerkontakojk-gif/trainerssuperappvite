@@ -332,8 +332,6 @@ export default function PdktSimulation({
   // Save Settings handler
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     await settingsResource.save(newSettings);
-    // Refetch history as scenarios configuration might affect display
-    await fetchHistory();
   };
 
   // Select session from history
@@ -381,8 +379,8 @@ export default function PdktSimulation({
           json: { mailboxDraftToken: pendingMailboxRetry.token },
         }),
       )) as string;
+      // History rows are only written on reply; the new email is mailbox-only.
       await refetch();
-      await fetchHistory();
       setPendingMailboxRetry(null);
       setReplayItem(null);
       setFilter("open");
@@ -446,8 +444,8 @@ export default function PdktSimulation({
         }),
       )) as { id: string; message: EmailMessage };
 
+      // History rows are only written on reply; the new email is mailbox-only.
       await refetch();
-      await fetchHistory(); // update history list as well
       setReplayItem(null);
       setFilter("open");
       setSelectedId(result.id);

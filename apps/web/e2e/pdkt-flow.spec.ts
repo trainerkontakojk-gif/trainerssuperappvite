@@ -3677,3 +3677,77 @@ test.describe("PDKT practice again subject policy", () => {
     });
   }
 });
+
+/**
+ * Performa: riwayat PDKT memuat semua sesi lengkap (email + lampiran), jadi
+ * setiap muat ulang yang tidak perlu menghabiskan egress Supabase. Baris
+ * riwayat hanya bertambah saat membalas email.
+ */
+test.describe("PDKT tidak memuat ulang riwayat tanpa perlu (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
+  });
+
+  test("menyimpan Pengaturan tidak memuat ulang riwayat", async ({ page }) => {
+    const { audit, dialog } = await openScenarioSettings(page);
+    const count = (call: string) =>
+      audit.mockedApi.filter((entry) => entry === call).length;
+    await waitForMockedApi(audit, ["GET /api/v1/pdkt/history"]);
+    const before = count("GET /api/v1/pdkt/history");
+
+    await dialog.getByRole("button", { name: "Pulihkan bawaan" }).click();
+    await page
+      .getByRole("dialog", { name: "Pulihkan pengaturan bawaan?" })
+      .getByRole("button", { name: "Pulihkan bawaan" })
+      .click();
+    await expect
+      .poll(() => count("POST /api/v1/pdkt/settings"), { timeout: 20000 })
+      .toBe(1);
+    await page.waitForTimeout(1500);
+
+    expect(count("GET /api/v1/pdkt/history")).toBe(before);
+    expectHermetic(audit);
+  });
+
+  test("telaah selesai milik orang lain tidak memuat ulang kotak masuk dan riwayat", async ({
+    page,
+  }) => {
+    const OTHER_HISTORY_ID = "pdkt-other-user-1";
+    const othersReply = mailboxItem("mail-others", "replied", {
+      user_id: "trainer-1",
+      history_id: OTHER_HISTORY_ID,
+      replied_at: MAIL_AT,
+      created_by_user: {
+        id: "trainer-1",
+        full_name: "Siti Aminah",
+        role: "Trainer",
+        is_current_user: false,
+      },
+    });
+    const evalCall = `GET /api/v1/pdkt/history/eval/${OTHER_HISTORY_ID}`;
+    const audit = await openWorkspace(page, [
+      {
+        method: "GET",
+        path: `/api/v1/pdkt/history/eval/${OTHER_HISTORY_ID}`,
+        body: {
+          success: true,
+          data: {
+            evaluation_status: "completed",
+            evaluation: EVALUATED_HISTORY[0].evaluation,
+            evaluation_error: null,
+          },
+        },
+      },
+      ...pdktMocks([], [othersReply]),
+    ]);
+    await waitForMockedApi(audit, [evalCall]);
+    await page.waitForTimeout(2000);
+
+    const afterEval = audit.mockedApi.slice(
+      audit.mockedApi.indexOf(evalCall) + 1,
+    );
+    expect(afterEval).not.toContain("GET /api/v1/pdkt/mailbox");
+    expect(afterEval).not.toContain("GET /api/v1/pdkt/history");
+    expectHermetic(audit);
+  });
+});

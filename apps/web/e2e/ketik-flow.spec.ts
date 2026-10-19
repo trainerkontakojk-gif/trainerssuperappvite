@@ -1337,6 +1337,87 @@ test.describe("KETIK ruang chat (hermetic)", () => {
     await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
+  test("waktu sesi habis menutup kolom balasan tepat saat batasnya", async ({
+    page,
+  }) => {
+    const audit = await open(
+      page,
+      "/ketik",
+      [
+        assignedSelf,
+        ...ketikMocks([], FAST_SETTINGS),
+        {
+          method: "GET",
+          path: "/api/v1/ai/usage/summary",
+          body: { success: true, data: null },
+        },
+        {
+          method: "POST",
+          path: "/api/v1/ketik/sessions",
+          body: {
+            success: true,
+            data: serverSession({
+              expiresAt: new Date(Date.now() + 8_000).toISOString(),
+            }),
+          },
+        },
+      ],
+      "agent",
+    );
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .click({ timeout: 20000 });
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(
+      room.getByRole("textbox", { name: "Tulis balasan" }),
+    ).toBeVisible();
+
+    await expect(
+      room.getByText(
+        "Waktu sesi berakhir. Akhiri chat untuk menyimpan percakapan.",
+      ),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      room.getByRole("textbox", { name: "Tulis balasan" }),
+    ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("mulai simulasi tidak menunggu ringkasan pemakaian AI bulan ini", async ({
+    page,
+  }) => {
+    const audit = await open(
+      page,
+      "/ketik",
+      [
+        assignedSelf,
+        ...ketikMocks([], FAST_SETTINGS),
+        {
+          method: "POST",
+          path: "/api/v1/ketik/sessions",
+          body: { success: true, data: serverSession() },
+        },
+      ],
+      "agent",
+    );
+    // Ringkasan bulanan yang lambat (membaca semua log AI bulan ini) tidak
+    // boleh menahan pembuatan sesi.
+    await page.route("**/api/v1/ai/usage/summary**", () => {
+      audit.mockedApi.push("GET /api/v1/ai/usage/summary (ditahan)");
+    });
+
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .click({ timeout: 20000 });
+
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(
+      room.getByRole("textbox", { name: "Tulis balasan" }),
+    ).toBeVisible();
+    expect(audit.mockedApi).toContain("POST /api/v1/ketik/sessions");
+    expectHermetic(audit);
+  });
+
   test("chat tanpa petunjuk sesi, akhiri dengan konfirmasi, lalu masuk tahap Telaah", async ({
     page,
   }) => {

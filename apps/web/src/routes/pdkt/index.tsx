@@ -118,7 +118,6 @@ export default function PdktLanding() {
 
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     await settingsResource.save(newSettings);
-    await fetchHistory();
   };
 
   const replaySession = requestedSessionId

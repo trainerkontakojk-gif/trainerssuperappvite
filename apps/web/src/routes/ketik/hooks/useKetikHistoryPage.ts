@@ -16,17 +16,21 @@ const EMPTY: KetikHistoryPage = {
   reviewedCount: 0,
   averageScore: null,
 };
+const SEARCH_DELAY_MS = 300;
+
 export function useKetikHistoryPage() {
   const userId = useAuthStore((s) => s.session?.user.id);
   const [filter, setStatus] = useState<KetikHistoryStatus>("all");
   const [query, setSearch] = useState("");
+  // The server search scans every session of the user; wait for typing to pause.
+  const [searchTerm, setSearchTerm] = useState("");
   const [cursors, setCursors] = useState<Array<string | undefined>>([
     undefined,
   ]);
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const cursor = cursors[page];
-  const key = JSON.stringify([userId, filter, query.trim(), cursor]);
+  const key = JSON.stringify([userId, filter, searchTerm, cursor]);
   const [result, setResult] = useState<{
     key: string;
     userId: string | undefined;
@@ -49,8 +53,17 @@ export function useKetikHistoryPage() {
     setCursors([undefined]);
   };
   useEffect(() => {
+    const next = query.trim();
+    const timer = setTimeout(
+      () => setSearchTerm(next),
+      next ? SEARCH_DELAY_MS : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [query]);
+  useEffect(() => {
     setStatus("all");
     setSearch("");
+    setSearchTerm("");
     setPage(0);
     setCursors([undefined]);
   }, [userId]);
@@ -63,7 +76,7 @@ export function useKetikHistoryPage() {
       state: "loading",
     }));
     void ketikApi
-      .getHistory({ limit: 20, q: query.trim(), status: filter, cursor })
+      .getHistory({ limit: 20, q: searchTerm, status: filter, cursor })
       .then((data) => {
         if (!cancelled) setResult({ key, userId, data, state: "ready" });
       })
@@ -79,13 +92,14 @@ export function useKetikHistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [key, userId, query, filter, cursor, attempt]);
+  }, [key, userId, searchTerm, filter, cursor, attempt]);
   const state = result.key === key ? result.state : "loading";
   return {
     data: result.userId === userId ? result.data : EMPTY,
     state,
     filter,
     query,
+    searchTerm,
     setFilter,
     setQuery,
     page: page + 1,

@@ -71,16 +71,15 @@ export function useServerKetikChat(initial: KetikServerSession) {
       ? KETIK_SESSION_ERRORS.SESSION_AI_FAILED
       : "",
   );
-  const [now, setNow] = useState(() => Date.now());
+  const expiresAt = Date.parse(initial.expiresAt);
+  const [expired, setExpired] = useState(() => Date.now() >= expiresAt);
   const [closed, setClosed] = useState(
     initial.consumerClosed || initial.state !== "active",
   );
   useEffect(() => {
     mounted.current = true;
-    const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       mounted.current = false;
-      clearInterval(tick);
       if (typingTimer.current) clearTimeout(typingTimer.current);
       if (delay.current) {
         clearTimeout(delay.current.timer);
@@ -88,7 +87,15 @@ export function useServerKetikChat(initial: KetikServerSession) {
       }
     };
   }, []);
-  const expired = now >= Date.parse(initial.expiresAt);
+  // One timer at the deadline; a 1 s tick re-rendered the whole chat.
+  useEffect(() => {
+    if (expired) return;
+    const timer = setTimeout(
+      () => setExpired(true),
+      Math.max(0, expiresAt - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [expired, expiresAt]);
   const process = useCallback(async () => {
     if (busy.current || blocked.current || !mounted.current) return;
     const wait = (ms: number) =>

@@ -315,3 +315,29 @@ test("account changes clear prior history counts and replay while the next accou
     page.getByText("Belum ada sesi latihan", { exact: true }),
   ).toBeVisible();
 });
+
+test("search waits for typing to pause before querying the server", async ({
+  page,
+}) => {
+  const audit = await openHermeticShell(page, {
+    path: "/ketik/history",
+    apiMocks: mocks(),
+  });
+  const { requests } = await dynamicPages(page);
+  await page.reload();
+  const table = page.getByRole("table", { name: "Daftar sesi KETIK" });
+  await expect(table.getByRole("row")).toHaveCount(21);
+  const searches = () =>
+    requests.filter((r) => /[?&]q=[^&]/.test(r) && !r.includes("limit=100"));
+
+  await page.getByRole("searchbox").pressSequentially("Latihan 204", {
+    delay: 40,
+  });
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("Latihan 204");
+
+  // One query for the finished word, not one per keystroke.
+  expect(searches()).toHaveLength(1);
+  expect(searches()[0]).toContain("q=Latihan+204");
+  expectHermetic(audit);
+});
