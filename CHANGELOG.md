@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-19
+
+- fix(telefun): download a Telaah recording once per visit and play, seek, draw the waveform and save from that local copy, instead of pulling it from Supabase Storage again for the player and every seek; an expired link is replaced once
+
 ## 2026-10-18
 
 - feat(users): give an account a last day (masa aktif) after which it cannot sign in and its open logins end, set it from the user page, the approve dialog or for many people at once, show "Masa aktif habis" with a Habis filter and a clear login message, and add checkboxes to the users list to approve, set a practice limit, set masa aktif or suspend up to 100 accounts with a per-person result

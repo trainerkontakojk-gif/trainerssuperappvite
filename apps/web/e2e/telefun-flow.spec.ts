@@ -12,11 +12,13 @@ import { assertLocalDevOnlyTargetAt as assertLocalDevOnlyTarget } from "./helper
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
 import {
+  AGENT_RECORDING_URL,
   ANNOTATED_ROW,
   FAILED_ROW,
   FULL_HISTORY,
   NO_RECORDING_ROW,
   PENDING_ROW,
+  RECORDING_URL,
   REVIEWED_ROW,
   agentRecordingMock,
   recordingMock,
@@ -572,6 +574,56 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("rekaman diunduh sekali per halaman: gelombang, putar, dan geser memakai salinan yang sama", async ({
+    page,
+  }) => {
+    // Kuota egress Supabase: tiap unduhan rekaman dari storage dihitung.
+    const downloads = { full: 0, agent: 0 };
+    page.on("request", (request) => {
+      if (request.url() === RECORDING_URL) downloads.full += 1;
+      if (request.url() === AGENT_RECORDING_URL) downloads.agent += 1;
+    });
+    const audit = await open(
+      page,
+      telaahPath(REVIEWED_ROW.id),
+      [
+        ...telefunMocks(FULL_HISTORY),
+        agentRecordingMock(REVIEWED_ROW.id),
+        recordingMock(REVIEWED_ROW.id),
+      ],
+      (target) =>
+        serveSpeechRecordings(target, {
+          full: [[30, 35]],
+          agent: [[30, 35]],
+        }),
+    );
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(transcript.getByTestId("telefun-waveform")).toHaveAttribute(
+      "data-state",
+      "ready",
+      { timeout: 20000 },
+    );
+    const audio = page.locator("audio");
+    await expect
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration))
+      .toBe(252);
+
+    await page.getByRole("button", { name: "Putar rekaman" }).click();
+    await transcript
+      .getByTestId("telefun-line-01.18")
+      .getByRole("button", { name: /^Putar dari/ })
+      .click();
+    await expect
+      .poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime))
+      .toBeGreaterThan(78);
+    await page.getByRole("button", { name: "Jeda rekaman" }).click();
+
+    expect(downloads).toEqual({ full: 1, agent: 1 });
+    expectHermetic(audit);
+  });
+
   test("rekaman senyap selama hold: digeser ke dalam hold maupun diputar melewatinya", async ({
     page,
   }) => {
@@ -639,7 +691,7 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("tautan rekaman yang kedaluwarsa lagi diperbarui; gagal terus tampil Coba lagi", async ({
+  test("tautan rekaman yang kedaluwarsa diganti sekali; rekaman lokal tetap diputar; gagal terus tampil Coba lagi", async ({
     page,
   }) => {
     const row = REVIEWED_ROW;
@@ -682,46 +734,37 @@ test.describe("Telefun Telaah (hermetic)", () => {
       },
     );
     const audio = page.locator("audio");
-    /** Nomor tautan yang sedang dipakai pemutar, bila rekaman sudah termuat. */
     const loaded = () =>
-      audio.evaluate((el: HTMLAudioElement) =>
-        el.duration === 252
-          ? Number(/expiring-(\d+)/.exec(el.currentSrc)?.[1])
-          : null,
+      audio.evaluate(
+        (el: HTMLAudioElement) =>
+          el.duration === 252 && el.currentSrc.startsWith("blob:"),
       );
-    const expireCurrent = async () => {
-      const current = await loaded();
-      expect(current).not.toBeNull();
-      expired.add(current!);
-      await audio.evaluate((el: HTMLAudioElement) => el.load());
-      return current!;
-    };
 
-    // Tautan pertama sudah kedaluwarsa: diperbarui, lalu rekaman termuat.
-    await expect.poll(loaded, { timeout: 20000 }).not.toBeNull();
-    expect(await loaded()).not.toBe(0);
+    // Tautan pertama sudah kedaluwarsa: diganti sekali, lalu rekaman termuat
+    // dari salinan lokal.
+    await expect.poll(loaded, { timeout: 20000 }).toBe(true);
+    expect(issued).toBe(2);
 
-    // Halaman dibiarkan lama: tautan kedaluwarsa dua kali lagi, tiap kali diperbarui.
-    for (let round = 0; round < 2; round += 1) {
-      const previous = await expireCurrent();
-      await expect
-        .poll(async () => {
-          const current = await loaded();
-          return current !== null && current > previous;
-        })
-        .toBe(true);
-    }
+    // Halaman dibiarkan lama: tautan kedaluwarsa tidak memengaruhi salinan
+    // lokal, dan tidak ada tautan atau unduhan baru.
+    expired.add(1);
+    await audio.evaluate((el: HTMLAudioElement) => el.load());
+    await expect.poll(loaded).toBe(true);
+    expect(issued).toBe(2);
 
-    // Tautan baru pun gagal: pemutar tidak diam, ada pesan dan Coba lagi.
+    // Salinan lokal gagal diputar dan unduhan ulang pun gagal: pemutar tidak
+    // diam, ada pesan dan Coba lagi.
     expireNew = true;
-    await expireCurrent();
+    await audio.evaluate((el: HTMLAudioElement) => {
+      el.src = "blob:e2e-revoked";
+    });
     const alert = page.getByRole("alert").filter({
       hasText: "Rekaman belum bisa dimuat.",
     });
     await expect(alert).toBeVisible();
     expireNew = false;
     await alert.getByRole("button", { name: "Coba lagi" }).click();
-    await expect.poll(loaded).not.toBeNull();
+    await expect.poll(loaded).toBe(true);
     await expect(alert).toHaveCount(0);
     expectHermetic(audit);
   });
