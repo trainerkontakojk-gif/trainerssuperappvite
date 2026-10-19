@@ -9,6 +9,8 @@ import type { EfekParticipantResult, EfekProgramReport } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
 import QaStatePanel from "../../components/ui/QaStatePanel";
 import { SERVICE_LABELS } from "../../lib/scoring";
+import { Button } from "../../components/ui/button";
+import { downloadEfekProgramHtml } from "./efek-export";
 import { Surface, Field, State } from "./shared";
 import { TnaTabs } from "./TnaTabs";
 import { selectClass } from "./utils";
@@ -58,13 +60,25 @@ export default function EfekProgramPage() {
       }
     >
       <TnaTabs current="efek" />
-      <Link
-        to="/tna/efek"
-        search={filters}
-        className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
-      >
-        Kembali ke EFEK
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to="/tna/efek"
+          search={filters}
+          className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
+        >
+          Kembali ke EFEK
+        </Link>
+        {data && data.program.participants > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => downloadEfekProgramHtml(data, search)}
+          >
+            Unduh laporan
+          </Button>
+        )}
+      </div>
       <State
         loading={report.loading}
         error={report.error}

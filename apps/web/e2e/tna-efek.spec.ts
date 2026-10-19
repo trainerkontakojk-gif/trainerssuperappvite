@@ -520,3 +520,54 @@ test("rincian program di ponsel menampilkan peserta sebagai kartu tanpa geser sa
   ).toBe(true);
   expectHermetic(audit);
 });
+
+test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-escape", async ({
+  page,
+}) => {
+  const risky = participant({
+    peserta_id: ids.plan,
+    nama: 'Cici <img src=x onerror="alert(1)">',
+    tim: "Tim <B>",
+  });
+  const audit = await openTna(page, "/tna/efek/program/ketik?window=6", [
+    {
+      method: "GET",
+      path: "/api/v1/tna/efek/report/ketik",
+      body: ok({
+        ...programReport,
+        window: 6,
+        participants: [...programReport.participants, risky],
+      }),
+    },
+    ...efekMocks,
+  ]);
+  await expect(
+    page.getByRole("heading", { name: "KETIK · layanan Chat" }),
+  ).toBeVisible({ timeout: 20000 });
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Unduh laporan" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(
+    /^EFEK-KETIK-\d{4}-\d{2}-\d{2}\.html$/,
+  );
+  const html = await (await file.createReadStream()).toArray().then((parts) =>
+    Buffer.concat(parts).toString("utf8"),
+  );
+  expect(html).toMatch(/^<!doctype html>/i);
+  expect(html).toContain("<title>EFEK KETIK · Laporan</title>");
+  expect(html).toContain("Data SIDAK sampai September 2026");
+  expect(html).toContain("Jendela banding 6 bulan");
+  expect(html).toContain("Ana Contoh");
+  expect(html).toContain("+4,0");
+  expect(html).toContain("Rincian bulanan Ana Contoh");
+  expect(html).toContain("Februari 2026");
+  expect(html).toContain("<svg");
+  expect(html).toContain("@media print");
+  expect(html).toContain(
+    "Cici &lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
+  );
+  expect(html).not.toContain("<img");
+  expect(html).not.toContain("<script");
+  expect(html).toContain("Tim &lt;B&gt;");
+  expectHermetic(audit);
+});

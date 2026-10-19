@@ -19,6 +19,7 @@ import { useAgentQuickview } from "../../hooks/useAgentQuickview";
 import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
 import AgentCoachingBrief from "../../components/sidak/AgentCoachingBrief";
 import AgentPerformanceQuickview from "../../components/sidak/AgentPerformanceQuickview";
+import AgentEfekTraining from "../../components/sidak/AgentEfekTraining";
 import AgentProfileSidebar from "../../components/sidak/AgentProfileSidebar";
 import AgentSwitcher from "../../components/sidak/AgentSwitcher";
 import AgentTemuanTab, {
@@ -382,12 +383,15 @@ export default function SidakAgentDetailPage() {
             ) : null
           }
           quickview={
-            <AgentPerformanceQuickview
-              data={quickviewData}
-              loading={quickviewLoading}
-              error={quickviewError}
-              scopeLabel={quickviewScopeLabel}
-            />
+            <>
+              <AgentPerformanceQuickview
+                data={quickviewData}
+                loading={quickviewLoading}
+                error={quickviewError}
+                scopeLabel={quickviewScopeLabel}
+              />
+              <AgentEfekTraining entries={quickviewData?.efekTraining} />
+            </>
           }
         />
 

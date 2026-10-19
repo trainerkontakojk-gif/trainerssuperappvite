@@ -6,9 +6,10 @@ import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { serviceTypeSchema } from "@trainers/types";
+import { can, serviceTypeSchema } from "@trainers/types";
 import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
+import { listEfekTrainingForAgent } from "../../services/efek/training";
 import {
   getRankingData,
   RankingInputError,
@@ -100,6 +101,13 @@ sidakDashboard.get(
         accessibleAgentIds,
         filterScope,
       });
+      // EFEK training is a TNA view: admin/trainer only, and never blocks SIDAK.
+      if (can(profile?.role, "tna.read")) {
+        const training = await listEfekTrainingForAgent(agentId).catch(
+          () => null,
+        );
+        if (training) data.efekTraining = training;
+      }
       return c.json({ success: true, data });
     } catch (error) {
       if (error instanceof ScopeUnavailableError) throw error;

@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Hono } from "hono";
-import type { EfekProgramReport, EfekReport } from "@trainers/types";
+import type {
+  EfekProgramReport,
+  EfekReport,
+  SidakAgentQuickviewResponse,
+} from "@trainers/types";
 import { tnaApiRequest } from "./helpers/tnaApi";
 import {
   createAdmin,
@@ -381,4 +385,45 @@ test("report validates input and stays admin/trainer only", async () => {
   expect((await call("/report/asing")).status).toBe(404);
   expect((await call("/report", leader.token)).status).toBe(403);
   expect((await call("/report/ketik", leader.token)).status).toBe(403);
+});
+
+test("SIDAK agent quickview lists the agent's EFEK training for admin and trainer only", async () => {
+  const quickview = async (token: string) => {
+    const response = await tnaApiRequest(
+      app,
+      `http://localhost/api/v1/sidak/agents/${people.dimas.id}/quickview?year=2019&service_type=chat`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return {
+      status: response.status,
+      body: (await response.json()) as {
+        data?: SidakAgentQuickviewResponse;
+      },
+    };
+  };
+  const trainerView = await quickview(trainer.token);
+  expect(trainerView.status).toBe(200);
+  expect(trainerView.body.data!.efekTraining).toEqual([
+    {
+      sessionId: november,
+      programCode: "ketik",
+      programName: "KETIK",
+      title: `Level Up Week November 2019 ${tag}`,
+      startDate: "2019-11-11",
+      endDate: "2019-11-15",
+    },
+    {
+      sessionId: mei,
+      programCode: "ketik",
+      programName: "KETIK",
+      title: `Level Up Week Mei 2019 ${tag}`,
+      startDate: "2019-05-13",
+      endDate: "2019-05-17",
+    },
+  ]);
+  // Leaders read SIDAK for their own team only; training stays a TNA view.
+  const leaderView = await quickview(leader.token);
+  if (leaderView.status === 200)
+    expect(leaderView.body.data!.efekTraining).toBeUndefined();
+  else expect(leaderView.status).toBe(403);
 });

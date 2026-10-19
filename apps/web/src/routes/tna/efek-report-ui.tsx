@@ -8,12 +8,11 @@ import type { EfekReportSearch } from "../../router";
 import { Field } from "./shared";
 import { selectClass } from "./utils";
 import {
+  chartGeometry,
   deltaClass,
   fmt,
   fmtDelta,
-  offsetLabel,
   offsetText,
-  one,
 } from "./efek-report-format";
 
 /** Shared EFEK report pieces for `/tna/efek` and `/tna/efek/program/$code`. */
@@ -202,38 +201,7 @@ export function RelativeChart({
   participantsLabel: string;
   comparisonLabel: string;
 }) {
-  const width = 480;
-  const height = 200;
-  const pad = { left: 36, right: 12, top: 14, bottom: 26 };
-  const values = points
-    .flatMap((p) => pick(p))
-    .filter((v): v is number => v !== null);
-  const min = values.length ? Math.min(...values) : 0;
-  const max = values.length ? Math.max(...values) : 1;
-  const span = max - min || 1;
-  const lo = min - span * 0.15;
-  const hi = max + span * 0.15;
-  const x = (i: number) =>
-    pad.left +
-    (i * (width - pad.left - pad.right)) / Math.max(1, points.length - 1);
-  const y = (v: number) =>
-    pad.top + ((hi - v) * (height - pad.top - pad.bottom)) / (hi - lo);
-  const path = (series: 0 | 1) => {
-    let d = "";
-    let pen = false;
-    points.forEach((p, i) => {
-      const v = pick(p)[series];
-      if (v === null) {
-        pen = false;
-        return;
-      }
-      d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
-      pen = true;
-    });
-    return d;
-  };
-  const zero = points.findIndex((p) => p.offset === 0);
-  const step = (width - pad.left - pad.right) / Math.max(1, points.length - 1);
+  const g = chartGeometry(points, pick);
   return (
     <figure className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-4">
       <figcaption className="text-sm font-semibold">{title}</figcaption>
@@ -252,76 +220,63 @@ export function RelativeChart({
         </span>
       </div>
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${g.width} ${g.height}`}
         className="h-auto w-full"
         aria-hidden="true"
       >
-        {zero >= 0 && (
-          <rect
-            x={x(zero) - step / 2}
-            y={pad.top}
-            width={step}
-            height={height - pad.top - pad.bottom}
-            className="fill-module-tna/10"
-          />
-        )}
-        {[lo + (hi - lo) * 0.15, (lo + hi) / 2, hi - (hi - lo) * 0.15].map(
-          (v) => (
-            <g key={v}>
-              <line
-                x1={pad.left}
-                x2={width - pad.right}
-                y1={y(v)}
-                y2={y(v)}
-                className="stroke-border"
-              />
-              <text
-                x={pad.left - 6}
-                y={y(v) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground text-[10px]"
-              >
-                {one.format(v)}
-              </text>
-            </g>
-          ),
-        )}
-        {points.map((p, i) => (
+        {g.band && <rect {...g.band} className="fill-module-tna/10" />}
+        {g.grid.map((line) => (
+          <g key={line.label}>
+            <line
+              x1={line.x1}
+              x2={line.x2}
+              y1={line.y}
+              y2={line.y}
+              className="stroke-border"
+            />
+            <text
+              x={line.labelX}
+              y={line.y + 3}
+              textAnchor="end"
+              className="fill-muted-foreground text-[10px]"
+            >
+              {line.label}
+            </text>
+          </g>
+        ))}
+        {g.ticks.map((t) => (
           <text
-            key={p.offset}
-            x={x(i)}
-            y={height - 8}
+            key={t.key}
+            x={t.x}
+            y={t.y}
             textAnchor="middle"
             className="fill-muted-foreground text-[10px]"
           >
-            {offsetLabel(p.offset)}
+            {t.label}
           </text>
         ))}
         <path
-          d={path(1)}
+          d={g.comparison}
           fill="none"
           strokeWidth={2}
           strokeDasharray="5 4"
           className="stroke-muted-foreground"
         />
         <path
-          d={path(0)}
+          d={g.participants}
           fill="none"
           strokeWidth={2.5}
           className="stroke-module-tna"
         />
-        {points.map((p, i) => {
-          const v = pick(p)[0];
-          return v === null ? null : (
-            <circle
-              key={p.offset}
-              cx={x(i)}
-              cy={y(v)}
-              r={3.5}
-              className="fill-module-tna"
-            />
-          );
-        })}
+        {g.dots.map((d) => (
+          <circle
+            key={d.key}
+            cx={d.x}
+            cy={d.y}
+            r={3.5}
+            className="fill-module-tna"
+          />
+        ))}
       </svg>
       <table className="sr-only">
         <caption>{title}</caption>

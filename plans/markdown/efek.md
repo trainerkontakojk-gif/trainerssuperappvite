@@ -58,9 +58,14 @@ Phase 2 (report, no schema change):
 
 Phase 3: printable HTML export and an "Ikut pelatihan" line on SIDAK agent detail (admin/trainer).
 
+- Export: "Unduh laporan" on `/tna/efek/program/$code` builds one self-contained HTML file in the
+  browser from the loaded report (same chart geometry as the page, every value HTML-escaped).
+- SIDAK: the agent quickview adds `efekTraining` only when the caller has `tna.read`; a failed
+  EFEK read is dropped so SIDAK never breaks (e.g. before the EFEK migration reaches production).
+
 ## Tasklist
 
 - [x] P1 RED: `apps/web/e2e/tna-efek-api.spec.ts` (real backend) and `tna-efek.spec.ts` (hermetic).
 - [x] P1 migration + rollback, types, API, web, CHANGELOG, docs.
 - [x] P2 report service + UI + E2E.
-- [ ] P3 export + SIDAK link + E2E.
+- [x] P3 export + SIDAK link + E2E.
