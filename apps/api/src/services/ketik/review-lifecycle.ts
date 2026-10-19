@@ -8,6 +8,7 @@ import {
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
 import { processKetikReviewJob } from "./review-processor";
+import { mapKetikReviewDetail } from "./settings-history";
 import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
 
 // Gemini can retry the developer-instruction incompatibility once, then OpenAI.
@@ -130,17 +131,25 @@ export async function getKetikReviewStatus(
   const missingResult =
     (history.review_status === "completed" || job?.status === "completed") &&
     !resultReady;
+  const status: KetikReviewStatus["status"] = missingResult
+    ? "failed"
+    : (job?.status ??
+      (resultReady
+        ? "completed"
+        : history.review_status === "failed"
+          ? "failed"
+          : history.review_status === "processing"
+            ? "processing"
+            : "pending"));
+  // A ready result rides along when the reader will show it next (finished,
+  // or a failed re-score that kept it), so opening Telaah needs one read. A
+  // re-score still running keeps the poll small.
+  const detail =
+    resultReady && (status === "completed" || status === "failed")
+      ? mapKetikReviewDetail(sessionId, data)
+      : null;
   return {
-    status: missingResult
-      ? "failed"
-      : (job?.status ??
-        (resultReady
-          ? "completed"
-          : history.review_status === "failed"
-            ? "failed"
-            : history.review_status === "processing"
-              ? "processing"
-              : "pending")),
+    status,
     resultReady,
     scores,
     previousKept: resultReady && job?.status === "failed",
@@ -148,6 +157,7 @@ export async function getKetikReviewStatus(
       actorRole === "agent" || actorRole === "leader"
         ? Math.max(0, KETIK_RERUN_LIMIT - (history.rerun_count ?? 0))
         : null,
+    ...(detail ? { detail } : {}),
     ...(job?.status === "failed" || missingResult
       ? { errorMessage: KETIK_ERROR_MESSAGES.REVIEW_FAILED }
       : {}),

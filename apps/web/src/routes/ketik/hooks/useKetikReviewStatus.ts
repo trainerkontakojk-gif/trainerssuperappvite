@@ -85,12 +85,12 @@ export function useKetikReviewStatus(
     [update],
   );
   const loadResult = useCallback(
-    async (run: number) => {
+    async (run: number, known?: KetikReviewDetail) => {
       const current = sessionRef.current;
       if (!current || run !== runRef.current) return;
       setState((prev) => ({ ...prev, phase: "loading-result", failure: null }));
       try {
-        const detail = await ketikApi.getReviewDetail(current.id);
+        const detail = known ?? (await ketikApi.getReviewDetail(current.id));
         if (run !== runRef.current) return;
         requestRef.current = null;
         update(withScores(current, detail.scores));
@@ -119,9 +119,9 @@ export function useKetikReviewStatus(
         setState((prev) => ({ ...prev, pollFailed: false }));
         if (data.status === "failed" && data.previousKept && data.resultReady) {
           rerunFailedRun.current = run;
-          await loadResult(run);
+          await loadResult(run, data.detail);
         } else if (data.status === "completed" && data.resultReady) {
-          await loadResult(run);
+          await loadResult(run, data.detail);
         } else if (data.status === "failed") {
           fail(run, "review", true);
         } else if (data.status === "queued" || data.status === "processing") {

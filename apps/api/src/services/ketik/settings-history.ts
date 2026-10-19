@@ -327,6 +327,14 @@ export async function getReviewDetail(
     p_session: sessionId,
   });
   if (error) throw error;
+  return mapKetikReviewDetail(sessionId, data);
+}
+
+/** Maps a `read_ketik_review` snapshot to the review result, or null if none is ready. */
+export function mapKetikReviewDetail(
+  sessionId: string,
+  data: any,
+): KetikReviewDetail | null {
   if (!data || data.history.review_status !== "completed" || !data.review)
     return null;
   const history = data.history;

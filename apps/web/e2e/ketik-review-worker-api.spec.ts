@@ -589,6 +589,9 @@ test("failure during rerun publication rolls back review, typos, scores and comp
       resultReady: true,
       previousKept: true,
     });
+    // The status already carries the kept result, so opening Telaah needs no
+    // second read of the same review.
+    expect(status.detail).toEqual(kept);
     expect(
       (
         await db

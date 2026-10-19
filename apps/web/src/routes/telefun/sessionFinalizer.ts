@@ -55,9 +55,11 @@ export interface FinalizerDependencies {
 }
 
 const defaultDependencies: FinalizerDependencies = {
+  // The local session is enough for the storage path; Storage RLS checks the
+  // token itself, so a network round trip to Auth adds only waiting.
   getUserId: async () => {
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.id;
   },
   uploadRecording: async ({ path, blob }) => {
     const { data } = await supabase.storage
@@ -236,58 +238,38 @@ export async function saveTelefunSession(
   let recordingTransition: TelefunRecordingTransitionResult | undefined;
 
   if (userId) {
-    if (params.fullBlob) {
+    const ownerId = userId;
+    // Both tracks upload together; each failure is reported on its own.
+    const uploadTrack = async (
+      type: "full_call" | "agent_only",
+      blob: Blob | null | undefined,
+    ) => {
+      if (!blob) return undefined;
+      const label = type === "full_call" ? "Full" : "Agent";
       try {
         const path = buildTelefunRecordingPath({
-          userId,
+          userId: ownerId,
           sessionId: params.sessionId,
-          type: "full_call",
+          type,
         });
-        const fullBlob = params.fullBlob;
-        recordingPath = await retryOnce(async () => {
-          const uploaded = await deps.uploadRecording({
-            path,
-            blob: fullBlob,
-            type: "full_call",
-          });
+        const uploadedPath = await retryOnce(async () => {
+          const uploaded = await deps.uploadRecording({ path, blob, type });
           if (!uploaded)
-            throw new Error("Full recording upload returned no path.");
+            throw new Error(`${label} recording upload returned no path.`);
           return isWebRtcSession ? path : uploaded;
         });
-        if (!recordingPath) {
-          markUploadFailed(status);
-        }
+        if (!uploadedPath) markUploadFailed(status);
+        return uploadedPath;
       } catch (err) {
-        console.error("Full recording upload failed:", err);
+        console.error(`${label} recording upload failed:`, err);
         markUploadFailed(status);
+        return undefined;
       }
-    }
-    if (params.agentBlob) {
-      try {
-        const path = buildTelefunRecordingPath({
-          userId,
-          sessionId: params.sessionId,
-          type: "agent_only",
-        });
-        const agentBlob = params.agentBlob;
-        agentRecordingPath = await retryOnce(async () => {
-          const uploaded = await deps.uploadRecording({
-            path,
-            blob: agentBlob,
-            type: "agent_only",
-          });
-          if (!uploaded)
-            throw new Error("Agent recording upload returned no path.");
-          return isWebRtcSession ? path : uploaded;
-        });
-        if (!agentRecordingPath) {
-          markUploadFailed(status);
-        }
-      } catch (err) {
-        console.error("Agent recording upload failed:", err);
-        markUploadFailed(status);
-      }
-    }
+    };
+    [recordingPath, agentRecordingPath] = await Promise.all([
+      uploadTrack("full_call", params.fullBlob),
+      uploadTrack("agent_only", params.agentBlob),
+    ]);
   } else if (params.fullBlob || params.agentBlob) {
     markUploadFailed(status);
   }
