@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { EfekTrainingEntry } from "./efek";
 
 export const serviceTypeSchema = z.enum([
   "call",
@@ -583,6 +584,8 @@ export interface SidakAgentQuickviewResponse {
   combinedTeam: SidakAgentRankQuickview | null;
   leaderTeam: SidakAgentRankQuickview | null;
   forecast: SidakAgentForecastQuickview | null;
+  /** EFEK sessions the agent joined; only for roles with `tna.read`. */
+  efekTraining?: EfekTrainingEntry[];
 }
 
 // Single source for root-cause cluster ids. SIDAK root causes and the TNA

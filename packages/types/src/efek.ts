@@ -225,3 +225,13 @@ export interface EfekProgramReport extends Omit<EfekReport, "programs"> {
   chart: EfekChartPoint[];
   participants: EfekParticipantResult[];
 }
+
+/** One training session an agent joined, shown on SIDAK agent detail (admin/trainer). */
+export interface EfekTrainingEntry {
+  sessionId: string;
+  programCode: string;
+  programName: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+}
