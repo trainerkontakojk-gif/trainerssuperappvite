@@ -24,3 +24,7 @@ Lane C (API contract + UI data loading). Sumber: audit `/mnt/project-files/audit
 - E2E: `telefun-call` "sambungan disiapkan selama nada dering" (setup terkirim saat masih "Memanggil…", tanpa `realtimeInput` sebelum diangkat).
 
 ## 4d. Indeks DB (migrasi + langkah untuk Fajar)
+
+- `20261019140000_practice_history_list_indexes.sql` adds `telefun_history (user_id, created_at DESC, id DESC)`, `pdkt_history (user_id, "timestamp" DESC, id DESC)`, and `pdkt_mailbox_items (last_activity_at DESC, id DESC)`. The mailbox is shared (SELECT policy `true`), so its list has no owner filter.
+- Additive, and no code depends on it, so the merge order does not matter. Verified locally: apply twice, then rollback, then apply again. With seqscan off, the plan uses an Index Only Scan.
+- Production: Fajar runs `supabase db push` from `main` (runbook `/mnt/project-files/audit-performa/gelombang-4-indeks-langkah-produksi.md`).
