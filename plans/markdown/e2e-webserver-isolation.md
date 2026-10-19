@@ -106,7 +106,7 @@ No browser spec needs the real API or Telefun process: every spec either mocks `
 - **G3:** `e2e-target-isolation.spec.ts` iterates over every served `import.meta.env` entry whose value parses as an `http(s)`/`ws(s)` URL and asserts loopback (empty `VITE_API_URL` stays allowed).
 - **G4:** this spec has no Supabase env pin (it needs no DB). The router now loads in `test.beforeAll` with a dynamic `import()` while `VITE_SUPABASE_URL`/`SUPABASE_URL` are pinned to `E2E_SUPABASE_URL` and restored afterwards. A future import reaching `lib/env` would then bind to the dead port, not production.
 - **No full-stack config.** No spec needs a running API or Telefun process. A `playwright.fullstack.config.ts` would add a path that boots background jobs for no current coverage. If a future spec needs one, it gets its own config whose `webServer` env comes from `.env.integration`, plus a preflight that refuses to start unless every Supabase URL is loopback.
-- **Out of scope, flagged:** root `pnpm dev` itself runs both maintenance jobs (subject-intent DELETE, orphan-claim UPDATE) against production whenever a developer uses it. That is a dev-workflow decision, not E2E. Options: gate the jobs behind `NODE_ENV=production` or an explicit flag, or point local dev at local Supabase.
+- **Out of scope, flagged (resolved 2026-10-19 by `plans/markdown/dev-production-database-guard.md`):** root `pnpm dev` itself runs both maintenance jobs (subject-intent DELETE, orphan-claim UPDATE) against production whenever a developer uses it. That is a dev-workflow decision, not E2E. Options: gate the jobs behind `NODE_ENV=production` or an explicit flag, or point local dev at local Supabase.
 
 ## Tasklist
 

@@ -26,3 +26,4 @@ export * from "./access";
 export * from "./ketik-history";
 
 export * from "./ketik-review";
+export * from "./dev-database-guard";

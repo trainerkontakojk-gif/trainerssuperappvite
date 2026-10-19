@@ -46,6 +46,7 @@ export default defineConfig({
       testMatch: ["user-controls-api.spec.ts", "account-controls-api.spec.ts"],
     },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
+    { name: "dev-database-guard", testMatch: "dev-database-guard-api.spec.ts" },
     {
       name: "pdkt-consumer-email-stub",
       testMatch: "pdkt-consumer-email-api.spec.ts",

@@ -1,3 +1,4 @@
+import { checkDevDatabaseTarget } from "@trainers/types";
 import { parseTelefunEnv } from "./env-schema.js";
 
 try {
@@ -16,5 +17,16 @@ if (!parsed.success) {
   });
   process.exit(1);
 }
+
+const guard = checkDevDatabaseTarget(
+  "Telefun",
+  parsed.data.SUPABASE_URL,
+  process.env,
+);
+if (guard.kind === "refused") {
+  console.error(guard.message);
+  process.exit(1);
+}
+if (guard.kind === "allowed") console.warn(guard.message);
 
 export const env = parsed.data;
