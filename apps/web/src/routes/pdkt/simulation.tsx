@@ -240,7 +240,7 @@ export default function PdktSimulation({
   const fetchHistory = useCallback(async () => {
     try {
       const res = (await unwrapResponse(
-        await pdktClient.history.$get(),
+        await pdktClient.history.$get({ query: { view: "list" } }),
       )) as any[];
       if (res) {
         const mapped = res.map(mapHistoryRow);
@@ -316,7 +316,8 @@ export default function PdktSimulation({
   );
   const notifyReview = useCallback(() => notifyAfter("review"), [notifyAfter]);
 
-  const { evaluations, retryEvaluation, seedEvaluation } = usePdktEvaluations({
+  const { evaluations, retryEvaluation, seedEvaluation, loadFullResult } =
+    usePdktEvaluations({
     visibleMailboxItems,
     history,
     refetch,
@@ -523,6 +524,19 @@ export default function PdktSimulation({
     if (error) console.error("[PDKT] Failed to load mailbox:", error);
   }, [error]);
 
+  // A review seeded from the summary history list holds only its score.
+  const telaahHistoryId =
+    isReviewOpen &&
+    selectedItem?.status === "replied" &&
+    selectedItem?.history_id &&
+    evaluations[selectedItem.id]?.partial
+      ? selectedItem.history_id
+      : null;
+  useEffect(() => {
+    if (telaahHistoryId && selectedItem)
+      void loadFullResult(selectedItem.id, telaahHistoryId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telaahHistoryId]);
   if (loading && !mailboxItems) {
     return <PdktInboxLoading onBack={onBack} />;
   }
@@ -639,7 +653,11 @@ export default function PdktSimulation({
         key={selectedItem.id}
         item={selectedItem}
         status={review?.status ?? null}
-        result={(review?.result as PdktEvaluationResult | null) ?? null}
+        result={
+          review?.partial
+            ? null
+            : ((review?.result as PdktEvaluationResult | null) ?? null)
+        }
         onRetry={() => {
           if (selectedItem.history_id) {
             void retryEvaluation(selectedItem.id, selectedItem.history_id);

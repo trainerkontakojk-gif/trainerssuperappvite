@@ -11,6 +11,8 @@ export interface PdktEvaluationEntry {
   result: any | null;
   status: MailboxReviewState["status"];
   error: string | null;
+  /** Seeded from a summary history row: `result` holds only the score. */
+  partial?: boolean;
 }
 
 interface UsePdktEvaluationsOptions {
@@ -92,17 +94,23 @@ export function usePdktEvaluations({
           (historyItem?.evaluation ? "completed" : "processing");
         const result = historyItem?.evaluation || null;
         const error = historyItem?.evaluationError || null;
+        const partial = historyItem?.detail === "summary";
+        // A full result already loaded outlives the summary row it came from.
+        if (partial && current && !current.partial && current.status === status)
+          return;
 
         if (
           !current ||
           current.status !== status ||
           current.error !== error ||
+          Boolean(current.partial) !== partial ||
           JSON.stringify(current.result) !== JSON.stringify(result)
         ) {
           next[item.id] = {
             result,
             status: status as "pending" | "processing" | "completed" | "failed",
             error,
+            ...(partial ? { partial } : {}),
           };
           changed = true;
         }
@@ -272,6 +280,37 @@ export function usePdktEvaluations({
     }
   };
 
+  /** Replaces a summary-seeded result with the full review before Telaah shows it. */
+  const loadFullResult = async (mailboxId: string, historyId: string) => {
+    if (inFlightEvaluationIdsRef.current.has(historyId)) return;
+    inFlightEvaluationIdsRef.current.add(historyId);
+    try {
+      const response = (await unwrapResponse(
+        await pdktClient.history.eval[":id"].$get({
+          param: { id: historyId },
+        }),
+      )) as any;
+      if (!response) return;
+      setEvaluations((prev) => {
+        const next = {
+          ...prev,
+          [mailboxId]: {
+            result: response.evaluation || null,
+            status: response.evaluation_status || "processing",
+            error: response.evaluation_error || null,
+          },
+        };
+        evaluationsRef.current = next;
+        return next;
+      });
+    } catch (err) {
+      console.error("[PDKT] Failed to load review:", err);
+      notify.error("Telaah belum bisa dimuat. Buka ulang email ini.");
+    } finally {
+      inFlightEvaluationIdsRef.current.delete(historyId);
+    }
+  };
+
   /** Seeds the review shown with a replay item, keeping any known state. */
   const seedEvaluation = (mailboxId: string, entry: PdktEvaluationEntry) => {
     setEvaluations((prev) => {
@@ -280,5 +319,5 @@ export function usePdktEvaluations({
     });
   };
 
-  return { evaluations, retryEvaluation, seedEvaluation };
+  return { evaluations, retryEvaluation, seedEvaluation, loadFullResult };
 }

@@ -25,6 +25,8 @@ export interface SessionHistory {
   evaluationError?: string | null;
   timeTaken?: number | null;
   simulationSubject?: SimulationSubjectSnapshot | null;
+  /** `summary`: a `?view=list` row; load `GET /pdkt/history/:id` to show it. */
+  detail?: "summary" | "full";
 }
 
 /** Baris mentah `GET /pdkt/history` → bentuk yang dipakai UI. */
@@ -43,6 +45,7 @@ export function mapHistoryRow(item: any): SessionHistory {
     evaluationError: item.evaluation_error,
     timeTaken: item.time_taken,
     simulationSubject: item.simulationSubject ?? null,
+    detail: item.detail === "summary" ? "summary" : "full",
   };
 }
 

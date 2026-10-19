@@ -1383,14 +1383,14 @@ test.describe("PDKT (hermetic)", () => {
       timeout: 20000,
     });
     const before = audit.mockedApi.filter((call) =>
-      call.endsWith("/api/v1/pdkt/history"),
+      call.endsWith("/api/v1/pdkt/history?view=list"),
     ).length;
     await page.getByRole("button", { name: "Coba lagi" }).click();
     await expect
       .poll(
         () =>
           audit.mockedApi.filter((call) =>
-            call.endsWith("/api/v1/pdkt/history"),
+            call.endsWith("/api/v1/pdkt/history?view=list"),
           ).length,
       )
       .toBeGreaterThan(before);
@@ -3816,6 +3816,118 @@ test.describe("PDKT tidak memuat ulang riwayat tanpa perlu (hermetic)", () => {
     );
     expect(afterEval).not.toContain("GET /api/v1/pdkt/mailbox");
     expect(afterEval).not.toContain("GET /api/v1/pdkt/history");
+    expectHermetic(audit);
+  });
+});
+
+test.describe("PDKT riwayat ringkas", () => {
+  test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
+
+  /** Bentuk `GET /pdkt/history?view=list`: hanya yang ditampilkan daftar. */
+  function summaryOf(session: SessionHistory) {
+    const emails = (session.emails ?? []) as Array<{ subject?: string }>;
+    const scenario = (
+      session.config as { scenarios?: Array<{ id?: string; title?: string }> }
+    )?.scenarios?.[0];
+    return {
+      id: session.id,
+      timestamp: session.timestamp,
+      detail: "summary",
+      evaluation_status: session.evaluationStatus,
+      evaluation:
+        typeof session.evaluation?.score === "number"
+          ? { score: session.evaluation.score }
+          : null,
+      config: { scenarios: [{ id: scenario?.id, title: scenario?.title }] },
+      emails: [{ subject: emails.at(-1)?.subject }],
+      simulationSubject: session.simulationSubject ?? null,
+    } as unknown as SessionHistory;
+  }
+
+  test("landing dan halaman Riwayat hanya memuat riwayat versi ringkas", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks(HISTORY_PAGE_SESSIONS.map(summaryOf)),
+    });
+    await waitForMockedApi(audit, ["/api/v1/pdkt/history?view=list"]);
+    await page.goto("/pdkt/history");
+    await expect(page.getByTestId("pdkt-history-summary")).toBeVisible();
+    await expect(
+      page.getByRole("table").getByText(REPLIED_MAIL.list.subject),
+    ).toBeVisible();
+    const historyCalls = audit.mockedApi.filter((entry) =>
+      entry.startsWith("GET /api/v1/pdkt/history"),
+    );
+    expect(historyCalls.length).toBeGreaterThanOrEqual(2);
+    expect(historyCalls).toEqual(
+      historyCalls.map(() => "GET /api/v1/pdkt/history?view=list"),
+    );
+    expectHermetic(audit);
+  });
+
+  test("Telaah dari riwayat ringkas memuat hasil lengkap lebih dulu", async ({
+    page,
+  }) => {
+    const audit = await openWorkspace(
+      page,
+      pdktNavigationMocks(EVALUATED_HISTORY, [REPLIED_MAIL]).map((mock) =>
+        mock.path === "/api/v1/pdkt/history"
+          ? {
+              ...mock,
+              body: { success: true, data: EVALUATED_HISTORY.map(summaryOf) },
+            }
+          : mock,
+      ),
+    );
+    await page.getByRole("button", { name: /^Dibalas/ }).click();
+    const row = page.getByRole("button", {
+      name: new RegExp(REPLIED_MAIL.list.subject),
+    });
+    await expect(row).toContainText("Skor 85");
+    await row.click();
+    await page.getByRole("button", { name: "Lihat telaah" }).click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await expect(page.getByText("Jawaban relevan dan jelas.")).toBeVisible();
+    expect(audit.mockedApi).toContain(
+      `GET /api/v1/pdkt/history/eval/${EVALUATED_HISTORY[0].id}`,
+    );
+    expectHermetic(audit);
+  });
+
+  test("membuka sesi dari riwayat ringkas memuat sesi lengkapnya", async ({
+    page,
+  }) => {
+    const session = {
+      ...EVALUATED_HISTORY[0],
+      simulationSubject: SUBJECT_X,
+      emails: [
+        SUBJECT_MAIL.detail.inbound_email,
+        ...SUBJECT_MAIL.detail.emails_thread,
+      ],
+    } as unknown as SessionHistory;
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt/history",
+      apiMocks: [
+        {
+          method: "GET",
+          path: `/api/v1/pdkt/history/${session.id}`,
+          body: { success: true, data: session },
+        },
+        ...CREATE_MOCKS,
+        ...pdktNavigationMocks([summaryOf(session)], [OPEN_MAIL]),
+      ],
+    });
+    await page
+      .getByRole("table")
+      .getByRole("link", { name: `Re: ${SUBJECT_MAIL.list.subject}` })
+      .click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await expect(page.getByText("Jawaban relevan dan jelas.")).toBeVisible();
+    expect(audit.mockedApi).toContain(
+      `GET /api/v1/pdkt/history/${session.id}`,
+    );
     expectHermetic(audit);
   });
 });

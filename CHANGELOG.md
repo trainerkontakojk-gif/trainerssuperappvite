@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-19
 
+- perf(pdkt): load the PDKT history list (Riwayat, workspace, landing) as short rows with only the score, scenario title and last subject (`GET /pdkt/history?view=list`), and fetch one full session (`GET /pdkt/history/:id`) only to replay it or its full Telaah only when Telaah opens, instead of downloading every email and evaluation up front
 - perf(practice): store KETIK scenario images and PDKT attachments once in a Supabase Storage bucket and keep only their links in settings, sessions, mailbox and history, with a one-off backfill (`pnpm --filter @trainers/api backfill:scenario-attachments`) that moves existing base64 attachments; PDKT shows and opens image and PDF links
 - perf(practice): open a finished KETIK Telaah with one read (the review status now carries the ready result), return the Telefun score without waiting for the coaching summary AI call, and upload both Telefun recordings at once after a call
 - perf(practice): stop reloading the full PDKT history after saving settings, creating an email or re-saving a draft, and when someone else's finished review is first read; start a KETIK session without waiting for the monthly AI cost summary, wait 300 ms after typing before searching KETIK history, re-render the KETIK chat once at the deadline instead of every second, and record Telefun calls at 32 kbps instead of the browser's ~128 kbps
