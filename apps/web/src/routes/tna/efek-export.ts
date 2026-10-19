@@ -98,6 +98,17 @@ export function buildEfekProgramHtml(
 <h1>EFEK · ${esc(p.name)} · layanan ${esc(service)}</h1>
 <p class="meta">Evaluasi Efektivitas dan Kinerja. Dibuat ${esc(DATE.format(now))} · Data SIDAK sampai ${esc(monthLabel(report.data_until))}</p>
 <p class="meta">${filters.map(esc).join(" · ")}</p>
+${
+  report.analysis
+    ? `<h2>Perbandingan analisis</h2>
+<p>Semua peserta: ${esc(fmtDelta(report.analysis.all_participants.avg_delta))} poin QA rata-rata · ${report.analysis.all_participants.evaluated} dari ${report.analysis.all_participants.participants} bisa dievaluasi.</p>
+<h3>Pengecualian analisis</h3>
+<p>Filter analisis saja; data keikutsertaan dan skor individu tidak dihapus. Berlaku untuk semua sesi agent pada filter laporan ini.</p>
+<ul>${report.analysis.exclusions.map((r) => `<li><b>${esc(r.nama)}</b>: ${esc(r.reason)}</li>`).join("")}</ul>
+<h3>Setelah pengecualian</h3>
+<p>Ringkasan, sesi dan grafik berikut hanya menghitung peserta yang disertakan.</p>`
+    : ""
+}
 <div class="grid">
 ${stat(fmtDelta(p.avg_delta), "poin QA rata-rata", tone(p.avg_delta))}
 ${stat(`${p.naik} / ${p.stabil} / ${p.turun}`, "naik / stabil / turun")}
@@ -131,7 +142,7 @@ ${report.sessions
 ${report.participants
   .map(
     (r) =>
-      `<tr><td><b>${esc(r.nama)}</b><br><span class="muted">${esc(r.tim ?? "Tanpa tim")} · ${r.months_before} bln sebelum, ${r.months_after} bln sesudah</span></td><td>${esc(r.session_title)}<br><span class="muted">${esc(monthShort({ year: Number(r.start_date.slice(0, 4)), month: Number(r.start_date.slice(5, 7)) }))}</span></td><td>${esc(fmt(r.findings_per_session_before))} → ${esc(fmt(r.findings_per_session_after))}</td><td>${esc(fmt(r.score_before))} → ${esc(fmt(r.score_after))}</td><td class="n ${tone(r.delta)}"><b>${esc(fmtDelta(r.delta))}</b></td><td class="n ${tone(r.relative_delta)}">${esc(fmtDelta(r.relative_delta))}</td><td><span class="chip">${esc(STATUS_LABELS[r.status])}</span>${r.thin ? '<span class="chip">Data tipis</span>' : ""}</td></tr>`,
+      `<tr><td><b>${esc(r.nama)}</b><br><span class="muted">${esc(r.tim ?? "Tanpa tim")} · ${r.months_before} bln sebelum, ${r.months_after} bln sesudah</span></td><td>${esc(r.session_title)}<br><span class="muted">${esc(monthShort({ year: Number(r.start_date.slice(0, 4)), month: Number(r.start_date.slice(5, 7)) }))}</span></td><td>${esc(fmt(r.findings_per_session_before))} → ${esc(fmt(r.findings_per_session_after))}</td><td>${esc(fmt(r.score_before))} → ${esc(fmt(r.score_after))}</td><td class="n ${tone(r.delta)}"><b>${esc(fmtDelta(r.delta))}</b></td><td class="n ${tone(r.relative_delta)}">${esc(fmtDelta(r.relative_delta))}</td><td><span class="chip">${esc(STATUS_LABELS[r.status])}</span>${r.thin ? '<span class="chip">Data tipis</span>' : ""}${r.exclusion_reason ? `<span class="chip">Dikecualikan</span><br>Alasan: ${esc(r.exclusion_reason)}` : ""}</td></tr>`,
   )
   .join("\n")}
 </tbody></table>

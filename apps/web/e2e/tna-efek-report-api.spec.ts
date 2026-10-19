@@ -110,6 +110,7 @@ const audits: Audit[] = [
   ]),
 ];
 const indicators = { critical: randomUUID(), nonCritical: randomUUID() };
+const ruleVersion = randomUUID();
 
 /** Months shifted from the current Asia/Jakarta month. */
 function jakartaMonth(shift: number) {
@@ -152,6 +153,13 @@ test.beforeAll(async () => {
   sql(
     `INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES ('${indicators.critical}','chat','Efek kritis ${tag}','critical',1),('${indicators.nonCritical}','chat','Efek non kritis ${tag}','non_critical',1);`,
   );
+  // Pin a fixture-owned rule snapshot: master indicators/weights in a reused
+  // disposable DB must not change these hand-calculated expectations.
+  sql(`INSERT INTO qa_service_rule_versions(id,service_type,effective_period_id,status,critical_weight,non_critical_weight,scoring_mode,version_number,created_by)
+    VALUES ('${ruleVersion}','chat',(SELECT id FROM qa_periods WHERE year=2019 AND month=1),'published',0.5,0.5,'weighted',1,'${trainer.userId}');
+    INSERT INTO qa_service_rule_indicators(id,rule_version_id,legacy_indicator_id,service_type,name,category,bobot,sort_order) VALUES
+    ('${randomUUID()}','${ruleVersion}','${indicators.critical}','chat','Efek critical ${tag}','critical',1,0),
+    ('${randomUUID()}','${ruleVersion}','${indicators.nonCritical}','chat','Efek non critical ${tag}','non_critical',1,1);`);
   const temuan = audits.flatMap(([who, m, sessions, bad]) =>
     Array.from({ length: sessions }, (_, i) =>
       i < bad
@@ -213,7 +221,7 @@ test.afterAll(async () => {
     .map((p) => p.id)
     .join("','");
   sql(
-    `BEGIN; DELETE FROM efek_sessions WHERE created_by IN ('${ids.join("','")}'); DELETE FROM qa_temuan WHERE peserta_id IN ('${pesertaIds}'); DELETE FROM qa_dashboard_agent_period_summary WHERE agent_id IN ('${pesertaIds}'); DELETE FROM qa_indicators WHERE id IN ('${indicators.critical}','${indicators.nonCritical}'); DELETE FROM profiler_peserta WHERE batch_name='efek-r-${tag}'; DELETE FROM profiler_folders WHERE id='${folder}'; DELETE FROM activity_logs WHERE user_id IN ('${ids.join("','")}'); DELETE FROM qa_periods p WHERE p.id IN ('${periods.join("','")}') AND NOT EXISTS (SELECT 1 FROM qa_dashboard_agent_period_summary s WHERE s.period_id=p.id) AND NOT EXISTS (SELECT 1 FROM qa_temuan t WHERE t.period_id=p.id); COMMIT;`,
+    `BEGIN; DELETE FROM efek_sessions WHERE created_by IN ('${ids.join("','")}'); DELETE FROM qa_temuan WHERE peserta_id IN ('${pesertaIds}'); DELETE FROM qa_dashboard_agent_period_summary WHERE agent_id IN ('${pesertaIds}'); DELETE FROM qa_service_rule_indicators WHERE rule_version_id='${ruleVersion}'; DELETE FROM qa_service_rule_versions WHERE id='${ruleVersion}'; DELETE FROM qa_indicators WHERE id IN ('${indicators.critical}','${indicators.nonCritical}'); DELETE FROM profiler_peserta WHERE batch_name='efek-r-${tag}'; DELETE FROM profiler_folders WHERE id='${folder}'; DELETE FROM activity_logs WHERE user_id IN ('${ids.join("','")}'); DELETE FROM qa_periods p WHERE p.id IN ('${periods.join("','")}') AND NOT EXISTS (SELECT 1 FROM qa_dashboard_agent_period_summary s WHERE s.period_id=p.id) AND NOT EXISTS (SELECT 1 FROM qa_temuan t WHERE t.period_id=p.id); COMMIT;`,
   );
   for (const id of users)
     expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();
@@ -365,6 +373,106 @@ test("program detail lists every participant with status, comparison, and monthl
   );
   expect(one.data.participants.map((p) => p.session_id)).toEqual([november]);
   expect(one.data.program.participants).toBe(1);
+});
+
+test("exclusions adjust aggregates without deleting attendance or changing the comparison group", async () => {
+  const reason = "Data audit perlu ditinjau";
+  const query = new URLSearchParams({
+    year: "2019",
+    exclusions: JSON.stringify([{ peserta_id: people.dimas.id, reason }]),
+  });
+  const result = await call<EfekProgramReport>(`/report/ketik?${query}`);
+  expect(result.status).toBe(200);
+  expect(result.data.analysis).toMatchObject({
+    all_participants: { participants: 4, evaluated: 2, avg_delta: 5 },
+    exclusions: [
+      { peserta_id: people.dimas.id, nama: people.dimas.nama, reason },
+    ],
+  });
+  expect(result.data.program).toMatchObject({
+    participants: 2,
+    evaluated: 1,
+    avg_delta: 10,
+    avg_relative_delta: 5,
+    findings_per_session_before: 0.67,
+    findings_per_session_after: 0.33,
+  });
+  expect(result.data.participants).toHaveLength(4);
+  const dimas = result.data.participants.filter(
+    (p) => p.peserta_id === people.dimas.id,
+  );
+  expect(dimas).toHaveLength(2);
+  expect(dimas.every((p) => p.exclusion_reason === reason)).toBe(true);
+  expect(dimas.find((p) => p.session_id === mei)?.delta).toBe(0);
+  expect(result.data.chart.find((c) => c.offset === -1)).toMatchObject({
+    score: 70,
+    comparison_score: 85,
+    findings_per_session: 1,
+  });
+  expect(result.data.sessions.find((s) => s.id === mei)).toMatchObject({
+    participants: 2,
+    evaluated: 1,
+    avg_delta: 10,
+  });
+  const summary = await call<EfekReport>(`/report?${query}`);
+  expect(summary.data.programs.find((p) => p.code === "ketik")?.avg_delta).toBe(
+    10,
+  );
+  const all = new URLSearchParams({
+    year: "2019",
+    exclusions: JSON.stringify(
+      [people.sari, people.dimas, people.andi].map((p) => ({
+        peserta_id: p.id,
+        reason,
+      })),
+    ),
+  });
+  const empty = await call<EfekProgramReport>(`/report/ketik?${all}`);
+  expect(empty.data.program).toMatchObject({
+    participants: 0,
+    evaluated: 0,
+    avg_delta: null,
+  });
+  expect(empty.data.participants).toHaveLength(4);
+  expect(empty.data.chart.every((c) => c.score === null)).toBe(true);
+  const restored = await call<EfekProgramReport>("/report/ketik?year=2019");
+  expect(restored.data.program.avg_delta).toBe(5);
+  expect(restored.data.analysis).toBeUndefined();
+  expect(restored.data.participants.every((p) => !p.exclusion_reason)).toBe(
+    true,
+  );
+  const unknown = await call<EfekProgramReport>(
+    `/report/ketik?exclusions=${encodeURIComponent(JSON.stringify([{ peserta_id: randomUUID(), reason }]))}`,
+  );
+  expect(unknown.status).toBe(200);
+  expect(unknown.data.analysis).toBeUndefined();
+});
+
+test("exclusion filters reject malformed, duplicate or unreasoned entries", async () => {
+  for (const value of [
+    "not-json",
+    "{}",
+    JSON.stringify([{ peserta_id: people.dimas.id, reason: "  " }]),
+    JSON.stringify([{ peserta_id: "bad-id", reason: "test" }]),
+    JSON.stringify([{ peserta_id: people.dimas.id, reason: "x".repeat(201) }]),
+    JSON.stringify(
+      Array.from({ length: 11 }, () => ({
+        peserta_id: randomUUID(),
+        reason: "test",
+      })),
+    ),
+    JSON.stringify(
+      Array.from({ length: 2 }, () => ({
+        peserta_id: people.dimas.id,
+        reason: "test",
+      })),
+    ),
+  ]) {
+    expect(
+      (await call(`/report/ketik?exclusions=${encodeURIComponent(value)}`))
+        .status,
+    ).toBe(400);
+  }
 });
 
 test("sessions whose after months have not closed wait instead of concluding", async () => {

@@ -235,7 +235,13 @@ const efekMocks = [
 test("trainer membuka EFEK dari TNA dan membuat sesi CERIWIS yang diukur dari CSO", async ({
   page,
 }) => {
-  const audit = await openTna(page, "/tna", efekMocks);
+  const audit = await openTna(
+    page,
+    "/tna",
+    efekMocks,
+    "trainer",
+    /\/tna(?:\?|$)/,
+  );
   await page.getByRole("link", { name: "EFEK", exact: true }).first().click();
   await expect(page).toHaveURL(/\/tna\/efek$/);
   await expect(
@@ -439,7 +445,9 @@ test("ringkasan EFEK menampilkan efek per program dan rincian peserta KETIK", as
   page,
 }) => {
   const audit = await openTna(page, "/tna/efek", efekMocks);
-  await expect(page.getByText("Data SIDAK sampai September 2026")).toBeVisible();
+  await expect(
+    page.getByText("Data SIDAK sampai September 2026"),
+  ).toBeVisible();
   const ketik = page
     .getByRole("region", { name: "Program pelatihan" })
     .getByRole("article")
@@ -521,6 +529,190 @@ test("rincian program di ponsel menampilkan peserta sebagai kartu tanpa geser sa
   expectHermetic(audit);
 });
 
+for (const width of [390, 1280])
+  test(`pengecualian agent transparan, dapat dipulihkan, dan ikut ekspor (${width}px)`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme: width === 390 ? "dark" : "light" });
+    const reason = "Audit <perlu> ditinjau";
+    const adjusted: EfekProgramReport = {
+      ...programReport,
+      program: {
+        ...ketikSummary,
+        participants: 1,
+        evaluated: 1,
+        stabil: 0,
+        avg_delta: 4,
+      },
+      analysis: {
+        all_participants: ketikSummary,
+        exclusions: [{ peserta_id: ids.budi, nama: "Budi Contoh", reason }],
+      },
+      participants: programReport.participants.map((p) =>
+        p.peserta_id === ids.budi ? { ...p, exclusion_reason: reason } : p,
+      ),
+    };
+    const audit = await openTna(page, "/tna/efek/program/ketik", [
+      {
+        method: "GET",
+        path: /\/api\/v1\/tna\/efek\/report\/ketik\?.*exclusions=/,
+        body: ok(adjusted),
+      },
+      ...efekMocks,
+    ]);
+    const filter = page.getByRole("region", { name: "Pengecualian analisis" });
+    await expect(filter).toBeVisible();
+    await filter.getByLabel("Agent").selectOption(ids.budi);
+    const apply = filter.getByRole("button", {
+      name: "Kecualikan dari analisis",
+    });
+    await expect(apply).toBeDisabled();
+    await filter.getByLabel("Alasan pengecualian").fill("   ");
+    await expect(apply).toBeDisabled();
+    await filter.getByLabel("Alasan pengecualian").fill(reason);
+    await filter.getByLabel("Alasan pengecualian").press("Tab");
+    await expect(apply).toBeFocused();
+    await apply.press("Enter");
+    await expect(page).toHaveURL(/exclusions=/);
+    const comparison = page.getByRole("region", {
+      name: "Perbandingan analisis",
+    });
+    await expect(comparison).toContainText("Semua peserta");
+    await expect(comparison).toContainText("+1,8");
+    await expect(comparison).toContainText("+4,0");
+    await expect(filter).toContainText(reason);
+    await expect(page.getByRole("region", { name: "Peserta" })).toContainText(
+      "Dikecualikan",
+    );
+    await page.reload();
+    await expect(filter).toContainText(reason);
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Unduh laporan" }).click();
+    const html = await (
+      await (await download).createReadStream()
+    )
+      .toArray()
+      .then((parts) => Buffer.concat(parts).toString("utf8"));
+    expect(html).toContain("Semua peserta");
+    expect(html).toContain("Setelah pengecualian");
+    expect(html).toContain("Audit &lt;perlu&gt; ditinjau");
+    expect(html).not.toContain("Audit <perlu>");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    for (const control of [
+      filter.getByLabel("Agent"),
+      filter.getByLabel("Alasan pengecualian"),
+      apply,
+    ]) {
+      expect(
+        await control.evaluate((el) => (el as HTMLElement).offsetHeight),
+      ).toBeGreaterThanOrEqual(44);
+    }
+    await filter.screenshot({
+      path: testInfo.outputPath(`exclusions-${width}.png`),
+    });
+    await comparison.screenshot({
+      path: testInfo.outputPath(`comparison-${width}.png`),
+    });
+    await filter
+      .getByRole("button", { name: "Sertakan kembali Budi Contoh" })
+      .click();
+    await expect(page).not.toHaveURL(/exclusions=/);
+    await expect(comparison).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Peserta" }),
+    ).not.toContainText("Dikecualikan");
+    await waitForMockedApi(audit, ["GET /api/v1/tna/efek/report/ketik"]);
+    expectHermetic(audit);
+  });
+
+test("semua agent dikecualikan tetap dapat dilihat, diunduh, dan dipulihkan", async ({
+  page,
+}) => {
+  const exclusions = programReport.participants.map((p) => ({
+    peserta_id: p.peserta_id,
+    nama: p.nama,
+    reason: "Data perlu ditinjau",
+  }));
+  const empty = summary(programs[0]!);
+  const audit = await openTna(
+    page,
+    `/tna/efek/program/ketik?exclusions=${encodeURIComponent(JSON.stringify(exclusions.map(({ peserta_id, reason }) => ({ peserta_id, reason }))))}`,
+    [
+      {
+        method: "GET",
+        path: /\/api\/v1\/tna\/efek\/report\/ketik\?.*exclusions=/,
+        body: ok({
+          ...programReport,
+          program: empty,
+          analysis: { all_participants: ketikSummary, exclusions },
+          participants: programReport.participants.map((p) => ({
+            ...p,
+            exclusion_reason: "Data perlu ditinjau",
+          })),
+          chart: programReport.chart.map((p) => ({ ...p, score: null })),
+        }),
+      },
+      ...efekMocks,
+    ],
+  );
+  await expect(page.getByRole("status")).toContainText(
+    "Semua peserta dikecualikan",
+  );
+  await expect(page.getByRole("region", { name: "Peserta" })).toContainText(
+    "Budi Contoh",
+  );
+  await expect(
+    page.getByRole("button", { name: "Unduh laporan" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Reset pengecualian" }).click();
+  await expect(
+    page.getByRole("region", { name: "Ringkasan program" }),
+  ).toContainText("+1,8");
+  expectHermetic(audit);
+});
+
+test("gagal memuat hasil pengecualian tidak menampilkan atau mengekspor hasil lama", async ({
+  page,
+}) => {
+  const audit = await openTna(page, "/tna/efek/program/ketik?window=6", [
+    {
+      method: "GET",
+      path: /\/api\/v1\/tna\/efek\/report\/ketik\?.*exclusions=/,
+      status: 503,
+      body: {
+        success: false,
+        error: { message: "Laporan belum tersedia. Coba lagi." },
+      },
+    },
+    ...efekMocks,
+  ]);
+  const form = page.getByRole("region", { name: "Pengecualian analisis" });
+  await form.getByLabel("Agent").selectOption(ids.budi);
+  await form.getByLabel("Alasan pengecualian").fill("Data perlu ditinjau");
+  await form.getByRole("button", { name: "Kecualikan dari analisis" }).click();
+  await expect(
+    page.getByText("Laporan belum tersedia. Coba lagi.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unduh laporan" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("region", { name: "Ringkasan program" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Reset pengecualian" }).click();
+  await expect(page).toHaveURL(/window=6/);
+  await expect(page).not.toHaveURL(/exclusions=/);
+  await expect(
+    page.getByRole("region", { name: "Ringkasan program" }),
+  ).toContainText("+1,8");
+  expectHermetic(audit);
+});
+
 test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-escape", async ({
   page,
 }) => {
@@ -550,9 +742,11 @@ test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-esc
   expect(file.suggestedFilename()).toMatch(
     /^EFEK-KETIK-\d{4}-\d{2}-\d{2}\.html$/,
   );
-  const html = await (await file.createReadStream()).toArray().then((parts) =>
-    Buffer.concat(parts).toString("utf8"),
-  );
+  const html = await (
+    await file.createReadStream()
+  )
+    .toArray()
+    .then((parts) => Buffer.concat(parts).toString("utf8"));
   expect(html).toMatch(/^<!doctype html>/i);
   expect(html).toContain("<title>EFEK KETIK · Laporan</title>");
   expect(html).toContain("Data SIDAK sampai September 2026");
@@ -563,9 +757,7 @@ test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-esc
   expect(html).toContain("Februari 2026");
   expect(html).toContain("<svg");
   expect(html).toContain("@media print");
-  expect(html).toContain(
-    "Cici &lt;img src=x onerror=&quot;alert(1)&quot;&gt;",
-  );
+  expect(html).toContain("Cici &lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
   expect(html).not.toContain("<img");
   expect(html).not.toContain("<script");
   expect(html).toContain("Tim &lt;B&gt;");

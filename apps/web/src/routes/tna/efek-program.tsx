@@ -11,6 +11,7 @@ import QaStatePanel from "../../components/ui/QaStatePanel";
 import { SERVICE_LABELS } from "../../lib/scoring";
 import { Button } from "../../components/ui/button";
 import { downloadEfekProgramHtml } from "./efek-export";
+import { EfekExclusions } from "./efek-exclusions";
 import { Surface, Field, State } from "./shared";
 import { TnaTabs } from "./TnaTabs";
 import { selectClass } from "./utils";
@@ -44,7 +45,8 @@ export default function EfekProgramPage() {
   const report = useApi<EfekProgramReport>(
     `/tna/efek/report/${code}${reportQuery(filters)}`,
   );
-  const data = report.data;
+  // Never present/export the previous cohort as the new filter's result.
+  const data = report.loading || report.error ? null : report.data;
   const service = data ? SERVICE_LABELS[data.program.service_type] : "";
   const title = data
     ? `${data.program.name} · layanan ${service}`
@@ -55,7 +57,7 @@ export default function EfekProgramPage() {
       title={title}
       description={
         data
-          ? `${data.program.participants} peserta terdaftar, ${data.program.evaluated} punya data sebelum dan sesudah pelatihan. Data SIDAK sampai ${monthLabel(data.data_until)}.`
+          ? `${data.participants.length} keikutsertaan terdaftar, ${data.program.evaluated} disertakan dengan data sebelum dan sesudah pelatihan. Data SIDAK sampai ${monthLabel(data.data_until)}.`
           : undefined
       }
     >
@@ -63,12 +65,29 @@ export default function EfekProgramPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/tna/efek"
-          search={filters}
+          search={{ ...filters, exclusions: undefined }}
           className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
         >
           Kembali ke EFEK
         </Link>
-        {data && data.program.participants > 0 && (
+        {search.exclusions && (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() =>
+              navigate({
+                to: "/tna/efek/program/$code",
+                params: { code },
+                search: { ...search, exclusions: undefined },
+                replace: true,
+              })
+            }
+          >
+            Reset pengecualian
+          </Button>
+        )}
+        {data && data.participants.length > 0 && (
           <Button
             type="button"
             variant="outline"
@@ -115,7 +134,22 @@ export default function EfekProgramPage() {
               </select>
             </Field>
           </ReportFilters>
-          {data.program.participants === 0 ? (
+          <EfekExclusions
+            report={data}
+            value={search.exclusions}
+            onChange={(rows) =>
+              navigate({
+                to: "/tna/efek/program/$code",
+                params: { code },
+                search: {
+                  ...search,
+                  exclusions: rows.length ? JSON.stringify(rows) : undefined,
+                },
+                replace: true,
+              })
+            }
+          />
+          {data.participants.length === 0 ? (
             <QaStatePanel
               type="empty"
               title="Belum ada peserta untuk filter ini"
@@ -123,12 +157,20 @@ export default function EfekProgramPage() {
             />
           ) : (
             <>
-              <section
-                aria-label="Ringkasan program"
-                className="max-w-sm rounded-lg border border-border bg-card p-4"
-              >
-                <ProgramStats program={data.program} />
-              </section>
+              {!data.analysis && (
+                <section
+                  aria-label="Ringkasan program"
+                  className="max-w-sm rounded-lg border border-border bg-card p-4"
+                >
+                  <ProgramStats program={data.program} />
+                </section>
+              )}
+              {data.program.participants === 0 && (
+                <p role="status" className="text-sm">
+                  Semua peserta dikecualikan. Sertakan kembali agent untuk
+                  melihat hasil analisis.
+                </p>
+              )}
               <section
                 aria-label="Grafik relatif bulan pelatihan"
                 className="space-y-2"
@@ -259,8 +301,8 @@ function ParticipantTable({
                       >
                         {p.nama}
                         <span className="block text-xs font-normal text-muted-foreground">
-                          {p.tim ?? "Tanpa tim"} · {p.months_before} bln sebelum,{" "}
-                          {p.months_after} bln sesudah
+                          {p.tim ?? "Tanpa tim"} · {p.months_before} bln
+                          sebelum, {p.months_after} bln sesudah
                         </span>
                       </button>
                     </td>
@@ -298,7 +340,13 @@ function ParticipantTable({
                       <span className="flex flex-wrap gap-1">
                         <Chip status={p.status}>{STATUS_LABELS[p.status]}</Chip>
                         {p.thin && <Chip>Data tipis</Chip>}
+                        {p.exclusion_reason && <Chip>Dikecualikan</Chip>}
                       </span>
+                      {p.exclusion_reason && (
+                        <p className="mt-1 max-w-[32ch] break-words text-xs">
+                          Alasan: {p.exclusion_reason}
+                        </p>
+                      )}
                     </td>
                   </tr>
                   {expanded && (

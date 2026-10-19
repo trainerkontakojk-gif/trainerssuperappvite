@@ -258,6 +258,9 @@ async function build(
   program?: string,
 ): Promise<Built> {
   const { window } = query;
+  const exclusions = new Map(
+    (query.exclusions ?? []).map((r) => [r.peserta_id, r.reason]),
+  );
   const current = currentEfekMonth();
   const allSessions = await loadSessions(supabase, program);
   const programPeople = new Map<string, Set<string>>();
@@ -391,6 +394,9 @@ async function build(
         session_id: s.id,
         program_code: s.program_code,
         peserta_id: person.peserta_id,
+        ...(exclusions.has(person.peserta_id)
+          ? { exclusion_reason: exclusions.get(person.peserta_id)! }
+          : {}),
         nama: person.profiler_peserta?.nama ?? "",
         tim: person.profiler_peserta?.tim ?? null,
         session_title: s.title,
@@ -431,6 +437,8 @@ async function build(
 }
 
 const isEvaluated = (r: Result) => r.raw_delta !== null;
+const included = (results: Result[]) =>
+  results.filter((r) => !r.exclusion_reason);
 
 function summarize(
   program: EfekProgram,
@@ -476,7 +484,7 @@ function summarize(
 
 function sessionSummaries(built: Built): EfekSessionSummary[] {
   return built.sessions.map((s) => {
-    const own = built.results.filter((r) => r.session_id === s.id);
+    const own = included(built.results).filter((r) => r.session_id === s.id);
     const evaluated = own.filter(isEvaluated);
     const end = dateMonth(s.end_date);
     const closed = Math.max(0, Math.min(built.window, built.current - 1 - end));
@@ -535,7 +543,7 @@ function publicResult({
 function chart(built: Built): EfekChartPoint[] {
   const points: EfekChartPoint[] = [];
   for (let offset = -built.window; offset <= built.window; offset++) {
-    const here = built.results.flatMap((r) =>
+    const here = included(built.results).flatMap((r) =>
       r.months.filter((m) => m.offset === offset && m.score !== null),
     );
     const scoreOf = mean(here.map((m) => m.score!));
@@ -580,7 +588,7 @@ export async function getEfekReport(
     programs: programs.map((p) =>
       summarize(
         p,
-        built.results.filter((r) => r.program_code === p.code),
+        included(built.results).filter((r) => r.program_code === p.code),
       ),
     ),
     sessions: sessionSummaries(built),
@@ -601,9 +609,31 @@ export async function getEfekProgramReport(
       "Program pelatihan tidak ditemukan.",
     );
   const built = await build(supabase, query, code);
+  const exclusions = [
+    ...new Map(
+      built.results
+        .filter((r) => r.exclusion_reason)
+        .map((r) => [
+          r.peserta_id,
+          {
+            peserta_id: r.peserta_id,
+            nama: r.nama,
+            reason: r.exclusion_reason!,
+          },
+        ]),
+    ).values(),
+  ];
   return {
     ...header(built),
-    program: summarize(program, built.results),
+    ...(exclusions.length
+      ? {
+          analysis: {
+            all_participants: summarize(program, built.results),
+            exclusions,
+          },
+        }
+      : {}),
+    program: summarize(program, included(built.results)),
     sessions: sessionSummaries(built),
     chart: chart(built),
     participants: built.results

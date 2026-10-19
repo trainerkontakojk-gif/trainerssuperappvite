@@ -772,6 +772,8 @@ const programSearch = (search: Record<string, unknown>) =>
     ? { program: search.program }
     : {};
 export interface EfekReportSearch {
+  /** JSON filter, kept verbatim so the backend can reject invalid input. */
+  exclusions?: string;
   program?: string;
   window?: number;
   year?: number;
@@ -780,6 +782,7 @@ export interface EfekReportSearch {
 }
 const efekReportSearch = (search: Record<string, unknown>): EfekReportSearch => {
   const out: EfekReportSearch = programSearch(search);
+  if (typeof search.exclusions === "string") out.exclusions = search.exclusions;
   const window = Number(search.window);
   if (Number.isInteger(window) && window >= 1 && window <= 6) out.window = window;
   const year = Number(search.year);
@@ -794,7 +797,12 @@ const efekRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tna/efek",
   component: lazy(() => import("./routes/tna/efek")),
-  validateSearch: efekReportSearch,
+  // Exclusions belong to a program analysis with an explicit baseline, not
+  // the cross-program overview.
+  validateSearch: (search): EfekReportSearch => ({
+    ...efekReportSearch(search),
+    exclusions: undefined,
+  }),
   beforeLoad: requireCapability("tna.read"),
 });
 const efekProgramRoute = createRoute({

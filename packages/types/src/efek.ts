@@ -111,12 +111,41 @@ export interface EfekNameMatch {
 
 /** Phase 2 report (plans/markdown/efek.md). Scores come from SIDAK monthly summaries. */
 export const EFEK_MAX_WINDOW = 6;
+export const EFEK_MAX_EXCLUSIONS = 10;
+export const efekExclusionsSchema = z
+  .array(
+    z
+      .object({
+        peserta_id: z.string().uuid(),
+        reason: z.string().trim().min(1).max(200),
+      })
+      .strict(),
+  )
+  .max(EFEK_MAX_EXCLUSIONS)
+  .refine(
+    (rows) => new Set(rows.map((r) => r.peserta_id)).size === rows.length,
+    "Agent tidak boleh berulang",
+  );
+export type EfekExclusion = z.infer<typeof efekExclusionsSchema>[number];
+const exclusionQuerySchema = z
+  .string()
+  .max(4000)
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: "custom", message: "Pengecualian tidak valid" });
+      return z.NEVER;
+    }
+  })
+  .pipe(efekExclusionsSchema);
 export const efekReportQuerySchema = z
   .object({
     window: z.coerce.number().int().min(1).max(EFEK_MAX_WINDOW).default(3),
     year: z.coerce.number().int().min(2000).max(2100).optional(),
     tim: z.string().trim().min(1).max(100).optional(),
     session: z.string().uuid().optional(),
+    exclusions: exclusionQuerySchema.optional(),
   })
   .strict();
 export type EfekReportQuery = z.infer<typeof efekReportQuerySchema>;
@@ -128,11 +157,7 @@ export interface EfekMonth {
 
 /** `menunggu`: no month after training has closed. `tanpa_data`: a side has no SIDAK data. */
 export type EfekParticipantStatus =
-  | "naik"
-  | "stabil"
-  | "turun"
-  | "menunggu"
-  | "tanpa_data";
+  "naik" | "stabil" | "turun" | "menunggu" | "tanpa_data";
 
 export interface EfekMonthPoint extends EfekMonth {
   /** −W..−1 before, 0 training, +1..+W after. */
@@ -144,6 +169,8 @@ export interface EfekMonthPoint extends EfekMonth {
 }
 
 export interface EfekParticipantResult {
+  /** Analysis-only exclusion; attendance and individual scores are unchanged. */
+  exclusion_reason?: string;
   session_id: string;
   peserta_id: string;
   nama: string;
@@ -221,6 +248,10 @@ export interface EfekReport {
 }
 
 export interface EfekProgramReport extends Omit<EfekReport, "programs"> {
+  analysis?: {
+    all_participants: EfekProgramSummary;
+    exclusions: (EfekExclusion & { nama: string })[];
+  };
   program: EfekProgramSummary;
   chart: EfekChartPoint[];
   participants: EfekParticipantResult[];
