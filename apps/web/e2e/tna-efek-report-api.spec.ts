@@ -16,7 +16,7 @@ import {
 } from "./helpers/sidakRealBackend";
 
 // EFEK phase 2 (plans/markdown/efek.md): before/after report computed from SIDAK
-// monthly summaries on the real Hono app against loopback Supabase. Scores live in
+// temuan on the real Hono app against loopback Supabase. Scores live in
 // 2019 so no other fixture shares the comparison group; every row is removed.
 test.describe.configure({ mode: "serial" });
 
@@ -85,35 +85,31 @@ async function createSession(body: Record<string, unknown>) {
   return ((await response.json()) as { data: { id: string } }).data.id;
 }
 
-// [agent, year, month, score, sessions, findings], service chat.
-type Score = readonly [
-  keyof typeof people,
-  number,
-  number,
-  number,
-  number,
-  number,
-];
-const scores: Score[] = [
-  ["sari", 2019, 2, 90, 3, 6],
-  ["sari", 2019, 3, 91, 3, 3],
-  ["sari", 2019, 4, 92, 3, 3],
-  ["sari", 2019, 5, 50, 3, 9],
-  ["sari", 2019, 6, 94, 3, 1],
-  ["sari", 2019, 7, 95, 3, 2],
-  ["sari", 2019, 8, 96, 3, 0],
-  ["dimas", 2019, 4, 90, 2, 4],
-  ["dimas", 2019, 6, 89.5, 2, 4],
-  ["dimas", 2019, 9, 70, 5, 9],
+// [agent, month, sessions, bad sessions] in 2019, service chat. Scores come from
+// raw SIDAK temuan the way SIDAK scores them: each bad session has one
+// non-critical 0 (session score 50), so a month scores 100 − 10 × bad sessions.
+type Audit = readonly [keyof typeof people, number, number, number];
+const audits: Audit[] = [
+  ["sari", 2, 3, 2],
+  ["sari", 3, 3, 1],
+  ["sari", 4, 3, 3],
+  ["sari", 5, 5, 5],
+  ["sari", 6, 3, 1],
+  ["sari", 7, 3, 0],
+  ["sari", 8, 3, 2],
+  ["dimas", 4, 2, 1],
+  ["dimas", 6, 2, 1],
+  ["dimas", 9, 5, 3],
   ...[2, 3, 4, 5].flatMap((m) => [
-    ["putri", 2019, m, 80, 4, 4] as const,
-    ["budi", 2019, m, 84, 4, 4] as const,
+    ["putri", m, 4, 2] as const,
+    ["budi", m, 4, 1] as const,
   ]),
   ...[6, 7, 8].flatMap((m) => [
-    ["putri", 2019, m, 81, 4, 2] as const,
-    ["budi", 2019, m, 85, 4, 2] as const,
+    ["putri", m, 4, 1] as const,
+    ["budi", m, 4, 1] as const,
   ]),
 ];
+const indicators = { critical: randomUUID(), nonCritical: randomUUID() };
 
 /** Months shifted from the current Asia/Jakarta month. */
 function jakartaMonth(shift: number) {
@@ -153,14 +149,23 @@ test.beforeAll(async () => {
     `INSERT INTO qa_periods(month,year) SELECT m, 2019 FROM generate_series(1,12) m ON CONFLICT DO NOTHING RETURNING id;`,
   );
   createdPeriods.push(...created.split("\n").filter(Boolean));
-  const values = scores
-    .map(
-      ([who, y, m, score, sessions, findings]) =>
-        `('${people[who].id}',(SELECT id FROM qa_periods WHERE year=${y} AND month=${m}),'chat',${score},${sessions},${findings})`,
-    )
-    .join(",");
   sql(
-    `INSERT INTO qa_dashboard_agent_period_summary(agent_id,period_id,service_type,final_score,session_count,findings_count) VALUES ${values};`,
+    `INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES ('${indicators.critical}','chat','Efek kritis ${tag}','critical',1),('${indicators.nonCritical}','chat','Efek non kritis ${tag}','non_critical',1);`,
+  );
+  const temuan = audits.flatMap(([who, m, sessions, bad]) =>
+    Array.from({ length: sessions }, (_, i) =>
+      i < bad
+        ? `('${people[who].id}',(SELECT id FROM qa_periods WHERE year=2019 AND month=${m}),'${indicators.nonCritical}','chat','T-${tag}-${who}-${m}-${i}',0,'Salah sapa')`
+        : `('${people[who].id}',(SELECT id FROM qa_periods WHERE year=2019 AND month=${m}),'${indicators.critical}','chat','T-${tag}-${who}-${m}-${i}',3,NULL)`,
+    ),
+  );
+  sql(
+    `INSERT INTO qa_temuan(peserta_id,period_id,indicator_id,service_type,no_tiket,nilai,ketidaksesuaian) VALUES ${temuan.join(",")};`,
+  );
+  // A stale dashboard cache row (the SQL refresh writes final_score 0) must not
+  // leak into EFEK; SIDAK itself scores from raw temuan.
+  sql(
+    `INSERT INTO qa_dashboard_agent_period_summary(agent_id,period_id,service_type,final_score,session_count,findings_count) VALUES ('${people.sari.id}',(SELECT id FROM qa_periods WHERE year=2019 AND month=2),'chat',0,3,2);`,
   );
   app = (await import("../../api/src/app")).default as unknown as Hono;
 
@@ -204,8 +209,11 @@ test.afterAll(async () => {
   const users = [trainer, leader].filter(Boolean).map((u) => u.userId);
   const ids = [...users, randomUUID()];
   const periods = [...createdPeriods, randomUUID()];
+  const pesertaIds = Object.values(people)
+    .map((p) => p.id)
+    .join("','");
   sql(
-    `BEGIN; DELETE FROM efek_sessions WHERE created_by IN ('${ids.join("','")}'); DELETE FROM profiler_peserta WHERE batch_name='efek-r-${tag}'; DELETE FROM profiler_folders WHERE id='${folder}'; DELETE FROM activity_logs WHERE user_id IN ('${ids.join("','")}'); DELETE FROM qa_periods p WHERE p.id IN ('${periods.join("','")}') AND NOT EXISTS (SELECT 1 FROM qa_dashboard_agent_period_summary s WHERE s.period_id=p.id) AND NOT EXISTS (SELECT 1 FROM qa_temuan t WHERE t.period_id=p.id); COMMIT;`,
+    `BEGIN; DELETE FROM efek_sessions WHERE created_by IN ('${ids.join("','")}'); DELETE FROM qa_temuan WHERE peserta_id IN ('${pesertaIds}'); DELETE FROM qa_dashboard_agent_period_summary WHERE agent_id IN ('${pesertaIds}'); DELETE FROM qa_indicators WHERE id IN ('${indicators.critical}','${indicators.nonCritical}'); DELETE FROM profiler_peserta WHERE batch_name='efek-r-${tag}'; DELETE FROM profiler_folders WHERE id='${folder}'; DELETE FROM activity_logs WHERE user_id IN ('${ids.join("','")}'); DELETE FROM qa_periods p WHERE p.id IN ('${periods.join("','")}') AND NOT EXISTS (SELECT 1 FROM qa_dashboard_agent_period_summary s WHERE s.period_id=p.id) AND NOT EXISTS (SELECT 1 FROM qa_temuan t WHERE t.period_id=p.id); COMMIT;`,
   );
   for (const id of users)
     expect((await admin.auth.admin.deleteUser(id)).error).toBeNull();
@@ -232,10 +240,10 @@ test("summary compares the closed months before and after training per program a
     naik: 1,
     stabil: 1,
     turun: 0,
-    avg_delta: 1.75,
-    avg_relative_delta: 0.75,
-    findings_per_session_before: 1.45,
-    findings_per_session_after: 0.64,
+    avg_delta: 5,
+    avg_relative_delta: 0,
+    findings_per_session_before: 0.64,
+    findings_per_session_after: 0.36,
   });
   const ceriwis = result.data.programs.find((p) => p.code === "ceriwis")!;
   expect(ceriwis).toMatchObject({
@@ -248,7 +256,7 @@ test("summary compares the closed months before and after training per program a
   expect(meiRow).toMatchObject({
     participants: 3,
     evaluated: 2,
-    avg_delta: 1.75,
+    avg_delta: 5,
     status: "terukur",
     months_after_closed: 3,
     first_after: { year: 2019, month: 6 },
@@ -269,7 +277,7 @@ test("summary compares the closed months before and after training per program a
     participants: 1,
     evaluated: 1,
     naik: 1,
-    avg_delta: 4,
+    avg_delta: 10,
   });
   expect(team.data.sessions.map((s) => s.id)).toEqual([mei]);
 });
@@ -289,41 +297,41 @@ test("program detail lists every participant with status, comparison, and monthl
     months_after: 3,
     sessions_before: 9,
     sessions_after: 9,
-    findings_before: 12,
+    findings_before: 6,
     findings_after: 3,
-    score_before: 91,
-    score_after: 95,
-    findings_per_session_before: 1.33,
+    score_before: 80,
+    score_after: 90,
+    findings_per_session_before: 0.67,
     findings_per_session_after: 0.33,
-    delta: 4,
-    comparison_delta: 1,
-    relative_delta: 3,
+    delta: 10,
+    comparison_delta: 5,
+    relative_delta: 5,
     status: "naik",
     thin: false,
   });
   expect(sari.months.map((m) => [m.offset, m.month, m.score])).toEqual([
-    [-3, 2, 90],
-    [-2, 3, 91],
-    [-1, 4, 92],
+    [-3, 2, 80],
+    [-2, 3, 90],
+    [-1, 4, 70],
     [0, 5, 50],
-    [1, 6, 94],
-    [2, 7, 95],
-    [3, 8, 96],
+    [1, 6, 90],
+    [2, 7, 100],
+    [3, 8, 80],
   ]);
   expect(sari.months[0]).toMatchObject({
     sessions: 3,
-    findings: 6,
-    comparison_score: 82,
+    findings: 2,
+    comparison_score: 85,
   });
 
   expect(byKey("dimas", mei)).toMatchObject({
     months_before: 1,
     months_after: 1,
     score_before: 90,
-    score_after: 89.5,
-    delta: -0.5,
-    comparison_delta: 1,
-    relative_delta: -1.5,
+    score_after: 90,
+    delta: 0,
+    comparison_delta: 5,
+    relative_delta: -5,
     status: "stabil",
     thin: true,
   });
@@ -342,14 +350,14 @@ test("program detail lists every participant with status, comparison, and monthl
   ]);
   expect(result.data.chart.find((c) => c.offset === -1)).toEqual({
     offset: -1,
-    score: 91,
-    comparison_score: 82,
-    findings_per_session: 1.4,
-    comparison_findings_per_session: 1,
+    score: 80,
+    comparison_score: 85,
+    findings_per_session: 0.8,
+    comparison_findings_per_session: 0.38,
   });
   expect(result.data.chart.find((c) => c.offset === 3)).toMatchObject({
-    score: 96,
-    comparison_score: 83,
+    score: 80,
+    comparison_score: 90,
   });
 
   const one = await call<EfekProgramReport>(

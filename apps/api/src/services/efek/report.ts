@@ -13,14 +13,30 @@ import type {
   EfekSessionSummary,
   ServiceType,
 } from "@trainers/types";
+import {
+  calculateQAScoreFromTemuan,
+  DEFAULT_SERVICE_WEIGHTS,
+  isAgentExcluded,
+} from "../../lib/scoring";
 import { fetchAllPages } from "../../lib/supabase-pagination";
+import { getScoreRows } from "../sidak/dashboard-aggregation";
+import { getIndicators, getPeriods } from "../sidak/period-indicator";
+import {
+  createPeriodScoringLoaders,
+  loadPeriodScoringContext,
+  mergeServiceWeights,
+  normalizePeriodScoringRows,
+  type PeriodScoringContext,
+} from "../sidak/period-scoring-context";
+import { isCountableFinding } from "../sidak/shared-constants";
 import { TnaServiceError } from "../tna/errors";
 import { listEfekPrograms } from "./sessions";
 
 /**
  * EFEK phase 2 (plans/markdown/efek.md): compares each participant's SIDAK
- * monthly summary before and after training with agents of the same service
- * who never joined that program. Reads use the caller JWT (RLS admin/trainer).
+ * monthly score before and after training with agents of the same service
+ * who never joined that program. Temuan reads use the caller JWT (RLS
+ * admin/trainer); scoring rules come from the shared SIDAK loaders.
  */
 
 const CHANGE_THRESHOLD = 1;
@@ -59,12 +75,23 @@ interface SessionRow {
     profiler_peserta: { nama: string; tim: string | null } | null;
   }[];
 }
-interface SummaryRow {
-  agent_id: string;
+interface TemuanRow {
+  id: string;
+  peserta_id: string;
   period_id: string;
-  final_score: number;
-  session_count: number;
-  findings_count: number;
+  indicator_id: string;
+  rule_indicator_id: string | null;
+  nilai: number | null;
+  no_tiket: string | null;
+  created_at: string;
+  is_phantom_padding: boolean | null;
+  ketidaksesuaian: string | null;
+  sebaiknya: string | null;
+  profiler_peserta: {
+    tim: string | null;
+    batch_name: string | null;
+    jabatan: string | null;
+  } | null;
 }
 interface MonthStat {
   score: number;
@@ -103,7 +130,13 @@ async function loadSessions(supabase: SupabaseClient, program?: string) {
   });
 }
 
-/** Monthly SIDAK stats keyed `service|agent|month` for the months in range. */
+/**
+ * Monthly SIDAK stats keyed `service|agent|month` for the months in range,
+ * scored from raw temuan exactly like the SIDAK agent page (rule version per
+ * period, worst five sessions). `qa_dashboard_agent_period_summary` is only a
+ * cache: rows written by the SQL refresh carry final_score 0 and imports never
+ * refresh it, so reading it gave impossible averages and missing months.
+ */
 async function loadScores(
   supabase: SupabaseClient,
   services: ServiceType[],
@@ -113,51 +146,102 @@ async function loadScores(
   const byAgent = new Map<string, MonthStat>();
   const byMonth = new Map<string, (MonthStat & { agent: string })[]>();
   if (!services.length || first > last) return { byAgent, byMonth };
-  const { data: periods, error } = await supabase
-    .from("qa_periods")
-    .select("id, year, month")
-    .gte("year", toMonth(first).year)
-    .lte("year", toMonth(last).year);
-  if (error) throw error;
+  const [periods, indicators, weights] = await Promise.all([
+    getPeriods(),
+    getIndicators(),
+    supabase.from("qa_service_weights").select("*"),
+  ]);
+  if (weights.error) throw weights.error;
+  const resolvedWeights = mergeServiceWeights(
+    DEFAULT_SERVICE_WEIGHTS,
+    weights.data ?? [],
+  );
   const periodMonth = new Map<string, number>();
-  for (const p of periods ?? []) {
+  for (const p of periods) {
     const index = monthIndex(p.year, p.month);
     if (index >= first && index <= last) periodMonth.set(p.id, index);
   }
   if (!periodMonth.size) return { byAgent, byMonth };
+  const loaders = createPeriodScoringLoaders(periods);
+
   for (const service of services) {
-    const rows = await fetchAllPages<SummaryRow>({
-      build: ({ from, to }) =>
-        supabase
-          .from("qa_dashboard_agent_period_summary")
-          .select(
-            "agent_id, period_id, final_score, session_count, findings_count",
-          )
-          .eq("service_type", service)
-          .in("period_id", [...periodMonth.keys()])
-          .gt("session_count", 0)
-          .order("id")
-          .range(from, to) as unknown as PromiseLike<{
-          data: SummaryRow[] | null;
-          error: { message: string } | null;
-        }>,
-    });
+    const rows = await loadTemuan(supabase, service, [...periodMonth.keys()]);
+    const groups = new Map<string, TemuanRow[]>();
     for (const row of rows) {
-      const index = periodMonth.get(row.period_id)!;
+      const key = `${row.period_id}|${row.peserta_id}`;
+      const group = groups.get(key);
+      if (group) group.push(row);
+      else groups.set(key, [row]);
+    }
+    const contexts = new Map<string, Promise<PeriodScoringContext>>();
+    for (const [key, group] of groups) {
+      const [periodId, agent] = key.split("|") as [string, string];
+      if (!contexts.has(periodId))
+        contexts.set(
+          periodId,
+          loadPeriodScoringContext(
+            service,
+            periodId,
+            indicators,
+            resolvedWeights[service],
+            loaders,
+          ),
+        );
+      const context = await contexts.get(periodId)!;
+      const score = calculateQAScoreFromTemuan(
+        context.indicators,
+        normalizePeriodScoringRows(getScoreRows(group), context),
+        context.weight,
+      );
+      if (!score.sessionCount) continue;
+      const index = periodMonth.get(periodId)!;
       const stat = {
-        score: Number(row.final_score),
-        sessions: row.session_count,
-        findings: row.findings_count,
+        score: score.finalScore,
+        sessions: score.sessionCount,
+        findings: group.filter((r) => isCountableFinding(r)).length,
       };
-      byAgent.set(`${service}|${row.agent_id}|${index}`, stat);
-      const key = `${service}|${index}`;
-      byMonth.set(key, [
-        ...(byMonth.get(key) ?? []),
-        { ...stat, agent: row.agent_id },
+      byAgent.set(`${service}|${agent}|${index}`, stat);
+      // QA, trainers, leaders and other excluded staff are never peers.
+      const p = group[0]!.profiler_peserta;
+      if (isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan)) continue;
+      const monthKey = `${service}|${index}`;
+      byMonth.set(monthKey, [
+        ...(byMonth.get(monthKey) ?? []),
+        { ...stat, agent },
       ]);
     }
   }
   return { byAgent, byMonth };
+}
+
+const TEMUAN_PAGE = 1000;
+
+/** One service's temuan for the given periods, keyset-paged by id. */
+async function loadTemuan(
+  supabase: SupabaseClient,
+  service: ServiceType,
+  periodIds: string[],
+) {
+  const rows: TemuanRow[] = [];
+  let lastId: string | null = null;
+  for (;;) {
+    let query = supabase
+      .from("qa_temuan")
+      .select(
+        "id, peserta_id, period_id, indicator_id, rule_indicator_id, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya, profiler_peserta!inner(tim, batch_name, jabatan)",
+      )
+      .eq("service_type", service)
+      .in("period_id", periodIds)
+      .order("id")
+      .limit(TEMUAN_PAGE);
+    if (lastId) query = query.gt("id", lastId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as unknown as TemuanRow[];
+    rows.push(...page);
+    if (page.length < TEMUAN_PAGE) return rows;
+    lastId = page[page.length - 1]!.id;
+  }
 }
 
 interface Built {
