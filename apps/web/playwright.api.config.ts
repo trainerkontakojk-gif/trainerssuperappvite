@@ -46,6 +46,10 @@ export default defineConfig({
       testMatch: "telefun-scoring-api.spec.ts",
     },
     {
+      name: "scenario-attachments-real-backend",
+      testMatch: "scenario-attachments-api.spec.ts",
+    },
+    {
       name: "user-controls-real-backend",
       testMatch: ["user-controls-api.spec.ts", "account-controls-api.spec.ts"],
     },

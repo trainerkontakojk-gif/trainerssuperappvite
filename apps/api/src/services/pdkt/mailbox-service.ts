@@ -10,6 +10,7 @@ import {
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
+import { externalizeScenarioAttachments } from "../../lib/scenario-attachments";
 import { toPdktSimulationEmail } from "./scenario-projections";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 
@@ -365,9 +366,21 @@ async function createPdktMailboxSubjectIntent(
 
 export async function createMailboxItem(
   supabaseClient: SupabaseClient,
-  payload: PdktMailboxWritePayload,
+  input: PdktMailboxWritePayload,
   actorId?: string,
 ): Promise<string> {
+  // Attachments are written as Storage links, never as base64 copies.
+  const payload: PdktMailboxWritePayload = {
+    ...input,
+    ...(await externalizeScenarioAttachments(
+      {
+        scenario_snapshot: input.scenario_snapshot,
+        config_snapshot: input.config_snapshot,
+        inbound_email: input.inbound_email,
+      },
+      supabaseAdmin,
+    )),
+  };
   const subject = payload.simulationSubject ?? { type: "self" as const };
   if (
     payload.simulationSubjectSnapshot &&

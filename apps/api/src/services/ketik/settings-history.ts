@@ -22,6 +22,7 @@ import {
   guardedUserSettingsWrite,
   isSettingsConflictError,
 } from "../../lib/guarded-user-settings";
+import { externalizeScenarioAttachments } from "../../lib/scenario-attachments";
 import { getGlobalKetikQuickTemplatesSnapshot } from "./global-templates";
 
 const coerceDuration = (duration?: number) => {
@@ -203,6 +204,7 @@ export async function saveSettings(
   const adminClient = createAdminClient();
 
   try {
+    const stored = await externalizeScenarioAttachments(settings, adminClient);
     const saved = await guardedUserSettingsWrite(
       adminClient,
       userId,
@@ -210,7 +212,7 @@ export async function saveSettings(
         ...(existingSettings && typeof existingSettings === "object"
           ? existingSettings
           : {}),
-        ketik: buildPersonalKetikSettings(settings, existingSettings),
+        ketik: buildPersonalKetikSettings(stored, existingSettings),
       }),
       expectedVersion,
     );

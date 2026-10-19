@@ -93,6 +93,26 @@ test.beforeAll(async () => {
         usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
       });
     }
+    // KETIK now coerces its model to Gemini; answer it the same way.
+    if (url.hostname === "generativelanguage.googleapis.com") {
+      providerCalls++;
+      if (providerGate) await providerGate();
+      if (failProvider)
+        return Response.json({ error: { message: marker } }, { status: 400 });
+      return Response.json({
+        candidates: [
+          {
+            content: { role: "model", parts: [{ text: providerText }] },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 5,
+          totalTokenCount: 15,
+        },
+      });
+    }
     return guardedFetch(input, init);
   };
   trainer = await createUserWithJwt(env, "trainer", ns);
@@ -427,7 +447,8 @@ test("historical attachments use the immutable session snapshot, sent-only proje
       const response = await api(trainer, `/history/${session.id}`);
       expect(response.status).toBe(200);
       const detail = (await response.json()).data;
-      expect(detail.attachments).toEqual([{ index: 0, src: png, alt: "Bukti asli" }]);
+      // Saved images live in Storage; the detail links the stored file.
+      expect(detail.attachments).toEqual([{ index: 0, src: expect.stringMatching(/\/storage\/v1\/object\/public\/scenario-attachments\/[\da-f]{64}\.png$/), alt: "Bukti asli" }]);
       expect(JSON.stringify(detail)).not.toMatch(/unsent-private|latest-settings|private-scenario-script|javascript:/);
     }
     expect((await api(agent, `/history/${session.id}`)).status).toBe(404);

@@ -7,6 +7,7 @@ import {
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
+import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 import { assertLocalDevOnlyTargetAt as assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
@@ -1884,6 +1885,73 @@ test.describe("PDKT (hermetic)", () => {
     await expect(
       page.getByRole("heading", { name: /^Balasan untuk/ }),
     ).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("lampiran yang tersimpan di Storage tampil sebagai tautan, gambar dan PDF", async ({
+    page,
+  }) => {
+    const storage = `${E2E_SUPABASE_URL}/storage/v1/object/public/scenario-attachments`;
+    const imageUrl = `${storage}/${"a".repeat(64)}.png`;
+    const pdfUrl = `${storage}/${"b".repeat(64)}.pdf`;
+    const mail = structuredClone(OPEN_MAIL);
+    mail.detail.inbound_email.attachments = [imageUrl, pdfUrl];
+    mail.detail.emails_thread = [mail.detail.inbound_email];
+    await page.addInitScript(() => {
+      (window as unknown as { openedUrls: string[] }).openedUrls = [];
+      window.open = ((url?: string | URL) => {
+        (window as unknown as { openedUrls: string[] }).openedUrls.push(
+          String(url),
+        );
+        return null;
+      }) as typeof window.open;
+    });
+    const audit = await openHermeticShell(page, {
+      path: "/pdkt",
+      apiMocks: pdktMocks(EVALUATED_HISTORY, [mail]),
+    });
+    const served: string[] = [];
+    await page.route(`${storage}/**`, (route) => {
+      served.push(route.request().url());
+      return route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: Buffer.from(PIXEL_PNG.split(",")[1], "base64"),
+      });
+    });
+    await page
+      .getByRole("button", { name: /^Mulai simulasi/ })
+      .first()
+      .click();
+    await enterWorkspace(page);
+
+    const reading = page.getByRole("article");
+    await expect(reading.getByText("Lampiran (2)")).toBeVisible({
+      timeout: 20000,
+    });
+    const image = reading.getByRole("button", {
+      name: "Lampiran 1",
+      exact: true,
+    });
+    await expect(image.locator("img")).toHaveAttribute("src", imageUrl);
+    await expect
+      .poll(() => image.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBe(1);
+    await image.click();
+    await expect(
+      page.getByRole("dialog", { name: "Pratinjau lampiran" }).locator("img"),
+    ).toHaveAttribute("src", imageUrl);
+    await page.getByRole("button", { name: "Tutup pratinjau lampiran" }).click();
+
+    await reading.getByRole("button", { name: "Lampiran 2 (PDF)" }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { openedUrls: string[] }).openedUrls,
+        ),
+      )
+      .toEqual([pdfUrl]);
+    expect(served).toContain(imageUrl);
     expectHermetic(audit);
   });
 

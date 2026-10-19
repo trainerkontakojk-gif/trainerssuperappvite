@@ -5,6 +5,7 @@ import ScenarioImage from "./ScenarioImage";
 import {
   getAttachmentDataUri,
   getPdfBlob,
+  getPdfUrl,
   isPdfAttachment,
 } from "../utils/detectMimeType";
 import { Button } from "../../../components/ui/button";
@@ -54,6 +55,11 @@ export function EmailAttachments({ attachments, size = "default" }: Props) {
   const open = (base64: string) => {
     if (!isPdfAttachment(base64)) {
       setZoomedImage(getAttachmentDataUri(base64));
+      return;
+    }
+    const pdfUrl = getPdfUrl(base64);
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank", "noopener,noreferrer");
       return;
     }
     try {

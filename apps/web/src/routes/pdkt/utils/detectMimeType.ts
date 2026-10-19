@@ -2,8 +2,13 @@
  * Utility untuk mendeteksi MIME type dari base64 string lampiran.
  */
 
+/** Lampiran baru disimpan di Storage sebagai tautan, bukan base64. */
+function isLinkAttachment(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
 export function getAttachmentDataUri(base64: string): string {
-  if (base64.startsWith("data:")) {
+  if (base64.startsWith("data:") || isLinkAttachment(base64)) {
     return base64;
   }
 
@@ -12,11 +17,17 @@ export function getAttachmentDataUri(base64: string): string {
 }
 
 export function isPdfAttachment(base64: string): boolean {
+  if (isLinkAttachment(base64)) return /\.pdf(?:[?#]|$)/i.test(base64);
   return getAttachmentDataUri(base64).startsWith("data:application/pdf");
 }
 
+/** Tautan PDF dibuka langsung; PDF base64 lama diubah dulu jadi Blob. */
+export function getPdfUrl(base64: string): string | null {
+  return isLinkAttachment(base64) && isPdfAttachment(base64) ? base64 : null;
+}
+
 export function getPdfBlob(base64: string): Blob | null {
-  if (!isPdfAttachment(base64)) return null;
+  if (!isPdfAttachment(base64) || isLinkAttachment(base64)) return null;
 
   try {
     const payload = base64.startsWith("data:")
