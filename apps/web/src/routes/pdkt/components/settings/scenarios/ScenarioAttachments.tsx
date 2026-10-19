@@ -34,7 +34,7 @@ export function ScenarioAttachments({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <label
           htmlFor="scenario-attachment-upload"
-          className="flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/40 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring sm:max-w-64"
+          className="relative flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/40 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring sm:max-w-64"
         >
           <FileUp aria-hidden="true" className="size-5 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">

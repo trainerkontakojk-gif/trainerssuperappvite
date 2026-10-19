@@ -558,7 +558,12 @@ test.describe("PDKT (hermetic)", () => {
               await root.getByRole("button", { name: "Tambah email" }).click();
             } else if (surface === "lampiran skenario") {
               await root.locator("summary").click();
-              await root.locator('input[type="file"]').setInputFiles({
+              const fileChooserEvent = page.waitForEvent("filechooser");
+              await root
+                .getByText("Pilih gambar atau PDF", { exact: true })
+                .click();
+              const fileChooser = await fileChooserEvent;
+              await fileChooser.setFiles({
                 name: "lampiran.png",
                 mimeType: "image/png",
                 buffer: Buffer.from(PIXEL_PNG.split(",")[1], "base64"),
@@ -566,6 +571,18 @@ test.describe("PDKT (hermetic)", () => {
               await expect(
                 root.getByRole("button", { name: "Hapus lampiran 1" }),
               ).toBeVisible();
+              await expect(
+                root.getByRole("heading", { name: "Ubah skenario" }),
+              ).toBeInViewport();
+              await root
+                .getByRole("button", { name: "Hapus lampiran 1" })
+                .scrollIntoViewIfNeeded();
+              await expect(
+                root.getByRole("button", { name: "Hapus lampiran 1" }),
+              ).toBeInViewport();
+              await expect(
+                root.getByRole("heading", { name: "Ubah skenario" }),
+              ).toBeInViewport();
             }
           }
         } else if (surface === "landing" || surface === "landing gagal") {
