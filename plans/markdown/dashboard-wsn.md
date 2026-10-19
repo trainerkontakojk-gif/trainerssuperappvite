@@ -1,0 +1,248 @@
+# Dashboard What / So what / Now what — spec untuk agen coding
+
+Status: **siap dikerjakan** oleh agen coding (Codex, DeepSeek, Claude) tanpa riwayat proyek. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
+
+> Mockup belum disetujui eksplisit oleh Fajar saat spec ini ditulis. Fajar meminta spec ini untuk dikerjakan agen lain, jadi kerjakan sesuai spec; bila Fajar mengubah sesuatu di mockup, ikuti perubahan itu.
+
+## 0. Wajib dibaca sebelum mulai
+
+1. `AGENTS.md` (aturan repo; menang atas spec ini bila bertentangan) dan `docs/AGENT_WORKFLOW.md` §3–§5.
+2. Lane: tahap 1 dan 2 = **Lane C/D** (kontrak API SIDAK, cakupan data leader). Tahap 3 = Lane C. Muat skill/aturan `trainers-superapp-tdd`: E2E Playwright **RED dulu**, lalu GREEN.
+3. Aturan yang paling sering dilanggar:
+   - Setiap commit menambah satu baris `- type(scope): ringkasan` di bawah `## <tanggal hari ini>` di `CHANGELOG.md`, di commit yang sama (dicek `.githooks/pre-commit` dan CI).
+   - Jangan menambah atau menjalankan unit test (Vitest). Bukti perilaku = Playwright E2E. Jangan menambah apa pun ke `scripts/test-core.json` / `scripts/test-fast.json`.
+   - E2E hanya ke target lokal/disposable. Jangan pernah ke produksi. Tidak ada migrasi database di spec ini; bila Anda merasa butuh migrasi, berhenti dan tanya Fajar.
+   - Tidak ada panggilan AI baru. Semua kalimat dibuat dengan aturan tetap (deterministik).
+   - Pesan ke pengguna berbahasa Indonesia yang ramah; jangan tampilkan error database mentah.
+4. **Aturan cakupan (keamanan):** leader hanya melihat agen dari tim yang disetujui. Semua data baru di spec ini harus dihitung dari data yang **sudah** dibatasi oleh `getAccessibleAgentIds` / `getAccessibleSidakFilters` / `resolveSidakFilterScope` di route yang sama. Jangan membuat query baru yang melewati batas ini. Nama agen hanya boleh keluar untuk agen dalam cakupan pemanggil.
+
+## 1. Masalah yang diselesaikan (ringkas)
+
+Setiap kartu data seharusnya menjawab: **What** (angka), **So what** (artinya: dibanding target/bulan lalu), **Now what** (langkah yang bisa diklik, sudah terfilter). Audit menemukan:
+
+| #   | Temuan                                                                                   | Bukti di kode                                                                                                                                                           |
+| --- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | Now what hampir tidak ada di dashboard; saran coaching hanya ada per agent               | `apps/web/src/components/sidak/AgentCoachingBrief.tsx`, `apps/api/src/services/sidak/agent-root-causes.ts`                                                              |
+| T2  | Jumlah temuan mentah dibaca sebagai baik/buruk tanpa memperhitungkan jumlah agen diaudit | `apps/web/src/routes/dashboard/home/TrendCard.tsx` (`Delta`)                                                                                                            |
+| T3  | Kartu "Pola temuan mingguan" SIDAK mengabaikan filter tim dan rentang bulan              | `apps/web/src/components/sidak/SidakDashboardHeatmap.tsx` hanya mengirim `year` + `serviceType`; `apps/api/src/routes/sidak/heatmap.ts` tidak punya parameter tim/bulan |
+| T4  | Rata-rata skor tidak dibandingkan dengan target 95                                       | `SIDAK_QA_TARGET` di `apps/web/src/utils/sidakScoreStatus.ts`                                                                                                           |
+| T5  | Tautan tidak membawa filter                                                              | `AttentionList.tsx` → `/sidak/agents`; `ServiceBreakdown.tsx` → `/sidak`                                                                                                |
+| T6  | Grafik tren tidak menyorot parameter yang paling naik                                    | `apps/web/src/routes/sidak/dashboard.tsx`                                                                                                                               |
+
+Di luar cakupan: laporan dampak pelatihan (EFEK, sudah ada di TNA), Beranda agent (tahap 4 opsional, jangan dikerjakan kecuali Fajar meminta), perubahan skema database, AI.
+
+## 2. Peta kode yang relevan
+
+| Bagian                                         | File                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route dashboard SIDAK (scope sudah diterapkan) | `apps/api/src/routes/sidak/dashboard.ts` → `GET /dashboard`, `GET /dashboard/trend`                                                                                                                                                                                                                                                    |
+| Data dashboard SIDAK                           | `apps/api/src/services/sidak/dashboard-data.ts` (`getDashboardData`), `dashboard-trends.ts` (`buildDashboardTrends`: `paramTrend`, `sparklines`, `periodMetrics`), `dashboard-types.ts` (`DashboardTemuanRow`)                                                                                                                         |
+| Pola penyebab + saran                          | `apps/api/src/services/sidak/agent-root-causes.ts` (`deriveAgentRootCauses`, fallback cluster `lainnya`)                                                                                                                                                                                                                               |
+| Heatmap                                        | `apps/api/src/routes/sidak/heatmap.ts`, `apps/api/src/services/sidak/heatmap-service.ts` (`getSidakHeatmap`, `fetchCountableRows`, `fetchMissingDateRows`, `HeatmapScope`), skema query `sidakHeatmapQuerySchema` (cari dengan `rg sidakHeatmapQuerySchema`), klien web `apps/web/src/lib/sidak-heatmap-client.ts`                     |
+| Filter tim → nama batch                        | `apps/api/src/services/sidak/access-scope.ts` (`resolveFolderFiltersByIds` → `filterNames` = nilai `profiler_peserta.batch_name`)                                                                                                                                                                                                      |
+| Beranda "Perlu tindakan"                       | `apps/api/src/services/home/attention.ts`, kontrak `packages/types/src/home.ts`, UI `apps/web/src/routes/dashboard/home/AttentionList.tsx`                                                                                                                                                                                             |
+| Tren Beranda                                   | `GET /dashboard/trend` → `apps/api/src/services/sidak/service-trends.ts` (`getServiceTrendForDashboardByRange`, **sudah** mengembalikan `periodStats[]` dengan `auditedAgents` dan `serviceStats` per periode), UI `TrendCard.tsx`, `ServiceBreakdown.tsx`, `useDashboardTrend.ts`                                                     |
+| Halaman SIDAK                                  | `apps/web/src/routes/sidak/dashboard.tsx`, `apps/web/src/components/sidak/{KpiCard,SidakConditionSummary,SidakParameterRanking,SidakDashboardHeatmap,TopAgentsTable,SidakDashboardPanel}.tsx`                                                                                                                                          |
+| Daftar agen SIDAK                              | `apps/web/src/routes/sidak/agents.tsx` (filter status lokal), `apps/web/src/utils/sidakAgentList.ts` (`AgentStatusFilter`, `isBelowTarget`), route di `apps/web/src/router.tsx` (`sidakAgentsRoute`, `validateSidakScopeSearch` di `apps/web/src/hooks/useSidakScope.ts`)                                                              |
+| Tipe bersama                                   | `packages/types/src/sidak.ts` (`DashboardData`), `packages/types/src/home.ts`                                                                                                                                                                                                                                                          |
+| Contoh E2E                                     | hermetic browser: `apps/web/e2e/home-staff.spec.ts`, `apps/web/e2e/sidak-scope.spec.ts`, helper `apps/web/e2e/helpers/hermeticShell.ts`, `sidakHomeFixture.ts`; backend nyata + Supabase lokal: `apps/web/e2e/sidak-dashboard-kpi-api.spec.ts`, `home-attention-api.spec.ts` (proyek terdaftar di `apps/web/playwright.api.config.ts`) |
+
+## 3. Kontrak bersama (dibuat di tahap 2, dipakai tahap 3)
+
+Tambahkan ke `packages/types/src/sidak.ts`:
+
+```ts
+export type DashboardInsightTone = "good" | "bad" | "neutral";
+
+export interface DashboardInsightAgent {
+  agentId: string;
+  nama: string;
+  tim: string | null;
+  count: number; // temuan parameter fokus di periode terbaru
+}
+
+export interface DashboardInsights {
+  /** Label periode terbaru dan pembandingnya, mis. "Okt 26" vs "Sep 26". null bila < 2 periode. */
+  latestLabel: string | null;
+  previousLabel: string | null;
+  /** Apa yang terjadi. */
+  what: {
+    text: string;
+    tone: DashboardInsightTone;
+    findingsChangePct: number | null; // (latest-prev)/prev*100, 1 desimal; null bila prev = 0 atau tidak ada
+    perAuditedLatest: number | null; // temuan per agen diaudit periode terbaru, 1 desimal
+    perAuditedPrevious: number | null;
+  };
+  /** Artinya. */
+  soWhat: {
+    text: string;
+    tone: DashboardInsightTone;
+    scoreGapToTarget: number | null; // 95 - avgAgentScore periode terbaru, 1 desimal; null bila >= 95 atau tidak ada data
+    belowTargetCount: number | null; // totalAudited - compliance periode terbaru
+  };
+  /** Parameter penyumbang kenaikan terbesar (null bila tidak memenuhi ambang). */
+  focusParameter: {
+    name: string;
+    category: "critical" | "non_critical" | string;
+    latestCount: number;
+    change: number; // selisih absolut vs periode sebelumnya
+    recommendation: string; // dari agent-root-causes
+    agents: DashboardInsightAgent[]; // maks 10, urut count desc lalu nama
+  } | null;
+  /** Lakukan ini. */
+  nowWhat: {
+    text: string;
+    action: "coach_focus_agents" | "open_ranking" | "none";
+  };
+  /** Perubahan per parameter (periode terbaru vs sebelumnya), untuk kartu Parameter teratas. */
+  parameterChanges: Array<{
+    name: string;
+    latestCount: number;
+    change: number | null;
+  }>;
+}
+```
+
+Lalu `DashboardData` mendapat field baru `insights: DashboardInsights | null` (null bila tidak ada data). Perbarui `emptyDashboardResponse` di server agar mengisi `insights: null`.
+
+## 4. Aturan kalimat (wajib persis, deterministik)
+
+Fungsi murni `buildDashboardInsights(input)` di file baru `apps/api/src/services/sidak/dashboard-insights.ts`. Tanpa I/O, tanpa `Date.now()`. Input: `periodMetrics` (urut lama → baru, dari `buildDashboardTrends`), `paramTrend`, `paretoData`, peta agen per parameter untuk periode terbaru, baris temuan parameter fokus di periode terbaru, `indicators`, `periodById`.
+
+Definisi: `L` = periode terakhir di `periodMetrics`, `P` = periode sebelumnya. Target = 95 (pakai konstanta server yang sudah ada, `complianceThreshold` di `dashboard-data.ts`; pindahkan ke konstanta bersama bila perlu, jangan menulis 95 di dua tempat baru).
+
+| Bagian                                             | Aturan                                                                                                                                                                                                                                     | Teks (contoh persis)                                                                                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| what, < 2 periode                                  | `latestLabel`/`previousLabel` null                                                                                                                                                                                                         | `"Belum ada periode pembanding untuk filter ini."`, tone neutral                                                                                   |
+| what, P.total = 0                                  | `findingsChangePct` null                                                                                                                                                                                                                   | `"{L.total} temuan di {L.label}; {P.label} tanpa temuan, jadi persentase tidak dihitung."` neutral                                                 |
+| what, \|perubahan\| < 5%                           |                                                                                                                                                                                                                                            | `"Temuan {L.label} relatif tetap ({+x,x}%) dibanding {P.label}."` neutral                                                                          |
+| what, naik ≥ 5% dan per-agen-diaudit juga naik     |                                                                                                                                                                                                                                            | `"Temuan {L.label} naik {x,x}% dan temuan per agen diaudit juga naik ({a} → {b}). Kenaikan ini nyata."` bad                                        |
+| what, naik ≥ 5% tapi per-agen-diaudit tidak naik   |                                                                                                                                                                                                                                            | `"Temuan {L.label} naik {x,x}%, tetapi temuan per agen diaudit tidak naik ({a} → {b}). Kenaikan ikut jumlah audit, belum tentu memburuk."` neutral |
+| what, turun ≥ 5% dan per-agen-diaudit juga turun   |                                                                                                                                                                                                                                            | `"Temuan {L.label} turun {x,x}% dan temuan per agen diaudit juga turun ({a} → {b})."` good                                                         |
+| what, turun ≥ 5% tapi per-agen-diaudit tidak turun |                                                                                                                                                                                                                                            | `"Temuan {L.label} turun {x,x}%, tetapi temuan per agen diaudit tidak turun ({a} → {b}). Penurunan ikut jumlah audit."` neutral                    |
+| soWhat, skor L < 95                                |                                                                                                                                                                                                                                            | `"Rata-rata skor {L.label} {s}%, {gap} poin di bawah target 95; {n} agen belum mencapai 95."` bad                                                  |
+| soWhat, skor L ≥ 95                                |                                                                                                                                                                                                                                            | `"Rata-rata skor {L.label} {s}%, sudah mencapai target 95; {n} agen belum mencapai 95."` good bila n = 0, selain itu neutral                       |
+| soWhat + fokus                                     | bila `focusParameter` ada, tambahkan kalimat                                                                                                                                                                                               | `" {nama} menyumbang kenaikan terbesar (+{change})."` + `" Termasuk kritikal."` bila category critical                                             |
+| focusParameter                                     | dataset non-total di `paramTrend` dengan `data[L]-data[P]` terbesar, **minimal +5**; seri dipecah dengan nama (`localeCompare("id")`)                                                                                                      | null bila tidak ada yang ≥ +5                                                                                                                      |
+| recommendation                                     | jalankan `deriveAgentRootCauses({ temuan: baris temuan countable parameter fokus di periode L, indicators, periodById, maxResults: 1 })`; ambil `recommendation` cluster teratas. Bila hasil kosong, pakai teks fallback cluster `lainnya` |                                                                                                                                                    |
+| agents                                             | dari loop agen di `getDashboardData`, hitung temuan countable per agen untuk parameter fokus **di periode L saja**; maks 10                                                                                                                |                                                                                                                                                    |
+| nowWhat, ada fokus + agents                        | `action: "coach_focus_agents"`                                                                                                                                                                                                             | `"Coaching {k} agen dengan temuan {nama} terbanyak."`                                                                                              |
+| nowWhat, tanpa fokus, ada agen bertemuan           | `action: "open_ranking"`                                                                                                                                                                                                                   | `"Tidak ada parameter yang naik berarti. Mulai dari agen dengan temuan terbanyak."`                                                                |
+| nowWhat, tidak ada data                            | `action: "none"`                                                                                                                                                                                                                           | `"Belum ada tindakan yang disarankan untuk filter ini."`                                                                                           |
+
+Format angka: desimal koma Indonesia (`new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 })`), tanda `+`/`−` eksplisit untuk perubahan. Per agen diaudit = `total / totalAudited` (null bila `totalAudited` = 0).
+
+`parameterChanges`: untuk setiap dataset non-total, `latestCount = data[L]`, `change = data[L]-data[P]` (null bila < 2 periode).
+
+Catatan pencocokan nama: `paramTrend` memakai `formatQAIndicatorName(indicator)` dari `indicator_id`, sedangkan Pareto/loop agen memakai `findIndicatorForRow` (konteks scoring). Pakai **nama dari `paramTrend`** sebagai kunci, cocokkan ke peta agen dengan nama yang sama; bila tidak ketemu, `agents: []` dan `nowWhat` jatuh ke `open_ranking`. Jangan menebak.
+
+## 5. Tahap 1 — perbaiki angka yang tidak cocok (1 PR)
+
+**Tujuan:** T3 dan T4.
+
+### 5.1 Heatmap ikut filter tim dan bulan (backend)
+
+- `sidakHeatmapQuerySchema`: tambah `folder_ids` opsional (string dipisah koma, tiap item UUID), `start_month` dan `end_month` opsional (int 1–12, `start_month <= end_month`, keduanya atau tidak sama sekali; selain itu 400 `VALIDATION_ERROR`).
+- Route `GET /sidak/heatmap`: bila `folder_ids` ada, resolve dengan `resolveFolderFiltersByIds(folderIds)` → `filterNames`. Ambil id peserta yang `batch_name` ∈ `filterNames` (pola yang sama dengan `access-scope.ts` baris yang memakai `.in("batch_name", folderNames)`), lalu **irisan** dengan `scope.agentIds` bila leader (`filterScope` tidak null). Irisan kosong → respons kosong yang sah (sudah ditangani `getSidakHeatmap` bila `agentIds` = `[]`).
+- `getSidakHeatmap` dan `fetchCountableRows`: tambah `startMonth`/`endMonth`; rentang tanggal menjadi `${year}-${MM(start)}-01` sampai hari terakhir `end` (pakai `new Date(Date.UTC(year, end, 0))`). Default tetap seluruh tahun. `fetchMissingDateRows` **tidak** diubah (memang "sejak dulu"), tetapi ikut irisan agen dari filter tim.
+- Respons boleh menambah `startMonth`, `endMonth` di objek yang sudah ada bila tipenya mengizinkan; jangan mengganti nama field yang ada.
+- Catatan untuk UI: heatmap memakai **tanggal layanan**, sedangkan kartu lain memakai **bulan periode QA**. Deskripsi kartu harus menyebut "per tanggal layanan" (sudah ada).
+
+### 5.2 Heatmap ikut filter (web)
+
+- `lib/sidak-heatmap-client.ts`: tambah `folderIds?: string[]`, `startMonth?`, `endMonth?` → query `folder_ids`, `start_month`, `end_month`.
+- `SidakDashboardHeatmap.tsx`: prop baru `folderId: string | null`, `startMonth: number | null`, `endMonth: number | null`; kirim ke klien; deskripsi kartu menjadi `{layanan} · {tim atau "Semua tim"} · {Bln–Bln} {tahun} · per tanggal layanan`. Teks "temuan sepanjang {tahun}" menjadi "temuan pada rentang ini".
+- `routes/sidak/dashboard.tsx`: teruskan `selectedFolder` (null bila `SIDAK_ALL_TEAMS`), `startMonth`, `endMonth`.
+- Halaman `/sidak/heatmap` dan tab heatmap agent **tidak** berubah perilakunya (parameter baru opsional).
+
+### 5.3 Pembanding target di KPI SIDAK
+
+- `KpiCard.tsx`: prop opsional `badge?: { text: string; tone: "good" | "bad" | "warn" }` ditampilkan sebagai pil kecil di bawah delta (warna: good emerald-700, bad rose-700, warn amber-700, versi `dark:` seperti delta yang ada).
+- `routes/sidak/dashboard.tsx` `KPI_CARDS`:
+  - "Rata-rata Skor": bila `summary.avgAgentScore < 95` → badge bad `"{gap} di bawah target 95"`, selain itu good `"Mencapai target 95"`.
+  - Kepatuhan: badge bad `"{n} agen belum ≥ 95"` dengan `n` dari `sparklines.compliance` titik terakhir (`totalAudited - count`); sembunyikan bila tidak ada titik.
+  - "Total Temuan QA per Parameter": badge warn/good `"{x} per agen diaudit · naik|turun|tetap"` dari dua titik terakhir `periodMetrics` (`total/totalAudited`); sembunyikan bila < 2 periode.
+  - Ganti `desc` "Kualitas performa rata-rata" menjadi `"Target 95"`.
+
+### 5.4 E2E tahap 1 (tulis dulu, jalankan sampai merah, lalu implementasi)
+
+- Backend nyata: tambah kasus ke `apps/web/e2e/sidak-dashboard-kpi-api.spec.ts` **atau** buat `sidak-heatmap-filter-api.spec.ts` (daftarkan proyek baru di `playwright.api.config.ts`). Fixture: 2 folder/tim, temuan dengan tanggal layanan di dua bulan berbeda. Buktikan: (a) `folder_ids` hanya menghitung tim itu; (b) `start_month/end_month` memotong tanggal; (c) leader dengan scope tim A yang meminta `folder_ids` tim B mendapat total 0; (d) `start_month > end_month` → 400.
+- Hermetic browser: di spec SIDAK dashboard yang ada (cari dengan `rg "sidak/dashboard" apps/web/e2e`) atau spec baru, mock `/sidak/dashboard` dan `/sidak/heatmap`; buktikan request heatmap membawa `folder_ids`, `start_month`, `end_month` saat filter dipilih, dan pil "di bawah target 95" tampil dengan angka yang benar.
+
+**Selesai bila:** semua E2E di atas hijau, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git diff --check` bersih, CHANGELOG diisi.
+
+## 6. Tahap 2 — Kesimpulan SIDAK (1 PR)
+
+**Tujuan:** T1, T6.
+
+### 6.1 Server
+
+1. `dashboard-types.ts`: tambah `ketidaksesuaian?: string | null; sebaiknya?: string | null;` ke `DashboardTemuanRow` (kolomnya sudah di-select di `DASHBOARD_TEMUAN_COLUMNS`).
+2. `dashboard-data.ts` di loop agen: bangun `Map<paramName, Map<agentId, { nama, tim, count }>>` dan `Map<paramName, DashboardTemuanRow[]>` **hanya untuk `period_id` = periode terbaru** (`trends.periodMetrics.at(-1)?.periodId`). Karena `trends` dihitung setelah loop, tentukan id periode terbaru lebih dulu dari `periods` yang terfilter, atau jalankan pengelompokan kecil setelah `buildDashboardTrends` dengan menyaring `rows` per `period_id`. Pilih cara kedua bila lebih sederhana; jangan query ulang database.
+3. Panggil `buildDashboardInsights(...)` dan kembalikan `insights` di respons. Biaya tambahan harus O(baris periode terbaru); tidak ada query baru.
+4. `periodById` untuk `deriveAgentRootCauses`: `new Map(periods.map(p => [p.id, p]))`.
+
+### 6.2 Web
+
+1. Komponen baru `apps/web/src/components/sidak/SidakDashboardBrief.tsx`: kartu tiga kolom (satu kolom di layar sempit) berlabel **"Apa yang terjadi" / "Artinya" / "Lakukan ini"**, ditempatkan di `routes/sidak/dashboard.tsx` **di atas** strip KPI, dengan judul `sr-only` "Kesimpulan". Kolom ketiga:
+   - `coach_focus_agents`: tombol utama `"Lihat {k} agen"` yang membuka daftar (disclosure atau popover yang bisa diakses keyboard) berisi nama + tim + jumlah temuan, tiap baris tautan ke `/sidak/agents/$id`. Tombol kedua `"Buka TNA"` → `/tna` hanya bila `isCapabilityAllowed(role, "tna.read")`.
+   - `open_ranking`: tombol `"Lihat ranking"` → URL ranking yang sama dengan `TopAgentsTable`.
+   - `none`: hanya teks.
+   - Tone: bad = teks rose, good = emerald, neutral = foreground. Jangan memakai warna sebagai satu-satunya penanda (teks sudah menjelaskan).
+2. `SidakParameterRanking.tsx`: terima `insights`. Untuk tiap baris, tampilkan perubahan dari `parameterChanges` (`+n vs {previousLabel}` merah, `−n` hijau, `tetap` abu). Baris yang sama dengan `focusParameter` dibuka otomatis menampilkan `recommendation` dan tombol `"Lihat {k} agen"` (daftar yang sama seperti Brief; buat satu komponen kecil `FocusAgentsDisclosure` dan pakai di dua tempat). Kalimat penutup Pareto yang ada tetap; tambahkan `" {nama} naik paling tajam, jadi prioritas pertama."` bila ada fokus.
+3. Grafik tren di `routes/sidak/dashboard.tsx`: saat data pertama kali dimuat (dan `hiddenParams` masih null), seri default yang aktif = Total + `focusParameter` (bila ada), bukan dua parameter pertama. Tambah pil di header panel `"{nama} +{change}"` dan satu kalimat di bawah grafik `"Kenaikan {latestLabel} terutama dari {nama} (+{change})."`. Perilaku chip lain tidak berubah.
+4. Jangan mengubah `SidakConditionSummary` selain bila perlu menghindari kalimat ganda; Brief berada di atasnya dan ringkasan tetap.
+
+### 6.3 E2E tahap 2
+
+- Backend nyata (`sidak-dashboard-kpi-api.spec.ts` atau spec baru `sidak-dashboard-insights-api.spec.ts`): fixture dua periode, parameter X naik +6 dan agen diaudit tetap. Buktikan `insights.what.tone = "bad"`, teks berisi "Kenaikan ini nyata", `focusParameter.name = X`, `agents` urut dan maks 10, `recommendation` tidak kosong, dan leader hanya melihat agen timnya di `agents`. Kasus kedua: agen diaudit naik dua kali lipat → teks "Kenaikan ikut jumlah audit". Kasus ketiga: satu periode → teks "Belum ada periode pembanding".
+- Hermetic browser: mock respons dengan `insights`; buktikan tiga kolom tampil, tombol "Lihat N agen" membuka daftar dan tautan ke detail agent, baris parameter fokus menampilkan saran, grafik default menyalakan parameter fokus.
+
+## 7. Tahap 3 — Beranda (1 PR)
+
+**Tujuan:** T2, T5 di Beranda staff.
+
+1. **Perlu tindakan** (`services/home/attention.ts`): pada item `agents_below_target` tambahkan `worstAgents?: { agentId: string; nama: string; score: number }[]` (maks 3, skor terendah dulu) dari `getAgentDirectorySummary` yang sudah dipanggil (agen `atRisk`). Perbarui `HomeAttentionItem` di `packages/types/src/home.ts`. UI `AttentionList.tsx`: baris kedua `"Terjauh: Rina (81,4), Dimas (84,0), Sari (85,2) dan {n-3} lainnya"`; tombol menjadi `"Lihat {n} agen"` dengan href `/sidak/agents?status=below`.
+   - Perubahan "+4 dari bulan lalu" di mockup **tidak** dikerjakan di tahap ini (butuh hitungan direktori bulan sebelumnya; bukan data yang sudah ada).
+2. **Daftar agen** (`routes/sidak/agents.tsx`, `router.tsx`, `utils/sidakAgentList.ts`): route `/sidak/agents` menerima search param `status` dengan nilai `AgentStatusFilter` plus nilai baru `"below"` (= `isBelowTarget`). Tambahkan opsi `{ value: "below", label: "Di bawah target 95" }`. Validator search harus mempertahankan param scope yang ada (`validateSidakScopeSearch`) dan menolak nilai status lain (abaikan, jangan error). State awal filter status membaca param ini.
+3. **Tren temuan QA** (`TrendCard.tsx`, `useDashboardTrend.ts`): tambahkan `periodStats` ke tipe `TrendData` (sudah dikirim API). Tambah stat `"Per agen diaudit"` = total periode terakhir / `auditedAgents` periode terakhir (untuk layanan terpilih pakai `serviceStats[svc]`), dengan arah naik/turun vs periode sebelumnya. Tambah satu kalimat di bawah grafik dengan aturan yang sama seperti bagian `what` di §4 (salin aturan ke helper web kecil `homeTrendSentence()` di folder `dashboard/home/`; jangan import kode server). Tambah tautan `"Lihat penyebab di SIDAK"` → `/sidak?layanan={svc}&tahun={year}&dari={m}&sampai={m}` (param scope SIDAK yang divalidasi `validateSidakScopeSearch`; untuk "Semua layanan" jangan kirim `layanan`).
+4. **Temuan per layanan** (`ServiceBreakdown.tsx`): judul tetap; isi menjadi **periode terakhir** pada rentang, dengan persentase porsi dan perubahan vs periode sebelumnya (`+18%` merah, `−6%` hijau, `tetap`). Kalimat `"{Layanan} naik paling tajam."` bila ada yang naik ≥ 5%. Tautan menjadi `"Buka SIDAK untuk {Layanan}"` → `/sidak?layanan={svc}` untuk layanan yang paling naik, atau `/sidak` bila tidak ada.
+5. **Cakupan:** `GET /dashboard/trend` sudah memakai `getAccessibleAgentIds`; jangan ubah. `worstAgents` hanya dari direktori yang sudah terbatas scope.
+
+### 7.1 E2E tahap 3
+
+- Backend nyata `home-attention-api.spec.ts`: `worstAgents` maks 3, urut skor naik, leader hanya melihat agen timnya.
+- Hermetic `home-staff.spec.ts`: kalimat tren, stat per agen diaudit, porsi dan perubahan per layanan, href tautan membawa filter; `/sidak/agents?status=below` membuka daftar dengan filter "Di bawah target 95" aktif.
+
+## 8. Perintah verifikasi (tiap tahap)
+
+```bash
+pnpm install --frozen-lockfile
+# Supabase lokal untuk spec backend nyata (lihat docs/e2e-testing.md)
+pnpm --filter @trainers/web test:e2e -- e2e/<spec-hermetic>.spec.ts
+pnpm --filter @trainers/web exec playwright test -c playwright.api.config.ts --project=<nama-proyek>
+pnpm typecheck
+pnpm lint
+pnpm build
+git diff --check
+```
+
+- Hanya satu run Playwright dalam satu waktu.
+- Di container tanpa unduhan browser, Chromium ada di `/opt/pw-browsers/chromium`; bila perlu, buat config sementara dengan `launchOptions.executablePath` lalu **hapus sebelum commit**.
+- Laporkan perintah dan hasil persisnya di PR. Jangan klaim cek yang tidak dijalankan.
+
+## 9. Aturan PR
+
+- Satu PR per tahap, berurutan (tahap 2 bergantung pada tipe tahap 1 hanya lewat file yang sama; rebase/merge `main` sebelum push karena `CHANGELOG.md` sering bentrok).
+- Judul contoh: `fix(sidak): make the weekly pattern follow the team and month filters`, `feat(sidak): add the dashboard summary with focus parameter and coaching agents`, `feat(home): add comparisons and filtered links to the staff home`.
+- Isi PR: Before/After dalam bahasa sederhana, lalu How singkat, lalu bukti perintah.
+- Merge ke `main` boleh setelah CI hijau (izin tetap dari Fajar). Deploy produksi **tidak** termasuk.
+
+## 10. Jebakan yang sudah diketahui
+
+- `getDashboardData` memakai service-role (`supabaseAdmin`) dengan scope aplikasi; semua data baru harus berasal dari `rows` yang sudah difilter, bukan query baru.
+- `periodMetrics` hanya berisi periode di rentang filter; "periode terakhir" berarti terakhir di rentang, bukan bulan kalender sekarang.
+- Ringkasan "Kepatuhan" untuk rentang multi-bulan adalah rata-rata per bulan; pil "agen belum ≥ 95" harus memakai periode **terakhir**, dan labelnya menyebut periode itu bila rentang > 1 bulan (mis. `"23 agen belum ≥ 95 di Okt"`).
+- `deriveAgentRootCauses` mencocokkan kata kunci; parameter tanpa kecocokan jatuh ke cluster `lainnya` dengan saran umum. Itu perilaku yang benar, jangan diganti dengan teks karangan.
+- Heatmap: jangan mengubah `fetchMissingDateRows` menjadi berbatas tanggal.
+- Jangan memakai `localStorage` untuk state filter baru; filter SIDAK ada di URL (`useSidakScope`).
