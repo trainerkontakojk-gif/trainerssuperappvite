@@ -1,6 +1,6 @@
 # Dashboard What / So what / Now what — spec untuk agen coding
 
-Status: **tahap 1 selesai** (`40629898`), **tahap 2 selesai** (`cbceff0b`), dan **tahap 3 diimplementasikan serta diverifikasi**. Tahap 4 tetap opsional. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
+Status: **tahap 1 selesai** (`40629898`), **tahap 2 selesai** (`cbceff0b`), dan **tahap 3 diimplementasikan serta diverifikasi**. Tahap 4 tetap opsional: draf di §11, **menunggu keputusan Fajar** (K1–K5) sebelum boleh dikerjakan. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
 
 > Mockup belum disetujui eksplisit oleh Fajar saat spec ini ditulis. Fajar meminta spec ini untuk dikerjakan agen lain, jadi kerjakan sesuai spec; bila Fajar mengubah sesuatu di mockup, ikuti perubahan itu.
 
@@ -29,7 +29,7 @@ Setiap kartu data seharusnya menjawab: **What** (angka), **So what** (artinya: d
 | T5  | Tautan tidak membawa filter                                                              | `AttentionList.tsx` → `/sidak/agents`; `ServiceBreakdown.tsx` → `/sidak`                                                                                                |
 | T6  | Grafik tren tidak menyorot parameter yang paling naik                                    | `apps/web/src/routes/sidak/dashboard.tsx`                                                                                                                               |
 
-Di luar cakupan: laporan dampak pelatihan (EFEK, sudah ada di TNA), Beranda agent (tahap 4 opsional, jangan dikerjakan kecuali Fajar meminta), perubahan skema database, AI.
+Di luar cakupan: laporan dampak pelatihan (EFEK, sudah ada di TNA), Beranda agent (tahap 4 opsional, draf §11; jangan dikerjakan sebelum Fajar mengisi keputusan K1–K5), perubahan skema database, AI.
 
 ## 2. Peta kode yang relevan
 
@@ -357,3 +357,78 @@ git diff --check
 - `deriveAgentRootCauses` mencocokkan kata kunci; parameter tanpa kecocokan jatuh ke cluster `lainnya` dengan saran umum. Itu perilaku yang benar, jangan diganti dengan teks karangan.
 - Heatmap: jangan mengubah `fetchMissingDateRows` menjadi berbatas tanggal.
 - Jangan memakai `localStorage` untuk state filter baru; filter SIDAK ada di URL (`useSidakScope`).
+
+## 11. Tahap 4 — Beranda agent (DRAF, menunggu keputusan Fajar)
+
+**Status:** draf ruang lingkup. **Jangan dikerjakan** sampai Fajar mengisi keputusan K1–K5 di §11.3 dan mengubah status ini. Setelah itu, agen coding menambah bagian Requirement/Design/Tasklist seperti tahap 1–3.
+
+**Tujuan:** Beranda agent (`AgentHome`) menjawab tiga hal untuk agen itu sendiri: _What_ (posisi skor QA saya), _So what_ (parameter yang paling menurunkan skor), _Now what_ (latihan apa yang dilakukan hari ini).
+
+### 11.1 Kondisi sekarang (dicek 2026-10-20)
+
+- `apps/web/src/routes/dashboard.tsx`: role tanpa `sidak.read` (yaitu `agent`) membuka `AgentHome`.
+- `apps/web/src/routes/dashboard/home/AgentHome.tsx`: hanya daftar modul **Latihan** dari `buildNavModel(role)` dan **Riwayat sesi** (5 terakhir, gabungan KETIK + PDKT; TELEFUN tidak ikut). E2E hermetic: `apps/web/e2e/home-agent.spec.ts`.
+- Capability agent (`packages/types/src/access.ts`): punya `sidak.dashboard.read`, **tidak** punya `sidak.read`, `tna.read`, atau `profiler.read`. Jadi `/sidak/agents/:id` (perlu `sidak.read`) dan EFEK (perlu `tna.read`) tertutup untuk agent.
+- Scope data: `resolveDataScope` (`apps/api/src/services/access/scope.ts`) memberi agent `{ kind: "self", pesertaId }` lewat `profiler_peserta.akun_id`, atau `{ kind: "none", reason: "unlinked" }` bila akun belum ditautkan admin/trainer.
+- Kuota latihan hari ini sudah ada: `GET /api/v1/me/practice-quota` (`getPracticeQuotaStatus`), dipakai web lewat `usePracticeQuota` dan `QuotaLine`.
+- Perhitungan skor per agen sudah ada di `getAgentDetail` (`apps/api/src/services/sidak/agent-directory.ts`). Fungsi ini membaca `profiler_peserta.*` dengan service-role, jadi hasilnya **tidak boleh** dikirim mentah ke agent (berisi data KTP).
+
+### 11.2 Usulan blok (pilih lewat K1)
+
+| Blok | Isi                                                                                                                             | Data / backend                                                                                                             | Risiko                           |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| A    | **Kuota latihan hari ini** per modul (`2 dari 5 dipakai`, jam reset) di baris Latihan                                           | Endpoint yang ada `GET /me/practice-quota`; tanpa backend baru                                                             | Rendah (Lane B)                  |
+| B    | **Skor QA saya** periode terakhir vs target 95: skor, selisih ke target, perubahan vs periode sebelumnya, kalimat deterministik | Endpoint baru `GET /api/v1/home/agent-summary` (scope `self`), memakai perhitungan `getAgentDetail`; tanpa rumus skor baru | Sedang (Lane D, kontrak + scope) |
+| C    | **Parameter yang paling sering jadi temuan** (maks 3, periode terakhir) + satu saran dari `deriveAgentRootCauses`               | Endpoint yang sama dengan B                                                                                                | Sedang                           |
+| D    | **Tren skor** maks 6 periode terakhir (sparkline kecil)                                                                         | Endpoint yang sama dengan B                                                                                                | Rendah setelah B                 |
+| E    | **Pembanding layanan**: rata-rata skor layanan agen itu, tanpa nama agen lain                                                   | Agregat di endpoint B; perlu keputusan privasi K3                                                                          | Sedang                           |
+| F    | **TELEFUN di Riwayat sesi**                                                                                                     | Riwayat TELEFUN milik akun (scope `AccountScope` self)                                                                     | Rendah                           |
+| G    | **Pelatihan yang saya ikuti** (sesi EFEK)                                                                                       | Agent tidak punya `tna.read`; butuh endpoint self baru di TNA                                                              | Sedang; usul ditunda             |
+
+Rekomendasi: **A, B, C, D, F** di tahap 4. E dan G ditunda ke tahap terpisah.
+
+### 11.3 Keputusan yang dibutuhkan dari Fajar
+
+- **K1 — Blok:** blok mana yang masuk tahap 4? (rekomendasi: A, B, C, D, F)
+- **K2 — Kedalaman temuan:** agent hanya melihat **nama parameter + jumlah temuan**, atau juga catatan QA / nomor tiket? (rekomendasi: nama + jumlah saja; detail tetap lewat coaching trainer/leader)
+- **K3 — Pembanding:** boleh menampilkan rata-rata layanan (tanpa nama)? (rekomendasi: tunda; bila ya, hanya untuk layanan dengan ≥ 5 agen diaudit agar tidak bisa ditebak)
+- **K4 — Akun belum ditautkan:** tampilkan panel netral `"Data QA Anda belum tersambung. Hubungi trainer untuk menautkan akun."` dan blok Latihan tetap tampil? (rekomendasi: ya)
+- **K5 — Periode:** blok B–D memakai **periode terakhir yang punya audit untuk agen itu** (bukan bulan kalender sekarang), dengan label bulannya? (rekomendasi: ya, sesuai jebakan §10)
+
+### 11.4 Draf kontrak (bila B/C/D disetujui)
+
+`packages/types/src/home.ts`:
+
+```ts
+export interface AgentHomeSummary {
+  linked: boolean; // false bila scope agent "unlinked"
+  qa: null | {
+    periodLabel: string; // periode terakhir yang punya audit agen ini
+    score: number; // 1 desimal, rumus sama dengan getAgentDetail
+    target: 95;
+    gapToTarget: number | null; // 95 - score; null bila score >= 95
+    previousLabel: string | null;
+    delta: number | null; // score - skor periode sebelumnya
+    trend: { periodLabel: string; score: number }[]; // maks 6, lama → baru
+    topParameters: { name: string; count: number }[]; // maks 3, count desc lalu nama
+    recommendation: string | null; // deriveAgentRootCauses, fallback cluster "lainnya"
+  };
+}
+```
+
+- Route `GET /api/v1/home/agent-summary`: `requireCapability("sidak.dashboard.read")`, hanya role `agent`; role lain → 403. Scope dari `resolveDataScope(..., "sidak")`: `self` → hitung untuk `pesertaId` itu saja; `none/unlinked` → `{ linked: false, qa: null }`; agent tertaut tanpa audit → `{ linked: true, qa: null }`.
+- Tidak ada parameter id di request: agent tidak bisa meminta data peserta lain.
+- Respons hanya field di atas; jangan meneruskan baris `profiler_peserta`, nama/tim agen lain, catatan QA, atau nomor tiket (kecuali K2 berkata lain).
+- Tanpa AI, tanpa migrasi. Error database → pesan ramah, bukan `qa: null` palsu.
+
+### 11.5 Draf aturan kalimat (deterministik)
+
+- `score >= 95`: `"Skor QA {periodLabel} {score}, sudah mencapai target 95."`
+- `score < 95`: `"Skor QA {periodLabel} {score}, {gap} poin di bawah target 95."`
+- Tambahan bila `delta` ada: `" Naik {delta} dari {previousLabel}."` / `" Turun {|delta|} dari {previousLabel}."` / `" Sama dengan {previousLabel}."`
+- `topParameters` kosong: `"Tidak ada temuan di {periodLabel}."`
+
+### 11.6 Draf E2E (RED dulu)
+
+- Backend nyata `home-agent-summary-api.spec.ts`: agent tertaut melihat skor, tren, dan parameter **hanya** dari data dirinya (fixture dua agen di layanan sama, agen lain punya skor berbeda); agent belum tertaut → `linked: false`; leader/trainer → 403; respons tidak memuat field di luar kontrak; kegagalan query → error ramah.
+- Hermetic `home-agent.spec.ts` (perluas): kalimat skor di atas/di bawah target, perubahan vs periode sebelumnya, maks 3 parameter + saran, panel belum tertaut, kuota per modul (A), TELEFUN di riwayat (F); tes lama tetap lulus.

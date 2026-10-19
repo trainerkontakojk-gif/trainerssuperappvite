@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(plans): draft the optional phase 4 agent home scope (current state, candidate blocks, decisions K1–K5, draft contract, sentences, and E2E) pending Fajar's decisions
 - feat(home): add scoped lowest-score agents, audited-agent trend comparisons, latest-period service shares, and filtered SIDAK links to the staff home
 
 ## 2026-10-19
