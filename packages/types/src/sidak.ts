@@ -50,13 +50,32 @@ export const HEATMAP_DATE_COLUMN: Record<
   qa: "tanggal_sampel",
 };
 
-export const sidakHeatmapQuerySchema = z.object({
-  mode: sidakHeatmapModeSchema,
-  year: z.coerce.number().int().min(2000).max(2100),
-  service_type: serviceTypeSchema.optional(),
-  count_by: sidakHeatmapCountBySchema.default("parameter"),
-  agent_id: z.string().uuid().optional(),
-});
+export const sidakHeatmapQuerySchema = z
+  .object({
+    mode: sidakHeatmapModeSchema,
+    year: z.coerce.number().int().min(2000).max(2100),
+    service_type: serviceTypeSchema.optional(),
+    count_by: sidakHeatmapCountBySchema.default("parameter"),
+    agent_id: z.string().uuid().optional(),
+    folder_ids: z
+      .string()
+      .transform((value) => value.split(","))
+      .pipe(z.array(z.string().uuid()).min(1))
+      .optional(),
+    start_month: z.coerce.number().int().min(1).max(12).optional(),
+    end_month: z.coerce.number().int().min(1).max(12).optional(),
+  })
+  .refine(
+    ({ start_month, end_month }) =>
+      (start_month === undefined && end_month === undefined) ||
+      (start_month !== undefined &&
+        end_month !== undefined &&
+        start_month <= end_month),
+    {
+      path: ["start_month"],
+      message: "Isi kedua bulan dengan rentang awal ≤ akhir.",
+    },
+  );
 export type SidakHeatmapQuery = z.infer<typeof sidakHeatmapQuerySchema>;
 
 /** Tiket bertemuan pada satu tanggal heatmap agen, dengan bulan periode QA-nya. */

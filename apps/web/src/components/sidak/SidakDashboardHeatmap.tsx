@@ -6,6 +6,7 @@ import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import {
   buildHeatmapInsights,
   formatInsightDateLong,
+  MONTH_SHORT,
 } from "./heatmap-insights";
 import SidakDashboardPanel, { panelLinkClass } from "./SidakDashboardPanel";
 import { SidakWeekdayBars } from "./SidakWeekdayBars";
@@ -14,6 +15,10 @@ interface Props {
   year: number;
   serviceType?: ServiceType;
   serviceLabel: string;
+  folderId: string | null;
+  folderLabel: string;
+  startMonth: number | null;
+  endMonth: number | null;
 }
 
 const INTEGER = new Intl.NumberFormat("id-ID");
@@ -27,6 +32,10 @@ export default function SidakDashboardHeatmap({
   year,
   serviceType,
   serviceLabel,
+  folderId,
+  folderLabel,
+  startMonth,
+  endMonth,
 }: Props) {
   const [data, setData] = useState<SidakHeatmapResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +53,9 @@ export default function SidakDashboardHeatmap({
         year,
         countBy: "parameter",
         serviceType,
+        folderIds: folderId ? [folderId] : undefined,
+        startMonth: startMonth ?? undefined,
+        endMonth: endMonth ?? undefined,
       });
       if (generation === generationRef.current) setData(response);
     } catch (cause) {
@@ -53,7 +65,7 @@ export default function SidakDashboardHeatmap({
     } finally {
       if (generation === generationRef.current) setLoading(false);
     }
-  }, [year, serviceType]);
+  }, [year, serviceType, folderId, startMonth, endMonth]);
 
   useEffect(() => {
     void load();
@@ -68,12 +80,18 @@ export default function SidakDashboardHeatmap({
   );
   const weekdayTotals = insights?.weekdayTotals ?? new Array<number>(7).fill(0);
   const weekendTotal = weekdayTotals[5]! + weekdayTotals[6]!;
+  const monthRange =
+    startMonth && endMonth
+      ? startMonth === endMonth
+        ? `${MONTH_SHORT[startMonth - 1]} ${year}`
+        : `${MONTH_SHORT[startMonth - 1]}–${MONTH_SHORT[endMonth - 1]} ${year}`
+      : String(year);
 
   return (
     <SidakDashboardPanel
       id="sidak-dashboard-heatmap-title"
       title="Pola temuan mingguan"
-      description={`${serviceLabel} · ${year} · per tanggal layanan`}
+      description={`${serviceLabel} · ${folderId ? folderLabel : "Semua tim"} · ${monthRange} · per tanggal layanan`}
       busy={loading}
       action={
         <Link to="/sidak/heatmap" className={panelLinkClass}>
@@ -117,7 +135,7 @@ export default function SidakDashboardHeatmap({
               <span className="font-outfit text-[1.75rem] leading-none font-bold tracking-[-0.03em] text-foreground tabular-nums">
                 {INTEGER.format(insights.total)}
               </span>{" "}
-              temuan sepanjang {year}
+              temuan pada rentang ini
             </p>
             <p className="text-sm text-foreground">
               <span className="font-semibold">Puncak:</span>{" "}
@@ -167,12 +185,12 @@ export default function SidakDashboardHeatmap({
         </>
       ) : (
         <p className="py-6 text-sm text-muted-foreground">
-          Belum ada temuan pada heatmap tahun {year}.
+          Belum ada temuan pada rentang ini.
         </p>
       )}
       <p className="mt-auto pt-4 text-xs leading-5 text-muted-foreground">
-        Tahun penuh · volume temuan, bukan rate · filter tim/bulan tidak berlaku
-        · cakupan akses akun tetap berlaku.
+        Volume temuan, bukan rate · filter tim dan bulan serta cakupan akses
+        akun tetap berlaku.
       </p>
     </SidakDashboardPanel>
   );

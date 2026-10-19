@@ -14,6 +14,7 @@ import {
 import { RefreshCw, Loader2, AlertTriangle, ArrowUp } from "lucide-react";
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
+import { SIDAK_QA_TARGET } from "../../utils/sidakScoreStatus";
 import { SERVICE_LABELS, DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import {
   findPrimarySidakFolderByName,
@@ -430,12 +431,47 @@ export default function SidakDashboardPage() {
     return { visible, hiddenCount: params.length - visible.length };
   })();
 
+  const numberLabel = (value: number) =>
+    value.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+  const latestCompliance = sparklines.compliance?.at(-1);
+  const belowTargetCount =
+    latestCompliance?.totalAudited !== undefined &&
+    latestCompliance.count !== undefined
+      ? Math.max(0, latestCompliance.totalAudited - latestCompliance.count)
+      : null;
+  const latestMetric = data?.periodMetrics?.at(-1);
+  const previousMetric = data?.periodMetrics?.at(-2);
+  const perAudited =
+    latestMetric &&
+    previousMetric &&
+    latestMetric.totalAudited > 0 &&
+    previousMetric.totalAudited > 0
+      ? {
+          latest: latestMetric.total / latestMetric.totalAudited,
+          previous: previousMetric.total / previousMetric.totalAudited,
+        }
+      : null;
+  const rateDirection = perAudited
+    ? perAudited.latest > perAudited.previous
+      ? "naik"
+      : perAudited.latest < perAudited.previous
+        ? "turun"
+        : "tetap"
+    : null;
+
   const KPI_CARDS = [
     {
       id: "total-defects",
       label: "Total Temuan QA per Parameter",
       value: summary?.totalDefects ?? 0,
       desc: "Setiap parameter bermasalah dihitung satu",
+      badge: perAudited
+        ? {
+            text: `${numberLabel(perAudited.latest)} per agen diaudit · ${rateDirection}`,
+            tone:
+              rateDirection === "naik" ? ("warn" as const) : ("good" as const),
+          }
+        : undefined,
       deltaUnit: "relative-percent" as const,
       lowerIsBetter: true,
     },
@@ -451,7 +487,20 @@ export default function SidakDashboardPage() {
       id: "avg-score",
       label: "Rata-rata Skor",
       value: `${(summary?.avgAgentScore ?? 0).toFixed(1)}%`,
-      desc: "Kualitas performa rata-rata",
+      desc: `Target ${SIDAK_QA_TARGET}`,
+      badge:
+        summary && summary.totalAgents > 0
+          ? {
+              text:
+                summary.avgAgentScore < SIDAK_QA_TARGET
+                  ? `${numberLabel(SIDAK_QA_TARGET - summary.avgAgentScore)} di bawah target ${SIDAK_QA_TARGET}`
+                  : `Mencapai target ${SIDAK_QA_TARGET}`,
+              tone:
+                summary.avgAgentScore < SIDAK_QA_TARGET
+                  ? ("bad" as const)
+                  : ("good" as const),
+            }
+          : undefined,
       deltaUnit: "percentage-point" as const,
       lowerIsBetter: false,
     },
@@ -459,6 +508,13 @@ export default function SidakDashboardPage() {
       id: "compliance",
       label: complianceLabel,
       value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`,
+      badge:
+        belowTargetCount !== null
+          ? {
+              text: `${belowTargetCount} agen belum ≥ ${SIDAK_QA_TARGET}${startMonth !== endMonth ? ` di ${latestCompliance!.label}` : ""}`,
+              tone: "bad" as const,
+            }
+          : undefined,
       desc:
         startMonth !== endMonth
           ? `${Math.round(summary?.complianceCount ?? 0)} agen dengan skor ≥ 95 (rata-rata per bulan)`
@@ -647,6 +703,7 @@ export default function SidakDashboardPage() {
                     value={kpi.value}
                     delta={buildDelta(kpi.id, kpi.deltaUnit, kpi.lowerIsBetter)}
                     desc={kpi.desc}
+                    badge={kpi.badge}
                     sparklineData={sparklines[kpi.id]}
                   />
                 ))}
@@ -837,6 +894,12 @@ export default function SidakDashboardPage() {
                 year={selectedYear}
                 serviceType={heatmapServiceType}
                 serviceLabel={heatmapServiceLabel}
+                folderId={
+                  selectedFolder === SIDAK_ALL_TEAMS ? null : selectedFolder
+                }
+                folderLabel={folderLabel}
+                startMonth={startMonth}
+                endMonth={endMonth}
               />
             </div>
           </div>

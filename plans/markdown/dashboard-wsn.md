@@ -136,6 +136,43 @@ Format angka: desimal koma Indonesia (`new Intl.NumberFormat("id-ID", { maximumF
 
 Catatan pencocokan nama: `paramTrend` memakai `formatQAIndicatorName(indicator)` dari `indicator_id`, sedangkan Pareto/loop agen memakai `findIndicatorForRow` (konteks scoring). Pakai **nama dari `paramTrend`** sebagai kunci, cocokkan ke peta agen dengan nama yang sama; bila tidak ketemu, `agents: []` dan `nowWhat` jatuh ke `open_ranking`. Jangan menebak.
 
+## Requirement — eksekusi tahap 1
+
+Implementasikan hanya §5: heatmap dashboard mengikuti tim dan rentang bulan tanpa memperluas akses leader, dan KPI memiliki pembanding target/rate. Tahap 2–4 tidak termasuk. Lane D (kontrak API dan scope).
+
+## Design — eksekusi tahap 1
+
+Gunakan validator bersama, resolver folder yang ada, irisan ID peserta dengan scope leader, dan rentang tanggal layanan di service heatmap. Pertahankan hitungan tanpa tanggal lintas periode, default setahun, serta halaman heatmap/agen. Gunakan pola komponen dan warna semantik yang sudah ada; badge tanpa data/denominator nol tidak boleh mengarang angka.
+
+## Tasklist — eksekusi tahap 1
+
+- [x] E2E backend lokal dan browser hermetic ditulis dan terbukti RED.
+- [x] Implementasi filter API/klien/komponen dan badge KPI.
+- [x] E2E fitur GREEN, audit scope/visual, typecheck, lint, build, diff check (pengecualian regresi DB lokal lama dicatat di bawah).
+- [x] Dokumentasikan kontrak dan bukti; tambah CHANGELOG.
+
+### Bukti eksekusi tahap 1 — 2026-10-19
+
+- RED API: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project=sidak-heatmap-filter-real-backend --workers=1 --trace on` → exit 1, tiga tes gagal sesuai kontrak: total tim 4 bukan 2, irisan leader 2 bukan 0, rentang terbalik 200 bukan 400. Tes error resolver tambahan juga RED (200 bukan 500), lalu helper folder diperbaiki agar melempar error.
+- RED browser: `pnpm --dir apps/web exec playwright test e2e/sidak-dashboard-insights.spec.ts --grep 'filter tim/bulan heatmap' --workers=1 --trace on` → exit 1 karena request belum membawa `folder_ids`.
+- GREEN API: perintah API di atas → exit 0, **4 passed**. Mencakup satu/multi-folder, UUID tak dikenal, batas akhir Februari tahun kabisat, hitungan tanpa tanggal, irisan leader, penolakan agen luar scope, validasi, dan error database ramah.
+- GREEN browser final: `pnpm --dir apps/web exec playwright test e2e/sidak-dashboard-insights.spec.ts e2e/sidak-scope.spec.ts --workers=1 --trace on` → exit 0, **19 passed**. Run sebelumnya 18 passed/1 failed karena selector geometri masih mencari teks lama `Tahun penuh`; selector diperbarui tanpa melonggarkan batas geometri.
+- Regresi backend tambahan: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project=sidak-heatmap-filter-real-backend --project=sidak-dashboard-kpi-real-backend --workers=1 --trace on` → exit 1, **8 passed, 1 failed**. Kegagalan hanya tes indeks lama: DB lokal tidak punya `idx_qa_temuan_tahun_id`; migrasi `supabase/migrations/20261017160000_qa_temuan_tahun_id_index.sql` sudah ada di HEAD sebelum perubahan ini. Empat tes perilaku KPI lama lulus. Tidak menerapkan migrasi atau mengubah tes indeks untuk menyembunyikan kegagalan ini.
+- Regresi backend ulang setelah `supabase migration up --local` (12 migrasi tertunda di DB lokal, termasuk `20261017160000_qa_temuan_tahun_id_index.sql`): perintah yang sama → exit 0, **9 passed**, termasuk tes indeks tahun.
+- `pnpm typecheck --concurrency=1` → exit 0 (4 workspace, termasuk tipe E2E).
+- `pnpm lint --concurrency=1` → exit 0 (74 warning pada file lama di luar diff, tanpa error).
+- `pnpm build --concurrency=1` → exit 0 (3 task).
+- `git diff --check` → exit 0.
+- Artefak repeatable: trace browser/API dan screenshot `kpi-{390,1280}-{light,dark}.png` di `apps/web/test-results/` (ignored, jangan commit karena trace dapat memuat auth lokal). Fixture API unik per run dan dibersihkan oleh `afterAll`.
+
+### Review tahap 1
+
+- Impeccable: **PASS** untuk permukaan yang berubah. Detector `impeccable detect --json` atas tiga file UI menghasilkan `[]`; E2E memeriksa kontras teks KPI ≥4,5:1 dan tanpa overflow pada 390/1280px, terang/gelap. Screenshot mobile terang dan desktop gelap dibaca langsung. Tidak ada kontrol interaktif baru; warna badge selalu disertai teks bermakna.
+- Thermo-nuclear / review keamanan dalam sesi (bukan reviewer independen): **PASS** untuk diff. Validasi → resolver folder → irisan scope → query temuan/tanpa tanggal ditelusuri; JWT/RLS admin/trainer, batas layanan/agen leader, race guard heatmap, dan default halaman/agent tetap dipertahankan. Pengecualian kesiapan integrasi: indeks DB lokal lama di atas belum tersedia.
+- Suite browser yang sudah >1.000 baris dipertahankan sebagai pemilik fixture/tes Dashboard yang ada; tambahan hanya dua tes kontrak, bukan suite duplikat. Tidak ada unit test baru/dijalankan, dependency baru, AI, perubahan skema, deploy, commit, atau push.
+- Graphify query `getSidakHeatmap` dipakai untuk callers; `GRAPHIFY_MAX_WORKERS=1 graphify update .` selesai sekali (exit 0), cache tidak dilacak Git. Context7 `/supabase/supabase-js` mengonfirmasi range inklusif, order stabil, dan pemeriksaan error.
+- File audit egress untracked milik pengguna tetap tidak disentuh. Tahap 2–4 belum diimplementasikan.
+
 ## 5. Tahap 1 — perbaiki angka yang tidak cocok (1 PR)
 
 **Tujuan:** T3 dan T4.

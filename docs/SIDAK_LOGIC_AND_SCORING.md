@@ -158,6 +158,22 @@ Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua 
 2. **Metrik Persen** (`avg-score` dan `compliance`): Delta ditampilkan sebagai perubahan poin persentase (poin) absolut agar operator tidak bingung. Rumusnya: `current - previous` (dengan nilai mutlak untuk magnitudo).
 3. **Kepatuhan (Compliance)**: Delta kepatuhan dihitung menggunakan `complianceRate` (persentase) alih-alih `complianceCount` (jumlah agen) agar konsisten dengan nilai utama KPI.
 
+### Pembanding target dan volume per agen diaudit
+
+Badge di strip KPI Dashboard melengkapi delta (bukan menggantinya):
+
+- Rata-rata skor dibandingkan dengan target QA 95, tanpa badge bila tidak ada agen diaudit.
+- Kepatuhan memakai `totalAudited - count` dari titik sparkline **terakhir**, bukan rata-rata jumlah agen pada rentang. Untuk rentang multi-bulan, badge menyebut label periode terakhir. Tanpa titik lengkap, badge disembunyikan.
+- Temuan per agen diaudit = `total / totalAudited` dari dua `periodMetrics` terakhir; arah naik/turun/tetap membandingkan rasio tersebut, bukan total temuan. Badge disembunyikan bila hanya satu periode atau salah satu penyebut nol.
+
+### Filter heatmap Dashboard
+
+`GET /sidak/heatmap` menerima parameter opsional `folder_ids` (UUID dipisah koma), `start_month`, dan `end_month` (1–12, harus berpasangan dan awal ≤ akhir). Input tidak valid menghasilkan 400 `VALIDATION_ERROR`. Tanpa bulan, rentang tetap setahun penuh. Bentuk respons tetap sama (hari setahun, jumlah nol di luar rentang).
+
+Folder di-resolve ke nama batch (termasuk folder induk), lalu ID peserta diiriskan dengan scope SIDAK leader yang disetujui. Irisan kosong menghasilkan nol, tidak memperluas akses. Admin/trainer tetap memakai JWT/RLS; leader memakai service-role dengan scope aplikasi. Kegagalan resolver/query menghasilkan error ramah, bukan heatmap kosong.
+
+Kartu **Pola temuan mingguan** Dashboard mengirim filter tim dan bulan aktif, dengan deskripsi layanan · tim · rentang · **per tanggal layanan**. Tanggal layanan tidak sama dengan bulan periode QA pada KPI; `missingDateFindingsAllPeriods` tetap lintas periode, tetapi mengikuti tim/akses. Halaman Heatmap penuh dan tab agen tidak mengirim parameter baru, sehingga perilakunya tetap. Bukti: `sidak-heatmap-filter-api.spec.ts` (JWT/backend/database lokal) dan `sidak-dashboard-insights.spec.ts` (browser hermetic).
+
 Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break tampilan. **Rank bisnis tetap memakai competition ranking**: jumlah defect yang sama berbagi peringkat yang sama, sedangkan tie-break nama hanya menentukan urutan baris. Sorting kolom nama atau skor mengubah urutan tampilan, bukan rank bisnis.
 
 Halaman ranking utama adalah ranking **prioritas temuan**: rank `1` berarti defect terbanyak dan rank yang lebih besar berarti prioritas lebih rendah. Untuk periode yang memiliki pembanding, `rankChange = previousRank - currentRank` sehingga:

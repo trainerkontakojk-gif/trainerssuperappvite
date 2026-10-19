@@ -226,12 +226,13 @@ export async function getFolderNamesByIds(
 export async function getFoldersByIds(
   folderIds: string[],
 ): Promise<SidakFolderRow[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("profiler_folders")
     .select("id, name, parent_id")
     .in("id", folderIds)
     .order("name");
 
+  if (error) throw error;
   return dedupeFolderRows(data ?? []);
 }
 

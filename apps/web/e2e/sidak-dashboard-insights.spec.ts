@@ -11,6 +11,7 @@ import {
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 import { MIN_TEXT_PX, findTextBelowFloor } from "./helpers/typographyFloor";
+import { pickSelect } from "./helpers/pickSelect";
 
 const YEAR = new Date().getFullYear();
 const PREVIOUS_LABEL = `Apr ${String(YEAR).slice(-2)}`;
@@ -412,6 +413,184 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
+  test("filter tim/bulan heatmap dan badge KPI memakai periode terbaru", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
+    const teamId = "11111111-1111-4111-8111-111111111111";
+    const apiMocks = DASHBOARD_MOCKS.map((mock) =>
+      mock.path === "/api/v1/sidak/dashboard"
+        ? {
+            ...mock,
+            body: {
+              success: true,
+              data: {
+                ...DASHBOARD_DATA,
+                folders: [{ id: teamId, name: "Tim Call" }],
+                periodMetrics: [
+                  {
+                    periodId: "period-apr",
+                    label: PREVIOUS_LABEL,
+                    total: 60,
+                    totalAudited: 10,
+                  },
+                  {
+                    periodId: "period-may",
+                    label: LATEST_LABEL,
+                    total: 48,
+                    totalAudited: 20,
+                  },
+                ],
+                sparklines: {
+                  ...DASHBOARD_DATA.sparklines,
+                  compliance: [
+                    {
+                      label: PREVIOUS_LABEL,
+                      value: 50,
+                      count: 5,
+                      totalAudited: 10,
+                    },
+                    {
+                      label: LATEST_LABEL,
+                      value: 65,
+                      count: 13,
+                      totalAudited: 20,
+                    },
+                  ],
+                },
+              },
+            },
+          }
+        : mock,
+    );
+    const audit = await openHermeticShell(page, {
+      path: `/sidak/dashboard?layanan=call&tahun=${YEAR}&dari=4&sampai=5&tim=ALL`,
+      apiMocks,
+    });
+    await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
+    await pickSelect(page, "Tim", "Tim Call");
+    await expect
+      .poll(() =>
+        audit.mockedApi.filter((r) => r.includes("/sidak/heatmap?")).at(-1),
+      )
+      .toContain(`folder_ids=${teamId}`);
+    const request = audit.mockedApi
+      .filter((r) => r.includes("/sidak/heatmap?"))
+      .at(-1)!;
+    expect(request).toContain("start_month=4");
+    expect(request).toContain("end_month=5");
+    const kpis = page.getByRole("region", { name: "Indikator utama" });
+    await expect(
+      kpis.getByText("2,6 di bawah target 95", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      kpis.getByText(`7 agen belum ≥ 95 di ${LATEST_LABEL}`, { exact: true }),
+    ).toBeVisible();
+    await expect(
+      kpis.getByText("2,4 per agen diaudit · turun", { exact: true }),
+    ).toBeVisible();
+    const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
+    await expect(heatmap).toContainText(
+      `Call · Tim Call · Apr–Mei ${YEAR} · per tanggal layanan`,
+    );
+    await expect(heatmap).toContainText("temuan pada rentang ini");
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const theme of ["light", "dark"] as const) {
+        await setDocumentTheme(page, theme);
+        await kpis.scrollIntoViewIfNeeded();
+        expect(
+          await findLowContrastText(kpis, {
+            selector: "p, span",
+            leafOnly: true,
+          }),
+        ).toEqual([]);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        await page.screenshot({
+          path: testInfo.outputPath(`kpi-${width}-${theme}.png`),
+        });
+      }
+    }
+    await pickSelect(page, "Tim", "Semua Tim");
+    await expect
+      .poll(() =>
+        audit.mockedApi.filter((r) => r.includes("/sidak/heatmap?")).at(-1),
+      )
+      .not.toContain("folder_ids");
+    expectHermetic(audit);
+  });
+
+  test("badge KPI: target tercapai, laju naik/tetap, dan data tanpa pembanding", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    for (const scenario of [
+      {
+        total: 140,
+        audited: 20,
+        points: 2,
+        expected: "7 per agen diaudit · naik",
+      },
+      {
+        total: 120,
+        audited: 20,
+        points: 2,
+        expected: "6 per agen diaudit · tetap",
+      },
+      { total: 0, audited: 0, points: 2, expected: null },
+      { total: 40, audited: 10, points: 1, expected: null },
+    ]) {
+      const apiMocks = DASHBOARD_MOCKS.map((mock) =>
+        mock.path === "/api/v1/sidak/dashboard"
+          ? {
+              ...mock,
+              body: {
+                success: true,
+                data: {
+                  ...DASHBOARD_DATA,
+                  summary: { ...DASHBOARD_DATA.summary, avgAgentScore: 96 },
+                  periodMetrics: [
+                    {
+                      periodId: "period-apr",
+                      label: PREVIOUS_LABEL,
+                      total: 60,
+                      totalAudited: 10,
+                    },
+                    {
+                      periodId: "period-may",
+                      label: LATEST_LABEL,
+                      total: scenario.total,
+                      totalAudited: scenario.audited,
+                    },
+                  ].slice(-scenario.points),
+                },
+              },
+            }
+          : mock,
+      );
+      const audit = await openHermeticShell(page, {
+        path: `/sidak/dashboard?layanan=call&tahun=${YEAR}&dari=4&sampai=5&tim=ALL`,
+        apiMocks,
+      });
+      await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
+      const kpis = page.getByRole("region", { name: "Indikator utama" });
+      await expect(
+        kpis.getByText("Mencapai target 95", { exact: true }),
+      ).toBeVisible();
+      if (scenario.expected)
+        await expect(
+          kpis.getByText(scenario.expected, { exact: true }),
+        ).toBeVisible();
+      else await expect(kpis.getByText(/per agen diaudit/)).toHaveCount(0);
+      await expect(kpis.getByText(/agen belum ≥/)).toHaveCount(0);
+      expectHermetic(audit);
+    }
+  });
+
   test("geometri kontinu dan kembali ke atas memakai scroller workspace", async ({
     page,
   }) => {
@@ -503,7 +682,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
             }
           }
           if (density === "dense" && width >= 1024) {
-            // The yearly chart grows with its panel instead of leaving a gap.
+            // The weekday chart grows with its panel instead of leaving a gap.
             const heatmapGap = await page
               .getByRole("region", { name: "Pola temuan mingguan" })
               .evaluate((panel) => {
@@ -511,7 +690,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
                   "[aria-label='Statistik pola harian']",
                 );
                 const note = [...panel.querySelectorAll("p")].find((item) =>
-                  item.textContent?.startsWith("Tahun penuh"),
+                  item.textContent?.startsWith("Volume temuan, bukan rate"),
                 );
                 if (!stats || !note) return Number.POSITIVE_INFINITY;
                 return (
@@ -788,15 +967,14 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     expect(heatmapRequest).toContain(`year=${YEAR}`);
     expect(heatmapRequest).toContain("service_type=call");
     expect(heatmapRequest).not.toContain("folder_ids");
-    expect(heatmapRequest).not.toContain("startMonth");
+    expect(heatmapRequest).toContain("start_month=1");
+    expect(heatmapRequest).toContain(`end_month=${new Date().getMonth() + 1}`);
     const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
     await expect(
       heatmap.getByText(`Puncak: 2 Mei ${YEAR} · 8 temuan`),
     ).toBeVisible();
     await expect(
-      heatmap.getByText(
-        /tahun penuh.*volume temuan, bukan rate.*filter tim\/bulan.*akses akun/i,
-      ),
+      heatmap.getByText(/volume temuan, bukan rate.*akses akun/i),
     ).toBeVisible();
     // Weekday distribution, not a second monthly chart next to Tren temuan.
     await expect(
@@ -972,7 +1150,9 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     await expect(range).toBeVisible();
     expect((await range.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
     // Kontrol lama Dari/Sampai sudah tidak ada.
-    await expect(page.getByRole("combobox", { name: "Bulan awal" })).toHaveCount(0);
+    await expect(
+      page.getByRole("combobox", { name: "Bulan awal" }),
+    ).toHaveCount(0);
 
     await range.click();
     const picker = page.getByRole("dialog", { name: "Pilih rentang bulan" });
@@ -1285,7 +1465,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("menjelaskan jika tidak ada temuan pada heatmap tahunan", async ({
+  test("menjelaskan jika tidak ada temuan pada rentang heatmap", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -1299,7 +1479,7 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
 
     const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });
     await expect(
-      heatmap.getByText(`Belum ada temuan pada heatmap tahun ${YEAR}.`),
+      heatmap.getByText("Belum ada temuan pada rentang ini."),
     ).toBeVisible();
     await expect(heatmap.getByText(/Puncak:/)).toHaveCount(0);
     expectHermetic(audit);
