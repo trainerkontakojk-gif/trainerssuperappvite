@@ -155,6 +155,10 @@ export default defineConfig({
       testMatch: "home-attention-api.spec.ts",
     },
     {
+      name: "home-agent-summary-real-backend",
+      testMatch: "home-agent-summary-api.spec.ts",
+    },
+    {
       name: "telefun-schema-real-backend",
       testMatch: "telefun-schema-contract-api.spec.ts",
     },

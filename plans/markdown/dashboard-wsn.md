@@ -1,6 +1,6 @@
 # Dashboard What / So what / Now what — spec untuk agen coding
 
-Status: **tahap 1 selesai** (`40629898`), **tahap 2 selesai** (`cbceff0b`), dan **tahap 3 diimplementasikan serta diverifikasi**. Tahap 4 tetap opsional: draf di §11, **menunggu keputusan Fajar** (K1–K5) sebelum boleh dikerjakan. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
+Status: **tahap 1 selesai** (`40629898`), **tahap 2 selesai** (`cbceff0b`), dan **tahap 3 diimplementasikan serta diverifikasi**. Tahap 4 **disetujui Fajar, diimplementasikan dan diverifikasi secara lokal** (K1–K5: semua rekomendasi); kontrak, tasklist dan bukti di §11. Dibuat 2026-10-19 dari audit dan mockup "Audit Dashboard Wawasan" (sumber HTML: `/mnt/project-files/telaah-dashboard-wsn/index.html`, artifact `https://claude.ai/artifact/HVnhfxddJVuwzKdvFV9xUD`). Pemilik produk: Fajar.
 
 > Mockup belum disetujui eksplisit oleh Fajar saat spec ini ditulis. Fajar meminta spec ini untuk dikerjakan agen lain, jadi kerjakan sesuai spec; bila Fajar mengubah sesuatu di mockup, ikuti perubahan itu.
 
@@ -29,7 +29,7 @@ Setiap kartu data seharusnya menjawab: **What** (angka), **So what** (artinya: d
 | T5  | Tautan tidak membawa filter                                                              | `AttentionList.tsx` → `/sidak/agents`; `ServiceBreakdown.tsx` → `/sidak`                                                                                                |
 | T6  | Grafik tren tidak menyorot parameter yang paling naik                                    | `apps/web/src/routes/sidak/dashboard.tsx`                                                                                                                               |
 
-Di luar cakupan: laporan dampak pelatihan (EFEK, sudah ada di TNA), Beranda agent (tahap 4 opsional, draf §11; jangan dikerjakan sebelum Fajar mengisi keputusan K1–K5), perubahan skema database, AI.
+Di luar cakupan: laporan dampak pelatihan (EFEK, sudah ada di TNA), Beranda agent di luar tahap 1–3 (tahap 4 disetujui terpisah, §11), perubahan skema database, AI.
 
 ## 2. Peta kode yang relevan
 
@@ -358,9 +358,9 @@ git diff --check
 - Heatmap: jangan mengubah `fetchMissingDateRows` menjadi berbatas tanggal.
 - Jangan memakai `localStorage` untuk state filter baru; filter SIDAK ada di URL (`useSidakScope`).
 
-## 11. Tahap 4 — Beranda agent (DRAF, menunggu keputusan Fajar)
+## 11. Tahap 4 — Beranda agent (disetujui, implementasi)
 
-**Status:** draf ruang lingkup. **Jangan dikerjakan** sampai Fajar mengisi keputusan K1–K5 di §11.3 dan mengubah status ini. Setelah itu, agen coding menambah bagian Requirement/Design/Tasklist seperti tahap 1–3.
+**Status:** diimplementasikan dan diverifikasi lokal. Fajar menyetujui seluruh rekomendasi K1–K5 melalui percakapan. Lane D (kontrak API, scope self, dan UI baru dalam shell yang ada). Tidak ada migrasi, izin baru, AI, atau deploy produksi.
 
 **Tujuan:** Beranda agent (`AgentHome`) menjawab tiga hal untuk agen itu sendiri: _What_ (posisi skor QA saya), _So what_ (parameter yang paling menurunkan skor), _Now what_ (latihan apa yang dilakukan hari ini).
 
@@ -387,7 +387,9 @@ git diff --check
 
 Rekomendasi: **A, B, C, D, F** di tahap 4. E dan G ditunda ke tahap terpisah.
 
-### 11.3 Keputusan yang dibutuhkan dari Fajar
+### 11.3 Keputusan Fajar — disetujui
+
+K1: A/B/C/D/F. K2: nama parameter + jumlah saja. K3: pembanding ditunda. K4: panel belum tertaut dan Latihan tetap tersedia. K5: periode terakhir dengan audit agent, berlabel bulan/tahun.
 
 - **K1 — Blok:** blok mana yang masuk tahap 4? (rekomendasi: A, B, C, D, F)
 - **K2 — Kedalaman temuan:** agent hanya melihat **nama parameter + jumlah temuan**, atau juga catatan QA / nomor tiket? (rekomendasi: nama + jumlah saja; detail tetap lewat coaching trainer/leader)
@@ -395,7 +397,7 @@ Rekomendasi: **A, B, C, D, F** di tahap 4. E dan G ditunda ke tahap terpisah.
 - **K4 — Akun belum ditautkan:** tampilkan panel netral `"Data QA Anda belum tersambung. Hubungi trainer untuk menautkan akun."` dan blok Latihan tetap tampil? (rekomendasi: ya)
 - **K5 — Periode:** blok B–D memakai **periode terakhir yang punya audit untuk agen itu** (bukan bulan kalender sekarang), dengan label bulannya? (rekomendasi: ya, sesuai jebakan §10)
 
-### 11.4 Draf kontrak (bila B/C/D disetujui)
+### 11.4 Kontrak yang disetujui (B/C/D)
 
 `packages/types/src/home.ts`:
 
@@ -403,6 +405,7 @@ Rekomendasi: **A, B, C, D, F** di tahap 4. E dan G ditunda ke tahap terpisah.
 export interface AgentHomeSummary {
   linked: boolean; // false bila scope agent "unlinked"
   qa: null | {
+    serviceType: ServiceType; // layanan yang sama untuk skor/tren/temuan
     periodLabel: string; // periode terakhir yang punya audit agen ini
     score: number; // 1 desimal, rumus sama dengan getAgentDetail
     target: 95;
@@ -432,3 +435,50 @@ export interface AgentHomeSummary {
 
 - Backend nyata `home-agent-summary-api.spec.ts`: agent tertaut melihat skor, tren, dan parameter **hanya** dari data dirinya (fixture dua agen di layanan sama, agen lain punya skor berbeda); agent belum tertaut → `linked: false`; leader/trainer → 403; respons tidak memuat field di luar kontrak; kegagalan query → error ramah.
 - Hermetic `home-agent.spec.ts` (perluas): kalimat skor di atas/di bawah target, perubahan vs periode sebelumnya, maks 3 parameter + saran, panel belum tertaut, kuota per modul (A), TELEFUN di riwayat (F); tes lama tetap lulus.
+
+### 11.7 Requirement / Design / Tasklist implementasi
+
+**Requirement:** tampilkan QA hanya untuk agent yang login, tanpa catatan QA/nomor tiket/PII atau pembanding layanan. Sumber gagal harus terlihat sebagai error yang bisa dicoba ulang; gagal QA/kuota/riwayat tidak menutup Latihan.
+
+**Design:**
+
+- Endpoint home baru memverifikasi capability dan role agent, menolak query ID/filter tambahan, kemudian `resolveDataScope(..., 'sidak')`. Tidak menerima identitas dari klien. Gunakan service-role backend dengan filter `peserta_id = scope.pesertaId` yang wajib, karena RLS `qa_temuan` memang tidak memberi agent akses langsung; tidak mengubah kebijakan ini.
+- Jangan memanggil `getAgentDetail` utuh: ia membaca profil dan membangun pembanding yang ditunda. Orkestrasi baru memakai mesin skoring SIDAK yang sama (`getScoreRows`, konteks versi per periode, normalisasi dan `calculateQAScoreFromTemuan`) dan `deriveAgentRootCauses`. Payload whitelist yang kecil saja. Data lintas tahun didukung; skor 0 adalah data, bukan kosong.
+- Jika ada beberapa layanan di bulan audit terbaru, ikuti preferensi layanan tim seperti direktori SIDAK; bila tidak ada layanan tim di bulan itu, pilih layanan valid secara deterministik. Tren/perubahan selalu untuk layanan terpilih yang sama (maks 6 periode punya audit, lama → baru), bukan mencampur layanan. Tambahkan `qa.serviceType` agar UI menjelaskan cakupannya.
+- Temuan top 3 hanya countable pada periode/layanan terakhir; nama dari snapshot indikator periode dengan ID ternormalisasi. Tidak ada temuan berarti rekomendasi null. Jangan mengembalikan bukti mentah dari root causes.
+- Kuota dibaca sekali di AgentHome dari endpoint yang ada (bukan satu request per modul); tampilkan status dan reset WIB, unlimited dengan keterangan. Tautan latihan tetap tersedia karena batas diputuskan backend saat memulai sesi.
+- Riwayat menggabungkan KETIK/PDKT/Telefun, urut terbaru lalu ID, ambil 5. Telefun memakai `getTelefunSessions()` view list dan mapper existing, bukan full transkrip/rekaman. Jelaskan skala skor Telefun /10 versus KETIK/PDKT /100, jangan mengonversi skala.
+- Frontend baru memakai typed `homeClient` Hono RPC dengan transport existing. State QA dan kuota punya loading/error/retry terpisah; request generasi lama tidak boleh menimpa yang baru.
+- UX constraints (ui-ux-pro-max): pertahankan home-page/home-section/home-panel, Outfit/Inter, token fg/fg2/border, tanpa tema/dekorasi/motion baru. Urutan salam → QA pribadi (angka + arti + tren + fokus latihan) → Latihan/kuota → Riwayat. Ponsel satu kolom, tabel riwayat boleh scroll di kontainernya, kontrol ≥44px, teks ≥12px, dark/light, keyboard dan reduced-motion diuji. Tidak ada tautan ke SIDAK/TNA yang tertutup bagi agent.
+
+**Tasklist:**
+
+- [x] RED API E2E lokal nyata: self/IDOR, role/anon, profil unlinked vs tanpa audit, skor nol/versi per periode/lintas tahun/6 periode, top3/tie/root cause, error aman.
+- [x] RED browser E2E: ringkasan skor & tren & temuan, panel unlinked/no audit/error/retry, kuota dan Telefun history, keadaan kosong/gagal sebagian, mobile/desktop.
+- [x] Implementasi tipe, route/service backend, dan UI memakai pola existing.
+- [x] GREEN focused API/browser suites, review scope/privacy, Impeccable dan thermo-nuclear self-review.
+- [x] Root typecheck/lint/build serial, update graph sekali, docs/changelog dan diff check.
+
+**Discovery:** Graphify `getAgentDetail` menunjuk mesin skoring, period context, dan root causes; dipastikan dengan live source. Context7 `/honojs/website` mengonfirmasi AppType membutuhkan route berantai dan inferensi `c.json()`, custom fetch dipakai ulang melalui `homeClient`. Dirty `docs/supabase-usage-egress-audit-2026-10-19.md` tetap di luar scope.
+
+### 11.8 Bukti verifikasi fase 4 (2026-10-20)
+
+Semua perintah dijalankan serial langsung dalam sesi ini; tanpa worker, unit/Vitest, provider AI, migrasi atau remote mutation. Supabase lokal yang sudah ada digunakan kembali setelah daemon OrbStack dinyalakan, dengan guard loopback dan fixture bernamespace yang dibersihkan `afterAll`. Tidak menghentikan container lokal yang kepemilikannya tidak pasti.
+
+- **RED API:** `pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project home-agent-summary-real-backend --grep 'self-only' --workers=1` → exit 1, endpoint 404 versus 200. Log `/tmp/home-agent-phase4-api-red.log`. Tambahan RED phantom-only → bulan padding keliru terpilih sebagai audit terbaru; diperbaiki dengan syarat baris audit nyata. Log `/tmp/home-agent-phase4-phantom-red.log`.
+- **RED browser:** `pnpm --dir apps/web exec playwright test home-agent.spec.ts --grep 'QA pribadi.*390' --workers=1 --trace on` → exit 1, region `Skor QA saya` belum ada. Log `/tmp/home-agent-phase4-browser-red.log`.
+- **GREEN API + regresi staff:** `pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project home-agent-summary-real-backend --project home-attention-real-backend --workers=1` → exit 0, **11 passed** (5 baru + 6 existing). Log `/tmp/home-agent-phase4-api-final.log`. Mencakup dua akun agent, admin/trainer/leader 403 dan anon 401, query IDOR 400, raw QA RLS tetap tertutup, service preference, skoring versi periode lintas tahun, 6 periode, phantom-only/padding, skor nol, top3/tie, root-cause suggestion, unlinked/no audit dan error aman pada empat sumber.
+- **GREEN browser + regresi staff:** `pnpm --dir apps/web exec playwright test home-agent.spec.ts home-staff.spec.ts --workers=1 --trace on` → exit 0, **27 passed** (13 agent + 14 staff). Log `/tmp/home-agent-phase4-browser-final.log`. Sesudah perapian ekuivalen counter cleanup (menghilangkan dua lint warning baru), `pnpm --dir apps/web exec playwright test home-agent.spec.ts --workers=1 --trace on` → exit 0, **13 passed**. Log `/tmp/home-agent-phase4-agent-final.log`; trace/screenshot terbaru di `apps/web/test-results/home-agent-*` (ignored, bukan data produksi).
+- **Root typecheck:** `pnpm exec turbo run typecheck --concurrency=1 --cache=local:rw` → exit 0, 4 workspace; final run 3 cache hit, web dijalankan ulang (termasuk E2E TypeScript). Log `/tmp/home-agent-phase4-typecheck.log`.
+- **Root lint:** `pnpm exec turbo run lint --concurrency=1 --cache=local:rw` → exit 0, web 66 warning lama / 0 error, tidak ada warning di file baru/berubah. Log `/tmp/home-agent-phase4-lint.log`. Scoped ESLint `AgentHome.tsx` dan `AgentQaSummary.tsx` juga exit 0 tanpa output.
+- **Root build:** `pnpm exec turbo run build --concurrency=1 --cache=local:rw` → exit 0, 3 workspace (final 2 cached, web dibangun ulang). Log `/tmp/home-agent-phase4-build.log`.
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` → exit 0, graph lokal ignored diperbarui sekali sesudah batch kode final. Log `/tmp/home-agent-phase4-graphify.log`.
+- `git diff --check` → exit 0; tidak ada unit test lama yang tersupersede untuk dihapus.
+
+**Impeccable self-audit**
+
+Verdict: PASS. Findings: tidak ada P1/P2 tersisa pada perubahan ini. Detector `detect --json AgentHome.tsx AgentQaSummary.tsx` → `[]`, exit 0 (`/tmp/home-agent-phase4-impeccable.json`). Verifikasi runtime: QA dan Latihan di 390px dark / 1280px light, reduced-motion, overflow halaman, teks ≥12px, retry keyboard dengan tinggi ≥44px. Screenshot `agent-qa-{390,1280}.png` dan `agent-practice-{390,1280}.png` diperiksa langsung. Tabel tren memberi alternatif angka yang terbaca untuk SVG. Ini bukti Chromium emulated viewport, bukan physical-device atau sertifikasi WCAG penuh. Hierarki dan token Beranda existing dipertahankan.
+
+**Thermo-nuclear / scope & privacy self-review**
+
+Verdict: PASS. Findings: tidak ada temuan material tersisa. Ditelusuri actor dari auth → capability + role → scope self → query profil minimal dengan akun cocok → qa_temuan filter peserta wajib → konteks skoring SIDAK per periode → payload whitelist → typed homeClient → UI. Tidak memanggil profile/comparison getAgentDetail utuh, tidak mengubah skoring/RLS existing, tidak mengirim catatan/tiket/profil/peer, dan tidak membuat rata-rata layanan. State generation mencegah request lama menimpa retry/unmount; gagal QA/kuota/history tidak menutup Latihan. Penggunaan quota hanya satu lookup per mount (StrictMode dev memutar ulang mount dua kali), bukan tiga per modul. Tidak ada dependensi atau konvensi visual baru. Review ini dilakukan sendiri, bukan independent review. Tidak ada commit, push atau deploy fase 4 dalam tahap implementasi ini.

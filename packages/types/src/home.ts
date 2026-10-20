@@ -1,3 +1,22 @@
+import type { ServiceType } from "./sidak";
+
+/** Only self QA aggregates; no profile, tickets, notes or peer data. */
+export interface AgentHomeSummary {
+  linked: boolean;
+  qa: null | {
+    serviceType: ServiceType;
+    periodLabel: string;
+    score: number;
+    target: 95;
+    gapToTarget: number | null;
+    previousLabel: string | null;
+    delta: number | null;
+    trend: { periodLabel: string; score: number }[];
+    topParameters: { name: string; count: number }[];
+    recommendation: string | null;
+  };
+}
+
 /**
  * Kontrak `GET /api/v1/home/attention` ("Perlu tindakan" di Beranda).
  *

@@ -2,8 +2,15 @@ import { Link } from "@tanstack/react-router";
 import type {
   KetikHistorySummaryItem,
   PdktSessionHistory,
+  PracticeQuotaStatus,
 } from "@trainers/types";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { buildNavModel } from "../../../components/layout/nav-config";
 import QaStatePanel from "../../../components/ui/QaStatePanel";
 import { Button, buttonVariants } from "../../../components/ui/button";
@@ -11,6 +18,14 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { pdktClient, unwrapResponse } from "../../../lib/api";
 import { HomeHeader } from "./HomeHeader";
 import { ketikApi } from "../../ketik/ketikApi";
+import {
+  getTelefunSessions,
+  mapTelefunSessionRow,
+  type TelefunSessionRow,
+} from "../../telefun/telefunApi";
+import { useApi } from "../../../hooks/useApi";
+import { QuotaLine } from "../../../components/simulation/QuotaLine";
+import { AgentQaSummary } from "./AgentQaSummary";
 
 const SESSION_LIMIT = 5;
 const DATE = new Intl.DateTimeFormat("id-ID", {
@@ -23,7 +38,8 @@ const DATE = new Intl.DateTimeFormat("id-ID", {
 
 type Session = {
   id: string;
-  module: "KETIK" | "PDKT";
+  module: "KETIK" | "PDKT" | "Telefun";
+  scale: 100 | 10;
   date: string;
   scenario: string;
   score: number | null;
@@ -47,6 +63,7 @@ function fromKetik(item: KetikHistorySummaryItem): Session {
   return {
     id: `ketik-${item.id}`,
     module: "KETIK",
+    scale: 100,
     date: item.date,
     scenario: item.scenarioTitle,
     score: typeof item.finalScore === "number" ? item.finalScore : null,
@@ -58,12 +75,42 @@ function fromPdkt(item: PdktHistoryRow): Session {
   return {
     id: `pdkt-${item.id}`,
     module: "PDKT",
+    scale: 100,
     date: item.timestamp,
     scenario: item.config?.scenarios?.[0]?.title ?? "Simulasi email",
     score:
       typeof item.evaluation?.score === "number" ? item.evaluation.score : null,
     status: item.evaluation_status ?? null,
   };
+}
+
+function fromTelefun(row: TelefunSessionRow): Session {
+  const item = mapTelefunSessionRow(row);
+  return {
+    id: `telefun-${item.id}`,
+    module: "Telefun",
+    scale: 10,
+    date: item.date,
+    scenario: item.scenarioTitle || "Simulasi telepon",
+    score: item.score ?? null,
+    status: item.scoringStatus ?? null,
+  };
+}
+
+const SCORE = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
+
+function PracticeQuota({
+  status,
+}: {
+  status: PracticeQuotaStatus | undefined;
+}) {
+  if (!status)
+    return <p className="text-[12px] text-fg2">Kuota modul belum tersedia.</p>;
+  return status.limit === null ? (
+    <p className="text-[12px] text-fg2">Tanpa batas harian</p>
+  ) : (
+    <QuotaLine status={status} />
+  );
 }
 
 type HistoryState =
@@ -83,35 +130,52 @@ export function AgentHome({
     buildNavModel(role).groups.find((group) => group.id === "latihan")?.items ??
     [];
   const [history, setHistory] = useState<HistoryState>({ status: "loading" });
+  const generation = useRef(0);
+  const quota = useApi<PracticeQuotaStatus[]>("/me/practice-quota");
 
   const load = useCallback(async () => {
+    const request = ++generation.current;
     setHistory({ status: "loading" });
-    const [ketik, pdkt] = await Promise.allSettled([
+    const [ketik, pdkt, telefun] = await Promise.allSettled([
       ketikApi.getHistory({ limit: SESSION_LIMIT }),
       (async () =>
         (await unwrapResponse(
           await pdktClient.history.$get(),
         )) as PdktHistoryRow[])(),
+      getTelefunSessions(),
     ]);
-    if (ketik.status === "rejected" && pdkt.status === "rejected") {
+    if (request !== generation.current) return;
+    if (
+      ketik.status === "rejected" &&
+      pdkt.status === "rejected" &&
+      telefun.status === "rejected"
+    ) {
       setHistory({ status: "error" });
       return;
     }
     const sessions = [
       ...(ketik.status === "fulfilled" ? ketik.value.items.map(fromKetik) : []),
       ...(pdkt.status === "fulfilled" ? (pdkt.value ?? []).map(fromPdkt) : []),
+      ...(telefun.status === "fulfilled" ? telefun.value.map(fromTelefun) : []),
     ]
-      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+      .sort(
+        (a, b) =>
+          Date.parse(b.date) - Date.parse(a.date) || a.id.localeCompare(b.id),
+      )
       .slice(0, SESSION_LIMIT);
     const failed = [
       ...(ketik.status === "rejected" ? ["KETIK"] : []),
       ...(pdkt.status === "rejected" ? ["PDKT"] : []),
+      ...(telefun.status === "rejected" ? ["Telefun"] : []),
     ];
     setHistory({ status: "ready", sessions, failed });
   }, []);
 
   useEffect(() => {
     void load();
+    return () => {
+      generation.current += 1;
+    };
   }, [load]);
 
   const retry = (
@@ -138,6 +202,8 @@ export function AgentHome({
         )}
       </HomeHeader>
 
+      <AgentQaSummary />
+
       <section aria-labelledby="home-practice-title" className="home-section">
         <div className="home-section-head">
           <h2 id="home-practice-title" className="home-section-title">
@@ -147,6 +213,24 @@ export function AgentHome({
             Modul simulasi yang bisa Anda pakai
           </p>
         </div>
+        {quota.loading && (
+          <p role="status" className="pb-3 text-[13px] text-fg2">
+            Memuat kuota latihan…
+          </p>
+        )}
+        {quota.error && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px] text-fg2">
+            <p>Kuota latihan belum dapat dimuat. Latihan tetap tersedia.</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[44px]"
+              onClick={() => void quota.refetch()}
+            >
+              Coba lagi
+            </Button>
+          </div>
+        )}
         <ul className="home-attention">
           {practice.map((item) => (
             <li key={item.id}>
@@ -160,14 +244,21 @@ export function AgentHome({
                   style={{ color: item.moduleColor }}
                   aria-hidden="true"
                 />
-                <span className="flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-[13px] font-semibold text-fg">
                     {item.label}
                   </span>
                   <span className="text-[12px] text-fg2">
                     {item.description}
                   </span>
-                </span>
+                  {!quota.loading && !quota.error && (
+                    <PracticeQuota
+                      status={quota.data?.find(
+                        (entry) => entry.module === item.id,
+                      )}
+                    />
+                  )}
+                </div>
                 <span
                   className={buttonVariants({
                     variant: "outline",
@@ -267,7 +358,7 @@ export function AgentHome({
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         {session.score !== null ? (
                           <span className="font-semibold tabular-nums text-fg">
-                            {Math.round(session.score)}
+                            {SCORE.format(session.score)} / {session.scale}
                           </span>
                         ) : (
                           <span className="text-[12px] text-fg2">
