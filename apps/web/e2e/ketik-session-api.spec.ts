@@ -1130,3 +1130,140 @@ test("server-picked and custom consumer identities carry the gender used for the
     await put(body.identitySettings.displayName);
   }
 });
+
+function consumerPromptIdentity(raw: string) {
+  const text = JSON.parse(raw)
+    .systemInstruction.parts.map((part: { text: string }) => part.text)
+    .join("\n");
+  return JSON.parse(
+    text.split("<scenario_data>\n")[1].split("\n</scenario_data>")[0],
+  ).identity;
+}
+
+for (const manual of [false, true]) {
+  test(`NIK/email ${manual ? "manual anomalies survive" : "pool values persist in"} session snapshot and history`, async () => {
+    const before = (await (await api(trainer, "/settings")).json()).data;
+    const previousProviderText = providerText;
+    const identitySettings = {
+      ...before.identitySettings,
+      nik: manual ? "327301010190000" : "",
+      email: manual ? "latihan@gnail.com" : "",
+    };
+    try {
+      expect(
+        (
+          await api(trainer, "/settings", "PUT", {
+            ...before,
+            identitySettings,
+          })
+        ).status,
+      ).toBe(200);
+      const session = await start();
+      const identity = session.config.identity;
+      if (manual) {
+        expect(identity.nik).toBe(identitySettings.nik);
+        expect(identity.email).toBe(identitySettings.email);
+      } else {
+        expect(identity.nik).toMatch(/^\d{12}0000$/);
+        expect(identity.email).toMatch(/^[^\s@]+@gmail\.com$/);
+      }
+      const stored = await createAdmin(env)
+        .from("ketik_sessions")
+        .select("snapshot")
+        .eq("id", session.id)
+        .single();
+      expect(stored.error).toBeNull();
+      expect(stored.data?.snapshot.config.identity).toEqual(identity);
+      providerPayloads = [];
+      if (manual) providerText = "3273010101900000, latihan@gmail.com";
+      expect(
+        (
+          await api(trainer, `/sessions/${session.id}/turns`, "POST", {
+            requestId: randomUUID(),
+            expectedVersion: 0,
+            text: "Mohon NIK dan email Anda.",
+          })
+        ).status,
+      ).toBe(200);
+      expect(providerPayloads[0]).toContain(identity.nik);
+      expect(providerPayloads[0]).toContain(identity.email);
+      expect(providerPayloads[0]).toContain(
+        "jangan menyebut NIK/email tanpa diminta",
+      );
+      if (manual) {
+        expect(providerPayloads[0]).toContain("correction");
+        expect(providerPayloads[0]).toContain("latihan@gmail.com");
+        expect(providerPayloads[0]).toContain("3273010101900000");
+        expect(consumerPromptIdentity(providerPayloads[0])).not.toHaveProperty(
+          "correctionApplied",
+        );
+        expect(
+          (
+            await api(trainer, `/sessions/${session.id}/turns`, "POST", {
+              requestId: randomUUID(),
+              expectedVersion: 2,
+              text: "Boleh diulangi datanya?",
+            })
+          ).status,
+        ).toBe(200);
+        expect(
+          consumerPromptIdentity(providerPayloads[1]).correctionApplied,
+        ).toEqual({
+          nik: "3273010101900000",
+          email: "latihan@gmail.com",
+        });
+      }
+      const finished = await api(
+        trainer,
+        `/sessions/${session.id}/finish`,
+        "POST",
+        {},
+      );
+      expect(finished.status).toBe(200);
+      expect((await finished.json()).data).toMatchObject({
+        consumerNik: identity.nik,
+        consumerEmail: identity.email,
+      });
+      const monitoring = await tnaApiRequest(
+        app,
+        `http://localhost/api/v1/ai/monitoring/history/ketik/${session.id}/review`,
+        {
+          headers: { Authorization: `Bearer ${trainer.token}` },
+        },
+      );
+      expect(monitoring.status).toBe(200);
+      expect((await monitoring.json()).data.session).toMatchObject({
+        consumerNik: identity.nik,
+        consumerEmail: identity.email,
+      });
+      const history = await createAdmin(env)
+        .from("ketik_history")
+        .select("consumer_nik,consumer_email")
+        .eq("id", session.id)
+        .single();
+      expect(history.error).toBeNull();
+      expect(history.data).toEqual({
+        consumer_nik: identity.nik,
+        consumer_email: identity.email,
+      });
+      const detail = (
+        await (await api(trainer, `/history/${session.id}`)).json()
+      ).data;
+      expect(detail).toMatchObject({
+        consumerNik: identity.nik,
+        consumerEmail: identity.email,
+      });
+      const page = (await (await api(trainer, "/history?limit=100")).json())
+        .data;
+      expect(
+        page.items.find((item: { id: string }) => item.id === session.id),
+      ).toMatchObject({
+        consumerNik: identity.nik,
+        consumerEmail: identity.email,
+      });
+    } finally {
+      providerText = previousProviderText;
+      expect((await api(trainer, "/settings", "PUT", before)).status).toBe(200);
+    }
+  });
+}

@@ -453,6 +453,8 @@ export async function finishServerKetikSession(
     consumerName: String(data.consumer_name),
     consumerPhone: data.consumer_phone as string,
     consumerCity: data.consumer_city as string,
+    consumerNik: (data.consumer_nik ?? null) as string | null,
+    consumerEmail: (data.consumer_email ?? null) as string | null,
     messages: data.messages as KetikSessionHistoryItem["messages"],
     simulationDuration: data.simulation_duration as number,
     finalScore: optionalScore(data.final_score),

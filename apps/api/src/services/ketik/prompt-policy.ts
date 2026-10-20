@@ -1,3 +1,4 @@
+import type { KetikIdentity, KetikIdentityCorrection } from "@trainers/types";
 import type {
   ChatMessage,
   KetikConsumerType,
@@ -163,7 +164,10 @@ KAPAN MENGIRIM LAMPIRAN:
 }
 
 export function buildKetikScenarioDataBlock(input: {
-  identity: { name: string; city: string; phone: string };
+  identity: KetikIdentity & {
+    correction?: KetikIdentityCorrection;
+    correctionApplied?: KetikIdentityCorrection;
+  };
   consumerType: KetikConsumerType;
   scenario: KetikScenario;
 }): string {

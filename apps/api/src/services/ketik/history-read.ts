@@ -11,7 +11,7 @@ import { createAdminClient } from "../../lib/supabase";
 import { readHistoryAttachments } from "./history-attachments";
 
 const COLUMNS =
-  "id,date,scenario_title,consumer_name,consumer_phone,consumer_city,simulation_duration,final_score,empathy_score,probing_score,resolution_score,typo_score,compliance_score,review_status,simulation_subject_type,simulation_subject_peserta_id,simulation_subject_name,simulation_subject_batch_name,simulation_subject_team";
+  "id,date,scenario_title,consumer_name,consumer_phone,consumer_city,consumer_nik,consumer_email,simulation_duration,final_score,empathy_score,probing_score,resolution_score,typo_score,compliance_score,review_status,simulation_subject_type,simulation_subject_peserta_id,simulation_subject_name,simulation_subject_batch_name,simulation_subject_team";
 const cursorSchema = z.strictObject({
   // Preserve Postgres microseconds. Date.toISOString() would lose precision.
   date: z.iso.datetime({ offset: true }),
@@ -45,6 +45,8 @@ function mapRow(row: Record<string, unknown>): KetikHistorySummaryItem {
     scenarioTitle: (row.scenario_title || "Simulation Chat") as string,
     consumerName: (row.consumer_name || "Consumer") as string,
     consumerPhone: (row.consumer_phone ?? undefined) as string | undefined,
+    consumerNik: (row.consumer_nik ?? null) as string | null,
+    consumerEmail: (row.consumer_email ?? null) as string | null,
     consumerCity: (row.consumer_city ?? undefined) as string | undefined,
     simulationDuration: (row.simulation_duration ?? undefined) as
       number | undefined,

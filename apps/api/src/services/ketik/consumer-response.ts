@@ -1,4 +1,6 @@
 import {
+  computeKetikIdentityCorrection,
+  type KetikIdentity,
   KetikScenario,
   KetikConsumerType,
   ChatMessage,
@@ -290,7 +292,7 @@ export async function generateConsumerResponse(
   config: {
     scenarios: KetikScenario[];
     consumerType: KetikConsumerType;
-    identity: { name: string; city: string; phone: string };
+    identity: KetikIdentity;
     selectedModel: string;
     simulationDuration: number;
     responsePacingMode: string;
@@ -333,8 +335,24 @@ Isi skrip tersedia di field \`scenario.script\` pada blok data skenario.
     chatHistory.filter((message) => message.sender === "consumer").length,
   );
 
+  const correction = computeKetikIdentityCorrection(config.identity);
+  // Keep already-disclosed corrections even when older turns are compacted.
+  const correctionApplied = correction
+    ? Object.fromEntries(
+        Object.entries(correction).filter(([, value]) =>
+          chatHistory.some(
+            (message) =>
+              message.sender === "consumer" && message.text.includes(value),
+          ),
+        ),
+      )
+    : {};
   const scenarioDataBlock = buildKetikScenarioDataBlock({
-    identity: config.identity,
+    identity: {
+      ...config.identity,
+      ...(correction ? { correction } : {}),
+      ...(Object.keys(correctionApplied).length ? { correctionApplied } : {}),
+    },
     consumerType: config.consumerType,
     scenario,
   });
@@ -381,7 +399,7 @@ ATURAN BALASAN:
 6. Jika ingin mengirim gambar, tulis HANYA tag [SEND_IMAGE: indeks] TANPA narasi deskriptif apapun di sekitarnya. Contoh benar: "[SEND_IMAGE: 0]". JANGAN tambahkan penjelasan seperti "Konsumen mengirim tangkapan layar". Jika ingin memberi keterangan tentang gambar, tulis sebagai chat biasa di part terpisah setelah [BREAK] sebelum tag gambar.
 7. Kembalikan [NO_RESPONSE] HANYA JIKA chat benar-benar selesai: kamu sudah puas dan tidak ada lagi yang ingin ditanyakan, atau di fase akhir kamu menutup chat sesuai PENUTUPAN dan tidak ada lagi yang ingin kamu katakan.
 8. Jangan pernah mengakui bahwa kamu AI. Tetap dalam karakter sebagai konsumen yang sedang menghadapi masalah keuangan/perbankan.
-9. KONSISTENSI DATA: Jika agen meminta data pribadi (Nama/HP/Kota), berikan data dari \`identity\`. JANGAN MENGARANG DATA BARU yang berbeda dengan profil ini.
+9. KONSISTENSI DATA: Jika agen meminta data pribadi (Nama/HP/Kota/NIK/Email), berikan persis dari \`identity\`. Jangan mengarang; jangan menyebut NIK/email tanpa diminta, termasuk di pesan pembuka. Jika agen mempertanyakan data salah format atau meminta kota/kabupaten yang spesifik, boleh menolak/mengabaikan bagian itu atau memberi HANYA versi dari \`identity.correction\`. Setelah memberikan koreksi, pakai versi itu sampai akhir; \`identity.correctionApplied\` mencatat koreksi yang sudah kamu berikan.
 10. JANGAN menulis ulang pesan agen. JANGAN gunakan format transkrip seperti "Agen:" atau "Konsumen:". Output-mu berupa isi chat konsumen SAJA, bukan dialog dua arah, bukan analisis, bukan narasi panggung.
 11. Jangan mengakhiri chat terlalu cepat. Dalam 3-4 pesan pertama kamu TIDAK BOLEH menutup chat dengan alasan apapun. JANGAN PERNAH membalas greeting pertama agen dengan pamit; balas dengan sapaan singkat sesuai tipemu dan inti keluhanmu.
 12. Jangan berpura-pura tahu timer internal simulasi. Jika belum ada status waktu yang benar-benar kritis, jangan bersikap seolah sesi sudah habis.

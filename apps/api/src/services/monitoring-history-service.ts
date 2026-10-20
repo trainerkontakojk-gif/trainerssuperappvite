@@ -376,7 +376,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
     readComplete(
       admin,
       "ketik_history",
-      "id, user_id, date, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
+      "id, user_id, date, scenario_title, consumer_name, consumer_phone, consumer_city, consumer_nik, consumer_email, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
     ),
     readComplete(
       admin,
@@ -429,6 +429,8 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       consumer_name: nullableString(row.consumer_name),
       consumer_phone: nullableString(row.consumer_phone),
       consumer_city: nullableString(row.consumer_city),
+      consumer_nik: nullableString(row.consumer_nik),
+      consumer_email: nullableString(row.consumer_email),
       review_status: status(row.review_status),
       scores: {
         final:
@@ -449,6 +451,8 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       },
       simulationSubject: mapSimulationSubjectRowToSnapshot(row),
       ketik_session: {
+        consumer_nik: nullableString(row.consumer_nik),
+        consumer_email: nullableString(row.consumer_email),
         consumer_name: nullableString(row.consumer_name),
         consumer_phone: nullableString(row.consumer_phone),
         consumer_city: nullableString(row.consumer_city),

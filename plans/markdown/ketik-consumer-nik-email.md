@@ -103,3 +103,87 @@
 - `status` per field dari AI tetapi divalidasi server: `agentMessageId` wajib id pesan **agen** yang ada di transkrip (selain itu dibuang menjadi `null`); `confirmed` tanpa `agentMessageId` valid diturunkan menjadi `unconfirmed`. `status` keseluruhan = `summarizeKetikVerificationStatus(fields)`.
 - `missedBeforeMessageId`: bila status bukan `confirmed`, id pesan agen pertama setelah konsumen memberikan data (atau pesan agen terakhir bila data tidak pernah diminta); `null` bila `confirmed`.
 - Nilai Probing berkurang dan satu `agentNotes` berverdict `fix` berdimensi `probing` ditambahkan untuk status selain `confirmed`, dengan `example` kalimat konfirmasi.
+
+### Catatan implementasi backend (Codex, 2026-10-20)
+
+- Pengurangan verifikasi: **20 poin Probing, sekali per sesi**, jika status gabungan
+  bukan `confirmed`; skor akhir dihitung ulang dari lima dimensi. Rencana tidak
+  menetapkan besar pengurangan sebelumnya. AI diminta memberi skor dasar tanpa
+  pengurangan verifikasi agar server tidak menguranginya dua kali.
+- RPC `ketik_history_page` memakai proyeksi eksplisit, sehingga migrasi/rollback
+  NIK/email juga memperbarui/memulihkan proyeksinya tanpa mengubah signature,
+  SECURITY, grants, RLS, cursor, atau pagination. E2E rollback pagination lama
+  kini menyimpan dan memulihkan definisi RPC terbaru agar tidak meninggalkan
+  proyeksi sebelum NIK/email setelah spec selesai.
+- Kekurangan kontrak yang ditemukan: `MonitoringConsumerMetadata` dan `MonitoringKetikSession` belum memuat
+  `consumer_nik`/`consumer_email`, meski endpoint daftar Monitoring memerlukan
+  keduanya. Perbaikan minimal menambah dua properti opsional nullable pada masing-masing
+  tipe; `KetikMonitoringReview.session` memakai kontrak yang sudah ada.
+- RED spec ditulis sebelum implementasi. Sesuai addendum, DB replay, rollback
+  round-trip, dan seluruh Playwright dijalankan orchestrator di stack lokal;
+  tidak dijalankan di sandbox Codex. Commit/staging juga ditolak sandbox saat
+  membuat `.git/worktrees/trainerssuperappvite-ketik-nik-backend/index.lock`.
+
+### Handoff verifikasi sandbox (2026-10-20)
+
+Lane D; self-review `thermo-nuclear` selesai tanpa temuan kode terbuka. Gate
+integrasi tetap **BLOCKED** sampai replay lokal dan E2E oleh orchestrator.
+Graphify tidak tersedia di worktree (`graph.json` tidak ada); penelusuran memakai
+imports/callers, migration, tipe, dan spec langsung. Graph update milik integrator.
+
+Perintah kualitas yang dijalankan (tidak termasuk pembacaan sumber):
+
+| Perintah | Exit | Bukti |
+| --- | --- | --- |
+| `graphify explain processKetikReviewJob` | 1 | `graph file not found` |
+| `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json` | 1 | launcher: `fetch failed` |
+| `node_modules/.bin/tsc --noEmit -p apps/api/tsconfig.json` | 1 | TS2353: metadata Monitoring belum punya `consumer_nik`; diperbaiki dengan properti opsional shared |
+| `npm_config_pm_on_fail=ignore pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json` | 1 | launcher: `fetch failed` |
+| `pnpm --pm-on-fail=ignore --dir apps/api exec tsc --noEmit -p tsconfig.json` | 1 | auto-install dependency: `fetch failed` |
+| `apps/api/node_modules/.bin/tsc --noEmit -p apps/api/tsconfig.json` | 0 | tanpa diagnostic |
+| `pnpm_config_verify_deps_before_run=false pnpm --pm-on-fail=ignore --dir apps/api exec tsc --noEmit -p tsconfig.json` | 0 | tanpa diagnostic |
+| `pnpm --filter @trainers/web exec tsc --noEmit` | 1 | launcher: `fetch failed` |
+| `pnpm_config_verify_deps_before_run=false pnpm --pm-on-fail=ignore --filter @trainers/web exec tsc --noEmit` | 0 | tanpa diagnostic |
+| `pnpm_config_pm_on_fail=ignore pnpm_config_verify_deps_before_run=false pnpm lint --concurrency=1` | 1 | Turbo strict env menghapus konfigurasi pnpm anak; `fetch failed` di task types |
+| `pnpm_config_pm_on_fail=ignore pnpm_config_verify_deps_before_run=false pnpm lint --concurrency=1 --env-mode=loose` | 0 | 4 successful / 4 total; API 0 error + 8 warning, web 0 error + 66 warning; warning di file tidak diubah; shared-cache IO warning sandbox |
+| `pnpm_config_pm_on_fail=ignore pnpm_config_verify_deps_before_run=false pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json` (final) | 0 | tanpa diagnostic |
+| `node_modules/.bin/eslint apps/web/e2e/ketik-history-api.spec.ts apps/web/e2e/ketik-review-worker-api.spec.ts apps/web/e2e/ketik-session-api.spec.ts` (setelah revisi spec terakhir) | 0 | tanpa diagnostic |
+| `node_modules/.bin/prettier --write <file TS backend/E2E yang diubah>` (beberapa batch) | 0 | seluruh batch selesai; perubahan format di luar fitur dikembalikan |
+| `git diff --check` (berulang, termasuk final) | 0 | tanpa output |
+
+Override pnpm di atas hanya memakai pnpm terpasang (11.5.1) dan dependencies
+lokal, tanpa mencoba bootstrap pnpm 12.9.1 / install ulang lewat jaringan.
+Tidak mengubah manifest, lockfile, `.env*`, atau konfigurasi pnpm.
+
+Tidak menjalankan DB reset/start, Playwright, unit/Vitest, root build, deploy,
+remote SQL, atau push. `supabase migration new ketik_history_consumer_nik_email`
+(exit 0) hanya membuat file; timestamp CLI `20261020125854` dinaikkan ke
+`20261020170000` agar setelah migrasi durable messages sesuai brief.
+
+`git add` dan `git commit` sama-sama exit 128: tidak dapat membuat `index.lock`
+(`Operation not permitted`). Tidak ada commit baru dan seluruh perubahan masih
+unstaged. Pisahkan empat baris perubahan `packages/types/src/monitoring.ts`
+serta bullet `fix(types)` CHANGELOG dalam commit tersendiri saat integrasi;
+commit backend memakai bullet `feat(ketik)`. Keduanya memakai trailer
+`Co-Authored-By: Codex <noreply@openai.com>`.
+
+E2E belum dijalankan: **0 run**, sehingga belum ada angka pass/fail. Dari
+`apps/web`, setelah replay stack lokal, jalankan satu per satu:
+
+```bash
+pnpm exec playwright test e2e/ketik-session-api.spec.ts -c playwright.api.config.ts --project ketik-session-real-backend -g '^NIK/email'
+pnpm exec playwright test e2e/ketik-history-api.spec.ts -c playwright.api.config.ts --project ketik-history-real-backend -g 'legacy history without NIK/email|local rollback/reapply'
+pnpm exec playwright test e2e/ketik-review-worker-api.spec.ts -c playwright.api.config.ts --project ketik-review-worker-real-backend -g '^identity verification review:'
+pnpm exec playwright test e2e/ketik-review-worker-api.spec.ts -c playwright.api.config.ts --project ketik-review-worker-embedded-real-backend -g '^identity verification review:'
+```
+
+- Session: dua judul baru `NIK/email pool values persist in session snapshot and history`
+  dan `NIK/email manual anomalies survive session snapshot and history`.
+- History: judul baru `legacy history without NIK/email values returns null in list and detail`;
+  cleanup spec `local rollback/reapply preserves history and scores while missing RPC stays a visible error` diperbarui.
+- Worker: delapan judul `identity verification review: <case>` dengan case
+  `valid`, `not_asked`, `unconfirmed`, `confirmed`, `city_only`, `consumer_id`,
+  `missing_id`, `mixed`; memakai stub HTTP loopback yang sudah ada dan melampirkan
+  payload/result JSON saat dijalankan. Kedua host memakai spec sama.
+- Config default Playwright mengecualikan API specs; karena itu perintah handoff
+  di atas wajib memakai config API (workers=1), bukan config browser default.

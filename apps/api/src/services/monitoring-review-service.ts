@@ -139,7 +139,7 @@ export async function getMonitoringReviewDetail(params: {
     const { data: history, error: historyError } = await admin
       .from("ketik_history")
       .select(
-        "scenario_title, date, review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, consumer_name, consumer_phone, consumer_city, simulation_duration, messages, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
+        "scenario_title, date, review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, consumer_name, consumer_phone, consumer_city, consumer_nik, consumer_email, simulation_duration, messages, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
       )
       .eq("id", params.historyId)
       .single();
@@ -185,6 +185,8 @@ export async function getMonitoringReviewDetail(params: {
           consumerName: history.consumer_name ?? null,
           consumerPhone: history.consumer_phone ?? null,
           consumerCity: history.consumer_city ?? null,
+          consumerNik: history.consumer_nik ?? null,
+          consumerEmail: history.consumer_email ?? null,
           simulationDuration: history.simulation_duration ?? null,
           messages: normalizeKetikMessages(history.messages),
         },
@@ -247,6 +249,8 @@ export async function getMonitoringReviewDetail(params: {
         consumerName: history.consumer_name ?? null,
         consumerPhone: history.consumer_phone ?? null,
         consumerCity: history.consumer_city ?? null,
+        consumerNik: history.consumer_nik ?? null,
+        consumerEmail: history.consumer_email ?? null,
         simulationDuration: history.simulation_duration ?? null,
         messages: normalizeKetikMessages(history.messages),
       },

@@ -36,6 +36,7 @@ const fixtures = new Set<string>();
 let boundaryRequests: unknown[] = [];
 let providerCalls = 0;
 let guidancePayload: unknown;
+let verificationPayload: unknown;
 let providerOrigin: string;
 const server = createServer(async (req, res) => {
   let raw = "";
@@ -74,6 +75,7 @@ const server = createServer(async (req, res) => {
                     compliance: 80,
                   },
                   dimensionGuidance: guidancePayload,
+                  verification: verificationPayload,
                   summary: "Local review",
                   strengths: ["Jelas"],
                   weaknesses: ["Probing"],
@@ -306,6 +308,7 @@ test.beforeEach(() => {
   providerCalls = 0;
   boundaryRequests = [];
   guidancePayload = undefined;
+  verificationPayload = undefined;
 });
 test.afterEach(async () => {
   await stopWorker();
@@ -1070,3 +1073,149 @@ test("migration rollback refuses live jobs, preserves published data, and reappl
     )
     .toBeGreaterThanOrEqual(3);
 });
+
+for (const scenario of [
+  "valid",
+  "not_asked",
+  "unconfirmed",
+  "confirmed",
+  "city_only",
+  "consumer_id",
+  "missing_id",
+  "mixed",
+] as const) {
+  test(`identity verification review: ${scenario}`, async () => {
+    providerMode = "success";
+    const id = await seedSession();
+    const messages = [
+      {
+        id: "a1",
+        sender: "agent",
+        text: "Mohon NIK, email, dan kota Anda.",
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: "c1",
+        sender: "consumer",
+        text: "327301010190000, latihan@gnail.com, Jakarta",
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: "a2",
+        sender: "agent",
+        text: "Mohon konfirmasi NIK 16 digit, apakah emailnya gmail.com, dan kota administrasi Jakarta yang mana?",
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: "c2",
+        sender: "consumer",
+        text: "Saya tidak bersedia menjawab.",
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: "a3",
+        sender: "agent",
+        text: "Baik, saya bantu cek keluhannya.",
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    const valid = scenario === "valid";
+    const notAsked = scenario === "not_asked";
+    const cityOnly = scenario === "city_only";
+    const transcript = notAsked ? [messages[4]] : messages;
+    expect(
+      (
+        await db
+          .from("ketik_history")
+          .update({
+            consumer_city: valid ? "Bandung" : "Jakarta",
+            consumer_nik:
+              valid || cityOnly ? "3273010101900000" : "327301010190000",
+            consumer_email:
+              valid || cityOnly ? "latihan@gmail.com" : "latihan@gnail.com",
+            messages: transcript,
+          })
+          .eq("id", id)
+      ).error,
+    ).toBeNull();
+    verificationPayload = {
+      fields: ["nik", "email", "city"].map((field) => ({
+        field,
+        value: "AI must not overwrite server data",
+        reason: "fabricated",
+        status: notAsked
+          ? "not_asked"
+          : scenario === "unconfirmed" ||
+              (scenario === "mixed" && field === "email")
+            ? "unconfirmed"
+            : "confirmed",
+        agentMessageId:
+          scenario === "consumer_id"
+            ? "c1"
+            : scenario === "missing_id"
+              ? "invented"
+              : "a2",
+      })),
+    };
+    expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+      202,
+    );
+    await startWorker();
+    await expect
+      .poll(async () => (await job(id)).status, { timeout: 20_000 })
+      .toBe("completed");
+    const detail = (await (await request(`/review/${id}`)).json()).data;
+    const prompt = JSON.stringify(boundaryRequests[0]);
+    if (valid) {
+      expect(prompt).not.toContain("verificationContext");
+      expect(detail.review.education.verification ?? null).toBeNull();
+      expect(detail.scores.probing).toBe(80);
+    } else {
+      expect(prompt).toContain("verificationContext");
+      expect(prompt).toContain("latihan@gnail.com");
+      const verification = detail.review.education.verification;
+      const confirmed = scenario === "confirmed" || cityOnly;
+      expect(verification.status).toBe(
+        confirmed ? "confirmed" : notAsked ? "not_asked" : "unconfirmed",
+      );
+      expect(
+        verification.fields.map((field: { field: string }) => field.field),
+      ).toEqual(cityOnly ? ["city"] : ["nik", "email", "city"]);
+      expect(verification.fields[0]).toMatchObject(
+        cityOnly
+          ? {
+              value: "Jakarta",
+              reason: "Jakarta tanpa kota administrasinya",
+            }
+          : {
+              value: "327301010190000",
+              reason: "15 digit, harus 16",
+            },
+      );
+      expect(JSON.stringify(verification)).not.toContain("fabricated");
+      if (scenario === "consumer_id" || scenario === "missing_id") {
+        expect(
+          verification.fields.every(
+            (field: { agentMessageId: string | null }) =>
+              field.agentMessageId === null,
+          ),
+        ).toBe(true);
+      }
+      expect(verification.missedBeforeMessageId).toBe(
+        confirmed ? null : notAsked ? "a3" : "a2",
+      );
+      expect(detail.scores.probing).toBe(confirmed ? 80 : 60);
+      expect(detail.scores.final).toBe(confirmed ? 80 : 76);
+      const notes = detail.review.education.agentNotes.filter(
+        (note: { dimension: string; verdict: string }) =>
+          note.dimension === "probing" && note.verdict === "fix",
+      );
+      expect(notes).toHaveLength(confirmed ? 0 : 1);
+      if (!confirmed) expect(notes[0].example).toContain("konfirmasi");
+    }
+    await test.info().attach(`verification-${scenario}`, {
+      body: JSON.stringify({ prompt: boundaryRequests[0], result: detail }),
+      contentType: "application/json",
+    });
+  });
+}
