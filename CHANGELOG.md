@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(plans): plan the EFEK baseline switch from non-participant agents to the monthly service average for KETIK, PDKT, Telefun and CERIWIS, so the dashed line no longer disappears once most agents have trained
 - fix(db): make the access groups count view honor caller RLS and revoke it from signed-in users (Supabase security_definer_view advisor)
 - feat(tna): add reversible EFEK agent exclusions with reasons and report comparisons
 
