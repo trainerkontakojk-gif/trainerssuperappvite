@@ -194,6 +194,7 @@ Rubrik Penilaian (0-100):
 - Di bawah 60: Perlu Coaching
 
 Aturan Deteksi Typo:
+- Nilai Tata Tulis HANYA dari pesan Agen. Jangan pernah menghitung pesan Konsumen sebagai typo atau mengutipnya sebagai bukti Tata Tulis: gaya informal konsumen (lo/gue, logat daerah, huruf kapital, "!!", "hadeh", emoji) adalah karakter simulasi, bukan kesalahan agen.
 - Abaikan singkatan atau bahasa Indonesia informal yang umum seperti "yg", "sy", "kak", "ga", "gak", "ok", dan "oke".
 - Identifikasi typo formal yang memengaruhi profesionalisme atau keterbacaan.
 - Severity wajib salah satu dari "minor", "medium", atau "critical".

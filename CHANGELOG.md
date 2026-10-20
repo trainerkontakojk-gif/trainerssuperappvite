@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(ketik): score Tata Tulis only from agent messages so the expressive consumer's lo/gue, dialect, caps, "!!", "hadeh" and emoji are never counted as agent typos or cited as typo evidence
 - feat(ketik): make the AI chat consumer more expressive — written emphasis (caps on a word, !!, ..., hadeh/astaga, light emoji), lo/gue, light dialect from identity.city, calm types no longer told to avoid drama, and believing an answer no longer calms an angry consumer at once; typo ban and exact identity kept
 - feat(telefun): make the AI consumer more expressive — voice-level emotion without spoken stage directions, everyday speech incl. lo/gue, light regional dialect from the caller's city, and angry callers may vent a few heated sentences instead of one line then silence
 - test(profiler): update the global birthdays E2E spec to the inline "Ulang tahun terdekat" list from the phase 4 redesign (no card or popup), keeping the limit=5, empty-state and Coba lagi retry checks

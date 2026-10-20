@@ -362,6 +362,11 @@ test("score explanations preserve real evidence and disclose missing or fabricat
     typo: 80,
     compliance: 80,
   });
+  // Tata Tulis hanya menilai agen; gaya ekspresif konsumen bukan typo agen.
+  const reviewPrompt = JSON.stringify(boundaryRequests[0]);
+  expect(reviewPrompt).toContain("Nilai Tata Tulis HANYA dari pesan Agen");
+  expect(reviewPrompt).toContain("logat daerah");
+  expect(reviewPrompt).toContain("bukan kesalahan agen");
   const guidance = detail.review.education.dimensionGuidance;
   expect(
     guidance.find((item: { key: string }) => item.key === "empathy"),
