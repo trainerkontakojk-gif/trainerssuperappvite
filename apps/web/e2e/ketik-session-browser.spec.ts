@@ -41,37 +41,47 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
   let reviewTranscript: unknown;
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    if (url.hostname === "api.openai.com" && url.pathname === "/v1/responses") {
-      calls++;
-      if (calls === 1)
-        return Response.json(
-          { error: { message: "local-private-provider-failure" } },
-          { status: 400 },
-        );
-      return Response.json({
-        id: "browser-local",
-        status: "completed",
-        output: [
-          {
-            type: "message",
-            role: "assistant",
-            content: [
-              {
-                type: "output_text",
-                text:
-                  calls === 2
-                    ? "Tagihan saya ganda."
-                    : "Nomornya 123, mohon dibantu.",
-              },
-            ],
-          },
-        ],
-        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
-      });
-    }
     if (url.hostname === "generativelanguage.googleapis.com") {
-      reviewCalls++;
       const payload = JSON.parse(await new Request(input, init).text());
+      const instruction = ((payload.systemInstruction?.parts ?? []) as Array<{
+        text?: string;
+      }>)
+        .map((part) => part.text ?? "")
+        .join("\n");
+      // KETIK coerces the saved model to Gemini, so the consumer and the review
+      // both reach this host; only the instruction tells them apart.
+      if (instruction.includes("ROLEPLAY: Kamu adalah KONSUMEN")) {
+        calls++;
+        if (calls === 1)
+          return Response.json(
+            { error: { message: "local-private-provider-failure" } },
+            { status: 400 },
+          );
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                role: "model",
+                parts: [
+                  {
+                    text:
+                      calls === 2
+                        ? "Tagihan saya ganda."
+                        : "Nomornya 123, mohon dibantu.",
+                  },
+                ],
+              },
+              finishReason: "STOP",
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: 5,
+            totalTokenCount: 15,
+          },
+        });
+      }
+      reviewCalls++;
       const prompt = payload.contents[0].parts[0].text as string;
       const block = prompt.match(
         /<transcript_data>\n([\s\S]*)\n<\/transcript_data>/,
@@ -239,7 +249,9 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
     await expect(room.getByRole("alert")).toContainText(
       "Balasan konsumen belum tersedia",
     );
-    await room.getByRole("button", { name: "Coba kirim lagi" }).click();
+    await room
+      .getByRole("button", { name: "Coba minta balasan lagi" })
+      .click();
     await expect(
       room.getByText("Tagihan saya ganda.", { exact: true }),
     ).toBeVisible({ timeout: 15000 });
@@ -291,12 +303,16 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
     expect(finished.data).toEqual({ state: "ended", messages: null });
     const finish = mutations.find((m) => m.path.endsWith("/finish"));
     expect(finish?.body).toEqual({});
-    const turn = mutations.find((m) => m.path.endsWith("/turns"));
-    expect(Object.keys(turn!.body).sort()).toEqual([
-      "expectedVersion",
-      "requestId",
-      "text",
+    const appends = mutations.filter((m) => m.path.endsWith("/messages"));
+    expect(appends.map((m) => Object.keys(m.body).sort())).toEqual([
+      ["expectedAgentVersion", "requestId", "text"],
+      ["expectedAgentVersion", "requestId", "text"],
     ]);
+    // Each append is durable on its own; only the reply trigger can be retried.
+    const responses = mutations.filter((m) => m.path.endsWith("/respond"));
+    expect(responses).toHaveLength(3);
+    for (const response of responses)
+      expect(Object.keys(response.body)).toEqual(["requestId"]);
     expect(calls).toBe(3);
     expect(reviewCalls).toBe(0); // Finish never auto-reviews.
     const { createKetikReviewWorker } =

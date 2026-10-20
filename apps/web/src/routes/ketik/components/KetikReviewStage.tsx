@@ -20,6 +20,7 @@ import { downloadKetikTranscript } from "../utils/transcript";
 import { buildQuoteMarks, pointLetter } from "../utils/quoteMarks";
 import { KetikReviewMessage } from "./KetikReviewMessage";
 import { KetikReviewAttachmentPreview } from "./KetikReviewAttachmentPreview";
+import { KetikReviewWait } from "./KetikReviewWait";
 import { ReviewResult } from "./KetikReviewResult";
 import {
   focusReviewTarget,
@@ -411,6 +412,7 @@ function ReviewProgress({
           ? "Hasil sudah tersedia dan sedang dimuat."
           : "Percakapan tetap tersimpan. Anda boleh meninggalkan halaman ini dan kembali untuk melihat hasilnya."}
       </p>
+      {!loadingResult && <KetikReviewWait />}
     </div>
   );
 }

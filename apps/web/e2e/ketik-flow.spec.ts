@@ -259,6 +259,7 @@ function serverSession(
     id: CHAT_ID,
     state: "active",
     version: 0,
+    agentVersion: 0,
     startedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 300_000).toISOString(),
     config: {
@@ -280,6 +281,8 @@ function serverSession(
     messages: [],
     consumerClosed: false,
     provenance: "server_v1",
+    awaitingResponse: false,
+    pendingResponse: null,
     pendingTurn: null,
     ...overrides,
   };
@@ -1507,37 +1510,58 @@ test.describe("KETIK ruang chat (hermetic)", () => {
       "agent",
     );
 
+    let activeSession = serverSession();
     await page.route(
-      `**/api/v1/ketik/sessions/${CHAT_ID}/turns`,
+      `**/api/v1/ketik/sessions/${CHAT_ID}/messages`,
       async (route) => {
-        audit.mockedApi.push(`POST /api/v1/ketik/sessions/${CHAT_ID}/turns`);
+        audit.mockedApi.push(`POST /api/v1/ketik/sessions/${CHAT_ID}/messages`);
         const body = route.request().postDataJSON();
         expect(Object.keys(body).sort()).toEqual([
-          "expectedVersion",
+          "expectedAgentVersion",
           "requestId",
           "text",
         ]);
+        activeSession = serverSession({
+          version: 1,
+          agentVersion: 1,
+          awaitingResponse: true,
+          messages: [
+            {
+              id: body.requestId,
+              sender: "agent",
+              text: body.text,
+              timestamp: savedAt,
+            },
+          ],
+        });
         await route.fulfill({
-          json: {
-            success: true,
-            data: serverSession({
-              version: 2,
-              messages: [
-                {
-                  id: body.requestId,
-                  sender: "agent",
-                  text: body.text,
-                  timestamp: savedAt,
-                },
-                {
-                  id: "n2",
-                  sender: "consumer",
-                  text: "Iya, tagihan saya muncul dua kali.",
-                  timestamp: savedAt,
-                },
-              ],
-            }),
-          },
+          json: { success: true, data: activeSession },
+        });
+      },
+    );
+    await page.route(
+      `**/api/v1/ketik/sessions/${CHAT_ID}/respond`,
+      async (route) => {
+        audit.mockedApi.push(`POST /api/v1/ketik/sessions/${CHAT_ID}/respond`);
+        expect(Object.keys(route.request().postDataJSON())).toEqual([
+          "requestId",
+        ]);
+        activeSession = {
+          ...activeSession,
+          version: 2,
+          awaitingResponse: false,
+          messages: [
+            ...activeSession.messages,
+            {
+              id: "n2",
+              sender: "consumer",
+              text: "Iya, tagihan saya muncul dua kali.",
+              timestamp: savedAt,
+            },
+          ],
+        };
+        await route.fulfill({
+          json: { success: true, data: activeSession },
         });
       },
     );

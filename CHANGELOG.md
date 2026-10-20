@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- feat(ketik): send each KETIK agent message as it is typed, keep the sent/read ticks, type published consumer replies out one at a time in the original rhythm (read time, length bands, occasional slow reply) instead of revealing them together, and show an honest elapsed clock plus a 1–2/3-minute estimate while Telaah runs
 - feat(ketik): add the durable KETIK message API and its migration — `POST /ketik/sessions/:id/messages` persists one agent message without calling AI, `POST /ketik/sessions/:id/respond` answers the whole durable context, one stale reply is discarded and regenerated when newer context arrives, `/turns` keeps working for clients that have not updated yet, and the response ledger is service-role-only with owner-bound RLS reads
 - fix(ketik): show agent messages instantly with sent/read ticks and guide the consumer to send relevant scenario attachments
 - fix(telefun): allow local recording reads under production CSP

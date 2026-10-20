@@ -25,6 +25,7 @@ let providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
 let failAttachmentRead = false;
 let providerCalls = 0;
 let providerGate: (() => Promise<void>) | null = null;
+let providerPayloads: string[] = [];
 const triggerName = `e2e_${ns.replaceAll("-", "_")}`;
 function fixtureSql(query: string) {
   try {
@@ -69,7 +70,11 @@ test.beforeAll(async () => {
   guardedFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    if (failAttachmentRead && url.pathname === "/rest/v1/ketik_sessions") return Response.json({ message: "private-attachment-read-sentinel", code: "XX000" }, { status: 500 });
+    if (failAttachmentRead && url.pathname === "/rest/v1/ketik_sessions")
+      return Response.json(
+        { message: "private-attachment-read-sentinel", code: "XX000" },
+        { status: 500 },
+      );
     if (url.hostname === "api.openai.com" && url.pathname === "/v1/responses") {
       providerCalls++;
       if (providerGate) await providerGate();
@@ -96,6 +101,7 @@ test.beforeAll(async () => {
     // KETIK now coerces its model to Gemini; answer it the same way.
     if (url.hostname === "generativelanguage.googleapis.com") {
       providerCalls++;
+      providerPayloads.push(await new Request(input, init).text());
       if (providerGate) await providerGate();
       if (failProvider)
         return Response.json({ error: { message: marker } }, { status: 400 });
@@ -332,6 +338,201 @@ test("messages, time, model and finalized history come from the server and dupli
   expect(logs.error).toBeNull();
   expect(logs.data?.some((row) => row.total_tokens === 15)).toBe(true);
 });
+test("agent messages persist immediately and a changed AI context is discarded then regenerated once", async () => {
+  const session = await start();
+  const firstMessage = {
+    requestId: randomUUID(),
+    expectedAgentVersion: 0,
+    text: "Pesan pertama untuk satu konteks.",
+  };
+  const callsBefore = providerCalls;
+  const usageBefore = await createAdmin(env)
+    .from("ai_usage_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", trainer.userId)
+    .eq("module", "ketik");
+  expect(usageBefore.error).toBeNull();
+  providerPayloads = [];
+
+  const firstAppend = await api(
+    trainer,
+    `/sessions/${session.id}/messages`,
+    "POST",
+    firstMessage,
+  );
+  expect(firstAppend.status).toBe(200);
+  expect(providerCalls).toBe(callsBefore);
+  expect((await firstAppend.json()).data).toMatchObject({
+    agentVersion: 1,
+    awaitingResponse: true,
+  });
+
+  let entered!: () => void;
+  let release!: () => void;
+  const firstProviderStarted = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const firstProviderGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let attempt = 0;
+  providerGate = async () => {
+    attempt++;
+    if (attempt === 1) {
+      entered();
+      await firstProviderGate;
+    }
+  };
+
+  const responseRequestId = randomUUID();
+  const response = api(trainer, `/sessions/${session.id}/respond`, "POST", {
+    requestId: responseRequestId,
+  });
+  try {
+    await firstProviderStarted;
+    const secondAppend = await api(
+      trainer,
+      `/sessions/${session.id}/messages`,
+      "POST",
+      {
+        requestId: randomUUID(),
+        expectedAgentVersion: 1,
+        text: "Pesan kedua harus ikut konteks terbaru.",
+      },
+    );
+    expect(secondAppend.status).toBe(200);
+    expect((await secondAppend.json()).data).toMatchObject({
+      agentVersion: 2,
+      awaitingResponse: true,
+    });
+    release();
+
+    const completed = await response;
+    expect(completed.status).toBe(200);
+    const data = (await completed.json()).data;
+    expect(providerCalls).toBe(callsBefore + 2);
+    const usageAfter = await createAdmin(env)
+      .from("ai_usage_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", trainer.userId)
+      .eq("module", "ketik");
+    expect(usageAfter.error).toBeNull();
+    expect(usageAfter.count).toBe((usageBefore.count ?? 0) + 2);
+    expect(providerPayloads).toHaveLength(2);
+    expect(providerPayloads[0]).toContain(firstMessage.text);
+    expect(providerPayloads[0]).not.toContain(
+      "Pesan kedua harus ikut konteks terbaru.",
+    );
+    expect(providerPayloads[1]).toContain(firstMessage.text);
+    expect(providerPayloads[1]).toContain(
+      "Pesan kedua harus ikut konteks terbaru.",
+    );
+    expect(data.awaitingResponse).toBe(false);
+    expect(
+      data.messages.filter(
+        (message: { sender: string }) => message.sender === "consumer",
+      ),
+    ).toHaveLength(2);
+
+    const reloaded = await api(trainer, `/sessions/${session.id}`);
+    expect((await reloaded.json()).data.messages).toEqual(data.messages);
+    const replay = await api(
+      trainer,
+      `/sessions/${session.id}/respond`,
+      "POST",
+      { requestId: responseRequestId },
+    );
+    expect(replay.status).toBe(200);
+    expect(providerCalls).toBe(callsBefore + 2);
+  } finally {
+    providerGate = null;
+    release?.();
+    await response;
+  }
+});
+
+test("a second context change supersedes the bounded retry and leaves a fresh response pending", async () => {
+  const session = await start();
+  const append = async (expectedAgentVersion: number, text: string) => {
+    const response = await api(
+      trainer,
+      `/sessions/${session.id}/messages`,
+      "POST",
+      { requestId: randomUUID(), expectedAgentVersion, text },
+    );
+    expect(response.status).toBe(200);
+    return (await response.json()).data;
+  };
+  await append(0, "Konteks awal.");
+
+  let firstEntered!: () => void;
+  let secondEntered!: () => void;
+  let releaseFirst!: () => void;
+  let releaseSecond!: () => void;
+  const firstStarted = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  const secondStarted = new Promise<void>((resolve) => {
+    secondEntered = resolve;
+  });
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const secondGate = new Promise<void>((resolve) => {
+    releaseSecond = resolve;
+  });
+  let attempt = 0;
+  providerGate = async () => {
+    attempt++;
+    if (attempt === 1) {
+      firstEntered();
+      await firstGate;
+    } else if (attempt === 2) {
+      secondEntered();
+      await secondGate;
+    }
+  };
+  const callsBefore = providerCalls;
+  const response = api(trainer, `/sessions/${session.id}/respond`, "POST", {
+    requestId: randomUUID(),
+  });
+  try {
+    await firstStarted;
+    await append(1, "Konteks yang memicu satu pengulangan.");
+    releaseFirst();
+    await secondStarted;
+    await append(2, "Konteks yang datang saat pengulangan.");
+    releaseSecond();
+
+    const superseded = await response;
+    expect(superseded.status).toBe(200);
+    const pending = (await superseded.json()).data;
+    expect(providerCalls).toBe(callsBefore + 2);
+    expect(pending.awaitingResponse).toBe(true);
+    expect(
+      pending.messages.filter(
+        (message: { sender: string }) => message.sender === "consumer",
+      ),
+    ).toHaveLength(0);
+
+    providerGate = null;
+    const fresh = await api(
+      trainer,
+      `/sessions/${session.id}/respond`,
+      "POST",
+      { requestId: randomUUID() },
+    );
+    expect(fresh.status).toBe(200);
+    expect((await fresh.json()).data.awaitingResponse).toBe(false);
+    expect(providerCalls).toBe(callsBefore + 3);
+  } finally {
+    providerGate = null;
+    releaseFirst?.();
+    releaseSecond?.();
+    await response;
+  }
+});
+
 test("provider failure is explicit and retry preserves exactly one agent message", async () => {
   const session = await start();
   const request = {
@@ -429,46 +630,140 @@ test("legacy transcript and generation endpoints cannot bypass session authority
   expect(providerCalls).toBe(calls);
 });
 test("historical attachments use the immutable session snapshot, sent-only projection and existing authorization", async () => {
-  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9ZkAAAAASUVORK5CYII=";
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j9ZkAAAAASUVORK5CYII=";
   const settingsResponse = await api(trainer, "/settings");
   const original = (await settingsResponse.json()).data;
   try {
-    const settings = { ...original, scenarios: original.scenarios.map((scenario: { id: string }, index: number) => ({ ...scenario, isActive: index === 0, images: [png, "https://example.invalid/unsent-private.png", "javascript:alert(1)"], imageAlts: ["Bukti asli", "Tidak dikirim", "Sumber tidak aman"], script: "private-scenario-script-sentinel" })) };
-    expect((await api(trainer, "/settings", "PUT", settings, { "x-settings-version": settingsResponse.headers.get("x-settings-version")! })).status).toBe(200);
+    const settings = {
+      ...original,
+      scenarios: original.scenarios.map(
+        (scenario: { id: string }, index: number) => ({
+          ...scenario,
+          isActive: index === 0,
+          images: [
+            png,
+            "https://example.invalid/unsent-private.png",
+            "javascript:alert(1)",
+          ],
+          imageAlts: ["Bukti asli", "Tidak dikirim", "Sumber tidak aman"],
+          script: "private-scenario-script-sentinel",
+        }),
+      ),
+    };
+    expect(
+      (
+        await api(trainer, "/settings", "PUT", settings, {
+          "x-settings-version":
+            settingsResponse.headers.get("x-settings-version")!,
+        })
+      ).status,
+    ).toBe(200);
     const session = await start();
-    providerText = "Ini bukti tagihannya [SEND_IMAGE:0] [SEND_IMAGE:2] [SEND_IMAGE:9]";
-    const turn = await api(trainer, `/sessions/${session.id}/turns`, "POST", { requestId: randomUUID(), expectedVersion: session.version, text: "Boleh kirim bukti tagihan? [SEND_IMAGE:1]" });
+    providerText =
+      "Ini bukti tagihannya [SEND_IMAGE:0] [SEND_IMAGE:2] [SEND_IMAGE:9]";
+    const turn = await api(trainer, `/sessions/${session.id}/turns`, "POST", {
+      requestId: randomUUID(),
+      expectedVersion: session.version,
+      text: "Boleh kirim bukti tagihan? [SEND_IMAGE:1]",
+    });
     expect(turn.status).toBe(200);
-    expect((await api(trainer, `/sessions/${session.id}/finish`, "POST", {})).status).toBe(200);
+    expect(
+      (await api(trainer, `/sessions/${session.id}/finish`, "POST", {})).status,
+    ).toBe(200);
     const latest = await api(trainer, "/settings");
-    const changed = { ...settings, scenarios: settings.scenarios.map((scenario: Record<string, unknown>) => ({ ...scenario, images: ["https://example.invalid/latest-settings.png"], imageAlts: ["Bukti terbaru"] })) };
-    expect((await api(trainer, "/settings", "PUT", changed, { "x-settings-version": latest.headers.get("x-settings-version")! })).status).toBe(200);
+    const changed = {
+      ...settings,
+      scenarios: settings.scenarios.map(
+        (scenario: Record<string, unknown>) => ({
+          ...scenario,
+          images: ["https://example.invalid/latest-settings.png"],
+          imageAlts: ["Bukti terbaru"],
+        }),
+      ),
+    };
+    expect(
+      (
+        await api(trainer, "/settings", "PUT", changed, {
+          "x-settings-version": latest.headers.get("x-settings-version")!,
+        })
+      ).status,
+    ).toBe(200);
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await api(trainer, `/history/${session.id}`);
       expect(response.status).toBe(200);
       const detail = (await response.json()).data;
       // Saved images live in Storage; the detail links the stored file.
-      expect(detail.attachments).toEqual([{ index: 0, src: expect.stringMatching(/\/storage\/v1\/object\/public\/scenario-attachments\/[\da-f]{64}\.png$/), alt: "Bukti asli" }]);
-      expect(JSON.stringify(detail)).not.toMatch(/unsent-private|latest-settings|private-scenario-script|javascript:/);
+      expect(detail.attachments).toEqual([
+        {
+          index: 0,
+          src: expect.stringMatching(
+            /\/storage\/v1\/object\/public\/scenario-attachments\/[\da-f]{64}\.png$/,
+          ),
+          alt: "Bukti asli",
+        },
+      ]);
+      expect(JSON.stringify(detail)).not.toMatch(
+        /unsent-private|latest-settings|private-scenario-script|javascript:/,
+      );
     }
     expect((await api(agent, `/history/${session.id}`)).status).toBe(404);
     const list = (await (await api(trainer, "/history")).json()).data;
-    expect(list.items.every((item: Record<string, unknown>) => !("attachments" in item))).toBe(true);
+    expect(
+      list.items.every(
+        (item: Record<string, unknown>) => !("attachments" in item),
+      ),
+    ).toBe(true);
     failAttachmentRead = true;
     const failed = await api(trainer, `/history/${session.id}`);
     expect(failed.status).toBe(500);
-    expect(await failed.text()).not.toContain("private-attachment-read-sentinel");
+    expect(await failed.text()).not.toContain(
+      "private-attachment-read-sentinel",
+    );
     failAttachmentRead = false;
     const legacyId = randomUUID();
-    expect((await createAdmin(env).from("ketik_history").insert({ id: legacyId, user_id: trainer.userId, scenario_title: "Legacy", consumer_name: "Konsumen", messages: [{ id: "legacy-image", sender: "consumer", text: "[SEND_IMAGE:0]" }] })).error).toBeNull();
-    const legacy = (await (await api(trainer, `/history/${legacyId}`)).json()).data;
+    expect(
+      (
+        await createAdmin(env)
+          .from("ketik_history")
+          .insert({
+            id: legacyId,
+            user_id: trainer.userId,
+            scenario_title: "Legacy",
+            consumer_name: "Konsumen",
+            messages: [
+              {
+                id: "legacy-image",
+                sender: "consumer",
+                text: "[SEND_IMAGE:0]",
+              },
+            ],
+          })
+      ).error,
+    ).toBeNull();
+    const legacy = (await (await api(trainer, `/history/${legacyId}`)).json())
+      .data;
     expect(legacy.attachments).toEqual([]);
-    await test.info().attach("attachment-history-contract", { body: JSON.stringify({ id: session.id, sentIndexes: [0, 2, 9], returnedIndexes: [0], legacyAttachments: legacy.attachments }), contentType: "application/json" });
+    await test.info().attach("attachment-history-contract", {
+      body: JSON.stringify({
+        id: session.id,
+        sentIndexes: [0, 2, 9],
+        returnedIndexes: [0],
+        legacyAttachments: legacy.attachments,
+      }),
+      contentType: "application/json",
+    });
   } finally {
     failAttachmentRead = false;
     providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
     const current = await api(trainer, "/settings");
-    expect((await api(trainer, "/settings", "PUT", original, { "x-settings-version": current.headers.get("x-settings-version")! })).status).toBe(200);
+    expect(
+      (
+        await api(trainer, "/settings", "PUT", original, {
+          "x-settings-version": current.headers.get("x-settings-version")!,
+        })
+      ).status,
+    ).toBe(200);
   }
 });
 
@@ -589,6 +884,16 @@ test("JWTs only read own operational rows and cannot mutate or execute session R
       })
     ).status,
   ).toBe(200);
+  expect(
+    (
+      await createAdmin(env).from("ketik_session_responses").insert({
+        session_id: active.id,
+        request_id: randomUUID(),
+        context_agent_version: 0,
+        status: "completed",
+      })
+    ).error,
+  ).toBeNull();
   for (const identity of [trainer, agent]) {
     const client = createClient(env.apiUrl, env.anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -606,6 +911,20 @@ test("JWTs only read own operational rows and cannot mutate or execute session R
       .eq("session_id", active.id);
     expect(turnRead.error).toBeNull();
     expect(turnRead.data).toHaveLength(identity === trainer ? 1 : 0);
+    const responseRead = await client
+      .from("ketik_session_responses")
+      .select("request_id")
+      .eq("session_id", active.id);
+    expect(responseRead.error).toBeNull();
+    expect(responseRead.data).toHaveLength(identity === trainer ? 1 : 0);
+    expect(
+      (
+        await client
+          .from("ketik_session_responses")
+          .select("lease")
+          .eq("session_id", active.id)
+      ).error?.code,
+    ).toBe("42501");
     expect(
       (
         await client.from("ketik_sessions").insert({
@@ -631,6 +950,16 @@ test("JWTs only read own operational rows and cannot mutate or execute session R
           request_id: randomUUID(),
           expected_version: 0,
           agent_text: "Forged",
+          status: "completed",
+        })
+      ).error?.code,
+    ).toBe("42501");
+    expect(
+      (
+        await client.from("ketik_session_responses").insert({
+          session_id: active.id,
+          request_id: randomUUID(),
+          context_agent_version: 0,
           status: "completed",
         })
       ).error?.code,
@@ -666,6 +995,46 @@ test("JWTs only read own operational rows and cannot mutate or execute session R
           p_lease: randomUUID(),
           p_messages: [],
           p_closed: false,
+        },
+      ],
+      [
+        "append_ketik_session_message",
+        {
+          p_user_id: identity.userId,
+          p_session_id: active.id,
+          p_request_id: randomUUID(),
+          p_expected_agent_version: 0,
+          p_text: "Forged",
+        },
+      ],
+      [
+        "claim_ketik_session_response",
+        {
+          p_user_id: identity.userId,
+          p_session_id: active.id,
+          p_request_id: randomUUID(),
+          p_lease_seconds: 30,
+        },
+      ],
+      [
+        "settle_ketik_session_response",
+        {
+          p_user_id: identity.userId,
+          p_session_id: active.id,
+          p_request_id: randomUUID(),
+          p_lease: randomUUID(),
+          p_messages: [],
+          p_closed: false,
+          p_lease_seconds: 30,
+        },
+      ],
+      [
+        "fail_ketik_session_response",
+        {
+          p_user_id: identity.userId,
+          p_session_id: active.id,
+          p_request_id: randomUUID(),
+          p_lease: randomUUID(),
         },
       ],
       [

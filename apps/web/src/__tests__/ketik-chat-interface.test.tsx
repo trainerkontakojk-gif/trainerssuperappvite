@@ -47,6 +47,7 @@ function renderChat(
         id: "chat-fixture",
         state: "active",
         version: 0,
+        agentVersion: 0,
         startedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
         config,
@@ -61,6 +62,8 @@ function renderChat(
         messages: [],
         consumerClosed: false,
         provenance: "server_v1",
+        awaitingResponse: false,
+        pendingResponse: null,
         pendingTurn: null,
       }}
       onEndSession={vi.fn()}

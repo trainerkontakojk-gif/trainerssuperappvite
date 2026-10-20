@@ -113,6 +113,62 @@ test.beforeAll(async () => {
   await assertLocalDevOnlyTarget();
 });
 
+test("KETIK review shows an honest elapsed clock and the same estimate as Telefun", async ({
+  page,
+}) => {
+  await page.clock.install({ time: Date.now() });
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=telaah`,
+    auth: { role: "agent" },
+    apiMocks: [
+      {
+        method: "GET",
+        path: `/api/v1/ketik/history/${id}`,
+        body: {
+          success: true,
+          data: { ...session, reviewStatus: "processing" },
+        },
+      },
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/status/${id}`,
+        body: {
+          success: true,
+          data: {
+            status: "queued",
+            resultReady: false,
+            previousKept: false,
+            scores: null,
+          },
+        },
+      },
+      ...mocks(),
+    ],
+  });
+  const result = page.getByRole("region", { name: "Hasil telaah" });
+  await expect(result).toContainText(
+    "Biasanya 1–2 menit, paling lama sekitar 3 menit.",
+  );
+  await expect(result.getByTestId("ketik-wait-elapsed")).toHaveText("00:00");
+  await expect(result.getByText(/\d+%/)).toHaveCount(0);
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: test.info().outputPath(`review-estimate-${width}.png`),
+    });
+  }
+  await page.clock.fastForward(181_000);
+  await expect(result).toContainText(
+    "Lebih lama dari biasanya. Tunggu sebentar lagi.",
+  );
+  expectHermetic(audit);
+});
+
 test("agent manually enqueues legacy review, sees real queue and poll failure without a fabricated timeout", async ({
   page,
 }) => {

@@ -86,6 +86,7 @@ export function ChatInterface({
     queuedCount,
     error,
     retry,
+    retryLabel,
     send,
     sessionPhase,
   } = useServerKetikChat(session);
@@ -352,13 +353,13 @@ export function ChatInterface({
             onClick={retry}
             disabled={isLoading || sessionPhase !== "active"}
           >
-            Coba kirim lagi
+            {retryLabel}
           </Button>
         </div>
       )}
-      {queuedCount > 1 && (
+      {queuedCount > 0 && (
         <p role="status" className="px-4 py-2 text-sm text-fg2">
-          {queuedCount - 1} pesan menunggu dikirim.
+          {queuedCount} pesan sedang disimpan.
         </p>
       )}
       {sessionPhase === "active" ? (

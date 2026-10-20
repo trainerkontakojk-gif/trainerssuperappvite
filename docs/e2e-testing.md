@@ -162,18 +162,24 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   migration history di atas. Rollback/reapply dilakukan eksternal pada DB disposable.
   Tidak ada panggilan provider atau test UI penugasan dalam tahap fondasi ini.
 - `ketik-session-api.spec.ts` (`ketik-session-real-backend`) membuktikan
-  snapshot, assignment wajib, strict input, idempotensi/versi/expiry, failed retry,
-  race/reclaim/fencing, RLS/RPC denial, finalisasi atomik dan penolakan legacy 410.
-  Terapkan migration `20261015140000_ketik_server_sessions.sql` setelah dua di atas.
-  Provider hanya HTTP fixture deterministik; tidak ada request keluar/biaya AI.
-- `ketik-server-chat.spec.ts` membuktikan antrean serial, typing/Send/Enter saat
-  loading, failed resume/retry, expiry, assignment error/retry tanpa auto-start,
+  snapshot, assignment wajib, strict input, append durable/idempoten, pemicu
+  response terpisah, discard-and-retry satu kali, bounded supersede, usage setiap
+  provider call, expiry, lease fencing, RLS/RPC denial, finalisasi atomik dan
+  penolakan legacy 410. Terapkan migration
+  `20261015140000_ketik_server_sessions.sql`, lalu
+  `20261020160000_ketik_durable_agent_messages.sql`. Provider hanya HTTP fixture
+  deterministik; tidak ada request keluar/biaya AI.
+- `ketik-server-chat.spec.ts` membuktikan bubble lokal lalu append server segera,
+  composer tetap aktif saat response AI, reload memakai transkrip durable,
+  legacy failed resume/retry, expiry, assignment error/retry tanpa auto-start,
   serta dialog konflik/sukses 390px/1280px, keyboard/focus dan target 44px.
 - `ketik-session-browser.spec.ts` opt-in dengan `E2E_KETIK_LIVE=1`: session/JWT
   Supabase asli, auth/profile lokal dan semua API Hono nyata melalui bridge
-  transport browser (bukan mockAuth atau stub service). Mulai → gagal provider →
-  retry UUID sama → dua turn → reload → finish → telaah manual; pesan dalam prompt
-  review harus sama persis dengan history. Guard menolak egress lain, provider
+  transport browser (bukan mockAuth atau stub service). Mulai → append durable →
+  gagal provider → retry request balasan dengan UUID sama → append kedua →
+  reload → finish → telaah manual; pesan dalam prompt review harus sama persis
+  dengan history. Fixture provider membedakan panggilan konsumen dan review lewat
+  `systemInstruction`, karena KETIK memaksa model ke Gemini. Guard menolak egress lain, provider
   hanya respons HTTP lokal, dan fixture/usage dihapus. Tanpa flag, tes di-skip;
   flag bukan pengganti guard env/target loopback. Trace berisi auth lokal: jangan commit.
 - `ketik-flow.spec.ts` membuktikan settings gagal dengan/tanpa backup tidak bisa
@@ -222,9 +228,10 @@ atau handler sinyal tersebut. Parameter claim/release NULL juga diuji terhadap
 guard database.
 
 `ketik-review-worker-browser.spec.ts` membuktikan agen memicu telaah manual,
-provenance legacy, queued/processing yang jujur, polling gagal/retry tanpa raw
-error atau timeout browser palsu, hasil rerun lama setelah reload, dan response
-polling terlambat. Screenshot 390/1280px serta assertion overflow disimpan di
+provenance legacy, queued/processing yang jujur, waktu berjalan + estimasi
+1–2/3 menit tanpa persen palsu, polling gagal/retry tanpa raw error atau timeout
+browser palsu, hasil rerun lama setelah reload, dan response polling terlambat.
+Screenshot 390/1280px serta assertion overflow disimpan di
 artifact ignored. `ketik-flow.spec.ts` memakai matriks izin baru; tidak ada
 POST review saat membuka sesi atau finish chat. E2E JWT browser sesi menjalankan
 runtime worker produk terhadap DB/provider test yang sama, tanpa auto-review;

@@ -11,8 +11,10 @@ import type {
   KetikReviewDetail,
   KetikScenario,
   KetikConsumerType,
+  AppendKetikSessionMessageRequest,
   KetikServerSession,
   KetikSessionTurnRequest,
+  RequestKetikSessionResponse,
   KetikAssignmentSnapshot,
   AssignKetikConfiguration,
   ManagedUser,
@@ -57,6 +59,20 @@ export const ketikApi = {
   getSession: async (id: string) =>
     unwrapResponse(
       await serverClient.sessions[":id"].$get({ param: { id } }),
+    ) as Promise<KetikServerSession>,
+  appendMessage: async (id: string, body: AppendKetikSessionMessageRequest) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].messages.$post({
+        param: { id },
+        json: body,
+      }),
+    ) as Promise<KetikServerSession>,
+  requestResponse: async (id: string, body: RequestKetikSessionResponse) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].respond.$post({
+        param: { id },
+        json: body,
+      }),
     ) as Promise<KetikServerSession>,
   sendTurn: async (id: string, body: KetikSessionTurnRequest) =>
     unwrapResponse(
