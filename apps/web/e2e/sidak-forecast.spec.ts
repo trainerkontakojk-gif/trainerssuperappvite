@@ -623,7 +623,7 @@ test.describe("Forecast SIDAK (hermetic)", () => {
     await expect(row.getByText("#1")).toHaveCount(0);
   });
 
-  test("w grafik menulis angka aktual dan proyeksi di titiknya, keterangan proyeksi hanya di legenda", async ({
+  test("w grafik menulis angka aktual kunci (terakhir, tertinggi, terendah) dan proyeksi, keterangan proyeksi hanya di legenda", async ({
     page,
   }) => {
     await open(page);
@@ -633,7 +633,8 @@ test.describe("Forecast SIDAK (hermetic)", () => {
         .locator(`[data-chart-label="${kind}"]`)
         .evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim()));
 
-    await expect.poll(() => labels("actual")).toEqual(["12", "10", "8"]);
+    // Titik tengah (10) tanpa angka: hanya terakhir, tertinggi dan terendah.
+    await expect.poll(() => labels("actual")).toEqual(["12", "8"]);
     await expect.poll(() => labels("forecast")).toEqual(["7", "6", "5"]);
     // Tanpa teks "Proyeksi" di dalam grafik: teks itu menumpuk dengan angka
     // titik proyeksi di pojok kanan atas. Area tetap diarsir.

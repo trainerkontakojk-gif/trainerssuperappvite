@@ -53,7 +53,18 @@ const insights: DashboardInsights = {
     { name: FOCUS, latestCount: 12, change: 6 },
   ],
 };
-function mocks(value: DashboardInsights | null): ApiMock[] {
+const TWO_PERIOD_TREND = {
+  labels: ["Sep 26", "Okt 26"],
+  datasets: [
+    { label: "Total Temuan", data: [20, 26], isTotal: true },
+    { label: "Verifikasi data", data: [43, 40], isTotal: false },
+    { label: FOCUS, data: [6, 12], isTotal: false },
+  ],
+};
+function mocks(
+  value: DashboardInsights | null,
+  paramTrend: typeof TWO_PERIOD_TREND = TWO_PERIOD_TREND,
+): ApiMock[] {
   return [
     {
       ...ACCESS_MOCK,
@@ -87,14 +98,7 @@ function mocks(value: DashboardInsights | null): ApiMock[] {
               category: "critical",
             },
           ],
-          paramTrend: {
-            labels: ["Sep 26", "Okt 26"],
-            datasets: [
-              { label: "Total Temuan", data: [20, 26], isTotal: true },
-              { label: "Verifikasi data", data: [43, 40], isTotal: false },
-              { label: FOCUS, data: [6, 12], isTotal: false },
-            ],
-          },
+          paramTrend,
         }),
       },
     },
@@ -179,13 +183,9 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await expect(
     parameters.getByText("−3 vs Sep 26", { exact: true }),
   ).toBeVisible();
-  await parameters
-    .locator("summary")
-    .filter({ hasText: "Lihat 2 agen" })
-    .click();
-  await expect(
-    parameters.getByRole("link", { name: /Ayu Larasati/ }),
-  ).toHaveAttribute("href", "/sidak/agents/agent-a");
+  // The agent list already lives in Kesimpulan; the ranking does not repeat it.
+  await expect(parameters.getByRole("link", { name: /Ayu Larasati/ })).toHaveCount(0);
+  await expect(parameters).not.toContainText("Lihat 2 agen");
   const trend = page.getByRole("region", { name: "Tren temuan", exact: true });
   await expect(
     trend.getByRole("button", { name: FOCUS, exact: true }),
@@ -212,6 +212,17 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await expect(
     trend.getByRole("button", { name: "Total Temuan", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
+  // Wide layout: "Apa yang terjadi" and "Artinya" stack in one column beside
+  // "Lakukan ini", so the short parts do not leave tall empty columns.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const box = async (name: string) =>
+    (await brief.getByRole("heading", { name, exact: true }).boundingBox())!;
+  const [what, soWhat, nowWhat] = await Promise.all(
+    ["Apa yang terjadi", "Artinya", "Lakukan ini"].map(box),
+  );
+  expect(Math.abs(what.x - soWhat.x)).toBeLessThan(2);
+  expect(soWhat.y).toBeGreaterThan(what.y);
+  expect(nowWhat.x).toBeGreaterThan(what.x + 200);
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     for (const theme of ["light", "dark"] as const) {
@@ -278,7 +289,7 @@ test("leader has no TNA action; ranking fallback carries the same context; null 
   }
 });
 
-test("more than three coaching agents fold the rest behind a keyboard disclosure", async ({
+test("more than three coaching agents fold the rest behind a toggle that collapses again", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -304,13 +315,50 @@ test("more than three coaching agents fold the rest behind a keyboard disclosure
   const list = brief.getByRole("list", { name: "Agen prioritas coaching" });
   await expect(list.getByRole("link")).toHaveCount(3);
   await expect(brief.getByRole("link", { name: /Dewi/ })).toBeHidden();
-  const summary = brief.locator("summary");
-  await expect(summary).toHaveText("Lihat 2 agen lainnya");
-  await summary.focus();
+  const toggle = brief.getByRole("button", { name: "Lihat 2 agen lainnya" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.focus();
   await page.keyboard.press("Space");
   await expect(brief.getByRole("link", { name: /Eko/ })).toHaveAttribute(
     "href",
     "/sidak/agents/agent-4",
   );
+  await expect(list.getByRole("link")).toHaveCount(5);
+  // Expanded: the "lainnya" wording is gone and the toggle offers to collapse.
+  await expect(brief).not.toContainText("agen lainnya");
+  const collapse = brief.getByRole("button", { name: "Tampilkan lebih sedikit" });
+  await expect(collapse).toHaveAttribute("aria-expanded", "true");
+  await collapse.click();
+  await expect(list.getByRole("link")).toHaveCount(3);
+  await expect(
+    brief.getByRole("button", { name: "Lihat 2 agen lainnya" }),
+  ).toBeFocused();
+  expectHermetic(audit);
+});
+
+test("trend chart labels only the latest, highest and lowest actual points", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const audit = await openHermeticShell(page, {
+    path: `/sidak/dashboard?layanan=call&tahun=${YEAR}&tim=ALL`,
+    apiMocks: mocks(insights, {
+      labels: ["Mei 26", "Jun 26", "Jul 26", "Agt 26", "Sep 26", "Okt 26"],
+      datasets: [
+        { label: "Total Temuan", data: [10, 30, 20, 5, 15, 25], isTotal: true },
+        { label: "Verifikasi data", data: [1, 2, 3, 4, 5, 6], isTotal: false },
+        { label: FOCUS, data: [6, 7, 8, 9, 10, 12], isTotal: false },
+      ],
+    }),
+  });
+  await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
+  const trend = page.getByRole("region", { name: "Tren temuan", exact: true });
+  await expect
+    .poll(() =>
+      trend
+        .locator('[data-chart-label="actual"]')
+        .evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim())),
+    )
+    .toEqual(["30", "5", "25"]);
   expectHermetic(audit);
 });

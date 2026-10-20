@@ -1,5 +1,4 @@
 import type { DashboardInsights } from "@trainers/types";
-import FocusAgentsDisclosure from "./FocusAgentsDisclosure";
 import type { ParetoViewModel } from "./pareto-view-model";
 import SidakDashboardPanel from "./SidakDashboardPanel";
 
@@ -101,10 +100,9 @@ export default function SidakParameterRanking({
                         <summary className="mt-2 min-h-[44px] cursor-pointer rounded-md py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           Saran coaching
                         </summary>
-                        <p className="mt-3 text-sm leading-relaxed text-fg2">
+                        <p className="mt-1 text-sm leading-relaxed text-fg2">
                           {focus.recommendation}
                         </p>
-                        <FocusAgentsDisclosure agents={focus.agents} />
                       </details>
                     </>
                   ) : (

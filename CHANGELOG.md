@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(sidak): tighten the dashboard summary (stacked left column, collapsible agent toggle), drop the duplicate agent list from Parameter teratas, and label only the latest, highest and lowest trend points
+
 - docs(audit): archive Supabase egress findings with evidence limits and redacted identities
 
 - feat(sidak): rework the dashboard What / So what / Now what summary with short headlines, worded tone labels, the coaching recommendation and top agents inline, and share the findings sentence with the Beranda trend card

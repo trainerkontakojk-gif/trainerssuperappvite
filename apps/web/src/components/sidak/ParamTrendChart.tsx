@@ -46,15 +46,42 @@ interface PointLabelProps {
 }
 
 /**
- * Angka di atas tiap titik. Titik proyeksi hanya diberi label di bulan
- * mendatang; bulan terakhir data sudah berlabel angka aktualnya.
+ * Indeks titik aktual yang diberi angka: bulan terakhir, tertinggi dan
+ * terendah. Angka di setiap titik membuat grafik sesak; nilai lain ada di tooltip.
  */
-function pointLabel(kind: "actual" | "forecast", rows: ChartRow[]) {
+function keyPointIndexes(rows: ChartRow[], dataKey: string) {
+  const points = rows.flatMap((row, index) =>
+    row.isForecast !== 1 && typeof row[dataKey] === "number"
+      ? [{ index, value: row[dataKey] as number }]
+      : [],
+  );
+  if (points.length === 0) return new Set<number>();
+  const pick = (better: (a: number, b: number) => boolean) =>
+    points.reduce((best, point) => (better(point.value, best.value) ? point : best))
+      .index;
+  return new Set([
+    points[points.length - 1].index,
+    pick((a, b) => a > b),
+    pick((a, b) => a < b),
+  ]);
+}
+
+/**
+ * Angka di atas titik. Aktual: hanya titik kunci (lihat keyPointIndexes).
+ * Proyeksi: hanya bulan mendatang; bulan terakhir sudah berlabel aktualnya.
+ */
+function pointLabel(
+  kind: "actual" | "forecast",
+  rows: ChartRow[],
+  dataKey: string,
+) {
+  const labelled = kind === "actual" ? keyPointIndexes(rows, dataKey) : null;
   return function PointLabel({ x, y, value, index }: PointLabelProps) {
     if (typeof value !== "number" || x === undefined || y === undefined) {
       return null;
     }
     if (kind === "forecast" && rows[index ?? -1]?.isForecast !== 1) return null;
+    if (labelled && !labelled.has(index ?? -1)) return null;
     return (
       <text
         data-chart-label={kind}
@@ -316,7 +343,7 @@ export default function ParamTrendChart({
                     {isFiltered || isForecastingThis ? (
                       <LabelList
                         dataKey={`actual_dataset_${i}`}
-                        content={pointLabel("actual", chartData)}
+                        content={pointLabel("actual", chartData, `actual_dataset_${i}`)}
                       />
                     ) : null}
                   </Area>
@@ -336,7 +363,7 @@ export default function ParamTrendChart({
                     >
                       <LabelList
                         dataKey={`forecast_dataset_${i}`}
-                        content={pointLabel("forecast", chartData)}
+                        content={pointLabel("forecast", chartData, `forecast_dataset_${i}`)}
                       />
                     </Area>
                   )}
@@ -370,7 +397,7 @@ export default function ParamTrendChart({
                 >
                   <LabelList
                     dataKey={`actual_dataset_${i}`}
-                    content={pointLabel("actual", chartData)}
+                    content={pointLabel("actual", chartData, `actual_dataset_${i}`)}
                   />
                 </Area>
                 {isForecastingTotal && (
@@ -389,7 +416,7 @@ export default function ParamTrendChart({
                   >
                     <LabelList
                       dataKey={`forecast_dataset_${i}`}
-                      content={pointLabel("forecast", chartData)}
+                      content={pointLabel("forecast", chartData, `forecast_dataset_${i}`)}
                     />
                   </Area>
                 )}

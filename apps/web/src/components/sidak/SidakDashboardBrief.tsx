@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -7,7 +7,11 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import type { DashboardInsights, DashboardInsightTone } from "@trainers/types";
+import type {
+  DashboardInsightAgent,
+  DashboardInsights,
+  DashboardInsightTone,
+} from "@trainers/types";
 import { useAuthStore } from "../../store/authStore";
 import { isCapabilityAllowed } from "../../lib/app-config";
 import { sidakRankingUrl } from "../../lib/sidak-ranking-url";
@@ -105,6 +109,38 @@ function Headline({
 
 const detailClass = "mt-1.5 text-sm leading-relaxed text-fg2 text-pretty";
 
+/** Inline list with a real toggle: the label flips, so nothing says "lainnya" once everything is shown. */
+function CoachingAgents({ agents }: { agents: DashboardInsightAgent[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  if (agents.length === 0) return null;
+  const hidden = agents.length - VISIBLE_AGENTS;
+  return (
+    <>
+      <FocusAgentList
+        id="sidak-brief-agents"
+        agents={expanded ? agents : agents.slice(0, VISIBLE_AGENTS)}
+        className="mt-3 -mx-2"
+      />
+      {hidden > 0 && (
+        <button
+          ref={toggleRef}
+          type="button"
+          aria-expanded={expanded}
+          aria-controls="sidak-brief-agents"
+          onClick={() => {
+            setExpanded((value) => !value);
+            toggleRef.current?.focus();
+          }}
+          className="-mx-2 flex min-h-[44px] w-fit cursor-pointer items-center rounded-md px-2 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? "Tampilkan lebih sedikit" : `Lihat ${hidden} agen lainnya`}
+        </button>
+      )}
+    </>
+  );
+}
+
 export default function SidakDashboardBrief({
   insights,
   serviceType,
@@ -121,8 +157,6 @@ export default function SidakDashboardBrief({
     nowWhat.action === "coach_focus_agents"
       ? (focusParameter?.agents ?? [])
       : [];
-  const visible = agents.slice(0, VISIBLE_AGENTS);
-  const rest = agents.slice(VISIBLE_AGENTS);
   const canOpenTna =
     nowWhat.action === "coach_focus_agents" &&
     isCapabilityAllowed(role, "tna.read");
@@ -145,7 +179,9 @@ export default function SidakDashboardBrief({
           </p>
         )}
       </div>
-      <div className="grid min-w-0 divide-y divide-border @[880px]/dashboard:grid-cols-[1fr_1fr_1.15fr] @[880px]/dashboard:divide-x @[880px]/dashboard:divide-y-0">
+      {/* Wide: the two short parts stack beside "Lakukan ini", so its agent list does not stretch empty columns. */}
+      <div className="grid min-w-0 divide-y divide-border @[880px]/dashboard:grid-cols-[1fr_1.2fr] @[880px]/dashboard:divide-x @[880px]/dashboard:divide-y-0">
+        <div className="min-w-0 divide-y divide-border">
         <Step index={1} title="Apa yang terjadi">
           <Headline
             text={what.headline}
@@ -176,6 +212,7 @@ export default function SidakDashboardBrief({
           />
           <p className={detailClass}>{soWhat.text}</p>
         </Step>
+        </div>
         <Step
           index={3}
           title="Lakukan ini"
@@ -183,21 +220,7 @@ export default function SidakDashboardBrief({
         >
           <Headline text={nowWhat.headline} tone="neutral" />
           <p className={detailClass}>{nowWhat.text}</p>
-          {visible.length > 0 && (
-            <FocusAgentList agents={visible} className="mt-3 -mx-2" />
-          )}
-          {rest.length > 0 && (
-            <details className="mt-1 min-w-0">
-              <summary className="flex min-h-[44px] w-fit cursor-pointer items-center rounded-md px-2 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                Lihat {rest.length} agen lainnya
-              </summary>
-              <FocusAgentList
-                agents={rest}
-                label="Agen prioritas lainnya"
-                className="-mx-2"
-              />
-            </details>
-          )}
+          <CoachingAgents agents={agents} />
           {(canOpenTna || nowWhat.action === "open_ranking") && (
             <div className="mt-auto flex flex-wrap gap-2 pt-4">
               {canOpenTna && (
