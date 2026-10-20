@@ -38,7 +38,7 @@ Phase 2 (report, no schema change):
   per period, worst five sessions, `isCountableFinding`). Not `qa_dashboard_agent_period_summary`:
   that cache holds final_score 0 from the SQL refresh and imports never refresh it (fix
   2026-10-19: a PDKT average of 35 and KETIK agents shown without data). Excluded staff (QA,
-  TL, trainer) are never comparison peers.
+  TL, trainer) are never part of the service average.
 - One row per participation (session × peserta), measured on the session's `service_type`.
   Training months = start month..end month (offset 0, excluded). Before = the `window` months
   before the start month (offset −1..−W); after = the `window` months after the end month
@@ -48,9 +48,13 @@ Phase 2 (report, no schema change):
 - Status: `menunggu` (no after month has closed), `tanpa_data` (a side has no data), else
   Δ = after − before → `naik` (≥ +1), `turun` (≤ −1), `stabil`. `thin` when a side has one month
   or fewer than 5 audit sessions. Evaluated = naik/stabil/turun.
-- Comparison: per month, mean `final_score` and Σfindings/Σsessions of agents in the same service
-  who never joined a session of that program. Δ relatif = Δ − (comparison after − before, over the
-  participant's own months with data).
+- Comparison: the same calendar month's service average, including participants and agents
+  excluded from the analysis: equal-weight mean monthly `finalScore` and pooled
+  Σfindings/Σsessions. Analysis exclusions never change this average; excluded staff stay out.
+  Δ relatif = Δ peserta − Δ rata-rata layanan, over the participant's own months with data.
+  This is indicative, not a control group, because participants are included.
+  Decision 2026-10-20: replace non-participant peers because that group becomes empty once
+  most of the service has trained, causing the dashed baseline to disappear.
 - Program card: participants, evaluated, pending, mean Δ, mean Δ relatif, naik/stabil/turun,
   findings per session before → after (evaluated only). Session row: participants, evaluated,
   mean Δ, status `terukur` (all W after months closed), `sebagian` (some), `menunggu` (none).

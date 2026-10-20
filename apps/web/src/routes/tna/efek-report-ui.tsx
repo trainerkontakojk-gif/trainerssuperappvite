@@ -168,7 +168,7 @@ export function ProgramStats({ program: p }: { program: EfekProgramSummary }) {
         <dd className="text-right font-semibold text-foreground">
           {p.evaluated} dari {p.participants}
         </dd>
-        <dt>Δ relatif agent lain</dt>
+        <dt>Δ relatif rata-rata layanan</dt>
         <dd className="text-right font-semibold text-foreground">
           {fmtDelta(p.avg_relative_delta)}
         </dd>
@@ -184,7 +184,7 @@ export function ProgramStats({ program: p }: { program: EfekProgramSummary }) {
 
 /**
  * Two series by month relative to training: participants (solid) against
- * agents of the same service who did not join (dashed). Plain SVG keeps the
+ * service average including participants (dashed). Plain SVG keeps the
  * route light and prints the same way in the phase 3 export; the values are
  * also listed in a table for screen readers.
  */
@@ -278,25 +278,27 @@ export function RelativeChart({
           />
         ))}
       </svg>
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th>Bulan</th>
-            <th>{participantsLabel}</th>
-            <th>{comparisonLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((p) => (
-            <tr key={p.offset}>
-              <td>{offsetText(p.offset)}</td>
-              <td>{fmt(pick(p)[0])}</td>
-              <td>{fmt(pick(p)[1])}</td>
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th>Bulan</th>
+              <th>{participantsLabel}</th>
+              <th>{comparisonLabel}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.offset}>
+                <td>{offsetText(p.offset)}</td>
+                <td>{fmt(pick(p)[0])}</td>
+                <td>{fmt(pick(p)[1])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

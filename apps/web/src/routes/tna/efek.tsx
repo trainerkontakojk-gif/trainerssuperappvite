@@ -35,7 +35,7 @@ export default function EfekIndex() {
   return (
     <Surface
       title="EFEK · Evaluasi Efektivitas dan Kinerja"
-      description="Perubahan skor QA dan temuan SIDAK agent sebelum dan sesudah pelatihan, dibandingkan dengan agent lain di layanan yang sama."
+      description="Perubahan skor QA dan temuan SIDAK agent sebelum dan sesudah pelatihan, dibandingkan dengan rata-rata layanan yang sama pada bulan yang sama."
     >
       <TnaTabs current="efek" />
       <div className="flex flex-wrap justify-end gap-2">

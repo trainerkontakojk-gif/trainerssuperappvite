@@ -181,7 +181,7 @@ export default function EfekProgramPage() {
                     points={data.chart}
                     pick={(p) => [p.score, p.comparison_score]}
                     participantsLabel={`Peserta ${data.program.name}`}
-                    comparisonLabel={`Agent ${service} lain`}
+                    comparisonLabel={`Rata-rata layanan ${service}`}
                   />
                   <RelativeChart
                     title="Temuan per sesi audit, dihitung dari bulan pelatihan"
@@ -191,13 +191,18 @@ export default function EfekProgramPage() {
                       p.comparison_findings_per_session,
                     ]}
                     participantsLabel={`Peserta ${data.program.name}`}
-                    comparisonLabel={`Agent ${service} lain`}
+                    comparisonLabel={`Rata-rata layanan ${service}`}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Sumbu bawah dihitung dari bulan pelatihan tiap orang (−3 =
                   tiga bulan sebelum, +3 = tiga bulan sesudah), jadi peserta
                   dari sesi berbeda bisa dibaca bersama.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Garis putus-putus = rata-rata semua agent {service} yang
+                  diaudit pada bulan yang sama, termasuk peserta. Bukan kelompok
+                  kontrol; perbedaannya bersifat indikatif.
                 </p>
               </section>
               <ParticipantTable participants={data.participants} />
@@ -390,7 +395,9 @@ function MonthlyBreakdown({
               Temuan per sesi
             </th>
             <th className="px-2 py-1 text-right font-semibold">Skor QA</th>
-            <th className="px-2 py-1 text-right font-semibold">Agent lain</th>
+            <th className="px-2 py-1 text-right font-semibold">
+              Rata-rata layanan
+            </th>
           </tr>
         </thead>
         <tbody>

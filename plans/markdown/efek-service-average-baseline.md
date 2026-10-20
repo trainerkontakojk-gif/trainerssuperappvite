@@ -98,14 +98,14 @@ Follow `trainers-superapp-tdd`. Run serially, loopback only (`one-test-run.sh` b
 
 ## Tasklist
 
-- [ ] Load `trainers-superapp-tdd`; Graphify query on `apps/api/src/services/efek/report.ts` to confirm callers (routes `efek.ts`, `tna.ts`, `sidak/dashboard.ts` training quickview) are unaffected beyond values.
-- [ ] RED: API tests 2–4 and updated browser label assertions. Record failing output.
-- [ ] GREEN: backend change, type JSDoc, web copy and caption, export.
-- [ ] Update KETIK expected numbers with arithmetic comments; run the full `tna-efek-report-api.spec.ts` and `tna-efek-api.spec.ts`, then `tna-efek.spec.ts`, serially.
-- [ ] Also run `sidak-agent-efek-training.spec.ts` (shares EFEK services) to confirm no regression.
-- [ ] `thermo-nuclear` review and `impeccable` audit on the changed UI copy/caption.
-- [ ] `pnpm exec turbo run typecheck lint build --concurrency=1`, `GRAPHIFY_MAX_WORKERS=1 graphify update .`, `git diff --check`.
-- [ ] Docs + CHANGELOG; record exact commands, exit codes, and pass counts below.
+- [x] Load `trainers-superapp-tdd`; Graphify query on `apps/api/src/services/efek/report.ts` to confirm callers (routes `efek.ts`, `tna.ts`, `sidak/dashboard.ts` training quickview) are unaffected beyond values.
+- [x] RED: API tests 2–4 and updated browser label assertions. Record failing output.
+- [x] GREEN: backend change, type JSDoc, web copy and caption, export.
+- [x] Update KETIK expected numbers with arithmetic comments; run the full `tna-efek-report-api.spec.ts` and `tna-efek-api.spec.ts`, then `tna-efek.spec.ts`, serially.
+- [x] Also run `sidak-agent-efek-training.spec.ts` (shares EFEK services) to confirm no regression.
+- [x] `thermo-nuclear` review and `impeccable` audit on the changed UI copy/caption.
+- [x] `pnpm exec turbo run typecheck lint build --concurrency=1`, `GRAPHIFY_MAX_WORKERS=1 graphify update .`, `git diff --check`.
+- [x] Docs + CHANGELOG; record exact commands, exit codes, and pass counts below.
 
 ## Non-goals
 
@@ -115,4 +115,52 @@ Follow `trainers-superapp-tdd`. Run serially, loopback only (`one-test-run.sh` b
 
 ## Evidence
 
-_(to be filled by the implementer)_
+Implemented 2026-10-20, Lane D. Direct implementation and in-thread reviews (no delegated/independent reviewer).
+
+### Safety and impact
+
+- Initial dirty path preserved untouched: `docs/supabase-usage-egress-audit-2026-10-19.md` (untracked).
+- `graphify query 'apps/api/src/services/efek/report.ts'` — exit 0. Confirmed report exports/routes/types; direct `rg` confirmed `efek.ts` is mounted by `tna.ts`. SIDAK dashboard quickview uses the separate `efek/training.ts` service, not report calculations.
+- Existing loopback guards in `sidakRealBackend.ts` verified API and database targets; API logs initialized project `127`. Browser preflight confirmed local Vite and loopback proxy with fail-closed request routing. Fixtures use namespace-tagged 2019 rows and fixture-owned scoring snapshots, removed by teardown.
+- No schema/RLS/scoring/window/status changes, production query, migration, deploy, commit, or push. No external API changes/dependency additions; Context7 not needed.
+
+### RED → GREEN
+
+Commands below run from `apps/web`; all use one Playwright worker. Logs are local, under `/tmp/efek-service-average/`.
+
+| Command                                                                                                                                                       | Exit | Evidence                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------ |
+| `pnpm exec playwright test tna-efek-report-api.spec.ts --config playwright.api.config.ts -g 'CERIWIS keeps' --workers=1`                                      | 1    | Expected regression: score and findings baseline both null instead of 90 / 0.33 (`red-api.log`). |
+| `pnpm exec playwright test tna-efek-report-api.spec.ts --config playwright.api.config.ts -g 'PDKT and Telefun\|exclusions adjust' --workers=1`                | 1    | PDKT baseline 100 instead of 90; serial exclusions test not run (`red-api-other.log`).           |
+| `pnpm exec playwright test tna-efek-report-api.spec.ts --config playwright.api.config.ts -g 'exclusions adjust' --workers=1`                                  | 1    | Baseline 85 instead of 82.5 (`red-exclusions.log`).                                              |
+| `pnpm exec playwright test tna-efek.spec.ts -g 'ringkasan EFEK' --workers=1`                                                                                  | 1    | New service-average legend absent (`red-browser.log`).                                           |
+| `pnpm exec playwright test tna-efek-report-api.spec.ts --config playwright.api.config.ts -g 'CERIWIS keeps\|PDKT and Telefun\|exclusions adjust' --workers=1` | 0    | 3 passed (`green-focused-api.log`).                                                              |
+| `pnpm exec playwright test tna-efek.spec.ts -g 'ringkasan EFEK\|CERIWIS labels\|unduh laporan' --workers=1`                                                   | 0    | 3 passed (`green-focused-browser.log`).                                                          |
+| `pnpm exec playwright test tna-efek-report-api.spec.ts tna-efek-api.spec.ts --config playwright.api.config.ts --workers=1`                                    | 0    | Final 14 passed: 9 report + 5 session API tests (`green-api-final.log`).                         |
+| `pnpm exec playwright test tna-efek.spec.ts --workers=1`                                                                                                      | 0    | 12 passed (`green-browser-full.log`).                                                            |
+| `pnpm exec playwright test sidak-agent-efek-training.spec.ts --workers=1`                                                                                     | 0    | 2 passed (`green-sidak.log`).                                                                    |
+| `pnpm exec playwright test tna-efek.spec.ts sidak-agent-efek-training.spec.ts --workers=1`                                                                    | 0    | Final 14 passed, retaining screenshot artifacts (`green-browser-final.log`).                     |
+
+Intermediate verification failures were resolved in scope:
+
+- Browser legend query initially counted both visible legends and screen-reader table headings (4, not 2); now scoped to legend spans.
+- New 2019 sessions also appear in team-summary/quickview fixtures; retained exact KETIK expectations scoped by program and asserted quickview total attendance.
+- Full browser run exposed 2px horizontal overflow from the wider hidden chart-table header at 390px. Diagnostic DOM bounds located the overflow; moved `sr-only` from the table onto a clipping wrapper, retaining semantic screen-reader table content. Both existing mobile overflow checks now pass. Temporary diagnostic code removed.
+
+### Reviews and artifacts
+
+- `thermo-nuclear` self-review: **PASS**. Complete diff reviewed; average comes only from existing filtered `byMonth`, cache key is service/month, analysis filters cannot affect it, and public fields/status/windows/RLS are unchanged. Existing unequal chat audit counts prove equal-agent score weighting vs pooled findings. No material unresolved findings.
+- `impeccable` scoped audit: **PASS** for changed copy/caption and chart wrapper. Existing tokens retained, no new interaction or animation; accessible tables retain the updated labels. Measured E2E checks show no horizontal document scroll at 390px and existing 44px exclusion controls remain intact. Locator screenshots inspected at 390px dark and 1280px light: captions/legends wrap without clipping. This is not a whole-app WCAG or physical-device certification.
+- `/Users/nadindyta/.pi/agent/skills/impeccable/scripts/impeccable context --target apps/web/src/routes/tna/efek-program.tsx` — exit 0.
+- `/Users/nadindyta/.pi/agent/skills/impeccable/scripts/impeccable detect --json apps/web/src/routes/tna/efek-program.tsx apps/web/src/routes/tna/efek-report-ui.tsx apps/web/src/routes/tna/efek.tsx apps/web/src/routes/tna/efek-export.ts` — exit 0, `[]` findings.
+- Screenshots (ignored, generated with hermetic sample data):
+  - `apps/web/test-results/tna-efek-pengecualian-agen-cfa75-hkan-dan-ikut-ekspor-390px--chromium/service-average-charts-390.png`
+  - `apps/web/test-results/tna-efek-pengecualian-agen-56ce8-kan-dan-ikut-ekspor-1280px--chromium/service-average-charts-1280.png`
+
+### Final quality gates (repository root)
+
+- `pnpm exec turbo run typecheck lint build --concurrency=1` — exit 0, 11/11 successful tasks, 0 cached (`turbo.log`). Lint emitted warnings in unchanged files; no errors. Browser runs also show the existing Vite native-loader warning for `__dirname`.
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` — exit 0; 17,494 nodes / 33,730 edges. HTML visualization skipped due to graph size; graph JSON/report updated in ignored local cache (`graphify.log`).
+- `grep -rn -i 'agent lain\|CSO lain\|tidak ikut' apps/web/src/routes/tna/efek*` — exit 1, no matches.
+- `git diff --check` — exit 0.
+- No unit tests added or run; no task-owned dev/test processes remain.

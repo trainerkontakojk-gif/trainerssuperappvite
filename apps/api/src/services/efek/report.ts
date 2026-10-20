@@ -34,8 +34,8 @@ import { listEfekPrograms } from "./sessions";
 
 /**
  * EFEK phase 2 (plans/markdown/efek.md): compares each participant's SIDAK
- * monthly score before and after training with agents of the same service
- * who never joined that program. Temuan reads use the caller JWT (RLS
+ * monthly score before and after training with the same calendar month's service
+ * average, including participants. Temuan reads use the caller JWT (RLS
  * admin/trainer); scoring rules come from the shared SIDAK loaders.
  */
 
@@ -98,7 +98,8 @@ interface MonthStat {
   sessions: number;
   findings: number;
 }
-interface Comparison {
+/** Monthly service average, including participants and analysis exclusions. */
+interface ServiceAverage {
   score: number | null;
   findingsPerSession: number | null;
 }
@@ -201,7 +202,7 @@ async function loadScores(
         findings: group.filter((r) => isCountableFinding(r)).length,
       };
       byAgent.set(`${service}|${agent}|${index}`, stat);
-      // QA, trainers, leaders and other excluded staff are never peers.
+      // QA, trainers, leaders and other excluded staff never enter the service average.
       const p = group[0]!.profiler_peserta;
       if (isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan)) continue;
       const monthKey = `${service}|${index}`;
@@ -263,12 +264,6 @@ async function build(
   );
   const current = currentEfekMonth();
   const allSessions = await loadSessions(supabase, program);
-  const programPeople = new Map<string, Set<string>>();
-  for (const s of allSessions) {
-    const set = programPeople.get(s.program_code) ?? new Set<string>();
-    s.efek_participants.forEach((p) => set.add(p.peserta_id));
-    programPeople.set(s.program_code, set);
-  }
   const sessions = allSessions
     .filter(
       (s) =>
@@ -293,23 +288,20 @@ async function build(
   const services = [...new Set(sessions.map((s) => s.service_type))];
   const scores = await loadScores(supabase, services, first, last);
 
-  const comparisons = new Map<string, Comparison>();
-  const comparison = (code: string, service: string, index: number) => {
-    const key = `${code}|${service}|${index}`;
-    if (!comparisons.has(key)) {
-      const exclude = programPeople.get(code) ?? new Set();
-      const others = (scores.byMonth.get(`${service}|${index}`) ?? []).filter(
-        (r) => !exclude.has(r.agent),
-      );
-      comparisons.set(key, {
-        score: mean(others.map((r) => r.score)),
+  const averages = new Map<string, ServiceAverage>();
+  const serviceAverage = (service: string, index: number) => {
+    const key = `${service}|${index}`;
+    if (!averages.has(key)) {
+      const rows = scores.byMonth.get(key) ?? [];
+      averages.set(key, {
+        score: mean(rows.map((r) => r.score)),
         findingsPerSession: ratio(
-          others.reduce((n, r) => n + r.findings, 0),
-          others.reduce((n, r) => n + r.sessions, 0),
+          rows.reduce((n, r) => n + r.findings, 0),
+          rows.reduce((n, r) => n + r.sessions, 0),
         ),
       });
     }
-    return comparisons.get(key)!;
+    return averages.get(key)!;
   };
 
   const results: Result[] = [];
@@ -333,15 +325,15 @@ async function build(
           const stat = scores.byAgent.get(
             `${s.service_type}|${person.peserta_id}|${index}`,
           );
-          const other = comparison(s.program_code, s.service_type, index);
+          const average = serviceAverage(s.service_type, index);
           return {
             ...toMonth(index),
             offset,
             score: stat?.score ?? null,
             sessions: stat?.sessions ?? 0,
             findings: stat?.findings ?? 0,
-            comparison_score: roundOrNull(other.score),
-            comparison_fps: other.findingsPerSession,
+            comparison_score: roundOrNull(average.score),
+            comparison_fps: average.findingsPerSession,
           };
         });
       const side = (before: boolean) => {
@@ -351,11 +343,7 @@ async function build(
         const compared = list
           .map(
             (m) =>
-              comparison(
-                s.program_code,
-                s.service_type,
-                monthIndex(m.year, m.month),
-              ).score,
+              serviceAverage(s.service_type, monthIndex(m.year, m.month)).score,
           )
           .filter((v): v is number => v !== null);
         return {

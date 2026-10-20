@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(efek): compare participants with the monthly service average so the baseline no longer disappears once most agents have trained
+
 - feat(home): add self-scoped agent QA summaries, practice quotas and Telefun history
 
 - docs(plans): plan the EFEK baseline switch from non-participant agents to the monthly service average for KETIK, PDKT, Telefun and CERIWIS, so the dashed line no longer disappears once most agents have trained

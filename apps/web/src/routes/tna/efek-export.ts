@@ -90,7 +90,7 @@ export function buildEfekProgramHtml(
   const stat = (value: string, label: string, cls = "") =>
     `<div class="stat"><b class="${cls}">${esc(value)}</b><span>${esc(label)}</span></div>`;
   const participantsLabel = `Peserta ${p.name}`;
-  const comparisonLabel = `Agent ${service} lain`;
+  const comparisonLabel = `Rata-rata layanan ${service}`;
 
   return `<!doctype html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -113,7 +113,7 @@ ${
 ${stat(fmtDelta(p.avg_delta), "poin QA rata-rata", tone(p.avg_delta))}
 ${stat(`${p.naik} / ${p.stabil} / ${p.turun}`, "naik / stabil / turun")}
 ${stat(`${p.evaluated} dari ${p.participants}`, "bisa dievaluasi")}
-${stat(fmtDelta(p.avg_relative_delta), "Δ relatif agent lain", tone(p.avg_relative_delta))}
+${stat(fmtDelta(p.avg_relative_delta), "Δ relatif rata-rata layanan", tone(p.avg_relative_delta))}
 ${stat(`${fmt(p.findings_per_session_before)} → ${fmt(p.findings_per_session_after)}`, "temuan per sesi audit")}
 </div>
 <h2>Cara hitung</h2>
@@ -121,9 +121,10 @@ ${stat(`${fmt(p.findings_per_session_before)} → ${fmt(p.findings_per_session_a
 <li>Sebelum: rata-rata skor QA bulanan SIDAK pada ${report.window} bulan yang sudah selesai sebelum bulan pelatihan. Sesudah: ${report.window} bulan yang sudah selesai setelahnya.</li>
 <li>Bulan pelatihan dan bulan yang masih berjalan tidak dihitung.</li>
 <li>Naik atau turun bila berubah 1 poin atau lebih. Data tipis bila hanya 1 bulan, atau kurang dari 5 sesi audit, di salah satu sisi.</li>
-<li>Δ relatif = perubahan peserta dikurangi perubahan agent ${esc(service)} lain yang tidak ikut ${esc(p.name)} pada bulan yang sama.</li>
+<li>Δ relatif = perubahan peserta dikurangi perubahan rata-rata layanan ${esc(service)} pada bulan yang sama. Rata-rata layanan mencakup semua agent yang diaudit, termasuk peserta, jadi bersifat indikatif.</li>
 </ul>
 <h2>Grafik relatif bulan pelatihan</h2>
+<p>Garis putus-putus = rata-rata semua agent ${esc(service)} yang diaudit pada bulan yang sama, termasuk peserta.</p>
 <div class="charts">
 ${chartSvg("Skor QA rata-rata", report.chart, (c) => [c.score, c.comparison_score], participantsLabel, comparisonLabel)}
 ${chartSvg("Temuan per sesi audit", report.chart, (c) => [c.findings_per_session, c.comparison_findings_per_session], participantsLabel, comparisonLabel)}
@@ -152,7 +153,7 @@ ${report.participants
     (
       r,
     ) => `<section class="month"><h3>Rincian bulanan ${esc(r.nama)} · ${esc(r.session_title)}</h3>
-<table><thead><tr><th>Bulan</th><th>Posisi</th><th class="n">Sesi audit</th><th class="n">Temuan</th><th class="n">Temuan per sesi</th><th class="n">Skor QA</th><th class="n">Agent lain</th></tr></thead><tbody>
+<table><thead><tr><th>Bulan</th><th>Posisi</th><th class="n">Sesi audit</th><th class="n">Temuan</th><th class="n">Temuan per sesi</th><th class="n">Skor QA</th><th class="n">Rata-rata layanan</th></tr></thead><tbody>
 ${
   r.months.length
     ? r.months

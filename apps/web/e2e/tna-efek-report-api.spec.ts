@@ -111,6 +111,19 @@ const audits: Audit[] = [
 ];
 const indicators = { critical: randomUUID(), nonCritical: randomUUID() };
 const ruleVersion = randomUUID();
+const serviceFixtures = (
+  [
+    ["ceriwis", "cso"],
+    ["pdkt", "email"],
+    ["telefun", "call"],
+  ] as const
+).map(([program, service]) => ({
+  program,
+  service,
+  version: randomUUID(),
+  critical: randomUUID(),
+  nonCritical: randomUUID(),
+}));
 
 /** Months shifted from the current Asia/Jakarta month. */
 function jakartaMonth(shift: number) {
@@ -177,6 +190,43 @@ test.beforeAll(async () => {
   );
   app = (await import("../../api/src/app")).default as unknown as Hono;
 
+  for (const f of serviceFixtures) {
+    sql(`INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES
+      ('${f.critical}','${f.service}','Efek critical ${tag}','critical',1),
+      ('${f.nonCritical}','${f.service}','Efek non critical ${tag}','non_critical',1);
+      INSERT INTO qa_service_rule_versions(id,service_type,effective_period_id,status,critical_weight,non_critical_weight,scoring_mode,version_number,created_by)
+      VALUES ('${f.version}','${f.service}',(SELECT id FROM qa_periods WHERE year=2019 AND month=1),'published',0.5,0.5,'weighted',1,'${trainer.userId}');
+      INSERT INTO qa_service_rule_indicators(id,rule_version_id,legacy_indicator_id,service_type,name,category,bobot,sort_order) VALUES
+      ('${randomUUID()}','${f.version}','${f.critical}','${f.service}','Efek critical ${tag}','critical',1,0),
+      ('${randomUUID()}','${f.version}','${f.nonCritical}','${f.service}','Efek non critical ${tag}','non_critical',1,1);`);
+    const months = f.service === "cso" ? [4, 5, 6, 7, 8] : [4, 6];
+    const values = months.flatMap((m) =>
+      ["sari", "dimas"].flatMap((who) => {
+        const sariBad = m <= 5 ? 2 : m === 6 && f.service === "cso" ? 1 : 0;
+        const bad = who === "sari" ? sariBad : 2 - sariBad;
+        return Array.from(
+          { length: 3 },
+          (_, i) =>
+            `('${people[who as "sari" | "dimas"].id}',(SELECT id FROM qa_periods WHERE year=2019 AND month=${m}),'${i < bad ? f.nonCritical : f.critical}','${f.service}','T-${tag}-${f.service}-${who}-${m}-${i}',${i < bad ? 0 : 3},${i < bad ? "'Salah sapa'" : "NULL"})`,
+        );
+      }),
+    );
+    sql(
+      `INSERT INTO qa_temuan(peserta_id,period_id,indicator_id,service_type,no_tiket,nilai,ketidaksesuaian) VALUES ${values.join(",")};`,
+    );
+    await createSession({
+      program_code: f.program,
+      title: `Service average ${f.program} ${tag}`,
+      service_type: f.service,
+      start_date: "2019-05-13",
+      end_date: "2019-05-17",
+      peserta_ids:
+        f.service === "cso"
+          ? [people.sari.id, people.dimas.id]
+          : [people.sari.id],
+    });
+  }
+
   mei = await createSession({
     program_code: "ketik",
     title: `Level Up Week Mei 2019 ${tag}`,
@@ -220,6 +270,12 @@ test.afterAll(async () => {
   const pesertaIds = Object.values(people)
     .map((p) => p.id)
     .join("','");
+  for (const f of serviceFixtures) {
+    sql(`DELETE FROM qa_temuan WHERE peserta_id IN ('${pesertaIds}') AND service_type='${f.service}';
+      DELETE FROM qa_service_rule_indicators WHERE rule_version_id='${f.version}';
+      DELETE FROM qa_service_rule_versions WHERE id='${f.version}';
+      DELETE FROM qa_indicators WHERE id IN ('${f.critical}','${f.nonCritical}');`);
+  }
   sql(
     `BEGIN; DELETE FROM efek_sessions WHERE created_by IN ('${ids.join("','")}'); DELETE FROM qa_temuan WHERE peserta_id IN ('${pesertaIds}'); DELETE FROM qa_dashboard_agent_period_summary WHERE agent_id IN ('${pesertaIds}'); DELETE FROM qa_service_rule_indicators WHERE rule_version_id='${ruleVersion}'; DELETE FROM qa_service_rule_versions WHERE id='${ruleVersion}'; DELETE FROM qa_indicators WHERE id IN ('${indicators.critical}','${indicators.nonCritical}'); DELETE FROM profiler_peserta WHERE batch_name='efek-r-${tag}'; DELETE FROM profiler_folders WHERE id='${folder}'; DELETE FROM activity_logs WHERE user_id IN ('${ids.join("','")}'); DELETE FROM qa_periods p WHERE p.id IN ('${periods.join("','")}') AND NOT EXISTS (SELECT 1 FROM qa_dashboard_agent_period_summary s WHERE s.period_id=p.id) AND NOT EXISTS (SELECT 1 FROM qa_temuan t WHERE t.period_id=p.id); COMMIT;`,
   );
@@ -249,15 +305,16 @@ test("summary compares the closed months before and after training per program a
     stabil: 1,
     turun: 0,
     avg_delta: 5,
-    avg_relative_delta: 0,
+    // (Sari 4.1667 + Dimas -7.5) / 2 = -1.6667.
+    avg_relative_delta: -1.67,
     findings_per_session_before: 0.64,
     findings_per_session_after: 0.36,
   });
   const ceriwis = result.data.programs.find((p) => p.code === "ceriwis")!;
   expect(ceriwis).toMatchObject({
     service_type: "cso",
-    participants: 0,
-    avg_delta: null,
+    participants: 2,
+    avg_delta: 0,
   });
 
   const meiRow = result.data.sessions.find((s) => s.id === mei)!;
@@ -287,7 +344,11 @@ test("summary compares the closed months before and after training per program a
     naik: 1,
     avg_delta: 10,
   });
-  expect(team.data.sessions.map((s) => s.id)).toEqual([mei]);
+  expect(
+    team.data.sessions
+      .filter((s) => s.program_code === "ketik")
+      .map((s) => s.id),
+  ).toEqual([mei]);
 });
 
 test("program detail lists every participant with status, comparison, and monthly breakdown", async () => {
@@ -312,8 +373,11 @@ test("program detail lists every participant with status, comparison, and monthl
     findings_per_session_before: 0.67,
     findings_per_session_after: 0.33,
     delta: 10,
-    comparison_delta: 5,
-    relative_delta: 5,
+    // Before: ((80+80+90)/3 + (90+80+90)/3 + (70+90+80+90)/4)/3 = 84.1667.
+    // After: ((90+90+90+90)/4 + (100+90+90)/3 + (80+90+90)/3)/3 = 90.
+    comparison_delta: 5.83,
+    // Participant 10 - service 5.8333 = 4.1667.
+    relative_delta: 4.17,
     status: "naik",
     thin: false,
   });
@@ -329,7 +393,8 @@ test("program detail lists every participant with status, comparison, and monthl
   expect(sari.months[0]).toMatchObject({
     sessions: 3,
     findings: 2,
-    comparison_score: 85,
+    // (Sari 80 + Putri 80 + Budi 90) / 3 = 83.3333.
+    comparison_score: 83.33,
   });
 
   expect(byKey("dimas", mei)).toMatchObject({
@@ -338,8 +403,10 @@ test("program detail lists every participant with status, comparison, and monthl
     score_before: 90,
     score_after: 90,
     delta: 0,
-    comparison_delta: 5,
-    relative_delta: -5,
+    // June (90+90+90+90)/4 - April (70+90+80+90)/4 = 7.5.
+    comparison_delta: 7.5,
+    // Participant 0 - service 7.5 = -7.5.
+    relative_delta: -7.5,
     status: "stabil",
     thin: true,
   });
@@ -348,7 +415,7 @@ test("program detail lists every participant with status, comparison, and monthl
     delta: null,
   });
   expect(byKey("dimas", november)).toMatchObject({ status: "tanpa_data" });
-  // Putri and Budi never joined KETIK, so they form the comparison group only.
+  // Putri and Budi never joined KETIK, so they only appear in the service average.
   expect(
     result.data.participants.some((p) => p.peserta_id === people.putri.id),
   ).toBe(false);
@@ -359,13 +426,16 @@ test("program detail lists every participant with status, comparison, and monthl
   expect(result.data.chart.find((c) => c.offset === -1)).toEqual({
     offset: -1,
     score: 80,
-    comparison_score: 85,
+    // April: (70+90+80+90)/4 = 82.5; pooled findings (3+1+2+1)/(3+2+4+4).
+    comparison_score: 82.5,
     findings_per_session: 0.8,
-    comparison_findings_per_session: 0.38,
+    comparison_findings_per_session: 0.54,
   });
   expect(result.data.chart.find((c) => c.offset === 3)).toMatchObject({
     score: 80,
-    comparison_score: 90,
+    // August: (80+90+90)/3 = 86.6667; pooled findings (2+1+1)/(3+4+4).
+    comparison_score: 86.67,
+    comparison_findings_per_session: 0.36,
   });
 
   const one = await call<EfekProgramReport>(
@@ -375,7 +445,44 @@ test("program detail lists every participant with status, comparison, and monthl
   expect(one.data.program.participants).toBe(1);
 });
 
-test("exclusions adjust aggregates without deleting attendance or changing the comparison group", async () => {
+test("CERIWIS keeps the service average when every audited agent participated", async () => {
+  const result = await call<EfekProgramReport>("/report/ceriwis?year=2019");
+  expect(result.status).toBe(200);
+  for (const offset of [0, 1, 2, 3]) {
+    // Both participants: (80 + 100) / 2 or (90 + 90) / 2; pooled findings 2 / 6.
+    expect(result.data.chart.find((p) => p.offset === offset)).toMatchObject({
+      score: 90,
+      comparison_score: 90,
+      findings_per_session: 0.33,
+      comparison_findings_per_session: 0.33,
+    });
+  }
+  expect(result.data.participants.every((p) => p.relative_delta !== null)).toBe(
+    true,
+  );
+});
+
+test("PDKT and Telefun include participants in the monthly service average", async () => {
+  for (const program of ["pdkt", "telefun"]) {
+    const result = await call<EfekProgramReport>(
+      `/report/${program}?year=2019`,
+    );
+    expect(result.status).toBe(200);
+    for (const offset of [-1, 1]) {
+      // Participant and non-participant: (80 + 100) / 2 = 90 in both months.
+      expect(
+        result.data.chart.find((p) => p.offset === offset)?.comparison_score,
+      ).toBe(90);
+    }
+    // Participant improves 100 - 80; service average changes 90 - 90.
+    expect(result.data.participants[0]).toMatchObject({
+      comparison_delta: 0,
+      relative_delta: 20,
+    });
+  }
+});
+
+test("exclusions adjust aggregates without deleting attendance or changing the service average", async () => {
   const reason = "Data audit perlu ditinjau";
   const query = new URLSearchParams({
     year: "2019",
@@ -393,7 +500,8 @@ test("exclusions adjust aggregates without deleting attendance or changing the c
     participants: 2,
     evaluated: 1,
     avg_delta: 10,
-    avg_relative_delta: 5,
+    // Only Sari remains: 10 - (90 - 84.1667) = 4.1667.
+    avg_relative_delta: 4.17,
     findings_per_session_before: 0.67,
     findings_per_session_after: 0.33,
   });
@@ -404,9 +512,14 @@ test("exclusions adjust aggregates without deleting attendance or changing the c
   expect(dimas).toHaveLength(2);
   expect(dimas.every((p) => p.exclusion_reason === reason)).toBe(true);
   expect(dimas.find((p) => p.session_id === mei)?.delta).toBe(0);
+  const unfiltered = await call<EfekProgramReport>("/report/ketik?year=2019");
+  expect(result.data.chart.find((c) => c.offset === -1)?.comparison_score).toBe(
+    unfiltered.data.chart.find((c) => c.offset === -1)?.comparison_score,
+  );
   expect(result.data.chart.find((c) => c.offset === -1)).toMatchObject({
     score: 70,
-    comparison_score: 85,
+    // (Sari 70 + Dimas 90 + Putri 80 + Budi 90) / 4 = 82.5, even with Dimas excluded.
+    comparison_score: 82.5,
     findings_per_session: 1,
   });
   expect(result.data.sessions.find((s) => s.id === mei)).toMatchObject({
@@ -415,9 +528,11 @@ test("exclusions adjust aggregates without deleting attendance or changing the c
     avg_delta: 10,
   });
   const summary = await call<EfekReport>(`/report?${query}`);
-  expect(summary.data.programs.find((p) => p.code === "ketik")?.avg_delta).toBe(
-    10,
-  );
+  expect(summary.data.programs.find((p) => p.code === "ketik")).toMatchObject({
+    avg_delta: 10,
+    // Only Sari: participant 10 - service (90 - 84.1667) = 4.1667.
+    avg_relative_delta: 4.17,
+  });
   const all = new URLSearchParams({
     year: "2019",
     exclusions: JSON.stringify(
@@ -519,7 +634,12 @@ test("SIDAK agent quickview lists the agent's EFEK training for admin and traine
   };
   const trainerView = await quickview(trainer.token);
   expect(trainerView.status).toBe(200);
-  expect(trainerView.body.data!.efekTraining).toEqual([
+  expect(trainerView.body.data!.efekTraining).toHaveLength(3);
+  expect(
+    trainerView.body.data!.efekTraining!.filter(
+      (s) => s.programCode === "ketik",
+    ),
+  ).toEqual([
     {
       sessionId: november,
       programCode: "ketik",

@@ -165,6 +165,7 @@ export interface EfekMonthPoint extends EfekMonth {
   score: number | null;
   sessions: number;
   findings: number;
+  /** Skor rata-rata layanan pada bulan kalender yang sama (termasuk peserta). */
   comparison_score: number | null;
 }
 
@@ -190,7 +191,9 @@ export interface EfekParticipantResult {
   findings_per_session_before: number | null;
   findings_per_session_after: number | null;
   delta: number | null;
+  /** Δ rata-rata layanan pada bulan kalender yang sama (termasuk peserta), memakai bulan peserta dengan data. */
   comparison_delta: number | null;
+  /** Δ peserta − Δ rata-rata layanan pada bulan kalender yang sama (termasuk peserta); indikatif, bukan kontrol. */
   relative_delta: number | null;
   status: EfekParticipantStatus;
   thin: boolean;
@@ -208,6 +211,7 @@ export interface EfekProgramSummary {
   stabil: number;
   turun: number;
   avg_delta: number | null;
+  /** Rerata Δ peserta − Δ rata-rata layanan pada bulan kalender yang sama (termasuk peserta). */
   avg_relative_delta: number | null;
   findings_per_session_before: number | null;
   findings_per_session_after: number | null;
@@ -233,8 +237,10 @@ export interface EfekSessionSummary {
 export interface EfekChartPoint {
   offset: number;
   score: number | null;
+  /** Skor rata-rata layanan pada bulan kalender yang sama (termasuk peserta). */
   comparison_score: number | null;
   findings_per_session: number | null;
+  /** Σ temuan / Σ sesi audit rata-rata layanan pada bulan kalender yang sama (termasuk peserta). */
   comparison_findings_per_session: number | null;
 }
 

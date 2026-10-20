@@ -435,6 +435,27 @@ test("impor CSV mencocokkan nama, meminta pilihan, dan mengelompokkan sesi", asy
   expectHermetic(audit);
 });
 
+test("CERIWIS labels the baseline as the CSO service average", async ({
+  page,
+}) => {
+  const audit = await openTna(page, "/tna/efek/program/ceriwis", [
+    {
+      method: "GET",
+      path: "/api/v1/tna/efek/report/ceriwis",
+      body: ok({
+        ...programReport,
+        program: summary(programs[3]!, { participants: 2 }),
+      }),
+    },
+    ...efekMocks,
+  ]);
+  await expect(
+    page.locator("figure span").filter({ hasText: /^Rata-rata layanan CSO$/ }),
+  ).toHaveCount(2);
+  await waitForMockedApi(audit, ["GET /api/v1/tna/efek/report/ceriwis"]);
+  expectHermetic(audit);
+});
+
 test("leader tidak bisa membuka EFEK", async ({ page }) => {
   await openTna(page, "/tna/efek", efekMocks, "leader");
   await expect(page).not.toHaveURL(/\/tna\/efek/);
@@ -477,6 +498,18 @@ test("ringkasan EFEK menampilkan efek per program dan rincian peserta KETIK", as
   await expect(
     page.getByText("Skor QA rata-rata, dihitung dari bulan pelatihan").first(),
   ).toBeVisible();
+  await expect(
+    page.locator("figure span").filter({ hasText: /^Rata-rata layanan Chat$/ }),
+  ).toHaveCount(2);
+  await expect(
+    page.getByText("Δ relatif rata-rata layanan", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Garis putus-putus = rata-rata semua agent Chat yang diaudit pada bulan yang sama, termasuk peserta.",
+      { exact: false },
+    ),
+  ).toBeVisible();
   const people = page.getByRole("region", { name: "Peserta" });
   const rows = people.locator("tbody > tr");
   await expect(rows.first()).toContainText("Ana Contoh");
@@ -492,6 +525,12 @@ test("ringkasan EFEK menampilkan efek per program dan rincian peserta KETIK", as
     name: "Rincian bulanan Ana Contoh",
   });
   await expect(monthly).toBeVisible();
+  await expect(
+    monthly.getByRole("columnheader", {
+      name: "Rata-rata layanan",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(monthly.getByRole("row").nth(1)).toContainText("Februari 2026");
   await expect(monthly.getByRole("row").nth(4)).toContainText(
     "Bulan pelatihan",
@@ -615,6 +654,11 @@ for (const width of [390, 1280])
     await filter.screenshot({
       path: testInfo.outputPath(`exclusions-${width}.png`),
     });
+    await page
+      .getByRole("region", { name: "Grafik relatif bulan pelatihan" })
+      .screenshot({
+        path: testInfo.outputPath(`service-average-charts-${width}.png`),
+      });
     await comparison.screenshot({
       path: testInfo.outputPath(`comparison-${width}.png`),
     });
@@ -755,6 +799,14 @@ test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-esc
   expect(html).toContain("+4,0");
   expect(html).toContain("Rincian bulanan Ana Contoh");
   expect(html).toContain("Februari 2026");
+  expect(html).toContain("Rata-rata layanan Chat");
+  expect(html).toContain(
+    "Δ relatif = perubahan peserta dikurangi perubahan rata-rata layanan Chat pada bulan yang sama. Rata-rata layanan mencakup semua agent yang diaudit, termasuk peserta, jadi bersifat indikatif.",
+  );
+  expect(html).toContain(
+    "Garis putus-putus = rata-rata semua agent Chat yang diaudit pada bulan yang sama, termasuk peserta.",
+  );
+  expect(html).not.toMatch(/agent lain/i);
   expect(html).toContain("<svg");
   expect(html).toContain("@media print");
   expect(html).toContain("Cici &lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
