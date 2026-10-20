@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(ketik): plan a 150-consumer pool and let the consumer refuse or give a server-computed corrected NIK/email when the agent confirms malformed data
 - docs(ketik): plan an unspaced NIK in the Data konsumen panel and a Verifikasi data section in Telaah for sessions with malformed NIK or email
 - docs(ketik): record the NIK/email decisions — Gmail addresses, a Data konsumen side panel, and review credit for confirming deliberately malformed NIK or email at least once
 - docs(ketik): plan NIK and email on KETIK consumer identities with a larger, region-consistent consumer pool

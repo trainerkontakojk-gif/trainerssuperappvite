@@ -1,7 +1,7 @@
 # KETIK — NIK dan email pada identitas konsumen
 
 - **Lane:** D (kontrak tipe bersama, migrasi `ketik_history` + RPC finish, prompt AI konsumen, tampilan riwayat/monitoring).
-- **Status:** keputusan D2–D4 diambil 2026-10-20; D1 menunggu konfirmasi. Mockup: https://claude.ai/artifact/KfxFGdTd6KiHbV4Q8Bzr5D (privat).
+- **Status:** semua keputusan (D1–D4) diambil 2026-10-20. Mockup: https://claude.ai/artifact/KfxFGdTd6KiHbV4Q8Bzr5D (privat).
 - **Batas operasi:** implementasi dan verifikasi hanya di Supabase lokal. Migrasi produksi dijalankan terpisah dengan izin eksplisit, sebelum kode tayang.
 
 ## Kondisi saat ini (hasil telusur kode)
@@ -17,10 +17,10 @@
 1. Setiap sesi KETIK memiliki identitas konsumen lengkap: nama, gender, kota, nomor HP, **NIK**, dan **email**.
 2. NIK berformat 16 digit yang tampak realistis (kode wilayah sesuai kota domisili, tanggal lahir dengan aturan +40 untuk perempuan, nomor urut) tetapi **dijamin bukan NIK orang sungguhan** (nomor urut `0000`, yang tidak pernah diterbitkan Dukcapil).
 3. Email turunan nama konsumen dengan domain `@gmail.com` (keputusan D2). Aplikasi tidak pernah mengirim email ke alamat ini; risiko kebetulan sama dengan alamat sungguhan diterima.
-4. Pool konsumen bawaan diperluas dari 50 menjadi ±150–200 rekaman lengkap; 50 nama lama tetap ada dan dilengkapi NIK/email. Nama, gender, kota, NIK, email, dan HP dalam satu rekaman konsisten satu sama lain.
+4. Pool konsumen bawaan diperluas dari 50 menjadi 150 rekaman lengkap; 50 nama lama tetap ada dan dilengkapi NIK/email. Nama, gender, kota, NIK, email, dan HP dalam satu rekaman konsisten satu sama lain.
 5. Pengguna dapat mengisi NIK dan email tetap di Pengaturan → Identitas, sama seperti HP/kota; kosong = dari pool acak. Isian **tidak diblokir** walau salah format: trainer boleh sengaja mengisi data "ngaco" (NIK kurang/lebih dari 16 digit, ada huruf, atau domain email typo seperti `gnail.com`). Di bawah isian tampil catatan netral bahwa data tidak sesuai format dan agen akan dinilai mengonfirmasinya; tombol Simpan tetap aktif.
 5a. Data dari pool acak selalu valid; anomali hanya datang dari isian manual.
-6. AI konsumen memberikan NIK dan email persis saat agen meminta verifikasi data, tidak mengarang yang lain, dan tidak menyebutkannya tanpa diminta. Bila data identitasnya salah format dan agen mengonfirmasi, konsumen **tidak membetulkan sendiri**: ia mengulang data apa adanya, atau tidak menanggapi bagian itu.
+6. AI konsumen memberikan NIK dan email persis saat agen meminta verifikasi data, tidak mengarang yang lain, dan tidak menyebutkannya tanpa diminta. Bila data identitasnya salah format dan agen mengonfirmasi, konsumen memilih salah satu: **tidak bersedia menjawab** (menolak atau mengabaikan bagian itu), atau **memberikan versi yang sesuai format**. Versi yang sesuai dihitung server secara deterministik dan dikirim ke prompt sebagai `identity.correction` (NIK: digit lebih dibuang dari belakang atau digit kurang ditambahkan; email: domain typo diganti domain umum terdekat, mis. `gnail.com` → `gmail.com`), supaya konsumen tidak mengarang nilai yang berbeda-beda. Setelah memberikan versi yang sesuai, konsumen konsisten memakai versi itu sampai akhir sesi.
 6a. Penilaian verifikasi (keputusan D4): bila NIK/email sesi tidak sesuai format, review menilai apakah agen **bertanya atau mengonfirmasi data yang tidak sesuai itu minimal 1 kali**. Satu kali sudah cukup untuk nilai penuh; agen tidak dituntut mengulang, dan tidak dikurangi nilainya bila konsumen tidak menjawab. Bila agen tidak pernah menyinggungnya, nilai Probing berkurang dan muncul catatan "fix" beserta contoh kalimat konfirmasi. Bila data sesi valid, aturan ini tidak berlaku (tetap tidak menghukum agen yang tidak menanyakan ulang data yang sudah jelas).
 6b. Panel Data konsumen menampilkan data apa adanya tanpa tanda peringatan, supaya agen sendiri yang menemukan ketidaksesuaian.
 7. Header chat, riwayat KETIK, ekspor transkrip, dan Monitoring menampilkan NIK dan email. Sesi lama (sebelum fitur ini) tampil "—", tidak error.
@@ -70,7 +70,7 @@
 
 ## Keputusan
 
-- **D1 — Jumlah konsumen di pool acak:** rekomendasi 150 (sekarang 50); menunggu konfirmasi.
+- **D1 — Jumlah konsumen di pool acak:** 150 (sekarang 50).
 - **D2 — Domain email:** `@gmail.com`.
 - **D3 — Tampilan simulasi:** NIK dan email ditampilkan lewat panel "Data konsumen" di samping chat (mockup Simulasi B).
 - **D4 — Penilaian:** review menilai konfirmasi data yang tidak sesuai, minimal 1 kali, sesuai Requirement 6a.
