@@ -15,6 +15,9 @@ export function ketikSessionRows(review: KetikMonitoringReview): SessionRow[] {
   const session = review.session;
   return [
     ["Konsumen", joined(session?.consumerName, session?.consumerCity, session?.consumerPhone)],
+    // Kosong pada sesi sebelum NIK/email ada.
+    ["NIK konsumen", session?.consumerNik || null],
+    ["Email konsumen", session?.consumerEmail || null],
     ["Lama sesi", formatLongDuration(review.header?.duration_seconds)],
     // `simulationDuration` adalah batas waktu yang dipilih (menit), bukan lama sesi.
     [

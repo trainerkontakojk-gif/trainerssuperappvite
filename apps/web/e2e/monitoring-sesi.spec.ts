@@ -321,11 +321,20 @@ test.describe("Monitoring detail sesi (hermetic)", () => {
       ["Batas waktu", "10 menit"],
     ]) {
       await expect(
-        info.getByRole("term").filter({ hasText: label }),
+        info.getByRole("term").filter({ hasText: new RegExp(`^${label}$`) }),
       ).toBeVisible();
       await expect(
         info.getByRole("definition").filter({ hasText: value }),
       ).toBeVisible();
+    }
+    // Sesi sebelum NIK/email ada: barisnya tetap tampil dengan tanda kosong.
+    for (const label of ["NIK konsumen", "Email konsumen"]) {
+      await expect(
+        info
+          .getByRole("term")
+          .filter({ hasText: label })
+          .locator("xpath=following-sibling::dd[1]"),
+      ).toHaveText("-");
     }
 
     const review = page.getByRole("region", { name: "Penilaian AI" });

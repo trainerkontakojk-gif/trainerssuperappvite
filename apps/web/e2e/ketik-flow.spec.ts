@@ -1994,3 +1994,273 @@ test("KETIK agent without assignment cannot start but can edit personal settings
   ).toBeEnabled();
   expectHermetic(audit);
 });
+
+/** Sesi dengan NIK 15 digit, domain email typo, dan domisili provinsi. */
+const MALFORMED_SESSION: KetikSessionHistoryItem = {
+  ...REVIEWED_SESSION,
+  id: "ketik-malformed-1",
+  consumerName: "Budi Santoso",
+  consumerCity: "Lampung",
+  consumerNik: "317405120885000",
+  consumerEmail: "budi.santoso85@gnail.com",
+  messages: [
+    { id: "v1", sender: "consumer", text: "Saya ditelepon penagih pinjol terus.", timestamp: REVIEWED_AT },
+    { id: "v2", sender: "agent", text: "Boleh disebutkan NIK dan email Bapak?", timestamp: REVIEWED_AT },
+    { id: "v3", sender: "consumer", text: "NIK 317405120885000, email budi.santoso85@gnail.com", timestamp: REVIEWED_AT },
+    { id: "v4", sender: "agent", text: "Terima kasih, Pak, sudah kami catat.", timestamp: REVIEWED_AT },
+  ],
+};
+
+const MALFORMED_REVIEW_DETAIL = {
+  ...REVIEW_DETAIL,
+  sessionId: MALFORMED_SESSION.id,
+  review: {
+    ...REVIEW_DETAIL.review,
+    sessionId: MALFORMED_SESSION.id,
+    education: {
+      ...REVIEW_DETAIL.review.education,
+      typosEnriched: [],
+      verification: {
+        status: "unconfirmed",
+        missedBeforeMessageId: "v4",
+        fields: [
+          { field: "nik", value: "317405120885000", reason: "15 digit, harus 16", status: "unconfirmed", agentMessageId: "v2", agentQuote: "Boleh disebutkan NIK dan email Bapak?" },
+          { field: "email", value: "budi.santoso85@gnail.com", reason: "Domain mirip gmail.com", status: "unconfirmed", agentMessageId: "v2", agentQuote: "Boleh disebutkan NIK dan email Bapak?" },
+          { field: "city", value: "Lampung", reason: "Nama provinsi, kota/kabupaten belum disebut", status: "not_asked", agentMessageId: null, agentQuote: null },
+        ],
+      },
+    },
+  },
+  typos: [],
+};
+
+test.describe("KETIK NIK dan email konsumen (hermetic)", () => {
+  test.beforeAll(async () => {
+    await assertLocalDevOnlyTarget(APP_ORIGIN);
+  });
+
+  test("Pengaturan menyimpan NIK dan email yang sengaja salah dengan catatan netral", async ({
+    page,
+  }) => {
+    const { audit, dialog } = await openKetikSettings(page);
+    await dialog.getByRole("tab", { name: /^Identitas konsumen/ }).click();
+
+    // Contoh dari pool latihan: NIK 16 digit berakhiran 0000, email gmail.
+    const example = dialog.getByRole("region", { name: "Contoh identitas acak" });
+    const exampleValues = example.getByRole("definition");
+    await expect(exampleValues.filter({ hasText: /^\d{12}0000$/ })).toHaveCount(1);
+    await expect(exampleValues.filter({ hasText: /@gmail\.com$/ })).toHaveCount(1);
+    await expect(example).toContainText("150 konsumen latihan");
+
+    const nik = dialog.getByRole("textbox", { name: /^NIK/ });
+    const email = dialog.getByRole("textbox", { name: /^Alamat email/ });
+    const city = dialog.getByRole("textbox", { name: /^Kota asal/ });
+    await nik.fill("317405120885000");
+    await email.fill("budi.santoso85@gnail.com");
+    await city.fill("Lampung");
+    await expect(nik).toHaveAccessibleDescription(
+      "15 digit, harus 16. Agen akan dinilai apakah mengonfirmasi data ini.",
+    );
+    await expect(email).toHaveAccessibleDescription(
+      "Domain mirip gmail.com. Agen akan dinilai apakah mengonfirmasi data ini.",
+    );
+    await expect(city).toHaveAccessibleDescription(
+      /Nama provinsi.*memastikan kota\/kabupatennya/,
+    );
+
+    const saveButton = dialog.getByRole("button", { name: "Simpan", exact: true });
+    await expect(saveButton).toBeEnabled();
+    const saveRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" &&
+        new URL(request.url()).pathname === "/api/v1/ketik/settings",
+    );
+    await saveButton.click();
+    const saved = (await saveRequest).postDataJSON() as KetikAppSettings;
+    expect(saved.identitySettings).toMatchObject({
+      nik: "317405120885000",
+      email: "budi.santoso85@gnail.com",
+      city: "Lampung",
+    });
+    expectHermetic(audit);
+  });
+
+  test("panel Data konsumen menampilkan NIK dan email apa adanya, jadi sheet di layar sempit", async ({
+    page,
+  }) => {
+    const identity = {
+      name: "Budi Santoso",
+      city: "Jakarta Selatan",
+      phone: "081234561234",
+      nik: "317405120885000",
+      email: "budi.santoso85@gnail.com",
+    };
+    const audit = await open(
+      page,
+      "/ketik",
+      [
+        assignedSelf,
+        ...ketikMocks([], FAST_SETTINGS),
+        { method: "GET", path: "/api/v1/ai/usage/summary", body: { success: true, data: null } },
+        {
+          method: "POST",
+          path: "/api/v1/ketik/sessions",
+          body: {
+            success: true,
+            data: serverSession({ config: { ...serverSession().config, identity } }),
+          },
+        },
+      ],
+      "agent",
+    );
+    await page.getByRole("button", { name: /^Mulai simulasi/ }).click({ timeout: 20000 });
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(room.getByRole("textbox", { name: "Tulis balasan" })).toBeVisible();
+
+    const toggle = room.getByRole("button", { name: "Data konsumen" });
+    const panel = room.getByRole("complementary", { name: "Data konsumen" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(panel).toBeVisible();
+    // Nilai utuh tanpa spasi atau tanda peringatan: agen sendiri yang menemukan.
+    await expect(panel.getByRole("definition").filter({ hasText: "317405120885000" })).toHaveText("317405120885000");
+    await expect(panel).toContainText("budi.santoso85@gnail.com");
+    await expect(panel).toContainText("081234561234");
+    await expect(panel.locator("mark")).toHaveCount(0);
+    for (const name of ["Salin nomor telepon", "Salin NIK", "Salin email"]) {
+      await expect(panel.getByRole("button", { name })).toBeVisible();
+    }
+    // Header tetap ramping: kota saja, nomor pindah ke panel.
+    await expect(room.locator("header")).not.toContainText("081234561234");
+
+    await toggle.click();
+    await expect(panel).toHaveCount(0);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await toggle.click();
+    await expect(panel).toBeVisible();
+    // Sheet dari bawah selebar ruang chat.
+    const box = await panel.boundingBox();
+    const roomBox = await room.boundingBox();
+    expect(box && roomBox).toBeTruthy();
+    expect(box!.y + box!.height).toBeCloseTo(roomBox!.y + roomBox!.height, 0);
+    expect(box!.width).toBeCloseTo(roomBox!.width, 0);
+    await panel.getByRole("button", { name: "Tutup data konsumen" }).click();
+    await expect(panel).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
+  test("Telaah menandai data tidak sesuai, garis konfirmasi yang terlewat, dan Verifikasi data", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(MALFORMED_SESSION.id), [
+      ...ketikMocks([MALFORMED_SESSION, ...FULL_HISTORY]),
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/${MALFORMED_SESSION.id}`,
+        body: { success: true, data: MALFORMED_REVIEW_DETAIL },
+      },
+    ]);
+
+    const transcript = page.getByRole("region", { name: "Percakapan" });
+    const visible = transcript.getByRole("region", {
+      name: "Data konsumen yang terlihat di panel agen",
+    });
+    await expect(visible).toBeVisible({ timeout: 20000 });
+    await expect(visible.locator("mark", { hasText: "317405120885000" })).toBeVisible();
+    await expect(visible.locator("mark", { hasText: /^gnail\.com$/ })).toBeVisible();
+    for (const label of ["15 digit", "domain typo", "nama provinsi"]) {
+      await expect(visible.getByText(label, { exact: true })).toBeVisible();
+    }
+    // Nilai yang sama di pesan konsumen ikut ditandai.
+    await expect(
+      transcript.getByTestId("ketik-message-3").locator("mark", { hasText: "317405120885000" }),
+    ).toBeVisible();
+    // Garis putus-putus tepat sebelum pesan agen yang seharusnya mengonfirmasi.
+    const marker = transcript.getByRole("note");
+    await expect(marker).toHaveText("Data tidak sesuai seharusnya dikonfirmasi di sini");
+    const order = await transcript.locator("ol > li").evaluateAll((items) =>
+      items.map((item) => item.getAttribute("role") ?? item.getAttribute("data-testid")),
+    );
+    expect(order).toEqual([
+      "ketik-message-1",
+      "ketik-message-2",
+      "ketik-message-3",
+      "note",
+      "ketik-message-4",
+    ]);
+
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const verification = result.getByRole("region", { name: "Verifikasi data" });
+    await expect(verification).toContainText("Belum dikonfirmasi");
+    const row = (name: string) =>
+      verification
+        .getByRole("row")
+        .filter({ has: page.getByRole("rowheader", { name, exact: true }) });
+    await expect(row("NIK")).toContainText("15 digit, harus 16");
+    await expect(row("NIK")).toContainText("Belum dikonfirmasi");
+    await expect(row("Email")).toContainText("Domain mirip gmail.com");
+    await expect(row("Domisili")).toContainText("Tidak ditanyakan");
+    await row("NIK").getByRole("button", { name: /Pesan 2/ }).click();
+    await expect(transcript.getByTestId("ketik-message-2")).toHaveAttribute("data-highlighted", "true");
+    expectHermetic(audit);
+  });
+
+  test("data konsumen, garis konfirmasi, dan Verifikasi data memenuhi kontras dan ukuran teks", async ({
+    page,
+  }) => {
+    const audit = await open(page, telaahPath(MALFORMED_SESSION.id), [
+      ...ketikMocks([MALFORMED_SESSION, ...FULL_HISTORY]),
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/${MALFORMED_SESSION.id}`,
+        body: { success: true, data: MALFORMED_REVIEW_DETAIL },
+      },
+    ]);
+    const verification = page.getByRole("region", { name: "Verifikasi data" });
+    await expect(verification).toBeVisible({ timeout: 20000 });
+    const regions = [
+      page.getByRole("region", { name: "Data konsumen yang terlihat di panel agen" }),
+      page.getByRole("region", { name: "Percakapan" }).getByRole("note"),
+      verification,
+    ];
+    for (const theme of ["light", "dark"] as const) {
+      await setDocumentTheme(page, theme);
+      for (const region of regions) {
+        const low = await findLowContrastText(region, { selector: "*", leafOnly: true });
+        expect(low, `${theme}: ${low.join("\n")}`).toEqual([]);
+      }
+    }
+    for (const region of regions) {
+      expect(await findTextBelowFloor(region)).toEqual([]);
+    }
+    expectHermetic(audit);
+  });
+
+  test("sesi lama tanpa NIK dan email menampilkan tanda kosong tanpa Verifikasi data", async ({
+    page,
+  }) => {
+    // Domisili "Jakarta" dulu boleh diisi bebas; aturan verifikasi tidak berlaku surut.
+    const legacy = { ...REVIEWED_SESSION, id: "ketik-legacy-jakarta", consumerCity: "Jakarta" };
+    const audit = await open(page, telaahPath(legacy.id), [
+      ...ketikMocks([legacy, ...FULL_HISTORY]),
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/${legacy.id}`,
+        body: { success: true, data: { ...REVIEW_DETAIL, sessionId: legacy.id } },
+      },
+    ]);
+    const visible = page
+      .getByRole("region", { name: "Percakapan" })
+      .getByRole("region", { name: "Data konsumen yang terlihat di panel agen" });
+    await expect(visible).toBeVisible({ timeout: 20000 });
+    await expect(visible.getByRole("definition")).toHaveText(["Jakarta", "—", "—"]);
+    await expect(visible.locator("mark")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Hasil telaah" }).getByTestId("ketik-final-score"),
+    ).toHaveText("82");
+    await expect(page.getByRole("region", { name: "Verifikasi data" })).toHaveCount(0);
+    await expect(page.getByRole("note")).toHaveCount(0);
+    expectHermetic(audit);
+  });
+});

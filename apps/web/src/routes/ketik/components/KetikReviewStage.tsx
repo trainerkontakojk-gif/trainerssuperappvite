@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, Link2, Play, RotateCcw } from "lucide-react";
+import { detectKetikSessionAnomalies } from "@trainers/types";
 import type {
   KetikHistoryDetail,
   KetikHistoryAttachment,
@@ -28,6 +29,10 @@ import {
 } from "../utils/reviewNavigation";
 import { KetikStageNav } from "./KetikStageNav";
 import { SessionReplayModal } from "./SessionReplayModal";
+import {
+  KetikVerificationMarker,
+  KetikVisibleConsumerData,
+} from "./KetikReviewVerification";
 
 interface KetikReviewStageProps {
   session: KetikHistoryDetail;
@@ -79,6 +84,25 @@ export function KetikReviewStage({
     return map;
   }, [review.typos]);
   const education = review.phase === "ready" ? review.review?.education : null;
+  const anomalies = useMemo(
+    () =>
+      detectKetikSessionAnomalies({
+        nik: session.consumerNik,
+        email: session.consumerEmail,
+        city: session.consumerCity,
+      }),
+    [session.consumerNik, session.consumerEmail, session.consumerCity],
+  );
+  // Malformed values are marked wherever the consumer repeats them.
+  const anomalyWords = useMemo(
+    () => anomalies.map((anomaly) => anomaly.highlight),
+    [anomalies],
+  );
+  const verification = education?.verification ?? null;
+  const missedBefore =
+    verification && verification.status !== "confirmed"
+      ? verification.missedBeforeMessageId
+      : null;
   const quoteMarks = useMemo(
     () =>
       buildQuoteMarks(
@@ -182,6 +206,14 @@ export function KetikReviewStage({
                 .join(" · ")}
             </p>
           </div>
+          <KetikVisibleConsumerData
+            values={{
+              city: session.consumerCity,
+              nik: session.consumerNik,
+              email: session.consumerEmail,
+            }}
+            anomalies={anomalies}
+          />
           <ol className="flex flex-col gap-3">
             {messages.map((message) => {
               if (message.sender === "system") return null;
@@ -189,56 +221,66 @@ export function KetikReviewStage({
               const isAgent = message.sender === "agent";
               const flagged = typosByMessage.has(message.id);
               const answers = answersByMessage.get(message.id);
+              const marker =
+                verification && message.id === missedBefore ? (
+                  <KetikVerificationMarker status={verification.status} />
+                ) : null;
               return (
-                <li
-                  key={message.id}
-                  ref={(element) => {
-                    if (element) messageRefs.current.set(message.id, element);
-                    else messageRefs.current.delete(message.id);
-                  }}
-                  tabIndex={-1}
-                  data-testid={`ketik-message-${number}`}
-                  data-highlighted={highlightedId === message.id}
-                  className={cn(
-                    "flex items-start gap-2 rounded-xl outline-none",
-                    isAgent && "flex-row-reverse",
-                  )}
-                >
-                  <span className="w-6 shrink-0 pt-2 text-center font-mono text-xs text-muted-foreground">
-                    <span className="sr-only">Pesan </span>
-                    {number}
-                  </span>
-                  <div
+                <Fragment key={message.id}>
+                  {marker}
+                  <li
+                    ref={(element) => {
+                      if (element) messageRefs.current.set(message.id, element);
+                      else messageRefs.current.delete(message.id);
+                    }}
+                    tabIndex={-1}
+                    data-testid={`ketik-message-${number}`}
+                    data-highlighted={highlightedId === message.id}
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-6 whitespace-pre-wrap break-words",
-                      isAgent
-                        ? "rounded-tr-sm bg-module-ketik text-module-ketik-foreground"
-                        : "rounded-tl-sm border border-border bg-surface-elevated text-foreground",
-                      (flagged || highlightedId === message.id) &&
-                        "outline-2 outline-offset-2 outline-chart-orange",
-                      highlightedId === message.id && "outline-foreground",
+                      "flex items-start gap-2 rounded-xl outline-none",
+                      isAgent && "flex-row-reverse",
                     )}
                   >
-                    <span className="sr-only">
-                      {isAgent ? "Agen: " : "Konsumen: "}
+                    <span className="w-6 shrink-0 pt-2 text-center font-mono text-xs text-muted-foreground">
+                      <span className="sr-only">Pesan </span>
+                      {number}
                     </span>
-                    <KetikReviewMessage
-                      text={message.text}
-                      attachments={session.attachments ?? []}
-                      marks={quoteMarks.get(message.id) ?? []}
-                      typoWords={typosByMessage.get(message.id) ?? []}
-                      onOpen={(selected, trigger) => {
-                        attachmentTrigger.current = trigger;
-                        setAttachment(selected);
-                      }}
-                    />
-                    {answers && (
-                      <span className="mt-1 block text-xs font-medium">
-                        Menjawab poin {answers.join(", ")}
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-6 whitespace-pre-wrap break-words",
+                        isAgent
+                          ? "rounded-tr-sm bg-module-ketik text-module-ketik-foreground"
+                          : "rounded-tl-sm border border-border bg-surface-elevated text-foreground",
+                        (flagged || highlightedId === message.id) &&
+                          "outline-2 outline-offset-2 outline-chart-orange",
+                        highlightedId === message.id && "outline-foreground",
+                      )}
+                    >
+                      <span className="sr-only">
+                        {isAgent ? "Agen: " : "Konsumen: "}
                       </span>
-                    )}
-                  </div>
-                </li>
+                      <KetikReviewMessage
+                        text={message.text}
+                        attachments={session.attachments ?? []}
+                        marks={quoteMarks.get(message.id) ?? []}
+                        typoWords={
+                          isAgent
+                            ? (typosByMessage.get(message.id) ?? [])
+                            : anomalyWords
+                        }
+                        onOpen={(selected, trigger) => {
+                          attachmentTrigger.current = trigger;
+                          setAttachment(selected);
+                        }}
+                      />
+                      {answers && (
+                        <span className="mt-1 block text-xs font-medium">
+                          Menjawab poin {answers.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                </Fragment>
               );
             })}
           </ol>

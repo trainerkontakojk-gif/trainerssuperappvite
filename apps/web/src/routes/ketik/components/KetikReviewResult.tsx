@@ -25,6 +25,7 @@ import {
   focusReviewTarget,
   type KetikReviewTarget,
 } from "../utils/reviewNavigation";
+import { KetikVerificationSummary } from "./KetikReviewVerification";
 import {
   AgentNoteItem,
   ConsumerPointItem,
@@ -204,6 +205,14 @@ export function ReviewResult({
           </li>
         ))}
       </ul>
+
+      {review.education?.verification && (
+        <KetikVerificationSummary
+          verification={review.education.verification}
+          numbers={numbers}
+          onShowMessage={onShowMessage}
+        />
+      )}
 
       {caseCore && (
         <section

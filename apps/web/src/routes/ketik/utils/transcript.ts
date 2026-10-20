@@ -51,6 +51,9 @@ export function downloadKetikTranscript(
     "Batch",
     "Tim",
     "Record Peserta",
+    "Konsumen",
+    "NIK Konsumen",
+    "Email Konsumen",
   ];
   const rows = session.messages.map((message) => [
     SENDER_LABELS[message.sender],
@@ -62,6 +65,9 @@ export function downloadKetikTranscript(
     participant && !participant.participantId
       ? "Tidak lagi tersedia"
       : "Tersedia",
+    session.consumerName,
+    session.consumerNik ?? "",
+    session.consumerEmail ?? "",
   ]);
   download(`ketik_transkrip_${session.id}.csv`, toCsv([header, ...rows]));
 }
@@ -76,6 +82,8 @@ export function downloadKetikHistory(
     "Peserta",
     "Konsumen",
     "Kota",
+    "NIK",
+    "Email",
     "Status",
     "Skor akhir",
     "Empati & Komunikasi",
@@ -92,6 +100,8 @@ export function downloadKetikHistory(
     }),
     session.consumerName,
     session.consumerCity ?? "",
+    session.consumerNik ?? "",
+    session.consumerEmail ?? "",
     reviewStatusLabel(session.reviewStatus),
     readFinalScore(session) ?? "",
     session.empathyScore ?? "",

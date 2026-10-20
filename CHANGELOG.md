@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- feat(ketik): add NIK and email to Pengaturan Identitas with neutral notes for deliberately malformed data, a Data konsumen panel beside the chat (bottom sheet on narrow screens), a Telaah consumer-data card, missed-confirmation marker and Verifikasi data section, and NIK/email in CSV exports and Monitoring
 - fix(ketik): skip NIK/email/domicile verification for sessions finished before NIK and email existed, so an old bare "Jakarta" domicile is never penalized on re-review
 - fix(ketik): keep the "do not invent new data" consumer rule beside the NIK/email rule and label verification notes as NIK, Email and Domisili
 - feat(ketik): store consumer NIK and email in KETIK history, have the consumer give them only when asked (with a server-computed correction for malformed data), and score verification of malformed NIK/email/domicile in the review with server-validated evidence
