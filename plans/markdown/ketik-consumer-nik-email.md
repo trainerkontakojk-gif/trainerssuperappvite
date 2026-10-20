@@ -63,7 +63,8 @@
 ### Web
 
 - `KetikIdentityTab.tsx`: dua input baru (NIK, Email) tanpa validasi yang memblokir; catatan netral dari `detectKetikIdentityAnomalies()` saat data tidak sesuai format; bagian "Contoh identitas acak".
-- `ChatInterface.tsx`: header tetap ramping (nama, kota, timer); tombol "Data konsumen" membuka panel kanan berisi Nama, Kota, HP, NIK (dikelompokkan 4-4-4-4), Email, dengan tombol salin. Di layar sempit panel menjadi sheet dari bawah (keputusan D3).
+- `ChatInterface.tsx`: header tetap ramping (nama, kota, timer); tombol "Data konsumen" membuka panel kanan berisi Nama, Kota, HP, NIK (16 digit utuh tanpa spasi, supaya agen bisa melihat sendiri bila jumlah digitnya kurang/lebih), Email, dengan tombol salin. Di layar sempit panel menjadi sheet dari bawah (keputusan D3).
+- Telaah (`KetikReviewResult.tsx`, `KetikReviewStage.tsx`): bila sesi punya data tidak sesuai, tampilkan bagian "Verifikasi data" di bawah skor per aspek — tabel Data / Nilai di sesi / Tidak sesuai karena / Dikonfirmasi (Ya/Tidak) — dan tandai nilai yang tidak sesuai di transkrip. Catatan "Probing · Verifikasi data" muncul di tab "Perbaiki dulu" dengan kutipan pesan agen yang seharusnya mengonfirmasi dan contoh kalimat. Sesi dengan data valid tidak menampilkan bagian ini.
 - `utils/transcript.ts`, riwayat KETIK, dan Monitoring sesi: tambah baris NIK dan email, fallback "—".
 - `ketik-avatar.ts` seed tidak diubah agar avatar sesi lama tetap sama.
 

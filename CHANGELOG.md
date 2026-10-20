@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(ketik): plan an unspaced NIK in the Data konsumen panel and a Verifikasi data section in Telaah for sessions with malformed NIK or email
 - docs(ketik): record the NIK/email decisions — Gmail addresses, a Data konsumen side panel, and review credit for confirming deliberately malformed NIK or email at least once
 - docs(ketik): plan NIK and email on KETIK consumer identities with a larger, region-consistent consumer pool
 - feat(ketik): send each KETIK agent message as it is typed, keep the sent/read ticks, type published consumer replies out one at a time in the original rhythm (read time, length bands, occasional slow reply) instead of revealing them together, and show an honest elapsed clock plus a 1–2/3-minute estimate while Telaah runs
