@@ -47,9 +47,8 @@ export default function SidakParameterRanking({
               const change = insights?.parameterChanges.find(
                 (item) => item.name === row.fullName,
               )?.change;
-              const isFocus = row.fullName === focus?.name;
-              const metrics = (
-                <>
+              return (
+                <li key={row.fullName} className="min-w-0">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="min-w-0 text-sm leading-5 text-foreground">
                       <span className="font-medium">{row.fullName}</span>
@@ -89,25 +88,6 @@ export default function SidakParameterRanking({
                           : `${change > 0 ? "+" : "−"}${COUNT.format(Math.abs(change))} vs ${insights.previousLabel}`}
                       </p>
                     )}
-                </>
-              );
-              return (
-                <li key={row.fullName} className="min-w-0">
-                  {isFocus && focus ? (
-                    <>
-                      {metrics}
-                      <details open>
-                        <summary className="mt-2 min-h-[44px] cursor-pointer rounded-md py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          Saran coaching
-                        </summary>
-                        <p className="mt-1 text-sm leading-relaxed text-fg2">
-                          {focus.recommendation}
-                        </p>
-                      </details>
-                    </>
-                  ) : (
-                    metrics
-                  )}
                 </li>
               );
             })}

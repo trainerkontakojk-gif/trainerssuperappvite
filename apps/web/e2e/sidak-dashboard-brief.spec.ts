@@ -174,9 +174,9 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await expect(brief).toContainText("Tim Call");
   await expect(brief).toContainText("8 temuan");
   const parameters = page.getByRole("region", { name: "Parameter teratas" });
-  await expect(
-    parameters.getByText(RECOMMENDATION, { exact: true }),
-  ).toBeVisible();
+  // The coaching suggestion lives in Kesimpulan only; the ranking stays a ranking.
+  await expect(parameters.getByText(RECOMMENDATION, { exact: true })).toHaveCount(0);
+  await expect(parameters).not.toContainText("Saran coaching");
   await expect(
     parameters.getByText("+6 vs Sep 26", { exact: true }),
   ).toBeVisible();
