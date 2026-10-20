@@ -365,7 +365,7 @@ health, and contract verification are the applicable evidence.
 ## Web Security Headers
 
 - Railway Web (staging atau auxiliary PRODUCTION) memakai `apps/web/public/serve.json`. File ini disalin Vite ke `apps/web/dist/serve.json`, lalu dibaca oleh `serve dist` saat `pnpm run start:web`.
-- Vercel Web memakai `headers` di root `vercel.json`.
+- Vercel Web memakai `headers` di root `vercel.json`. `connect-src` mengizinkan `blob:` untuk pembacaan rekaman lokal oleh waveform dan tombol unduh Telefun; `media-src blob:` saja hanya mencakup pemutaran audio. Izin ini tidak menambah origin jaringan atau unduhan dari Supabase.
 - Header yang dijaga: `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, dan `Permissions-Policy`.
 
 ### Telefun Production Smoke Test

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(telefun): allow local recording reads under production CSP
+
 - feat(telefun): clarify review audio waveform and playback position
 
 - fix(ketik): score Tata Tulis only from agent messages so the expressive consumer's lo/gue, dialect, caps, "!!", "hadeh" and emoji are never counted as agent typos or cited as typo evidence

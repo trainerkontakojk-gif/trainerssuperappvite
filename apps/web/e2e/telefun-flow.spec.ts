@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import vercelConfig from "../../../vercel.json" with { type: "json" };
 import {
   APP_ORIGIN,
   expectHermetic,
@@ -594,6 +595,27 @@ test.describe("Telefun Telaah (hermetic)", () => {
         recordingMock(REVIEWED_ROW.id),
       ],
       async (target) => {
+        // Reproduce the real production fetch policy, including blob reads.
+        // Other directives are omitted here for Vite's development bootstrap.
+        const connectSrc = vercelConfig.headers
+          .flatMap((entry) => entry.headers)
+          .find((header) => header.key === "Content-Security-Policy")!
+          .value.split(";")
+          .map((directive) => directive.trim())
+          .find((directive) => directive.startsWith("connect-src "))!;
+        await target.route(
+          (url) => url.origin === APP_ORIGIN && url.pathname === "/telefun",
+          async (route) => {
+            const response = await route.fetch();
+            await route.fulfill({
+              response,
+              headers: {
+                ...response.headers(),
+                "content-security-policy": connectSrc,
+              },
+            });
+          },
+        );
         await serveSpeechRecordings(target, {
           full: [[30, 35]],
           agent: [[30, 35]],
@@ -691,6 +713,10 @@ test.describe("Telefun Telaah (hermetic)", () => {
       });
     }
 
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Unduh rekaman" }).click();
+    const download = await downloadPromise;
+    expect(await download.failure()).toBeNull();
     expect(downloads).toEqual({ full: 1, agent: 1 });
     expectHermetic(audit);
   });
