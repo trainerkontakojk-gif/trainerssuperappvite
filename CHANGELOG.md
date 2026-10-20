@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(db): record the production apply of the KETIK consumer NIK/email migration
 - fix(ketik): drop the verification hint and the practice-data note from the simulation Data konsumen panel so the agent gets no clue, and record the one-time Probing −20 decision
 - feat(ketik): add NIK and email to Pengaturan Identitas with neutral notes for deliberately malformed data, a Data konsumen panel beside the chat (bottom sheet on narrow screens), a Telaah consumer-data card, missed-confirmation marker and Verifikasi data section, and NIK/email in CSV exports and Monitoring
 - fix(ketik): skip NIK/email/domicile verification for sessions finished before NIK and email existed, so an old bare "Jakarta" domicile is never penalized on re-review

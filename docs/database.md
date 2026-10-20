@@ -583,3 +583,12 @@ with NULL for old rows. Finish and pagination retain their signatures, SECURITY
 INVOKER settings and service-role-only execution; row policies are unchanged.
 Rollback restores both previous RPC definitions before dropping the columns and
 loses any stored NIK/email values. Deployment/replay is a separate local gate.
+
+#### Diterapkan ke produksi 2026-10-20
+
+- **Diterapkan ke produksi `ruosnjmtywcrghjgqugz`** dengan izin eksplisit Fajar; hanya migrasi `20261020170000`, bukan `db push`.
+- Preflight hanya-baca: `supabase migration list --linked` (exit 0) menunjukkan prasyarat `20261020160000` sudah applied dan `20261020170000` belum; query `information_schema.columns` (exit 0) mengembalikan 0 baris untuk `consumer_nik`/`consumer_email`.
+- `supabase db query --linked -f supabase/migrations/20261020170000_ketik_history_consumer_nik_email.sql` (exit 0), dijalankan tepat satu kali.
+- Sesi terputus setelah pemanggilan awal `supabase migration repair --linked --status applied 20261020170000`; hasil/exit code pemanggilan itu tidak terekam. Saat dilanjutkan, `supabase migration list --linked` (exit 0) masih menunjukkan versi belum applied, lalu perintah repair yang sama dijalankan sekali dan selesai exit 0 (`Repaired migration history: [20261020170000] => applied`). SQL migrasi tidak diulang.
+- Verifikasi hanya-baca: dua `supabase db query --linked` (masing-masing exit 0) memastikan kedua kolom bertipe `text`, nullable (`YES`); `pg_get_functiondef` kedua RPC memuat `consumer_nik` dan `consumer_email`, keduanya SECURITY INVOKER (`prosecdef = false`); `has_function_privilege(..., 'EXECUTE')` untuk masing-masing RPC: `anon = false`, `authenticated = false`, `service_role = true`.
+- `supabase migration list --linked` pasca-verifikasi (exit 0) menampilkan `20261020170000` pada kolom Local dan Remote. Tidak ada pemanggilan RPC, pembacaan row pengguna, rollback, migrasi lain, atau penulisan data pengguna.
