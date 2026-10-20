@@ -71,24 +71,34 @@ Kewajiban assignment ditegakkan pada endpoint mulai sesi server berikut.
 
 ## KETIK — sesi dan transkrip server
 
-Migration `20261015140000_ketik_server_sessions.sql` menambah:
+Migration `20261015140000_ketik_server_sessions.sql` menambah fondasi sesi;
+migration `20261020160000_ketik_durable_agent_messages.sql` memisahkan append
+agen dari pemicu balasan:
 
 - `ketik_sessions`: snapshot immutable konfigurasi/skenario/subjek/versi assignment,
-  pemilik, waktu server, versi dan transkrip aktif. Sesi belum selesai tidak masuk
-  History/Monitoring/SIDAK.
-- `ketik_session_turns`: request UUID, expected version, payload agen untuk
-  idempotensi, status dan lease/fencing. Satu turn unresolved per sesi; maksimal
-  100 turn selesai. Bukan sumber transkrip penilaian kedua.
+  pemilik, waktu server, versi, `agent_version`, dan transkrip aktif. Sesi belum
+  selesai tidak masuk History/Monitoring/SIDAK. `agent_version` hanya naik saat
+  pesan agen dipersist agar publish konsumen tidak membuat append browser stale.
+- `ketik_session_turns`: ledger request UUID dan payload agen untuk idempotensi.
+  Append baru langsung terminal `completed`; row lease lama tetap dibaca untuk
+  kompatibilitas endpoint `/turns`. Maksimal efektif 100 perubahan transkrip.
+- `ketik_session_responses`: request UUID pemicu balasan, versi konteks agen,
+  retry count 0/1, status, dan lease/fencing. Hanya satu response aktif per sesi.
+  Tabel ini bukan sumber transkrip penilaian kedua.
 - `ketik_history.transcript_provenance`: `legacy` untuk row lama dan `server_v1`
   untuk finalisasi sesi baru. Tidak ada backfill atau regrade.
 
-RPC `start_ketik_session`, `claim_ketik_session_turn`,
-`publish_ketik_session_turn`, `finish_ketik_session` adalah SECURITY INVOKER dan
-EXECUTE service-role-only. Authenticated hanya SELECT owner pada dua tabel
-operasional. Start memeriksa status akun, versi settings dan assignment wajib
-agen/leader. Claim memvalidasi owner/versi/expiry dan menyimpan pesan agen sekali.
-AI berlangsung di luar transaksi; retry ID/payload sama memakai fencing baru
-setelah lease hilang. Respons lease lama tidak bisa dipublikasikan. Tidak ada
+RPC start/legacy-turn/finish serta `append_ketik_session_message`,
+`claim_ketik_session_response`, `settle_ketik_session_response`, dan
+`fail_ketik_session_response` adalah SECURITY INVOKER dan EXECUTE
+service-role-only. Authenticated hanya SELECT owner pada kolom status yang aman
+di tiga tabel operasional; token `lease` response tidak diberi SELECT. Start
+memeriksa status akun, versi settings dan assignment wajib agen/leader. Append
+memvalidasi owner/agent-version/expiry dan menyimpan pesan agen sekali. AI
+berlangsung di luar transaksi; settle membandingkan context `agent_version`:
+perubahan pertama memperbarui snapshot dan memberi satu retry, perubahan kedua
+menandai request `superseded` tanpa memublikasikan hasil stale. Respons lease lama
+tidak bisa dipublikasikan. Setiap provider call tetap dicatat, tetapi tidak ada
 jaminan exactly-once biaya provider ketika crash/reclaim.
 
 Finalisasi atomik menulis history ber-ID sama tanpa skor, lalu mengosongkan

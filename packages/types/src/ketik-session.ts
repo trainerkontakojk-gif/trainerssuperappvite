@@ -21,12 +21,27 @@ export const ketikSessionTurnSchema = z.strictObject({
   // The agent has more messages queued: store this one without a consumer reply.
   awaitMore: z.literal(true).optional(),
 });
+export const appendKetikSessionMessageSchema = z.strictObject({
+  requestId: z.uuid(),
+  expectedAgentVersion: z.number().int().min(0),
+  text: z.string().trim().min(1).max(KETIK_PROMPT_LIMITS.chatMessageText),
+});
+export const requestKetikSessionResponseSchema = z.strictObject({
+  requestId: z.uuid(),
+});
 export const finishKetikSessionSchema = z.strictObject({});
 export type KetikSessionTurnRequest = z.infer<typeof ketikSessionTurnSchema>;
+export type AppendKetikSessionMessageRequest = z.infer<
+  typeof appendKetikSessionMessageSchema
+>;
+export type RequestKetikSessionResponse = z.infer<
+  typeof requestKetikSessionResponseSchema
+>;
 export interface KetikServerSession {
   id: string;
   state: "active" | "ended" | "discarded";
   version: number;
+  agentVersion: number;
   startedAt: string;
   expiresAt: string;
   config: KetikSessionConfig;
@@ -35,6 +50,13 @@ export interface KetikServerSession {
   messages: ChatMessage[];
   consumerClosed: boolean;
   provenance: "server_v1";
+  awaitingResponse: boolean;
+  pendingResponse: {
+    requestId: string;
+    status: "processing" | "failed";
+    retryCount: number;
+    leaseExpiresAt: string | null;
+  } | null;
   pendingTurn:
     | (KetikSessionTurnRequest & {
         status: "processing" | "failed";

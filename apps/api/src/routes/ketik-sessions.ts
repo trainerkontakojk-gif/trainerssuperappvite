@@ -3,8 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import {
   KETIK_SESSION_ERRORS,
+  appendKetikSessionMessageSchema,
   startKetikSessionSchema,
   ketikSessionTurnSchema,
+  requestKetikSessionResponseSchema,
   finishKetikSessionSchema,
 } from "@trainers/types";
 import { getActor, requireCapability } from "../middleware/role";
@@ -17,8 +19,10 @@ import {
 import { SimulationSubjectError } from "../services/simulation-subject-service";
 import { PracticeQuotaError } from "../services/practice-quota";
 import {
+  appendServerKetikMessage,
   startServerKetikSession,
   getServerKetikSession,
+  requestServerKetikResponse,
   sendServerKetikTurn,
   finishServerKetikSession,
   KetikSessionError,
@@ -96,6 +100,47 @@ export const ketikSessions = new Hono<{ Variables: Variables }>()
             getActor(c).id,
             c.req.valid("param").id,
             getUserClient(c),
+          ),
+        });
+      } catch (error) {
+        return failure(c, error);
+      }
+    },
+  )
+  .post(
+    "/:id/messages",
+    requireCapability("ketik.use"),
+    zValidator("param", idSchema),
+    zValidator("json", appendKetikSessionMessageSchema),
+    async (c) => {
+      try {
+        return c.json({
+          success: true,
+          data: await appendServerKetikMessage(
+            getActor(c).id,
+            c.req.valid("param").id,
+            c.req.valid("json"),
+          ),
+        });
+      } catch (error) {
+        return failure(c, error);
+      }
+    },
+  )
+  .post(
+    "/:id/respond",
+    requireCapability("ketik.use"),
+    aiRateLimitMiddleware,
+    zValidator("param", idSchema),
+    zValidator("json", requestKetikSessionResponseSchema),
+    async (c) => {
+      try {
+        return c.json({
+          success: true,
+          data: await requestServerKetikResponse(
+            getActor(c).id,
+            c.req.valid("param").id,
+            c.req.valid("json"),
           ),
         });
       } catch (error) {

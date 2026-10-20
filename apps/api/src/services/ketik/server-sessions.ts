@@ -7,9 +7,11 @@ import {
   normalizeGeneratedParts,
   resolveKetikSessionIdentity,
   mapSimulationSubjectRowToSnapshot,
+  type AppendKetikSessionMessageRequest,
   type KetikServerSession,
   type KetikSessionTurnRequest,
   type KetikSessionHistoryItem,
+  type RequestKetikSessionResponse,
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import type { Actor } from "../../middleware/role";
@@ -17,10 +19,7 @@ import { createAdminClient } from "../../lib/supabase";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { getSettingsSnapshot } from "./settings-history";
 import { getKetikAssignment } from "./configuration-assignments";
-import {
-  consumePracticeQuota,
-  refundPracticeQuota,
-} from "../practice-quota";
+import { consumePracticeQuota, refundPracticeQuota } from "../practice-quota";
 import { generateConsumerResponse } from "./consumer-response";
 
 const statuses = {
@@ -44,6 +43,7 @@ type SessionRow = {
   user_id: string;
   state: KetikServerSession["state"];
   version: number;
+  agent_version: number;
   started_at: string;
   expires_at: string;
   messages: KetikServerSession["messages"] | null;
@@ -60,10 +60,20 @@ type TurnRow = {
   status: "processing" | "failed";
   lease_expires_at: string | null;
 };
+type ResponseRow = {
+  request_id: string;
+  status: "processing" | "failed" | "completed" | "superseded";
+  retry_count: number;
+  lease_expires_at: string | null;
+};
 type RpcName =
   | "start_ketik_session"
   | "claim_ketik_session_turn"
   | "publish_ketik_session_turn"
+  | "append_ketik_session_message"
+  | "claim_ketik_session_response"
+  | "settle_ketik_session_response"
+  | "fail_ketik_session_response"
   | "finish_ketik_session";
 async function rpc<T>(
   name: RpcName,
@@ -102,24 +112,54 @@ async function rowToSession(
     if (!data) throw new KetikSessionError("SESSION_NOT_FOUND");
     messages = data.messages;
   }
-  const { data: pending, error } = await client
-    .from("ketik_session_turns")
-    .select("request_id,expected_version,agent_text,status,lease_expires_at")
-    .eq("session_id", row.id)
-    .neq("status", "completed")
-    .maybeSingle();
+  const [{ data: pending, error }, latestResponse] = await Promise.all([
+    client
+      .from("ketik_session_turns")
+      .select("request_id,expected_version,agent_text,status,lease_expires_at")
+      .eq("session_id", row.id)
+      .neq("status", "completed")
+      .maybeSingle(),
+    client
+      .from("ketik_session_responses")
+      .select("request_id,status,retry_count,lease_expires_at")
+      .eq("session_id", row.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
   if (error) throw error;
+  if (latestResponse.error) throw latestResponse.error;
   const turn = pending as TurnRow | null;
+  const response = latestResponse.data as ResponseRow | null;
+  const lastConversationalMessage = [...messages]
+    .reverse()
+    .find((message) => message.sender !== "system");
+  const awaitingResponse =
+    !row.consumer_closed && lastConversationalMessage?.sender === "agent";
   return {
     id: row.id,
     state: row.state,
     version: row.version,
+    agentVersion: row.agent_version ?? 0,
     startedAt: row.started_at,
     expiresAt: row.expires_at,
     ...row.snapshot,
     messages,
     consumerClosed: row.consumer_closed,
     provenance: "server_v1",
+    awaitingResponse,
+    pendingResponse:
+      row.state === "active" &&
+      awaitingResponse &&
+      response &&
+      (response.status === "processing" || response.status === "failed")
+        ? {
+            requestId: response.request_id,
+            status: response.status,
+            retryCount: response.retry_count,
+            leaseExpiresAt: response.lease_expires_at,
+          }
+        : null,
     pendingTurn:
       row.state === "active" && turn
         ? {
@@ -217,6 +257,127 @@ export async function startServerKetikSession(
     throw error;
   }
 }
+async function generateServerConsumerMessages(s: SessionRow, userId: string) {
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - Date.parse(s.started_at)) / 1000),
+  );
+  const result = await generateConsumerResponse(
+    s.snapshot.config,
+    {
+      ...s.snapshot.scenario,
+      images: s.snapshot.scenario.images?.map(() => ""),
+    },
+    s.messages ?? [],
+    { module: "ketik", action: "generate_consumer_response" },
+    userId,
+    {
+      elapsedSeconds,
+      remainingSeconds: Math.max(
+        0,
+        (Date.parse(s.expires_at) - Date.now()) / 1000,
+      ),
+      totalDurationSeconds: s.snapshot.config.simulationDuration * 60,
+    },
+  );
+  if (!result.success || !result.text)
+    throw new KetikSessionError("SESSION_AI_FAILED");
+  const text = result.text.replace(/\[NO_RESPONSE\]/gi, "").trim();
+  const parts = normalizeGeneratedParts(
+    text
+      .split("[BREAK]")
+      .map((part) => part.trim())
+      .filter(Boolean),
+  );
+  if (
+    (text && !parts.length) ||
+    parts.length > 3 ||
+    parts.some((part) => part.text.length > KETIK_PROMPT_LIMITS.chatMessageText)
+  )
+    throw new KetikSessionError("SESSION_AI_FAILED");
+  return {
+    messages: parts.map((part) => ({
+      ...part,
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+    })),
+    closed: !text,
+  };
+}
+
+export async function appendServerKetikMessage(
+  userId: string,
+  id: string,
+  request: AppendKetikSessionMessageRequest,
+) {
+  const row = await rpc<SessionRow>("append_ketik_session_message", {
+    p_user_id: userId,
+    p_session_id: id,
+    p_request_id: request.requestId,
+    p_expected_agent_version: request.expectedAgentVersion,
+    p_text: request.text,
+  });
+  return rowToSession(row);
+}
+
+export async function requestServerKetikResponse(
+  userId: string,
+  id: string,
+  request: RequestKetikSessionResponse,
+) {
+  const current = await getServerKetikSession(userId, id);
+  const timeoutMs =
+    resolveModelProvider(current.config.selectedModel).timeoutMs ?? 120_000;
+  const leaseSeconds = Math.min(
+    600,
+    Math.ceil((timeoutMs * 3 + 30_000) / 1000),
+  );
+  const claimed = await rpc<{
+    session: SessionRow;
+    lease?: string;
+    replay: boolean;
+    noop: boolean;
+  }>("claim_ketik_session_response", {
+    p_user_id: userId,
+    p_session_id: id,
+    p_request_id: request.requestId,
+    p_lease_seconds: leaseSeconds,
+  });
+  if (claimed.replay || claimed.noop || !claimed.lease)
+    return rowToSession(claimed.session);
+
+  let snapshot = claimed.session;
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const generated = await generateServerConsumerMessages(snapshot, userId);
+      const settled = await rpc<{
+        action: "retry" | "published" | "superseded";
+        session: SessionRow;
+      }>("settle_ketik_session_response", {
+        p_user_id: userId,
+        p_session_id: id,
+        p_request_id: request.requestId,
+        p_lease: claimed.lease,
+        p_messages: generated.messages,
+        p_closed: generated.closed,
+        p_lease_seconds: leaseSeconds,
+      });
+      snapshot = settled.session;
+      if (settled.action !== "retry") return rowToSession(snapshot);
+    }
+    return rowToSession(snapshot);
+  } catch (error) {
+    // Best effort: a lost lease must not mask the provider/DB error the caller sees.
+    await rpc<boolean>("fail_ketik_session_response", {
+      p_user_id: userId,
+      p_session_id: id,
+      p_request_id: request.requestId,
+      p_lease: claimed.lease,
+    }).catch(() => false);
+    throw error;
+  }
+}
+
 export async function sendServerKetikTurn(
   userId: string,
   id: string,
@@ -240,8 +401,7 @@ export async function sendServerKetikTurn(
   if (claimed.replay) return rowToSession(claimed.session);
   const s = claimed.session;
   try {
-    // The consumer reads the agent's back-to-back messages and answers once,
-    // on the last one; earlier ones are stored without an AI call.
+    // Compatibility path for clients deployed before messages/respond split.
     if (request.awaitMore) {
       const stored = await rpc<SessionRow>("publish_ketik_session_turn", {
         p_user_id: userId,
@@ -253,55 +413,14 @@ export async function sendServerKetikTurn(
       });
       return rowToSession(stored);
     }
-    const elapsedSeconds = Math.max(
-      0,
-      Math.floor((Date.now() - Date.parse(s.started_at)) / 1000),
-    );
-    const result = await generateConsumerResponse(
-      s.snapshot.config,
-      {
-        ...s.snapshot.scenario,
-        images: s.snapshot.scenario.images?.map(() => ""),
-      },
-      s.messages ?? [],
-      { module: "ketik", action: "generate_consumer_response" },
-      userId,
-      {
-        elapsedSeconds,
-        remainingSeconds: Math.max(
-          0,
-          (Date.parse(s.expires_at) - Date.now()) / 1000,
-        ),
-        totalDurationSeconds: s.snapshot.config.simulationDuration * 60,
-      },
-    );
-    if (!result.success || !result.text)
-      throw new KetikSessionError("SESSION_AI_FAILED");
-    const text = result.text.replace(/\[NO_RESPONSE\]/gi, "").trim();
-    const parts = normalizeGeneratedParts(
-      text
-        .split("[BREAK]")
-        .map((p) => p.trim())
-        .filter(Boolean),
-    );
-    if (
-      (text && !parts.length) ||
-      parts.length > 3 ||
-      parts.some((p) => p.text.length > KETIK_PROMPT_LIMITS.chatMessageText)
-    )
-      throw new KetikSessionError("SESSION_AI_FAILED");
-    const messages = parts.map((p) => ({
-      ...p,
-      id: randomUUID(),
-      timestamp: new Date().toISOString(),
-    }));
+    const generated = await generateServerConsumerMessages(s, userId);
     const published = await rpc<SessionRow>("publish_ketik_session_turn", {
       p_user_id: userId,
       p_session_id: id,
       p_request_id: request.requestId,
       p_lease: claimed.lease,
-      p_messages: messages,
-      p_closed: !text,
+      p_messages: generated.messages,
+      p_closed: generated.closed,
     });
     return rowToSession(published);
   } catch (error) {
