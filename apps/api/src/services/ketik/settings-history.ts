@@ -98,6 +98,8 @@ function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
       signatureName: stored.identitySettings?.signatureName || "",
       phoneNumber: stored.identitySettings?.phoneNumber || "",
       city: stored.identitySettings?.city || "",
+      nik: stored.identitySettings?.nik || "",
+      email: stored.identitySettings?.email || "",
     },
     selectedModel: coerceKetikPdktModelId(stored.selectedModel),
     simulationDuration: coerceDuration(stored.simulationDuration),

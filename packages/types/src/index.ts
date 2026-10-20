@@ -9,6 +9,7 @@ export * from "./ketik";
 export * from "./ketik-session";
 export * from "./ketik-messages";
 export * from "./ketik-identity";
+export * from "./ketik-identity-verification";
 export * from "./pdkt";
 export * from "./telefun";
 export type { TelefunHistoryScoringView } from "./telefun";

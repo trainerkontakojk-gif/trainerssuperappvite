@@ -89,3 +89,17 @@
 7. E2E UI: `ketik-flow.spec.ts` mengisi NIK/email di Pengaturan dan melihatnya di riwayat.
 8. Gate: typecheck/lint/build, E2E fokus hijau, `thermo-nuclear`, CHANGELOG.
 9. Rilis: migrasi produksi (dengan izin) → push API → push web, sama seperti rilis durable messages; commit backend sudah membawa penyesuaian tipe/fixture web agar setiap commit lolos CI.
+
+## Pembagian kerja (2026-10-20)
+
+- **Kontrak bersama (selesai, Claude):** `packages/types` — `ketik-consumer-pool.ts` (150 rekaman, dibangkitkan `scripts/generate-ketik-consumer-pool.mjs`), `resolveKetikSessionIdentity()` memilih satu rekaman utuh (nama kustom meminjam rekaman bergender sama agar NIK konsisten), `ketik-identity-verification.ts` (`detectKetikIdentityAnomalies`, `computeKetikIdentityCorrection`), field `nik`/`email` di settings/identity/history/monitoring, dan `KetikEducation.verification` (`KetikVerificationReview`, `summarizeKetikVerificationStatus`).
+- **Frontend (Claude):** Pengaturan → Identitas, panel Data konsumen, Telaah Verifikasi data, transkrip/riwayat/Monitoring, E2E UI.
+- **Backend (Codex `gpt-6.1-sol`, effort medium, worktree terpisah):** migrasi + rollback `ketik_history.consumer_nik/consumer_email` dan `finish_ketik_session`, prompt konsumen (`identity.correction` dari `computeKetikIdentityCorrection`), review verifikasi (mengisi `education.verification` tervalidasi server), history/monitoring read, E2E API.
+
+### Kontrak `education.verification`
+
+- Hanya diisi bila `detectKetikIdentityAnomalies(identity sesi)` tidak kosong; sesi valid → `null`/tidak ada.
+- `fields[]` satu per anomali, urutan sama dengan hasil deteksi; `value`/`reason` disalin server dari deteksi, bukan dari AI.
+- `status` per field dari AI tetapi divalidasi server: `agentMessageId` wajib id pesan **agen** yang ada di transkrip (selain itu dibuang menjadi `null`); `confirmed` tanpa `agentMessageId` valid diturunkan menjadi `unconfirmed`. `status` keseluruhan = `summarizeKetikVerificationStatus(fields)`.
+- `missedBeforeMessageId`: bila status bukan `confirmed`, id pesan agen pertama setelah konsumen memberikan data (atau pesan agen terakhir bila data tidak pernah diminta); `null` bila `confirmed`.
+- Nilai Probing berkurang dan satu `agentNotes` berverdict `fix` berdimensi `probing` ditambahkan untuk status selain `confirmed`, dengan `example` kalimat konfirmasi.

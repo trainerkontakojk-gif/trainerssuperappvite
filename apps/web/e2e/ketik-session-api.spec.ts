@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_KETIK_SETTINGS, KETIK_DUMMY_CONSUMERS } from "@trainers/types";
+import { DEFAULT_KETIK_SETTINGS, KETIK_CONSUMER_POOL } from "@trainers/types";
 import {
   createAdmin,
   createUserWithJwt,
@@ -1115,7 +1115,9 @@ test("server-picked and custom consumer identities carry the gender used for the
     await put("");
     for (let i = 0; i < 4; i++) {
       const { name, gender } = (await start()).config.identity;
-      expect(KETIK_DUMMY_CONSUMERS).toContainEqual({ name, gender });
+      expect(KETIK_CONSUMER_POOL).toContainEqual(
+        expect.objectContaining({ name, gender }),
+      );
     }
     await put("Pak Hendra");
     expect((await start()).config.identity).toMatchObject({

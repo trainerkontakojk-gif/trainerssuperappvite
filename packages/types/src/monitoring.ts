@@ -173,6 +173,8 @@ export interface KetikMonitoringReview {
     consumerName: string | null;
     consumerPhone: string | null;
     consumerCity: string | null;
+    consumerNik?: string | null;
+    consumerEmail?: string | null;
     simulationDuration: number | null;
     messages: MonitoringKetikMessage[];
   } | null;

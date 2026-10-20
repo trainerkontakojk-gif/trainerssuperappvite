@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_AI_MODEL_ID } from "./ai-models";
+import type { KetikIdentityAnomalyField } from "./ketik-identity-verification";
 import type { SimulationSubjectSnapshot } from "./simulation-subject";
 
 // Public copy only. Provider/database detail belongs in backend logs, never here.
@@ -75,6 +76,10 @@ export interface KetikIdentitySettings {
   signatureName: string;
   phoneNumber: string;
   city: string;
+  /** Empty = taken from the practice consumer pool. May be deliberately malformed. */
+  nik: string;
+  /** Empty = taken from the practice consumer pool. May be deliberately malformed. */
+  email: string;
 }
 
 export interface KetikAppSettings {
@@ -229,6 +234,8 @@ export const DEFAULT_KETIK_SETTINGS: KetikAppSettings = {
     signatureName: "",
     phoneNumber: "",
     city: "",
+    nik: "",
+    email: "",
   },
   selectedModel: DEFAULT_AI_MODEL_ID,
   simulationDuration: 5,
@@ -243,6 +250,9 @@ export interface KetikSessionHistoryItem {
   consumerName: string;
   consumerPhone?: string;
   consumerCity?: string;
+  /** Absent on sessions finished before NIK/email existed. */
+  consumerNik?: string | null;
+  consumerEmail?: string | null;
   messages: ChatMessage[];
   simulationDuration?: number;
   finalScore?: number;
@@ -304,6 +314,9 @@ export interface ChatSession {
   consumerName: string;
   consumerPhone?: string;
   consumerCity?: string;
+  /** Absent on sessions finished before NIK/email existed. */
+  consumerNik?: string | null;
+  consumerEmail?: string | null;
   messages: ChatMessage[];
   finalScore?: number;
   empathyScore?: number;
@@ -395,6 +408,51 @@ export interface KetikAgentNote {
   example: string | null;
 }
 
+export const KETIK_VERIFICATION_STATUSES = [
+  "confirmed",
+  "unconfirmed",
+  "not_asked",
+] as const;
+/**
+ * confirmed: the agent asked about or confirmed the malformed value at least once.
+ * unconfirmed: the agent asked for the data but never questioned the malformed value.
+ * not_asked: the agent never asked for that data at all.
+ */
+export type KetikVerificationStatus =
+  (typeof KETIK_VERIFICATION_STATUSES)[number];
+
+/** One malformed NIK/email/domicile field and what the agent did about it. */
+export interface KetikVerificationField {
+  field: KetikIdentityAnomalyField;
+  /** Session value, copied by the backend from the session identity. */
+  value: string;
+  /** From `detectKetikIdentityAnomalies`, e.g. "15 digit, harus 16". */
+  reason: string;
+  status: KetikVerificationStatus;
+  /** Agent message that asked/confirmed; for not-confirmed, the message where it should have. */
+  agentMessageId: string | null;
+  agentQuote: string | null;
+}
+
+/** Present only on reviews of sessions whose identity had anomalies. */
+export interface KetikVerificationReview {
+  /** Worst field status; see `summarizeKetikVerificationStatus`. */
+  status: KetikVerificationStatus;
+  fields: KetikVerificationField[];
+  /** Telaah draws the dashed "should have confirmed here" line before this message. */
+  missedBeforeMessageId: string | null;
+}
+
+/** confirmed only when every field is; otherwise unconfirmed beats not_asked. */
+export function summarizeKetikVerificationStatus(
+  fields: readonly Pick<KetikVerificationField, "status">[],
+): KetikVerificationStatus {
+  if (fields.every((field) => field.status === "confirmed")) return "confirmed";
+  return fields.some((field) => field.status === "unconfirmed")
+    ? "unconfirmed"
+    : "not_asked";
+}
+
 export interface KetikEducation {
   dimensionGuidance: KetikDimensionGuidance[]; // length 5, sorted by priorityRank
   overallNextSteps?: string[];
@@ -403,6 +461,8 @@ export interface KetikEducation {
   caseCore?: string | null;
   consumerPoints?: KetikConsumerPoint[];
   agentNotes?: KetikAgentNote[];
+  // Verifikasi data; hanya ada bila identitas sesi memuat data tidak sesuai.
+  verification?: KetikVerificationReview | null;
 }
 
 export interface KetikSessionReview {
@@ -481,6 +541,9 @@ export const ketikIdentitySettingsSchema = z.object({
   signatureName: z.string(),
   phoneNumber: z.string(),
   city: z.string(),
+  // Settings saved before NIK/email existed omit them.
+  nik: z.string().max(64).default(""),
+  email: z.string().max(254).default(""),
 });
 
 // Training-only data may be copied to another account; identity/templates must not.
@@ -534,6 +597,9 @@ export const ketikIdentitySchema = z.object({
   name: z.string(),
   city: z.string(),
   phone: z.string(),
+  // Optional so session snapshots from before NIK/email still parse.
+  nik: z.string().optional(),
+  email: z.string().optional(),
   signatureName: z.string().optional(),
   gender: z.enum(["male", "female"]).optional(),
   voiceName: z.string().optional(),
@@ -545,7 +611,13 @@ export const generateMessageSchema = z.object({
   scenarioDraft: ketikScenarioSchema.optional(),
   consumerTypeId: z.string(),
   consumerTypeDraft: ketikConsumerTypeSchema.optional(),
-  identity: z.object({ name: z.string(), city: z.string(), phone: z.string() }),
+  identity: z.object({
+    name: z.string(),
+    city: z.string(),
+    phone: z.string(),
+    nik: z.string().optional(),
+    email: z.string().optional(),
+  }),
   selectedModel: z.string().default(DEFAULT_AI_MODEL_ID),
   simulationDuration: z.number().default(5),
   responsePacingMode: z

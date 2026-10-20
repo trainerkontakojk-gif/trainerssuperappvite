@@ -39,6 +39,8 @@ const settings = {
     signatureName: "",
     phoneNumber: "",
     city: "",
+    nik: "",
+    email: "",
   },
   selectedModel: "gpt-5.4-mini",
   simulationDuration: 5,

@@ -5,7 +5,7 @@ describe("resolveKetikSessionIdentity", () => {
   it("fills empty identity fields with contextual fallback values", () => {
     // Using 0 as pickIndex for deterministic results
     const identity = resolveKetikSessionIdentity(
-      { displayName: "", signatureName: "Agen", phoneNumber: "", city: "" },
+      { displayName: "", signatureName: "Agen", phoneNumber: "", city: "", nik: "", email: "" },
       0,
     );
 
@@ -22,6 +22,8 @@ describe("resolveKetikSessionIdentity", () => {
         signatureName: "",
         phoneNumber: "08129999",
         city: "Bandung",
+        nik: "",
+        email: "",
       },
       1,
     );

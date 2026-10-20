@@ -1,158 +1,86 @@
 import type { KetikIdentity, KetikIdentitySettings } from "./ketik";
+import { KETIK_CONSUMER_POOL } from "./ketik-consumer-pool";
 
 type KetikGender = NonNullable<KetikIdentity["gender"]>;
 
-/** Server-picked consumers carry an explicit gender so the portrait never guesses. */
-export const KETIK_DUMMY_CONSUMERS: ReadonlyArray<{
-  name: string;
-  gender: KetikGender;
-}> = [
-  { name: "Budi Santoso", gender: "male" },
-  { name: "Siti Aminah", gender: "female" },
-  { name: "Agus Setiawan", gender: "male" },
-  { name: "Dewi Lestari", gender: "female" },
-  { name: "Rina Wati", gender: "female" },
-  { name: "Eko Prasetyo", gender: "male" },
-  { name: "Hendra Wijaya", gender: "male" },
-  { name: "Nurul Hidayah", gender: "female" },
-  { name: "Bambang Pamungkas", gender: "male" },
-  { name: "Lina Marlina", gender: "female" },
-  { name: "Dedi Supriyadi", gender: "male" },
-  { name: "Sri Wahyuni", gender: "female" },
-  { name: "Rudi Hartono", gender: "male" },
-  { name: "Ratna Sari", gender: "female" },
-  { name: "Joko Widodo", gender: "male" },
-  { name: "Mega Ayuningtyas", gender: "female" },
-  { name: "Andi Pratama", gender: "male" },
-  { name: "Fitri Handayani", gender: "female" },
-  { name: "Rudi Hermawan", gender: "male" },
-  { name: "Lukman Hakim", gender: "male" },
-  { name: "Ayu Kartika", gender: "female" },
-  { name: "Fajar Nugroho", gender: "male" },
-  { name: "Yanti Susanti", gender: "female" },
-  { name: "Iwan Saputra", gender: "male" },
-  { name: "Maya Putri", gender: "female" },
-  { name: "Reza Rahadian", gender: "male" },
-  { name: "Indah Permatasari", gender: "female" },
-  { name: "Slamet Riyadi", gender: "male" },
-  { name: "Tuti Alawiyah", gender: "female" },
-  { name: "Farhan Maulana", gender: "male" },
-  { name: "Nabila Zahra", gender: "female" },
-  { name: "Gilang Ramadhan", gender: "male" },
-  { name: "Citra Kirana", gender: "female" },
-  { name: "Bayu Anggara", gender: "male" },
-  { name: "Wulan Dari", gender: "female" },
-  { name: "Teuku Fariz", gender: "male" },
-  { name: "Cut Marlia", gender: "female" },
-  { name: "I Made Wirata", gender: "male" },
-  { name: "Ni Luh Ayu", gender: "female" },
-  { name: "Ujang Komarudin", gender: "male" },
-  { name: "Eneng Suryani", gender: "female" },
-  { name: "La Ode Haris", gender: "male" },
-  { name: "Wa Ode Sitti", gender: "female" },
-  { name: "Johan Panjaitan", gender: "male" },
-  { name: "Boruk Sihombing", gender: "male" },
-  { name: "Daeng Makkawaru", gender: "male" },
-  { name: "Andi Tenri", gender: "female" },
-  { name: "Yohanes Korwa", gender: "male" },
-  { name: "Maria Matulessy", gender: "female" },
-];
-const DUMMY_CITIES = [
-  "Jakarta Selatan",
-  "Jakarta Pusat",
-  "Jakarta Barat",
-  "Jakarta Timur",
-  "Jakarta Utara",
-  "Kota Bogor",
-  "Kota Depok",
-  "Kota Bekasi",
-  "Kota Tangerang",
-  "Kota Tangerang Selatan",
-  "Bandung",
-  "Surabaya",
-  "Medan",
-  "Semarang",
-  "Makassar",
-  "Palembang",
-  "Yogyakarta",
-  "Malang",
-  "Denpasar",
-  "Balikpapan",
-  "Samarinda",
-  "Banjarmasin",
-  "Pontianak",
-  "Manado",
-  "Padang",
-  "Pekanbaru",
-  "Bandar Lampung",
-  "Batam",
-  "Cirebon",
-  "Solo",
-  "Kediri",
-  "Jember",
-  "Mataram",
-  "Kupang",
-  "Ambon",
-  "Jayapura",
-  "Sorong",
-  "Banda Aceh",
-  "Bengkulu",
-  "Jambi",
-  "Cilegon",
-  "Serang",
-  "Purwokerto",
-  "Magelang",
-  "Palu",
-  "Kendari",
-  "Gorontalo",
-  "Ternate",
-  "Mamuju",
-];
-const PHONE_PREFIXES = [
-  "0812",
-  "0813",
-  "0821",
-  "0852",
-  "0811",
-  "0815",
-  "0817",
-  "0818",
-  "0819",
-  "0822",
-  "0823",
-  "0851",
-  "0853",
-  "0856",
-  "0857",
-  "0858",
-  "0895",
-  "0896",
-];
+export {
+  KETIK_CONSUMER_POOL,
+  type KetikPoolConsumer,
+} from "./ketik-consumer-pool";
 
+/**
+ * One whole pool record per session, so name, gender, city, NIK, email and
+ * phone agree. A field the user filled in Pengaturan always wins; an email for
+ * a user-chosen name is rebuilt from that name.
+ */
 export function resolveKetikSessionIdentity(
   settings: KetikIdentitySettings,
   pickIndex = Math.floor(Math.random() * 1000000),
 ): KetikIdentity {
-  const dummy =
-    KETIK_DUMMY_CONSUMERS[Math.abs(pickIndex) % KETIK_DUMMY_CONSUMERS.length];
-  const name = settings.displayName || dummy.name;
-  const gender = settings.displayName
+  const start = Math.abs(pickIndex) % KETIK_CONSUMER_POOL.length;
+  const customGender = settings.displayName
     ? inferKetikIdentityGender(settings.displayName)
-    : dummy.gender;
-  const city =
-    settings.city || DUMMY_CITIES[Math.abs(pickIndex) % DUMMY_CITIES.length];
-  const prefix = PHONE_PREFIXES[Math.abs(pickIndex) % PHONE_PREFIXES.length];
-  const phone =
-    settings.phoneNumber ||
-    `${prefix}${String(Math.abs(pickIndex)).padStart(8, "0").slice(-8)}`;
+    : undefined;
+  // The NIK encodes gender (day +40 for women), so a custom name borrows the
+  // next record of its own gender.
+  const record =
+    (customGender &&
+      [...KETIK_CONSUMER_POOL.slice(start), ...KETIK_CONSUMER_POOL].find(
+        (candidate) => candidate.gender === customGender,
+      )) ||
+    KETIK_CONSUMER_POOL[start];
+  const name = settings.displayName || record.name;
+  const gender = settings.displayName ? customGender : record.gender;
+  const email =
+    settings.email ||
+    (settings.displayName
+      ? buildKetikConsumerEmail(settings.displayName, record.birthDate)
+      : record.email);
 
   return {
     name,
-    city,
-    phone,
+    city: settings.city || record.city,
+    phone: settings.phoneNumber || record.phone,
+    nik: settings.nik || record.nik,
+    email,
     signatureName: settings.signatureName,
     ...(gender ? { gender } : {}),
   };
+}
+
+const EMAIL_SKIP_TOKENS = new Set([
+  "i",
+  "ni",
+  "pak",
+  "bapak",
+  "bu",
+  "ibu",
+  "mas",
+  "mbak",
+  "kak",
+  "bang",
+]);
+
+/** `nama.belakang<YY>@gmail.com`, the same shape the pool generator uses. */
+export function buildKetikConsumerEmail(
+  name: string,
+  birthDate: string,
+): string {
+  const tokens = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z ]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  const kept = tokens.filter(
+    (token, index) =>
+      !EMAIL_SKIP_TOKENS.has(token) || index === tokens.length - 1,
+  );
+  const words = kept.length > 0 ? kept : ["konsumen"];
+  const local =
+    words.length === 1 ? words[0] : `${words[0]}.${words[words.length - 1]}`;
+  return `${local}${birthDate.slice(2, 4)}@gmail.com`;
 }
 
 const FEMALE_TITLES = new Set(["bu", "ibu", "mbak", "nona", "nyonya", "cut", "ni", "wa"]);

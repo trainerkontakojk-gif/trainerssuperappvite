@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- feat(ketik): add the 150-consumer practice pool with NIK and email, malformed-identity detection and correction, and the shared NIK/email/verification contract
 - docs(ketik): extend the verification rule to province-level or bare-Jakarta domicile while treating shared city/regency names as the city
 - docs(ketik): penalize never asking for malformed NIK/email and show the session data plus a missed-verification marker beside the Telaah transcript
 - docs(ketik): state that the consumer never volunteers NIK or email before the agent asks

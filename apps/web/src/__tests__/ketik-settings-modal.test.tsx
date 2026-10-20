@@ -72,6 +72,8 @@ describe(
       signatureName: "Jane",
       phoneNumber: "08123456789",
       city: "Bandung",
+      nik: "",
+      email: "",
     },
     selectedModel: "gemini-3.1-flash-lite",
     simulationDuration: 5,
