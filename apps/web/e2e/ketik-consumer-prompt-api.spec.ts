@@ -212,3 +212,44 @@ test("agent messages sent back to back get one consumer reply that reads them al
     replied.messages.map((m: { sender: string }) => m.sender).slice(-3),
   ).toEqual(["agent", "agent", "consumer"]);
 });
+
+test("scenario attachments are offered with their descriptions and say when to send them", async () => {
+  const saved = await api("/settings", "PUT", {
+    ...DEFAULT_KETIK_SETTINGS,
+    activeConsumerTypeId: "ramah",
+    scenarios: DEFAULT_KETIK_SETTINGS.scenarios.map((scenario) =>
+      scenario.id === "pinjol"
+        ? {
+            ...scenario,
+            images: ["https://img.test/a.png", "https://img.test/b.png"],
+            imageAlts: [
+              "Tangkapan layar ancaman penagih di WhatsApp",
+              "Bukti transfer cicilan ke rekening pinjol",
+            ],
+          }
+        : { ...scenario, isActive: false },
+    ),
+    responsePacingMode: "training_fast",
+  });
+  expect(saved.status).toBe(200);
+  const started = await api("/sessions", "POST", { requestId: randomUUID() });
+  expect(started.status).toBe(200);
+  const session = (await started.json()).data;
+  instructions = [];
+  await sendTurn(session.id, 0, "Boleh kirim bukti ancamannya, Ibu?");
+  expect(instructions).toHaveLength(1);
+  const prompt = instructions[0];
+  // Each attachment is offered by index with its description.
+  expect(prompt).toContain(
+    'Indeks 0: "Tangkapan layar ancaman penagih di WhatsApp"',
+  );
+  expect(prompt).toContain(
+    'Indeks 1: "Bukti transfer cicilan ke rekening pinjol"',
+  );
+  // The instruction says when an attachment belongs in the chat.
+  expect(prompt).toContain("KAPAN MENGIRIM LAMPIRAN");
+  expect(prompt).toMatch(/agen meminta bukti/i);
+  expect(prompt).toContain("sesuai keterangannya");
+  expect(prompt).toContain("Setiap lampiran cukup dikirim sekali");
+  expect(prompt).toContain("[SEND_IMAGE: indeks]");
+});

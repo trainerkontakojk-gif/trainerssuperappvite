@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(ketik): show agent messages instantly with sent/read ticks and guide the consumer to send relevant scenario attachments
 - fix(telefun): allow local recording reads under production CSP
 
 - feat(telefun): clarify review audio waveform and playback position

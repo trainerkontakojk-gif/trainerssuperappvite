@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  ChatMessage,
   KetikServerSession,
   KetikSessionTurnRequest,
 } from "@trainers/types";
@@ -28,21 +29,84 @@ function pendingAgentTexts(session: KetikServerSession, excludeId: string) {
   return texts;
 }
 
+interface QueuedTurn {
+  requestId: string;
+  text: string;
+  sentAt: string;
+}
+
+/**
+ * Server messages plus queued agent bubbles, each agent bubble with its tick:
+ * sent (browser only), delivered (stored), read (consumer read or replied).
+ * Once the chat is closed, unsent queued text is no longer part of it.
+ */
+function presentMessages(
+  list: ChatMessage[],
+  state: {
+    open: boolean;
+    queued: QueuedTurn[];
+    acked: Set<string>;
+    read: Set<string>;
+  },
+) {
+  const known = new Set(list.map((m) => m.id));
+  const all: ChatMessage[] = [
+    ...list,
+    ...state.queued
+      .filter((q) => state.open && !known.has(q.requestId))
+      .map((q) => ({
+        id: q.requestId,
+        sender: "agent" as const,
+        text: q.text,
+        timestamp: q.sentAt,
+      })),
+  ];
+  let repliedAfter = false;
+  for (let i = all.length - 1; i >= 0; i--) {
+    const m = all[i];
+    if (m.sender === "consumer") repliedAfter = true;
+    if (m.sender !== "agent") continue;
+    const status =
+      repliedAfter || state.read.has(m.id)
+        ? "read"
+        : state.queued.some((q) => q.requestId === m.id) &&
+            !state.acked.has(m.id)
+          ? "sent"
+          : "delivered";
+    all[i] = { ...m, status };
+  }
+  return all;
+}
+
 /** One ordered queue; typing/send stays available while a turn is in flight. */
 export function useServerKetikChat(initial: KetikServerSession) {
   const current = useRef(initial);
   const slow = useRef({ total: 0, consecutive: 0 });
   const mounted = useRef(true);
-  const queue = useRef<Array<{ requestId: string; text: string }>>(
+  const queue = useRef<QueuedTurn[]>(
     initial.pendingTurn
       ? [
           {
             requestId: initial.pendingTurn.requestId,
             text: initial.pendingTurn.text,
+            sentAt: new Date().toISOString(),
           },
         ]
       : [],
   );
+  // Agent messages the server has stored, and those the consumer has read.
+  const acked = useRef(
+    new Set(initial.pendingTurn ? [initial.pendingTurn.requestId] : []),
+  );
+  const read = useRef(new Set<string>());
+  const present = (list: ChatMessage[]) =>
+    presentMessages(list, {
+      open:
+        current.current.state === "active" && !current.current.consumerClosed,
+      queued: queue.current,
+      acked: acked.current,
+      read: read.current,
+    });
   const request = useRef<KetikSessionTurnRequest | null>(
     initial.pendingTurn
       ? {
@@ -61,7 +125,14 @@ export function useServerKetikChat(initial: KetikServerSession) {
   const lastSendAt = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [typing, setTyping] = useState(false);
-  const [messages, setMessages] = useState(initial.messages);
+  const [messages, setMessages] = useState(() =>
+    presentMessages(initial.messages, {
+      open: initial.state === "active" && !initial.consumerClosed,
+      queued: [],
+      acked: new Set(),
+      read: new Set(),
+    }),
+  );
   const [loading, setLoading] = useState(
     initial.pendingTurn?.status === "processing",
   );
@@ -143,24 +214,12 @@ export function useServerKetikChat(initial: KetikServerSession) {
         }
         const next = queue.current[0];
         request.current ??= {
-          ...next,
+          requestId: next.requestId,
+          text: next.text,
           expectedVersion: session.version,
           ...(queue.current.length > 1 ? { awaitMore: true as const } : {}),
         };
         const active = request.current;
-        setMessages((prev) =>
-          prev.some((m) => m.id === active.requestId)
-            ? prev
-            : [
-                ...prev,
-                {
-                  id: active.requestId,
-                  sender: "agent",
-                  text: active.text,
-                  timestamp: new Date().toISOString(),
-                },
-              ],
-        );
         // The consumer reads every agent message since its last reply, then types.
         const factor = consumerSpeedFactor(session.config.consumerType.id);
         const readEnd =
@@ -172,7 +231,17 @@ export function useServerKetikChat(initial: KetikServerSession) {
             factor;
         if (!active.awaitMore) {
           typingTimer.current = setTimeout(
-            () => mounted.current && setTyping(true),
+            () => {
+              if (!mounted.current) return;
+              // Typing means the consumer has read everything up to this turn.
+              setMessages((prev) => {
+                const end = prev.findIndex((m) => m.id === active.requestId);
+                for (const m of prev.slice(0, end + 1))
+                  if (m.sender === "agent") read.current.add(m.id);
+                return present(prev);
+              });
+              setTyping(true);
+            },
             Math.max(0, readEnd - Date.now()),
           );
         }
@@ -180,10 +249,11 @@ export function useServerKetikChat(initial: KetikServerSession) {
           const result = await ketikApi.sendTurn(initial.id, active);
           if (!mounted.current) return;
           current.current = result;
+          acked.current.add(active.requestId);
           const agentIndex = result.messages.findIndex(
             (m) => m.id === active.requestId,
           );
-          setMessages(result.messages.slice(0, agentIndex + 1));
+          setMessages(present(result.messages.slice(0, agentIndex + 1)));
           const ranges =
             mode === "training_fast" ? TRAINING_FAST_RANGES : REALISTIC_RANGES;
           const remaining = Math.max(
@@ -240,11 +310,11 @@ export function useServerKetikChat(initial: KetikServerSession) {
               Math.min(planned, Date.parse(result.expiresAt) - Date.now()),
             );
             if (!mounted.current) return;
-            setMessages(result.messages.slice(0, index + 1));
+            setMessages(present(result.messages.slice(0, index + 1)));
             showAt = Math.max(showAt, Date.now());
           }
           stopTyping();
-          setMessages(result.messages);
+          setMessages(present(result.messages));
           setClosed(result.consumerClosed || result.state !== "active");
           queue.current.shift();
           request.current = null;
@@ -281,7 +351,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
         const loaded = await ketikApi.getSession(initial.id);
         if (cancelled) return;
         current.current = loaded;
-        setMessages(loaded.messages);
+        setMessages(present(loaded.messages));
         if (!loaded.pendingTurn) {
           queue.current.shift();
           request.current = null;
@@ -329,8 +399,14 @@ export function useServerKetikChat(initial: KetikServerSession) {
       return false;
     }
     lastSendAt.current = Date.now();
-    queue.current.push({ requestId: crypto.randomUUID(), text });
+    queue.current.push({
+      requestId: crypto.randomUUID(),
+      text,
+      sentAt: new Date().toISOString(),
+    });
     setCount(queue.current.length);
+    // The bubble shows at once; only the server request waits for the quiet window.
+    setMessages((prev) => present(prev));
     void process();
     return true;
   };

@@ -813,3 +813,98 @@ test("the start button shows today's remaining KETIK quota and turns off when it
   await expect(start).toHaveAccessibleDescription(reason);
   expectHermetic(out);
 });
+
+test("agent bubbles appear on send with a sent tick, before the quiet window releases the turn, then turn read", async ({
+  page,
+}) => {
+  let live = session({
+    config: { ...session().config, responsePacingMode: "realistic" },
+  });
+  const audit = await openHermeticShell(page, {
+    path: "/ketik",
+    apiMocks: base,
+    expectedThirdPartyHosts: ["randomuser.me"],
+  });
+  await page.route(`**/api/v1/ketik/sessions/${id}`, (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  await page.route("**/api/v1/ketik/sessions", (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  const calls: KetikSessionTurnRequest[] = [];
+  await page.route(`**/api/v1/ketik/sessions/${id}/turns`, async (route) => {
+    const body = route.request().postDataJSON() as KetikSessionTurnRequest;
+    calls.push(body);
+    live = {
+      ...live,
+      version: live.version + 1,
+      messages: [
+        ...live.messages,
+        {
+          id: body.requestId,
+          sender: "agent",
+          text: body.text,
+          timestamp: new Date().toISOString(),
+        },
+        ...(body.awaitMore
+          ? []
+          : [
+              {
+                id: "reply-susulan",
+                sender: "consumer" as const,
+                text: "Oke kak",
+                timestamp: new Date().toISOString(),
+              },
+            ]),
+      ],
+    };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+  await page.getByRole("button", { name: /^Mulai simulasi/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Mulai|Lanjutkan/ })
+    .click();
+  const room = page.getByRole("region", { name: "Ruang chat" });
+  const input = room.getByRole("textbox", { name: "Tulis balasan" });
+  await input.fill("Pesan langsung");
+  await input.press("Enter");
+  await input.fill("Pesan susulan");
+  await input.press("Enter");
+  // The realistic quiet window holds the request for 3 s; the bubbles do not wait.
+  await expect(room.getByText("Pesan langsung", { exact: true })).toBeVisible({
+    timeout: 1000,
+  });
+  await expect(room.getByText("Pesan susulan", { exact: true })).toBeVisible({
+    timeout: 1000,
+  });
+  expect(calls).toHaveLength(0);
+  // One tick while only the browser has the message.
+  await expect(room.getByRole("img", { name: "Terkirim" })).toHaveCount(2);
+  // Both turns still reach the server in order, once each, without extra fields.
+  await expect.poll(() => calls.length, { timeout: 15000 }).toBe(2);
+  expect(calls.map((call) => call.text)).toEqual([
+    "Pesan langsung",
+    "Pesan susulan",
+  ]);
+  expect(Object.keys(calls[0]).sort()).toEqual([
+    "awaitMore",
+    "expectedVersion",
+    "requestId",
+    "text",
+  ]);
+  expect(Object.keys(calls[1]).sort()).toEqual([
+    "expectedVersion",
+    "requestId",
+    "text",
+  ]);
+  // The consumer's reply turns both agent bubbles to read.
+  await expect(room.getByText("Oke kak", { exact: true })).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(room.getByRole("img", { name: "Dibaca" })).toHaveCount(2);
+  await expect(room.getByRole("img", { name: "Terkirim" })).toHaveCount(0);
+  await expect(room.getByText("Pesan langsung", { exact: true })).toHaveCount(1);
+  await expect(room.getByText("Pesan susulan", { exact: true })).toHaveCount(1);
+  expectHermetic(audit);
+});

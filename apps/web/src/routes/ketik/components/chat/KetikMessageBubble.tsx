@@ -9,11 +9,34 @@ interface KetikMessageBubbleProps {
   onImageClick: (src: string) => void;
 }
 
+const TICK_LABELS: Record<string, string> = {
+  sent: "Terkirim",
+  delivered: "Diterima",
+  read: "Dibaca",
+};
+
+/** WhatsApp-style tick: one when sent, two when delivered, two at full strength when read. */
 const TickIcon = ({ status }: { status?: string }) => {
-  if (!status) return null;
-  const color = status === "read" ? "text-primary" : "text-muted-foreground";
-  if (status === "sent") return <Check className={`h-3.5 w-3.5 ${color}`} />;
-  return <CheckCheck className={`h-3.5 w-3.5 ${color}`} />;
+  const shouldReduceMotion = useReducedMotion();
+  if (!status || !TICK_LABELS[status]) return null;
+  const Icon = status === "sent" ? Check : CheckCheck;
+  return (
+    <motion.span
+      key={status}
+      role="img"
+      aria-label={TICK_LABELS[status]}
+      initial={shouldReduceMotion ? false : { scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={
+        shouldReduceMotion
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 520, damping: 22 }
+      }
+      className={`inline-flex ${status === "read" ? "opacity-100" : "opacity-60"}`}
+    >
+      <Icon aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
+    </motion.span>
+  );
 };
 
 export function renderKetikMessageContent(
