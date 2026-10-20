@@ -1,9 +1,11 @@
-import type {
-  DashboardData,
-  DashboardInsightAgent,
-  DashboardInsights,
-  QAIndicator,
-  QAPeriod,
+import {
+  describeFindingsChange,
+  formatInsightNumber,
+  type DashboardData,
+  type DashboardInsightAgent,
+  type DashboardInsights,
+  type QAIndicator,
+  type QAPeriod,
 } from "@trainers/types";
 import { isServiceType } from "../../lib/scoring";
 import { roundTo } from "../../lib/math-utils";
@@ -27,9 +29,9 @@ interface Input {
   periodById: Map<string, QAPeriod>;
   hasFindings: boolean;
 }
-const NUMBER = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
-const fmt = (n: number) => NUMBER.format(n);
-const signed = (n: number) => `${n < 0 ? "−" : "+"}${fmt(Math.abs(n))}`;
+const fmt = formatInsightNumber;
+/** Kenaikan absolut minimal agar sebuah parameter menjadi fokus. */
+const FOCUS_MIN_INCREASE = 5;
 
 /** Pure, deterministic summary. All inputs must already have the caller's SIDAK scope. */
 export function buildDashboardInsights(input: Input): DashboardInsights | null {
@@ -47,31 +49,22 @@ export function buildDashboardInsights(input: Input): DashboardInsights | null {
       ? ((latest.total - previous.total) / previous.total) * 100
       : null;
   const what: DashboardInsights["what"] = {
-    text: "Belum ada periode pembanding untuk filter ini.",
-    tone: "neutral",
+    ...describeFindingsChange(
+      {
+        label: latest.label,
+        total: latest.total,
+        audited: latest.totalAudited,
+      },
+      previous && {
+        label: previous.label,
+        total: previous.total,
+        audited: previous.totalAudited,
+      },
+    ),
     findingsChangePct: changePct === null ? null : roundTo(changePct, 1),
     perAuditedLatest: perLatest === null ? null : roundTo(perLatest, 1),
     perAuditedPrevious: perPrevious === null ? null : roundTo(perPrevious, 1),
   };
-  if (previous) {
-    if (changePct === null) {
-      what.text = `${fmt(latest.total)} temuan di ${latest.label}; ${previous.label} tanpa temuan, jadi persentase tidak dihitung.`;
-    } else if (Math.abs(changePct) < 5) {
-      what.text = `Temuan ${latest.label} relatif tetap (${signed(changePct)}%) dibanding ${previous.label}.`;
-    } else {
-      const up = changePct > 0;
-      const direction = up ? "naik" : "turun";
-      const prefix = `Temuan ${latest.label} ${direction} ${fmt(Math.abs(changePct))}%`;
-      if (perLatest === null || perPrevious === null) {
-        what.text = `${prefix}, tetapi jumlah agen diaudit belum tersedia untuk membandingkan laju temuan.`;
-      } else if (up ? perLatest > perPrevious : perLatest < perPrevious) {
-        what.text = `${prefix} dan temuan per agen diaudit juga ${direction} (${fmt(perPrevious)} → ${fmt(perLatest)}).${up ? " Kenaikan ini nyata." : ""}`;
-        what.tone = up ? "bad" : "good";
-      } else {
-        what.text = `${prefix}, tetapi temuan per agen diaudit tidak ${direction} (${fmt(perPrevious)} → ${fmt(perLatest)}). ${up ? "Kenaikan ikut jumlah audit, belum tentu memburuk." : "Penurunan ikut jumlah audit."}`;
-      }
-    }
-  }
   const parameterChanges = input.paramTrend.datasets
     .filter((ds) => !ds.isTotal)
     .map((ds) => {
@@ -84,7 +77,7 @@ export function buildDashboardInsights(input: Input): DashboardInsights | null {
       };
     });
   const focus = parameterChanges
-    .filter((p) => p.change !== null && p.change >= 5)
+    .filter((p) => p.change !== null && p.change >= FOCUS_MIN_INCREASE)
     .sort(
       (a, b) => b.change! - a.change! || a.name.localeCompare(b.name, "id"),
     )[0];
@@ -143,35 +136,46 @@ export function buildDashboardInsights(input: Input): DashboardInsights | null {
       ? roundTo(target - latest.avgAgentScore, 1)
       : null;
   const soWhat: DashboardInsights["soWhat"] = {
-    text: "Belum ada skor audit untuk periode ini.",
+    headline: "Belum ada skor",
+    text: `Belum ada skor audit untuk ${latest.label}.`,
     tone: "neutral",
     scoreGapToTarget: gap,
     belowTargetCount: below,
   };
   if (below !== null) {
-    const prefix = `Rata-rata skor ${latest.label} ${fmt(latest.avgAgentScore)}%, `;
-    soWhat.text =
-      prefix +
-      (gap !== null
-        ? `${fmt(gap)} poin di bawah target ${target}`
-        : `sudah mencapai target ${target}`) +
-      `; ${fmt(below)} agen belum mencapai ${target}.`;
-    soWhat.tone = gap !== null ? "bad" : below === 0 ? "good" : "neutral";
+    const score = `Skor rata-rata ${fmt(latest.avgAgentScore)}% di ${latest.label}`;
+    if (gap !== null) {
+      soWhat.headline = `Kurang ${fmt(gap)} poin dari target ${target}`;
+      soWhat.text = `${score}; ${fmt(below)} agen belum mencapai ${target}.`;
+      soWhat.tone = "bad";
+    } else {
+      soWhat.headline = `Target ${target} tercapai`;
+      soWhat.text =
+        below === 0
+          ? `${score}; semua agen yang diaudit sudah mencapai ${target}.`
+          : `${score}, tetapi ${fmt(below)} agen masih di bawah ${target}.`;
+      soWhat.tone = below === 0 ? "good" : "neutral";
+    }
   }
   if (focusParameter)
-    soWhat.text += ` ${focusParameter.name} menyumbang kenaikan terbesar (+${fmt(focusParameter.change)}).${focusParameter.category === "critical" ? " Termasuk kritikal." : ""}`;
+    soWhat.text += ` Kenaikan terbesar datang dari ${focusParameter.name} (+${fmt(focusParameter.change)} temuan${focusParameter.category === "critical" ? ", parameter kritikal" : ""}).`;
   const nowWhat: DashboardInsights["nowWhat"] = focusParameter?.agents.length
     ? {
-        text: `Coaching ${focusParameter.agents.length} agen dengan temuan ${focusParameter.name} terbanyak.`,
+        headline: `Coaching ${focusParameter.agents.length} agen untuk ${focusParameter.name}`,
+        text: focusParameter.recommendation,
         action: "coach_focus_agents",
       }
     : input.hasFindings
       ? {
-          text: "Tidak ada parameter yang naik berarti. Mulai dari agen dengan temuan terbanyak.",
+          headline: "Mulai dari agen dengan temuan terbanyak",
+          text: previous
+            ? `Tidak ada parameter yang naik ${FOCUS_MIN_INCREASE} temuan atau lebih dari ${previous.label}.`
+            : "Belum ada periode pembanding untuk menentukan parameter fokus.",
           action: "open_ranking",
         }
       : {
-          text: "Belum ada tindakan yang disarankan untuk filter ini.",
+          headline: "Belum ada yang perlu ditindaklanjuti",
+          text: "Tidak ada temuan untuk filter ini.",
           action: "none",
         };
   return {

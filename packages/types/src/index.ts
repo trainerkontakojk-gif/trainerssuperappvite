@@ -1,5 +1,6 @@
 export * from "./common";
 export * from "./sidak";
+export * from "./sidak-insight-copy";
 export * from "./sidak-schedule";
 export * from "./tna";
 export * from "./efek";

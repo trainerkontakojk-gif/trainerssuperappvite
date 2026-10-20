@@ -429,6 +429,9 @@ export interface DashboardInsights {
   latestLabel: string | null;
   previousLabel: string | null;
   what: {
+    /** Short fact shown large, e.g. "Temuan naik 30% dari Sep 26". */
+    headline: string;
+    /** Plain-language explanation under the headline. */
     text: string;
     tone: DashboardInsightTone;
     findingsChangePct: number | null;
@@ -436,6 +439,7 @@ export interface DashboardInsights {
     perAuditedPrevious: number | null;
   };
   soWhat: {
+    headline: string;
     text: string;
     tone: DashboardInsightTone;
     scoreGapToTarget: number | null;
@@ -450,6 +454,7 @@ export interface DashboardInsights {
     agents: DashboardInsightAgent[];
   } | null;
   nowWhat: {
+    headline: string;
     text: string;
     action: "coach_focus_agents" | "open_ranking" | "none";
   };

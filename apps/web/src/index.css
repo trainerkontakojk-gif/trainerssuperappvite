@@ -1033,10 +1033,15 @@
     color: var(--fg2);
     text-wrap: pretty;
   }
-  .home-trend-note[data-tone="bad"] {
+  .home-trend-headline {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .home-trend-note[data-tone="bad"] .home-trend-headline {
     color: var(--home-bad);
   }
-  .home-trend-note[data-tone="good"] {
+  .home-trend-note[data-tone="good"] .home-trend-headline {
     color: var(--home-good);
   }
   .home-stat-trend {

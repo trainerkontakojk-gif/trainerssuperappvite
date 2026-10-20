@@ -107,6 +107,8 @@ Lalu `DashboardData` mendapat field baru `insights: DashboardInsights | null` (n
 
 ## 4. Aturan kalimat (wajib persis, deterministik)
 
+> **Diperbarui 2026-10-20 (permintaan Fajar: desain dan copy kurang bagus).** Ambang dan logika di bawah tetap berlaku, tetapi teks persisnya diganti: setiap bagian kini punya `headline` + `text` (lihat `packages/types/src/sidak-insight-copy.ts` untuk kalimat temuan dan `apps/api/src/services/sidak/dashboard-insights.ts` untuk Artinya/Lakukan ini). Contoh baru: "Temuan naik 30% dari Sep 26" / "Rata-rata temuan per agen diaudit juga naik (2 → 2,6), jadi kualitas memang menurun."; "Kurang 5 poin dari target 95"; "Coaching 2 agen untuk {parameter}" + saran coaching. Tabel di bawah adalah teks historis tahap 2.
+
 Fungsi murni `buildDashboardInsights(input)` di file baru `apps/api/src/services/sidak/dashboard-insights.ts`. Tanpa I/O, tanpa `Date.now()`. Input: `periodMetrics` (urut lama → baru, dari `buildDashboardTrends`), `paramTrend`, `paretoData`, peta agen per parameter untuk periode terbaru, baris temuan parameter fokus di periode terbaru, `indicators`, `periodById`.
 
 Definisi: `L` = periode terakhir di `periodMetrics`, `P` = periode sebelumnya. Target = 95 (pakai konstanta server yang sudah ada, `complianceThreshold` di `dashboard-data.ts`; pindahkan ke konstanta bersama bila perlu, jangan menulis 95 di dua tempat baru).

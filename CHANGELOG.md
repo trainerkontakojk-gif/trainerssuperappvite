@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- feat(sidak): rework the dashboard What / So what / Now what summary with short headlines, worded tone labels, the coaching recommendation and top agents inline, and share the findings sentence with the Beranda trend card
+
 - fix(efek): compare participants with the monthly service average so the baseline no longer disappears once most agents have trained
 
 - feat(home): add self-scoped agent QA summaries, practice quotas and Telefun history

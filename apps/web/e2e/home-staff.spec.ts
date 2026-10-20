@@ -464,9 +464,11 @@ test.describe("Beranda staff", () => {
     const link = card.getByRole("link", { name: "Lihat penyebab di SIDAK" });
 
     // Turun ≥5% dan per agen diaudit juga turun (40/20 → 30/28).
+    await expect(
+      card.getByText("Temuan turun 25% dari Agu 26", { exact: true }),
+    ).toBeVisible({ timeout: 20000 });
     await expect(card).toContainText(
-      "Temuan Sep 26 turun 25% dan temuan per agen diaudit juga turun (2 → 1,1).",
-      { timeout: 20000 },
+      "Rata-rata temuan per agen diaudit juga turun (2 → 1,1), jadi kualitas membaik.",
     );
     // "Semua layanan" tidak mengirim `layanan`; buka periode terakhir berdata,
     // bukan Januari–Oktober (September adalah periode terakhir pada fixture).
@@ -480,7 +482,7 @@ test.describe("Beranda staff", () => {
       .getByRole("combobox", { name: "Layanan" })
       .selectOption({ label: "Layanan Chat" });
     await expect(card).toContainText(
-      "Temuan Sep 26 turun 20%, tetapi temuan per agen diaudit tidak turun (1 → 2). Penurunan ikut jumlah audit.",
+      "Rata-rata temuan per agen diaudit tidak turun (1 → 2). Penurunan ini karena lebih sedikit agen diaudit, belum tentu kualitas membaik.",
     );
     expect(await link.getAttribute("href")).toContain("layanan=chat");
 
@@ -594,7 +596,9 @@ test.describe("Beranda staff", () => {
       card.getByRole("link", { name: "Buka SIDAK untuk Chat" }),
     ).toHaveAttribute("href", /\/sidak\?layanan=chat$/);
     // Kenaikan nyata (per agen diaudit ikut naik) tetap dilaporkan di tren.
-    await expect(trendCard(page)).toContainText("Kenaikan ini nyata.");
+    await expect(trendCard(page)).toContainText(
+      "jadi kualitas memang menurun.",
+    );
     for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 900 });
       for (const theme of ["light", "dark"] as const) {
@@ -653,23 +657,23 @@ test.describe("Beranda staff", () => {
     for (const scenario of [
       {
         rows: [RISING_PERIODS[1]],
-        text: "Belum ada periode pembanding untuk filter ini.",
+        text: "Pilih rentang minimal dua bulan untuk melihat perubahan temuan.",
       },
       {
         rows: [{ ...RISING_PERIODS[0], call: 0, chat: 0 }, RISING_PERIODS[1]],
-        text: "29 temuan di Sep 26; Agu 26 tanpa temuan, jadi persentase tidak dihitung.",
+        text: "Agu 26 tanpa temuan, jadi persentase perubahan tidak dihitung.",
       },
       {
         rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], audited: 0 }],
-        text: "jumlah agen diaudit belum tersedia",
+        text: "Jumlah agen diaudit belum tersedia",
       },
       {
         rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], audited: 20 }],
-        text: "Kenaikan ikut jumlah audit, belum tentu memburuk.",
+        text: "karena lebih banyak agen diaudit, belum tentu kualitas menurun.",
       },
       {
         rows: [RISING_PERIODS[0], { ...RISING_PERIODS[1], call: 10, chat: 10 }],
-        text: "relatif tetap (+0%)",
+        text: "Temuan stabil (+0%)",
       },
     ]) {
       const audit = await openHermeticShell(page, {

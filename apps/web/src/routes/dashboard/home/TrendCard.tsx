@@ -348,9 +348,10 @@ export function TrendCard({
       )}
 
       {sentence && (
-        <p className="home-trend-note" data-tone={sentence.tone}>
-          {sentence.text}
-        </p>
+        <div className="home-trend-note" data-tone={sentence.tone}>
+          <p className="home-trend-headline">{sentence.headline}</p>
+          <p>{sentence.text}</p>
+        </div>
       )}
 
       {latestMonth !== null && (

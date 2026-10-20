@@ -162,7 +162,8 @@ test("latest focus +6, deterministic recommendation, sorted/capped agents and pe
   expect(result.insights).toBeTruthy();
   const insight = result.insights;
   expect(insight.what.tone).toBe("bad");
-  expect(insight.what.text).toContain("Kenaikan ini nyata");
+  expect(insight.what.headline).toBe("Temuan naik 46,2% dari Jan 95");
+  expect(insight.what.text).toContain("jadi kualitas memang menurun");
   expect(insight.what.findingsChangePct).toBe(46.2);
   expect(insight.focusParameter).toMatchObject({
     name: parameter,
@@ -180,8 +181,14 @@ test("latest focus +6, deterministic recommendation, sorted/capped agents and pe
       count: n === 0 ? 7 : 1,
     })),
   );
-  expect(insight.nowWhat.action).toBe("coach_focus_agents");
-  expect(insight.soWhat.text).toContain("Termasuk kritikal.");
+  expect(insight.nowWhat).toEqual({
+    headline: `Coaching 10 agen untuk ${parameter}`,
+    text: "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
+    action: "coach_focus_agents",
+  });
+  expect(insight.soWhat.text).toContain(
+    `Kenaikan terbesar datang dari ${parameter} (+6 temuan, parameter kritikal).`,
+  );
 });
 
 test("leader receives only approved agents even with a broad/foreign folder request", async () => {
@@ -208,10 +215,16 @@ test("more audits do not imply worsening; one period and empty ranges state thei
     const result = await dashboard();
     expect(result.insights).toBeTruthy();
     expect(result.insights.what.tone).toBe("neutral");
-    expect(result.insights.what.text).toContain("Kenaikan ikut jumlah audit");
+    expect(result.insights.what.text).toContain(
+      "karena lebih banyak agen diaudit, belum tentu kualitas menurun",
+    );
     const one = await dashboard({ startMonth: "2", endMonth: "2" });
-    expect(one.insights.what.text).toBe(
-      "Belum ada periode pembanding untuk filter ini.",
+    expect(one.insights.what).toMatchObject({
+      headline: "Belum ada pembanding",
+      text: "Pilih rentang minimal dua bulan untuk melihat perubahan temuan.",
+    });
+    expect(one.insights.nowWhat.headline).toBe(
+      "Mulai dari agen dengan temuan terbanyak",
     );
     expect(one.insights.previousLabel).toBeNull();
     expect(one.insights.latestLabel).toBeNull();
@@ -242,17 +255,19 @@ test("stable, falling, zero baseline and no-finding narratives are honest", asyn
   findings(13, 13);
   const stable = (await dashboard()).insights;
   expect(stable.what).toMatchObject({ tone: "neutral", findingsChangePct: 0 });
-  expect(stable.what.text).toContain("relatif tetap (+0%)");
+  expect(stable.what.headline).toBe("Temuan stabil (+0%)");
   expect(stable.focusParameter).toBeNull();
   findings(13, 12);
   const down = (await dashboard()).insights;
   expect(down.what.tone).toBe("good");
-  expect(down.what.text).toContain("temuan per agen diaudit juga turun");
+  expect(down.what.text).toContain("jadi kualitas membaik");
   for (const id of agents.slice(13, 26)) insertRows(id, periods[0]!, 1, null);
   try {
     const volume = (await dashboard()).insights;
     expect(volume.what.tone).toBe("neutral");
-    expect(volume.what.text).toContain("Penurunan ikut jumlah audit");
+    expect(volume.what.text).toContain(
+      "karena lebih sedikit agen diaudit, belum tentu kualitas membaik",
+    );
   } finally {
     for (const id of agents.slice(13, 26))
       runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${q(id)};`);
@@ -260,9 +275,10 @@ test("stable, falling, zero baseline and no-finding narratives are honest", asyn
   findings(0, 19);
   const zero = (await dashboard()).insights;
   expect(zero.what.findingsChangePct).toBeNull();
-  expect(zero.what.text).toBe(
-    "19 temuan di Feb 95; Jan 95 tanpa temuan, jadi persentase tidak dihitung.",
-  );
+  expect(zero.what).toMatchObject({
+    headline: "19 temuan di Feb 95",
+    text: "Jan 95 tanpa temuan, jadi persentase perubahan tidak dihitung.",
+  });
   findings(0, 0);
   const clean = (await dashboard()).insights;
   expect(clean.soWhat).toMatchObject({
@@ -270,5 +286,9 @@ test("stable, falling, zero baseline and no-finding narratives are honest", asyn
     scoreGapToTarget: null,
     belowTargetCount: 0,
   });
-  expect(clean.nowWhat.action).toBe("none");
+  expect(clean.soWhat.headline).toBe("Target 95 tercapai");
+  expect(clean.nowWhat).toMatchObject({
+    action: "none",
+    headline: "Belum ada yang perlu ditindaklanjuti",
+  });
 });

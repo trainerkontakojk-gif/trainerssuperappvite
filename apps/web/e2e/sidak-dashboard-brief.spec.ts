@@ -18,14 +18,16 @@ const insights: DashboardInsights = {
   latestLabel: "Okt 26",
   previousLabel: "Sep 26",
   what: {
-    text: "Temuan Okt 26 naik 30% dan temuan per agen diaudit juga naik (2 → 2,6). Kenaikan ini nyata.",
+    headline: "Temuan naik 30% dari Sep 26",
+    text: "Rata-rata temuan per agen diaudit juga naik (2 → 2,6), jadi kualitas memang menurun.",
     tone: "bad",
     findingsChangePct: 30,
     perAuditedLatest: 2.6,
     perAuditedPrevious: 2,
   },
   soWhat: {
-    text: "Rata-rata skor Okt 26 90%, 5 poin di bawah target 95; 2 agen belum mencapai 95. Akurasi informasi menyumbang kenaikan terbesar (+6). Termasuk kritikal.",
+    headline: "Kurang 5 poin dari target 95",
+    text: "Skor rata-rata 90% di Okt 26; 2 agen belum mencapai 95. Kenaikan terbesar datang dari Akurasi informasi (+6 temuan, parameter kritikal).",
     tone: "bad",
     scoreGapToTarget: 5,
     belowTargetCount: 2,
@@ -42,7 +44,8 @@ const insights: DashboardInsights = {
     ],
   },
   nowWhat: {
-    text: `Coaching 2 agen dengan temuan ${FOCUS} terbanyak.`,
+    headline: `Coaching 2 agen untuk ${FOCUS}`,
+    text: RECOMMENDATION,
     action: "coach_focus_agents",
   },
   parameterChanges: [
@@ -137,14 +140,26 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
     await expect(
       brief.getByRole("heading", { name: text, exact: true }),
     ).toBeVisible();
-  await expect(brief).toContainText("Kenaikan ini nyata");
+  await expect(brief).toContainText("Okt 26 dibanding Sep 26");
+  // Tone lives in a labelled cue on the headline, not in a fully coloured paragraph.
+  for (const [headline, tone] of [
+    ["Temuan naik 30% dari Sep 26", "Memburuk"],
+    ["Kurang 5 poin dari target 95", "Perlu perhatian"],
+  ])
+    await expect(
+      brief.getByText(headline, { exact: true }).locator(".."),
+    ).toContainText(tone);
+  await expect(
+    brief.getByText(`Coaching 2 agen untuk ${FOCUS}`, { exact: true }),
+  ).toBeVisible();
+  // The coaching recommendation now sits in "Lakukan ini" itself.
+  await expect(brief.getByText(RECOMMENDATION, { exact: true })).toBeVisible();
   await expect(brief.getByRole("link", { name: "Buka TNA" })).toHaveAttribute(
     "href",
     "/tna",
   );
-  const disclosure = brief.locator("summary");
-  await disclosure.focus();
-  await page.keyboard.press("Space");
+  // Up to three priority agents are listed without an extra click.
+  await expect(brief.locator("summary")).toHaveCount(0);
   await expect(
     brief.getByRole("link", { name: /Ayu Larasati/ }),
   ).toHaveAttribute("href", "/sidak/agents/agent-a");
@@ -231,7 +246,8 @@ test("leader has no TNA action; ranking fallback carries the same context; null 
       ...insights,
       focusParameter: null,
       nowWhat: {
-        text: "Tidak ada parameter yang naik berarti. Mulai dari agen dengan temuan terbanyak.",
+        headline: "Mulai dari agen dengan temuan terbanyak",
+        text: "Tidak ada parameter yang naik 5 temuan atau lebih dari Sep 26.",
         action: "open_ranking" as const,
       },
     },
@@ -260,4 +276,41 @@ test("leader has no TNA action; ranking fallback carries the same context; null 
     }
     expectHermetic(audit);
   }
+});
+
+test("more than three coaching agents fold the rest behind a keyboard disclosure", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const many = ["Ayu", "Bima", "Citra", "Dewi", "Eko"].map((nama, n) => ({
+    agentId: `agent-${n}`,
+    nama,
+    tim: "Tim Call",
+    count: 5 - n,
+  }));
+  const audit = await openHermeticShell(page, {
+    path: `/sidak/dashboard?layanan=call&tahun=${YEAR}&tim=ALL`,
+    apiMocks: mocks({
+      ...insights,
+      focusParameter: { ...insights.focusParameter!, agents: many },
+      nowWhat: {
+        ...insights.nowWhat,
+        headline: `Coaching 5 agen untuk ${FOCUS}`,
+      },
+    }),
+  });
+  await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
+  const brief = page.getByRole("region", { name: "Kesimpulan", exact: true });
+  const list = brief.getByRole("list", { name: "Agen prioritas coaching" });
+  await expect(list.getByRole("link")).toHaveCount(3);
+  await expect(brief.getByRole("link", { name: /Dewi/ })).toBeHidden();
+  const summary = brief.locator("summary");
+  await expect(summary).toHaveText("Lihat 2 agen lainnya");
+  await summary.focus();
+  await page.keyboard.press("Space");
+  await expect(brief.getByRole("link", { name: /Eko/ })).toHaveAttribute(
+    "href",
+    "/sidak/agents/agent-4",
+  );
+  expectHermetic(audit);
 });
