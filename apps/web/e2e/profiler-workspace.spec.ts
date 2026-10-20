@@ -110,23 +110,34 @@ test.describe("Workspace Profiler (hermetic)", () => {
       apiMocks: PROFILER_MOCKS,
     });
 
-    const nav = batchNav(page);
-    await expect(nav).toBeVisible({ timeout: 20000 });
-    await expect(
-      nav.getByRole("button", { name: /^Batch Pagi/ }),
-    ).toBeVisible();
-    await expect(nav.getByRole("button", { name: /^Tim Email/ })).toBeVisible();
-
     const overview = page.getByRole("region", { name: /Folder tahun 2026/ });
-    await expect(overview).toBeVisible();
-    await expect(
-      overview.getByRole("button", { name: /Batch Pagi.*2 peserta/ }),
-    ).toBeVisible();
-    // Tim tanpa batch dipakai langsung sebagai batch: kolom Tim tetap nama tim,
-    // bukan label "Tanpa batch" yang menyesatkan.
-    const soloRow = overview.getByRole("button", { name: /^Tim Email/ });
-    await expect(soloRow).toHaveAccessibleName(/^Tim Email Tim Email\b/);
+    await expect(overview).toBeVisible({ timeout: 20000 });
+
+    // Beranda: daftar tim → folder tampil sekali, di area utama; panel kiri
+    // dan tabel folder datar tidak ikut tampil.
+    await expect(batchNav(page)).toHaveCount(1);
+    const nav = overview.getByRole("navigation", {
+      name: "Daftar tim dan folder",
+    });
+    await expect(nav.getByRole("button", { name: /^Batch Pagi 2$/ })).toBeVisible();
+    await expect(nav.getByRole("button", { name: /^Tim Email/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Panel folder" })).toHaveCount(0);
     await expect(overview.getByText("Tanpa batch")).toHaveCount(0);
+    await expect(
+      overview.getByRole("region", { name: "Ulang tahun terdekat" }),
+    ).toBeVisible();
+
+    // Masuk folder memunculkan panel kiri dengan jalan kembali ke ringkasan.
+    await nav.getByRole("button", { name: /^Batch Pagi/ }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Batch Pagi" }),
+    ).toBeVisible();
+    await page
+      .getByRole("complementary", { name: "Panel folder" })
+      .getByRole("button", { name: "Ringkasan tahun" })
+      .click();
+    await expect(page).not.toHaveURL(/batch=/);
+    await expect(overview).toBeVisible();
 
     // Navigator tengah dan panel hierarki lama tidak lagi tampil berdampingan.
     await expect(page.getByText("Hierarki data")).toHaveCount(0);

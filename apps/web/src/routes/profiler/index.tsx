@@ -373,29 +373,45 @@ export default function ProfilerLanding() {
     },
   };
 
+  // Beranda memuat daftar tim → folder di area utama, jadi panel kiri hanya
+  // tampil saat sebuah folder atau task terbuka. Dibaca dari URL supaya panel
+  // tidak berkedip selama data dimuat.
+  const showsOverview = !task && !selectedBatch;
+  const panelNavProps = {
+    ...libraryNavProps,
+    onShowOverview: () => selectBatch(""),
+  };
+
   return (
     <LeaderAccessGate module="ktp" moduleLabel="KTP">
       <div className="relative flex w-full flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 md:hidden">
-          <p className="min-w-0 truncate text-sm text-muted-foreground">
-            {activeYearLabel ? `Profiler · ${activeYearLabel}` : "Profiler"}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={() => setIsNavOpen(true)}
-            className="min-h-11 shrink-0"
-          >
-            <PanelLeft data-icon="inline-start" aria-hidden="true" />
-            Pilih folder
-          </Button>
-        </div>
+        {!showsOverview && (
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 md:hidden">
+            <p className="min-w-0 truncate text-sm text-muted-foreground">
+              {activeYearLabel ? `Profiler · ${activeYearLabel}` : "Profiler"}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => setIsNavOpen(true)}
+              className="min-h-11 shrink-0"
+            >
+              <PanelLeft data-icon="inline-start" aria-hidden="true" />
+              Pilih folder
+            </Button>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <aside className="hidden w-72 shrink-0 border-r border-border bg-card md:block">
-            <ProfilerLibraryNav {...libraryNavProps} />
-          </aside>
+          {!showsOverview && (
+            <aside
+              aria-label="Panel folder"
+              className="hidden w-72 shrink-0 border-r border-border bg-card md:block"
+            >
+              <ProfilerLibraryNav {...panelNavProps} />
+            </aside>
+          )}
 
           <div className="min-w-0 flex-1 overflow-y-auto custom-scrollbar">
             {!loaded ? (
@@ -483,13 +499,7 @@ export default function ProfilerLanding() {
             ) : (
               <ProfilerYearOverview
                 yearLabel={activeYearLabel}
-                yearId={selectedYearId}
-                folders={folders}
-                counts={counts}
-                isReadOnly={isReadOnly}
-                onSelectBatch={(name) => selectBatch(name)}
-                onAddYear={() => setShowAddYear(true)}
-                onAddFolder={(yearId) => setShowAddFolder({ yearId })}
+                navProps={libraryNavProps}
               />
             )}
           </div>
@@ -506,7 +516,7 @@ export default function ProfilerLanding() {
                 Pilih tahun, tim, dan folder Profiler.
               </DialogDescription>
             </DialogHeader>
-            <ProfilerLibraryNav {...libraryNavProps} />
+            <ProfilerLibraryNav {...panelNavProps} />
           </DialogContent>
         </Dialog>
 

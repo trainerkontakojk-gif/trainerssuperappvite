@@ -3,6 +3,7 @@ import type { ProfilerFolder, ProfilerYear } from "@trainers/types";
 import {
   CalendarPlus,
   Copy,
+  LayoutGrid,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -44,6 +45,8 @@ interface ProfilerLibraryNavProps {
   onRenameFolder: (folder: ProfilerFolder) => void;
   onDeleteFolder: (folder: ProfilerFolder) => void;
   onDuplicateFolder: (folder: ProfilerFolder) => void;
+  /** Bila ada, baris "Ringkasan tahun" tampil untuk kembali ke beranda. */
+  onShowOverview?: () => void;
   className?: string;
 }
 
@@ -67,6 +70,7 @@ export default function ProfilerLibraryNav({
   onRenameFolder,
   onDeleteFolder,
   onDuplicateFolder,
+  onShowOverview,
   className,
 }: ProfilerLibraryNavProps) {
   const [query, setQuery] = useState("");
@@ -179,6 +183,19 @@ export default function ProfilerLibraryNav({
         aria-label="Daftar tim dan folder"
         className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar"
       >
+        {onShowOverview && selectedYearId && (
+          <button
+            type="button"
+            onClick={onShowOverview}
+            className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-foreground/90 outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LayoutGrid
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+            Ringkasan tahun
+          </button>
+        )}
         {!selectedYearId ? null : teams.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             {query.trim()
@@ -209,6 +226,13 @@ export default function ProfilerLibraryNav({
                       <div className="flex min-h-11 items-center gap-1 pl-3">
                         <span className="min-w-0 flex-1 truncate text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                           {team.name}
+                        </span>
+                        <span className="shrink-0 px-3 font-mono text-xs tabular-nums text-muted-foreground">
+                          {allBatches.reduce(
+                            (sum, batch) => sum + (counts[batch.name] ?? 0),
+                            0,
+                          )}
+                          <span className="sr-only"> peserta</span>
                         </span>
                         {!isReadOnly && (
                           <RowMenu

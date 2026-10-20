@@ -1,6 +1,5 @@
-import { useMemo } from "react";
-import type { ProfilerFolder } from "@trainers/types";
-import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import { useMemo, type ComponentProps } from "react";
+import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,60 +11,47 @@ import {
 } from "@/components/ui/empty";
 
 import GlobalBirthdaysWidget from "./GlobalBirthdaysWidget";
+import ProfilerLibraryNav from "./ProfilerLibraryNav";
 
 interface ProfilerYearOverviewProps {
   yearLabel: string | null;
-  yearId: string | null;
-  folders: ProfilerFolder[];
-  counts: Record<string, number>;
-  isReadOnly: boolean;
-  onSelectBatch: (name: string) => void;
-  onAddYear: () => void;
-  onAddFolder: (yearId: string) => void;
+  /** Daftar tim → folder tampil di sini; panel kiri disembunyikan di beranda. */
+  navProps: ComponentProps<typeof ProfilerLibraryNav>;
 }
 
-type BatchRow = { id: string; name: string; team: string };
-
-/** Isi kanan saat belum ada folder terpilih: semua folder di tahun aktif. */
+/** Isi beranda saat belum ada folder terpilih: daftar tim → folder dan ulang tahun. */
 export default function ProfilerYearOverview({
   yearLabel,
-  yearId,
-  folders,
-  counts,
-  isReadOnly,
-  onSelectBatch,
-  onAddYear,
-  onAddFolder,
+  navProps,
 }: ProfilerYearOverviewProps) {
-  const rows = useMemo<BatchRow[]>(() => {
-    if (!yearId) return [];
-    const teams = folders.filter(
-      (folder) => folder.year_id === yearId && !folder.parent_id,
-    );
-    return teams.flatMap((team): BatchRow[] => {
-      const batches = folders.filter((folder) => folder.parent_id === team.id);
-      if (batches.length === 0) {
-        // Tim tanpa batch dipakai langsung sebagai batch.
-        return [{ id: team.id, name: team.name, team: team.name }];
-      }
-      return batches.map((batch) => ({
-        id: batch.id,
-        name: batch.name,
-        team: team.name,
-      }));
-    });
-  }, [folders, yearId]);
+  const { years, folders, counts, selectedYearId, isReadOnly, onAddYear } =
+    navProps;
 
-  const totalPeserta = rows.reduce(
-    (sum, row) => sum + (counts[row.name] ?? 0),
-    0,
-  );
+  const summary = useMemo(() => {
+    if (!selectedYearId) return null;
+    const teams = folders.filter(
+      (folder) => folder.year_id === selectedYearId && !folder.parent_id,
+    );
+    // Tim tanpa folder dipakai langsung sebagai folder.
+    const batchNames = teams.flatMap((team) => {
+      const batches = folders.filter((folder) => folder.parent_id === team.id);
+      return batches.length > 0
+        ? batches.map((batch) => batch.name)
+        : [team.name];
+    });
+    return {
+      teams: teams.length,
+      folders: batchNames.length,
+      peserta: batchNames.reduce((sum, name) => sum + (counts[name] ?? 0), 0),
+    };
+  }, [folders, counts, selectedYearId]);
+
   const title = yearLabel ? `Folder tahun ${yearLabel}` : "Profiler";
 
   return (
     <section
       aria-labelledby="profiler-overview-title"
-      className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-4 sm:p-6 lg:p-8"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-4 sm:p-6 lg:p-8"
     >
       <header className="flex flex-col gap-1">
         <h1
@@ -74,15 +60,16 @@ export default function ProfilerYearOverview({
         >
           {title}
         </h1>
-        {rows.length > 0 && (
+        {summary && summary.folders > 0 && (
           <p className="text-sm text-muted-foreground tabular-nums">
-            {rows.length} folder · {totalPeserta} peserta
+            {summary.peserta} peserta · {summary.teams} tim · {summary.folders}{" "}
+            folder
           </p>
         )}
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        {!yearId ? (
+        {years.length === 0 ? (
           <Empty className="min-h-56 border border-dashed border-border p-8">
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -105,66 +92,9 @@ export default function ProfilerYearOverview({
               </Button>
             )}
           </Empty>
-        ) : rows.length === 0 ? (
-          <Empty className="min-h-56 border border-dashed border-border p-8">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Users aria-hidden="true" />
-              </EmptyMedia>
-              <EmptyTitle>Belum ada tim di tahun ini</EmptyTitle>
-              <EmptyDescription>
-                Buat tim untuk mulai mengelola data peserta.
-              </EmptyDescription>
-            </EmptyHeader>
-            {!isReadOnly && (
-              <Button
-                type="button"
-                size="lg"
-                onClick={() => onAddFolder(yearId)}
-                className="min-h-11"
-              >
-                <Plus data-icon="inline-start" aria-hidden="true" />
-                Buat tim pertama
-              </Button>
-            )}
-          </Empty>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_1.5rem] gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground sm:grid">
-              <span>Folder</span>
-              <span>Tim</span>
-              <span className="text-right">Peserta</span>
-              <span aria-hidden="true" />
-            </div>
-            <ul className="divide-y divide-border">
-              {rows.map((row) => {
-                const count = counts[row.name] ?? 0;
-                return (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectBatch(row.name)}
-                      className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto_1.5rem] items-center gap-x-4 gap-y-0.5 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_1.5rem]"
-                    >
-                      <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                        {row.name}
-                      </span>
-                      <span className="col-start-1 row-start-2 min-w-0 truncate text-xs text-muted-foreground sm:col-start-auto sm:row-start-auto sm:text-sm">
-                        {row.team}
-                      </span>
-                      <span className="row-span-2 text-right font-mono text-sm tabular-nums text-foreground sm:row-span-1">
-                        {count}
-                        <span className="sr-only"> peserta</span>
-                      </span>
-                      <ChevronRight
-                        aria-hidden="true"
-                        className="row-span-2 size-4 text-muted-foreground sm:row-span-1"
-                      />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <ProfilerLibraryNav {...navProps} />
           </div>
         )}
 

@@ -114,7 +114,9 @@ test.describe("Profiler tahap 4: ringkasan, statistik, slide, HP", () => {
 
     const overview = page.getByRole("region", { name: /Folder tahun 2026/ });
     await expect(overview).toBeVisible({ timeout: 20000 });
-    await expect(overview.getByText(/folder · \d+ peserta/)).toBeVisible();
+    await expect(
+      overview.getByText(/\d+ peserta · \d+ tim · \d+ folder/),
+    ).toBeVisible();
     const birthdays = page.getByRole("region", {
       name: "Ulang tahun terdekat",
     });
