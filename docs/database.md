@@ -571,3 +571,15 @@ dan skor published tetap ada. Terapkan rollback hanya setelah drain/stop dan
 pergantian build yang dijelaskan di [deployment.md](deployment.md). Migration,
 rollback, reapply, grants dan atomic failure diuji pada loopback disposable;
 ledger migration CLI lokal/remote tidak otomatis berubah oleh apply SQL tes.
+
+### KETIK consumer NIK/email (2026-10-20)
+
+Migration `20261020170000_ketik_history_consumer_nik_email.sql` adds nullable
+`ketik_history.consumer_nik` and `consumer_email` (`text`, no default or backfill).
+`finish_ketik_session(uuid,uuid)` copies the exact snapshot identity values,
+including deliberately malformed trainer inputs. Old rows remain NULL. History
+pagination includes both columns; API reads expose `consumerNik`/`consumerEmail`
+with NULL for old rows. Finish and pagination retain their signatures, SECURITY
+INVOKER settings and service-role-only execution; row policies are unchanged.
+Rollback restores both previous RPC definitions before dropping the columns and
+loses any stored NIK/email values. Deployment/replay is a separate local gate.

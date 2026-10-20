@@ -8,8 +8,10 @@ import type {
   KetikAgentNote,
   KetikConsumerPoint,
   KetikScoreEvidence,
+  KetikVerificationReview,
 } from "@trainers/types";
 import { Type } from "@google/genai";
+import { KETIK_VERIFICATION_INSTRUCTION } from "./review-verification";
 
 // ── Evaluasi Edukatif (deterministic education layer) ──
 export type KetikDimensionKey =
@@ -166,8 +168,10 @@ export const KETIK_REVIEW_RESPONSE_SCHEMA = {
   ],
 };
 
-export function buildKetikReviewSystemInstruction(): string {
-  return `Anda adalah AI Quality Assurance (QA) dan coaching ahli untuk contact center.
+export function buildKetikReviewSystemInstruction(
+  hasVerification = false,
+): string {
+  return `${hasVerification ? KETIK_VERIFICATION_INSTRUCTION : ""}Anda adalah AI Quality Assurance (QA) dan coaching ahli untuk contact center.
 Tinjau transkrip chat layanan pelanggan antara Agen (pengguna) dan Konsumen.
 
 Kategori Evaluasi (skala 0-100):
@@ -390,6 +394,7 @@ export interface KetikDimensionGuidanceResult {
 }
 
 export interface KetikEducationResult {
+  verification?: KetikVerificationReview | null;
   dimensionGuidance: KetikDimensionGuidanceResult[];
   caseCore?: string | null;
   consumerPoints?: KetikConsumerPoint[];

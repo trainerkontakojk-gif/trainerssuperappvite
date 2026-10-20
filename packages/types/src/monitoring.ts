@@ -16,6 +16,8 @@ export type MonitoringReviewStatus =
   | "failed";
 
 export interface MonitoringConsumerMetadata {
+  consumer_nik?: string | null;
+  consumer_email?: string | null;
   consumer_name?: string | null;
   consumer_phone?: string | null;
   consumer_city?: string | null;
@@ -98,6 +100,8 @@ export type MonitoringPdktEvaluationSummary = {
 };
 
 export interface MonitoringKetikSession {
+  consumer_nik?: string | null;
+  consumer_email?: string | null;
   consumer_name: string | null;
   consumer_phone: string | null;
   consumer_city: string | null;

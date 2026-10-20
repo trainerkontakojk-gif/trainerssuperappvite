@@ -351,6 +351,11 @@ test("local rollback/reapply preserves history and scores while missing RPC stay
     env,
     `SELECT count(*),sum(final_score) FROM public.ketik_history WHERE user_id='${owner.userId}';`,
   );
+  // Restore the current projection too, including columns added by later migrations.
+  const currentPagination = runSql(
+    env,
+    "SELECT pg_get_functiondef('public.ketik_history_page(uuid,integer,text,text,timestamptz,uuid)'::regprocedure);",
+  );
   try {
     runSql(
       env,
@@ -365,6 +370,8 @@ test("local rollback/reapply preserves history and scores while missing RPC stay
     ).toBe(before);
   } finally {
     runSql(env, sql("migrations/20261015145210_ketik_history_pagination.sql"));
+    runSql(env, currentPagination);
+    runSql(env, "NOTIFY pgrst,'reload schema';");
   }
   await expect
     .poll(async () => (await api("/history")).status, { timeout: 5000 })
@@ -375,4 +382,19 @@ test("local rollback/reapply preserves history and scores while missing RPC stay
       `SELECT count(*),sum(final_score) FROM public.ketik_history WHERE user_id='${owner.userId}';`,
     ),
   ).toBe(before);
+});
+
+test("legacy history without NIK/email values returns null in list and detail", async () => {
+  const page = (await (await api("/history?limit=100")).json()).data;
+  expect(page.items.length).toBeGreaterThan(0);
+  for (const item of page.items) {
+    expect(item.consumerNik).toBeNull();
+    expect(item.consumerEmail).toBeNull();
+  }
+  const response = await api(`/history/${ids[0]}`);
+  expect(response.status).toBe(200);
+  expect((await response.json()).data).toMatchObject({
+    consumerNik: null,
+    consumerEmail: null,
+  });
 });
