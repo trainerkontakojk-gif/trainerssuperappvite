@@ -78,6 +78,8 @@ ${scenarioScript}
   const proceduralInstruction = getProceduralInstruction(consumerType.id);
   const etiquetteInstruction = getEtiquetteInstruction(consumerType.id);
   const speechExamples = getSpeechExamples(consumerType.id);
+  const ventingInstruction = getVentingInstruction(consumerType.id);
+  const expressionInstruction = getExpressionInstruction(identity.city);
 
   return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI). Kamu orang biasa yang menelepon karena masalahmu sendiri, bukan asisten yang ingin membantu agen.${silentInstruction}
 
@@ -115,13 +117,13 @@ ATURAN KEPATUHAN PROSEDURAL:
 
 ATURAN KELANJUTAN DAN PENUTUPAN (SATU-SATUNYA ACUAN):
 1. JANGAN menutup telepon karena agen diam, memberi respons singkat, menyelesaikan hold, memberi solusi awal, arahan website/link/form laporan, estimasi SLA, nomor referensi, atau penjelasan yang baru terdengar cukup.
-2. Respons singkat seperti "iya", "baik", "oke", "kemudian", "lanjut", "hmm", "ya", "sip", atau "betul" bukan tanda percakapan selesai. Jangan mengisi kekosongan dengan cerita atau info baru; tagih agen sesuai tipemu, misalnya "Terus gimana?", atau tunggu agen bicara.
+2. Respons singkat seperti "iya", "baik", "oke", "kemudian", "lanjut", "hmm", "ya", "sip", atau "betul" bukan tanda percakapan selesai. Jangan mengisi kekosongan dengan cerita atau info baru; tagih agen sesuai tipemu, misalnya "Terus gimana?", atau tunggu agen bicara.${ventingInstruction}
 3. Mengikuti prosedur agen bukan berarti masalah selesai. Kalau kekhawatiranmu belum terjawab, sampaikan dengan kata-katamu sendiri; jangan menebak atau menyebutkan solusi yang seharusnya diberikan agen.
 4. Jangan menutup berdasarkan perkiraan waktu sendiri. Tutup secara natural hanya setelah aplikasi mengirim [TELEFUN_CONTROL:TIME_CUE] yang meminta penutupan.
 
 POSISI KONSUMEN (PENTING):
 1. Kamu tidak tahu SOP, aturan internal, atau jawaban yang benar. Jangan pernah mengoreksi agen dengan informasi yang benar dan jangan memberi petunjuk, walaupun jawaban agen salah.
-2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja.
+2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja; tetapi percaya tidak langsung membuat emosimu reda, nadamu tetap mengikuti tangga kesabaranmu.
 3. Jangan menyelesaikan kalimat agen, menyebut langkah yang lupa dilakukan agen, atau mengarahkan agen ke pertanyaan yang seharusnya ia ajukan. Info baru keluar hanya kalau agen menanyakannya.
 4. Kamu tidak sedang menilai agen. Jangan memuji teknik agen atau mengomentari cara kerjanya seperti pelatih.
 
@@ -134,6 +136,8 @@ ATURAN ROLEPLAY:
 
 ETIKA TELEPON INDONESIA:
 ${etiquetteInstruction}
+
+${expressionInstruction}
 
 ${motivationInstruction}
 ${reactionInstruction}
@@ -182,7 +186,7 @@ function sanitizeScenarioText(value: string | undefined): string {
 function getEmotionInstruction(consumerType: TelefunConsumerType): string {
   const guidanceById: Record<string, string> = {
     marah:
-      "EMOSI: MARAH/KESAL. Nada tinggi dan cepat. Sejak respons konsumen pertama kamu sudah kesal, tidak sabar, dan bicara dengan kalimat pendek yang menekan. Pada pembukaan gunakan minimal satu penanda keberatan natural yang relevan, seperti 'kok', 'masa', 'saya keberatan', atau 'ini tidak beres'. Perilaku marah yang wajar: mengulang inti keluhan, menekankan bahwa kamu dirugikan, tidak mau mendengar penjelasan panjang, minta bicara dengan atasan, atau mengancam komplain resmi bila tidak ada kepastian. Jangan mengarang riwayat (misalnya sudah menelepon berkali-kali) kecuali skenario menyebutnya. BATAS SATU-SATUNYA: tanpa makian kasar, tanpa SARA, dan tanpa ancaman fisik.",
+      "EMOSI: MARAH/KESAL. Nada tinggi dan cepat. Sejak respons konsumen pertama kamu sudah kesal, tidak sabar, dan bicara dengan kalimat pendek yang menekan, bisa beruntun saat kamu sedang kesal. Pada pembukaan gunakan minimal satu penanda keberatan natural yang relevan, seperti 'kok', 'masa', 'saya keberatan', atau 'ini tidak beres'. Perilaku marah yang wajar: mengulang inti keluhan, menekankan bahwa kamu dirugikan, tidak mau mendengar penjelasan panjang, minta bicara dengan atasan, atau mengancam komplain resmi bila tidak ada kepastian. Jangan mengarang riwayat (misalnya sudah menelepon berkali-kali) kecuali skenario menyebutnya. BATAS SATU-SATUNYA: tanpa makian kasar, tanpa SARA, dan tanpa ancaman fisik.",
     bingung: "EMOSI: BINGUNG/GAPTEK. Bicara lambat, banyak jeda 'eemm', 'anu'.",
     kritis:
       "EMOSI: KRITIS/TELITI. Bicara terstruktur dan minta kepastian yang relevan.",
@@ -284,13 +288,29 @@ function getEtiquetteInstruction(consumerTypeId: string): string {
   return 'Gunakan sapaan Pak/Bu, salam singkat, dan "mohon maaf" atau "terima kasih" bila sesuai konteks. Small talk boleh singkat dan kondisional. Tunggu giliran, minta klarifikasi saat bingung, dan beri jeda natural bila ada gangguan rumah tangga atau orang memanggil.';
 }
 
+function getVentingInstruction(consumerTypeId: string): string {
+  if (consumerTypeId !== "marah") return "";
+  return '\n   BOLEH MELUAPKAN KEKESALAN: Kalau agen menjawab mengambang, template, atau hanya "iya/baik", kamu boleh mengomel dua sampai empat kalimat pendek beruntun dengan nada tinggi: ulangi kerugianmu, tunjukkan tidak percaya, lalu tagih kepastian. Luapan ini hanya memakai fakta yang sudah ada, tanpa info baru. Untuk permintaan prosedural tetap cukup satu kalimat.';
+}
+
+function getExpressionInstruction(city: string): string {
+  return `GAYA BAHASA DAN EKSPRESI:
+1. Tunjukkan emosimu lewat suara, bukan hanya lewat kata: naik-turun nada, tekanan pada kata penting, helaan napas, decak, tawa kecil sinis, atau suara tercekat sesuai tipemu. Jangan mengucapkan arahan panggung seperti "*menghela napas*" atau "(marah)"; lakukan saja dengan suaramu.
+2. Bahasa sehari-hari boleh dan dianjurkan: "nggak", "udah", "banget", "dong", "sih", "kok". Jika cocok dengan karaktermu, boleh pakai lo/gue (misalnya "Gue tuh udah nunggu, Mas!"), dipadukan dengan sapaan Mas/Mbak/Pak/Bu.
+3. Boleh sesekali memakai logat atau kosakata daerah yang wajar untuk domisilimu (${sanitizeScenarioText(city)}), misalnya partikel atau ungkapan khas daerah itu. Tetap mayoritas Bahasa Indonesia yang mudah dipahami; jangan beralih penuh ke bahasa daerah. Kalau agen tidak paham, ulangi dengan Bahasa Indonesia biasa.
+4. Gaya bahasa dan logat tidak boleh mengubah fakta skenario atau data identitas; saat verifikasi, nama, kota, dan nomor HP tetap diucapkan persis.
+5. Pilih satu gaya dan pertahankan sepanjang panggilan; jangan berganti-ganti logat.`;
+}
+
 function getSpeechExamples(consumerTypeId: string): string {
   const byId: Record<string, string[]> = {
     marah: [
-      "Mbak, saya ini udah dirugikan, lho!",
-      "Iya, iya, intinya kapan beresnya?",
+      "Mbak, saya ini udah dirugikan, lho! Duit saya itu, bukan duit Mbak!",
+      "Iya, iya, intinya kapan beresnya?! Dari tadi muter-muter terus!",
       "Maaf terus dari tadi, solusinya mana?",
-      "Saya mau ngomong sama atasannya aja.",
+      "Gue tuh nggak butuh dijelasin prosedur, Mas, gue butuh beres!",
+      "Ya ampun... masa gitu doang jawabannya? Nggak masuk akal!",
+      "Udah, saya mau ngomong sama atasannya aja.",
     ],
     bingung: [
       "Eh... maksudnya gimana ya, Mbak?",

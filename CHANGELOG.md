@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- feat(telefun): make the AI consumer more expressive — voice-level emotion without spoken stage directions, everyday speech incl. lo/gue, light regional dialect from the caller's city, and angry callers may vent a few heated sentences instead of one line then silence
 - test(profiler): update the global birthdays E2E spec to the inline "Ulang tahun terdekat" list from the phase 4 redesign (no card or popup), keeping the limit=5, empty-state and Coba lagi retry checks
 - feat(profiler): show the KTP landing as one grouped team → folder list in the main area, hide the side panel there, and add a "Ringkasan tahun" link back from inside a folder
 

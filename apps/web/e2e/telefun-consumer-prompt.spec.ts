@@ -122,6 +122,14 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expect(prompt).toContain("CONTOH GAYA BICARA");
     expect(prompt).not.toContain("BENIH KONSISTENSI");
     expect(prompt).not.toContain("mohon maaf");
+    // Ekspresif: bahasa informal dan logat daerah boleh, tanpa membaca arahan panggung.
+    expect(prompt).toContain("GAYA BAHASA DAN EKSPRESI");
+    expect(prompt).toContain("lo/gue");
+    expect(prompt).toContain("logat");
+    expect(prompt).toContain("Jangan mengucapkan arahan panggung");
+    // Marah boleh meluapkan kekesalan, bukan sekadar satu kalimat lalu diam.
+    expect(prompt).toContain("BOLEH MELUAPKAN");
+    expect(prompt).toContain("tidak langsung membuat emosimu reda");
     expectHermetic(audit);
   });
 
