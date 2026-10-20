@@ -577,7 +577,8 @@ test.describe("Telefun Telaah (hermetic)", () => {
 
   test("rekaman diunduh sekali per halaman: gelombang, putar, dan geser memakai salinan yang sama", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.setTimeout(60000); // Pemutaran + dua ukuran layar dan screenshot.
     // Kuota egress Supabase: tiap unduhan rekaman dari storage dihitung.
     const downloads = { full: 0, agent: 0 };
     page.on("request", (request) => {
@@ -592,11 +593,36 @@ test.describe("Telefun Telaah (hermetic)", () => {
         agentRecordingMock(REVIEWED_ROW.id),
         recordingMock(REVIEWED_ROW.id),
       ],
-      (target) =>
-        serveSpeechRecordings(target, {
+      async (target) => {
+        await serveSpeechRecordings(target, {
           full: [[30, 35]],
           agent: [[30, 35]],
-        }),
+        });
+        // Bunyi tiruan dengan jeda dan amplitudo bervariasi untuk pratinjau
+        // waveform; tetap hermetic, tanpa rekaman konsumen sungguhan.
+        const full = speechWav(252, [
+          [2, 18],
+          [24, 46],
+          [100, 116],
+          [135, 160],
+          [180, 208],
+          [220, 248],
+        ]);
+        for (let index = 44; index < full.length; index += 1) {
+          const seconds = (index - 44) / 4000;
+          const gain =
+            (0.25 + 0.75 * Math.abs(Math.sin(seconds * 1.3))) *
+            (0.4 + 0.6 * Math.abs(Math.sin(seconds * 0.17)));
+          full[index] = 128 + Math.round((full[index] - 128) * gain);
+        }
+        await target.route(RECORDING_URL, (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "audio/wav",
+            body: full,
+          }),
+        );
+      },
     );
     const transcript = page.getByRole("region", {
       name: "Rekaman dan transkrip",
@@ -620,6 +646,50 @@ test.describe("Telefun Telaah (hermetic)", () => {
       .poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime))
       .toBeGreaterThan(78);
     await page.getByRole("button", { name: "Jeda rekaman" }).click();
+
+    // Batang nyata simetris terhadap garis tengah; tinggi dan posisi tetap
+    // terbaca saat berganti ukuran layar, tanpa mengambil audio lagi.
+    const waveform = transcript.getByTestId("telefun-waveform");
+    for (const viewport of [
+      { width: 1440, height: 1000 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await waveform.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() =>
+          waveform.locator("svg").evaluate((svg) => {
+            const heights = Array.from(svg.querySelectorAll("rect"), (bar) =>
+              Number(bar.getAttribute("height")),
+            );
+            return Math.max(...heights);
+          }),
+        )
+        .toBeGreaterThan(40);
+      const geometry = await waveform.locator("svg").evaluate((svg) => {
+        const height = svg.getBoundingClientRect().height;
+        return Array.from(svg.querySelectorAll("rect")).every(
+          (bar) =>
+            Math.abs(
+              Number(bar.getAttribute("y")) +
+                Number(bar.getAttribute("height")) / 2 -
+                height / 2,
+            ) < 0.01,
+        );
+      });
+      expect(geometry).toBe(true);
+      await expect(
+        transcript.getByRole("slider", { name: "Posisi rekaman" }),
+      ).toBeInViewport();
+      const screenshot = testInfo.outputPath(`waveform-${viewport.width}.png`);
+      await page
+        .getByTestId("telefun-call-player")
+        .screenshot({ path: screenshot });
+      await testInfo.attach(`waveform-${viewport.width}`, {
+        path: screenshot,
+        contentType: "image/png",
+      });
+    }
 
     expect(downloads).toEqual({ full: 1, agent: 1 });
     expectHermetic(audit);

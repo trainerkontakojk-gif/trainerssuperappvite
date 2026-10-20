@@ -49,7 +49,7 @@ interface TelefunCallPlayerProps {
 const SPEEDS = [1, 1.25, 1.5, 2] as const;
 /** Lebar batang gelombang + celah, dalam px. */
 const BAR_STEP = 3;
-const WAVE_HEIGHT = 40;
+const WAVE_HEIGHT = 64;
 
 /** Gelombang rekaman dari selubung kekerasan suara; bagian terputar berwarna. */
 function Waveform({
@@ -98,16 +98,24 @@ function Waveform({
               y={(WAVE_HEIGHT - height) / 2}
               width={BAR_STEP - 1}
               height={height}
-              rx={1}
+              rx={0.5}
               className={cn(
-                index < played
-                  ? "fill-module-telefun"
-                  : "fill-muted-foreground/45",
+                index < played ? "fill-module-telefun" : "fill-foreground/65",
                 analysis.status === "loading" && "motion-safe:animate-pulse",
               )}
             />
           );
         })}
+        {progress > 0 && (
+          <line
+            x1={Math.min(width - 1, progress * width)}
+            x2={Math.min(width - 1, progress * width)}
+            y1={0}
+            y2={WAVE_HEIGHT}
+            className="stroke-module-telefun"
+            strokeWidth={1}
+          />
+        )}
       </svg>
     </div>
   );
@@ -218,7 +226,7 @@ export function TelefunCallPlayer({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div data-testid="telefun-call-player" className="flex flex-col gap-2.5">
       {ready && (
         <audio
           ref={audioRef}
@@ -283,7 +291,10 @@ export function TelefunCallPlayer({
         >
           {formatClock(currentMs)}
         </span>
-        <div className="relative h-10 min-w-0 flex-1">
+        <div
+          className="relative min-w-0 flex-1 rounded-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring"
+          style={{ height: WAVE_HEIGHT }}
+        >
           <Waveform
             analysis={analysis}
             progress={totalMs > 0 ? Math.min(1, currentMs / totalMs) : 0}
