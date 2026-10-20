@@ -76,6 +76,8 @@
 - **D2 — Domain email:** `@gmail.com`.
 - **D3 — Tampilan simulasi:** NIK dan email ditampilkan lewat panel "Data konsumen" di samping chat (mockup Simulasi B).
 - **D4 — Penilaian:** review menilai konfirmasi data yang tidak sesuai, minimal 1 kali, sesuai Requirement 6a.
+- **D5 — Besaran pengurangan (2026-10-20, didelegasikan Fajar):** Probing −20 sekali per sesi bila status verifikasi bukan `confirmed`, tidak dikalikan per field. Alasan: satu kelalaian menurunkan Probing sekitar satu tingkat verdict dan skor akhir ~4 poin; tiga data salah dalam satu sesi tetap satu kelalaian verifikasi.
+- **D6 — Panel Data konsumen tanpa petunjuk (2026-10-20):** panel di simulasi hanya berisi judul dan data; tidak ada kalimat "cocokkan saat verifikasi" atau catatan "data latihan", karena keduanya memberi petunjuk ke agen.
 
 ## Tasklist
 

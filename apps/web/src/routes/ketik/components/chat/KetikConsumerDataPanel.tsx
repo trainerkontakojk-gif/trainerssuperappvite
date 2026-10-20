@@ -21,9 +21,9 @@ async function copy(value: string, label: string) {
 }
 
 /**
- * Consumer data the agent matches against the consumer's answers. Values are
- * shown exactly as the session holds them, without warnings, so the agent has
- * to spot a malformed NIK or email on their own.
+ * Consumer data as a real agent console would show it: values exactly as the
+ * session holds them, with no warnings, hints or "practice data" notes, so the
+ * agent has to spot a malformed NIK or email on their own.
  */
 export function KetikConsumerDataPanel({
   id,
@@ -56,18 +56,13 @@ export function KetikConsumerDataPanel({
       }}
       className="module-clean-panel flex shrink-0 flex-col border-border bg-surface-elevated max-lg:absolute max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[70] max-lg:max-h-[75%] max-lg:overflow-y-auto max-lg:rounded-t-2xl max-lg:border-t max-lg:shadow-lg lg:w-80 lg:border-l"
     >
-      <div className="flex items-start gap-2 px-5 pt-5 pb-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2
-            id={`${id}-title`}
-            className="font-display text-[17px] font-semibold tracking-tight text-foreground"
-          >
-            Data konsumen
-          </h2>
-          <p className="text-[13px] leading-5 text-fg2">
-            Cocokkan dengan jawaban konsumen saat verifikasi.
-          </p>
-        </div>
+      <div className="flex items-center gap-2 px-5 pt-4 pb-3">
+        <h2
+          id={`${id}-title`}
+          className="min-w-0 flex-1 font-display text-[17px] font-semibold tracking-tight text-foreground"
+        >
+          Data konsumen
+        </h2>
         <Button
           type="button"
           variant="ghost"
@@ -80,7 +75,7 @@ export function KetikConsumerDataPanel({
         </Button>
       </div>
 
-      <dl className="flex flex-col px-2">
+      <dl className="flex flex-col px-2 pb-4">
         {rows.map((row) => (
           <div
             key={row.label}
@@ -113,10 +108,6 @@ export function KetikConsumerDataPanel({
           </div>
         ))}
       </dl>
-
-      <p className="mx-5 mt-auto mb-5 pt-4 text-xs leading-[18px] text-muted-foreground">
-        Data latihan, bukan milik orang sungguhan.
-      </p>
     </aside>
   );
 }

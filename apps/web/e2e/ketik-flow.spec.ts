@@ -2126,6 +2126,8 @@ test.describe("KETIK NIK dan email konsumen (hermetic)", () => {
     await expect(panel).toContainText("budi.santoso85@gnail.com");
     await expect(panel).toContainText("081234561234");
     await expect(panel.locator("mark")).toHaveCount(0);
+    // Tanpa petunjuk verifikasi atau catatan "data latihan" di layar agen.
+    await expect(panel).not.toContainText(/cocokkan|verifikasi|latihan|sungguhan/i);
     for (const name of ["Salin nomor telepon", "Salin NIK", "Salin email"]) {
       await expect(panel.getByRole("button", { name })).toBeVisible();
     }
