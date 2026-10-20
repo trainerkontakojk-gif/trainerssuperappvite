@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- docs(ketik): penalize never asking for malformed NIK/email and show the session data plus a missed-verification marker beside the Telaah transcript
 - docs(ketik): state that the consumer never volunteers NIK or email before the agent asks
 - docs(ketik): plan a 150-consumer pool and let the consumer refuse or give a server-computed corrected NIK/email when the agent confirms malformed data
 - docs(ketik): plan an unspaced NIK in the Data konsumen panel and a Verifikasi data section in Telaah for sessions with malformed NIK or email
