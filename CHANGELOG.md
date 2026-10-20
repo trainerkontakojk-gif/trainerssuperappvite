@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-20
 
+- fix(sidak): give every agent a unique rank using critical findings, QA score, then name as tie-breakers
+
 - fix(sidak): drop the coaching suggestion from Parameter teratas; it already leads Kesimpulan
 
 - fix(sidak): tighten the dashboard summary (stacked left column, collapsible agent toggle), drop the duplicate agent list from Parameter teratas, and label only the latest, highest and lowest trend points

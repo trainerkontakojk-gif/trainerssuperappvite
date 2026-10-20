@@ -1197,10 +1197,9 @@ const emptyAgentFixture: AgentDetailData = {
 /**
  * Agen ketujuh (Fase 5) — peringkat seri (`quickview`).
  *
- * Kontrak yang diukur: saat dua agen lain seri peringkat, dokumen menyebutkan
- * siapa mereka, dan cepatview itu sendiri bisa MEMBUKA daftar agen yang berbagi
- * peringkat. Quickview dimock per-agen (lihat `mockAgentApi`), jadi fixture
- * ini tidak mengubah dokumen test lain.
+ * Kontrak yang diukur: metadata peer dari respons lama tidak muncul lagi
+ * pada laporan berperingkat unik. Quickview dimock per-agen (lihat
+ * `mockAgentApi`), jadi fixture ini tidak mengubah dokumen test lain.
  */
 const TIE_AGENT_ID = "agent-peringkat-seri";
 const TIE_AGENT_NAME = "Dimas Prakoso";
@@ -1227,7 +1226,6 @@ const quickviewFixture: SidakAgentQuickviewResponse = {
     scopeId: "combined-scope",
     scopeLabel: "Tim Call",
     basis: "least_findings_ytd",
-    tiedAgents: [],
   },
   leaderTeam: {
     rank: 1,
@@ -1235,7 +1233,6 @@ const quickviewFixture: SidakAgentQuickviewResponse = {
     scopeId: "leader-scope",
     scopeLabel: "Tim Leader",
     basis: "least_findings_ytd",
-    tiedAgents: [],
   },
   forecast: {
     status: "improving",
@@ -1248,8 +1245,8 @@ const quickviewFixture: SidakAgentQuickviewResponse = {
   },
 };
 
-/** Quickview dengan DUA agen yang seri peringkat — kasus plural. */
-const tiedQuickviewFixture: SidakAgentQuickviewResponse = {
+/** JSON respons lama: field peer tambahan sengaja di luar kontrak produk. */
+const tiedQuickviewFixture = {
   ...quickviewFixture,
   // `useAgentQuickview` membuang respons yang `context`-nya tidak cocok dengan
   // agen/tahun/layanan yang diminta, jadi `context.agentId` WAJIB ikut diganti —

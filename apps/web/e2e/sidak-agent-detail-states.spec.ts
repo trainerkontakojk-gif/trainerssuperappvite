@@ -22,7 +22,7 @@ import {
 
 const AGENT_NAME = "Rahmawati Kusumaningrum";
 const RANKING_NOTE =
-  "Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.";
+  "Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas.";
 
 type Quickview = ReturnType<typeof richQuickviewPayload>;
 
@@ -133,7 +133,9 @@ test.describe("Detail agent — quickview performa", () => {
       page.getByLabel("Memuat peringkat dan forecast"),
     ).toBeVisible();
     await expect(profile(page).getByText("Tim Gabungan")).toHaveCount(0);
-    await expect(profile(page).getByText(/^Berbagi peringkat/)).toHaveCount(0);
+    await expect(profile(page).getByText(/^Berbagi\s+peringkat/)).toHaveCount(
+      0,
+    );
 
     release();
     await expect(
@@ -177,7 +179,9 @@ test.describe("Detail agent — quickview performa", () => {
       leader.getByText("Belum masuk peringkat pada cakupan ini"),
     ).toBeVisible();
     await expect(leader.getByText("Belum ada agen pembanding")).toHaveCount(0);
-    await expect(profile(page).getByText(/^Berbagi peringkat/)).toHaveCount(0);
+    await expect(profile(page).getByText(/^Berbagi\s+peringkat/)).toHaveCount(
+      0,
+    );
   });
 
   test("cohort hilang setelah kegagalan parsial tampil netral", async ({
@@ -259,9 +263,7 @@ test.describe("Detail agent — quickview performa", () => {
     await expect(metric.getByText("Data belum cukup")).toHaveCount(0);
   });
 
-  test("seri peringkat: satu dan dua agen ditulis langsung", async ({
-    page,
-  }) => {
+  test("peringkat unik tanpa label seri dan basis baru", async ({ page }) => {
     await open(page, {
       quickviewPayload: quickview((q) => ({
         ...q,
@@ -281,20 +283,22 @@ test.describe("Detail agent — quickview performa", () => {
       })),
     });
     await expect(
-      profile(page)
-        .getByRole("group", { name: "Tim Gabungan: peringkat 1" })
-        .getByText("Berbagi peringkat 1 dengan Tania", { exact: true }),
+      profile(page).getByRole("group", {
+        name: "Tim Gabungan: peringkat 1",
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
-      profile(page)
-        .getByRole("group", { name: "Tim Leader: peringkat 1" })
-        .getByText("Berbagi peringkat 1 dengan Tania dan Budi"),
+      profile(page).getByRole("group", {
+        name: "Tim Leader: peringkat 1",
+        exact: true,
+      }),
     ).toBeVisible();
-    // Info seri tidak menggeser catatan dasar peringkat.
+    await expect(profile(page).getByText(/Berbagi\s+peringkat/)).toHaveCount(0);
     await expect(profile(page).getByText(RANKING_NOTE)).toBeVisible();
   });
 
-  test("seri tiga agen atau lebih diringkas dengan disclosure", async ({
+  test("peringkat unik mengabaikan daftar peer lama tanpa disclosure", async ({
     page,
   }) => {
     await open(page, {
@@ -315,27 +319,10 @@ test.describe("Detail agent — quickview performa", () => {
     const metric = profile(page).getByRole("group", {
       name: "Tim Gabungan: peringkat 2",
     });
-    await expect(
-      metric.getByText("Berbagi peringkat 2 dengan Tania dan 3 agen lain"),
-    ).toBeVisible();
+    await expect(metric).toBeVisible();
+    await expect(metric.getByText(/Berbagi\s+peringkat/)).toHaveCount(0);
+    await expect(metric.getByRole("button")).toHaveCount(0);
     await expect(metric.getByText("Siti Rahma")).toHaveCount(0);
-
-    const show = metric.getByRole("button", {
-      name: "Lihat semua agen yang berbagi peringkat 2",
-    });
-    await expect(show).toHaveAttribute("aria-expanded", "false");
-    await show.click();
-
-    const hide = metric.getByRole("button", {
-      name: "Sembunyikan daftar agen yang berbagi peringkat 2",
-    });
-    await expect(hide).toHaveAttribute("aria-expanded", "true");
-    const panelId = await hide.getAttribute("aria-controls");
-    expect(panelId).toBeTruthy();
-    const list = page.locator(`[id="${panelId}"]`);
-    for (const name of ["Budi Santoso", "Siti Rahma", "Dimas Putra"]) {
-      await expect(list.getByText(name)).toBeVisible();
-    }
   });
 });
 

@@ -113,7 +113,6 @@ tbody tr:nth-child(even) td, tbody tr:nth-child(even) th { background: #fbfcfe; 
 .standing-item dd { margin-top: 0.3rem; color: var(--ink); font-size: 1.375rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .standing-item small { display: block; margin-top: 0.3rem; color: var(--ink-mute); font-size: 0.8125rem; }
 .standing-note { padding: 0.85rem 1.15rem; background: var(--paper); color: var(--ink-mute); font-size: 0.8125rem; grid-column: 1 / -1; }
-.tie-list { margin-top: 0.4rem; color: var(--ink-mute); font-size: 0.8125rem; }
 
 /* ── Akar masalah ─────────────────────────────────────────────────────── */
 .cause { padding: 1rem 0; border-bottom: 1px solid var(--line); }

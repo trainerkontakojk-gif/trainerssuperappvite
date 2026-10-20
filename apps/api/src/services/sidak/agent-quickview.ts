@@ -7,6 +7,7 @@ import type {
   SidakAgentRankQuickview,
 } from "@trainers/types";
 import { getDashboardData } from "./dashboard-data";
+import { assignRanks, compareLeastFindings } from "./agent-rank-order";
 import { generateSidakAgentForecast } from "./forecast";
 import {
   getAllFolders,
@@ -105,33 +106,14 @@ async function getRankForFolder(params: {
     allowedServiceTypes: params.allowedServiceTypes,
     limit: 0,
   });
-  const viewedAgent = dashboard.topAgents.find(
-    (agent) => agent.agentId === params.agentId,
-  );
+  const ranks = assignRanks(dashboard.topAgents, compareLeastFindings);
 
   return {
-    rank: viewedAgent
-      ? 1 +
-        dashboard.topAgents.filter(
-          (agent) => agent.defects < viewedAgent.defects,
-        ).length
-      : null,
+    rank: ranks.get(params.agentId) ?? null,
     total: dashboard.topAgents.length,
     scopeId: params.folder.id,
     scopeLabel: params.folder.name,
     basis: "least_findings_ytd",
-    tiedAgents: viewedAgent
-      ? dashboard.topAgents
-          .filter(
-            (agent) =>
-              agent.agentId !== params.agentId &&
-              agent.defects === viewedAgent.defects,
-          )
-          .map((agent) => ({
-            agentId: agent.agentId,
-            nama: agent.nama,
-          }))
-      : null,
   };
 }
 

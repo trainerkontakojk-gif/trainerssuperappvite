@@ -1,25 +1,22 @@
 import {
-  ChevronDown,
   Minus,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import { useState, useId, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type {
   SidakAgentForecastQuickview,
   SidakAgentQuickviewResponse,
   SidakAgentRankQuickview,
-  TiedPeerInfo,
 } from "@trainers/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Arah peringkat detail agen sengaja kebalikan halaman Ranking. */
 const RANKING_BASIS_NOTE =
-  "Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.";
+  "Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas.";
 
 /** Satu baris sidebar: label di kiri, nilai di kanan. */
 function MetricRow({
@@ -76,81 +73,6 @@ interface RankMetricProps {
   sameAsCombined?: boolean;
 }
 
-function buildTieText(
-  rank: number,
-  peers: TiedPeerInfo[],
-): { summary: string; disclosure: boolean } {
-  if (peers.length === 1) {
-    return {
-      summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama}`,
-      disclosure: false,
-    };
-  }
-  if (peers.length === 2) {
-    return {
-      summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama} dan ${peers[1].nama}`,
-      disclosure: false,
-    };
-  }
-  // 3+ peers — collapsed
-  return {
-    summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama} dan ${peers.length - 1} agen lain`,
-    disclosure: true,
-  };
-}
-
-function TieDisclosure({
-  peers,
-  rank,
-}: {
-  peers: TiedPeerInfo[];
-  rank: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-
-  return (
-    <div className="mt-0.5">
-      <span className="text-xs text-muted-foreground">
-        Berbagi peringkat {rank} dengan {peers[0].nama} dan {peers.length - 1}{" "}
-        agen lain
-      </span>
-      <Button
-        type="button"
-        variant="link"
-        size="lg"
-        aria-expanded={open}
-        aria-controls={id}
-        aria-label={
-          open
-            ? `Sembunyikan daftar agen yang berbagi peringkat ${rank}`
-            : `Lihat semua agen yang berbagi peringkat ${rank}`
-        }
-        onClick={() => setOpen(!open)}
-        className="ml-1 min-h-11 gap-0.5 px-1 text-xs font-medium text-primary"
-      >
-        {open ? "Sembunyikan" : "Lihat"}
-        <ChevronDown
-          aria-hidden="true"
-          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </Button>
-      {open && (
-        <ul
-          id={id}
-          className="mt-1 flex flex-col gap-0.5 rounded bg-muted/50 px-2 py-1"
-        >
-          {peers.map((peer) => (
-            <li key={peer.agentId} className="text-xs text-muted-foreground">
-              • {peer.nama}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 function RankMetric({
   label,
   rowLabel,
@@ -169,16 +91,6 @@ function RankMetric({
           ? "Belum masuk peringkat pada cakupan ini"
           : "Belum ada agen pembanding";
 
-  // ── Tie info ──
-  const tiedAgents = metric?.tiedAgents ?? null;
-  const hasTieData = tiedAgents !== null && tiedAgents !== undefined;
-  const tieCount = hasTieData ? tiedAgents.length : 0;
-  const hasTie = tieCount > 0;
-  const tieText =
-    hasTie && metric?.rank != null
-      ? buildTieText(metric.rank, tiedAgents!)
-      : null;
-
   return (
     <div
       role="group"
@@ -192,13 +104,6 @@ function RankMetric({
       </MetricRow>
       {supportingText ? (
         <p className="mt-0.5 text-xs text-muted-foreground">{supportingText}</p>
-      ) : null}
-      {hasTie && tieCount <= 2 && tieText ? (
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {tieText.summary}
-        </p>
-      ) : hasTie && tieCount >= 3 && metric?.rank != null ? (
-        <TieDisclosure peers={tiedAgents!} rank={metric.rank} />
       ) : null}
     </div>
   );
@@ -328,7 +233,8 @@ export default function AgentPerformanceQuickview({
         <ForecastMetric forecast={data.forecast} />
       </div>
       <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
-        {RANKING_BASIS_NOTE}
+        {RANKING_BASIS_NOTE} Bila semua angka kinerja sama, nama A–Z lalu ID agen
+        menentukan urutan; nama bukan ukuran kinerja.
         {scopeLabel ? ` Cakupan ${scopeLabel}.` : null}
       </p>
     </section>

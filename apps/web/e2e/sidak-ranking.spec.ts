@@ -4,7 +4,7 @@
  * Semua `/api` di-mock lewat `helpers/hermeticShell` (fail-closed), jadi spec
  * ini tidak menyentuh database mana pun. Menggantikan kontrak jsdom di
  * `sidak-ranking-fatal-badge.test.tsx`: pergerakan posisi, label filter dan
- * navigasi agen, serta peringkat bersama untuk jumlah temuan yang sama.
+ * navigasi agen, serta peringkat unik dari backend.
  */
 
 import { expect, test, type Page } from "@playwright/test";
@@ -29,6 +29,7 @@ type RankingRow = {
   score: number;
   hasCritical: boolean;
   criticalFindings?: number;
+  rank: number;
   rankChange?: number | null;
 };
 
@@ -37,6 +38,7 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 
 const MOVEMENT_ROWS: RankingRow[] = [
   {
+    rank: 2,
     agentId: "agent-normal",
     nama: "Agent Normal",
     batch: "Batch A",
@@ -46,6 +48,7 @@ const MOVEMENT_ROWS: RankingRow[] = [
     rankChange: 0,
   },
   {
+    rank: 1,
     agentId: "agent-fatal",
     nama: "Agent Fatal",
     batch: "Batch A",
@@ -62,23 +65,38 @@ const TIE_ROWS: RankingRow[] = [
     nama: "Agent Tie A",
     batch: "Batch A",
     defects: 10,
-    score: 75,
-    hasCritical: false,
+    score: 90,
+    criticalFindings: 2,
+    rank: 1,
+    hasCritical: true,
   },
   {
     agentId: "tie-b",
     nama: "Agent Tie B",
     batch: "Batch A",
     defects: 10,
-    score: 95,
-    hasCritical: false,
+    score: 80,
+    criticalFindings: 1,
+    rank: 2,
+    hasCritical: true,
   },
   {
     agentId: "tie-c",
     nama: "Agent Tie C",
     batch: "Batch A",
+    defects: 10,
+    score: 85,
+    criticalFindings: 1,
+    rank: 3,
+    hasCritical: true,
+  },
+  {
+    agentId: "tie-d",
+    nama: "Agent Tie D",
+    batch: "Batch A",
     defects: 3,
     score: 99,
+    rank: 4,
     hasCritical: false,
   },
 ];
@@ -241,7 +259,7 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
     await expect(page).toHaveURL(/\/sidak\/agents\/agent-normal$/);
   });
 
-  test("jumlah temuan sama berbagi peringkat, juga setelah diurutkan per skor", async ({
+  test("peringkat backend unik dan tetap setelah diurutkan per skor", async ({
     page,
   }) => {
     const audit = await openRanking(page, TIE_ROWS);
@@ -252,22 +270,21 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
       ).toHaveText("1");
       await expect(
         rowFor(page, "Agent Tie B").getByRole("cell").first(),
-      ).toHaveText("1");
+      ).toHaveText("2");
       await expect(
         rowFor(page, "Agent Tie C").getByRole("cell").first(),
       ).toHaveText("3");
+      await expect(
+        rowFor(page, "Agent Tie D").getByRole("cell").first(),
+      ).toHaveText("4");
     };
 
     await expectRanks();
-    await expect(rowFor(page, "Agent Tie A")).toContainText(
-      "Berbagi peringkat 1 dengan Agent Tie B",
-    );
-    await expect(rowFor(page, "Agent Tie B")).toContainText(
-      "Berbagi peringkat 1 dengan Agent Tie A",
-    );
-    await expect(rowFor(page, "Agent Tie C")).not.toContainText(
-      "Berbagi peringkat",
-    );
+    await expect(rankingTable(page)).not.toContainText(/Berbagi\s+peringkat/);
+    await expect(page.getByText(
+      "Urutan: temuan terbanyak, lalu temuan kritikal terbanyak, lalu skor QA terendah.",
+      { exact: true },
+    )).toBeVisible();
 
     // Urutan tampilan berubah, peringkat bisnis tidak.
     await rankingTable(page)
@@ -275,9 +292,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
       .click();
     const names = rankingTable(page).getByRole("row").getByRole("link");
     await expect(names).toHaveText([
+      "Agent Tie D",
+      "Agent Tie A",
       "Agent Tie C",
       "Agent Tie B",
-      "Agent Tie A",
     ]);
     await expectRanks();
     expectHermetic(audit);
@@ -366,10 +384,10 @@ test.describe("Ranking agen SIDAK (hermetic)", () => {
 });
 
 const TEAM_ROWS: RankingRow[] = [
-  { agentId: "t-1", nama: "Andi", batch: "Batch A", tim: "Tim Sari", defects: 9, score: 84, hasCritical: true, criticalFindings: 2, rankChange: 1 },
-  { agentId: "t-2", nama: "Bela", batch: "Batch A", tim: "Tim Andi", defects: 7, score: 88, hasCritical: false, criticalFindings: 0, rankChange: 0 },
-  { agentId: "t-3", nama: "Caca", batch: "Batch B", tim: "Tim Sari", defects: 4, score: 93, hasCritical: false, criticalFindings: 0, rankChange: -2 },
-  { agentId: "t-4", nama: "Dodi", batch: "Batch B", tim: "Tim Andi", defects: 2, score: 97, hasCritical: false, criticalFindings: 0, rankChange: null },
+  { rank: 1, agentId: "t-1", nama: "Andi", batch: "Batch A", tim: "Tim Sari", defects: 9, score: 84, hasCritical: true, criticalFindings: 2, rankChange: 1 },
+  { rank: 2, agentId: "t-2", nama: "Bela", batch: "Batch A", tim: "Tim Andi", defects: 7, score: 88, hasCritical: false, criticalFindings: 0, rankChange: 0 },
+  { rank: 3, agentId: "t-3", nama: "Caca", batch: "Batch B", tim: "Tim Sari", defects: 4, score: 93, hasCritical: false, criticalFindings: 0, rankChange: -2 },
+  { rank: 4, agentId: "t-4", nama: "Dodi", batch: "Batch B", tim: "Tim Andi", defects: 2, score: 97, hasCritical: false, criticalFindings: 0, rankChange: null },
 ];
 
 test.describe("Ranking SIDAK: pembanding dan Unduh Excel (hermetic)", () => {
@@ -386,7 +404,7 @@ test.describe("Ranking SIDAK: pembanding dan Unduh Excel (hermetic)", () => {
     await expect(page.getByRole("group", { name: "Tampilan ranking" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Per tim leader" })).toHaveCount(0);
     await expect(page.getByTestId("ranking-count")).toHaveText(
-      `4 agen · jumlah temuan sama berbagi peringkat · perubahan posisi dibanding Jan–Sep ${YEAR}`,
+      `4 agen · perubahan posisi dibanding Jan–Sep ${YEAR}`,
     );
     expectHermetic(audit);
   });

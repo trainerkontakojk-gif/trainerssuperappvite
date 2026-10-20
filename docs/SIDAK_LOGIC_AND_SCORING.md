@@ -189,7 +189,7 @@ Folder di-resolve ke nama batch (termasuk folder induk), lalu ID peserta diirisk
 
 Kartu **Pola temuan mingguan** Dashboard mengirim filter tim dan bulan aktif, dengan deskripsi layanan · tim · rentang · **per tanggal layanan**. Tanggal layanan tidak sama dengan bulan periode QA pada KPI; `missingDateFindingsAllPeriods` tetap lintas periode, tetapi mengikuti tim/akses. Halaman Heatmap penuh dan tab agen tidak mengirim parameter baru, sehingga perilakunya tetap. Bukti: `sidak-heatmap-filter-api.spec.ts` (JWT/backend/database lokal) dan `sidak-dashboard-insights.spec.ts` (browser hermetic).
 
-Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break tampilan. **Rank bisnis tetap memakai competition ranking**: jumlah defect yang sama berbagi peringkat yang sama, sedangkan tie-break nama hanya menentukan urutan baris. Sorting kolom nama atau skor mengubah urutan tampilan, bukan rank bisnis.
+Ranking prioritas memberi nomor unik berurutan (1, 2, 3, …): `defects` terbanyak, `criticalFindings` terbanyak (`undefined` = 0), `score` terendah, nama A–Z (`Intl.Collator("id", { sensitivity: "base", numeric: true })`), lalu `agentId` A–Z. Nama bukan ukuran kinerja dan hanya digunakan saat semua angka sama; ID menjamin urutan stabil untuk nama identik. Backend menetapkan `TopAgentData.rank` pada semua jalur, termasuk tanpa pembanding. `rankChange` menggunakan urutan yang sama pada periode kini dan pembanding. Sorting kolom nama atau skor hanya mengubah urutan tampilan, bukan peringkat; unduhan Excel memakai `agent.rank` yang sama.
 
 Halaman ranking utama adalah ranking **prioritas temuan**: rank `1` berarti defect terbanyak dan rank yang lebih besar berarti prioritas lebih rendah. Untuk periode yang memiliki pembanding, `rankChange = previousRank - currentRank` sehingga:
 
@@ -198,7 +198,7 @@ Halaman ranking utama adalah ranking **prioritas temuan**: rank `1` berarti defe
 - `0` berarti **Tetap**;
 - `null` berarti **Baru** dan `alltime` tidak menampilkan perbandingan periode.
 
-Status perubahan posisi ditampilkan satu kali pada setiap breakpoint: di kolom **Perubahan posisi** pada desktop, dan di bawah nama agent pada mobile ketika kolom desktop disembunyikan. Catatan **Berbagi peringkat dengan ...** tetap terpisah dari status perubahan. Label `Fatal` bukan bagian dari status ranking karena tidak diperlukan untuk keputusan prioritas.
+Status perubahan posisi ditampilkan satu kali pada setiap breakpoint: di kolom **Perubahan posisi** pada desktop, dan di bawah nama agent pada mobile ketika kolom desktop disembunyikan. Catatan basis menjelaskan: `Urutan: temuan terbanyak, lalu temuan kritikal terbanyak, lalu skor QA terendah.` Catatan tambahan menyatakan bahwa nama bukan ukuran kinerja. Label `Fatal` bukan bagian dari status ranking karena tidak diperlukan untuk keputusan prioritas.
 
 Quickview performa agent dapat memakai konteks performa tersendiri dan wajib memberi label semantic-nya secara eksplisit.
 
@@ -468,62 +468,26 @@ Lihat `apps/api/src/routes/sidak/dashboard.ts` (baris 52–113) dan `apps/api/sr
   4. folder gabungan = parent dari folder leader (jika leader punya parent), atau folder leader itu sendiri.
 - **Tim Leader** adalah folder/batch agent yang langsung cocok. Jika `leaderFolder.id === combinedFolder.id` (standalone atau parent-nya sendiri), backend hanya menjalankan **satu query ranking** dan kedua scope berbagi objek hasil (`leaderRankPromise = combinedRankPromise`). UI menampilkan label "Cohort yang sama dengan Tim Gabungan" saat `scopeId` sama.
 - **Ranking** hanya dihitung dari data tahun terpilih dan layanan terpilih via `getDashboardData()` dengan `folder_ids: [folder.id]`, `limit: 0`, dan di-scope oleh `accessibleAgentIds` serta `allowedServiceTypes`.
-- **Formula rank** (baris 113–117): `rank = 1 + topAgents.filter(a => a.defects < viewedAgent.defects).length`. Hanya agent dengan temuan **strictly lebih kecil** yang dihitung, sehingga temuan sama mendapat rank sama (contoh `1, 1, 3`).
+- **Formula rank**: `assignRanks(topAgents, compareLeastFindings)` memberi nomor `index + 1` setelah sort. Urutannya: `defects` paling sedikit, `criticalFindings` paling sedikit (`undefined` = 0), `score` tertinggi, nama A–Z, lalu `agentId` A–Z. Nama memakai collator Indonesia yang sama dengan ranking prioritas. Nomor selalu unik tanpa lompatan.
 - **Denominator** (`total` / `dari N`) = `topAgents.length` — jumlah agent audited yang benar-benar masuk hasil ranking untuk folder tersebut, bukan seluruh peserta terdaftar.
 - **Null rank** terjadi ketika `viewedAgent` tidak ditemukan di `topAgents` (mis. agent tidak punya temuan di tahun/layanan terpilih). UI menampilkan "—" dengan teks "Agent belum masuk ranking pada konteks ini" atau "Belum ada agent pembanding" bila `total === 0`.
-- **Basis** semua ranking adalah `"least_findings_ytd"` — terikat microcopy: `Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.` (konstanta `RANKING_BASIS_NOTE` di komponen).
+- **Basis** quickview adalah `"least_findings_ytd"` — microcopy: `Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas.` Catatan tambahan menyatakan bahwa bila semua angka sama, nama A–Z lalu ID agen menentukan urutan; nama bukan ukuran kinerja. Laporan HTML memakai basis yang sama.
 
-### Tied Peer Semantics (tiedAgents)
+### Kontrak dan tampilan peringkat unik
 
-Rank view menyertakan daftar agen lain yang berbagi peringkat yang sama (`tiedAgents`).
-
-**Kontrak `TiedPeerInfo`:**
+`apps/api/src/services/sidak/agent-rank-order.ts` merupakan sumber kebenaran kedua arah peringkat: `comparePriority`, `compareLeastFindings`, dan `assignRanks`. Keduanya memakai angka kinerja yang saling mencerminkan, tetapi nama dan ID tetap A–Z. Tidak ada query atau migrasi baru; cakupan akses tetap mengikuti `getDashboardData`.
 
 ```typescript
-interface TiedPeerInfo {
-  agentId: string;
-  nama: string;
-}
-
 interface SidakAgentRankQuickview {
   rank: number | null;
   total: number;
   scopeId: string | null;
   scopeLabel: string;
   basis: "least_findings_ytd";
-  /** Agen-agen lain yang berbagi peringkat yang sama (tidak termasuk agent
-   *  yang sedang dilihat). `null/undefined` ketika data rank tidak tersedia.
-   *  `[]` berarti tidak ada tie. Urutan deterministik: mengikuti urutan
-   *  dashboard (defects descending, nama ascending setelah exclude viewedAgent). */
-  tiedAgents?: TiedPeerInfo[] | null;
 }
 ```
 
-Aturan:
-
-- **Exclude viewed agent**: `tiedAgents` menyaring `viewedAgent` dari daftar tie (`agent.agentId !== params.agentId`). Agent yang sedang dilihat tidak muncul sebagai peer-nya sendiri.
-- **Deterministic order**: Urutan peer mengikuti urutan `topAgents` dashboard — `defects` descending, lalu `nama` ascending sebagai tie-break, setelah viewed agent dikecualikan.
-- **Null vs empty**: `tiedAgents = null` ketika agent tidak ditemukan di `topAgents` (rank juga `null`); `tiedAgents = []` ketika agent ditemukan tetapi tidak ada tie; `tiedAgents = [...]` ketika ada 1+ agen dengan jumlah temuan identik.
-- **Rank formula**: `rank = 1 + count of agents with strictly fewer defects`. Temuan sama → rank sama (`1, 1, 3`). Tie tidak di-break secara buatan.
-- **Tidak ada perubahan ranking/dashboard/forecast**: Quickview bersifat **display-only**. Data quickview tidak mengubah tabel ranking, KPI dashboard, atau hasil forecast. Semua komponen quickview adalah komputasi ulang deterministik dari data yang sama, tanpa efek samping write ke DB atau cache.
-
-### UI: Tampilan Ranking Peer (1/2/3+)
-
-Komponen `RankMetric` menampilkan teks tie sesuai jumlah peer:
-
-| Peer count | Tampilan                                                              |
-| ---------- | --------------------------------------------------------------------- |
-| 1 peer     | `Berbagi peringkat X dengan {nama}` (inline, tanpa disclosure)        |
-| 2 peers    | `Berbagi peringkat X dengan {nama1} dan {nama2}` (inline)             |
-| 3+ peers   | `Berbagi peringkat X dengan {nama1} dan N agen lain` + tombol "Lihat" |
-
-Untuk 3+ peer, tombol **Lihat/Sembunyikan** menggunakan komponen `TieDisclosure`:
-
-- `aria-expanded={open}` — state boolean disclosure
-- `aria-controls={id}` — menghubungkan tombol ke `<ul id={id}>`
-- `aria-label` — berubah antara `"Sembunyikan daftar agen yang berbagi peringkat {rank}"` dan `"Lihat semua agen yang berbagi peringkat {rank}"`
-- Ikon `ChevronDown` dengan `aria-hidden="true"`, rotasi 180° saat terbuka
-- Daftar dirender sebagai `<ul>` dengan bullet (`•`) per peer, `text-xs text-muted-foreground`
+Quickview dan laporan HTML hanya menampilkan peringkat unik, tanpa daftar peer atau disclosure seri. Komputasi tidak mengubah KPI dashboard, forecast, atau data persisten.
 
 Container ranking juga memiliki `aria-label` per cohort: `"Tim Gabungan: peringkat X"`, `"Tim Leader: peringkat X"`, atau `"belum tersedia"`.
 
@@ -594,13 +558,13 @@ Agent di luar akses tidak boleh ikut numerator, denominator, maupun payload scop
 
 ### Test Coverage
 
-| File                                                            | Tests | Cakupan                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/src/__tests__/sidak-agent-quickview.test.ts`          | 16    | Service contract, rank resolution, tie semantics, access rejection, folder resolution, scope filtering, forecast mapping, partial failure, combined=leader dedup                                                                                                                                                                                                                                   |
-| `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts`    | 6     | Route forwarding, 403 guard (inaccessible & empty), 400 validation (year & service_type), 404 envelope                                                                                                                                                                                                                                                                                             |
-| `apps/web/src/__tests__/useAgentQuickview.test.tsx`             | 5     | Request path, stale context suppression, stale error clearing, empty service, error clear on deselection                                                                                                                                                                                                                                                                                           |
-| `apps/web/e2e/sidak-agent-detail-states.spec.ts` (E2E hermetic) | 20    | Menggantikan unit test `AgentPerformanceQuickview`, `AgentProfileBar`, `MonthRail`, `AgentAuditDossier`, `RootCauseCard`, `ContextControlBar`: render ranking + forecast, skeleton, error tenang, rank null/di luar cohort, kegagalan parsial, cakupan sama, ikon per status forecast, seri 1/2/3+ dengan disclosure, tiket pengurang, selisih kosong, akar masalah + empty state, toolbar per tab |
-| `apps/web/e2e/sidak-agent-detail-layout.spec.ts` (E2E hermetic) | 3     | Tata letak detail agent: header satu baris, tab di atas toolbar, ringkasan tanpa judul bertumpuk, satu catatan target QA, selisih dalam poin, mobile tanpa scroll horizontal                                                                                                                                                                                                                       |
+| File                                                            | Tests | Cakupan                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/__tests__/sidak-agent-quickview.test.ts`          | 16    | Service contract, unique rank resolution, access rejection, folder resolution, scope filtering, forecast mapping, partial failure, combined=leader dedup                                                                                                                                                                                                                                                        |
+| `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts`    | 6     | Route forwarding, 403 guard (inaccessible & empty), 400 validation (year & service_type), 404 envelope                                                                                                                                                                                                                                                                                                          |
+| `apps/web/src/__tests__/useAgentQuickview.test.tsx`             | 5     | Request path, stale context suppression, stale error clearing, empty service, error clear on deselection                                                                                                                                                                                                                                                                                                        |
+| `apps/web/e2e/sidak-agent-detail-states.spec.ts` (E2E hermetic) | 20    | Menggantikan unit test `AgentPerformanceQuickview`, `AgentProfileBar`, `MonthRail`, `AgentAuditDossier`, `RootCauseCard`, `ContextControlBar`: render ranking + forecast, skeleton, error tenang, rank null/di luar cohort, kegagalan parsial, cakupan sama, ikon per status forecast, peringkat unik tanpa label/disclosure seri, tiket pengurang, selisih kosong, akar masalah + empty state, toolbar per tab |
+| `apps/web/e2e/sidak-agent-detail-layout.spec.ts` (E2E hermetic) | 3     | Tata letak detail agent: header satu baris, tab di atas toolbar, ringkasan tanpa judul bertumpuk, satu catatan target QA, selisih dalam poin, mobile tanpa scroll horizontal                                                                                                                                                                                                                                    |
 
 Skor bulanan halaman agent detail (`GET /sidak/agents/:id`) dihitung dari `qa_temuan` melalui scoring engine aplikasi dengan `PeriodScoringContext` yang spesifik per periode. Tabel `qa_dashboard_agent_period_summary` tidak digunakan sebagai sumber skor agent detail karena row history dapat berisi placeholder hasil migration refresh yang tidak setara dengan formula aplikasi.
 
@@ -621,9 +585,9 @@ Lihat `apps/api/src/services/sidak/period-scoring-context.ts` untuk implementasi
 Catatan:
 
 - API 22: `sidak-agent-quickview.test.ts` 16 + `sidak-agent-quickview-route.test.ts` 6.
-- AgentPerformance 24: render penuh, skeleton, null rank, unavailable state, partial failure, insufficient forecast, calm error, same-scope label, mobile grid, forecast icons, 1/2/3+ tied peer, empty/null/undefined tiedAgents, disclosure expand, accessibility assertions.
+- AgentPerformance 24: render penuh, skeleton, null rank, unavailable state, partial failure, insufficient forecast, calm error, same-scope label, mobile grid, forecast icons, peringkat unik, respons peer lama diabaikan tanpa disclosure, catatan basis baru, accessibility assertions.
 - Web regression 31 = 24 component/AgentPerformance + 3 profile bar + 3 dashboard parity + 1 ranking parity — angka independen per gate, bukan overlap subtraction.
-- Manual visual QA: perlu verifikasi visual terhadap responsive mobile grid, tie disclosure 1/2/3+ peer, skeleton loading, forecast icons, error state, dan aksesibilitas aria labels — dilakukan setelah deploy.
+- Manual visual QA: periksa responsive mobile grid, catatan basis peringkat unik, skeleton loading, forecast icons, error state, dan aksesibilitas aria labels.
 
 ## Agent Detail Root Cause Diagnosis
 

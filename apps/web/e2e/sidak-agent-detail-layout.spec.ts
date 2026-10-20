@@ -139,7 +139,7 @@ test.describe("Tata letak detail agent", () => {
         height === 768 ? "false" : "true",
       );
       // Isi paling bawah selalu bisa dicapai dengan scroll halaman biasa.
-      const lastItem = aside.getByText("Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.");
+      const lastItem = aside.getByText("Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas.");
       await lastItem.scrollIntoViewIfNeeded();
       await expect(lastItem).toBeInViewport();
     }
@@ -336,7 +336,7 @@ test.describe("Tata letak detail agent", () => {
     await sameRow(leader.getByText("Peringkat Tim Leader Andika"), leader.getByText("3 / 12"));
     const forecast = aside.getByRole("group", { name: "Forecast: Memburuk" });
     await sameRow(forecast.getByText("Forecast 3 bulan"), forecast.getByText("Memburuk", { exact: true }));
-    await expect(aside.getByText("Peringkat 1 = temuan paling sedikit. Jumlah temuan sama berbagi peringkat.")).toBeVisible();
+    await expect(aside.getByText("Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas.")).toBeVisible();
     await expect(aside.getByRole("button", { name: "Cara membaca peringkat" })).toHaveCount(0);
   });
 

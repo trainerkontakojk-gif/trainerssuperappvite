@@ -1,51 +1,6 @@
 import type { TopAgentData } from "@trainers/types";
 import { writeFlatExcel } from "../lib/excel-utils";
 
-const collator = new Intl.Collator("id", {
-  sensitivity: "base",
-  numeric: true,
-});
-
-/**
- * Peringkat bisnis: temuan terbanyak = 1, jumlah temuan sama berbagi
- * peringkat. Urutan tampilan tabel tidak mengubah peringkat ini.
- */
-export function computeRanks(agents: TopAgentData[]): Map<string, number> {
-  const ordered = [...agents].sort(
-    (a, b) => b.defects - a.defects || collator.compare(a.nama, b.nama),
-  );
-  const ranks = new Map<string, number>();
-  let previousDefects: number | undefined;
-  let previousRank = 0;
-  ordered.forEach((agent, index) => {
-    const rank =
-      index > 0 && agent.defects === previousDefects ? previousRank : index + 1;
-    ranks.set(agent.agentId, rank);
-    previousDefects = agent.defects;
-    previousRank = rank;
-  });
-  return ranks;
-}
-
-/** Nama agen lain yang berbagi jumlah temuan (= peringkat) per agen. */
-export function tiedNames(agents: TopAgentData[]): Map<string, string[]> {
-  const byDefects = new Map<number, string[]>();
-  for (const agent of agents) {
-    byDefects.set(agent.defects, [
-      ...(byDefects.get(agent.defects) ?? []),
-      agent.nama,
-    ]);
-  }
-  const result = new Map<string, string[]>();
-  for (const agent of agents) {
-    const peers = (byDefects.get(agent.defects) ?? [])
-      .filter((name) => name !== agent.nama)
-      .sort((a, b) => collator.compare(a, b));
-    if (peers.length > 0) result.set(agent.agentId, peers);
-  }
-  return result;
-}
-
 export const NO_TEAM_LABEL = "Tanpa tim";
 
 /** Teks bila ranking tidak punya periode pembanding (tidak pernah kosong). */
@@ -65,11 +20,10 @@ export function rankChangeLabel(
 /** Unduh baris ranking yang tampil sebagai .xlsx, angka tetap angka. */
 export async function downloadRankingXlsx(options: {
   agents: TopAgentData[];
-  ranks: Map<string, number>;
   fileName: string;
 }): Promise<void> {
   const rows = options.agents.map((agent) => ({
-    Peringkat: options.ranks.get(agent.agentId) ?? null,
+    Peringkat: agent.rank ?? null,
     Agen: agent.nama,
     Tim: agent.tim?.trim() || NO_TEAM_LABEL,
     Batch: agent.batch ?? "",

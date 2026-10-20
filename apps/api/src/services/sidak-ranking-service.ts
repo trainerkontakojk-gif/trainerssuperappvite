@@ -1,6 +1,7 @@
 import type { TopAgentData } from "@trainers/types";
 import { supabaseAdmin } from "../lib/supabase";
 import * as sidakService from "./sidak-service";
+import { assignRanks, comparePriority } from "./sidak/agent-rank-order";
 import { applyPesertaScope, pesertaScopeFromIds } from "./access/scope";
 
 /** `range` = rentang bulan cakupan bersama (`startMonth`..`endMonth`). */
@@ -81,29 +82,6 @@ async function fetchActivePeriodIds(
   return new Set(temuanPeriods.map((t) => t.period_id));
 }
 
-function buildBusinessRankMap(agents: TopAgentData[]): Map<string, number> {
-  const ordered = [...agents].sort(
-    (left, right) =>
-      right.defects - left.defects ||
-      left.nama.localeCompare(right.nama, "id", { sensitivity: "base", numeric: true }),
-  );
-  const ranks = new Map<string, number>();
-  let previousDefects: number | undefined;
-  let previousRank = 0;
-
-  ordered.forEach((agent, index) => {
-    const rank =
-      index > 0 && agent.defects === previousDefects
-        ? previousRank
-        : index + 1;
-    ranks.set(agent.agentId, rank);
-    previousDefects = agent.defects;
-    previousRank = rank;
-  });
-
-  return ranks;
-}
-
 type PeriodRow = { id: string; year: number; month: number };
 
 /** ID periode QA untuk bulan `start..end` di `year`; bulan < 1 mundur ke tahun lalu. */
@@ -129,16 +107,22 @@ export class RankingInputError extends Error {}
 
 function withRankChange(
   current: TopAgentData[],
-  previous: TopAgentData[],
+  previous?: TopAgentData[],
 ): TopAgentData[] {
-  const prevRankMap = buildBusinessRankMap(previous);
-  const currentRankMap = buildBusinessRankMap(current);
+  const prevRankMap = assignRanks(previous ?? [], comparePriority);
+  const currentRankMap = assignRanks(current, comparePriority);
   return current.map((agent) => {
-    const currentRank = currentRankMap.get(agent.agentId) ?? 0;
+    const currentRank = currentRankMap.get(agent.agentId)!;
     const previousRank = prevRankMap.get(agent.agentId);
     return {
       ...agent,
-      rankChange: previousRank !== undefined ? previousRank - currentRank : null,
+      rank: currentRank,
+      rankChange:
+        previous === undefined
+          ? undefined
+          : previousRank !== undefined
+            ? previousRank - currentRank
+            : null,
     };
   });
 }
@@ -209,7 +193,9 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
     : dashboardData.availableServices;
 
   let finalRankings =
-    rangePeriodIds && rangePeriodIds.length === 0 ? [] : dashboardData.topAgents;
+    rangePeriodIds && rangePeriodIds.length === 0
+      ? []
+      : withRankChange(dashboardData.topAgents);
   let comparison: RankingData["comparison"] = null;
 
   if (isRange && rangePeriodIds && rangePeriodIds.length > 0) {

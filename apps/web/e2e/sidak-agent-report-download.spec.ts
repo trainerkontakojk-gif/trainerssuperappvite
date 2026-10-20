@@ -3229,8 +3229,8 @@ test.describe("SIDAK agent report download nyata", () => {
     expect(gapFile.text).not.toMatch(/<script[^>]*>/i);
     expectNoApplicationTraffic(gapAudit);
 
-    // (2) Nama agen yang menutup quickview harus ter-escape, dan disclosure
-    //     "berbagi peringkat" harus benar-benar bisa dibuka.
+    // (2) Peer seri dari respons lama tidak lagi masuk laporan, termasuk
+    //     nama yang mengandung markup berbahaya.
     const tieAudit = startAudit();
     await openAgentDetail(page, tieAudit, {
       id: TIE_AGENT_ID,
@@ -3238,13 +3238,11 @@ test.describe("SIDAK agent report download nyata", () => {
     });
     const tieFile = await exportFromMenu(page, "HTML Statis", "hostile-tie");
 
-    expect(tieFile.text).toContain("Berbagi peringkat");
-    expect(tieFile.text).toContain("Nurul &lt;Hidayah&gt;");
+    expect(tieFile.text).not.toMatch(/Berbagi\s+peringkat/);
+    expect(tieFile.text).not.toContain("Nurul &lt;Hidayah&gt;");
     expect(tieFile.text).not.toMatch(/<script[^>]*>/i);
-    // Dua agen seri: yang pertama disebut, sisanya diringkas, keduanya tetap
-    // bisa ditemukan pembaca lewat disclosure.
-    expect(tieFile.text).toMatch(/quickview-ties/);
-    expect(tieFile.text).toMatch(/1 agen lain|Yoga Saputra/);
+    expect(tieFile.text).not.toMatch(/quickview-ties/);
+    expect(tieFile.text).not.toContain("Yoga Saputra");
     expectNoApplicationTraffic(tieAudit);
   });
 });

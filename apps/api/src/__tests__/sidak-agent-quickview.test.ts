@@ -279,7 +279,7 @@ describe("getSidakAgentQuickview", () => {
     });
   });
 
-  it("gives tied agents the same rank and counts only strictly fewer findings", async () => {
+  it("gives equal-findings agents unique ranks using QA score", async () => {
     mockDashboardByFolder({
       "parent-call": [
         { ...rankedParentWorstFirst[0], defects: 4 },
@@ -305,7 +305,7 @@ describe("getSidakAgentQuickview", () => {
       agentId: "agent-2",
       accessibleAgentIds: ["agent-1", "agent-2", "agent-3"],
     });
-    expect(otherTied.combinedTeam?.rank).toBe(1);
+    expect(otherTied.combinedTeam?.rank).toBe(2);
 
     participantState.data = {
       id: "agent-3",
@@ -524,8 +524,8 @@ describe("getSidakAgentQuickview", () => {
     expect(result.combinedTeam?.scopeId).toBe("parent-call");
   });
 
-  describe("tiedAgents computation", () => {
-    it("returns tied peer (excluding the viewed agent) for a 1-peer tie", async () => {
+  describe("unique ranking contract", () => {
+    it("uses alphabetical names when performance numbers match", async () => {
       mockDashboardByFolder({
         "parent-call": [
           {
@@ -558,13 +558,11 @@ describe("getSidakAgentQuickview", () => {
 
       const result = await getSidakAgentQuickview(baseParams);
 
-      expect(result.combinedTeam?.rank).toBe(1);
-      expect(result.combinedTeam?.tiedAgents).toEqual([
-        { agentId: "tania-002", nama: "Tania" },
-      ]);
+      expect(result.combinedTeam?.rank).toBe(2);
+      expect(result.combinedTeam).not.toHaveProperty("tiedAgents");
     });
 
-    it("returns empty array when no tie exists (singleton)", async () => {
+    it("returns the unique first rank without peer metadata", async () => {
       mockDashboardByFolder({
         "parent-call": [
           {
@@ -597,10 +595,11 @@ describe("getSidakAgentQuickview", () => {
 
       const result = await getSidakAgentQuickview(baseParams);
 
-      expect(result.combinedTeam?.tiedAgents).toEqual([]);
+      expect(result.combinedTeam?.rank).toBe(1);
+      expect(result.combinedTeam).not.toHaveProperty("tiedAgents");
     });
 
-    it("excludes viewed agent and returns all other tied peers (3+ tie)", async () => {
+    it("uses QA score then name for several equal-findings agents", async () => {
       mockDashboardByFolder({
         "parent-call": [
           {
@@ -649,22 +648,11 @@ describe("getSidakAgentQuickview", () => {
 
       const result = await getSidakAgentQuickview(baseParams);
 
-      expect(result.combinedTeam?.rank).toBe(1);
-      expect(result.combinedTeam?.tiedAgents).toHaveLength(3);
-      expect(result.combinedTeam?.tiedAgents).toEqual(
-        expect.arrayContaining([
-          { agentId: "tania-002", nama: "Tania" },
-          { agentId: "budi-003", nama: "Budi Santoso" },
-          { agentId: "siti-004", nama: "Siti Rahma" },
-        ]),
-      );
-      // Ensure viewed agent is NOT in the list
-      expect(
-        result.combinedTeam?.tiedAgents?.find((a) => a.agentId === "agent-1"),
-      ).toBeUndefined();
+      expect(result.combinedTeam?.rank).toBe(2);
+      expect(result.combinedTeam).not.toHaveProperty("tiedAgents");
     });
 
-    it("returns null tiedAgents when agent is not found in topAgents (rank null)", async () => {
+    it("returns null rank when agent is not found in topAgents", async () => {
       // agent-1 not in topAgents
       mockDashboardByFolder({
         "parent-call": [
@@ -692,10 +680,10 @@ describe("getSidakAgentQuickview", () => {
       const result = await getSidakAgentQuickview(baseParams);
 
       expect(result.combinedTeam?.rank).toBeNull();
-      expect(result.combinedTeam?.tiedAgents).toBeNull();
+      expect(result.combinedTeam).not.toHaveProperty("tiedAgents");
     });
 
-    it("returns null tiedAgents when combined ranking segment fails", async () => {
+    it("returns null when combined ranking segment fails", async () => {
       vi.mocked(getDashboardData).mockImplementation(async (params) => {
         if (params.folder_ids?.[0] === "parent-call") {
           throw new Error("combined ranking unavailable");
@@ -710,7 +698,7 @@ describe("getSidakAgentQuickview", () => {
       expect(result.combinedTeam).toBeNull();
     });
 
-    it("maintains deterministic order (defects descending, then nama ascending)", async () => {
+    it("prioritizes QA score over alphabetical names for equal findings", async () => {
       mockDashboardByFolder({
         "parent-call": [
           {
@@ -751,12 +739,9 @@ describe("getSidakAgentQuickview", () => {
 
       const result = await getSidakAgentQuickview(baseParams);
 
-      // YBS has defects=1, same as Alpha and Beta — tied group: Alpha, Beta
-      // Order should be alphabetical: Alpha, Beta
-      expect(result.combinedTeam?.tiedAgents).toEqual([
-        { agentId: "a-001", nama: "Alpha" },
-        { agentId: "b-001", nama: "Beta" },
-      ]);
+      // YBS has the highest QA score among agents with one finding.
+      expect(result.combinedTeam?.rank).toBe(1);
+      expect(result.combinedTeam).not.toHaveProperty("tiedAgents");
     });
   });
 });

@@ -22,10 +22,8 @@ import {
 } from "lucide-react";
 import { notify } from "../../lib/toast";
 import {
-  computeRanks,
   downloadRankingXlsx,
   rankChangeLabel as describeRankChange,
-  tiedNames as tiedNamesFor,
 } from "../../utils/sidakRanking";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
@@ -165,26 +163,6 @@ export default function SidakRankingPage() {
 
   const rankings = data?.rankings;
   const [exporting, setExporting] = useState(false);
-  const businessRanks = useMemo(
-    () => computeRanks(rankings ?? []),
-    [rankings],
-  );
-
-  const tiedNamesByAgent = useMemo(
-    () => tiedNamesFor(rankings ?? []),
-    [rankings],
-  );
-
-  const formatTieLabel = (rank: number, names: string[]) => {
-    if (names.length === 0) return null;
-    const peerLabel =
-      names.length <= 2
-        ? names.join(" dan ")
-        : `${names[0]} dan ${names.length - 1} agen lain`;
-    return `Berbagi peringkat ${rank} dengan ${peerLabel}`;
-  };
-
-
   const sortedRankings = useMemo(() => {
     if (!rankings) return [];
     const collator = new Intl.Collator("id", {
@@ -214,7 +192,6 @@ export default function SidakRankingPage() {
       // Excel mengikuti urutan tabel yang tampil.
       await downloadRankingXlsx({
         agents: sortedRankings,
-        ranks: businessRanks,
         fileName: `ranking-sidak-${effectiveService}-${selectedYear}-${pad2(startMonth)}-${pad2(endMonth)}.xlsx`,
       });
     } catch {
@@ -243,12 +220,8 @@ export default function SidakRankingPage() {
       : <ArrowDown className="w-3.5 h-3.5" />;
   };
 
-  const renderRow = (
-    agent: TopAgentData,
-    rank: number,
-    tiedNames: string[],
-  ) => {
-                        const tieLabel = formatTieLabel(rank, tiedNames);
+  const renderRow = (agent: TopAgentData) => {
+                        const rank = agent.rank;
                         const rankChange = agent.rankChange;
                         const rankChangeLabel = describeRankChange(rankChange);
                         // Prioritas naik = temuan makin banyak (perlu perhatian);
@@ -270,7 +243,7 @@ export default function SidakRankingPage() {
                                   rank === 1 ? "text-primary" : "text-muted-foreground"
                                 }`}
                               >
-                                {rank}
+                                {rank ?? "—"}
                               </span>
                             </td>
                             <td className="min-w-0 px-0 py-0 align-middle md:table-cell md:px-4 md:py-4">
@@ -294,11 +267,6 @@ export default function SidakRankingPage() {
                               {rankChangeLabel && (
                                 <span className={`mt-2 block text-[12px] font-semibold md:hidden ${rankChangeClass}`}>
                                   {rankChangeLabel}
-                                </span>
-                              )}
-                              {tieLabel && (
-                                <span className="mt-1 block text-[12px] text-muted-foreground">
-                                  {tieLabel}
                                 </span>
                               )}
                             </td>
@@ -331,7 +299,7 @@ export default function SidakRankingPage() {
                                     {rankChangeLabel}
                                     {typeof rankChange === "number" && rankChange !== 0 && (
                                       <span className="ml-1 font-normal text-muted-foreground">
-                                        (sebelumnya posisi {rank + rankChange})
+                                        (sebelumnya posisi {rank !== undefined ? rank + rankChange : "—"})
                                       </span>
                                     )}
                                   </span>
@@ -360,7 +328,7 @@ export default function SidakRankingPage() {
         <div className="max-w-7xl mx-auto space-y-6">
           <SidakPageHeader
             title="Ranking"
-            description="Agen dengan temuan terbanyak ada di peringkat 1. Jumlah temuan yang sama berbagi peringkat."
+            description="Agen dengan temuan terbanyak ada di peringkat 1. Setiap agen mendapat peringkat unik."
             scope={
               <SidakScopeLine
                 layanan={effectiveService}
@@ -481,12 +449,20 @@ export default function SidakRankingPage() {
           </section>
 
           {!loading && sortedRankings.length > 0 ? (
-            <p data-testid="ranking-count" className="text-sm text-fg2 tabular-nums">
-              {sortedRankings.length} agen · jumlah temuan sama berbagi peringkat ·{" "}
-              {data?.comparison
-                ? `perubahan posisi dibanding ${data.comparison.label}`
-                : "belum ada periode pembanding untuk perubahan posisi"}
-            </p>
+            <div>
+              <p className="mb-2 text-sm text-fg2">
+                Urutan: temuan terbanyak, lalu temuan kritikal terbanyak, lalu skor QA terendah.
+              </p>
+              <p className="mb-2 text-xs text-fg2">
+                Bila semua angka kinerja sama, nama A–Z lalu ID agen menentukan urutan; nama bukan ukuran kinerja.
+              </p>
+              <p data-testid="ranking-count" className="text-sm text-fg2 tabular-nums">
+                {sortedRankings.length} agen ·{" "}
+                {data?.comparison
+                  ? `perubahan posisi dibanding ${data.comparison.label}`
+                  : "belum ada periode pembanding untuk perubahan posisi"}
+              </p>
+            </div>
           ) : null}
 
           {/* RANKING TABLE */}
@@ -564,13 +540,7 @@ export default function SidakRankingPage() {
                         </tr>
                       ))
                     ) : sortedRankings.length > 0 ? (
-                      sortedRankings.map((agent, i) =>
-                        renderRow(
-                          agent,
-                          businessRanks.get(agent.agentId) ?? i + 1,
-                          tiedNamesByAgent.get(agent.agentId) ?? [],
-                        ),
-                      )
+                      sortedRankings.map((agent) => renderRow(agent))
                     ) : (
                       <tr>
                         <td colSpan={7} className="px-6 py-24 text-center">

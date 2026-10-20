@@ -164,7 +164,6 @@ function buildHighlightsHtml(input: AgentReportHtmlInput): string {
 function buildStandingHtml(input: AgentReportHtmlInput): string {
   const quickview = input.context.quickview;
   if (!quickview) return "";
-  const open = input.variant === "static" ? " open" : "";
   const sameScope =
     quickview.combinedTeam?.scopeId != null &&
     quickview.combinedTeam.scopeId === quickview.leaderTeam?.scopeId;
@@ -184,17 +183,6 @@ function buildStandingHtml(input: AgentReportHtmlInput): string {
           : finiteNumber(metric.total) > 0
             ? "Belum masuk peringkat pada cakupan ini"
             : "Belum ada agen pembanding";
-    const peers = metric?.tiedAgents ?? null;
-    const tie =
-      peers && peers.length > 0 && hasRank
-        ? `<details class="disclosure quickview-ties"${open}><summary>Berbagi peringkat ${formatNumber(metric?.rank)} dengan ${escHtml(peers[0].nama)}${
-            peers.length === 2
-              ? " dan " + escHtml(peers[1].nama)
-              : " dan " + (peers.length - 1) + " agen lain"
-          }</summary><ul class="tie-list">${peers
-            .map((peer) => `<li>${escHtml(peer.nama)}</li>`)
-            .join("")}</ul></details>`
-        : "";
     return [
       '<div class="standing-item">',
       "<dt>" + escHtml(label) + "</dt>",
@@ -204,7 +192,6 @@ function buildStandingHtml(input: AgentReportHtmlInput): string {
           : "—") +
         "</dd>",
       "<small>" + escHtml(supporting) + "</small>",
-      tie,
       "</div>",
     ].join("");
   };
@@ -226,7 +213,7 @@ function buildStandingHtml(input: AgentReportHtmlInput): string {
       "</small>",
     "</div>",
     completeRanking
-      ? '<p class="standing-note">Peringkat 1 = temuan paling sedikit sejak awal tahun. Jumlah temuan yang sama mendapat peringkat yang sama.</p>'
+      ? '<p class="standing-note">Semakin tinggi peringkat, semakin sedikit temuan YTD. Bila jumlah temuan sama, yang lebih sedikit temuan kritikal lalu skor QA lebih tinggi berada di atas. Bila semua angka kinerja sama, nama A–Z lalu ID agen menentukan urutan; nama bukan ukuran kinerja.</p>'
       : "",
     "</dl>",
     "</div>",
