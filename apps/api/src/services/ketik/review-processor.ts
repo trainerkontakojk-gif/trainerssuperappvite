@@ -1,4 +1,4 @@
-import { detectKetikIdentityAnomalies } from "@trainers/types";
+import { detectKetikSessionAnomalies } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
 import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
@@ -171,7 +171,7 @@ export async function processKetikReviewJob(
   }
 
   const transcript = serializeKetikPromptData(session.messages);
-  const anomalies = detectKetikIdentityAnomalies({
+  const anomalies = detectKetikSessionAnomalies({
     nik: session.consumer_nik,
     email: session.consumer_email,
     city: session.consumer_city,

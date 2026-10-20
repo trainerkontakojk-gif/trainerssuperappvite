@@ -1083,6 +1083,7 @@ for (const scenario of [
   "consumer_id",
   "missing_id",
   "mixed",
+  "legacy",
 ] as const) {
   test(`identity verification review: ${scenario}`, async () => {
     providerMode = "success";
@@ -1120,6 +1121,9 @@ for (const scenario of [
       },
     ];
     const valid = scenario === "valid";
+    // Sessions finished before NIK/email existed: no verification rule applies,
+    // even for a bare "Jakarta" domicile.
+    const legacy = scenario === "legacy";
     const notAsked = scenario === "not_asked";
     const cityOnly = scenario === "city_only";
     const transcript = notAsked ? [messages[4]] : messages;
@@ -1129,10 +1133,16 @@ for (const scenario of [
           .from("ketik_history")
           .update({
             consumer_city: valid ? "Bandung" : "Jakarta",
-            consumer_nik:
-              valid || cityOnly ? "3273010101900000" : "327301010190000",
-            consumer_email:
-              valid || cityOnly ? "latihan@gmail.com" : "latihan@gnail.com",
+            consumer_nik: legacy
+              ? null
+              : valid || cityOnly
+                ? "3273010101900000"
+                : "327301010190000",
+            consumer_email: legacy
+              ? null
+              : valid || cityOnly
+                ? "latihan@gmail.com"
+                : "latihan@gnail.com",
             messages: transcript,
           })
           .eq("id", id)
@@ -1166,7 +1176,7 @@ for (const scenario of [
       .toBe("completed");
     const detail = (await (await request(`/review/${id}`)).json()).data;
     const prompt = JSON.stringify(boundaryRequests[0]);
-    if (valid) {
+    if (valid || legacy) {
       expect(prompt).not.toContain("verificationContext");
       expect(detail.review.education.verification ?? null).toBeNull();
       expect(detail.scores.probing).toBe(80);

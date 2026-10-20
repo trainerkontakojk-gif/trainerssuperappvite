@@ -236,6 +236,25 @@ export function detectKetikIdentityAnomalies(
   );
 }
 
+/**
+ * Anomalies a finished session is reviewed on. Every session since NIK/email
+ * carries a NIK (from settings or the pool); older sessions have none and get
+ * no verification rule, even for a bare "Jakarta" domicile they were never
+ * meant to be tested on.
+ */
+export function detectKetikSessionAnomalies(session: {
+  nik?: string | null;
+  email?: string | null;
+  city?: string | null;
+}): KetikIdentityAnomaly[] {
+  if (!session.nik?.trim()) return [];
+  return detectKetikIdentityAnomalies({
+    nik: session.nik,
+    email: session.email ?? undefined,
+    city: session.city ?? undefined,
+  });
+}
+
 function correctNik(nik: string): string {
   const digits = nik.replace(/[^0-9]/g, "");
   return digits.slice(0, NIK_LENGTH).padEnd(NIK_LENGTH, "0");
