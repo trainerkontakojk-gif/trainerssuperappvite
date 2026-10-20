@@ -1,7 +1,7 @@
 # KETIK — NIK dan email pada identitas konsumen
 
 - **Lane:** D (kontrak tipe bersama, migrasi `ketik_history` + RPC finish, prompt AI konsumen, tampilan riwayat/monitoring).
-- **Status:** draft, menunggu keputusan pengguna pada bagian "Keputusan terbuka".
+- **Status:** keputusan D2–D4 diambil 2026-10-20; D1 menunggu konfirmasi. Mockup: https://claude.ai/artifact/KfxFGdTd6KiHbV4Q8Bzr5D (privat).
 - **Batas operasi:** implementasi dan verifikasi hanya di Supabase lokal. Migrasi produksi dijalankan terpisah dengan izin eksplisit, sebelum kode tayang.
 
 ## Kondisi saat ini (hasil telusur kode)
@@ -16,10 +16,13 @@
 
 1. Setiap sesi KETIK memiliki identitas konsumen lengkap: nama, gender, kota, nomor HP, **NIK**, dan **email**.
 2. NIK berformat 16 digit yang tampak realistis (kode wilayah sesuai kota domisili, tanggal lahir dengan aturan +40 untuk perempuan, nomor urut) tetapi **dijamin bukan NIK orang sungguhan** (nomor urut `0000`, yang tidak pernah diterbitkan Dukcapil).
-3. Email turunan nama konsumen dan memakai domain yang tidak dapat menerima email sungguhan (lihat keputusan D2).
+3. Email turunan nama konsumen dengan domain `@gmail.com` (keputusan D2). Aplikasi tidak pernah mengirim email ke alamat ini; risiko kebetulan sama dengan alamat sungguhan diterima.
 4. Pool konsumen bawaan diperluas dari 50 menjadi ±150–200 rekaman lengkap; 50 nama lama tetap ada dan dilengkapi NIK/email. Nama, gender, kota, NIK, email, dan HP dalam satu rekaman konsisten satu sama lain.
-5. Pengguna dapat mengisi NIK dan email tetap di Pengaturan → Identitas, sama seperti HP/kota; kosong = dari pool acak. NIK manual divalidasi 16 digit, email divalidasi format.
-6. AI konsumen memberikan NIK dan email persis saat agen meminta verifikasi data, tidak mengarang yang lain, dan tidak menyebutkannya tanpa diminta.
+5. Pengguna dapat mengisi NIK dan email tetap di Pengaturan → Identitas, sama seperti HP/kota; kosong = dari pool acak. Isian **tidak diblokir** walau salah format: trainer boleh sengaja mengisi data "ngaco" (NIK kurang/lebih dari 16 digit, ada huruf, atau domain email typo seperti `gnail.com`). Di bawah isian tampil catatan netral bahwa data tidak sesuai format dan agen akan dinilai mengonfirmasinya; tombol Simpan tetap aktif.
+5a. Data dari pool acak selalu valid; anomali hanya datang dari isian manual.
+6. AI konsumen memberikan NIK dan email persis saat agen meminta verifikasi data, tidak mengarang yang lain, dan tidak menyebutkannya tanpa diminta. Bila data identitasnya salah format dan agen mengonfirmasi, konsumen **tidak membetulkan sendiri**: ia mengulang data apa adanya, atau tidak menanggapi bagian itu.
+6a. Penilaian verifikasi (keputusan D4): bila NIK/email sesi tidak sesuai format, review menilai apakah agen **bertanya atau mengonfirmasi data yang tidak sesuai itu minimal 1 kali**. Satu kali sudah cukup untuk nilai penuh; agen tidak dituntut mengulang, dan tidak dikurangi nilainya bila konsumen tidak menjawab. Bila agen tidak pernah menyinggungnya, nilai Probing berkurang dan muncul catatan "fix" beserta contoh kalimat konfirmasi. Bila data sesi valid, aturan ini tidak berlaku (tetap tidak menghukum agen yang tidak menanyakan ulang data yang sudah jelas).
+6b. Panel Data konsumen menampilkan data apa adanya tanpa tanda peringatan, supaya agen sendiri yang menemukan ketidaksesuaian.
 7. Header chat, riwayat KETIK, ekspor transkrip, dan Monitoring menampilkan NIK dan email. Sesi lama (sebelum fitur ini) tampil "—", tidak error.
 8. Penugasan konfigurasi (`configuration-assignments.ts`) tetap tidak menyalin identitas ke akun lain.
 
@@ -51,24 +54,29 @@
 ### Backend
 
 - `consumer-response.ts` dan `prompt-policy.ts`: tipe `identity` + `nik`, `email`; aturan KONSISTENSI DATA menjadi "Nama/HP/Kota/NIK/Email"; tambahkan aturan "jangan menyebut NIK/email tanpa diminta; saat diminta, tulis persis".
+- Deteksi anomali deterministik di `packages/types/src/ketik-identity.ts` (`detectKetikIdentityAnomalies(identity)`), dipakai bersama oleh catatan di Pengaturan dan oleh review:
+  - NIK: bukan tepat 16 digit angka (kurang, lebih, atau ada karakter selain angka/spasi).
+  - Email: format tanpa `@`/domain, atau domain berjarak edit 1–2 dari domain umum (`gmail.com`, `yahoo.com`, `yahoo.co.id`, `outlook.com`, `hotmail.com`, `icloud.com`) tetapi tidak sama persis, mis. `gnail.com`, `gmial.com`, `gmail.co`.
+- `review-policy.ts`: bila ada anomali, prompt review mendapat blok `verificationContext` (field mana yang tidak sesuai dan nilainya, dari server, bukan dari browser) dan aturan Probing tambahan sesuai Requirement 6a. Tanpa anomali, blok ini tidak dikirim. Tidak menambah dimensi atau kolom skor baru.
 - `history-read.ts`, `monitoring-history-service.ts`, `packages/types/src/monitoring.ts`: select dan map `consumer_nik`, `consumer_email`.
 
 ### Web
 
-- `KetikIdentityTab.tsx`: dua input baru (NIK, Email) dengan validasi ringan dan teks bantuan "kosongkan agar dibuat acak".
-- `ChatInterface.tsx` header: tampilkan email; NIK hanya di panel detail/riwayat agar header tidak penuh (lihat D3).
+- `KetikIdentityTab.tsx`: dua input baru (NIK, Email) tanpa validasi yang memblokir; catatan netral dari `detectKetikIdentityAnomalies()` saat data tidak sesuai format; bagian "Contoh identitas acak".
+- `ChatInterface.tsx`: header tetap ramping (nama, kota, timer); tombol "Data konsumen" membuka panel kanan berisi Nama, Kota, HP, NIK (dikelompokkan 4-4-4-4), Email, dengan tombol salin. Di layar sempit panel menjadi sheet dari bawah (keputusan D3).
 - `utils/transcript.ts`, riwayat KETIK, dan Monitoring sesi: tambah baris NIK dan email, fallback "—".
 - `ketik-avatar.ts` seed tidak diubah agar avatar sesi lama tetap sama.
 
-## Keputusan terbuka
+## Keputusan
 
-- **D1 — Skala pool:** 150 (rekomendasi) atau 300 rekaman?
-- **D2 — Domain email:** (a) domain fiktif yang tampak wajar tetapi tidak bisa menerima email, mis. `@mail.ojk-sim.id` atau `@contoh.id` — rekomendasi; (b) `@gmail.com`/`@yahoo.com` — paling realistis, tetapi bisa kebetulan sama dengan alamat orang sungguhan.
-- **D3 — Tampilan header chat:** tampilkan NIK di header (agen langsung melihat) atau sembunyikan agar agen tetap berlatih menanyakan NIK ke konsumen? Rekomendasi: sembunyikan di header, tampilkan di riwayat/review.
-- **D4 — Penilaian:** apakah review KETIK perlu menilai "agen meminta NIK/email untuk verifikasi"? Rekomendasi: tidak di tahap ini; pisahkan sebagai perubahan rubrik.
+- **D1 — Jumlah konsumen di pool acak:** rekomendasi 150 (sekarang 50); menunggu konfirmasi.
+- **D2 — Domain email:** `@gmail.com`.
+- **D3 — Tampilan simulasi:** NIK dan email ditampilkan lewat panel "Data konsumen" di samping chat (mockup Simulasi B).
+- **D4 — Penilaian:** review menilai konfirmasi data yang tidak sesuai, minimal 1 kali, sesuai Requirement 6a.
 
 ## Tasklist
 
+1. RED E2E (tambahan): sesi dengan NIK 15 digit / email `@gnail.com` dari Pengaturan tersimpan apa adanya di snapshot dan riwayat; review menerima `verificationContext` hanya bila ada anomali.
 1. RED E2E: perluas `apps/web/e2e/ketik-session-api.spec.ts` / `ketik-history-api.spec.ts` — sesi baru menyimpan `consumer_nik` 16 digit berakhiran `0000` dan email valid di riwayat; sesi dengan settings NIK/email manual memakai nilai itu; riwayat sesi lama mengembalikan `null` tanpa error.
 2. Skrip generator + file pool ter-commit; perbarui `resolveKetikSessionIdentity()`.
 3. Tipe + normalisasi settings.
