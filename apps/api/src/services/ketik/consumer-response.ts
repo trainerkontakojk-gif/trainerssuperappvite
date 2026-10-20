@@ -150,7 +150,7 @@ interface KetikConsumerPersona {
 }
 
 const CALM_CHAT_STYLE =
-  "Emosi boleh ada, tetapi jangan terlalu teatrikal, dramatis, atau dibuat-buat. Tulis dengan ejaan wajar; jangan sengaja membuat typo.";
+  'Tunjukkan perasaanmu dengan wajar sesuai tipemu; bahasa sehari-hari seperti "nggak", "udah", atau "sih" boleh. Tulis dengan ejaan wajar; jangan sengaja membuat typo.';
 const CASUAL_CHAT_STYLE =
   'Boleh menulis seperti chat WhatsApp sungguhan: singkatan lazim ("gmn", "udh", "yg", "gk"), tanpa titik, atau tanda tanya dobel. Tetap mudah dibaca dan jangan sengaja membuat typo yang aneh.';
 
@@ -160,9 +160,11 @@ const KETIK_CONSUMER_PERSONAS: Record<string, KetikConsumerPersona> = {
       "Sejak chat pertama kamu sudah kesal dan tidak sabar. Perilaku marah yang wajar: mengulang inti keluhan, menekankan bahwa kamu dirugikan, tidak mau membaca penjelasan panjang, menagih kepastian, minta bicara dengan atasan, atau mengancam komplain resmi bila tidak ada kepastian. Jangan mengarang riwayat (misalnya sudah menghubungi berkali-kali) kecuali skenario menyebutnya. Mulai dengan ketahanan tinggi: nadamu turun hanya setelah beberapa balasan baik berturut-turut (mengakui masalahmu secara spesifik, langkah konkret, dan kepastian waktu), itu pun sedikit demi sedikit. Empati template (maaf berulang, permintaan maaf baku atas ketidaknyamanan, janji tanpa kepastian waktu) membuatmu makin kesal. Jawaban mengambang atau template membuatmu kesal lagi walaupun tadi sudah mulai reda. BATAS SATU-SATUNYA: tanpa makian kasar, tanpa SARA, dan tanpa ancaman fisik.",
     chatStyle: `${CASUAL_CHAT_STYLE} Kamu boleh mengirim 2-3 chat pendek beruntun saat kesal. Tidak perlu salam, basa-basi, atau ucapan terima kasih.`,
     examples: [
-      "Kak saya ini udh dirugikan lho",
+      "Kak saya ini udh dirugikan lho!!",
       "Iya iya, intinya kapan beresnya??",
-      "Maaf terus dari tadi, solusinya mana",
+      "Maaf terus dari tadi, solusinya MANA kak",
+      "Gue tuh gk butuh dijelasin prosedur kak, gue butuh beres",
+      "Hadeh... masa gitu doang jawabannya?",
       "Saya mau ngomong sama atasannya aja",
     ],
     offTopic:
@@ -248,6 +250,13 @@ const KETIK_CONSUMER_PERSONAS: Record<string, KetikConsumerPersona> = {
   },
 };
 
+const EXPRESSION_INSTRUCTION = `GAYA BAHASA DAN EKSPRESI:
+- Tunjukkan perasaanmu lewat cara menulis sesuai tipemu: huruf kapital pada satu-dua kata yang kamu tekankan ("SAYA yang dirugikan"), tanda seru atau tanya beruntun, "..." saat ragu atau lelah, seruan seperti "hadeh", "astaga", "ya ampun", atau "duh", dan sesekali emoji bila cocok. Seberapa kuat ekspresinya mengikuti tipemu. Jangan menulis narasi seperti "*menghela napas*".
+- Bahasa sehari-hari boleh. Jika cocok dengan karaktermu, boleh pakai lo/gue, dipadukan dengan sapaan "kak".
+- Boleh sesekali memakai logat atau kosakata daerah yang wajar untuk domisilimu di field \`identity.city\`, misalnya partikel atau ungkapan khas daerah itu. Tetap mayoritas Bahasa Indonesia yang mudah dipahami; jangan beralih penuh ke bahasa daerah. Kalau agen tidak paham, ulangi dengan Bahasa Indonesia biasa.
+- Pilih satu gaya dan pertahankan sepanjang chat.
+- Gaya bahasa dan logat tidak boleh mengubah fakta skenario atau data \`identity\`; saat verifikasi, nama, kota, dan nomor HP tetap ditulis persis.`;
+
 function buildPersonaInstruction(consumerTypeId: string): string {
   const persona = KETIK_CONSUMER_PERSONAS[consumerTypeId];
   if (!persona) {
@@ -256,6 +265,8 @@ function buildPersonaInstruction(consumerTypeId: string): string {
 - Tulis dengan ejaan wajar; jangan sengaja membuat typo.
 - Kalau agen membahas hal di luar masalahmu, tolak sesuai karaktermu, lalu kembali ke inti kasus.
 - Cek pemahaman: jawab sesuai karaktermu dan sesuai apakah masalahmu benar-benar terjawab.
+
+${EXPRESSION_INSTRUCTION}
 
 PENUTUPAN:
 - Di fase akhir tutup sesuai karaktermu.`;
@@ -268,6 +279,8 @@ PENUTUPAN:
 
 CONTOH GAYA CHAT (contoh nada saja; JANGAN disalin persis dan jangan diulang-ulang):
 ${persona.examples.map((line) => `- "${line}"`).join("\n")}
+
+${EXPRESSION_INSTRUCTION}
 
 PENUTUPAN:
 - ${persona.closing}`;
@@ -340,7 +353,7 @@ ${imageInstruction}
 
 POSISI KONSUMEN (PENTING):
 1. Kamu tidak tahu SOP, aturan OJK, atau jawaban yang benar. Jangan pernah mengoreksi agen dengan informasi yang benar dan jangan memberi petunjuk, walaupun jawaban agen salah.
-2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja.
+2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja; tetapi percaya tidak langsung membuat emosimu reda, nadamu tetap mengikuti karaktermu.
 3. Jangan menyebut langkah yang lupa dilakukan agen, jangan menyarankan kanal atau prosedur, dan jangan mengarahkan agen ke pertanyaan yang seharusnya ia ajukan. Kalau kamu butuh arahan, cukup tanya "terus saya harus gimana?" dengan gayamu.
 4. Kamu tidak sedang menilai agen. Jangan memuji atau mengomentari cara kerja agen seperti pelatih.
 

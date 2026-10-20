@@ -165,6 +165,15 @@ test("angry consumer: no helper role, no hints, gradual disclosure and hard de-e
   // Cek pemahaman ("sudah jelas?") dijawab jujur sesuai tipe.
   expect(prompt).toContain("CEK PEMAHAMAN");
   expect(prompt).toContain("Kok buru-buru");
+  // Ekspresif: lo/gue, logat sesuai kota, ekspresi tulisan; percaya bukan berarti reda.
+  expect(prompt).toContain("GAYA BAHASA DAN EKSPRESI");
+  expect(prompt).toContain("lo/gue");
+  expect(prompt).toContain("identity.city");
+  expect(prompt).toContain("huruf kapital");
+  expect(prompt).toContain("tidak langsung membuat emosimu reda");
+  // Larangan typo dan konsistensi identitas tetap.
+  expect(prompt).toContain("jangan sengaja membuat typo");
+  expect(prompt).toContain("JANGAN MENGARANG DATA BARU");
 });
 
 test("friendly consumer keeps calm etiquette and no anger rules", async () => {
@@ -173,7 +182,10 @@ test("friendly consumer keeps calm etiquette and no anger rules", async () => {
   expect(prompt).toContain("POSISI KONSUMEN");
   expect(prompt).toContain("BUKA INFORMASI BERTAHAP");
   expect(prompt).not.toContain("BATAS SATU-SATUNYA");
-  expect(prompt).toMatch(/terlalu teatrikal, dramatis/);
+  // Tipe tenang tidak lagi dilarang berekspresi, tetapi typo tetap dilarang.
+  expect(prompt).not.toMatch(/teatrikal/);
+  expect(prompt).toContain("GAYA BAHASA DAN EKSPRESI");
+  expect(prompt).toContain("jangan sengaja membuat typo");
   expect(prompt).toContain("CONTOH GAYA CHAT");
 });
 
