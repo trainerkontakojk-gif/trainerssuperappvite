@@ -9,11 +9,12 @@ import { PROFILER_MOCKS } from "./helpers/profilerMocks";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
- * Widget "Ulang Tahun Terdekat" (seluruh data) di ringkasan tahun `/profiler`.
+ * Bagian "Ulang tahun terdekat" (seluruh data) di ringkasan tahun `/profiler`.
  *
- * Menggantikan unit test `global-birthdays-widget.test.tsx`: kartu hanya
- * menampilkan yang terdekat, daftar lengkap ada di popup, state kosong, dan
- * state error dengan "Coba lagi" yang benar-benar memanggil ulang API.
+ * Sejak redesign tahap 4 daftarnya tampil langsung di samping daftar folder,
+ * tanpa popup. Spec ini menjaga kontrak bagian tersebut: maksimal 5 data
+ * diminta, label "Hari ini"/"N hari lagi", state kosong, dan state error
+ * dengan "Coba lagi" yang benar-benar memanggil ulang API.
  */
 
 const BIRTHDAYS_PATH = "/api/v1/profiler/peserta/upcoming-birthdays";
@@ -52,8 +53,8 @@ function withBirthdays(mock: Omit<ApiMock, "method" | "path">): ApiMock[] {
   ];
 }
 
-function widgetCard(page: Page) {
-  return page.getByRole("button", { name: "Lihat ulang tahun terdekat" });
+function birthdaysSection(page: Page) {
+  return page.getByRole("region", { name: "Ulang tahun terdekat" });
 }
 
 test.describe("Widget ulang tahun global Profiler (hermetic)", () => {
@@ -61,40 +62,39 @@ test.describe("Widget ulang tahun global Profiler (hermetic)", () => {
     await assertLocalDevOnlyTarget();
   });
 
-  test("kartu menampilkan yang terdekat; daftar lengkap hanya di popup", async ({
-    page,
-  }) => {
+  test("daftar terdekat tampil langsung tanpa popup", async ({ page }) => {
     const audit = await openHermeticShell(page, {
       path: "/profiler",
       apiMocks: withBirthdays({ body: { success: true, data: SAMPLE } }),
     });
 
-    const card = widgetCard(page);
-    await expect(card.getByText("Siti Nur Anisa")).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(card.getByText("Hari ini!")).toBeVisible();
-    await expect(page.getByText("Muhammad Fahmi")).toHaveCount(0);
+    const section = birthdaysSection(page);
+    const rows = section.getByRole("listitem");
+    await expect(rows).toHaveCount(3, { timeout: 20000 });
+    await expect(rows.filter({ hasText: "Siti Nur Anisa" })).toContainText(
+      "Hari ini",
+    );
+    await expect(rows.filter({ hasText: "Muhammad Fahmi" })).toContainText(
+      "4 hari lagi",
+    );
+    await expect(rows.filter({ hasText: "Dwiana Amelia" })).toContainText(
+      "15 hari lagi",
+    );
+    await expect(rows.filter({ hasText: "Dwiana Amelia" })).toContainText(
+      "Batch C",
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(
       audit.mockedApi.some((entry) =>
         entry.startsWith(`GET ${BIRTHDAYS_PATH}?limit=5`),
       ),
     ).toBe(true);
 
-    await card.click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText("Muhammad Fahmi")).toBeVisible();
-    await expect(dialog.getByText("Dwiana Amelia")).toBeVisible();
-    await expect(dialog.getByText("HARI INI")).toBeVisible();
-    await expect(dialog.getByText("4 HARI LAGI")).toBeVisible();
-    await expect(dialog.getByText("15 HARI LAGI")).toBeVisible();
-    await expect(dialog.getByText("Menampilkan 5 data terdekat")).toBeVisible();
-
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);
   });
 
-  test("tanpa data: kartu dan popup menyatakan kosong dalam bahasa Indonesia", async ({
+  test("tanpa data: bagian menyatakan kosong dalam bahasa Indonesia", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -102,22 +102,18 @@ test.describe("Widget ulang tahun global Profiler (hermetic)", () => {
       apiMocks: withBirthdays({ body: { success: true, data: [] } }),
     });
 
-    const card = widgetCard(page);
-    await expect(card.getByText("Belum ada ulang tahun terdekat")).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText("No data available")).toHaveCount(0);
-
-    await card.click();
+    const section = birthdaysSection(page);
     await expect(
-      page.getByRole("dialog").getByText("Tidak ada data ulang tahun."),
-    ).toBeVisible();
+      section.getByText("Belum ada data tanggal lahir."),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(section.getByRole("listitem")).toHaveCount(0);
+    await expect(page.getByText("No data available")).toHaveCount(0);
 
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);
   });
 
-  test("gagal memuat: pesan server tampil dan Coba lagi memanggil ulang API", async ({
+  test("gagal memuat: pesan error tampil dan Coba lagi memanggil ulang API", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -134,10 +130,11 @@ test.describe("Widget ulang tahun global Profiler (hermetic)", () => {
       }),
     });
 
-    const card = widgetCard(page);
-    await expect(
-      card.getByText("Data ulang tahun sedang tidak tersedia."),
-    ).toBeVisible({ timeout: 20000 });
+    const section = birthdaysSection(page);
+    await expect(section.getByRole("alert")).toHaveText(
+      "Gagal memuat ulang tahun.",
+      { timeout: 20000 },
+    );
 
     // Percobaan berikutnya berhasil. Route ini didaftarkan setelah guard
     // hermetic sehingga didahulukan Playwright, dan hanya melayani endpoint ini.
@@ -151,16 +148,10 @@ test.describe("Widget ulang tahun global Profiler (hermetic)", () => {
       });
     });
 
-    await card.click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Coba lagi" }).click();
-    await expect(dialog.getByText("Muhammad Fahmi")).toBeVisible();
+    await section.getByRole("button", { name: "Coba lagi" }).click();
+    await expect(section.getByRole("listitem")).toHaveCount(3);
+    await expect(section.getByRole("alert")).toHaveCount(0);
     expect(retryHits).toBe(1);
-
-    // Kartu di belakang modal ikut diperbarui setelah dialog ditutup.
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(card.getByText("Siti Nur Anisa")).toBeVisible();
 
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);
