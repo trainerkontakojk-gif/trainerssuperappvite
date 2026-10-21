@@ -94,7 +94,8 @@ RPC start/legacy-turn/finish serta `append_ketik_session_message`,
 service-role-only. Authenticated hanya SELECT owner pada kolom status yang aman
 di tiga tabel operasional; token `lease` response tidak diberi SELECT. Start
 memeriksa status akun, versi settings dan assignment wajib agen/leader. Append
-memvalidasi owner/agent-version/expiry dan menyimpan pesan agen sekali. AI
+memvalidasi owner/agent-version/state dan menyimpan pesan agen sekali; setelah
+migration closing di bawah, expiry/consumer_closed tidak lagi menolak append. AI
 berlangsung di luar transaksi; settle membandingkan context `agent_version`:
 perubahan pertama memperbarui snapshot dan memberi satu retry, perubahan kedua
 menandai request `superseded` tanpa memublikasikan hasil stale. Respons lease lama
@@ -571,6 +572,25 @@ dan skor published tetap ada. Terapkan rollback hanya setelah drain/stop dan
 pergantian build yang dijelaskan di [deployment.md](deployment.md). Migration,
 rollback, reapply, grants dan atomic failure diuji pada loopback disposable;
 ledger migration CLI lokal/remote tidak otomatis berubah oleh apply SQL tes.
+
+### KETIK post-expiry closing (2026-10-21)
+
+Migration `20261021090000_ketik_post_expiry_closing.sql` mengganti tiga RPC
+(dengan signature tetap): append agen diizinkan setelah expiry/consumer closed
+selama sesi masih active; claim setelah expiry mengembalikan `closing` untuk
+satu balasan penutup konsumen; settle setelah expiry menandai consumer closed.
+Tidak ada backfill, perubahan tabel, atau perubahan hak akses. Kompatibel dengan
+kode lama; migration harus mendahului deploy API/web baru agar append setelah
+expiry tidak ditolak 410.
+
+#### Diterapkan ke produksi 2026-10-21
+
+- Target linked `ruosnjmtywcrghjgqugz`, dengan izin eksplisit Fajar. Percobaan preflight sebelumnya timeout di `Initialising login role...` setelah 60 detik (exit 124), tanpa mutasi; retry berikutnya berhasil.
+- `supabase migration list --linked` (exit 0) memastikan `20261020170000` sudah applied dan `20261021090000` belum.
+- `supabase db query --linked -f supabase/migrations/20261021090000_ketik_post_expiry_closing.sql` dijalankan tepat satu kali (exit 0); bukan `db push`.
+- `supabase migration repair --linked --status applied 20261021090000` dijalankan sekali (exit 0): `Repaired migration history: [20261021090000] => applied`.
+- Verifikasi hanya-baca `supabase db query --linked` (exit 0), melalui `pg_get_functiondef`: append tidak lagi memuat `Session expired`, claim memuat `'closing'`, settle memuat `consumer_closed = p_closed OR`. Ketiganya `prosecdef = false`; `has_function_privilege(..., 'EXECUTE')` masing-masing: `anon = false`, `authenticated = false`, `service_role = true`.
+- `supabase migration list --linked` pasca-verifikasi (exit 0) menampilkan `20261021090000` pada kolom Local dan Remote. Tidak ada pemanggilan RPC, pembacaan row pengguna, rollback, migrasi lain, atau E2E ke production. Verifikasi database selesai sebelum push `main`; status deployment aplikasi adalah gate terpisah.
 
 ### KETIK consumer NIK/email (2026-10-20)
 

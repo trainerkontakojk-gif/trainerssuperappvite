@@ -28,4 +28,4 @@ No data-loss risk: functions only (`CREATE OR REPLACE`, same signatures, grants 
 - [x] RED: `ketik-session-api.spec.ts` (post-expiry append, one closing reply, no further AI), `ketik-server-chat.spec.ts` (composer stays after expiry/close, closing reply shown, no reply to post-close messages), `ketik-flow.spec.ts` (phone in Telaah card).
 - [x] GREEN: migration + rollback, API, web.
 - [x] Local replay, focused E2E, thermo-nuclear, typecheck/lint, changelog.
-- [ ] Production: apply `20261021090000_ketik_post_expiry_closing.sql` (needs Fajar's OK), before the API/web deploy.
+- [x] Production: with Fajar's explicit approval, applied `20261021090000_ketik_post_expiry_closing.sql` once on 2026-10-21 before pushing the API/web code; repaired migration history and verified function definitions, service-role-only EXECUTE and remote applied status (all exit 0). Evidence: `docs/database.md`, KETIK post-expiry closing.
