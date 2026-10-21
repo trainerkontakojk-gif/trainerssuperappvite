@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type {
   TelefunContentReview,
@@ -7,12 +7,7 @@ import type {
 } from "@trainers/types";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../../../components/ui/tabs";
+import { focusReviewTarget } from "../utils/contentMarks";
 import { getCommunicationProfileFromAssessment } from "../../../lib/voiceAssessmentUtils";
 import type { CallRecord } from "../types";
 import {
@@ -33,7 +28,7 @@ import {
   ContentNotAvailable,
 } from "./TelefunContentReview";
 
-/** Panel hasil Telaah Telefun: skor, aspek, inti kasus, dan tab rincian. */
+/** Panel hasil Telaah Telefun dalam satu kolom. */
 
 function barColor(score: number): string {
   if (score < TELEFUN_FIX_THRESHOLD) return "bg-chart-orange";
@@ -112,8 +107,8 @@ export function ReviewResult({
   assessment,
   previous,
   transcript,
-  tab,
-  onTabChange,
+  notesOpen,
+  onNotesOpenChange,
   onShowLine,
   rerunStartedAt,
   rerunFailed,
@@ -126,8 +121,8 @@ export function ReviewResult({
   assessment: VoiceQualityAssessment;
   previous: number | null;
   transcript: readonly TelefunTranscriptEntry[];
-  tab: string;
-  onTabChange: (tab: string) => void;
+  notesOpen: boolean;
+  onNotesOpenChange: (open: boolean) => void;
   onShowLine: (startMs: number) => void;
   /** Saat Telaah ulang dimulai; `null` bila tidak berjalan. */
   rerunStartedAt: number | null;
@@ -149,6 +144,35 @@ export function ReviewResult({
   const good =
     content?.agentNotes.filter((note) => note.verdict === "good") ?? [];
   const nextSteps = assessment.overallNextSteps ?? [];
+  const root = useRef<HTMLElement | null>(null);
+  const jump = (id: string) => {
+    const element = root.current?.querySelector<HTMLElement>(`#${id}`);
+    if (element) focusReviewTarget(element);
+  };
+  const navigation = [
+    {
+      id: "summary",
+      label: "Ringkasan",
+      show: Boolean(content?.caseCore || profile),
+    },
+    {
+      id: "fix",
+      label: `Perbaiki ${toFix.length}`,
+      show: !content || toFix.length > 0 || nextSteps.length > 0,
+    },
+    {
+      id: "questions",
+      label: `Pertanyaan ${content?.consumerPoints.length ?? 0}`,
+      show: true,
+    },
+    { id: "scores", label: "Alasan skor", show: aspects.length > 0 },
+    {
+      id: "good",
+      label: `Sudah baik ${good.length}`,
+      show: !content || good.length > 0 || assessment.strengths.length > 0,
+    },
+    { id: "notes", label: "Catatan trainer", show: true },
+  ];
 
   return (
     <>
@@ -191,15 +215,20 @@ export function ReviewResult({
         {aspects.map((aspect) => (
           <li
             key={aspect.key}
-            className="grid grid-cols-[minmax(0,9.5rem)_1fr_2.5rem] items-center gap-x-3 gap-y-0.5 text-[13px]"
+            className="grid h-16 grid-cols-[minmax(0,9.5rem)_1fr_2.5rem] items-center gap-x-3 text-[13px]"
           >
             <button
               type="button"
-              onClick={() => onTabChange("scores")}
+              onClick={() => jump(`telefun-score-${aspect.key}`)}
               aria-label={`Lihat penjelasan ${aspect.label}`}
               className="min-h-[44px] text-left text-fg2 underline decoration-border underline-offset-4 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
               {aspect.label}
+              {aspect.raw && (
+                <span className="block text-xs text-muted-foreground no-underline">
+                  {aspect.raw}
+                </span>
+              )}
             </button>
             <span
               aria-hidden="true"
@@ -220,199 +249,205 @@ export function ReviewResult({
             <span className="text-right font-mono font-bold text-foreground tabular-nums">
               {aspect.score !== null ? formatTelefunScore(aspect.score) : "–"}
             </span>
-            {aspect.raw && (
-              <span className="col-start-2 col-end-4 text-xs text-muted-foreground">
-                {aspect.raw}
-              </span>
-            )}
           </li>
         ))}
       </ul>
 
-      {content?.caseCore && (
-        <section
-          aria-labelledby="telefun-case-core"
-          className="flex flex-col gap-1 rounded-xl bg-background px-4 py-3"
-        >
-          <h3
-            id="telefun-case-core"
-            className="text-[13px] font-semibold text-foreground"
-          >
-            Inti kasus
-          </h3>
-          <p className="text-sm leading-6 text-fg2">{content.caseCore}</p>
-        </section>
+      <nav
+        ref={(element) => {
+          root.current = element?.parentElement ?? null;
+        }}
+        aria-label="Lompat ke bagian"
+        className="sticky top-0 z-10 flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-surface-elevated py-2"
+      >
+        {navigation
+          .filter((item) => item.show)
+          .map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                if (item.id === "notes") onNotesOpenChange(true);
+                jump(`telefun-review-${item.id}`);
+              }}
+              className="min-h-[44px] shrink-0 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-fg2 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {item.label}
+            </button>
+          ))}
+      </nav>
+
+      {(content?.caseCore || profile) && (
+        <ReviewSection id="summary" title="Ringkasan">
+          {content?.caseCore && (
+            <div className="flex flex-col gap-1">
+              <h4 className="text-[13px] font-semibold text-foreground">
+                Inti kasus
+              </h4>
+              <p className="max-w-[65ch] text-sm leading-6 text-fg2">
+                {content.caseCore}
+              </p>
+            </div>
+          )}
+          {profile && (
+            <div className="flex flex-col gap-4 @min-[38rem]:flex-row @min-[38rem]:items-center">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <h4 className="text-[13px] font-semibold text-foreground">
+                  Profil suara
+                </h4>
+                <p className="max-w-[65ch] text-[13px] leading-6 text-fg2">
+                  {profile.overallSummary}
+                </p>
+              </div>
+              <div className="min-w-0 flex-1">
+                <TelefunProfileRadar profile={profile} />
+              </div>
+            </div>
+          )}
+        </ReviewSection>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          if (typeof value === "string") onTabChange(value);
-        }}
-        className="gap-4"
-      >
-        <TabsList
-          variant="line"
-          aria-label="Rincian telaah"
-          className="relative w-full justify-start overflow-x-auto border-b border-border"
-        >
-          <TabsTrigger
-            value="fix"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Perbaiki dulu ({toFix.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="good"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Sudah baik ({good.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="scores"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Penjelasan skor
-          </TabsTrigger>
-          <TabsTrigger
-            value="questions"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Pertanyaan konsumen
-            {content ? ` (${content.consumerPoints.length})` : ""}
-          </TabsTrigger>
-          <TabsTrigger
-            value="lines"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Kalimat agen{content ? ` (${content.agentNotes.length})` : ""}
-          </TabsTrigger>
-          <TabsTrigger
-            value="notes"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Catatan trainer
-          </TabsTrigger>
-          <TabsTrigger
-            value="profile"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Profil
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="fix" className="flex flex-col gap-3">
-          {!content ? (
-            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
-          ) : toFix.length === 0 ? (
-            <Empty>
-              Tidak ada kalimat agen yang ditandai perlu diperbaiki.
-            </Empty>
-          ) : (
-            <AgentNoteList
-              notes={content.agentNotes}
-              verdict="fix"
-              onShowLine={onShowLine}
-              clockOf={clockOf}
-            />
-          )}
-          {nextSteps.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Langkah latihan berikutnya
-              </h4>
-              <PlainList items={nextSteps.slice(0, 3)} ordered />
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="good" className="flex flex-col gap-3">
-          {!content ? (
-            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
-          ) : good.length === 0 ? (
-            <Empty>
-              Belum ada contoh ucapan agen yang ditandai sudah tepat.
-            </Empty>
-          ) : (
-            <AgentNoteList
-              notes={content.agentNotes}
-              verdict="good"
-              onShowLine={onShowLine}
-              clockOf={clockOf}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="scores" className="flex flex-col gap-3">
-          <p className="text-[13px] leading-6 text-muted-foreground">
-            Penilaian suara dan saran latihan per aspek. Skor tinggi masih dapat
-            disertai koreksi; contoh ucapan dibahas pada tab Sudah baik dan
-            Perbaiki dulu.
-          </p>
-          <TelefunScoreDetails
-            assessment={assessment}
-            transcript={transcript}
+      <ReviewSection id="fix" title="Perbaiki dulu">
+        {!content ? (
+          <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
+        ) : toFix.length === 0 ? (
+          <Empty>Tidak ada kalimat agen yang ditandai perlu diperbaiki.</Empty>
+        ) : (
+          <AgentNoteList
+            notes={content.agentNotes}
+            verdict="fix"
             onShowLine={onShowLine}
+            highlightedId={highlightedId}
             clockOf={clockOf}
           />
-          {assessment.strengths.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold">
-                Kekuatan menurut penilaian AI
-              </h4>
-              <PlainList items={assessment.strengths} />
-            </div>
-          )}
-        </TabsContent>
+        )}
+        {nextSteps.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-[13px] font-semibold text-foreground">
+              Langkah latihan berikutnya
+            </h4>
+            <PlainList items={nextSteps.slice(0, 3)} ordered />
+          </div>
+        )}
+      </ReviewSection>
 
-        <TabsContent value="questions" className="flex flex-col gap-3">
-          {!content ? (
-            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
-          ) : content.consumerPoints.length === 0 ? (
-            <Empty>
-              AI tidak menemukan pertanyaan konsumen di panggilan ini.
-            </Empty>
-          ) : (
-            <ConsumerPointList
-              points={content.consumerPoints}
-              onShowLine={onShowLine}
-              highlightedId={highlightedId}
-              clockOf={clockOf}
-            />
-          )}
-        </TabsContent>
+      <ReviewSection
+        id="questions"
+        title="Pertanyaan konsumen"
+        count={
+          content
+            ? `${content.consumerPoints.filter((point) => point.status === "answered").length} dari ${content.consumerPoints.length} terjawab`
+            : undefined
+        }
+      >
+        {!content ? (
+          <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
+        ) : content.consumerPoints.length === 0 ? (
+          <Empty>
+            AI tidak menemukan pertanyaan konsumen di panggilan ini.
+          </Empty>
+        ) : (
+          <ConsumerPointList
+            points={content.consumerPoints}
+            onShowLine={onShowLine}
+            highlightedId={highlightedId}
+            clockOf={clockOf}
+          />
+        )}
+      </ReviewSection>
 
-        <TabsContent value="lines" className="flex flex-col gap-3">
-          {!content ? (
-            <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
-          ) : content.agentNotes.length === 0 ? (
-            <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
-          ) : (
-            <AgentNoteList
-              notes={content.agentNotes}
-              onShowLine={onShowLine}
-              highlightedId={highlightedId}
-              clockOf={clockOf}
-            />
-          )}
-        </TabsContent>
+      <ReviewSection id="scores" title="Alasan skor">
+        <p className="text-[13px] leading-6 text-muted-foreground">
+          Penilaian suara dan saran latihan per aspek. Skor tinggi masih dapat
+          disertai koreksi; contoh ucapan dibahas pada bagian Sudah baik dan
+          Perbaiki dulu.
+        </p>
+        <TelefunScoreDetails
+          assessment={assessment}
+          transcript={transcript}
+          onShowLine={onShowLine}
+          clockOf={clockOf}
+        />
+      </ReviewSection>
 
-        <TabsContent value="notes">{notes}</TabsContent>
+      <ReviewSection id="good" title="Sudah baik">
+        {good.length > 0 && content ? (
+          <AgentNoteList
+            notes={content.agentNotes}
+            verdict="good"
+            onShowLine={onShowLine}
+            highlightedId={highlightedId}
+            clockOf={clockOf}
+          />
+        ) : assessment.strengths.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-[13px] font-semibold">
+              Kekuatan menurut penilaian AI
+            </h4>
+            <PlainList items={assessment.strengths} />
+          </div>
+        ) : !content ? (
+          <ContentNotAvailable review={content} canRerun={Boolean(onRerun)} />
+        ) : (
+          <Empty>Belum ada contoh ucapan agen yang ditandai sudah tepat.</Empty>
+        )}
+      </ReviewSection>
 
-        <TabsContent value="profile" className="flex flex-col gap-3">
-          {profile ? (
-            <>
-              <p className="max-w-[65ch] text-[13px] leading-6 text-fg2">
-                {profile.overallSummary}
-              </p>
-              <TelefunProfileRadar profile={profile} />
-            </>
-          ) : (
-            <Empty>Profil komunikasi belum tersedia untuk panggilan ini.</Empty>
-          )}
-        </TabsContent>
-      </Tabs>
+      <section
+        id="telefun-review-notes"
+        aria-labelledby="telefun-review-notes-title"
+        tabIndex={-1}
+        className="shrink-0 outline-none focus:ring-2 focus:ring-ring"
+      >
+        <details
+          id="telefun-trainer-notes"
+          open={notesOpen}
+          onToggle={(event) => onNotesOpenChange(event.currentTarget.open)}
+        >
+          <summary className="min-h-[44px] cursor-pointer py-3 focus-visible:outline-2 focus-visible:outline-ring">
+            <h3
+              id="telefun-review-notes-title"
+              className="inline text-base font-semibold text-foreground"
+            >
+              Catatan trainer
+            </h3>
+          </summary>
+          {notes}
+        </details>
+      </section>
     </>
+  );
+}
+
+function ReviewSection({
+  id,
+  title,
+  count,
+  children,
+}: {
+  id: string;
+  title: string;
+  count?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={`telefun-review-${id}`}
+      aria-labelledby={`telefun-review-${id}-title`}
+      tabIndex={-1}
+      className="flex shrink-0 flex-col gap-3 outline-none focus:ring-2 focus:ring-ring"
+    >
+      <h3
+        id={`telefun-review-${id}-title`}
+        className="flex flex-wrap items-baseline justify-between gap-2 text-base font-semibold text-foreground"
+      >
+        {title}
+        {count && (
+          <span className="text-[13px] font-normal text-fg2">{count}</span>
+        )}
+      </h3>
+      {children}
+    </section>
   );
 }
 

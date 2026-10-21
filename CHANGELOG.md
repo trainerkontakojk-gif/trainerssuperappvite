@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-21
 
+- feat(telefun): tampilkan telaah dalam satu kolom tanpa catatan berulang, dengan navigasi bagian, alasan skor yang dapat dibuka, dan tombol sembunyikan/tampilkan telaah
+
 - feat(ketik): tampilkan telaah dalam satu kolom tanpa catatan berulang, dengan navigasi bagian, alasan skor yang dapat dibuka, dan tombol sembunyikan/tampilkan telaah
 
 - fix(ketik): the AI consumer treats attachment descriptions as its own facts, sees one indexed attachment list so it sends the right image, and remembers what each sent image showed

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, PanelRightOpen } from "lucide-react";
 import { can } from "@trainers/types";
 import type {
   TelefunCoachingSummary,
@@ -33,12 +33,14 @@ import {
   annotationItemId,
   buildTelefunQuoteMarks,
   contentItemId,
+  focusReviewTarget,
 } from "../utils/contentMarks";
 import { buildFillerPattern, withFillerMarks } from "../utils/fillerMarks";
 import { windowsInRecording } from "../utils/recordingAudio";
 import {
   formatCallDuration,
   formatClock,
+  formatTelefunScore,
   holdIntervals,
   readTelefunScore,
   sortTelefunNewestFirst,
@@ -152,18 +154,17 @@ export function TelefunReviewStage({
     "telefun.manage",
   );
   const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
-  const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(
-    null,
-  );
+  const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(null);
   const [rerunFailed, setRerunFailed] = useState(false);
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
-  // Ada pertanyaan konsumen: tab itu dibuka lebih dulu.
-  const [tab, setTab] = useState(() =>
-    record.voiceAssessment?.contentReview?.consumerPoints.length
-      ? "questions"
-      : "fix",
-  );
+  const [reviewVisible, setReviewVisible] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const openNotes = useCallback((open: boolean) => {
+    setNotesOpen(open);
+    if (open) setNotesLoaded(true);
+  }, []);
   const recording = useTelefunRecordingUrl(record);
   const state = telefunAnalysisState(record);
   const transcript = useMemo(
@@ -194,41 +195,49 @@ export function TelefunReviewStage({
     [holds, recordingMs, sessionDurationMs],
   );
   const assessment = state === "scored" ? record.voiceAssessment : null;
+  const voiceScore = readTelefunScore(record);
   const fillerPattern = useMemo(
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
     [assessment],
   );
   const pointTo = useCallback(
-    (tabValue: string, id: string) => {
-      setTab(tabValue);
+    (id: string, trainerNote = false) => {
+      setReviewVisible(true);
+      if (trainerNote) openNotes(true);
       setPointed({ id });
     },
-    [setTab],
+    [openNotes],
   );
   const quoteMarks = useMemo(
     () =>
       buildTelefunQuoteMarks(assessment?.contentReview, (target) =>
-        pointTo(target.tab, contentItemId(target)),
+        pointTo(contentItemId(target)),
       ),
     [assessment, pointTo],
   );
 
-  // Butir yang ditunjuk baru ada setelah tabnya terbuka.
+  // Catatan trainer bisa baru tersedia sesudah pemuatan selesai.
   useEffect(() => {
-    if (!pointed) return;
-    const frame = window.requestAnimationFrame(() => {
+    if (!pointed || !reviewVisible) return;
+    const pane = document.getElementById("telefun-review-result");
+    if (!pane) return;
+    const focus = () => {
       const element = document.getElementById(pointed.id);
-      if (!element) return;
-      element.scrollIntoView({
-        block: "nearest",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "instant"
-          : "smooth",
-      });
-      element.focus({ preventScroll: true });
+      if (!element) return false;
+      focusReviewTarget(element);
+      return true;
+    };
+    const observer = new MutationObserver(() => {
+      if (focus()) observer.disconnect();
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [pointed, tab]);
+    const frame = window.requestAnimationFrame(() => {
+      if (!focus()) observer.observe(pane, { childList: true, subtree: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [pointed, reviewVisible]);
 
   // Sesi yang belum dinilai diperiksa sekali saat dibuka; pemantau berhenti
   // sendiri pada status akhir atau batas waktu.
@@ -240,12 +249,11 @@ export function TelefunReviewStage({
     onWatchScoring(record.id);
   }, [record.id, state, onWatchScoring]);
 
-  const annotationsOpen = tab === "notes";
   const annotations = useApi<TelefunReplayAnnotation[]>(
-    annotationsOpen ? `/telefun/annotations/${record.id}` : null,
+    notesLoaded ? `/telefun/annotations/${record.id}` : null,
   );
   const summary = useApi<TelefunCoachingSummary>(
-    annotationsOpen ? `/telefun/coaching-summary/${record.id}` : null,
+    notesLoaded ? `/telefun/coaching-summary/${record.id}` : null,
   );
   const annotationItems = useMemo(
     () => (annotations.data ?? []).map(mapAnnotation),
@@ -446,6 +454,16 @@ export function TelefunReviewStage({
           <Button
             type="button"
             variant="outline"
+            aria-controls={reviewVisible ? "telefun-review-result" : undefined}
+            aria-expanded={reviewVisible}
+            onClick={() => setReviewVisible((visible) => !visible)}
+            className="min-h-[44px] px-3 text-[13px]"
+          >
+            {reviewVisible ? "Sembunyikan telaah" : "Tampilkan telaah"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             disabled={transcript.length === 0}
             onClick={() => downloadTranscript(record, transcript, clockOf)}
             className="min-h-[44px] gap-2 px-3 text-[13px]"
@@ -463,7 +481,10 @@ export function TelefunReviewStage({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div
+        data-review-scroll
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden"
+      >
         <section
           aria-labelledby="telefun-transcript-title"
           className="flex min-w-0 flex-col border-border bg-background lg:order-first lg:flex-[1_1_55%] lg:overflow-y-auto lg:border-r"
@@ -495,7 +516,7 @@ export function TelefunReviewStage({
               notes={notes}
               downloadName={`Telefun_${record.consumerName || "rekaman"}_${record.id}.webm`}
               onTimeChange={setCurrentMs}
-              onSelectNote={(id) => pointTo("notes", annotationItemId(id))}
+              onSelectNote={(id) => pointTo(annotationItemId(id), true)}
             />
           </div>
 
@@ -582,71 +603,101 @@ export function TelefunReviewStage({
           )}
         </section>
 
-        <section
-          aria-labelledby="telefun-result-title"
-          className="order-first flex min-w-0 flex-col gap-6 bg-surface-elevated p-4 sm:p-6 lg:order-last lg:flex-[1_1_45%] lg:overflow-y-auto"
-        >
-          <h2 id="telefun-result-title" className="sr-only">
-            Hasil telaah
-          </h2>
-          {state === "scored" && assessment ? (
-            <ReviewResult
-              record={record}
-              assessment={assessment}
-              previous={previousScore(record, history)}
-              transcript={transcript}
-              tab={tab}
-              onTabChange={setTab}
-              onShowLine={showLine}
-              highlightedId={pointed?.id ?? null}
-              clockOf={clockOf}
-              rerunStartedAt={rerunStartedAt}
-              rerunFailed={rerunFailed}
-              onRerun={canRerun ? () => setRerunOpen(true) : undefined}
-              notes={
-                <Suspense
-                  fallback={
-                    <p className="text-[13px] text-muted-foreground">
-                      Memuat catatan…
-                    </p>
-                  }
-                >
-                  <ReplayAnnotator
-                    sessionId={record.id}
-                    annotations={annotationItems}
-                    recommendations={recommendations}
-                    isLoading={annotations.loading || summary.loading}
-                    error={
-                      annotations.error || summary.error
-                        ? "Catatan belum bisa dimuat."
-                        : undefined
-                    }
-                    onRetry={() => {
-                      void annotations.refetch();
-                      void summary.refetch();
-                    }}
-                    onAddAnnotation={addAnnotation}
-                    onDeleteAnnotation={deleteAnnotation}
-                    sessionDurationMs={record.duration * 1000}
-                    highlightedId={pointed?.id ?? null}
-                    onPlayFrom={(ms) => playerRef.current?.playFrom(ms)}
-                  />
-                </Suspense>
-              }
-            />
-          ) : state === "scored" ? (
-            <ScoreOnly record={record} />
-          ) : (
-            <TelefunReviewStatus
-              record={record}
-              state={state}
-              analyzeStartedAt={analyzeStartedAt}
-              checking={checking}
-              onAnalyze={() => void analyze()}
-              onCheckStatus={() => void checkStatus()}
-            />
-          )}
-        </section>
+        {reviewVisible && (
+          <section
+            id="telefun-review-result"
+            aria-labelledby="telefun-result-title"
+            className="@container order-first flex min-w-0 shrink-0 flex-col gap-6 bg-surface-elevated p-4 sm:p-6 lg:order-last lg:shrink lg:flex-[1_1_45%] lg:overflow-y-auto [&>*]:shrink-0"
+          >
+            <h2 id="telefun-result-title" className="sr-only">
+              Hasil telaah
+            </h2>
+            {state === "scored" && assessment ? (
+              <ReviewResult
+                record={record}
+                assessment={assessment}
+                previous={previousScore(record, history)}
+                transcript={transcript}
+                notesOpen={notesOpen}
+                onNotesOpenChange={openNotes}
+                onShowLine={showLine}
+                highlightedId={pointed?.id ?? null}
+                clockOf={clockOf}
+                rerunStartedAt={rerunStartedAt}
+                rerunFailed={rerunFailed}
+                onRerun={canRerun ? () => setRerunOpen(true) : undefined}
+                notes={
+                  notesLoaded && (
+                    <Suspense
+                      fallback={
+                        <p className="text-[13px] text-muted-foreground">
+                          Memuat catatan…
+                        </p>
+                      }
+                    >
+                      <ReplayAnnotator
+                        sessionId={record.id}
+                        annotations={annotationItems}
+                        recommendations={recommendations}
+                        isLoading={annotations.loading || summary.loading}
+                        error={
+                          annotations.error || summary.error
+                            ? "Catatan belum bisa dimuat."
+                            : undefined
+                        }
+                        onRetry={() => {
+                          void annotations.refetch();
+                          void summary.refetch();
+                        }}
+                        onAddAnnotation={addAnnotation}
+                        onDeleteAnnotation={deleteAnnotation}
+                        sessionDurationMs={record.duration * 1000}
+                        highlightedId={pointed?.id ?? null}
+                        onPlayFrom={(ms) => playerRef.current?.playFrom(ms)}
+                      />
+                    </Suspense>
+                  )
+                }
+              />
+            ) : state === "scored" ? (
+              <ScoreOnly record={record} />
+            ) : (
+              <TelefunReviewStatus
+                record={record}
+                state={state}
+                analyzeStartedAt={analyzeStartedAt}
+                checking={checking}
+                onAnalyze={() => void analyze()}
+                onCheckStatus={() => void checkStatus()}
+              />
+            )}
+          </section>
+        )}
+        {!reviewVisible && (
+          <aside
+            aria-label="Telaah disembunyikan"
+            className="order-first flex shrink-0 items-center justify-between gap-2 border-border bg-surface-elevated p-3 lg:order-last lg:w-20 lg:flex-col lg:justify-start lg:border-l"
+          >
+            {state === "scored" && voiceScore !== null && (
+              <p className="flex items-baseline gap-2 text-[13px] text-fg2 lg:flex-col lg:items-center">
+                <span>Skor</span>
+                <strong className="font-mono text-lg text-foreground tabular-nums">
+                  {formatTelefunScore(voiceScore)}
+                </strong>
+              </p>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="Tampilkan telaah"
+              aria-expanded={false}
+              onClick={() => setReviewVisible(true)}
+              className="min-h-[44px] min-w-[44px]"
+            >
+              <PanelRightOpen />
+            </Button>
+          </aside>
+        )}
       </div>
 
       <ConfirmDialog

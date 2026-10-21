@@ -184,19 +184,27 @@ export function ConsumerPointList({
 }: ContentListProps & { points: readonly TelefunConsumerPoint[] }) {
   return (
     <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
-      {points.map((point, index) => (
-        <ConsumerPointItem
-          key={`${point.startMs}-${index}`}
-          point={point}
-          letter={pointLetter(index)}
-          id={contentItemId({ tab: "questions", index })}
-          highlighted={
-            highlightedId === contentItemId({ tab: "questions", index })
-          }
-          onShowLine={onShowLine}
-          clockOf={clockOf}
-        />
-      ))}
+      {points
+        .map((point, index) => ({ point, index }))
+        .sort((a, b) => {
+          const order = { unanswered: 0, partial: 1, answered: 2 };
+          return (
+            order[a.point.status] - order[b.point.status] || a.index - b.index
+          );
+        })
+        .map(({ point, index }) => (
+          <ConsumerPointItem
+            key={`${point.startMs}-${index}`}
+            point={point}
+            letter={pointLetter(index)}
+            id={contentItemId({ kind: "question", index })}
+            highlighted={
+              highlightedId === contentItemId({ kind: "question", index })
+            }
+            onShowLine={onShowLine}
+            clockOf={clockOf}
+          />
+        ))}
     </ol>
   );
 }
@@ -220,13 +228,9 @@ export function AgentNoteList({
               key={`${note.startMs}-${index}`}
               note={note}
               number={index + 1}
-              id={
-                verdict
-                  ? `telefun-${verdict}-lines-${index}`
-                  : contentItemId({ tab: "lines", index })
-              }
+              id={contentItemId({ kind: "line", index })}
               highlighted={
-                highlightedId === contentItemId({ tab: "lines", index })
+                highlightedId === contentItemId({ kind: "line", index })
               }
               onShowLine={onShowLine}
               clockOf={clockOf}
