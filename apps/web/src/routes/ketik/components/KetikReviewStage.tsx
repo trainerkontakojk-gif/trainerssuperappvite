@@ -220,6 +220,11 @@ export function KetikReviewStage({
               if (message.sender === "system") return null;
               const number = numbers.get(message.id);
               const isAgent = message.sender === "agent";
+              const timestamp = message.timestamp
+                ? new Date(message.timestamp)
+                : null;
+              const hasValidTimestamp =
+                timestamp !== null && Number.isFinite(timestamp.getTime());
               const flagged = typosByMessage.has(message.id);
               const answers = answersByMessage.get(message.id);
               const marker =
@@ -278,6 +283,22 @@ export function KetikReviewStage({
                         <span className="mt-1 block text-xs font-medium">
                           Menjawab poin {answers.join(", ")}
                         </span>
+                      )}
+                      {hasValidTimestamp && (
+                        <time
+                          dateTime={message.timestamp}
+                          className={cn(
+                            "mt-1 block text-right text-[13px] font-medium tabular-nums",
+                            isAgent
+                              ? "text-module-ketik-foreground"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </time>
                       )}
                     </div>
                   </li>

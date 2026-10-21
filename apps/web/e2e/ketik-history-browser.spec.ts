@@ -154,7 +154,9 @@ test("old deep-link loads detail independently of the first page and failed deta
     waitForUrl: /\/ketik/,
   });
   await expect(
-    page.getByText("Konsumen: Transkrip sesi 204", { exact: true }),
+    page
+      .getByTestId("ketik-message-1")
+      .getByText("Transkrip sesi 204", { exact: true }),
   ).toBeVisible();
   await expect(page).toHaveURL(new RegExp(history[204].id));
   expectHermetic(audit);
@@ -166,8 +168,95 @@ test("old deep-link loads detail independently of the first page and failed deta
   control.failDetail = false;
   await page.getByRole("button", { name: "Coba lagi", exact: true }).click();
   await expect(
-    page.getByText("Konsumen: Transkrip sesi 204", { exact: true }),
+    page
+      .getByTestId("ketik-message-1")
+      .getByText("Transkrip sesi 204", { exact: true }),
   ).toBeVisible();
+});
+
+test("Telaah shows consumer and agent timestamps without inventing legacy times", async ({
+  page,
+}, info) => {
+  const session = {
+    ...history[204],
+    messages: [
+      {
+        id: "consumer",
+        sender: "consumer",
+        text: "Pertanyaan konsumen",
+        timestamp: "2026-06-09T03:04:00.000Z",
+      },
+      {
+        id: "agent",
+        sender: "agent",
+        text: "Balasan agen",
+        timestamp: "2026-06-09T03:06:00.000Z",
+      },
+      { id: "legacy", sender: "consumer", text: "Pesan lama tanpa waktu" },
+      {
+        id: "invalid",
+        sender: "agent",
+        text: "Pesan dengan waktu rusak",
+        timestamp: "invalid",
+      },
+    ],
+  };
+  const apiMocks = mocks().map((mock) =>
+    mock.path === `/api/v1/ketik/history/${session.id}`
+      ? {
+          ...mock,
+          body: {
+            success: true,
+            data: { ...session, previousFinalScore: null },
+          },
+        }
+      : mock,
+  );
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${session.id}&tahap=telaah`,
+    apiMocks,
+    waitForUrl: /\/ketik/,
+  });
+  for (const [index, timestamp] of [
+    "2026-06-09T03:04:00.000Z",
+    "2026-06-09T03:06:00.000Z",
+  ].entries()) {
+    const time = page.getByTestId(`ketik-message-${index + 1}`).locator("time");
+    await expect(time).toBeVisible();
+    await expect(time).toHaveAttribute("datetime", timestamp);
+    const expected = await page.evaluate(
+      (value) =>
+        new Date(value).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      timestamp,
+    );
+    await expect(time).toHaveText(expected);
+  }
+  for (const number of [3, 4]) {
+    await expect(page.getByTestId(`ketik-message-${number}`)).toBeAttached();
+    await expect(
+      page.getByTestId(`ketik-message-${number}`).locator("time"),
+    ).toHaveCount(0);
+  }
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByTestId("ketik-message-1").scrollIntoViewIfNeeded();
+    await expect(
+      page.getByTestId("ketik-message-1").locator("time"),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: info.outputPath(`review-times-${width}.png`),
+      fullPage: true,
+    });
+  }
+  expectHermetic(audit);
 });
 
 test("server pages, search, replay and full filtered CSV have honest progress/failure states", async ({

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-21
 
+- fix(ketik): show consumer and agent message timestamps in Telaah without inventing missing legacy times
+
 - docs(db): record the verified production apply of KETIK post-expiry closing and complete the production task
 
 - fix(ketik): at session expiry the consumer sends one goodbye with a reason, the agent can keep sending closing messages without AI replies until Akhiri chat, and Telaah shows the consumer phone number
