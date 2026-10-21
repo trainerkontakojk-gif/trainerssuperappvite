@@ -9,7 +9,7 @@ Decision (Fajar, 2026-10-21): the consumer sends a scenario attachment proactive
 - The consumer prompt no longer contradicts itself: evidence is removed from "BUKA INFORMASI BERTAHAP"; attachments follow "KAPAN MENGIRIM LAMPIRAN" only.
 - "KAPAN MENGIRIM LAMPIRAN" says: when you tell what an attachment shows, or the agent asks about it or asks for proof, send it in that same reply without waiting to be asked.
 - Backend guard after generation, before persisting: when the reply carries no `[SEND_IMAGE]` and an unsent attachment applies, append one tag:
-  - the latest agent messages ask for proof (bukti, foto, gambar, tangkapan layar, screenshot, lampiran) → the unsent attachment whose description best matches those messages, else the first unsent one without description, else the first unsent one;
+  - the latest agent messages ask for proof (bukti, foto, gambar, tangkapan layar, screenshot, lampiran) → the unsent attachment whose description best matches those messages, else the first unsent one without description (a described attachment that matches nothing is never sent by the guard);
   - the consumer reply shares at least two significant words with an unsent attachment description → that attachment.
 - At most one tag added per reply; an attachment already sent in the chat is never re-added; a closing reply (no text) is untouched.
 

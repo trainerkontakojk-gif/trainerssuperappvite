@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-21
 
+- docs(ketik): correct the proactive-attachment plan fallback to match the shipped guard
 - fix(ketik): send scenario attachments proactively when their topic comes up, and have the backend add the matching unsent image when the AI forgets the tag after a proof request or a reply that tells what the image shows
 
 ## 2026-10-20
