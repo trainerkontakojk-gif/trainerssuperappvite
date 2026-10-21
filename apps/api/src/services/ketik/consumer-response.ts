@@ -337,7 +337,7 @@ Gunakan skrip berikut sebagai panduan utama arah percakapan, informasi penting, 
 - Jika ada konflik antara skrip, pertanyaan agen, dan kondisi percakapan aktual, prioritaskan respons yang paling natural namun tetap konsisten dengan inti masalah pada skrip.
 
 Isi skrip tersedia di field \`scenario.script\` pada blok data skenario.
-- Deskripsi skenario menetapkan inti masalah dan fakta utama; skrip mengatur alur serta detail respons.
+- Deskripsi skenario menetapkan inti masalah dan fakta utama; skrip mengatur alur serta detail respons, dan keterangan lampiran memberi fakta isi bukti.
 - Jika ada konflik fakta, pertahankan inti masalah dari deskripsi skenario dan abaikan bagian skrip yang bertentangan.`
     : "";
 
@@ -415,7 +415,7 @@ ATURAN BALASAN:
 10. JANGAN menulis ulang pesan agen. JANGAN gunakan format transkrip seperti "Agen:" atau "Konsumen:". Output-mu berupa isi chat konsumen SAJA, bukan dialog dua arah, bukan analisis, bukan narasi panggung.
 11. Jangan mengakhiri chat terlalu cepat. Dalam 3-4 pesan pertama kamu TIDAK BOLEH menutup chat dengan alasan apapun. JANGAN PERNAH membalas greeting pertama agen dengan pamit; balas dengan sapaan singkat sesuai tipemu dan inti keluhanmu.
 12. Jangan berpura-pura tahu timer internal simulasi. Jika belum ada status waktu yang benar-benar kritis, jangan bersikap seolah sesi sudah habis.
-13. BATASAN KONTEKS SKENARIO: bahas hanya fakta, isu, produk, atau layanan yang ada di deskripsi skenario, skrip, atau pertanyaan agen yang masih terkait masalah inti. JANGAN menambah isu, produk, atau topik baru (misalnya skenario penipuan tidak tiba-tiba membahas cetak SLIK atau pengajuan kredit). Detail tambahan yang masuk akal sebagai elaborasi masalah yang sama boleh, tetapi jangan mengarang riwayat yang tidak ada di skenario.
+13. BATASAN KONTEKS SKENARIO: bahas hanya fakta, isu, produk, atau layanan yang ada di deskripsi skenario, skrip, keterangan lampiran, atau pertanyaan agen yang masih terkait masalah inti. JANGAN menambah isu, produk, atau topik baru (misalnya skenario penipuan tidak tiba-tiba membahas cetak SLIK atau pengajuan kredit). Detail tambahan yang masuk akal sebagai elaborasi masalah yang sama boleh, tetapi jangan mengarang riwayat yang tidak ada di skenario.
   `;
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
@@ -425,7 +425,7 @@ ATURAN BALASAN:
 
   const providerSystemInstruction =
     usesConservativeTemperature && hasScript
-      ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
+      ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, skrip, atau keterangan lampiran kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
       : systemInstruction;
 
   // Compaction: total prompt budget mencakup providerSystemInstruction +
@@ -437,13 +437,18 @@ ATURAN BALASAN:
     scenario.title,
     chatHistory.length, // conservative omitted-count estimate (worst case)
   );
+  const attachmentContext = {
+    imageCount: scenario.images?.length ?? 0,
+    imageAlts: scenario.imageAlts,
+  };
   const { compacted: compactedHistory, omittedCount } =
-    compactChatHistory(chatHistory, availableHistoryBudget);
+    compactChatHistory(chatHistory, availableHistoryBudget, attachmentContext);
 
   const prompt = buildKetikTurnPrompt({
     scenarioTitle: scenario.title,
     chatHistory: compactedHistory,
     omittedCount,
+    attachmentContext,
   });
 
   // Injection detection and timing still inspect the FULL chatHistory

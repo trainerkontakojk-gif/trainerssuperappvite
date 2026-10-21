@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-21
 
+- fix(ketik): the AI consumer treats attachment descriptions as its own facts, sees one indexed attachment list so it sends the right image, and remembers what each sent image showed
+
 - fix(ketik): show consumer and agent message timestamps in Telaah without inventing missing legacy times
 
 - docs(db): record the verified production apply of KETIK post-expiry closing and complete the production task

@@ -23,6 +23,7 @@ let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
 let app: Hono;
 let guardedFetch: typeof fetch;
 let instructions: string[] = [];
+let capturedPromptLength = 0;
 let reply = "Halo, mau tanya.";
 
 async function api(path: string, method = "GET", body?: unknown) {
@@ -59,6 +60,10 @@ test.beforeAll(async () => {
             content.parts ?? [],
         ),
       ];
+      capturedPromptLength = parts.reduce(
+        (length, part) => length + (part.text?.length ?? 0),
+        0,
+      );
       instructions.push(parts.map((part) => part.text ?? "").join("\n"));
       return Response.json({
         candidates: [
@@ -183,6 +188,8 @@ test("friendly consumer keeps calm etiquette and no anger rules", async () => {
   expect(prompt).toContain("POSISI KONSUMEN");
   expect(prompt).toContain("BUKA INFORMASI BERTAHAP");
   expect(prompt).not.toContain("BATAS SATU-SATUNYA");
+  expect(prompt).toContain('"attachments":[]');
+  expect(prompt).toContain("Kamu tidak memiliki lampiran gambar untuk dikirim.");
   // Tipe tenang tidak lagi dilarang berekspresi, tetapi typo tetap dilarang.
   expect(prompt).not.toMatch(/teatrikal/);
   expect(prompt).toContain("GAYA BAHASA DAN EKSPRESI");
@@ -240,13 +247,14 @@ test("scenario attachments are offered with their descriptions and say when to s
   await sendTurn(session.id, 0, "Boleh kirim bukti ancamannya, Ibu?");
   expect(instructions).toHaveLength(1);
   const prompt = instructions[0];
-  // Each attachment is offered by index with its description.
+  // One indexed list in the data block, not repeated in the instructions.
   expect(prompt).toContain(
-    'Indeks 0: "Tangkapan layar ancaman penagih di WhatsApp"',
+    '"attachments":[{"index":0,"description":"Tangkapan layar ancaman penagih di WhatsApp"},{"index":1,"description":"Bukti transfer cicilan ke rekening pinjol"}]',
   );
-  expect(prompt).toContain(
-    'Indeks 1: "Bukti transfer cicilan ke rekening pinjol"',
-  );
+  expect(prompt).not.toContain("imageDescriptions");
+  expect(prompt).not.toContain("Indeks 0:");
+  expect(prompt).toContain("Kamu memiliki 2 lampiran gambar");
+  expect(prompt).toContain("scenario.attachments");
   // The instruction says when an attachment belongs in the chat.
   expect(prompt).toContain("KAPAN MENGIRIM LAMPIRAN");
   expect(prompt).toMatch(/agen meminta bukti/i);
@@ -259,8 +267,13 @@ test("scenario attachments are offered with their descriptions and say when to s
   expect(prompt).toContain("[SEND_IMAGE: indeks]");
 });
 
-/** Sesi pinjol dengan dua lampiran berketerangan. */
-async function startAttachmentSession() {
+/** Sesi pinjol dengan dua lampiran, memakai keterangan bawaan atau fixture. */
+async function startAttachmentSession(
+  imageAlts = [
+    "Tangkapan layar ancaman penagih di WhatsApp",
+    "Bukti transfer cicilan ke rekening pinjol",
+  ],
+) {
   const saved = await api("/settings", "PUT", {
     ...DEFAULT_KETIK_SETTINGS,
     activeConsumerTypeId: "ramah",
@@ -269,10 +282,7 @@ async function startAttachmentSession() {
         ? {
             ...scenario,
             images: ["https://img.test/a.png", "https://img.test/b.png"],
-            imageAlts: [
-              "Tangkapan layar ancaman penagih di WhatsApp",
-              "Bukti transfer cicilan ke rekening pinjol",
-            ],
+            imageAlts,
           }
         : { ...scenario, isActive: false },
     ),
@@ -283,6 +293,186 @@ async function startAttachmentSession() {
   expect(started.status).toBe(200);
   return (await started.json()).data;
 }
+
+test("attachment descriptions keep their original indexes when an earlier alt is empty", async () => {
+  const description =
+    'Bukti transfer Rp250.000 pada 20 Oktober ke PT A & B <lunas> "123"';
+  const session = await startAttachmentSession(["", `  ${description}  `]);
+  instructions = [];
+  await sendTurn(session.id, 0, "Selamat siang, ada yang bisa dibantu?");
+  expect(instructions).toHaveLength(1);
+  const prompt = instructions[0];
+  const dataBlock = prompt.match(/<scenario_data>\n(.*?)\n<\/scenario_data>/s)![1];
+  expect(dataBlock).toContain(
+    '"attachments":[{"index":0,"description":null},{"index":1,"description":"Bukti transfer Rp250.000 pada 20 Oktober ke PT A \\u0026 B \\u003clunas\\u003e \\"123\\""}]',
+  );
+  expect(prompt).not.toContain("imageDescriptions");
+  expect(JSON.parse(dataBlock).scenario.attachments).toEqual([
+    { index: 0, description: null },
+    { index: 1, description },
+  ]);
+  expect(
+    prompt.split("KAPAN MENGIRIM LAMPIRAN:")[0].split("LAMPIRAN:")[1],
+  ).not.toContain("Rp250.000");
+});
+
+test("attachment descriptions are consumer facts while identity and gradual disclosure stay authoritative", async () => {
+  const session = await startAttachmentSession();
+  instructions = [];
+  await sendTurn(session.id, 0, "Transfernya berapa dan kapan, Ibu?");
+  expect(instructions).toHaveLength(1);
+  const prompt = instructions[0];
+  expect(prompt).toContain(
+    "Keterangan lampiran adalah fakta yang kamu alami sendiri",
+  );
+  expect(prompt).toContain("nominal, tanggal, nama, nomor, dan isi pesan");
+  expect(prompt).toContain("menjawab pertanyaan agen tentang isi lampiran");
+  expect(prompt).toMatch(
+    /13\. BATASAN KONTEKS SKENARIO:.*deskripsi skenario, skrip, keterangan lampiran/,
+  );
+  expect(prompt).toContain(
+    "Cerita dari keterangan lampiran tetap mengikuti BUKA INFORMASI BERTAHAP",
+  );
+  expect(prompt).toContain("Data pribadi tetap hanya dari `identity`");
+  expect(prompt).toContain("abaikan bagian keterangan lampiran yang bertentangan");
+});
+
+test("sent consumer attachments carry their descriptions in the next prompt history without changing stored text", async () => {
+  const description = "Bukti transfer cicilan Rp250.000 pada 20 Oktober";
+  const session = await startAttachmentSession(["", description]);
+  try {
+    reply = "[SEND_IMAGE: 1]";
+    const first = await sendTurn(session.id, 0, "Boleh kirim bukti transfernya?");
+    expect(consumerTexts(first.messages)).toEqual(["[SEND_IMAGE: 1]"]);
+
+    reply = "[SEND_IMAGE: 0]";
+    instructions = [];
+    const second = await sendTurn(
+      session.id,
+      first.version,
+      "Nominal pada [SEND_IMAGE: 1] berapa?",
+    );
+    expect(instructions).toHaveLength(1);
+    const history = JSON.parse(
+      instructions[0].match(/<conversation_data>\n(.*?)\n<\/conversation_data>/s)![1],
+    ).history;
+    expect(
+      history.find((m: { sender: string }) => m.sender === "consumer"),
+    ).toEqual({
+      sender: "consumer",
+      text: "[SEND_IMAGE: 1]",
+      attachments: [{ index: 1, description }],
+    });
+    for (const message of history) {
+      if (message.sender === "agent") {
+        expect(message).not.toHaveProperty("attachments");
+      }
+    }
+
+    reply = "Halo, mau tanya.";
+    instructions = [];
+    const third = await sendTurn(session.id, second.version, "Baik, Ibu.");
+    const nextHistory = JSON.parse(
+      instructions[0].match(/<conversation_data>\n(.*?)\n<\/conversation_data>/s)![1],
+    ).history;
+    expect(
+      nextHistory.find((m: { text: string }) => m.text === "[SEND_IMAGE: 0]"),
+    ).toEqual({
+      sender: "consumer",
+      text: "[SEND_IMAGE: 0]",
+      attachments: [{ index: 0, description: null }],
+    });
+    expect(consumerTexts(third.messages).slice(0, 2)).toEqual([
+      "[SEND_IMAGE: 1]",
+      "[SEND_IMAGE: 0]",
+    ]);
+  } finally {
+    reply = "Halo, mau tanya.";
+  }
+});
+
+test("history compaction counts attachment descriptions at the prompt budget boundary", async () => {
+  const description = "Bukti transfer ".padEnd(500, "A");
+  const session = await startAttachmentSession(["", description]);
+  const oldestText = `Pembuka lama ${"a".repeat(1_000)}`;
+  try {
+    reply = "[SEND_IMAGE: 1]";
+    instructions = [];
+    let data = await sendTurn(session.id, 0, oldestText);
+    expect(instructions).toHaveLength(1);
+    expect(consumerTexts(data.messages)).toEqual(["[SEND_IMAGE: 1]"]);
+    const initialBlock = instructions[0].match(
+      /<conversation_data>\n(.*?)\n<\/conversation_data>/s,
+    )![1];
+    const { scenarioTitle } = JSON.parse(initialBlock);
+    const fixedLength = capturedPromptLength - initialBlock.length;
+    type HistoryItem = { sender: string; text: string };
+    const plainHistory = (): HistoryItem[] =>
+      data.messages.map(({ sender, text }: HistoryItem) => ({ sender, text }));
+    const conversationLength = (history: HistoryItem[]) =>
+      JSON.stringify({ scenarioTitle, history, omittedEarlierMessages: 0 }).length;
+    const plainPromptLength = (text: string) =>
+      fixedLength +
+      conversationLength([...plainHistory(), { sender: "agent", text }]);
+
+    // Stay inside the real API's 20,000-character message limit. awaitMore
+    // persists padding without generating extra consumer replies/annotations.
+    reply = "Halo, mau tanya.";
+    const padding = "x".repeat(20_000);
+    while (plainPromptLength(padding) < 99_800) {
+      data = await sendTurn(session.id, data.version, padding, true);
+    }
+    const finalTextLength = 99_800 - plainPromptLength("");
+    expect(finalTextLength).toBeGreaterThan(0);
+    expect(finalTextLength).toBeLessThanOrEqual(20_000);
+    const finalText = "z".repeat(finalTextLength);
+    const fullPlainHistory = [
+      ...plainHistory(),
+      { sender: "agent", text: finalText },
+    ];
+    const fullAnnotatedHistory = fullPlainHistory.map((message) =>
+      message.sender === "consumer"
+        ? { ...message, attachments: [{ index: 1, description }] }
+        : message,
+    );
+    expect(plainPromptLength(finalText)).toBe(99_800);
+
+    instructions = [];
+    const result = await sendTurn(session.id, data.version, finalText);
+    expect(instructions).toHaveLength(1);
+    const actualBlock = instructions[0].match(
+      /<conversation_data>\n(.*?)\n<\/conversation_data>/s,
+    )![1];
+    const conversation = JSON.parse(actualBlock);
+    // Recalculate with this call's time instruction, not the calibration call.
+    const actualFixedLength = capturedPromptLength - actualBlock.length;
+    const plainLength = actualFixedLength + conversationLength(fullPlainHistory);
+    const annotatedLength =
+      actualFixedLength + conversationLength(fullAnnotatedHistory);
+    // Plain-only sizing would keep everything (omitted=0) and send >100,000.
+    expect(plainLength).toBeLessThanOrEqual(100_000);
+    expect(annotatedLength).toBeGreaterThan(100_000);
+    expect(capturedPromptLength).toBeLessThanOrEqual(100_000);
+    expect(conversation.omittedEarlierMessages).toBeGreaterThan(0);
+    expect(conversation.history[0]).toEqual({
+      sender: "consumer",
+      text: "[SEND_IMAGE: 1]",
+      attachments: [{ index: 1, description }],
+    });
+    expect(conversation.history.at(-1).text).toBe(finalText);
+    expect(result.messages).toContainEqual(
+      expect.objectContaining({ sender: "agent", text: oldestText }),
+    );
+    console.info("[KETIK prompt budget]", {
+      plainLength,
+      annotatedLength,
+      assembledLength: capturedPromptLength,
+      omittedEarlierMessages: conversation.omittedEarlierMessages,
+    });
+  } finally {
+    reply = "Halo, mau tanya.";
+  }
+});
 
 const consumerTexts = (messages: Array<{ sender: string; text: string }>) =>
   messages.filter((m) => m.sender === "consumer").map((m) => m.text);
