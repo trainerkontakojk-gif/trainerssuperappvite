@@ -610,6 +610,117 @@ test("expiry is enforced server-side and empty finalized sessions are discarded 
     .eq("id", session.id);
   expect(history.data).toEqual([]);
 });
+test("after expiry the consumer closes once with a reason and the agent can still send closing messages", async () => {
+  const session = await start();
+  const db = createAdmin(env);
+  const append = (text: string, expectedAgentVersion: number) =>
+    api(trainer, `/sessions/${session.id}/messages`, "POST", {
+      requestId: randomUUID(),
+      expectedAgentVersion,
+      text,
+    });
+  expect((await append("Ada yang bisa dibantu?", 0)).status).toBe(200);
+  providerText = "Tagihan saya ganda.";
+  const replied = await api(
+    trainer,
+    `/sessions/${session.id}/respond`,
+    "POST",
+    {
+      requestId: randomUUID(),
+    },
+  );
+  expect(replied.status).toBe(200);
+  // The consumer spoke last, so a normal claim would be a no-op.
+  const expired = await db
+    .from("ketik_sessions")
+    .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+    .eq("id", session.id);
+  expect(expired.error).toBeNull();
+
+  providerPayloads = [];
+  providerText = "Ya sudah kak, saya ada urusan dulu. Nanti saya hubungi lagi.";
+  const calls = providerCalls;
+  const closing = await api(
+    trainer,
+    `/sessions/${session.id}/respond`,
+    "POST",
+    {
+      requestId: randomUUID(),
+    },
+  );
+  expect(closing.status).toBe(200);
+  const closed = (await closing.json()).data;
+  expect(providerCalls).toBe(calls + 1);
+  expect(providerPayloads[0]).toContain("WAKTU CHAT SUDAH HABIS");
+  expect(closed.consumerClosed).toBe(true);
+  expect(closed.messages.at(-1)).toMatchObject({
+    sender: "consumer",
+    text: providerText,
+  });
+
+  const farewell = await append(
+    "Baik, terima kasih sudah menghubungi kami.",
+    1,
+  );
+  expect(farewell.status).toBe(200);
+  expect((await farewell.json()).data).toMatchObject({
+    agentVersion: 2,
+    awaitingResponse: false,
+  });
+  const again = await api(trainer, `/sessions/${session.id}/respond`, "POST", {
+    requestId: randomUUID(),
+  });
+  expect(again.status).toBe(409);
+  expect(providerCalls).toBe(calls + 1);
+
+  const finished = await api(
+    trainer,
+    `/sessions/${session.id}/finish`,
+    "POST",
+    {},
+  );
+  expect(finished.status).toBe(200);
+  expect((await finished.json()).data.messages.at(-1)).toMatchObject({
+    sender: "agent",
+    text: "Baik, terima kasih sudah menghubungi kami.",
+  });
+  providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
+});
+test("a closing after the consumer already said goodbye adds no message", async () => {
+  const session = await start();
+  const db = createAdmin(env);
+  expect(
+    (
+      await api(trainer, `/sessions/${session.id}/messages`, "POST", {
+        requestId: randomUUID(),
+        expectedAgentVersion: 0,
+        text: "Ada lagi yang bisa dibantu?",
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await db
+        .from("ketik_sessions")
+        .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+        .eq("id", session.id)
+    ).error,
+  ).toBeNull();
+  providerText = "[NO_RESPONSE]";
+  const closing = await api(
+    trainer,
+    `/sessions/${session.id}/respond`,
+    "POST",
+    {
+      requestId: randomUUID(),
+    },
+  );
+  expect(closing.status).toBe(200);
+  const data = (await closing.json()).data;
+  expect(data.consumerClosed).toBe(true);
+  expect(data.messages.at(-1).sender).toBe("agent");
+  providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
+});
 test("legacy transcript and generation endpoints cannot bypass session authority", async () => {
   const calls = providerCalls;
   for (const path of ["/generate", "/history"]) {

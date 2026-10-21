@@ -143,7 +143,7 @@ test("failed turn resumes without automatic generation; retry uses the same ID a
   expectHermetic(audit);
 });
 
-test("resume completion never sends queued text after the consumer closes", async ({
+test("text queued while a legacy turn resumes is saved as an agent message after the consumer closes", async ({
   page,
 }) => {
   const request = {
@@ -201,6 +201,40 @@ test("resume completion never sends queued text after the consumer closes", asyn
       },
     });
   });
+  const appends: string[] = [];
+  await page.route(`**/api/v1/ketik/sessions/${id}/messages`, (route) => {
+    const body = route.request().postDataJSON() as {
+      requestId: string;
+      text: string;
+    };
+    appends.push(body.text);
+    return route.fulfill({
+      json: {
+        success: true,
+        data: {
+          ...pending,
+          version: 3,
+          agentVersion: 1,
+          pendingTurn: null,
+          consumerClosed: true,
+          messages: [
+            ...pending.messages,
+            {
+              id: body.requestId,
+              sender: "agent",
+              text: body.text,
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        },
+      },
+    });
+  });
+  let responseCalls = 0;
+  await page.route(`**/api/v1/ketik/sessions/${id}/respond`, (route) => {
+    responseCalls++;
+    return route.abort();
+  });
   const room = page.getByRole("region", { name: "Ruang chat" });
   await room
     .getByRole("textbox", { name: "Tulis balasan" })
@@ -208,49 +242,126 @@ test("resume completion never sends queued text after the consumer closes", asyn
   await room.getByRole("textbox", { name: "Tulis balasan" }).press("Enter");
   await expect(room.getByText("1 pesan sedang disimpan.")).toBeVisible();
   closed = true;
-  await expect(
-    room.getByText("Chat telah berakhir", { exact: true }),
-  ).toBeVisible();
+  await expect(room.getByText(/Konsumen telah mengakhiri chat/)).toBeVisible();
+  await expect.poll(() => appends).toEqual(["Pesan antrean rahasia"]);
   await expect(
     room.getByText("Pesan antrean rahasia", { exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   expect(calls).toBe(0);
-  await expect(room.getByRole("alert")).toContainText(
-    "Pesan terakhir belum tersimpan",
-  );
+  expect(responseCalls).toBe(0);
+  await expect(room.getByRole("alert")).toHaveCount(0);
+  await expect(
+    room.getByRole("textbox", { name: "Tulis balasan" }),
+  ).toBeEnabled();
   expectHermetic(audit);
 });
 
-test("server expiry closes the composer without inventing a consumer message", async ({
+test("at expiry the consumer says goodbye once and the agent can still send closing messages", async ({
   page,
 }) => {
-  await page.clock.install();
-  const live = session({
-    expiresAt: new Date(Date.now() + 60000).toISOString(),
+  const now = Date.now();
+  let live = session({
+    version: 2,
+    agentVersion: 1,
+    // Real time, not page.clock: a faked clock stalls the typing indicator's
+    // exit animation.
+    expiresAt: new Date(now + 6000).toISOString(),
+    messages: [
+      {
+        id: "agent-1",
+        sender: "agent",
+        text: "Ada yang bisa dibantu?",
+        timestamp: new Date(now).toISOString(),
+      },
+      {
+        id: "consumer-1",
+        sender: "consumer",
+        text: "Tagihan saya ganda.",
+        timestamp: new Date(now).toISOString(),
+      },
+    ],
   });
   const audit = await openHermeticShell(page, {
     path: `/ketik?sesi=${id}&tahap=chat`,
-    apiMocks: [
-      ...base,
-      {
-        method: "GET",
-        path: `/api/v1/ketik/sessions/${id}`,
-        body: { success: true, data: live },
-      },
-    ],
+    apiMocks: base,
     expectedThirdPartyHosts: ["randomuser.me"],
   });
+  await page.route(`**/api/v1/ketik/sessions/${id}`, (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  let responseCalls = 0;
+  await page.route(`**/api/v1/ketik/sessions/${id}/respond`, async (route) => {
+    responseCalls++;
+    live = {
+      ...live,
+      version: live.version + 1,
+      consumerClosed: true,
+      awaitingResponse: false,
+      messages: [
+        ...live.messages,
+        {
+          id: "consumer-goodbye",
+          sender: "consumer",
+          text: "Ya sudah kak, saya ada urusan dulu.",
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+  const appends: string[] = [];
+  await page.route(`**/api/v1/ketik/sessions/${id}/messages`, async (route) => {
+    const body = route.request().postDataJSON() as {
+      requestId: string;
+      text: string;
+    };
+    appends.push(body.text);
+    live = {
+      ...live,
+      version: live.version + 1,
+      agentVersion: live.agentVersion + 1,
+      messages: [
+        ...live.messages,
+        {
+          id: body.requestId,
+          sender: "agent",
+          text: body.text,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+
   const room = page.getByRole("region", { name: "Ruang chat" });
+  const input = room.getByRole("textbox", { name: "Tulis balasan" });
   await expect(
-    room.getByRole("textbox", { name: "Tulis balasan" }),
+    room.getByText("Tagihan saya ganda.", { exact: true }),
   ).toBeVisible();
-  await page.clock.fastForward(120000);
+  expect(responseCalls).toBe(0);
   await expect(
-    room.getByText(
-      "Waktu sesi berakhir. Akhiri chat untuk menyimpan percakapan.",
-    ),
+    room.getByText("Ya sudah kak, saya ada urusan dulu.", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  expect(responseCalls).toBe(1);
+  await expect(room.getByText(/Konsumen telah mengakhiri chat/)).toBeVisible();
+  await expect(input).toBeEnabled();
+
+  await input.fill("Baik, terima kasih sudah menghubungi kami.");
+  await input.press("Enter");
+  await expect(
+    room.getByText("Baik, terima kasih sudah menghubungi kami.", {
+      exact: true,
+    }),
   ).toBeVisible();
-  await expect(room.getByRole("textbox")).toHaveCount(0);
+  await expect
+    .poll(() => appends)
+    .toEqual(["Baik, terima kasih sudah menghubungi kami."]);
+  // Nothing answers the agent's closing message.
+  await page.waitForTimeout(4000);
+  expect(responseCalls).toBe(1);
+  await expect(
+    room.getByRole("status", { name: "Konsumen sedang mengetik" }),
+  ).toHaveCount(0);
   await expect(room.getByRole("button", { name: "Akhiri chat" })).toBeEnabled();
   expectHermetic(audit);
 });
@@ -478,6 +589,12 @@ test("simulation timer counts up from the server start and stops once the chat c
         method: "GET",
         path: `/api/v1/ketik/sessions/${id}`,
         body: { success: true, data: live },
+      },
+      {
+        // At expiry the consumer's goodbye closes the chat.
+        method: "POST",
+        path: `/api/v1/ketik/sessions/${id}/respond`,
+        body: { success: true, data: { ...live, consumerClosed: true } },
       },
     ],
     expectedThirdPartyHosts: ["randomuser.me"],

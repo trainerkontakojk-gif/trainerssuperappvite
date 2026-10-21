@@ -65,16 +65,22 @@ function MarkedValue({ anomaly }: { anomaly: KetikIdentityAnomaly }) {
   );
 }
 
+type VisibleField = KetikIdentityAnomalyField | "phone";
+const VISIBLE_LABELS: Record<VisibleField, string> = {
+  ...FIELD_LABELS,
+  phone: "Nomor telepon",
+};
+
 /** Above the transcript: what the agent saw in the Data konsumen panel. */
 export function KetikVisibleConsumerData({
   values,
   anomalies,
 }: {
   /** Session values; sessions from before NIK/email have none. */
-  values: Record<KetikIdentityAnomalyField, string | null | undefined>;
+  values: Record<VisibleField, string | null | undefined>;
   anomalies: readonly KetikIdentityAnomaly[];
 }) {
-  const fields: KetikIdentityAnomalyField[] = ["city", "nik", "email"];
+  const fields: VisibleField[] = ["city", "phone", "nik", "email"];
   return (
     <section
       aria-labelledby="ketik-visible-data-title"
@@ -86,18 +92,20 @@ export function KetikVisibleConsumerData({
       >
         Data konsumen yang terlihat di panel agen
       </h3>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
         {fields.map((field) => {
           const anomaly = anomalies.find((item) => item.field === field);
           return (
             <div key={field} className="flex min-w-0 flex-col gap-0.5">
               <dt className="text-xs text-muted-foreground">
-                {FIELD_LABELS[field]}
+                {VISIBLE_LABELS[field]}
               </dt>
               <dd
                 className={cn(
                   "flex flex-wrap items-center gap-2 font-medium break-all text-foreground",
-                  field === "nik" ? "font-mono text-[13.5px]" : "text-sm",
+                  field === "nik" || field === "phone"
+                    ? "font-mono text-[13.5px]"
+                    : "text-sm",
                 )}
               >
                 {anomaly ? (

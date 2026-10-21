@@ -29,6 +29,18 @@ function needsResponse(session: KetikServerSession): boolean {
   );
 }
 
+/**
+ * Once the time is up the consumer owes one goodbye, even when it spoke last;
+ * after that nothing the agent sends gets a reply.
+ */
+function owesClosing(session: KetikServerSession): boolean {
+  return (
+    session.state === "active" &&
+    !session.consumerClosed &&
+    Date.parse(session.expiresAt) <= Date.now()
+  );
+}
+
 function agentTextsSinceConsumer(
   messages: readonly ChatMessage[],
   queued: readonly QueuedMessage[],
@@ -120,6 +132,8 @@ export function useServerKetikChat(initial: KetikServerSession) {
     timer: ReturnType<typeof setTimeout>;
     resolve: () => void;
   } | null>(null);
+  /** Closing requests the server did not answer with a goodbye yet. */
+  const closingAttempts = useRef(0);
   const requestResponseRef = useRef<() => void>(() => {});
   const scheduleResponseRef = useRef<() => void>(() => {});
   const latestAgent = [...initial.messages]
@@ -131,8 +145,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
 
   const present = (list: ChatMessage[]) =>
     presentMessages(list, {
-      open:
-        current.current.state === "active" && !current.current.consumerClosed,
+      open: current.current.state === "active",
       queued: queued.current,
       read: read.current,
       hidden: hidden.current,
@@ -140,7 +153,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
 
   const [messages, setMessages] = useState(() =>
     presentMessages(initial.messages, {
-      open: initial.state === "active" && !initial.consumerClosed,
+      open: initial.state === "active",
       queued: [],
       read: new Set(),
       hidden: new Set(),
@@ -185,7 +198,10 @@ export function useServerKetikChat(initial: KetikServerSession) {
   useEffect(() => {
     if (expired) return;
     const timer = setTimeout(
-      () => setExpired(true),
+      () => {
+        setExpired(true);
+        scheduleResponseRef.current();
+      },
       Math.max(0, expiresAt - Date.now()),
     );
     return () => clearTimeout(timer);
@@ -200,12 +216,20 @@ export function useServerKetikChat(initial: KetikServerSession) {
       responseBlocked.current ||
       appendBlocked.current ||
       queued.current.length > 0 ||
-      !needsResponse(session) ||
       session.state !== "active" ||
-      session.consumerClosed ||
-      Date.parse(session.expiresAt) <= Date.now()
+      session.consumerClosed
     )
       return;
+    if (owesClosing(session)) {
+      // A browser clock ahead of the server gets a no-op until the server
+      // agrees the time is up; retry slowly instead of in a tight loop.
+      responseTimer.current = setTimeout(
+        () => requestResponseRef.current(),
+        closingAttempts.current ? 2000 : 0,
+      );
+      return;
+    }
+    if (!needsResponse(session)) return;
     const mode = session.config.responsePacingMode;
     const factor = consumerSpeedFactor(session.config.consumerType.id);
     const texts = agentTextsSinceConsumer(session.messages, []);
@@ -234,17 +258,13 @@ export function useServerKetikChat(initial: KetikServerSession) {
     setError("");
     try {
       while (queued.current.length && mounted.current) {
+        // The agent may still close politely after the time is up or the
+        // consumer left; only an ended session stops saving.
         const session = current.current;
-        if (
-          session.state !== "active" ||
-          session.consumerClosed ||
-          Date.parse(session.expiresAt) <= Date.now()
-        ) {
-          setClosed(session.state !== "active" || session.consumerClosed);
+        if (session.state !== "active") {
+          setClosed(true);
           setRetryKind("append");
-          setError(
-            "Chat sudah ditutup atau waktu sesi berakhir. Pesan terakhir belum tersimpan.",
-          );
+          setError("Chat sudah diakhiri. Pesan terakhir belum tersimpan.");
           break;
         }
         const next = queued.current[0];
@@ -290,7 +310,9 @@ export function useServerKetikChat(initial: KetikServerSession) {
       return;
     }
     const session = current.current;
-    if (!needsResponse(session)) return;
+    if (session.consumerClosed) return;
+    if (!needsResponse(session) && !owesClosing(session)) return;
+    if (owesClosing(session)) closingAttempts.current++;
     responseBusy.current = true;
     setResponseLoading(true);
     setError("");
@@ -415,7 +437,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
       initial.pendingResponse?.status === "processing" ||
       initial.pendingTurn?.status === "processing";
     if (!processing) {
-      if (needsResponse(initial)) scheduleResponseRef.current();
+      scheduleResponseRef.current();
       return;
     }
     let cancelled = false;
@@ -447,7 +469,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
             setError(KETIK_SESSION_ERRORS.SESSION_AI_FAILED);
           } else if (queued.current.length) {
             void processAppends();
-          } else if (needsResponse(loaded)) {
+          } else {
             scheduleResponseRef.current();
           }
           return;
@@ -470,13 +492,9 @@ export function useServerKetikChat(initial: KetikServerSession) {
   }, [initial, initial.id, processAppends]);
 
   const send = (text: string) => {
-    if (closed || expired || queued.current.length >= 20) {
+    if (current.current.state !== "active" || queued.current.length >= 20) {
       setRetryKind("append");
-      setError(
-        expired
-          ? KETIK_SESSION_ERRORS.SESSION_EXPIRED
-          : "Antrean penyimpanan penuh atau chat sudah ditutup.",
-      );
+      setError("Antrean penyimpanan penuh atau chat sudah diakhiri.");
       return false;
     }
     if (responseTimer.current) clearTimeout(responseTimer.current);
@@ -505,7 +523,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
           setMessages(present(loaded.messages));
           setResponseLoading(false);
           if (queued.current.length) void processAppends();
-          else if (needsResponse(loaded)) scheduleResponseRef.current();
+          else scheduleResponseRef.current();
         })
         .catch(() => {
           setResponseLoading(false);

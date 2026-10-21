@@ -209,6 +209,7 @@ export function KetikReviewStage({
           <KetikVisibleConsumerData
             values={{
               city: session.consumerCity,
+              phone: session.consumerPhone,
               nik: session.consumerNik,
               email: session.consumerEmail,
             }}

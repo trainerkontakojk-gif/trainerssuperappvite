@@ -73,6 +73,8 @@ export interface SessionTimingContext {
   remainingSeconds?: number;
   elapsedSeconds?: number;
   totalDurationSeconds?: number;
+  /** The session time is over: this reply is the consumer's goodbye. */
+  closing?: boolean;
 }
 
 function buildTimeLimitInstruction(
@@ -82,6 +84,16 @@ function buildTimeLimitInstruction(
 ): string {
   if (!simulationDurationMinutes || simulationDurationMinutes <= 0) {
     return "";
+  }
+
+  if (timing?.closing) {
+    return `
+STATUS WAKTU SIMULASI SAAT INI:
+- WAKTU CHAT SUDAH HABIS. Ini balasan terakhirmu; setelah ini kamu tidak membalas lagi.
+- Tulis SATU pesan singkat untuk mengakhiri chat dengan alasan yang wajar sesuai tipemu (lihat PENUTUPAN), misalnya ada urusan lain, harus pergi, atau akan menghubungi lagi nanti.
+- Kalau agen baru saja bertanya atau menjelaskan, boleh tanggapi intinya sangat singkat di pesan yang sama sebelum pamit.
+- Jika di pesan terakhirmu kamu sudah pamit atau menutup chat, kembalikan [NO_RESPONSE] saja.
+- Jangan menyebut "timer", "waktu sistem", atau istilah teknis simulasi. Tetap sebagai konsumen biasa.`;
   }
 
   const totalDurationSeconds =

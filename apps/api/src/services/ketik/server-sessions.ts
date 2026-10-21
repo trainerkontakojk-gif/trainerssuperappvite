@@ -258,7 +258,11 @@ export async function startServerKetikSession(
     throw error;
   }
 }
-async function generateServerConsumerMessages(s: SessionRow, userId: string) {
+async function generateServerConsumerMessages(
+  s: SessionRow,
+  userId: string,
+  closing = false,
+) {
   const elapsedSeconds = Math.max(
     0,
     Math.floor((Date.now() - Date.parse(s.started_at)) / 1000),
@@ -279,6 +283,7 @@ async function generateServerConsumerMessages(s: SessionRow, userId: string) {
         (Date.parse(s.expires_at) - Date.now()) / 1000,
       ),
       totalDurationSeconds: s.snapshot.config.simulationDuration * 60,
+      closing,
     },
   );
   if (!result.success || !result.text)
@@ -345,6 +350,7 @@ export async function requestServerKetikResponse(
     lease?: string;
     replay: boolean;
     noop: boolean;
+    closing?: boolean;
   }>("claim_ketik_session_response", {
     p_user_id: userId,
     p_session_id: id,
@@ -357,7 +363,11 @@ export async function requestServerKetikResponse(
   let snapshot = claimed.session;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const generated = await generateServerConsumerMessages(snapshot, userId);
+      const generated = await generateServerConsumerMessages(
+        snapshot,
+        userId,
+        claimed.closing === true,
+      );
       const settled = await rpc<{
         action: "retry" | "published" | "superseded";
         session: SessionRow;

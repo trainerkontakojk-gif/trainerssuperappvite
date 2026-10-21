@@ -1377,7 +1377,7 @@ test.describe("KETIK ruang chat (hermetic)", () => {
     await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
-  test("waktu sesi habis menutup kolom balasan tepat saat batasnya", async ({
+  test("waktu sesi habis: konsumen pamit dan kolom balasan tetap terbuka untuk pesan penutup", async ({
     page,
   }) => {
     const audit = await open(
@@ -1401,6 +1401,24 @@ test.describe("KETIK ruang chat (hermetic)", () => {
             }),
           },
         },
+        {
+          method: "POST",
+          path: `/api/v1/ketik/sessions/${CHAT_ID}/respond`,
+          body: {
+            success: true,
+            data: serverSession({
+              consumerClosed: true,
+              messages: [
+                {
+                  id: "pamit",
+                  sender: "consumer",
+                  text: "Saya ada urusan dulu, kak.",
+                  timestamp: new Date().toISOString(),
+                },
+              ],
+            }),
+          },
+        },
       ],
       "agent",
     );
@@ -1413,13 +1431,14 @@ test.describe("KETIK ruang chat (hermetic)", () => {
     ).toBeVisible();
 
     await expect(
-      room.getByText(
-        "Waktu sesi berakhir. Akhiri chat untuk menyimpan percakapan.",
-      ),
+      room.getByText("Saya ada urusan dulu, kak.", { exact: true }),
     ).toBeVisible({ timeout: 15000 });
     await expect(
+      room.getByText(/Konsumen telah mengakhiri chat\. Anda masih bisa mengirim pesan penutup/),
+    ).toBeVisible();
+    await expect(
       room.getByRole("textbox", { name: "Tulis balasan" }),
-    ).toHaveCount(0);
+    ).toBeEnabled();
     expectHermetic(audit);
   });
 
@@ -2169,6 +2188,10 @@ test.describe("KETIK NIK dan email konsumen (hermetic)", () => {
       name: "Data konsumen yang terlihat di panel agen",
     });
     await expect(visible).toBeVisible({ timeout: 20000 });
+    // Nomor telepon tetap tampil setelah chat diakhiri, sama seperti di panel agen.
+    await expect(visible.getByRole("definition")).toHaveCount(4);
+    await expect(visible.getByText("Nomor telepon", { exact: true })).toBeVisible();
+    await expect(visible.getByText("0812-1111-2222", { exact: true })).toBeVisible();
     await expect(visible.locator("mark", { hasText: "317405120885000" })).toBeVisible();
     await expect(visible.locator("mark", { hasText: /^gnail\.com$/ })).toBeVisible();
     for (const label of ["15 digit", "domain typo", "nama provinsi"]) {
@@ -2256,7 +2279,7 @@ test.describe("KETIK NIK dan email konsumen (hermetic)", () => {
       .getByRole("region", { name: "Percakapan" })
       .getByRole("region", { name: "Data konsumen yang terlihat di panel agen" });
     await expect(visible).toBeVisible({ timeout: 20000 });
-    await expect(visible.getByRole("definition")).toHaveText(["Jakarta", "—", "—"]);
+    await expect(visible.getByRole("definition")).toHaveText(["Jakarta", "0812-1111-2222", "—", "—"]);
     await expect(visible.locator("mark")).toHaveCount(0);
     await expect(
       page.getByRole("region", { name: "Hasil telaah" }).getByTestId("ketik-final-score"),

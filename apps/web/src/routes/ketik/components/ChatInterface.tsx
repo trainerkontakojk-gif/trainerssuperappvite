@@ -155,7 +155,7 @@ export function ChatInterface({
     return () => window.removeEventListener("beforeunload", warn);
   }, [queuedCount]);
   const handleSend = () => {
-    if (!inputText.trim() || isOverLimit || sessionPhase !== "active") return;
+    if (!inputText.trim() || isOverLimit) return;
     if (send(inputText.trim())) setInputText("");
   };
 
@@ -377,7 +377,7 @@ export function ChatInterface({
                 variant="outline"
                 className="min-h-[44px]"
                 onClick={retry}
-                disabled={isLoading || sessionPhase !== "active"}
+                disabled={isLoading}
               >
                 {retryLabel}
               </Button>
@@ -388,148 +388,149 @@ export function ChatInterface({
               {queuedCount} pesan sedang disimpan.
             </p>
           )}
-          {sessionPhase === "active" ? (
-            <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
-              <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
-                <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
-                  <label htmlFor="ketik-message-input" className="sr-only">
-                    Tulis balasan
-                  </label>
-                  <Textarea
-                    id="ketik-message-input"
-                    ref={textareaRef}
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Tulis balasan… ketik / untuk template"
-                    className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-lg font-medium text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 md:text-lg"
-                    rows={1}
-                    aria-describedby="ketik-char-counter"
-                    aria-invalid={isOverLimit}
-                  />
+          {sessionPhase !== "active" && (
+            <p
+              role="status"
+              className="border-t px-4 py-3 text-center text-sm font-medium text-fg2"
+            >
+              {sessionPhase === "closed"
+                ? "Konsumen telah mengakhiri chat."
+                : "Waktu sesi berakhir."}{" "}
+              Anda masih bisa mengirim pesan penutup, lalu Akhiri chat untuk
+              menyimpan percakapan.
+            </p>
+          )}
+          <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
+            <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
+              <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
+                <label htmlFor="ketik-message-input" className="sr-only">
+                  Tulis balasan
+                </label>
+                <Textarea
+                  id="ketik-message-input"
+                  ref={textareaRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Tulis balasan… ketik / untuk template"
+                  className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-lg font-medium text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 md:text-lg"
+                  rows={1}
+                  aria-describedby="ketik-char-counter"
+                  aria-invalid={isOverLimit}
+                />
 
-                  {/* Character Counter */}
-                  <div
-                    id="ketik-char-counter"
-                    className={`flex items-center justify-end gap-1 px-1 pt-1 text-[14px] font-medium tabular-nums ${
-                      isOverLimit ? "text-destructive" : "text-muted-foreground"
-                    }`}
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`${charCount} karakter dari ${maxChars}`}
+                {/* Character Counter */}
+                <div
+                  id="ketik-char-counter"
+                  className={`flex items-center justify-end gap-1 px-1 pt-1 text-[14px] font-medium tabular-nums ${
+                    isOverLimit ? "text-destructive" : "text-muted-foreground"
+                  }`}
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`${charCount} karakter dari ${maxChars}`}
+                >
+                  <span>{charCount.toLocaleString()}</span>
+                  <span>/</span>
+                  <span>{maxChars.toLocaleString()}</span>
+                </div>
+
+                {/* Over-limit error */}
+                {isOverLimit && (
+                  <Alert
+                    variant="destructive"
+                    className="mt-1 px-2 py-1"
+                    aria-live="assertive"
                   >
-                    <span>{charCount.toLocaleString()}</span>
-                    <span>/</span>
-                    <span>{maxChars.toLocaleString()}</span>
-                  </div>
+                    <AlertDescription className="text-[14px] font-semibold">
+                      Pesan terlalu panjang ({charCount.toLocaleString()}{" "}
+                      karakter). Maksimum {maxChars.toLocaleString()} karakter.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                  {/* Over-limit error */}
-                  {isOverLimit && (
-                    <Alert
-                      variant="destructive"
-                      className="mt-1 px-2 py-1"
-                      aria-live="assertive"
+                {/* Floating Template Popup */}
+                <AnimatePresence>
+                  {showTemplatePopup && (
+                    <motion.div
+                      ref={templatePopupRef}
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.16, ease: "easeOut" }}
+                      className="custom-scrollbar absolute bottom-full left-0 z-[60] mb-3 flex max-h-64 w-[min(22rem,calc(100vw-2rem))] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card p-2"
+                      role="listbox"
+                      aria-label="Pilihan template cepat"
                     >
-                      <AlertDescription className="text-[14px] font-semibold">
-                        Pesan terlalu panjang ({charCount.toLocaleString()}{" "}
-                        karakter). Maksimum {maxChars.toLocaleString()}{" "}
-                        karakter.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* Floating Template Popup */}
-                  <AnimatePresence>
-                    {showTemplatePopup && (
-                      <motion.div
-                        ref={templatePopupRef}
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.16, ease: "easeOut" }}
-                        className="custom-scrollbar absolute bottom-full left-0 z-[60] mb-3 flex max-h-64 w-[min(22rem,calc(100vw-2rem))] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card p-2"
-                        role="listbox"
-                        aria-label="Pilihan template cepat"
-                      >
-                        <div className="mb-1 flex items-center justify-between border-b border-border px-3 py-2">
-                          <span className="text-[13px] font-semibold text-muted-foreground">
-                            Pilih Template
-                          </span>
-                          <span className="text-[13px] font-medium text-muted-foreground">
-                            ↑↓ Navigasi
+                      <div className="mb-1 flex items-center justify-between border-b border-border px-3 py-2">
+                        <span className="text-[13px] font-semibold text-muted-foreground">
+                          Pilih Template
+                        </span>
+                        <span className="text-[13px] font-medium text-muted-foreground">
+                          ↑↓ Navigasi
+                        </span>
+                      </div>
+                      {filteredTemplates.length > 0 ? (
+                        filteredTemplates.map((t, i) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => insertTemplate(t)}
+                            onMouseEnter={() => setSelectedTemplateIndex(i)}
+                            className={`flex w-full cursor-pointer flex-col gap-1 rounded-xl border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                              i === selectedTemplateIndex
+                                ? "border-module-ketik/30 bg-module-ketik/10"
+                                : "hover:bg-foreground/5 border border-transparent"
+                            }`}
+                            role="option"
+                            aria-selected={i === selectedTemplateIndex}
+                          >
+                            <span
+                              className={`text-[13px] font-semibold ${i === selectedTemplateIndex ? "text-module-ketik" : "text-muted-foreground"}`}
+                            >
+                              /{t.keyword}
+                            </span>
+                            <span className="text-[14px] text-foreground font-medium line-clamp-1 opacity-80">
+                              {t.content}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-center">
+                          <span className="text-[14px] text-muted-foreground font-medium">
+                            Tidak ada template yang cocok
                           </span>
                         </div>
-                        {filteredTemplates.length > 0 ? (
-                          filteredTemplates.map((t, i) => (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => insertTemplate(t)}
-                              onMouseEnter={() => setSelectedTemplateIndex(i)}
-                              className={`flex w-full cursor-pointer flex-col gap-1 rounded-xl border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                                i === selectedTemplateIndex
-                                  ? "border-module-ketik/30 bg-module-ketik/10"
-                                  : "hover:bg-foreground/5 border border-transparent"
-                              }`}
-                              role="option"
-                              aria-selected={i === selectedTemplateIndex}
-                            >
-                              <span
-                                className={`text-[13px] font-semibold ${i === selectedTemplateIndex ? "text-module-ketik" : "text-muted-foreground"}`}
-                              >
-                                /{t.keyword}
-                              </span>
-                              <span className="text-[14px] text-foreground font-medium line-clamp-1 opacity-80">
-                                {t.content}
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-4 py-3 text-center">
-                            <span className="text-[14px] text-muted-foreground font-medium">
-                              Tidak ada template yang cocok
-                            </span>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <Button
-                  variant={
-                    inputText.trim() && !isOverLimit ? "default" : "secondary"
-                  }
-                  size="icon-lg"
-                  onClick={handleSend}
-                  disabled={!inputText.trim() || isOverLimit}
-                  className={`h-12 w-12 shrink-0 rounded-2xl transition-transform active:scale-95 md:h-14 md:w-14 ${
-                    inputText.trim() && !isOverLimit
-                      ? "module-clean-button-primary text-white"
-                      : "bg-foreground/5 text-muted-foreground"
-                  }`}
-                  type="button"
-                  aria-label="Kirim pesan"
-                >
-                  <Send
-                    data-icon="inline"
-                    className={
-                      inputText.trim() && !isOverLimit
-                        ? "translate-x-0.5 -translate-y-0.5"
-                        : ""
-                    }
-                  />
-                </Button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+              <Button
+                variant={
+                  inputText.trim() && !isOverLimit ? "default" : "secondary"
+                }
+                size="icon-lg"
+                onClick={handleSend}
+                disabled={!inputText.trim() || isOverLimit}
+                className={`h-12 w-12 shrink-0 rounded-2xl transition-transform active:scale-95 md:h-14 md:w-14 ${
+                  inputText.trim() && !isOverLimit
+                    ? "module-clean-button-primary text-white"
+                    : "bg-foreground/5 text-muted-foreground"
+                }`}
+                type="button"
+                aria-label="Kirim pesan"
+              >
+                <Send
+                  data-icon="inline"
+                  className={
+                    inputText.trim() && !isOverLimit
+                      ? "translate-x-0.5 -translate-y-0.5"
+                      : ""
+                  }
+                />
+              </Button>
             </div>
-          ) : (
-            <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
-              <span className="text-[15px] font-semibold text-muted-foreground">
-                {sessionPhase === "expired"
-                  ? "Waktu sesi berakhir. Akhiri chat untuk menyimpan percakapan."
-                  : "Chat telah berakhir"}
-              </span>
-            </div>
-          )}
+          </div>
         </div>
         {dataPanelOpen && (
           <KetikConsumerDataPanel
