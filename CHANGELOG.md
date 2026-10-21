@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-21
+
+- fix(ketik): send scenario attachments proactively when their topic comes up, and have the backend add the matching unsent image when the AI forgets the tag after a proof request or a reply that tells what the image shows
+
 ## 2026-10-20
 
 - docs(db): record the production apply of the KETIK consumer NIK/email migration

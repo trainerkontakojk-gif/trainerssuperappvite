@@ -21,6 +21,7 @@ import { getSettingsSnapshot } from "./settings-history";
 import { getKetikAssignment } from "./configuration-assignments";
 import { consumePracticeQuota, refundPracticeQuota } from "../practice-quota";
 import { generateConsumerResponse } from "./consumer-response";
+import { ensureKetikAttachmentParts } from "./prompt-policy";
 
 const statuses = {
   SESSION_NOT_FOUND: 404,
@@ -284,10 +285,17 @@ async function generateServerConsumerMessages(s: SessionRow, userId: string) {
     throw new KetikSessionError("SESSION_AI_FAILED");
   const text = result.text.replace(/\[NO_RESPONSE\]/gi, "").trim();
   const parts = normalizeGeneratedParts(
-    text
-      .split("[BREAK]")
-      .map((part) => part.trim())
-      .filter(Boolean),
+    ensureKetikAttachmentParts(
+      text
+        .split("[BREAK]")
+        .map((part) => part.trim())
+        .filter(Boolean),
+      {
+        imageCount: s.snapshot.scenario.images?.length ?? 0,
+        imageAlts: s.snapshot.scenario.imageAlts,
+        chatHistory: s.messages ?? [],
+      },
+    ),
   );
   if (
     (text && !parts.length) ||

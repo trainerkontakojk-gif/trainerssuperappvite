@@ -23,6 +23,7 @@ let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
 let app: Hono;
 let guardedFetch: typeof fetch;
 let instructions: string[] = [];
+let reply = "Halo, mau tanya.";
 
 async function api(path: string, method = "GET", body?: unknown) {
   return tnaApiRequest(app, `http://localhost/api/v1/ketik${path}`, {
@@ -62,7 +63,7 @@ test.beforeAll(async () => {
       return Response.json({
         candidates: [
           {
-            content: { role: "model", parts: [{ text: "Halo, mau tanya." }] },
+            content: { role: "model", parts: [{ text: reply }] },
             finishReason: "STOP",
           },
         ],
@@ -249,7 +250,91 @@ test("scenario attachments are offered with their descriptions and say when to s
   // The instruction says when an attachment belongs in the chat.
   expect(prompt).toContain("KAPAN MENGIRIM LAMPIRAN");
   expect(prompt).toMatch(/agen meminta bukti/i);
+  // Attachments go out proactively; gradual disclosure no longer holds them back.
+  expect(prompt).toContain("tanpa menunggu diminta");
+  expect(prompt).not.toMatch(/kronologi, bukti\)/);
+  expect(prompt).toContain("Lampiran gambar tidak ikut aturan bertahap ini");
   expect(prompt).toContain("sesuai keterangannya");
   expect(prompt).toContain("Setiap lampiran cukup dikirim sekali");
   expect(prompt).toContain("[SEND_IMAGE: indeks]");
+});
+
+/** Sesi pinjol dengan dua lampiran berketerangan. */
+async function startAttachmentSession() {
+  const saved = await api("/settings", "PUT", {
+    ...DEFAULT_KETIK_SETTINGS,
+    activeConsumerTypeId: "ramah",
+    scenarios: DEFAULT_KETIK_SETTINGS.scenarios.map((scenario) =>
+      scenario.id === "pinjol"
+        ? {
+            ...scenario,
+            images: ["https://img.test/a.png", "https://img.test/b.png"],
+            imageAlts: [
+              "Tangkapan layar ancaman penagih di WhatsApp",
+              "Bukti transfer cicilan ke rekening pinjol",
+            ],
+          }
+        : { ...scenario, isActive: false },
+    ),
+    responsePacingMode: "training_fast",
+  });
+  expect(saved.status).toBe(200);
+  const started = await api("/sessions", "POST", { requestId: randomUUID() });
+  expect(started.status).toBe(200);
+  return (await started.json()).data;
+}
+
+const consumerTexts = (messages: Array<{ sender: string; text: string }>) =>
+  messages.filter((m) => m.sender === "consumer").map((m) => m.text);
+
+test("backend sends the matching attachment when the agent asks for proof and the AI forgot", async () => {
+  const session = await startAttachmentSession();
+  reply = "Ada kak, sebentar ya";
+  try {
+    const data = await sendTurn(
+      session.id,
+      0,
+      "Boleh kirim bukti ancamannya, Ibu?",
+    );
+    expect(consumerTexts(data.messages)).toEqual([
+      "Ada kak, sebentar ya",
+      "[SEND_IMAGE: 0]",
+    ]);
+  } finally {
+    reply = "Halo, mau tanya.";
+  }
+});
+
+test("backend sends an attachment once the consumer tells what it shows, and never twice", async () => {
+  const session = await startAttachmentSession();
+  try {
+    reply = "Saya sudah transfer cicilan ke rekening mereka tapi tetap ditagih";
+    const first = await sendTurn(
+      session.id,
+      0,
+      "Kronologinya bagaimana, Ibu?",
+    );
+    expect(consumerTexts(first.messages)).toEqual([
+      "Saya sudah transfer cicilan ke rekening mereka tapi tetap ditagih",
+      "[SEND_IMAGE: 1]",
+    ]);
+
+    reply = "Iya kak, transfer cicilan itu sudah lunas";
+    const second = await sendTurn(
+      session.id,
+      first.version,
+      "Transfernya kapan, Ibu?",
+    );
+    expect(consumerTexts(second.messages).slice(2)).toEqual([
+      "Iya kak, transfer cicilan itu sudah lunas",
+    ]);
+
+    // A plain reply with no proof request and no matching topic stays as is.
+    reply = "Halo, mau tanya.";
+    const third = await sendTurn(session.id, second.version, "Baik, Ibu.");
+    expect(consumerTexts(third.messages).at(-1)).toBe("Halo, mau tanya.");
+    expect(consumerTexts(third.messages)).toHaveLength(4);
+  } finally {
+    reply = "Halo, mau tanya.";
+  }
 });
