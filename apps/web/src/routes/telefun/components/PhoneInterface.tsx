@@ -5,7 +5,16 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
-import { Mic, MicOff, Pause, PhoneOff, Play, Volume2 } from "lucide-react";
+import {
+  CircleAlert,
+  Mic,
+  MicOff,
+  Pause,
+  Phone,
+  PhoneOff,
+  Play,
+  Volume2,
+} from "lucide-react";
 import type { SessionMetrics } from "@trainers/types";
 import {
   TELEFUN_FIRST_HOLD_LIMIT_MS,
@@ -26,6 +35,12 @@ import { useMicrophoneActivity } from "./useMicrophoneActivity";
 import { HoldStatusDisplay } from "./HoldStatusDisplay";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+} from "../../../components/ui/avatar";
+import { getKetikConsumerAvatarUrl } from "../../ketik/lib/ketik-avatar";
 
 type TelefunEndSessionReason = "completed" | "failed" | "timeout";
 
@@ -44,6 +59,8 @@ interface PhoneInterfaceProps {
   onSessionCreated?: (sessionId: string) => void;
   /** Nama peserta bila trainer menjalankan panggilan untuk peserta. */
   participantLabel?: string | null;
+  /** The route guards cleanup and fresh session creation as one retry action. */
+  onRetry?: (closeFailedAttempt: () => Promise<boolean>) => Promise<void>;
 }
 
 interface ActiveHoldUi {
@@ -73,6 +90,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   onRecordingReady,
   onSessionCreated,
   participantLabel = null,
+  onRetry,
 }) => {
   const [connectionState, setConnectionState] = useState("Memanggil...");
   const [callDuration, setCallDuration] = useState(0);
@@ -103,6 +121,10 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const isDisconnectingRef = useRef(false);
   const endCallStartedRef = useRef(false);
   const cleanupRetryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const retryStartedRef = useRef(false);
+  // A terminal recording must not dismiss the failure/recovery screen.
+  const pendingFailedRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const failedCleanupCompleteRef = useRef(false);
 
   const uiAudioContextRef = useRef<AudioContext | null>(null);
   const holdMusicOscillators = useRef<OscillatorNode[]>([]);
@@ -319,35 +341,45 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             agentBlob,
             metrics,
           ) => {
-            // Transfer the page owner synchronously before upload/transition/
-            // remux work can outlive the session callback deadline.
-            let callbackResult: void | Promise<void> = undefined;
-            if (onRecordingReadyRef.current) {
-              const measuredDuration =
-                Number.isFinite(metrics.sessionDurationMs) &&
-                metrics.sessionDurationMs > 0
-                  ? Math.round(metrics.sessionDurationMs / 1000)
-                  : callDurationRef.current;
-              try {
-                callbackResult = await onRecordingReadyRef.current(
-                  url,
-                  config.consumerName,
-                  measuredDuration,
-                  fullBlob,
-                  agentBlob,
-                  metrics,
-                );
-              } catch (err) {
-                console.error("onRecordingReady failed:", err);
-                callbackResult = undefined;
+            const deliverRecording = async () => {
+              // Transfer the page owner synchronously before upload/transition/
+              // remux work can outlive the session callback deadline.
+              let callbackResult: void | Promise<void> = undefined;
+              if (onRecordingReadyRef.current) {
+                const measuredDuration =
+                  Number.isFinite(metrics.sessionDurationMs) &&
+                  metrics.sessionDurationMs > 0
+                    ? Math.round(metrics.sessionDurationMs / 1000)
+                    : callDurationRef.current;
+                try {
+                  callbackResult = await onRecordingReadyRef.current(
+                    url,
+                    config.consumerName,
+                    measuredDuration,
+                    fullBlob,
+                    agentBlob,
+                    metrics,
+                  );
+                } catch (err) {
+                  console.error("onRecordingReady failed:", err);
+                  callbackResult = undefined;
+                }
               }
+              if (mountedRef.current && !isDisconnectingRef.current) {
+                onEndSessionRef.current(
+                  terminalFailureRef.current ? "failed" : "completed",
+                );
+              }
+              return callbackResult;
+            };
+            if (
+              terminalFailureRef.current &&
+              !failedCleanupCompleteRef.current
+            ) {
+              pendingFailedRecordingRef.current = deliverRecording;
+              return;
             }
-            if (mountedRef.current && !isDisconnectingRef.current) {
-              onEndSessionRef.current(
-                terminalFailureRef.current ? "failed" : "completed",
-              );
-            }
-            return callbackResult;
+            return deliverRecording();
           };
         };
 
@@ -486,7 +518,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const handleEndCall = useCallback(
     async (reason?: TelefunEndSessionReason) => {
       // Guard: prevent concurrent end-call executions
-      if (endCallStartedRef.current) return;
+      if (endCallStartedRef.current) return false;
       endCallStartedRef.current = true;
       setIsDisconnecting(true);
       isDisconnectingRef.current = true;
@@ -520,14 +552,33 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           setCleanupRetryable(true);
           setError(CLEANUP_PENDING_MESSAGE);
         }
-        return;
+        return false;
       }
 
       setCleanupRetryable(false);
       if (mountedRef.current) onEndSessionRef.current(reason);
+      if (reason === "failed") {
+        // Notify the route before recording delivery so it saves the failed
+        // attempt without navigating to Telaah over the recovery action.
+        failedCleanupCompleteRef.current = true;
+        const pending = pendingFailedRecordingRef.current;
+        pendingFailedRecordingRef.current = null;
+        await pending?.();
+      }
+      return true;
     },
     [stopHoldMusic],
   );
+
+  const retryFailedCall = async () => {
+    if (!onRetry || retryStartedRef.current) return;
+    retryStartedRef.current = true;
+    try {
+      await onRetry(() => handleEndCall("failed"));
+    } finally {
+      retryStartedRef.current = false;
+    }
+  };
 
   useEffect(() => {
     const maxMinutes = config.maxCallDuration || 0;
@@ -552,7 +603,6 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       }
     }
   }, [callDuration, config.maxCallDuration, connectionState]);
-
 
   const micActivity = useMicrophoneActivity({
     active: connectionState === "Tersambung" && !isOnHold,
@@ -587,22 +637,40 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const displayPhone = config.resolvedIdentity?.phone || "08123456789";
   const displayCity = config.resolvedIdentity?.city || "Jakarta";
   const initials = getInitials(displayName);
-  // Satu baris status netral, seperti layar softphone.
+  const avatarUrl = getKetikConsumerAvatarUrl({
+    name: displayName,
+    phone: displayPhone,
+    city: displayCity,
+    gender: config.resolvedIdentity?.gender,
+  });
+  const failed = terminalFailure || connectionState === "Gagal" || !!error;
+  const speaking = isConnected && isAiSpeaking && !isOnHold && !isDisconnecting;
+  const halo =
+    !failed && !isDisconnecting && !isOnHold && (isRinging || speaking);
+  const headerStatus = isDisconnecting
+    ? "Menyimpan…"
+    : failed
+      ? "Gagal"
+      : isOnHold
+        ? "Ditahan"
+        : isRinging
+          ? "Berdering"
+          : isConnected
+            ? "Tersambung"
+            : connectionState === "Selesai"
+              ? "Selesai"
+              : "Menghubungkan…";
   let statusText = "Menghubungkan…";
-  let statusTone: "neutral" | "failure" = "neutral";
   if (isDisconnecting) {
     statusText = "Menyimpan rekaman…";
   } else if (isOnHold) {
-    statusText = "Ditahan · konsumen mendengar musik tunggu";
+    statusText = "Ditahan";
   } else if (isRinging) {
     statusText = "Memanggil…";
   } else if (isConnected) {
     statusText = isAiSpeaking ? "Konsumen berbicara" : "Giliran Anda";
   } else if (connectionState === "Selesai") {
     statusText = "Panggilan selesai";
-  } else if (terminalFailure || connectionState === "Gagal" || error) {
-    statusText = error || "Panggilan terputus";
-    statusTone = "failure";
   }
 
   return (
@@ -611,7 +679,13 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       aria-label="Panggilan"
       className="relative flex h-full w-full flex-col bg-background text-foreground"
     >
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface-elevated px-4 py-2.5 sm:px-6">
+      <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-surface-elevated px-4 py-2.5 sm:gap-3 sm:px-6">
+        <span
+          aria-hidden="true"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-module-telefun/10 text-module-telefun"
+        >
+          <Phone className="size-4" />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">
             Panggilan masuk
@@ -622,13 +696,31 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             </p>
           )}
         </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+            failed
+              ? "bg-destructive/10 text-foreground"
+              : isConnected && !isOnHold && !isDisconnecting
+                ? "bg-module-telefun/10 text-foreground"
+                : "bg-muted text-fg2",
+          )}
+        >
+          {failed && (
+            <span
+              aria-hidden="true"
+              className="mr-1.5 size-1.5 rounded-full bg-destructive"
+            />
+          )}
+          {headerStatus}
+        </span>
         <span className="shrink-0 font-mono text-sm font-bold text-foreground tabular-nums">
           <span className="sr-only">Lama panggilan </span>
           {formatTime(callDuration)}
         </span>
       </header>
 
-      {activeHold && (
+      {activeHold && !failed && (
         <HoldStatusDisplay
           active
           sequence={activeHold.sequence}
@@ -637,159 +729,252 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-8 text-center">
-        <div
-          role="group"
-          aria-label="Data penelepon"
-          className="flex flex-col items-center gap-4"
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              "flex size-20 items-center justify-center rounded-full bg-module-telefun/10 font-display text-2xl font-bold text-foreground ring-8 ring-module-telefun/10 transition-opacity duration-200 motion-reduce:transition-none",
-              isOnHold && "opacity-50 ring-0",
-              isRinging && "motion-safe:animate-pulse",
-            )}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6">
+        <div className="mx-auto flex min-h-full w-full max-w-lg flex-col items-center justify-center gap-6 py-10 text-center">
+          <div
+            role="group"
+            aria-label="Data penelepon"
+            className="flex w-full min-w-0 flex-col items-center gap-6"
           >
-            {initials}
-          </span>
-          <h2 className="max-w-full font-display text-2xl font-bold tracking-tight break-words text-foreground sm:text-3xl">
-            {displayName}
-          </h2>
-          <dl className="flex flex-wrap items-start justify-center gap-x-8 gap-y-3 rounded-2xl border border-border bg-surface-elevated px-6 py-3.5">
-            <div className="flex flex-col items-center gap-0.5">
-              <dt className="text-xs text-fg2">Nomor telepon</dt>
-              <dd className="font-mono text-xl font-semibold tracking-wide text-foreground tabular-nums sm:text-2xl">
-                {displayPhone}
-              </dd>
-            </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <dt className="text-xs text-fg2">Kota</dt>
-              <dd className="text-xl font-semibold text-foreground sm:text-2xl">
-                {displayCity}
-              </dd>
-            </div>
-          </dl>
-        </div>
-        <p
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={cn(
-            "inline-flex min-h-8 max-w-md items-center gap-2 rounded-full border px-3.5 text-[13px]",
-            statusTone === "failure"
-              ? "border-destructive bg-destructive/10 text-foreground"
-              : "border-border bg-surface-elevated text-foreground",
-          )}
-        >
-          {statusText}
-        </p>
-        {isOnHold && (
-          <p className="max-w-[34ch] text-xs text-muted-foreground">
-            Kembali sebelum batas, lalu ucapkan terima kasih sudah menunggu.
-          </p>
-        )}
-        {isConnected && !isOnHold && (
-          <div className="flex flex-col items-center gap-1.5">
-            <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
-              <span>{isMuted ? "Mikrofon dibisukan" : "Mikrofon"}</span>
-              <span
-                aria-hidden="true"
-                className="h-1.5 w-40 overflow-hidden rounded-full bg-surface-sunken"
+            <div className="relative size-[128px] shrink-0 sm:size-[168px]">
+              {halo &&
+                [0, 1].map((ring) => (
+                  <span
+                    key={ring}
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-0 rounded-full motion-safe:animate-ping motion-safe:[animation-duration:2s]",
+                      speaking ? "bg-chart-green/10" : "bg-module-telefun/10",
+                    )}
+                    style={{ animationDelay: `${ring * 0.7}s` }}
+                  />
+                ))}
+              <Avatar
+                className={cn(
+                  "size-full border-4 border-surface-elevated ring-1 ring-border",
+                  (isOnHold || failed) && "grayscale opacity-50",
+                )}
               >
-                <span
-                  className="block h-full rounded-full bg-chart-green transition-[width] duration-100 ease-out motion-reduce:transition-none"
-                  style={{ width: `${isMuted ? 0 : Math.min(100, displayVolume)}%` }}
+                <AvatarImage
+                  src={avatarUrl}
+                  alt={`Foto ${displayName}`}
+                  referrerPolicy="no-referrer"
                 />
-              </span>
+                <AvatarFallback className="bg-module-telefun/10 font-display text-4xl font-bold text-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              {isOnHold && !failed && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-0 bottom-0 flex size-9 items-center justify-center rounded-full bg-foreground text-background ring-4 ring-background"
+                >
+                  <Pause className="size-4 fill-current" />
+                </span>
+              )}
             </div>
-            {micSilent && (
-              <p className="text-xs text-fg2">
-                Suara Anda tidak terdeteksi. Periksa mikrofon atau bicara lebih
-                dekat.
+            <div className="flex w-full min-w-0 flex-col items-center gap-2">
+              <h2 className="max-w-full font-display text-[28px] leading-tight font-bold tracking-tight break-words text-balance text-foreground sm:text-4xl">
+                {displayName}
+              </h2>
+              <p className="max-w-full text-base text-fg2">
+                <span className="sr-only">Nomor telepon </span>
+                <span className="font-mono tabular-nums">{displayPhone}</span>
+                <span aria-hidden="true" className="px-2">
+                  ·
+                </span>
+                <span className="sr-only">Kota </span>
+                {displayCity}
               </p>
-            )}
+            </div>
           </div>
-        )}
-        {playbackBlocked && !isDisconnecting && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void retryAudioPlayback()}
-            className="min-h-[44px] gap-2"
-          >
-            <Volume2 data-icon="inline-start" />
-            Aktifkan audio
-          </Button>
-        )}
-        {cleanupRetryable && (
-          <Button
-            ref={cleanupRetryButtonRef}
-            type="button"
-            variant="outline"
-            onClick={() => void handleEndCall()}
-            disabled={isDisconnecting}
-            aria-busy={isDisconnecting}
-            className="min-h-[44px]"
-          >
-            Coba lagi mengakhiri panggilan
-          </Button>
-        )}
+          {!failed && (
+            <p
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className={cn(
+                "inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border px-4 text-sm font-medium",
+                speaking
+                  ? "border-chart-green/20 bg-chart-green/10 text-foreground"
+                  : "border-border bg-surface-elevated text-foreground",
+              )}
+            >
+              {speaking && (
+                <span
+                  aria-hidden="true"
+                  className="flex h-4 items-center gap-0.5"
+                >
+                  {[8, 14, 10, 16, 6].map((height, index) => (
+                    <span
+                      key={index}
+                      className="w-0.5 rounded-full bg-chart-green motion-safe:animate-pulse"
+                      style={{ height, animationDelay: `${index * 150}ms` }}
+                    />
+                  ))}
+                </span>
+              )}
+              {statusText}
+            </p>
+          )}
+          {isRinging && !failed && !isDisconnecting && (
+            <p className="max-w-[46ch] text-xs leading-relaxed text-fg2">
+              Siapkan salam pembuka. Rekaman dan penilaian mulai saat telepon
+              diangkat.
+            </p>
+          )}
+          {isOnHold && !failed && (
+            <p className="max-w-[46ch] text-xs leading-relaxed text-fg2">
+              Konsumen mendengar musik tunggu. Kembali sebelum batas, lalu
+              ucapkan terima kasih sudah menunggu.
+            </p>
+          )}
+          {failed && (
+            <>
+              <div
+                role="alert"
+                className="flex w-full items-start gap-3 rounded-xl border border-destructive/30 bg-surface-elevated p-5 text-left"
+              >
+                <CircleAlert
+                  aria-hidden="true"
+                  className="mt-0.5 size-5 shrink-0 text-destructive"
+                />
+                <div className="min-w-0 space-y-1">
+                  <h3 className="text-sm font-semibold">
+                    Panggilan belum dapat dimulai
+                  </h3>
+                  <p className="text-sm leading-relaxed text-fg2">
+                    {(() => {
+                      const mappedError = error || mapTelefunTransportError(null);
+                      const title = "Panggilan belum dapat dimulai";
+                      return mappedError === title || mappedError.startsWith(title)
+                        ? "Sambungan suara tidak berhasil dibuka. Periksa koneksi internet, lalu coba panggil lagi."
+                        : mappedError;
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                {onRetry && (
+                  <Button
+                    type="button"
+                    className="min-h-[44px]"
+                    disabled={isDisconnecting}
+                    aria-busy={isDisconnecting}
+                    onClick={() => void retryFailedCall()}
+                  >
+                    Coba panggil lagi
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[44px]"
+                  disabled={isDisconnecting}
+                  onClick={() => void handleEndCall("failed")}
+                >
+                  Kembali ke Telefun
+                </Button>
+              </div>
+            </>
+          )}
+          {isConnected && !isOnHold && (
+            <div className="flex flex-col items-center gap-1.5">
+              <MicrophoneWaveform level={displayVolume} muted={isMuted} />
+              {micSilent && (
+                <p className="text-xs text-fg2">
+                  Suara Anda tidak terdeteksi. Periksa mikrofon atau bicara
+                  lebih dekat.
+                </p>
+              )}
+            </div>
+          )}
+          {playbackBlocked && !isDisconnecting && !failed && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void retryAudioPlayback()}
+              className="min-h-[44px] gap-2"
+            >
+              <Volume2 data-icon="inline-start" />
+              Aktifkan audio
+            </Button>
+          )}
+          {cleanupRetryable && (
+            <Button
+              ref={cleanupRetryButtonRef}
+              type="button"
+              variant="outline"
+              onClick={() => void handleEndCall(failed ? "failed" : undefined)}
+              disabled={isDisconnecting}
+              aria-busy={isDisconnecting}
+              className="min-h-[44px]"
+            >
+              Coba lagi mengakhiri panggilan
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-start justify-center gap-7 border-t border-border bg-surface-elevated px-6 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
-        <CallControl label={isOnHold ? "Lanjutkan" : "Tahan"}>
-          <Button
-            type="button"
-            variant={isOnHold ? "default" : "outline"}
-            size="icon-lg"
-            onClick={toggleHold}
-            disabled={isRinging || isDisconnecting}
-            aria-label={isOnHold ? "Lanjutkan" : "Tahan"}
-            aria-pressed={isOnHold}
-            className="size-14 rounded-full"
-          >
-            {isOnHold ? (
-              <Play data-icon="inline" className="fill-current" />
-            ) : (
-              <Pause data-icon="inline" />
-            )}
-          </Button>
-        </CallControl>
-        <CallControl label={isMuted ? "Bunyikan" : "Bisukan"}>
-          <Button
-            type="button"
-            variant={isMuted ? "default" : "outline"}
-            size="icon-lg"
-            onClick={() => {
-              if (!isDisconnectingRef.current) setIsMuted((muted) => !muted);
-            }}
-            disabled={isOnHold || isRinging || isDisconnecting}
-            aria-label={isMuted ? "Bunyikan" : "Bisukan"}
-            aria-pressed={isMuted}
-            className="size-14 rounded-full"
-          >
-            {isMuted ? <MicOff data-icon="inline" /> : <Mic data-icon="inline" />}
-          </Button>
-        </CallControl>
-        <CallControl label={isDisconnecting ? "Mengakhiri…" : "Akhiri"}>
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon-lg"
-            onClick={() => setConfirmEndOpen(true)}
-            disabled={isDisconnecting}
-            aria-label={isDisconnecting ? "Mengakhiri panggilan" : "Akhiri"}
-            className="size-16 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            <PhoneOff data-icon="inline" />
-          </Button>
-        </CallControl>
-      </div>
+      {!failed && (
+        <div className="flex shrink-0 items-start justify-center gap-7 border-t border-border bg-surface-elevated px-6 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+          <CallControl label={isOnHold ? "Lanjutkan" : "Tahan"}>
+            <Button
+              type="button"
+              variant={isOnHold ? "default" : "outline"}
+              size="icon-lg"
+              onClick={toggleHold}
+              disabled={isRinging || isDisconnecting}
+              aria-label={isOnHold ? "Lanjutkan" : "Tahan"}
+              aria-pressed={isOnHold}
+              className="size-14 rounded-full"
+            >
+              {isOnHold ? (
+                <Play data-icon="inline" className="fill-current" />
+              ) : (
+                <Pause data-icon="inline" />
+              )}
+            </Button>
+          </CallControl>
+          <CallControl label={isMuted ? "Bunyikan" : "Bisukan"}>
+            <Button
+              type="button"
+              variant={isMuted ? "default" : "outline"}
+              size="icon-lg"
+              onClick={() => {
+                if (!isDisconnectingRef.current) setIsMuted((muted) => !muted);
+              }}
+              disabled={isOnHold || isRinging || isDisconnecting}
+              aria-label={isMuted ? "Bunyikan" : "Bisukan"}
+              aria-pressed={isMuted}
+              className="size-14 rounded-full"
+            >
+              {isMuted ? (
+                <MicOff data-icon="inline" />
+              ) : (
+                <Mic data-icon="inline" />
+              )}
+            </Button>
+          </CallControl>
+          <CallControl label={isDisconnecting ? "Mengakhiri…" : "Akhiri"}>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-lg"
+              onClick={() => setConfirmEndOpen(true)}
+              disabled={isDisconnecting}
+              aria-label={isDisconnecting ? "Mengakhiri panggilan" : "Akhiri"}
+              className="size-16 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <PhoneOff data-icon="inline" />
+            </Button>
+          </CallControl>
+        </div>
+      )}
 
       <ConfirmDialog
         // Panggilan yang berakhir sendiri (durasi habis) menutup konfirmasi.
-        open={confirmEndOpen && !isDisconnecting}
+        open={confirmEndOpen && !isDisconnecting && !failed}
         title="Akhiri panggilan?"
         description="Rekaman disimpan lalu AI menilai suara Anda. Panggilan yang sudah diakhiri tidak bisa dilanjutkan."
         cancelLabel="Lanjutkan panggilan"
@@ -804,6 +989,57 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     </section>
   );
 };
+
+/** Only this small subtree renders on the 90ms history sampling clock. */
+function MicrophoneWaveform({
+  level,
+  muted,
+}: {
+  level: number;
+  muted: boolean;
+}) {
+  const latestLevel = useRef(level);
+  const [samples, setSamples] = useState<number[]>(() => Array(28).fill(0));
+  useEffect(() => {
+    latestLevel.current = level;
+  }, [level]);
+  useEffect(() => {
+    if (muted) return;
+    const interval = setInterval(() => {
+      const sample = Math.max(0, Math.min(100, latestLevel.current));
+      setSamples((history) => [...history.slice(1), sample]);
+    }, 90);
+    return () => clearInterval(interval);
+  }, [muted]);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        data-testid="microphone-waveform"
+        aria-hidden="true"
+        className="flex h-10 items-center gap-1"
+      >
+        {samples.map((sample, index) => (
+          <span
+            key={index}
+            className={cn(
+              "w-1 rounded-full transition-[height,background-color] duration-75 motion-reduce:transition-none",
+              !muted && sample >= SILENT_VOLUME
+                ? "bg-chart-green"
+                : "bg-fg2/30",
+            )}
+            style={{
+              height: muted || sample < SILENT_VOLUME ? 4 : 4 + sample * 0.36,
+            }}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-fg2">
+        Suara Anda{muted && <span> · Mikrofon dibisukan</span>}
+      </p>
+    </div>
+  );
+}
 
 function CallControl({
   label,

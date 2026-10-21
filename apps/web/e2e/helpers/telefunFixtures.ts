@@ -467,9 +467,22 @@ export async function mockTelefunVoiceServer(
   sessionId: string,
   /** Diisi setiap pesan JSON dari aplikasi, untuk memeriksa isi instruksi. */
   messages: Record<string, unknown>[] = [],
+  options: {
+    failAttempt?: number;
+    failAfterPickup?: boolean;
+  } = {},
 ) {
   const received: string[] = [];
+  let attempt = 0;
   await page.routeWebSocket(`${E2E_TELEFUN_WS_URL}/ws`, (ws) => {
+    const currentAttempt = ++attempt;
+    let failed = false;
+    const fail = () => {
+      failed = true;
+      // The active client reports terminal errors through WebSocket close,
+      // not a JSON `error` frame (which it deliberately ignores).
+      ws.close({ code: 1011, reason: "E2E voice failure" });
+    };
     ws.onMessage((message) => {
       if (typeof message !== "string") return;
       let parsed: Record<string, unknown>;
@@ -481,8 +494,20 @@ export async function mockTelefunVoiceServer(
       const type = typeof parsed.type === "string" ? parsed.type : "setup";
       received.push(type);
       messages.push(parsed);
+      if (
+        currentAttempt === options.failAttempt &&
+        !failed &&
+        (options.failAfterPickup
+          ? "realtimeInput" in parsed
+          : parsed.type === "authenticate")
+      ) {
+        fail();
+        return;
+      }
       if (parsed.type === "authenticate") {
-        ws.send(JSON.stringify({ type: "auth_ok", sessionId }));
+        const requestedId =
+          typeof parsed.sessionId === "string" ? parsed.sessionId : sessionId;
+        ws.send(JSON.stringify({ type: "auth_ok", sessionId: requestedId }));
       } else if (parsed.type === "telefun_session_configure") {
         ws.send(JSON.stringify({ type: "telefun_session_configured" }));
       } else if ("setup" in parsed) {
@@ -498,6 +523,21 @@ export async function mockTelefunVoiceServer(
     });
   });
   return received;
+}
+
+/** Portrait fixtures are fulfilled locally; no randomuser.me egress. */
+export async function mockTelefunAvatar(page: Page, fail = false) {
+  await page.route("https://randomuser.me/api/portraits/**", (route) =>
+    fail
+      ? route.abort("failed")
+      : route.fulfill({
+          contentType: "image/png",
+          body: Buffer.from(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+            "base64",
+          ),
+        }),
+  );
 }
 
 /**

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-21
 
+- feat(telefun): pulihkan foto konsumen, tata ulang layar panggilan dengan waveform mikrofon langsung dan retry aman tanpa mengubah timer panggilan atau hold
+
 - feat(telefun): tampilkan telaah dalam satu kolom tanpa catatan berulang, dengan navigasi bagian, alasan skor yang dapat dibuka, dan tombol sembunyikan/tampilkan telaah
 
 - feat(ketik): tampilkan telaah dalam satu kolom tanpa catatan berulang, dengan navigasi bagian, alasan skor yang dapat dibuka, dan tombol sembunyikan/tampilkan telaah

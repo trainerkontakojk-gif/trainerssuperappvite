@@ -119,6 +119,7 @@ export default function TelefunLanding() {
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const startCallInFlightRef = useRef(false);
+  const failedSessionIdsRef = useRef(new Set<string>());
   const quota = usePracticeQuota("telefun");
   // Panggilan aktif dibaca lewat ref: callback rekaman bisa selesai setelah render berikutnya.
   const activeCallRef = useRef<ActiveCall | null>(null);
@@ -263,7 +264,10 @@ export default function TelefunLanding() {
     }
   };
 
-  const startCallOnce = async (selection: SimulationSubjectSelection) => {
+  const startCallOnce = async (
+    selection: SimulationSubjectSelection,
+    retryConfig?: ActiveTelefunSessionConfig,
+  ) => {
     const token = getToken();
     if (!token) {
       notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
@@ -271,40 +275,45 @@ export default function TelefunLanding() {
     }
 
     const activeScenarios = settings.scenarios.filter((s) => s.isActive);
-    if (activeScenarios.length === 0) {
+    if (!retryConfig && activeScenarios.length === 0) {
       notify.warning("Aktifkan minimal satu skenario di Pengaturan.");
       setIsSettingsOpen(true);
       return;
     }
-    const scenario = pickRandom(activeScenarios);
+    const scenario = retryConfig?.activeScenario ?? pickRandom(activeScenarios);
     const consumerType =
-      settings.preferredConsumerTypeId === "random"
+      retryConfig?.activeConsumerType ??
+      (settings.preferredConsumerTypeId === "random"
         ? pickRandom(settings.consumerTypes)
         : (settings.consumerTypes.find(
             (ct) => ct.id === settings.preferredConsumerTypeId,
-          ) ?? settings.consumerTypes[0]);
+          ) ?? settings.consumerTypes[0]));
 
     const normalizedSelection = normalizeTelefunBrowserSelection(
       settings.telefunModelId,
       settings.telefunTransport,
     );
-    const identity = resolveFinalIdentity(
-      settings.identitySettings,
-      normalizedSelection.model.id,
-    );
+    const identity =
+      retryConfig?.resolvedIdentity ??
+      resolveFinalIdentity(
+        settings.identitySettings,
+        normalizedSelection.model.id,
+      );
 
-    const config: ActiveTelefunSessionConfig = {
-      ...settings,
-      telefunModelId: normalizedSelection.model.id,
-      telefunTransport: "gemini-live",
-      activeScenario: scenario,
-      activeConsumerType: consumerType,
-      scenarioTitle: scenario.title,
-      consumerName: identity.name,
-      consumerGender: identity.gender,
-      voiceName: identity.voiceName || settings.voiceName,
-      resolvedIdentity: identity,
-    };
+    const config: ActiveTelefunSessionConfig = retryConfig
+      ? { ...retryConfig }
+      : {
+          ...settings,
+          telefunModelId: normalizedSelection.model.id,
+          telefunTransport: "gemini-live",
+          activeScenario: scenario,
+          activeConsumerType: consumerType,
+          scenarioTitle: scenario.title,
+          consumerName: identity.name,
+          consumerGender: identity.gender,
+          voiceName: identity.voiceName || settings.voiceName,
+          resolvedIdentity: identity,
+        };
 
     let sessionId: string;
     try {
@@ -317,8 +326,8 @@ export default function TelefunLanding() {
         persona_config: {
           consumerType: consumerType?.name || consumerType?.id,
         },
-        configured_duration: settings.maxCallDuration * 60,
-        response_pacing_mode: settings.responsePacingMode,
+        configured_duration: config.maxCallDuration * 60,
+        response_pacing_mode: config.responsePacingMode,
         telefun_model_id: config.telefunModelId,
         telefun_transport: config.telefunTransport,
         simulationSubject: selection,
@@ -355,11 +364,16 @@ export default function TelefunLanding() {
     });
   };
 
-  const startCall = async (selection: SimulationSubjectSelection) => {
+  const startCall = async (
+    selection: SimulationSubjectSelection,
+    retryConfig?: ActiveTelefunSessionConfig,
+    closeFailedAttempt?: () => Promise<boolean>,
+  ) => {
     if (startCallInFlightRef.current) return;
     startCallInFlightRef.current = true;
     try {
-      await startCallOnce(selection);
+      if (closeFailedAttempt && !(await closeFailedAttempt())) return;
+      await startCallOnce(selection, retryConfig);
     } finally {
       startCallInFlightRef.current = false;
       setShowSubjectPicker(false);
@@ -377,7 +391,14 @@ export default function TelefunLanding() {
     setShowSubjectPicker(true);
   };
 
-  const handleEndCall = () => setActiveCall(null);
+  const handleEndCall = (reason?: "completed" | "failed" | "timeout") => {
+    if (reason === "failed" && activeCallRef.current) {
+      failedSessionIdsRef.current.add(
+        callSessionIdRef.current ?? activeCallRef.current.sessionId,
+      );
+    }
+    setActiveCall(null);
+  };
 
   const startUsagePolling = (runId: number, baseline: UsageSnapshot | null) => {
     if (!baseline || runId !== sessionRunIdRef.current) return;
@@ -405,11 +426,14 @@ export default function TelefunLanding() {
     fullBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: SessionMetrics,
+    call = activeCallRef.current,
   ) => {
-    const call = activeCallRef.current;
     if (!call) return;
     const { config, scenarioTitle } = call;
-    const sessionId = callSessionIdRef.current ?? call.sessionId;
+    const sessionId =
+      activeCallRef.current === call
+        ? (callSessionIdRef.current ?? call.sessionId)
+        : call.sessionId;
     const usageRunId = sessionRunIdRef.current;
     const usageBaseline = sessionBaselineRef.current;
 
@@ -455,11 +479,15 @@ export default function TelefunLanding() {
       });
     }
 
-    setActiveCall(null);
-    void navigate({
-      to: "/telefun",
-      search: { sesi: sessionId, tahap: "telaah" },
-    });
+    // A failed recording still saves normally, but must not replace a retry
+    // (or the return-to-landing action) with the old attempt's Telaah screen.
+    if (!failedSessionIdsRef.current.has(sessionId)) {
+      setActiveCall(null);
+      void navigate({
+        to: "/telefun",
+        search: { sesi: sessionId, tahap: "telaah" },
+      });
+    }
 
     const savedForScoring = saved && !saved.saveFailed ? saved : null;
     const scoring = savedForScoring?.agentRecordingPath
@@ -648,10 +676,37 @@ export default function TelefunLanding() {
             className="fixed inset-0 z-[100] bg-background"
           >
             <PhoneInterface
+              key={activeCall.sessionId}
               config={activeCall.config}
               accessToken={activeCall.accessToken}
               onEndSession={handleEndCall}
-              onRecordingReady={handleRecordingReady}
+              onRetry={(closeFailedAttempt) =>
+                startCall(
+                  activeCall.config.simulationSubjectSelection ?? {
+                    type: "self",
+                  },
+                  activeCall.config,
+                  closeFailedAttempt,
+                )
+              }
+              onRecordingReady={(
+                url,
+                name,
+                duration,
+                fullBlob,
+                agentBlob,
+                metrics,
+              ) =>
+                handleRecordingReady(
+                  url,
+                  name,
+                  duration,
+                  fullBlob,
+                  agentBlob,
+                  metrics,
+                  activeCall,
+                )
+              }
               participantLabel={
                 activeCall.config.simulationSubject?.type === "participant"
                   ? formatSimulationSubjectLabel(

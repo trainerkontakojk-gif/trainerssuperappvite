@@ -11,6 +11,7 @@ import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import {
   PENDING_ROW,
   mockRecordingUpload,
+  mockTelefunAvatar,
   mockTelefunVoiceServer,
   recordingMock,
   serveRecording,
@@ -35,11 +36,17 @@ test.use({
   permissions: ["microphone"],
 });
 
-async function open(page: Page, path: string, apiMocks: ApiMock[]) {
+async function open(
+  page: Page,
+  path: string,
+  apiMocks: ApiMock[],
+  avatarFails = false,
+) {
   const audit = await openHermeticShell(page, {
     path,
     apiMocks,
     waitForUrl: /\/telefun/,
+    beforeNavigate: (page) => mockTelefunAvatar(page, avatarFails),
   });
   console.log("[audit]", formatAudit(audit));
   return audit;
@@ -58,9 +65,9 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     scenario_title: "Panggilan Baru",
   };
 
-  function callMocks(): ApiMock[] {
+  function callMocks(settings: unknown = {}): ApiMock[] {
     return [
-      ...telefunMocks([]),
+      ...telefunMocks([], settings),
       {
         method: "POST",
         path: "/api/v1/telefun/sessions",
@@ -123,6 +130,275 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     return picker;
   }
 
+  const identitySettings = {
+    displayName: "Dian Permana",
+    gender: "male",
+    phoneNumber: "0823-3456-7890",
+    city: "Depok",
+    signatureName: "Dian",
+    voiceName: "Fenrir",
+  };
+
+  async function startFromPicker(page: Page) {
+    const picker = await openPicker(page);
+    const start = picker.getByRole("button", { name: "Mulai panggilan" });
+    await expect(start).toBeEnabled({ timeout: 15000 });
+    await start.click();
+    return page.getByRole("region", { name: "Panggilan" });
+  }
+
+  test("potret, jam panggilan maju tanpa sisa waktu, waveform hidup dan datar saat bisu", async ({
+    page,
+  }, testInfo) => {
+    await page.clock.install();
+    await mockTelefunVoiceServer(page, NEW_ID);
+    const audit = await open(
+      page,
+      "/telefun",
+      callMocks({ identitySettings, maxCallDuration: 5 }),
+    );
+    const call = await startFromPicker(page);
+    await expect(
+      call.getByText(
+        "Siapkan salam pembuka. Rekaman dan penilaian mulai saat telepon diangkat.",
+      ),
+    ).toBeVisible();
+    await expect(
+      call.getByRole("img", { name: "Foto Dian Permana", exact: true }),
+    ).toBeVisible();
+    await expect(call.getByRole("status")).toHaveText("Giliran Anda", {
+      timeout: 20000,
+    });
+    const timer = call
+      .locator("header")
+      .getByText(/Lama panggilan/)
+      .locator("..");
+    await expect(timer).toBeVisible();
+    const before = await timer.textContent();
+    await page.clock.fastForward(3_000);
+    await expect(timer).not.toHaveText(before!);
+    await expect(call).not.toContainText(/Sisa waktu|hitung mundur|countdown/i);
+    await expect(call.getByRole("progressbar")).toHaveCount(0);
+    const waveform = call.getByTestId("microphone-waveform");
+    await expect(waveform).toBeVisible();
+    await expect(waveform).toHaveAttribute("aria-hidden", "true");
+    await expect(waveform.locator("span")).toHaveCount(28);
+    await expect(call.getByText("Suara Anda", { exact: true })).toBeVisible();
+    await expect
+      .poll(() =>
+        waveform
+          .locator("span")
+          .evaluateAll((bars) =>
+            bars.some(
+              (bar) => parseFloat((bar as HTMLElement).style.height) > 4,
+            ),
+          ),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("connected-desktop.png"),
+    });
+    await call.getByRole("button", { name: "Bisukan", exact: true }).click();
+    await expect(call.getByText("Mikrofon dibisukan")).toBeVisible();
+    await expect
+      .poll(() =>
+        waveform
+          .locator("span")
+          .evaluateAll((bars) =>
+            bars.every((bar) => (bar as HTMLElement).style.height === "4px"),
+          ),
+      )
+      .toBe(true);
+    await call.getByRole("button", { name: "Tahan", exact: true }).click();
+    await expect(waveform).toHaveCount(0);
+    await call.getByRole("button", { name: "Lanjutkan", exact: true }).click();
+    await expect(waveform).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("potret gagal memakai inisial, ponsel 390px tanpa overflow dan reduced motion", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await mockTelefunVoiceServer(page, NEW_ID);
+    const audit = await open(
+      page,
+      "/telefun",
+      callMocks({ identitySettings }),
+      true,
+    );
+    const call = await startFromPicker(page);
+    await expect(call.locator('[data-slot="avatar-fallback"]')).toHaveText(
+      "DP",
+    );
+    await expect(call.locator('[data-slot="avatar-fallback"]')).toBeVisible();
+    expect(
+      await call
+        .locator('[data-slot="avatar"]')
+        .evaluate((el) => el.getBoundingClientRect().width),
+    ).toBe(128);
+    await expect(
+      call.getByRole("img", { name: "Foto Dian Permana" }),
+    ).toHaveCount(0);
+    await expect(call.getByRole("status")).toHaveText("Giliran Anda", {
+      timeout: 20000,
+    });
+    expect(await call.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+      true,
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    expect(
+      await call
+        .getByTestId("microphone-waveform")
+        .locator("span")
+        .evaluateAll((bars) =>
+          bars.every(
+            (bar) => getComputedStyle(bar).transitionProperty === "none",
+          ),
+        ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath("connected-mobile-reduced-motion.png"),
+    });
+    expectHermetic(audit);
+  });
+
+  for (const failAfterPickup of [false, true]) {
+    test(`gagal ${failAfterPickup ? "terminal" : "menghubungkan"}: alert, retry menutup percobaan lama sebelum sesi baru`, async ({
+      page,
+    }, testInfo) => {
+      if (!failAfterPickup)
+        await page.setViewportSize({ width: 390, height: 844 });
+      const messages: Record<string, unknown>[] = [];
+      let releaseSave: () => void = () => {};
+      const saveAllowed = new Promise<void>((resolve) => {
+        releaseSave = resolve;
+      });
+      await mockTelefunVoiceServer(page, NEW_ID, messages, {
+        failAttempt: 1,
+        failAfterPickup,
+      });
+      const audit = await open(
+        page,
+        "/telefun",
+        callMocks({ identitySettings }),
+      );
+      let creates = 0;
+      const configs: unknown[] = [];
+      await page.route("**/api/v1/telefun/sessions", async (route) => {
+        if (route.request().method() !== "POST") return route.fallback();
+        creates += 1;
+        configs.push(route.request().postDataJSON());
+        await route.fulfill({
+          json: {
+            success: true,
+            data: {
+              id: creates === 1 ? NEW_ID : "telefun-retry-2",
+              simulationSubject: null,
+            },
+          },
+        });
+      });
+      let failedAttemptSaved = false;
+      let failedAttemptSaveRequests = 0;
+      await page.route(
+        `**/api/v1/telefun/sessions/${NEW_ID}`,
+        async (route) => {
+          if (route.request().method() !== "PATCH") return route.fallback();
+          failedAttemptSaveRequests += 1;
+          await saveAllowed;
+          failedAttemptSaved = true;
+          await route.fulfill({ json: { success: true, data: null } });
+        },
+      );
+      await mockRecordingUpload(page);
+      await serveRecording(page);
+      const call = await startFromPicker(page);
+      const alert = call.getByRole("alert");
+      await expect(alert).toContainText("Panggilan belum dapat dimulai", {
+        timeout: 20000,
+      });
+      await expect(alert).toContainText(
+        "Sambungan suara tidak berhasil dibuka. Periksa koneksi internet, lalu coba panggil lagi.",
+      );
+      await expect(alert).not.toContainText("Panggilan belum dapat dimulai.");
+      for (const name of ["Tahan", "Bisukan", "Akhiri"])
+        await expect(
+          call.getByRole("button", { name, exact: true }),
+        ).toHaveCount(0);
+      const retry = call.getByRole("button", {
+        name: "Coba panggil lagi",
+        exact: true,
+      });
+      await expect(retry).toBeVisible();
+      await expect(
+        call.getByRole("button", { name: "Kembali ke Telefun", exact: true }),
+      ).toBeVisible();
+      expect(
+        await retry.evaluate((el) => (el as HTMLElement).offsetHeight),
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        await call.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      ).toBe(true);
+      if (failAfterPickup) {
+        await expect(alert).toBeVisible();
+        expect(failedAttemptSaveRequests).toBe(0);
+        expect(failedAttemptSaved).toBe(false);
+        await expect(page).not.toHaveURL(/tahap=telaah/);
+      }
+      await page.screenshot({ path: testInfo.outputPath("failed.png") });
+      await retry.dblclick();
+      // Saving a terminal recording is part of cleanup, never a reason to
+      // dismiss the alert early or create the next session concurrently.
+      if (failAfterPickup) {
+        expect(creates).toBe(1);
+        await expect.poll(() => failedAttemptSaveRequests).toBe(1);
+        expect(creates).toBe(1);
+      }
+      releaseSave();
+      await expect.poll(() => creates).toBe(2);
+      expect(configs[1]).toEqual(configs[0]);
+      if (failAfterPickup) expect(failedAttemptSaved).toBe(true);
+      await expect(call.getByRole("status")).toHaveText("Giliran Anda", {
+        timeout: 20000,
+      });
+      await expect(
+        call.getByRole("img", { name: "Foto Dian Permana" }),
+      ).toBeVisible();
+      // Keep the fresh session ID observable; a remount, not a reused transport.
+      expect(
+        messages
+          .filter((m) => m.type === "authenticate")
+          .map((m) => m.sessionId),
+      ).toEqual([NEW_ID, "telefun-retry-2"]);
+      expect(creates).toBe(2);
+      expectHermetic(audit);
+    });
+  }
+
+  test("gagal: Kembali ke Telefun menutup sesi dan kembali ke landing", async ({
+    page,
+  }) => {
+    await mockTelefunVoiceServer(page, NEW_ID, [], { failAttempt: 1 });
+    const audit = await open(page, "/telefun", callMocks());
+    const call = await startFromPicker(page);
+    await expect(call.getByRole("alert")).toBeVisible({ timeout: 20000 });
+    await call
+      .getByRole("button", { name: "Kembali ke Telefun", exact: true })
+      .click();
+    await expect(call).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /^Mulai simulasi/ }),
+    ).toBeVisible();
+    await expect(page).not.toHaveURL(/tahap=telaah/);
+    expectHermetic(audit);
+  });
+
   test("cek mikrofon, layar softphone berlabel Indonesia, akhiri dengan konfirmasi, lalu tahap Telaah", async ({
     page,
   }) => {
@@ -158,12 +434,12 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     // Nama dan nomor penelepon besar di tengah layar, seperti layar telepon.
     const caller = call.getByRole("group", { name: "Data penelepon" });
     await expect(caller.getByRole("heading", { level: 2 })).not.toBeEmpty();
-    await expect(caller.getByText("Nomor telepon")).toBeVisible();
+    await expect(caller.getByText("Nomor telepon")).toHaveClass(/sr-only/);
     const phone = caller.getByText(/^0[\d-]{9,15}$/);
     await expect(phone).toBeVisible();
     expect(
       await phone.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-    ).toBeGreaterThanOrEqual(20);
+    ).toBeGreaterThanOrEqual(14);
     for (const name of ["Tahan", "Bisukan", "Akhiri"]) {
       await expect(call.getByRole("button", { name })).toBeVisible();
     }
@@ -272,6 +548,17 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await expect(band).toContainText("Hold melewati batas");
     await expect(band).toContainText("+00.0");
     await expect(band).toContainText("Kembali ke konsumen sekarang");
+    const overtime = await band.textContent();
+    await page.clock.fastForward(5_000);
+    await expect(band).toBeVisible();
+    await expect(band).not.toHaveText(overtime!);
+    await expect(band).toContainText(/\+00\.0[7-9]/);
+    await expect(
+      call.getByRole("button", { name: "Lanjutkan", exact: true }),
+    ).toBeVisible();
+    await expect(
+      call.getByRole("button", { name: "Lanjutkan", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     await call.getByRole("button", { name: "Lanjutkan" }).click();
     await expect(band).toHaveCount(0);
@@ -310,8 +597,7 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     });
 
     const recorders = await page.evaluate(
-      () =>
-        (window as unknown as { __recorders: unknown[] }).__recorders,
+      () => (window as unknown as { __recorders: unknown[] }).__recorders,
     );
     // Rekaman penuh dan rekaman agen.
     expect(recorders).toEqual([
