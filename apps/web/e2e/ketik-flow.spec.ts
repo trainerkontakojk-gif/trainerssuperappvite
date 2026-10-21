@@ -634,6 +634,101 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
+  test("kolom telaah tanpa tab: unik, navigasi bagian, disclosure, dan sembunyikan", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const detail = {
+      ...ANNOTATED_REVIEW_DETAIL,
+      review: {
+        ...ANNOTATED_REVIEW_DETAIL.review,
+        coachingFocus: [" Verifikasi identitas di awal ", "Konfirmasi data sebelum memberi solusi."],
+      },
+    };
+    const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
+      ...ketikMocks(FULL_HISTORY),
+      { ...reviewDetailMock, body: { success: true, data: detail } },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    await expect(result.getByRole("tab")).toHaveCount(0);
+    for (const note of ANNOTATED_REVIEW_DETAIL.review.education.agentNotes) {
+      await expect(result.getByText(note.note, { exact: true })).toHaveCount(1);
+    }
+    await expect(result.getByText("Menyapa dengan nama", { exact: true })).toHaveCount(0);
+    await expect(result.getByRole("region", { name: "Langkah berikutnya" }).getByRole("listitem")).toHaveCount(2);
+    const probing = result.locator('details[data-review-target="scores-probing"]');
+    const resolution = result.locator('details[data-review-target="scores-resolution"]');
+    await expect(probing).toHaveAttribute("open", "");
+    await expect(resolution).not.toHaveAttribute("open");
+    await result.getByRole("button", { name: "Jelaskan skor Resolusi" }).click();
+    await expect(resolution).toHaveAttribute("open", "");
+    await expect(resolution.locator("summary")).toBeFocused();
+    await expect(result.getByText("Diagnosis Resolusi.", { exact: false })).toHaveCount(1);
+    const expectControlsResolve = async (count: number) => {
+      const controls = page.locator(
+        '[data-module="ketik"] > header [aria-controls], aside[aria-label="Telaah disembunyikan"] [aria-controls]',
+      );
+      await expect(controls).toHaveCount(count);
+      for (const control of await controls.all()) {
+        const ids = (await control.getAttribute("aria-controls"))!.split(/\s+/);
+        for (const id of ids) await expect(page.locator("#" + id)).toHaveCount(1);
+      }
+    };
+    const nav = result.getByRole("navigation", { name: "Lompat ke bagian" });
+    await expect(nav).toHaveCSS("position", "sticky");
+    await expect(nav).toHaveCSS("top", "0px");
+    await expect(nav.getByRole("button")).toHaveText(["Perbaiki 2", "Pertanyaan 2", "Alasan skor", "Sudah baik 1", "Ejaan 1", "Langkah berikutnya"]);
+    expect(await nav.getByRole("button").evaluateAll(buttons => buttons.every(button => (button as HTMLElement).offsetHeight >= 44))).toBe(true);
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const transcript = page.getByRole("region", { name: "Percakapan" });
+      const transcriptScroll = await transcript.evaluate(el => el.scrollTop);
+      await nav.getByRole("button", { name: "Alasan skor" }).click();
+      const scores = result.getByRole("region", { name: "Alasan skor", exact: true });
+      await expect(scores).toBeFocused();
+      await expect(scores.getByRole("heading", { name: "Alasan skor", exact: true })).toBeInViewport();
+      expect((await scores.getByRole("heading").boundingBox())!.y).toBeGreaterThanOrEqual((await nav.boundingBox())!.y + (await nav.boundingBox())!.height);
+      await nav.getByRole("button", { name: "Langkah berikutnya" }).click();
+      const next = result.getByRole("region", { name: "Langkah berikutnya" });
+      await expect(next).toBeFocused();
+      await expect(next).toBeInViewport();
+      if (width >= 1024) expect(await transcript.evaluate(el => el.scrollTop)).toBe(transcriptScroll);
+      expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0);
+      const hide = page.getByRole("button", { name: "Sembunyikan telaah" });
+      await expect(hide).toHaveAttribute("aria-controls", "ketik-review-result");
+      await expect(hide).toHaveAttribute("aria-expanded", "true");
+      await expectControlsResolve(1);
+      const oldWidth = (await transcript.boundingBox())!.width;
+      await hide.click();
+      await expectControlsResolve(2);
+      await expect(page.locator("#ketik-review-result")).toHaveAttribute("hidden", "");
+      await expect(page.locator("#ketik-review-result")).not.toBeVisible();
+      await expect(result).toHaveCount(0);
+      const show = page.getByRole("button", { name: "Tampilkan telaah", exact: true });
+      await expect(show).toHaveCount(2);
+      await expect(show.first()).toHaveAttribute("aria-expanded", "false");
+      await expect(page.getByRole("complementary", { name: "Telaah disembunyikan" })).toContainText("Skor82");
+      if (width >= 1024) expect((await transcript.boundingBox())!.width).toBeGreaterThan(oldWidth);
+      await page.screenshot({ path: test.info().outputPath(`hidden-review-${width}.png`), animations: "disabled" });
+      await show.last().click();
+      await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+      await expectControlsResolve(1);
+      // Revealing via a transcript mark must focus even the same target again.
+      const marker = transcript.getByRole("button", { name: "Lihat kalimat agen 1" });
+      for (let repeat = 0; repeat < 2; repeat++) {
+        await page.getByRole("button", { name: "Sembunyikan telaah" }).click();
+        await marker.click();
+        await expect(result.locator('[data-review-target="notes-0"]')).toBeFocused();
+        await expect(result).toBeVisible();
+        await expectControlsResolve(1);
+      }
+      await page.screenshot({ path: test.info().outputPath(`scroll-review-${width}.png`), animations: "disabled" });
+    }
+    await page.getByRole("button", { name: "Sembunyikan telaah" }).click();
+    await page.reload();
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82");
+    expectHermetic(audit);
+  });
+
   test("skor akhir tampil pertama, lima aspek, dan temuan menunjuk nomor pesan", async ({
     page,
   }) => {
@@ -657,15 +752,11 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(aspects.getByRole("listitem")).toHaveCount(5);
     await expect(aspects).toContainText("Probing");
 
-    // Tab pertama: aspek yang perlu diperbaiki (skor < 75).
-    await expect(result.getByRole("tab", { name: /Perbaiki dulu/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(result.getByRole("tab")).toHaveCount(0);
     await expect(result.getByText("Cara memperbaiki Probing.")).toBeVisible();
 
     // Ejaan: menyebut nomor pesan, tingkat dalam bahasa Indonesia.
-    await result.getByRole("tab", { name: /Ejaan/ }).click();
+    await result.getByRole("navigation", { name: "Lompat ke bagian" }).getByRole("button", { name: /Ejaan/ }).click();
     const finding = result.getByRole("button", { name: /Pesan 2/ });
     await expect(finding).toContainText("tagihn");
     await expect(finding).toContainText("tagihan");
@@ -681,7 +772,6 @@ test.describe("KETIK Telaah (hermetic)", () => {
       "true",
     );
 
-    await result.getByRole("tab", { name: "Ringkasan" }).click();
     await expect(result.getByText(/verifikasi data terlambat/)).toBeVisible();
 
     await waitForMockedApi(audit, [`/ketik/review/${REVIEWED_SESSION.id}`]);
@@ -715,7 +805,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
-    await result.getByRole("tab", { name: /Ejaan/ }).click();
+    await result.getByRole("navigation", { name: "Lompat ke bagian" }).getByRole("button", { name: /Ejaan/ }).click();
     await expect(result.getByRole("button", { name: /Pesan 2/ })).toContainText(
       "tagihn",
     );
@@ -792,30 +882,27 @@ test.describe("KETIK Telaah (hermetic)", () => {
       },
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
-    await result.getByRole("tab", { name: /Perbaiki dulu/ }).click();
+    await result.getByRole("navigation", { name: "Lompat ke bagian" }).getByRole("button", { name: /Perbaiki/ }).click();
     await expect(result).toContainText(
       "Belum ada langkah atau estimasi waktu.",
     );
     await expect(result).toContainText("Verifikasi terlambat");
-    await result.getByRole("tab", { name: /Sudah baik/ }).click();
+    await result.getByRole("navigation", { name: "Lompat ke bagian" }).getByRole("button", { name: /Sudah baik/ }).click();
     await expect(result).toContainText(
       "Sapaan sopan dan menyebut panggilan konsumen.",
     );
     await expect(
-      result.getByRole("button", { name: /Pesan 2.*Baik Bu/ }),
+      result.getByRole("list", { name: "Respons agen yang sudah baik" }).getByRole("button", { name: /Pesan 2.*Baik Bu/ }),
     ).toBeVisible();
-    await expect(result).not.toContainText("Diagnosis Resolusi.");
+    await expect(result.locator('details[data-review-target="scores-resolution"]')).not.toHaveAttribute("open");
     await result
       .getByRole("button", { name: /Jelaskan skor Resolusi/ })
       .click();
-    await expect(
-      result.getByRole("tab", { name: /Penjelasan skor/ }),
-    ).toHaveAttribute("aria-selected", "true");
-    await expect(
-      result.getByRole("article", { name: "Resolusi" }),
-    ).toContainText("Cara memperbaiki Resolusi.");
-    await expect(result.getByRole("article", { name: "Resolusi" })).toContainText("Bukti percakapan");
-    await expect(result.getByRole("article", { name: "Resolusi" })).toContainText("Diagnosis Resolusi.");
+    await expect(result.locator('details[data-review-target="scores-resolution"]')).toHaveAttribute("open", "");
+    const resolution = result.locator('details[data-review-target="scores-resolution"]');
+    await expect(resolution).toContainText("Cara memperbaiki Resolusi.");
+    await expect(resolution).toContainText("Bukti percakapan");
+    await expect(resolution).toContainText("Diagnosis Resolusi.");
     expectHermetic(audit);
   });
 
@@ -841,25 +928,19 @@ test.describe("KETIK Telaah (hermetic)", () => {
       });
       await marker.focus();
       await page.keyboard.press("Enter");
-      await expect(
-        result.getByRole("tab", { name: /Kalimat agen/ }),
-      ).toHaveAttribute("aria-selected", "true");
-      const note = result
-        .getByRole("list", { name: "Kalimat agen yang dinilai" })
-        .getByRole("listitem")
-        .first();
+      const note = result.locator('[data-review-target="notes-0"]');
       await expect(note).toBeFocused();
       await note.getByRole("button", { name: /Pesan 2/ }).click();
       await expect(transcript.getByTestId("ketik-message-2")).toBeFocused();
       await marker.click();
       await expect(note).toBeFocused();
+      await page.getByRole("button", { name: "Sembunyikan telaah" }).click();
+      await transcript.getByRole("button", { name: "Lihat kalimat agen 2" }).click();
+      await expect(result.locator('[data-review-target="notes-1"]')).toBeFocused();
       await transcript
         .getByRole("button", { name: "Lihat pertanyaan konsumen B" })
         .click();
-      const point = result
-        .getByRole("list", { name: "Pertanyaan konsumen" })
-        .getByRole("listitem")
-        .nth(1);
+      const point = result.locator('[data-review-target="questions-1"]');
       await expect(point).toBeFocused();
       await expect(point).toBeInViewport();
       expect(
@@ -884,7 +965,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
     await result.getByRole("button", { name: /Jelaskan skor Empati/ }).click();
-    const aspect = result.getByRole("article", { name: "Empati & Komunikasi" });
+    const aspect = result.locator('details[data-review-target="scores-empathy"]');
     await expect(aspect).toContainText(
       "Alasan skor berdasarkan percakapan belum tersedia",
     );
@@ -911,30 +992,20 @@ test.describe("KETIK Telaah (hermetic)", () => {
     });
 
     // Inti kasus tampil sebelum rincian.
-    const caseCore = result.getByRole("region", { name: "Inti kasus" });
+    const caseCore = result.getByRole("region", { name: "Ringkasan" });
     await expect(caseCore).toContainText("tertagih dua kali dan ia minta segera");
 
-    // Tab bawaan: pertanyaan konsumen, dengan status yang tertulis.
-    const questionsTab = result.getByRole("tab", {
-      name: /Pertanyaan konsumen \(2\)/,
-    });
-    await expect(questionsTab).toHaveAttribute("aria-selected", "true");
-    // Enam tab tidak muat; tab aktif tetap terlihat utuh, tidak tergeser keluar.
-    const tabList = await result
-      .getByRole("tablist", { name: "Rincian telaah" })
-      .boundingBox();
-    const activeTab = await questionsTab.boundingBox();
-    expect(activeTab!.x).toBeGreaterThanOrEqual(tabList!.x);
-    expect(activeTab!.x + activeTab!.width).toBeLessThanOrEqual(tabList!.x + tabList!.width);
+    await expect(result.getByRole("region", { name: /Pertanyaan konsumen/ })).toContainText("0 dari 2 terjawab");
     const points = result.getByRole("list", { name: "Pertanyaan konsumen" });
     await expect(points.getByRole("listitem")).toHaveCount(2);
-    const pointA = points.getByRole("listitem").nth(0);
+    const pointA = points.locator('[data-review-target="questions-0"]');
+    await expect(points.getByRole("listitem").first()).toHaveAttribute("data-review-target", "questions-1");
     await expect(pointA).toContainText("A");
     await expect(pointA).toContainText("Sebagian");
     await expect(pointA).toContainText("Kenapa tagihan tertagih dua kali");
     await expect(pointA).toContainText("belum menjelaskan penyebabnya");
     await expect(pointA.getByRole("button", { name: /Dijawab di pesan 2/ })).toBeVisible();
-    const pointB = points.getByRole("listitem").nth(1);
+    const pointB = points.locator('[data-review-target="questions-1"]');
     await expect(pointB).toContainText("Belum terjawab");
     await expect(pointB).toContainText("Belum ada balasan agen untuk poin ini.");
 
@@ -956,19 +1027,16 @@ test.describe("KETIK Telaah (hermetic)", () => {
     );
 
     // Kalimat agen: catatan, aspek, dan kalimat yang lebih tepat.
-    await result.getByRole("tab", { name: /Kalimat agen \(2\)/ }).click();
-    const notes = result.getByRole("list", {
-      name: "Kalimat agen yang dinilai",
-    });
-    await expect(notes.getByRole("listitem")).toHaveCount(2);
-    const fix = notes.getByRole("listitem").nth(0);
+    const fix = result.locator('[data-review-target="notes-0"]');
+    await expect(fix).toHaveCount(1);
     await expect(fix).toContainText("Resolusi");
     await expect(fix).toContainText("Perlu diperbaiki");
     await expect(fix).toContainText("Belum ada langkah atau estimasi waktu.");
     await expect(fix).toContainText(
       "Kalimat yang lebih tepat: Saya cek transaksi ganda Ibu sekarang",
     );
-    const good = notes.getByRole("listitem").nth(1);
+    const good = result.locator('[data-review-target="notes-1"]');
+    await expect(good).toHaveCount(1);
     await expect(good).toContainText("Sudah tepat");
     await expect(good).not.toContainText("Kalimat yang lebih tepat");
 
@@ -982,7 +1050,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
-  test("telaah lama tanpa anotasi: ditandai belum tersedia, tab bawaan tetap Perbaiki dulu", async ({
+  test("telaah lama tanpa anotasi: belum tersedia dan kekuatan menjadi fallback Sudah baik", async ({
     page,
   }) => {
     const audit = await open(page, telaahPath(REVIEWED_SESSION.id), [
@@ -990,15 +1058,10 @@ test.describe("KETIK Telaah (hermetic)", () => {
       reviewDetailMock,
     ]);
     const result = page.getByRole("region", { name: "Hasil telaah" });
-    await expect(result.getByRole("tab", { name: /Perbaiki dulu/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-      { timeout: 20000 },
-    );
-    await expect(result.getByRole("region", { name: "Inti kasus" })).toHaveCount(0);
-    await result.getByRole("tab", { name: /Pertanyaan konsumen/ }).click();
-    await expect(result).toContainText("Belum tersedia untuk telaah ini");
-    await result.getByRole("tab", { name: /Kalimat agen/ }).click();
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("82", { timeout: 20000 });
+    await expect(result.getByRole("tab")).toHaveCount(0);
+    await expect(result.getByRole("region", { name: "Sudah baik", exact: true })).toContainText("Menyapa dengan nama");
+    await expect(result.getByText("Menyapa dengan nama", { exact: true })).toHaveCount(1);
     await expect(result).toContainText("Belum tersedia untuk telaah ini");
     await expect(result).toContainText("Jalankan Telaah ulang untuk melengkapinya");
     expectHermetic(audit);
@@ -1019,20 +1082,18 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
+    // Closed native details defer descendant styling; inspect each disclosed body.
+    for (const disclosure of await result.locator("details").all()) {
+      if (await disclosure.getAttribute("open") === null) await disclosure.locator("summary").click();
+    }
     for (const theme of ["light", "dark"] as const) {
       await setDocumentTheme(page, theme);
       const marks = await findLowContrastText(transcript, {
         selector: "mark, mark *, li p span",
       });
       expect(marks, `${theme}: ${marks.join("\n")}`).toEqual([]);
-      for (const tab of ["Pertanyaan konsumen", "Kalimat agen"]) {
-        await result.getByRole("tab", { name: new RegExp(tab) }).click();
-        const panel = await findLowContrastText(result, {
-          selector: "[role=tabpanel] *",
-          leafOnly: true,
-        });
-        expect(panel, `${theme} ${tab}: ${panel.join("\n")}`).toEqual([]);
-      }
+      const panel = await findLowContrastText(result, { selector: "section *", leafOnly: true });
+      expect(panel, `${theme}: ${panel.join("\n")}`).toEqual([]);
     }
     expectHermetic(audit);
   });
@@ -1127,9 +1188,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
-    await expect(
-      result.getByRole("region", { name: "Inti kasus" }),
-    ).toHaveCount(0);
+    await expect(result.getByRole("heading", { name: "Inti kasus", exact: true })).toHaveCount(0);
 
     // Route ditambahkan setelah shell: Playwright mendahulukan yang terakhir.
     let rerunBody: unknown = null;
@@ -1159,7 +1218,7 @@ test.describe("KETIK Telaah (hermetic)", () => {
       .getByRole("dialog", { name: "Telaah ulang sesi ini?" })
       .getByRole("button", { name: "Telaah ulang" })
       .click();
-    await expect(result.getByRole("region", { name: "Inti kasus" })).toBeVisible();
+    await expect(result.getByRole("region", { name: "Ringkasan" })).toContainText("Tagihan kartu kredit konsumen tertagih dua kali");
     expect(rerunBody).toEqual({ sessionId: REVIEWED_SESSION.id, rerun: true, requestId: expect.any(String) });
     expectHermetic(audit);
   });
@@ -1354,18 +1413,10 @@ test.describe("KETIK Telaah (hermetic)", () => {
     await expect(result.getByTestId("ketik-final-score")).toHaveText("82", {
       timeout: 20000,
     });
-    const offenders: string[] = [];
-    for (const tab of [
-      "Pertanyaan konsumen",
-      "Kalimat agen",
-      "Perbaiki dulu",
-      "Sudah baik",
-      "Ejaan",
-      "Ringkasan",
-    ]) {
-      await result.getByRole("tab", { name: new RegExp(tab) }).click();
-      offenders.push(...(await findTextBelowFloor(page.locator("body"))));
+    for (const disclosure of await result.locator("details").all()) {
+      if (await disclosure.getAttribute("open") === null) await disclosure.locator("summary").click();
     }
+    const offenders = await findTextBelowFloor(page.locator("body"));
     const unique = [...new Set(offenders)];
     expect(unique, unique.join("\n")).toEqual([]);
     expectHermetic(audit);

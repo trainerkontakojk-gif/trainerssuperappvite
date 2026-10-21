@@ -10,12 +10,6 @@ import { cn } from "cn";
 import { pointLetter } from "../utils/quoteMarks";
 import { Button } from "../../../components/ui/button";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../../../components/ui/tabs";
-import {
   KETIK_FIX_THRESHOLD,
   readAspectScores,
   scoreVerdict,
@@ -82,7 +76,6 @@ export function ReviewResult({
   const guidance = [...(review.education?.dimensionGuidance ?? [])].sort(
     (a, b) => a.priorityRank - b.priorityRank,
   );
-  const toFix = guidance.filter((item) => item.score < KETIK_FIX_THRESHOLD);
 
   const enriched = review.education?.typosEnriched ?? [];
   // Telaah lama tidak punya field anotasi sama sekali.
@@ -95,29 +88,69 @@ export function ReviewResult({
   const good = (notes ?? [])
     .map((note, index) => ({ note, index }))
     .filter(({ note }) => note.verdict === "good");
-  const [tab, setTab] = useState<string>(points?.length ? "questions" : "fix");
-  const [selected, setSelected] = useState<KetikReviewTarget | null>(null);
+  const statusOrder = { unanswered: 0, partial: 1, answered: 2 };
+  const orderedPoints = (points ?? [])
+    .map((point, index) => ({ point, index }))
+    .sort((a, b) => statusOrder[a.point.status] - statusOrder[b.point.status]);
+  const nextSteps = [
+    ...new Set(
+      [...review.coachingFocus, ...(review.education?.overallNextSteps ?? [])]
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const [localTarget, setLocalTarget] = useState<KetikReviewTarget | null>(
+    null,
+  );
+  const selected = localTarget ?? target;
   const root = useRef<HTMLDivElement>(null);
+  // Incoming transcript marks win over the previous in-panel selection.
   useEffect(() => {
-    if (target) {
-      setTab(target.tab);
-      setSelected(target);
-    }
+    setLocalTarget(null);
   }, [target]);
   useEffect(() => {
-    if (!selected || selected.tab !== tab) return;
+    if (!selected) return;
     const frame = requestAnimationFrame(() => {
       const element = root.current?.querySelector<HTMLElement>(
-        `[data-review-target="${selected.tab}-${selected.key}"]`,
+        `[data-review-target="${selected.section}-${selected.key}"]`,
       );
-      if (element) focusReviewTarget(element);
+      if (!element) return;
+      if (element instanceof HTMLDetailsElement) {
+        element.open = true;
+        focusReviewTarget(element.querySelector("summary") ?? element);
+      } else {
+        focusReviewTarget(element);
+      }
     });
     return () => cancelAnimationFrame(frame);
-  }, [selected, tab]);
-  const explain = (key: string) => {
-    setTab("scores");
-    setSelected({ tab: "scores", key });
+  }, [selected]);
+  const explain = (key: string) => setLocalTarget({ section: "scores", key });
+  const jump = (id: string) => {
+    const element = root.current?.querySelector<HTMLElement>(
+      `#ketik-review-${id}`,
+    );
+    if (element) focusReviewTarget(element);
   };
+  const navigation = [
+    {
+      id: "fix",
+      label: `Perbaiki ${fixes.length + review.weaknesses.length}`,
+      show: fixes.length + review.weaknesses.length > 0,
+    },
+    {
+      id: "questions",
+      label: `Pertanyaan ${points?.length ?? 0}`,
+      show: !!points?.length,
+    },
+    { id: "scores", label: "Alasan skor", show: guidance.length > 0 },
+    {
+      id: "good",
+      label: `Sudah baik ${good.length || review.strengths.length}`,
+      show: good.length + review.strengths.length > 0,
+    },
+    { id: "typo", label: `Ejaan ${typos.length}`, show: typos.length > 0 },
+    { id: "next", label: "Langkah berikutnya", show: nextSteps.length > 0 },
+  ].filter((item) => item.show);
 
   return (
     <div ref={root} className="flex min-w-0 flex-col gap-6">
@@ -206,6 +239,24 @@ export function ReviewResult({
         ))}
       </ul>
 
+      {navigation.length > 0 && (
+        <nav
+          aria-label="Lompat ke bagian"
+          className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-border bg-surface-elevated py-2"
+        >
+          {navigation.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => jump(item.id)}
+              className="min-h-[44px] shrink-0 whitespace-nowrap rounded-md px-3 text-[13px] text-fg2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {review.education?.verification && (
         <KetikVerificationSummary
           verification={review.education.verification}
@@ -214,291 +265,189 @@ export function ReviewResult({
         />
       )}
 
-      {caseCore && (
-        <section
-          aria-labelledby="ketik-case-core-title"
-          className="flex flex-col gap-1"
-        >
-          <h3
-            id="ketik-case-core-title"
-            className="text-[13px] font-semibold text-foreground"
-          >
-            Inti kasus
-          </h3>
-          <p className="max-w-[65ch] text-[15px] leading-6 text-fg2">
-            {caseCore}
-          </p>
-        </section>
+      {(caseCore || review.aiSummary) && (
+        <ReviewSection id="summary" title="Ringkasan">
+          {caseCore && (
+            <div className="flex flex-col gap-1">
+              <h4 className="text-[13px] font-semibold text-foreground">
+                Inti kasus
+              </h4>
+              <p className="max-w-[65ch] text-[15px] leading-6 text-fg2">
+                {caseCore}
+              </p>
+            </div>
+          )}
+          {review.aiSummary && (
+            <p className="max-w-[65ch] text-[15px] leading-7 text-fg2">
+              {review.aiSummary}
+            </p>
+          )}
+        </ReviewSection>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(String(value));
-          setSelected(null);
-        }}
-        className="gap-4"
+      <ReviewSection id="fix" title="Perbaiki dulu">
+        {fixes.length > 0 && (
+          <ol
+            aria-label="Kalimat yang perlu diperbaiki"
+            className="flex flex-col gap-3"
+          >
+            {fixes.map(({ note, index }) => (
+              <AgentNoteItem
+                key={index}
+                note={note}
+                targetKey={`notes-${index}`}
+                highlighted={
+                  selected?.section === "notes" && selected.key === index
+                }
+                number={index + 1}
+                numbers={numbers}
+                onShowMessage={onShowMessage}
+              />
+            ))}
+          </ol>
+        )}
+        {review.weaknesses.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-semibold">Temuan lain</h4>
+            <PlainList items={review.weaknesses} />
+          </div>
+        )}
+        {fixes.length === 0 && review.weaknesses.length === 0 && (
+          <Empty>Belum ada temuan perbaikan yang tersedia.</Empty>
+        )}
+      </ReviewSection>
+
+      <ReviewSection
+        id="questions"
+        title="Pertanyaan konsumen"
+        count={
+          points
+            ? `${points.filter((point) => point.status === "answered").length} dari ${points.length} terjawab`
+            : undefined
+        }
       >
-        <TabsList
-          variant="line"
-          aria-label="Rincian telaah"
-          className="relative w-full justify-start overflow-x-auto border-b border-border"
-        >
-          <TabsTrigger
-            value="questions"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Pertanyaan konsumen{points ? ` (${points.length})` : ""}
-          </TabsTrigger>
-          <TabsTrigger
-            value="notes"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Kalimat agen{notes ? ` (${notes.length})` : ""}
-          </TabsTrigger>
-          <TabsTrigger
-            value="fix"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Perbaiki dulu
-          </TabsTrigger>
-          <TabsTrigger
-            value="good"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Sudah baik ({good.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="scores"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Penjelasan skor
-          </TabsTrigger>
-          <TabsTrigger
-            value="typo"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Ejaan ({typos.length})
-          </TabsTrigger>
-          <TabsTrigger
-            value="summary"
-            className="min-h-[44px] shrink-0 flex-none px-3 text-[13px]"
-          >
-            Ringkasan
-          </TabsTrigger>
-        </TabsList>
+        {!points ? (
+          <NotAvailable canRerun={onRerun !== null} />
+        ) : points.length === 0 ? (
+          <Empty>
+            AI tidak menemukan pertanyaan konsumen di percakapan ini.
+          </Empty>
+        ) : (
+          <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
+            {orderedPoints.map(({ point, index }) => (
+              <ConsumerPointItem
+                key={index}
+                point={point}
+                targetKey={`questions-${index}`}
+                highlighted={
+                  selected?.section === "questions" && selected.key === index
+                }
+                letter={pointLetter(index)}
+                numbers={numbers}
+                onShowMessage={onShowMessage}
+              />
+            ))}
+          </ol>
+        )}
+      </ReviewSection>
 
-        <TabsContent value="questions" className="flex flex-col gap-3">
-          {!points ? (
-            <NotAvailable canRerun={onRerun !== null} />
-          ) : points.length === 0 ? (
-            <Empty>
-              AI tidak menemukan pertanyaan konsumen di percakapan ini.
-            </Empty>
-          ) : (
-            <ol
-              aria-label="Pertanyaan konsumen"
-              className="flex flex-col gap-3"
-            >
-              {points.map((point, index) => (
-                <ConsumerPointItem
-                  key={`${point.messageId}-${index}`}
-                  point={point}
-                  targetKey={`questions-${index}`}
-                  highlighted={
-                    selected?.tab === "questions" && selected.key === index
-                  }
-                  letter={pointLetter(index)}
-                  numbers={numbers}
-                  onShowMessage={onShowMessage}
-                />
-              ))}
-            </ol>
-          )}
-        </TabsContent>
+      <ReviewSection id="scores" title="Alasan skor">
+        <p className="text-[13px] leading-6 text-fg2">
+          Setiap aspek dapat memiliki kekuatan dan kekurangan sekaligus. Skor
+          tinggi tetap dapat memiliki temuan perbaikan.
+        </p>
+        {guidance.map((item) => (
+          <GuidanceItem
+            key={item.key}
+            item={item}
+            targetKey={`scores-${item.key}`}
+            numbers={numbers}
+            onShowMessage={onShowMessage}
+          />
+        ))}
+        {guidance.length === 0 && (
+          <Empty>
+            Alasan skor berdasarkan percakapan belum tersedia untuk telaah ini.
+          </Empty>
+        )}
+      </ReviewSection>
 
-        <TabsContent value="notes" className="flex flex-col gap-3">
-          {!notes ? (
-            <NotAvailable canRerun={onRerun !== null} />
-          ) : notes.length === 0 ? (
-            <Empty>Tidak ada kalimat agen yang dinilai.</Empty>
-          ) : (
-            <ol
-              aria-label="Kalimat agen yang dinilai"
-              className="flex flex-col gap-3"
-            >
-              {notes.map((note, index) => (
-                <AgentNoteItem
-                  key={`${note.messageId}-${index}`}
-                  note={note}
-                  targetKey={`notes-${index}`}
-                  highlighted={
-                    selected?.tab === "notes" && selected.key === index
-                  }
-                  number={index + 1}
-                  numbers={numbers}
-                  onShowMessage={onShowMessage}
-                />
-              ))}
-            </ol>
-          )}
-        </TabsContent>
+      <ReviewSection id="good" title="Sudah baik">
+        {good.length > 0 ? (
+          <ol
+            aria-label="Respons agen yang sudah baik"
+            className="flex flex-col gap-3"
+          >
+            {good.map(({ note, index }) => (
+              <AgentNoteItem
+                key={index}
+                note={note}
+                targetKey={`notes-${index}`}
+                highlighted={
+                  selected?.section === "notes" && selected.key === index
+                }
+                number={index + 1}
+                numbers={numbers}
+                onShowMessage={onShowMessage}
+              />
+            ))}
+          </ol>
+        ) : review.strengths.length > 0 ? (
+          <PlainList items={review.strengths} />
+        ) : (
+          <Empty>
+            Belum tersedia respons agen yang dinilai sudah tepat. Skor tinggi
+            saja tidak menunjukkan kalimat mana yang sudah baik.
+          </Empty>
+        )}
+      </ReviewSection>
 
-        <TabsContent value="fix" className="flex flex-col gap-4">
-          {fixes.length > 0 && (
-            <ol
-              aria-label="Kalimat yang perlu diperbaiki"
-              className="flex flex-col gap-3"
-            >
-              {fixes.map(({ note, index }) => (
-                <AgentNoteItem
-                  key={index}
-                  note={note}
-                  number={index + 1}
-                  numbers={numbers}
-                  onShowMessage={onShowMessage}
-                />
-              ))}
-            </ol>
-          )}
-          {review.weaknesses.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-sm font-semibold">Temuan lain</h4>
-              <PlainList items={review.weaknesses} />
-            </div>
-          )}
-          {toFix.map((item) => (
-            <GuidanceItem
-              key={item.key}
-              item={item}
-              numbers={numbers}
-              onShowMessage={onShowMessage}
-            />
-          ))}
-          {fixes.length === 0 &&
-            review.weaknesses.length === 0 &&
-            toFix.length === 0 && (
-              <Empty>Belum ada temuan perbaikan yang tersedia.</Empty>
-            )}
-        </TabsContent>
+      <ReviewSection id="typo" title="Ejaan">
+        {typos.length === 0 ? (
+          <Empty>Tidak ada salah ketik yang ditemukan.</Empty>
+        ) : (
+          typos.map((typo) => {
+            const number = numbers.get(typo.messageId);
+            const why = enriched.find(
+              (item) =>
+                item.messageId === typo.messageId &&
+                item.originalWord === typo.originalWord,
+            )?.whyWrong;
+            return (
+              <button
+                key={typo.id}
+                type="button"
+                onClick={() => onShowMessage(typo.messageId)}
+                disabled={number === undefined}
+                className="flex min-h-[44px] w-full flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-default"
+              >
+                <span className="font-mono text-xs text-module-ketik">
+                  {number !== undefined
+                    ? `Pesan ${number}`
+                    : "Pesan tidak ditemukan"}{" "}
+                  · {typoSeverityLabel(typo.severity)}
+                </span>
+                <span className="text-sm text-foreground">
+                  <span className="line-through decoration-muted-foreground">
+                    {typo.originalWord}
+                  </span>{" "}
+                  →{" "}
+                  <strong className="font-semibold">
+                    {typo.correctedWord}
+                  </strong>
+                </span>
+                {why && <span className="text-[13px] text-fg2">{why}</span>}
+              </button>
+            );
+          })
+        )}
+      </ReviewSection>
 
-        <TabsContent value="good" className="flex flex-col gap-3">
-          {good.length > 0 ? (
-            <ol
-              aria-label="Respons agen yang sudah baik"
-              className="flex flex-col gap-3"
-            >
-              {good.map(({ note, index }) => (
-                <AgentNoteItem
-                  key={index}
-                  note={note}
-                  number={index + 1}
-                  numbers={numbers}
-                  onShowMessage={onShowMessage}
-                />
-              ))}
-            </ol>
-          ) : (
-            <Empty>
-              Belum tersedia respons agen yang dinilai sudah tepat. Skor tinggi
-              saja tidak menunjukkan kalimat mana yang sudah baik.
-            </Empty>
-          )}
-        </TabsContent>
-
-        <TabsContent value="scores" className="flex flex-col gap-4">
-          <p className="text-[13px] leading-6 text-fg2">
-            Setiap aspek dapat memiliki kekuatan dan kekurangan sekaligus. Skor
-            tinggi tetap dapat memiliki temuan perbaikan.
-          </p>
-          {guidance.map((item) => (
-            <GuidanceItem
-              key={item.key}
-              item={item}
-              targetKey={`scores-${item.key}`}
-              numbers={numbers}
-              onShowMessage={onShowMessage}
-            />
-          ))}
-          {guidance.length === 0 && (
-            <Empty>
-              Alasan skor berdasarkan percakapan belum tersedia untuk telaah
-              ini.
-            </Empty>
-          )}
-        </TabsContent>
-
-        <TabsContent value="typo" className="flex flex-col gap-2">
-          {typos.length === 0 ? (
-            <Empty>Tidak ada salah ketik yang ditemukan.</Empty>
-          ) : (
-            typos.map((typo) => {
-              const number = numbers.get(typo.messageId);
-              const why = enriched.find(
-                (item) =>
-                  item.messageId === typo.messageId &&
-                  item.originalWord === typo.originalWord,
-              )?.whyWrong;
-              return (
-                <button
-                  key={typo.id}
-                  type="button"
-                  onClick={() => onShowMessage(typo.messageId)}
-                  disabled={number === undefined}
-                  className="flex min-h-[44px] w-full flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-default"
-                >
-                  <span className="font-mono text-xs text-module-ketik">
-                    {number !== undefined
-                      ? `Pesan ${number}`
-                      : "Pesan tidak ditemukan"}{" "}
-                    · {typoSeverityLabel(typo.severity)}
-                  </span>
-                  <span className="text-sm text-foreground">
-                    <span className="line-through decoration-muted-foreground">
-                      {typo.originalWord}
-                    </span>{" "}
-                    →{" "}
-                    <strong className="font-semibold">
-                      {typo.correctedWord}
-                    </strong>
-                  </span>
-                  {why && <span className="text-[13px] text-fg2">{why}</span>}
-                </button>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="summary" className="flex flex-col gap-5">
-          <p className="max-w-[65ch] text-[15px] leading-7 text-fg2">
-            {review.aiSummary}
-          </p>
-          {review.strengths.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Kekuatan dalam ringkasan
-              </h4>
-              <PlainList items={review.strengths} />
-            </div>
-          )}
-          {review.coachingFocus.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Fokus coaching
-              </h4>
-              <PlainList items={review.coachingFocus} />
-            </div>
-          )}
-          {(review.education?.overallNextSteps?.length ?? 0) > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="text-[13px] font-semibold text-foreground">
-                Langkah berikutnya
-              </h4>
-              <PlainList items={review.education?.overallNextSteps ?? []} />
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+      {nextSteps.length > 0 && (
+        <ReviewSection id="next" title="Langkah berikutnya">
+          <PlainList items={nextSteps} />
+        </ReviewSection>
+      )}
     </div>
   );
 }
@@ -517,58 +466,91 @@ function GuidanceItem({
   const verified =
     item.source === "transcript" && (item.evidence?.length ?? 0) > 0;
   return (
-    <article
-      aria-label={item.label}
+    <details
       data-review-target={targetKey}
-      tabIndex={-1}
-      className="flex flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 outline-none focus:ring-2 focus:ring-ring"
+      open={item.score < KETIK_FIX_THRESHOLD}
+      className="border-b border-border"
     >
-      <h4 className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-semibold text-foreground">
-        {item.label}
+      <summary className="min-h-[44px] cursor-pointer py-3 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        {item.label}{" "}
         <span className="font-mono text-xs font-medium text-muted-foreground">
           {item.score} · {item.verdict}
         </span>
-      </h4>
-      {verified ? (
-        <>
+      </summary>
+      <div className="flex flex-col gap-2 pb-4">
+        {verified ? (
+          <>
+            <p className="text-[13px] leading-6 text-fg2">
+              <strong className="font-semibold">Alasan skor: </strong>
+              {item.diagnosis}
+            </p>
+            <p className="text-[13px] font-semibold">Bukti percakapan</p>
+            {item.evidence?.map((evidence, index) => (
+              <QuoteButton
+                key={index}
+                prefix="Pesan"
+                messageId={evidence.messageId}
+                quote={evidence.quote}
+                numbers={numbers}
+                onShowMessage={onShowMessage}
+              />
+            ))}
+          </>
+        ) : (
           <p className="text-[13px] leading-6 text-fg2">
-            <strong className="font-semibold">Alasan skor: </strong>
-            {item.diagnosis}
+            Alasan skor berdasarkan percakapan belum tersedia untuk aspek ini.
+            Panduan umum di bawah bukan penjelasan spesifik atas nilai{" "}
+            {item.score}.
           </p>
-          <p className="text-[13px] font-semibold">Bukti percakapan</p>
-          {item.evidence?.map((evidence, index) => (
-            <QuoteButton
-              key={index}
-              prefix="Pesan"
-              messageId={evidence.messageId}
-              quote={evidence.quote}
-              numbers={numbers}
-              onShowMessage={onShowMessage}
-            />
-          ))}
-        </>
-      ) : (
-        <p className="text-[13px] leading-6 text-fg2">
-          Alasan skor berdasarkan percakapan belum tersedia untuk aspek ini.
-          Panduan umum di bawah bukan penjelasan spesifik atas nilai{" "}
-          {item.score}.
+        )}
+        <p className="text-[13px] leading-6 text-foreground">
+          <strong className="font-semibold">
+            {verified ? "Langkah berikutnya: " : "Panduan umum: "}
+          </strong>
+          {item.howToFix}
         </p>
-      )}
-      <p className="text-[13px] leading-6 text-foreground">
-        <strong className="font-semibold">
-          {verified ? "Langkah berikutnya: " : "Panduan umum: "}
-        </strong>
-        {item.howToFix}
-      </p>
-      {item.exampleRewrite && (
-        <p className="rounded-lg bg-muted px-3 py-2 text-[13px] leading-6 text-foreground">
-          <span className="font-semibold">
-            {verified ? "Contoh lebih baik: " : "Contoh latihan: "}
-          </span>
-          {item.exampleRewrite}
-        </p>
-      )}
-    </article>
+        {item.exampleRewrite && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-[13px] leading-6 text-foreground">
+            <span className="font-semibold">
+              {verified ? "Contoh lebih baik: " : "Contoh latihan: "}
+            </span>
+            {item.exampleRewrite}
+          </p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function ReviewSection({
+  id,
+  title,
+  count,
+  children,
+}: {
+  id: string;
+  title: string;
+  count?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={`ketik-review-${id}`}
+      aria-labelledby={`ketik-review-${id}-title`}
+      tabIndex={-1}
+      className="flex flex-col gap-3 outline-none focus:ring-2 focus:ring-ring"
+    >
+      <h3
+        id={`ketik-review-${id}-title`}
+        className="flex flex-wrap items-baseline justify-between gap-2 text-base font-semibold text-foreground"
+      >
+        {title}
+        {count && (
+          <span className="text-[13px] font-normal text-fg2">{count}</span>
+        )}
+      </h3>
+      {children}
+    </section>
   );
 }
 

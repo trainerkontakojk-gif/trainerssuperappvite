@@ -1,5 +1,12 @@
 import { Fragment, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download, Link2, Play, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Link2,
+  PanelRightOpen,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import { detectKetikSessionAnomalies } from "@trainers/types";
 import type {
   KetikHistoryDetail,
@@ -64,6 +71,7 @@ export function KetikReviewStage({
   const [replayOpen, setReplayOpen] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
   const [target, setTarget] = useState<KetikReviewTarget | null>(null);
+  const [reviewVisible, setReviewVisible] = useState(true);
   const messageRefs = useRef(new Map<string, HTMLLIElement>());
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
@@ -108,7 +116,10 @@ export function KetikReviewStage({
       buildQuoteMarks(
         education?.consumerPoints ?? [],
         education?.agentNotes ?? [],
-        setTarget,
+        (nextTarget) => {
+          setReviewVisible(true);
+          setTarget(nextTarget);
+        },
       ),
     [education],
   );
@@ -168,6 +179,16 @@ export function KetikReviewStage({
           >
             <Play data-icon="inline-start" />
             Putar ulang chat
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            aria-controls="ketik-review-result"
+            aria-expanded={reviewVisible}
+            onClick={() => setReviewVisible((visible) => !visible)}
+            className="min-h-[44px] px-3 text-[13px]"
+          >
+            {reviewVisible ? "Sembunyikan telaah" : "Tampilkan telaah"}
           </Button>
           <Button
             type="button"
@@ -309,8 +330,13 @@ export function KetikReviewStage({
         </section>
 
         <section
+          id="ketik-review-result"
           aria-labelledby="ketik-result-title"
-          className="order-first flex min-w-0 flex-col gap-6 bg-surface-elevated p-4 sm:p-6 lg:order-last lg:flex-[1_1_45%] lg:overflow-y-auto"
+          hidden={!reviewVisible}
+          className={cn(
+            "order-first min-w-0 flex-col gap-6 bg-surface-elevated p-4 sm:p-6 lg:order-last lg:flex-[1_1_45%] lg:overflow-y-auto",
+            reviewVisible ? "flex" : "hidden",
+          )}
         >
           <h2 id="ketik-result-title" className="sr-only">
             Hasil telaah
@@ -365,6 +391,32 @@ export function KetikReviewStage({
             />
           )}
         </section>
+        {!reviewVisible && (
+          <aside
+            aria-label="Telaah disembunyikan"
+            className="order-first flex shrink-0 items-center justify-between gap-2 border-border bg-surface-elevated p-3 lg:order-last lg:w-20 lg:flex-col lg:justify-start lg:border-l"
+          >
+            {review.phase === "ready" && (
+              <p className="flex items-baseline gap-2 text-[13px] text-fg2 lg:flex-col lg:items-center">
+                <span>Skor</span>
+                <strong className="font-mono text-lg text-foreground tabular-nums">
+                  {session.finalScore ?? 0}
+                </strong>
+              </p>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="Tampilkan telaah"
+              aria-controls="ketik-review-result"
+              aria-expanded={false}
+              onClick={() => setReviewVisible(true)}
+              className="min-h-[44px] min-w-[44px]"
+            >
+              <PanelRightOpen />
+            </Button>
+          </aside>
+        )}
       </div>
 
       <KetikReviewAttachmentPreview

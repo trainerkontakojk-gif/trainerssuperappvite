@@ -50,7 +50,7 @@ export function buildQuoteMarks(
     add(point.messageId, {
       quote: point.quote,
       label: pointLetter(index),
-      onSelect: () => onSelect({ tab: "questions", key: index }),
+      onSelect: () => onSelect({ section: "questions", key: index }),
       selectLabel: `Lihat pertanyaan konsumen ${pointLetter(index)}`,
       className: consumerMarkClass(point.status),
     }),
@@ -59,7 +59,7 @@ export function buildQuoteMarks(
     add(note.messageId, {
       quote: note.quote,
       label: String(index + 1),
-      onSelect: () => onSelect({ tab: "notes", key: index }),
+      onSelect: () => onSelect({ section: "notes", key: index }),
       selectLabel: `Lihat kalimat agen ${index + 1}`,
       // Gelembung agen berwarna modul: tanda memakai warna teksnya sendiri.
       className: agentMarkClass(note.verdict),

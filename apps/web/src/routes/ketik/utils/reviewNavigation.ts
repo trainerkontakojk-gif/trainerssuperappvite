@@ -1,5 +1,5 @@
 export interface KetikReviewTarget {
-  tab: "questions" | "notes" | "scores";
+  section: "questions" | "notes" | "scores";
   key: string | number;
 }
 
@@ -17,8 +17,18 @@ export function focusReviewTarget(target: HTMLElement): void {
     ) {
       const rect = target.getBoundingClientRect();
       const box = pane.getBoundingClientRect();
+      const navigation = target
+        .closest("#ketik-review-result")
+        ?.querySelector<HTMLElement>('nav[aria-label="Lompat ke bagian"]');
+      const inset = navigation
+        ? navigation.getBoundingClientRect().height +
+          parseFloat(getComputedStyle(pane).paddingTop) +
+          12
+        : 0;
+      // Tall sections must start below the sticky nav, not above the viewport.
+      const offset = Math.max(inset, (pane.clientHeight - rect.height) / 2);
       pane.scrollBy({
-        top: rect.top - box.top - (pane.clientHeight - rect.height) / 2,
+        top: rect.top - box.top - offset,
         behavior,
       });
     }
