@@ -1,0 +1,29 @@
+# Render Blueprint: temporary home for the API and Telefun while Railway is
+# unavailable. Web stays on Vercel. Secrets are not stored here: paste them in
+# the Render dashboard (each service -> Environment -> "Add from .env").
+services:
+  - type: web
+    name: trainers-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    plan: starter
+    region: singapore
+    autoDeploy: false
+    healthCheckPath: /api/health
+    envVars:
+      - key: SERVICE
+        value: api
+
+  - type: web
+    name: trainers-telefun
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    plan: starter
+    region: singapore
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: SERVICE
+        value: telefun

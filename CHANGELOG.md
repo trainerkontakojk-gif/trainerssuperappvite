@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-22
+
+- feat(deploy): API dan Telefun bisa dijalankan sementara di Render (Dockerfile.render + render.yaml dengan FFmpeg), pengaman database produksi dan pembatas spam mengenali Render, dan web mengizinkan alamat onrender.com
+
 ## 2026-10-21
 
 - feat(telefun): pulihkan foto konsumen, tata ulang layar panggilan dengan waveform mikrofon langsung dan retry aman tanpa mengubah timer panggilan atau hold

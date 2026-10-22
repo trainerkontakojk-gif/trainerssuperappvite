@@ -107,8 +107,16 @@ const MAX_CLIENT_IP_LENGTH = 64;
  * Client address for per-IP buckets. Railway's edge appends the real peer as
  * the rightmost X-Forwarded-For hop; every hop to its left is caller-supplied,
  * so keying on those lets a caller mint a fresh bucket per request.
+ *
+ * On Render the request crosses Cloudflare first, which overwrites
+ * `CF-Connecting-IP` with the real peer; the rightmost hop there can be a
+ * proxy address that every client shares.
  */
 function resolveClientIp(c: Context): string {
+  if (process.env.RENDER) {
+    const cfIp = c.req.header("cf-connecting-ip")?.trim();
+    if (cfIp) return cfIp.slice(0, MAX_CLIENT_IP_LENGTH);
+  }
   const hops = c.req.header("x-forwarded-for")?.split(",") ?? [];
   for (let i = hops.length - 1; i >= 0; i--) {
     const hop = hops[i].trim();

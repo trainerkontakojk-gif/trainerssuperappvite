@@ -1,0 +1,14 @@
+# Used by BuildKit for Dockerfile.render. The image is built from a GitHub
+# clone, so this only keeps it small and any local .env out of it.
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+.git
+**/dist
+**/test-results
+**/playwright-report
+mockups
+plans
+plan
+docs

@@ -5,7 +5,8 @@ import { expect, test } from "@playwright/test";
 /**
  * API dan Telefun yang dijalankan di luar server produksi (laptop, Codex)
  * menolak menyala bila Supabase-nya proyek produksi, kecuali sengaja
- * diizinkan dengan ALLOW_PROD_DB_IN_DEV=1. Railway dan Vercel tetap menyala.
+ * diizinkan dengan ALLOW_PROD_DB_IN_DEV=1. Railway, Render, dan Vercel tetap
+ * menyala.
  * Proses dijalankan sungguhan; semua akses jaringan non-loopback diblokir.
  */
 
@@ -20,6 +21,7 @@ const HOSTED_KEYS = [
   "RAILWAY_SERVICE_ID",
   "RAILWAY_DEPLOYMENT_ID",
   "VERCEL",
+  "RENDER",
   "ALLOW_PROD_DB_IN_DEV",
 ];
 
@@ -110,6 +112,12 @@ for (const service of ["api", "telefun"] as const) {
     const { code, log } = await boot(service, {
       RAILWAY_ENVIRONMENT: "production",
     });
+    expect(code, log).toBeNull();
+    expect(log).not.toContain("database produksi");
+  });
+
+  test(`${service}: di Render tetap menyala tanpa peringatan`, async () => {
+    const { code, log } = await boot(service, { RENDER: "true" });
     expect(code, log).toBeNull();
     expect(log).not.toContain("database produksi");
   });

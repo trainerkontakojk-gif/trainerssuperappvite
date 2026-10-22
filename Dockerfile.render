@@ -1,0 +1,22 @@
+# Image for the API and Telefun services on Render (see render.yaml).
+# Named Dockerfile.render on purpose: a root `Dockerfile` would make Railway
+# switch from Railpack to this image.
+# One image holds both; the SERVICE env var (api | telefun) picks which starts.
+FROM node:22-bookworm-slim
+
+# The API remuxes Telefun recordings with FFmpeg; without it WebRTC scoring
+# is never enqueued.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g --no-fund --no-audit pnpm@12.9.1
+
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile \
+  --filter "@trainers/api..." --filter "@trainers/telefun..."
+
+ENV NODE_ENV=production
+ENV SERVICE=api
+CMD ["sh", "-c", "pnpm --filter \"@trainers/${SERVICE}\" start"]
