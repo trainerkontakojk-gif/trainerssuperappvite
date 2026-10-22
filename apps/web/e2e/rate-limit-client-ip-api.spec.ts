@@ -7,6 +7,10 @@
  * requests mimic that shape: a caller-chosen value on the left, a fixed proxy
  * hop on the right.
  *
+ * On Render (`RENDER` set) the request passes Cloudflare first, which
+ * overwrites `CF-Connecting-IP` with the real peer, so that header is the key
+ * there and the rightmost hop may be a shared proxy address.
+ *
  * Runs the real API app (`apps/api/src/app.ts`) in-process. Supabase env is
  * pinned to an unreachable loopback before import and fetch is guarded, so no
  * request can leave the process. Requests carry no token, so the auth
@@ -28,9 +32,9 @@ function proxyHop(): string {
   return `2001:db8::${group()}:${group()}:${group()}`;
 }
 
-function send(forwardedFor: string) {
+function send(forwardedFor: string, extra: Record<string, string> = {}) {
   return app.request("http://localhost/api/v1/home", {
-    headers: { "x-forwarded-for": forwardedFor },
+    headers: { "x-forwarded-for": forwardedFor, ...extra },
   });
 }
 
@@ -81,4 +85,35 @@ test("a single-hop header is still the client key", async () => {
   expect(first.headers.get("x-ratelimit-remaining")).toBe(String(LIMIT - 1));
   const second = await send(` ${client} `);
   expect(second.headers.get("x-ratelimit-remaining")).toBe(String(LIMIT - 2));
+});
+
+test.describe("on Render", () => {
+  test.beforeEach(() => {
+    process.env.RENDER = "true";
+  });
+  test.afterEach(() => {
+    delete process.env.RENDER;
+  });
+
+  test("clients behind one shared proxy hop keep separate buckets", async () => {
+    const sharedHop = proxyHop();
+    const limited = proxyHop();
+    for (let i = 0; i <= LIMIT; i++) {
+      await send(`10.0.0.1, ${sharedHop}`, { "cf-connecting-ip": limited });
+    }
+    const blocked = await send(sharedHop, { "cf-connecting-ip": limited });
+    expect(blocked.status).toBe(429);
+
+    const other = await send(sharedHop, { "cf-connecting-ip": proxyHop() });
+    expect(other.status).toBe(401);
+    expect(other.headers.get("x-ratelimit-remaining")).toBe(String(LIMIT - 1));
+  });
+
+  test("without CF-Connecting-IP the rightmost hop is still the key", async () => {
+    const client = proxyHop();
+    const res = await send(`192.0.2.9, ${client}`);
+    expect(res.headers.get("x-ratelimit-remaining")).toBe(String(LIMIT - 1));
+    const again = await send(`198.51.100.4, ${client}`);
+    expect(again.headers.get("x-ratelimit-remaining")).toBe(String(LIMIT - 2));
+  });
 });

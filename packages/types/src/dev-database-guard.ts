@@ -2,8 +2,8 @@
  * Pengaman database untuk API dan Telefun. Proses yang dijalankan di luar
  * server produksi (laptop, Codex, skrip) tidak boleh memakai proyek Supabase
  * produksi tanpa sengaja: pekerjaan latar belakangnya menulis ke produksi dan
- * pembacaannya menghabiskan kuota egress. Railway dan Vercel dikenali dari
- * variabel yang mereka pasang sendiri.
+ * pembacaannya menghabiskan kuota egress. Railway, Render, dan Vercel dikenali
+ * dari variabel yang mereka pasang sendiri.
  */
 
 export const PRODUCTION_SUPABASE_REF = "ruosnjmtywcrghjgqugz";
@@ -14,6 +14,7 @@ const HOSTED_ENV_KEYS = [
   "RAILWAY_PROJECT_ID",
   "RAILWAY_SERVICE_ID",
   "RAILWAY_DEPLOYMENT_ID",
+  "RENDER",
   "VERCEL",
 ] as const;
 
