@@ -97,6 +97,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       path: "/telefun",
       apiMocks: callMocks(),
       waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
     });
     console.log("[audit]", formatAudit(audit));
     await startCall(page);
@@ -133,6 +134,44 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("konsumen marah: kontrak peran di atas, nada tinggi dan cepat, tetap konsumen saat dihina", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks(),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    console.log("[audit]", formatAudit(audit));
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    // Kontrak peran paling atas, larangan menawarkan bantuan cukup sekali.
+    const head = prompt.slice(0, 900);
+    expect(head).toContain("KONTRAK PERAN");
+    expect(head).toContain("JANGAN PERNAH MENAWARKAN BANTUAN");
+    expect(head).toContain("menjelaskan prosedur");
+    expect(prompt.split("MENAWARKAN BANTUAN").length - 1).toBe(1);
+    // Emosi dibaca sebelum data skenario.
+    expect(prompt.indexOf("EMOSI: MARAH/KESAL")).toBeLessThan(
+      prompt.indexOf("DATA SKENARIO"),
+    );
+    // Dihina tetap konsumen dan makin marah.
+    expect(prompt).toContain("menghina");
+    // Nada tinggi dan tempo cepat, tanpa arahan tempo yang menyuruh sabar.
+    expect(prompt).toContain("TEMPO RESPONS (MARAH)");
+    expect(prompt).not.toContain("Jangan memotong agen terlalu cepat");
+    expect(prompt).not.toContain("oh begitu");
+    expect(prompt).not.toContain("tunggu dengan sabar");
+    // Tidak ada kata maaf yang bisa ditiru sebagai gaya bicara agen.
+    expect(prompt).not.toMatch(/maaf/i);
+    expect(prompt).not.toContain("ketidaknyamanan");
+    expectHermetic(audit);
+  });
+
   test("sinyal hold: urutan hold dan lamanya dikirim ke konsumen saat hold selesai", async ({
     page,
   }) => {
@@ -143,6 +182,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       path: "/telefun",
       apiMocks: callMocks(),
       waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
     });
     const call = await startCall(page);
     expect(holdEndCues(messages)).toEqual([]);
@@ -198,6 +238,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
         ],
       }),
       waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
     });
     await startCall(page);
 
