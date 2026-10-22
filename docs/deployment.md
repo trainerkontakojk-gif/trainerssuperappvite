@@ -75,6 +75,7 @@ root sekarang mengunci ke web saja.
 | `VITE_SUPABASE_URL`                           | `https://<project>.supabase.co`     | Supabase project URL                                                                     |
 | `SUPABASE_SERVICE_ROLE_KEY`                   | `eyJ...`                            | Service role key                                                                         |
 | `GEMINI_API_KEY`                              | `AI...`                             | Google Gemini API key                                                                    |
+| `GEMINI_PROXY_URL` | kosong (opsional) | Proxy HTTP(S) via CONNECT, hanya untuk `generativelanguage.googleapis.com`. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. OpenAI/Supabase tetap langsung; proxy gagal tidak fallback langsung. |
 | `OPENAI_API_KEY`                              | `sk-...`                            | OpenAI API key untuk text generation direct via Responses API                            |
 | `TELEFUN_INTERNAL_URL`                        | retired compatibility value         | Tidak memulai assessment OpenAI Telefun; API scoring tidak memanggil endpoint internal ini |
 | `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
@@ -128,6 +129,7 @@ Detail batas integrasi ada di [`docs/architecture.md`](architecture.md#sidak--ja
 | `SUPABASE_ANON_KEY`                                | `eyJ...`                        | Supabase anon key                                                                                                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                        | `eyJ...`                        | Service role key                                                                                                              |
 | `GEMINI_API_KEY`                                   | `AI...`                         | Google Gemini API key                                                                                                         |
+| `GEMINI_PROXY_URL` | kosong (opsional) | Proxy HTTP(S) via CONNECT khusus Gemini Live. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. Supabase/OpenAI tetap langsung; semua reconnect Gemini tetap lewat proxy. |
 | `OPENAI_API_KEY`                                   | kosong/opsional                 | Tidak digunakan untuk Telefun start; API tetap memerlukan key ini untuk direct OpenAI text |
 | `TELEFUN_OPENAI_ENABLED`                           | retired/no-op                  | Retired permanently; ignored and cannot enable Telefun OpenAI Realtime                                                      |
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | retired/no-op                  | Retired permanently; POST/start and capability remain unavailable                                                            |
@@ -146,6 +148,8 @@ Detail batas integrasi ada di [`docs/architecture.md`](architecture.md#sidak--ja
 | `ALLOWED_ORIGINS`                                  | exact HTTPS allowlist           | Exact origin list for production and historical cleanup DELETE; wildcard/HTTP are rejected                                     |
 
 Aturan secret/config:
+
+- `GEMINI_PROXY_URL` bersifat server-only untuk API dan Telefun, tanpa prefix `VITE_`. Contoh untuk host yang diblokir Google: `http://10.0.1.1:40000` (atau URL proxy `https://`). Nilai kosong/tidak diset mempertahankan koneksi langsung. URL tidak valid atau protokol selain HTTP(S) menolak startup dengan pesan `GEMINI_PROXY_URL`; jangan mencatat URL berkredensial ke log. Proxy harus dapat dijangkau dari container; pengaturan bridge/forwarder VPS merupakan langkah terpisah, bukan bagian dari perubahan kode ini.
 
 - `OPENAI_API_KEY` wajib ada di API service untuk direct text generation. Telefun tidak mengaktifkan OpenAI Realtime; optional historical cleanup credentials tetap server-only dan tidak pernah dibundle ke Web/Vercel.
 - `TELEFUN_INTERNAL_URL`/`TELEFUN_INTERNAL_TOKEN` remain server-only compatibility/health values. They do not authorize OpenAI scoring, sideband, or a provider start, and must never be exposed as `VITE_*` values.

@@ -20,6 +20,15 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_ANON_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
+  GEMINI_PROXY_URL: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z
+      .string()
+      .url("GEMINI_PROXY_URL must be a valid HTTP(S) URL")
+      .regex(/^https?:\/\//, "GEMINI_PROXY_URL must be a valid HTTP(S) URL")
+      .optional(),
+  ),
   OPENAI_API_KEY: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional(),
   NODE_ENV: z

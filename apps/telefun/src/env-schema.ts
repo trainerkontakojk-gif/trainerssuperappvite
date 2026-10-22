@@ -25,6 +25,15 @@ export const telefunEnvSchema = z
     SUPABASE_ANON_KEY: z.string().min(1),
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     GEMINI_API_KEY: z.string().min(1),
+    GEMINI_PROXY_URL: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z
+        .string()
+        .url("GEMINI_PROXY_URL must be a valid HTTP(S) URL")
+        .regex(/^https?:\/\//, "GEMINI_PROXY_URL must be a valid HTTP(S) URL")
+        .optional(),
+    ),
     // Optional solely for historical WebRTC hangup cleanup. It never changes
     // readiness, provider selection, or admission.
     OPENAI_API_KEY: optionalSecret,

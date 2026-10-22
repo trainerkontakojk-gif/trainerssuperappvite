@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-22
 
+- feat(deploy): tambahkan proxy HTTP opsional khusus Gemini di API dan Telefun tanpa mengubah koneksi langsung saat GEMINI_PROXY_URL kosong
+
 - feat(deploy): web mengizinkan panggilan https/wss ke *.trainerssuperapp.my.id agar web, API, dan Telefun bisa berjalan di VPS Coolify
 
 - feat(deploy): API dan Telefun bisa dijalankan sementara di Render (Dockerfile.render + render.yaml dengan FFmpeg), pengaman database produksi dan pembatas spam mengenali Render, dan web mengizinkan alamat onrender.com

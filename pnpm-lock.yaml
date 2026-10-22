@@ -270,6 +270,9 @@ importers:
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      undici:
+        specifier: 7.30.0
+        version: 7.30.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -301,6 +304,9 @@ importers:
       '@trainers/types':
         specifier: workspace:*
         version: link:../../packages/types
+      https-proxy-agent:
+        specifier: 7.0.6
+        version: 7.0.6(supports-color@7.2.0)
       ws:
         specifier: ^8.22.0
         version: 8.22.0

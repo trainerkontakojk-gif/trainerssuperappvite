@@ -34,6 +34,7 @@
     "@trainers/types": "workspace:*",
     "hono": "^4.13.13",
     "tsx": "^4.23.15",
+    "undici": "7.30.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

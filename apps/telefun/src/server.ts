@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import { env } from "./env.js";
+import { getGeminiProxyOptions } from "./gemini-proxy.js";
 import { verifyToken } from "./auth.js";
 import {
   flushLiveUsage,
@@ -220,7 +221,8 @@ const allowedOrigins =
 
 function connectGemini(): WebSocket {
   const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${env.GEMINI_API_KEY}`;
-  return new WebSocket(geminiUrl);
+  const options = getGeminiProxyOptions();
+  return options ? new WebSocket(geminiUrl, options) : new WebSocket(geminiUrl);
 }
 
 wss.on("connection", async (ws, req) => {

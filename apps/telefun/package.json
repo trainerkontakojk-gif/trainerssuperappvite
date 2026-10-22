@@ -21,6 +21,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
     "@trainers/types": "workspace:*",
+    "https-proxy-agent": "7.0.6",
     "ws": "^8.22.0",
     "zod": "^4.6.7"
   },
