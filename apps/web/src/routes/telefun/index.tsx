@@ -65,6 +65,7 @@ const navButtonClass =
 type ActiveTelefunSessionConfig = TelefunAppSettings & {
   simulationSubject?: SimulationSubjectSnapshot | null;
   simulationSubjectSelection?: SimulationSubjectSelection;
+  microphoneDeviceId?: string;
 };
 
 interface ActiveCall {
@@ -110,6 +111,7 @@ export default function TelefunLanding() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [micStatus, setMicStatus] = useState<MicCheckStatus>("asking");
+  const [microphoneDeviceId, setMicrophoneDeviceId] = useState<string>();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
@@ -304,6 +306,7 @@ export default function TelefunLanding() {
       ? { ...retryConfig }
       : {
           ...settings,
+          microphoneDeviceId,
           telefunModelId: normalizedSelection.model.id,
           telefunTransport: "gemini-live",
           activeScenario: scenario,
@@ -388,6 +391,7 @@ export default function TelefunLanding() {
       return;
     }
     setMicStatus("asking");
+    setMicrophoneDeviceId(undefined);
     setShowSubjectPicker(true);
   };
 
@@ -766,7 +770,10 @@ export default function TelefunLanding() {
           onConfirm={(selection) => startCall(selection)}
           onCancel={() => setShowSubjectPicker(false)}
         >
-          <MicCheck onStatusChange={setMicStatus} />
+          <MicCheck
+            onStatusChange={setMicStatus}
+            onDeviceChange={setMicrophoneDeviceId}
+          />
         </SimulationSubjectPicker>
       )}
     </div>

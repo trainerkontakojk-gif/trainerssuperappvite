@@ -71,6 +71,23 @@ does not publish a first-party gender field for the full catalog.
 Historical raw model and transport fields remain visible in history. Settings
 normalization never rewrites historical history rows.
 
+## Mikrofon panggilan
+
+- Dialog **Siapa yang berlatih?** mengecek mikrofon secara lokal. Setelah izin
+  diberikan, pilihan **Mikrofon** muncul bila ada beberapa input; satu input
+  tetap ditampilkan sebagai nama perangkat dan meter suara. Daftar diperbarui
+  saat headset dipasang/dilepas.
+- Pilihan diingat per browser (`localStorage`, bukan pengaturan server). Bila
+  perangkat tersimpan sudah tidak ada, dialog mengecek default browser dan
+  menampilkan nama perangkat aktual. Penyimpanan yang diblokir tidak menghalangi
+  cek mikrofon atau panggilan.
+- Panggilan meminta `deviceId` track yang sudah dicek dengan constraint `exact`;
+  meter selama panggilan mengamati stream sesi yang sama. Tanpa id yang tersedia,
+  jalur lama memakai default browser.
+- Headset yang hilang setelah cek membuat panggilan gagal, bukan beralih diam-diam
+  ke mikrofon laptop. Pesan meminta pengguna memeriksa headset atau memilih
+  mikrofon lain; kembali ke Telefun untuk membuka cek mikrofon lagi.
+
 ## Scoring runtime
 
 Post-session voice scoring memakai queue durable di Supabase dan kini diproses oleh

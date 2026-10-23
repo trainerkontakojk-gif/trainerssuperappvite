@@ -169,7 +169,7 @@ export class LiveSession {
 
   public async connect(
     accessToken: string,
-    options: { pickUp?: Promise<void> } = {},
+    options: { pickUp?: Promise<void>; microphoneDeviceId?: string } = {},
   ) {
     if (options.pickUp) {
       this.isPickedUp = false;
@@ -186,6 +186,9 @@ export class LiveSession {
       // 1. Get User Media
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          ...(options.microphoneDeviceId
+            ? { deviceId: { exact: options.microphoneDeviceId } }
+            : {}),
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -309,6 +312,28 @@ export class LiveSession {
         });
       };
     } catch (err) {
+      if (
+        options.microphoneDeviceId &&
+        !this.stream &&
+        err &&
+        typeof err === "object" &&
+        "name" in err &&
+        ["OverconstrainedError", "NotFoundError"].includes(String(err.name))
+      ) {
+        const error = Object.assign(
+          new Error("Selected microphone unavailable"),
+          {
+            code: "selected_microphone_unavailable",
+          },
+        );
+        // Fail closed before any socket/recording starts. Never retry another mic.
+        this.intentionalClose = true;
+        this.cleanupAudio();
+        this.onError(error);
+        this.onStatusChange("Gagal");
+        this.setSessionState("ended");
+        return;
+      }
       this.onError(err as Error);
     }
   }

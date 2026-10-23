@@ -20,7 +20,7 @@ export interface GeminiTelefunTransportSession {
   /** `pickUp` resolves when the ring ends; the call starts then. */
   connect(
     accessToken: string,
-    options?: { pickUp?: Promise<void> },
+    options?: { pickUp?: Promise<void>; microphoneDeviceId?: string },
   ): Promise<void>;
   setMute(muted: boolean): void;
   setHold(held: boolean): void;
@@ -143,6 +143,9 @@ function readTransportError(error: unknown): TelefunTransportErrorDetails {
 
 export function mapTelefunTransportError(error: unknown): string {
   const details = readTransportError(error);
+  if (details.code === "selected_microphone_unavailable") {
+    return "Mikrofon yang dipilih tidak tersedia. Periksa headset atau pilih mikrofon lain, lalu coba lagi.";
+  }
   if (
     [
       "NotAllowedError",

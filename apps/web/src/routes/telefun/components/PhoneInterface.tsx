@@ -45,7 +45,7 @@ import { getKetikConsumerAvatarUrl } from "../../ketik/lib/ketik-avatar";
 type TelefunEndSessionReason = "completed" | "failed" | "timeout";
 
 interface PhoneInterfaceProps {
-  config: TelefunAppSettings;
+  config: TelefunAppSettings & { microphoneDeviceId?: string };
   accessToken: string;
   onEndSession: (reason?: TelefunEndSessionReason) => void;
   onRecordingReady?: (
@@ -396,7 +396,10 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         sessionRef.current = session;
         bindSession(session);
         void session
-          .connect(accessToken, { pickUp: ring.then(() => undefined) })
+          .connect(accessToken, {
+            pickUp: ring.then(() => undefined),
+            microphoneDeviceId: config.microphoneDeviceId,
+          })
           .catch((connectError: unknown) => {
             if (terminalFailureRef.current) return;
             terminalFailureRef.current = true;
@@ -605,7 +608,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   }, [callDuration, config.maxCallDuration, connectionState]);
 
   const micActivity = useMicrophoneActivity({
-    active: connectionState === "Tersambung" && !isOnHold,
+    active: connectionState === "Tersambung" && !isOnHold && !!localStream,
     muted: isMuted,
     stream: localStream,
   });

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-23
 
+- fix(telefun): panggilan memakai mikrofon yang dipilih dan dicek di dialog Siapa yang berlatih (mis. headset Jabra), pilihan diingat per browser, dan panggilan gagal jelas bila mic itu hilang alih-alih pindah diam-diam ke mic laptop
+
 - fix(telefun): konsumen AI kembali memilih Mas/Mbak atau Pak/Bu dari suara agen seperti Agustus, memakai "Kak" hanya saat ragu, tanpa meniru sapaan dari contoh kalimat
 
 - fix(telefun): konsumen AI memanggil agen dengan sapaan netral "Kak" atau tanpa sapaan dan tidak lagi menebak Mas/Mbak/Pak/Bu, karena jenis kelamin agen tidak diketahui prompt
