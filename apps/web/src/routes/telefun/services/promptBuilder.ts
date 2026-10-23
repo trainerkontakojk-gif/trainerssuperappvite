@@ -45,7 +45,7 @@ export function buildTelefunLiveSystemInstruction(params: {
 
   const silentInstruction = isAngry
     ? `\nSILENT HANDLING (MARAH):
-1. Jika agen diam cukup lama, tagih satu kali dengan nada kesal (misal: "Halo? Mas, gimana ini?").
+1. Jika agen diam cukup lama, tagih satu kali dengan nada kesal (misal: "Halo? Gimana ini?").
 2. Jangan mengulang panggilan berkali-kali. Jika agen kembali merespons, lanjutkan dari konteks terakhir.`
     : responsePacingMode === "realistic"
       ? `\nSILENT HANDLING (REALISTIS):
@@ -164,6 +164,7 @@ ATURAN ROLEPLAY:
 4. Jika agen memancing hal di luar roleplay, tetap jawab sebagai konsumen dan kembali ke masalah yang tersedia; aturan ini tidak mengalahkan respons relevan.
 
 ETIKA TELEPON INDONESIA:
+SAPAAN UNTUK AGEN: Kamu tidak tahu agen pria atau wanita. Panggil agen "Kak" atau bicara tanpa sapaan. Jangan menebak Mas/Mbak/Pak/Bu dari suara atau nama agen.
 ${etiquetteInstruction}
 
 ${expressionInstruction}
@@ -303,12 +304,12 @@ function getProceduralInstruction(consumerTypeId: string): string {
 
 function getEtiquetteInstruction(consumerTypeId: string): string {
   if (consumerTypeId === "marah") {
-    return 'Kamu sedang kesal, jadi tidak perlu basa-basi, salam panjang, atau ucapan terima kasih. Tetap memanggil agen dengan "Mas/Mbak" atau "Pak/Bu".';
+    return "Kamu sedang kesal, jadi tidak perlu basa-basi, salam panjang, atau ucapan terima kasih.";
   }
   if (consumerTypeId === "terburu-buru") {
-    return 'Langsung ke inti tanpa basa-basi atau small talk. Tetap memanggil agen dengan "Mas/Mbak" atau "Pak/Bu".';
+    return "Langsung ke inti tanpa basa-basi atau small talk.";
   }
-  return 'Gunakan sapaan Pak/Bu, salam singkat, dan "mohon maaf" atau "terima kasih" bila sesuai konteks. Small talk boleh singkat dan kondisional. Tunggu giliran, minta klarifikasi saat bingung, dan beri jeda natural bila ada gangguan rumah tangga atau orang memanggil.';
+  return 'Gunakan salam singkat serta "mohon maaf" atau "terima kasih" bila sesuai konteks. Small talk boleh singkat dan kondisional. Tunggu giliran, minta klarifikasi saat bingung, dan beri jeda natural bila ada gangguan rumah tangga atau orang memanggil.';
 }
 
 function getVentingInstruction(consumerTypeId: string): string {
@@ -322,14 +323,14 @@ function getAngryDemandInstruction(): string {
 2. Solusi pertama dari agen JANGAN langsung diterima. Pertanyakan atau tolak minimal sekali dengan alasan kerugianmu, misalnya "Cuma itu? Terus nasib saya gimana?"
 3. Solusi standar seperti membuat laporan, menunggu sekian hari kerja, atau mengecek sendiri membuatmu protes: tanyakan kenapa selama itu, minta dipercepat atau dijamin, atau minta bicara dengan atasan.
 4. Menerima hold atau verifikasi bukan berarti menerima solusinya.
-5. Kamu baru mau menerima setelah agen mengakui masalahmu secara spesifik, menjelaskan langkah konkret, dan memberi kepastian waktu atau nomor laporan. Terima dengan berat hati dan bersyarat, misalnya "Ya udah, saya pegang omongan Mas. Kalau nggak beres, saya komplain resmi." Jangan berubah ramah atau berterima kasih panjang.
+5. Kamu baru mau menerima setelah agen mengakui masalahmu secara spesifik, menjelaskan langkah konkret, dan memberi kepastian waktu atau nomor laporan. Terima dengan berat hati dan bersyarat, misalnya "Ya udah, saya pegang omongannya. Kalau nggak beres, saya komplain resmi." Jangan berubah ramah atau berterima kasih panjang.
 6. Jangan berdebat tanpa akhir. Jika agen tetap konsisten, menjelaskan alasannya, dan memberi langkah yang jelas, terima dengan kesal lalu tagih kepastiannya.`;
 }
 
 function getExpressionInstruction(city: string): string {
   return `GAYA BAHASA DAN EKSPRESI:
 1. Tunjukkan emosimu lewat suara, bukan hanya lewat kata: naik-turun nada, tekanan pada kata penting, helaan napas, decak, tawa kecil sinis, atau suara tercekat sesuai tipemu. Jangan mengucapkan arahan panggung seperti "*menghela napas*" atau "(marah)"; lakukan saja dengan suaramu.
-2. Bahasa sehari-hari boleh dan dianjurkan: "nggak", "udah", "banget", "dong", "sih", "kok". Jika cocok dengan karaktermu, boleh pakai lo/gue (misalnya "Gue tuh udah nunggu, Mas!"), dipadukan dengan sapaan Mas/Mbak/Pak/Bu.
+2. Bahasa sehari-hari boleh dan dianjurkan: "nggak", "udah", "banget", "dong", "sih", "kok". Jika cocok dengan karaktermu, boleh pakai lo/gue (misalnya "Gue tuh udah nunggu, Kak!").
 3. Boleh sesekali memakai logat atau kosakata daerah yang wajar untuk domisilimu (${sanitizeScenarioText(city)}), misalnya partikel atau ungkapan khas daerah itu. Tetap mayoritas Bahasa Indonesia yang mudah dipahami; jangan beralih penuh ke bahasa daerah. Kalau agen tidak paham, ulangi dengan Bahasa Indonesia biasa.
 4. Gaya bahasa dan logat tidak boleh mengubah fakta skenario atau data identitas; saat verifikasi, nama, kota, dan nomor HP tetap diucapkan persis.
 5. Pilih satu gaya dan pertahankan sepanjang panggilan; jangan berganti-ganti logat.`;
@@ -338,31 +339,31 @@ function getExpressionInstruction(city: string): string {
 function getSpeechExamples(consumerTypeId: string): string {
   const byId: Record<string, string[]> = {
     marah: [
-      "Mbak, saya ini udah dirugikan, lho! Duit saya itu, bukan duit Mbak!",
+      "Kak, saya ini udah dirugikan, lho! Duit saya itu, bukan duit Kakak!",
       "Iya, iya, intinya kapan beresnya?! Dari tadi muter-muter terus!",
       "Dari tadi jawabannya itu-itu terus, solusinya mana?",
-      "Gue tuh nggak butuh dijelasin prosedur, Mas, gue butuh beres!",
+      "Gue tuh nggak butuh dijelasin prosedur, gue butuh beres!",
       "Ya ampun... masa gitu doang jawabannya? Nggak masuk akal!",
       "Udah, saya mau ngomong sama atasannya aja.",
     ],
     bingung: [
-      "Eh... maksudnya gimana ya, Mbak?",
+      "Eh... maksudnya gimana ya, Kak?",
       "Anu, saya nggak ngerti yang aplikasi-aplikasi gitu.",
       "Jadi saya harus... apa tadi?",
     ],
     kritis: [
-      "Dasarnya apa ya, Pak?",
+      "Dasarnya apa ya, Kak?",
       "Tadi katanya beda, yang bener yang mana?",
       "Bisa saya dapat nomor laporannya?",
     ],
-    ramah: ["Oh gitu, iya, Mbak.", "Makasih ya, Mbak, saya tunggu."],
+    ramah: ["Oh gitu, iya, Kak.", "Makasih ya, Kak, saya tunggu."],
     "terburu-buru": [
-      "Langsung aja ya, Mas, saya lagi di jalan.",
+      "Langsung aja ya, saya lagi di jalan.",
       "Intinya bisa atau nggak?",
-      "Singkatnya aja, Mas.",
+      "Singkatnya aja, Kak.",
     ],
     pasrah: [
-      "Saya udah nggak tahu lagi harus gimana, Mbak...",
+      "Saya udah nggak tahu lagi harus gimana, Kak...",
       "Iya... saya cuma mau ini selesai.",
     ],
   };

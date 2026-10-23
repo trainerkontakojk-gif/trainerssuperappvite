@@ -241,6 +241,35 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  for (const consumerTypeId of ["marah", "ramah"]) {
+    test(`sapaan agen netral (${consumerTypeId}): konsumen tidak menebak agen pria atau wanita`, async ({
+      page,
+    }) => {
+      const messages: Record<string, unknown>[] = [];
+      await mockTelefunVoiceServer(page, NEW_ID, messages);
+      const audit = await openHermeticShell(page, {
+        path: "/telefun",
+        apiMocks: callMocks({ preferredConsumerTypeId: consumerTypeId }),
+        waitForUrl: /\/telefun/,
+        expectedThirdPartyHosts: ["randomuser.me"],
+      });
+      await startCall(page);
+
+      const prompt = configuredInstructions(messages);
+      expect(prompt).toContain(`EMOSI: ${consumerTypeId.toUpperCase()}`);
+      const rule = prompt
+        .split("\n")
+        .find((line) => line.startsWith("SAPAAN UNTUK AGEN:"));
+      expect(rule).toContain('"Kak"');
+      expect(rule).toContain("Jangan menebak");
+      // Di luar aturan itu tidak ada sapaan bergender untuk agen yang bisa ditiru.
+      const rest = prompt.replace(rule!, "");
+      expect(rest).not.toMatch(/\b(Mas|Mbak|Pak|Bu)\b/);
+      expect(rest).toContain("KARAKTER: ");
+      expectHermetic(audit);
+    });
+  }
+
   test("sinyal hold: urutan hold dan lamanya dikirim ke konsumen saat hold selesai", async ({
     page,
   }) => {

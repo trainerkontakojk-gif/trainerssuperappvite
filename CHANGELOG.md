@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-23
 
+- fix(telefun): konsumen AI memanggil agen dengan sapaan netral "Kak" atau tanpa sapaan dan tidak lagi menebak Mas/Mbak/Pak/Bu, karena jenis kelamin agen tidak diketahui prompt
+
 - fix(telefun): konsumen marah ngotot menolak solusi pertama dan baru menerima dengan berat hati setelah ada langkah konkret dan kepastian waktu, dan domisili provinsi seperti "Lampung" dijawab dengan kota/kabupaten spesifik hanya saat agen memprobingnya
 
 - fix(pdkt): catat peserta yang dipilih saat membalas pada Riwayat, Monitoring, dan SIDAK tanpa mengubah snapshot pembuat email atau riwayat lama
