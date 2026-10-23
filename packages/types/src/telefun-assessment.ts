@@ -125,6 +125,28 @@ export const TELEFUN_CONSUMER_POINT_STATUSES = [
   "unanswered",
 ] as const;
 export const TELEFUN_AGENT_NOTE_VERDICTS = ["good", "fix"] as const;
+export const TELEFUN_AGENT_NOTE_LIMIT = 16;
+export const TELEFUN_AGENT_NOTE_CATEGORIES = [
+  "repetition",
+  "effectiveness",
+  "clarity",
+  "empathy",
+  "politeness",
+  "accuracy",
+  "confirmation",
+] as const;
+export const TELEFUN_AGENT_NOTE_LABELS: Record<
+  (typeof TELEFUN_AGENT_NOTE_CATEGORIES)[number],
+  string
+> = {
+  repetition: "Pengulangan",
+  effectiveness: "Efektivitas kalimat",
+  clarity: "Kejelasan penjelasan",
+  empathy: "Empati",
+  politeness: "Kesantunan",
+  accuracy: "Ketepatan informasi",
+  confirmation: "Konfirmasi dan penggalian",
+};
 
 const transcriptTimeSchema = finiteNumber.nonnegative();
 
@@ -141,10 +163,18 @@ export const telefunConsumerPointSchema = z.object({
   answerQuote: z.string().nullable(),
 });
 
-/** Kalimat agen yang dinilai, dengan kalimat yang lebih tepat bila perlu. */
-export const telefunAgentNoteSchema = z.object({
+/** Exact occurrence in the original transcript; legacy notes have no offset. */
+const telefunQuoteEvidenceSchema = z.object({
   startMs: transcriptTimeSchema,
   quote: z.string(),
+  startOffset: finiteNumber.int().nonnegative().optional(),
+});
+
+/** Kalimat agen yang dinilai, dengan kalimat yang lebih tepat bila perlu. */
+export const telefunAgentNoteSchema = telefunQuoteEvidenceSchema.extend({
+  /** Absent on older results; never infer a category from their prose. */
+  category: z.enum(TELEFUN_AGENT_NOTE_CATEGORIES).optional(),
+  comparison: telefunQuoteEvidenceSchema.optional(),
   verdict: z.enum(TELEFUN_AGENT_NOTE_VERDICTS),
   note: z.string(),
   /** Kalimat pengganti; hanya untuk `verdict: "fix"`. */
@@ -158,7 +188,7 @@ export const telefunAgentNoteSchema = z.object({
 export const telefunContentReviewSchema = z.object({
   caseCore: z.string().nullable(),
   consumerPoints: z.array(telefunConsumerPointSchema).max(5),
-  agentNotes: z.array(telefunAgentNoteSchema).max(8),
+  agentNotes: z.array(telefunAgentNoteSchema).max(TELEFUN_AGENT_NOTE_LIMIT),
 });
 
 export type TelefunConsumerPointStatus =

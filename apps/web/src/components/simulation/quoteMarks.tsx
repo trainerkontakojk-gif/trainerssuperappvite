@@ -60,6 +60,8 @@ export const pointLetter = (index: number) => String.fromCharCode(65 + index);
 /** Kutipan anotasi yang ditandai di satu baris transkrip. */
 export interface QuoteMark {
   quote: string;
+  /** Exact UTF-16 offset verified against the original transcript. */
+  startOffset?: number;
   label: string;
   className: string;
   /** Label tanda menjadi tombol menuju poinnya di panel hasil. */
@@ -95,47 +97,92 @@ export function withQuoteMarks(
 ): ReactNode {
   const placed = marks
     .flatMap((mark) => {
-      const range = findQuoteRange(text, mark.quote);
+      const offset = mark.startOffset;
+      const range =
+        offset === undefined
+          ? findQuoteRange(text, mark.quote)
+          : Number.isInteger(offset) &&
+              offset >= 0 &&
+              mark.quote.length > 0 &&
+              text.slice(offset, offset + mark.quote.length) === mark.quote
+            ? { start: offset, end: offset + mark.quote.length }
+            : null;
       return range ? [{ ...range, mark }] : [];
     })
-    .sort((a, b) => a.start - b.start)
-    // Kutipan yang bertumpuk dengan tanda sebelumnya tidak ditandai.
-    .filter((item, index, list) =>
-      list.slice(0, index).every((prev) => prev.end <= item.start),
-    );
+    .sort((a, b) => a.start - b.start);
   if (placed.length === 0) return renderInner(text);
 
+  // Merge intersecting coverage, not findings: every finding keeps its own
+  // button at its quote end. Never duplicate text or nest interactive marks.
+  const groups: { start: number; end: number; items: typeof placed }[] = [];
+  for (const item of placed) {
+    const last = groups.at(-1);
+    if (last && item.start < last.end) {
+      last.end = Math.max(last.end, item.end);
+      last.items.push(item);
+    } else groups.push({ start: item.start, end: item.end, items: [item] });
+  }
   const parts: ReactNode[] = [];
   let cursor = 0;
-  for (const { start, end, mark } of placed) {
-    if (start > cursor) {
+  for (const group of groups) {
+    if (group.start > cursor)
       parts.push(
         <span key={`t${cursor}`}>
-          {renderInner(text.slice(cursor, start))}
+          {renderInner(text.slice(cursor, group.start))}
         </span>,
       );
+    const boundaries = [
+      ...new Set(group.items.flatMap(({ start, end }) => [start, end])),
+    ].sort((a, b) => a - b);
+    const content: ReactNode[] = [];
+    for (let i = 1; i < boundaries.length; i++) {
+      const start = boundaries[i - 1]!;
+      const end = boundaries[i]!;
+      const active = group.items.filter(
+        (item) => item.start <= start && item.end >= end,
+      );
+      content.push(
+        <span
+          key={`s${start}`}
+          className={cn(...active.map((item) => item.mark.className))}
+        >
+          {renderInner(text.slice(start, end))}
+        </span>,
+      );
+      group.items
+        .filter((item) => item.end === end)
+        .forEach(({ mark }, index) => {
+          content.push(
+            mark.onSelect ? (
+              <button
+                key={`b${end}-${index}`}
+                type="button"
+                onClick={mark.onSelect}
+                aria-label={mark.selectLabel ?? mark.label}
+                className="relative -top-1.5 ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-md border border-border bg-background px-1 align-baseline font-mono text-xs leading-none font-bold text-foreground no-underline transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+              >
+                {mark.label}
+              </button>
+            ) : (
+              <sup
+                key={`b${end}-${index}`}
+                className="ml-0.5 font-mono text-xs font-bold"
+              >
+                {mark.label}
+              </sup>
+            ),
+          );
+        });
     }
     parts.push(
       <mark
-        key={`m${start}`}
-        className={cn("px-0.5 [box-decoration-break:clone]", mark.className)}
+        key={`m${group.start}`}
+        className="bg-transparent px-0.5 text-inherit [box-decoration-break:clone]"
       >
-        {renderInner(text.slice(start, end))}
-        {mark.onSelect ? (
-          <button
-            type="button"
-            onClick={mark.onSelect}
-            aria-label={mark.selectLabel ?? mark.label}
-            className="relative -top-1.5 ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-md border border-border bg-background px-1 align-baseline font-mono text-xs leading-none font-bold text-foreground no-underline transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-          >
-            {mark.label}
-          </button>
-        ) : (
-          <sup className="ml-0.5 font-mono text-xs font-bold">{mark.label}</sup>
-        )}
+        {content}
       </mark>,
     );
-    cursor = end;
+    cursor = group.end;
   }
   if (cursor < text.length) {
     parts.push(

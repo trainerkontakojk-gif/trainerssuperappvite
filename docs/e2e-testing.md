@@ -194,6 +194,28 @@ pnpm --filter @trainers/web exec playwright test ketik-flow.spec.ts ketik-server
 E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-session-browser.spec.ts --workers=1 --trace on
 ```
 
+## Telefun — bukti bahasa
+
+`telefun-flow.spec.ts` memuat skenario kategori bahasa di Telaah: label
+Pengulangan/Efektivitas kalimat, navigasi dua arah berulang pada dua kutipan,
+dua kemunculan dalam satu baris, kutipan bertumpang tindih, dan catatan lama.
+Skenario menyimpan screenshot 390/1280px light/dark dan memeriksa overflow.
+
+`telefun-language-evidence-api.spec.ts` / project
+`telefun-language-evidence-stub` menjalankan handler skor Hono, assessment,
+parser shared, normalisasi dan logger usage produk. Transport database,
+storage dan respons HTTP provider memakai fixture loopback/fail-closed,
+bukan pengganti fungsi bisnis. Kontrak yang diperiksa: kategori/pembanding
+bertahan sampai RPC persist/response, bukti palsu/salah pembicara/masa depan/
+kemunculan sama ditolak, offset satu baris, batas 16 catatan, hasil lama,
+skor tetap dan jumlah panggilan AI tidak bertambah. Ini bukan sertifikasi
+JWT/RLS, database produksi, audio model atau akurasi semantik model nyata.
+
+```bash
+pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project telefun-language-evidence-stub --workers=1
+pnpm --dir apps/web exec playwright test telefun-flow.spec.ts --workers=1
+```
+
 ## Repository hygiene
 
 `apps/web/test-results/` is run output: it is gitignored and no longer tracked, because every

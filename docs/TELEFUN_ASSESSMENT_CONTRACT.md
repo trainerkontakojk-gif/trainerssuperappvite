@@ -40,6 +40,41 @@ Assessment wajib memiliki lima aspek:
 Payload tanpa salah satu aspek tersebut ditolak. Angka non-finite, WPM negatif,
 dan jumlah filler negatif atau pecahan juga ditolak.
 
+## Bukti bahasa pada Telaah
+
+`contentReview.agentNotes` memuat maksimal 16 temuan. Field lama tetap berlaku;
+hasil lama tanpa `category` tetap terbaca tanpa diberi kategori hasil tebakan.
+Kategori baru: `repetition` (Pengulangan), `effectiveness` (Efektivitas kalimat),
+`clarity`, `empathy`, `politeness`, `accuracy`, dan `confirmation`.
+
+AI diminta memeriksa setiap dimensi, bukan memenuhi kuota kesalahan. Catatan
+`fix` berkategori harus mempunyai contoh kalimat pengganti. Aspek bahasa tidak
+mengubah skor suara atau rumus radar, dan tidak menambah panggilan AI; field
+ini dihasilkan oleh panggilan assessment yang sudah ada. Ketepatan informasi
+hanya dinilai sejauh dapat dibuktikan oleh konteks; tidak ada sumber aturan
+eksternal baru. Intonasi, artikulasi dan tempo tetap dinilai dari audio, bukan
+dari transkrip. Keandalan klasifikasi semantik tetap bergantung pada model.
+
+Backend mencocokkan kutipan dengan ucapan pembicara yang benar. Field opsional
+`startOffset` menyimpan posisi karakter UTF-16 pada teks asli. Untuk kategori
+pengulangan, `comparison` wajib menunjuk bukti agen yang lebih awal; bukti
+tidak ada, pembicara salah, referensi ke masa depan atau satu kemunculan yang
+dipakai dua kali ditolak. Satu baris boleh memuat dua kemunculan berbeda yang
+tidak bertumpuk. Ini membuktikan keberadaan/urutan kutipan, bukan membuktikan
+secara deterministik bahwa pengulangannya tidak perlu. Konfirmasi yang memang
+bertujuan memperjelas kebutuhan bukan otomatis kesalahan.
+
+UI menandai kutipan utama dengan nomor catatan dan pembanding dengan akhiran
+`a` (misalnya `1` dan `1a`). Keduanya membuka catatan yang sama; tombol Agen
+dan Pembanding kembali ke baris terkait. Kutipan bertumpang tindih tetap
+mempertahankan semua tombol tanpa menggandakan teks. Posisi eksplisit yang
+tidak lagi cocok tidak dipindahkan diam-diam ke kemunculan lain.
+
+Tidak ada migrasi/backfill otomatis atau Telaah ulang saat membuka hasil lama.
+Trainer/admin dapat menjalankan Telaah ulang secara eksplisit untuk memperoleh
+anotasi baru. Perubahan ini baru tersedia setelah versi aplikasi dirilis;
+penambahan kode bukan bukti deployment.
+
 ## Communication Profile
 
 Communication profile adalah struktur deterministik yang dibangun dari

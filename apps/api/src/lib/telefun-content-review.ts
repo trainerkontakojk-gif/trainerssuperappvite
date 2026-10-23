@@ -1,4 +1,6 @@
 import {
+  TELEFUN_AGENT_NOTE_CATEGORIES,
+  TELEFUN_AGENT_NOTE_LIMIT,
   TELEFUN_AGENT_NOTE_VERDICTS,
   TELEFUN_CONSUMER_POINT_STATUSES,
   type TelefunAgentNote,
@@ -17,7 +19,7 @@ import { sanitizeAiResponse } from "./ai-sanitize";
 
 export const TELEFUN_CONTENT_REVIEW_LIMITS = {
   consumerPoints: 5,
-  agentNotes: 8,
+  agentNotes: TELEFUN_AGENT_NOTE_LIMIT,
   quote: 300,
   text: 400,
 } as const;
@@ -49,10 +51,22 @@ export const TELEFUN_CONTENT_REVIEW_AI_PROPERTIES = {
         line: { type: "number" },
         quote: { type: "string" },
         verdict: { type: "string", enum: [...TELEFUN_AGENT_NOTE_VERDICTS] },
+        category: { type: "string", enum: [...TELEFUN_AGENT_NOTE_CATEGORIES] },
+        relatedLine: { type: "number", nullable: true },
+        relatedQuote: { type: "string", nullable: true },
         note: { type: "string" },
         example: { type: "string", nullable: true },
       },
-      required: ["line", "quote", "verdict", "note"],
+      required: [
+        "line",
+        "quote",
+        "verdict",
+        "note",
+        "category",
+        "relatedLine",
+        "relatedQuote",
+        "example",
+      ],
     },
   },
 } as const;
@@ -105,7 +119,10 @@ export function buildTelefunContentReviewPrompt(
 
     - "caseCore": 1-2 kalimat inti kasus — apa masalah konsumen dan apa yang ia butuhkan. Tanpa nama/PII.
     - "consumerPoints": maksimal 5 pertanyaan atau permintaan konsumen, urut sesuai kemunculan. Setiap poin: "line" (nomor baris konsumen), "quote" (salinan PERSIS 3-15 kata dari baris itu), "summary" (inti pertanyaan, maks 12 kata), "status" ("answered" bila dijawab tuntas, "partial" bila baru sebagian, "unanswered" bila tidak dijawab), "reason" (1 kalimat alasan status, atau null), "answerLine" dan "answerQuote" (nomor baris agen yang menjawab dan salinan PERSIS kalimatnya, atau null bila tidak ada).
-    - "agentNotes": maksimal 8 kalimat agen yang paling menentukan mutu layanan, baik maupun buruk. Setiap catatan: "line" (nomor baris agen), "quote" (salinan PERSIS kalimat agen), "verdict" ("good" bila sudah tepat, "fix" bila perlu diperbaiki), "note" (1 kalimat alasannya), "example" (kalimat utuh yang sebaiknya diucapkan agen untuk verdict "fix"; null untuk "good").
+    - "agentNotes": maksimal ${TELEFUN_AGENT_NOTE_LIMIT} temuan konkret pada kalimat agen, baik maupun buruk. Setiap catatan: "line" (nomor baris agen), "quote" (salinan PERSIS bagian yang dinilai), "category", "verdict" ("good" bila sudah tepat, "fix" bila perlu diperbaiki), "note" (alasan spesifik dan dampaknya), "example" (kalimat pengganti utuh yang mempertahankan maksud untuk "fix"; null untuk "good"), "relatedLine" dan "relatedQuote" (bukti pembanding pengulangan; selain itu null).
+    - Periksa SETIAP dimensi: "repetition" = pengulangan tidak perlu tanpa informasi baru; "effectiveness" = kehematan/efektivitas kalimat, kata mubazir atau bertele-tele; "clarity" = struktur/istilah yang membantu atau menghambat pemahaman; "empathy" = pengakuan kebutuhan/perasaan; "politeness" = kesantunan; "accuracy" = ketepatan/konsistensi informasi yang dapat dibuktikan dari konteks; "confirmation" = konfirmasi dan penggalian kebutuhan. Tulis temuan hanya bila ada bukti: tidak ada kuota per kategori, tidak wajib mencari kesalahan, jangan mengarang aturan/solusi yang tidak tersedia dalam konteks.
+    - Untuk "repetition", "line" menunjuk pengulangan dan "relatedLine" menunjuk ucapan agen SEBELUMNYA; keduanya wajib punya kutipan PERSIS. Pengulangan dalam satu baris boleh menunjuk baris yang sama jika kutipan kedua benar-benar muncul lagi sesudah kutipan pertama. Konfirmasi ulang identitas, rangkuman, klarifikasi atau pengulangan yang diminta konsumen BUKAN otomatis kesalahan; nilai tujuan konfirmasinya dan gunakan "confirmation" bila tepat.
+    - Dimensi di atas dinilai dari TEKS; jangan menyimpulkan intonasi, artikulasi, tempo, volume atau emosi suara dari transkrip. Aspek suara tetap dinilai dari audio pada rubrik terpisah, tanpa mengubah skor karena anotasi isi.
     - "caseCore", "consumerPoints", dan "agentNotes" WAJIB ada di JSON. Isi array kosong hanya bila memang tidak ada pertanyaan konsumen atau kalimat agen yang layak dinilai.
     - Kutipan WAJIB disalin persis dari transkrip. Kutipan yang tidak ada di transkrip akan dibuang.
   `;
@@ -140,7 +157,11 @@ function fold(value: string): { text: string; index: number[] } {
  * Teks lipatan hanya memuat huruf, angka, dan satu spasi pemisah, jadi batas
  * kata adalah tepi teks atau spasi.
  */
-function findQuote(text: string, quote: string): string | null {
+function findQuote(
+  text: string,
+  quote: string,
+  from = 0,
+): { quote: string; startOffset: number } | null {
   const needle = fold(quote).text;
   if (!needle) return null;
   const haystack = fold(text);
@@ -156,7 +177,8 @@ function findQuote(text: string, quote: string): string | null {
     ) {
       const start = haystack.index[at]!;
       const end = haystack.index[after - 1]! + 1;
-      return text.slice(start, end);
+      if (start >= from)
+        return { quote: text.slice(start, end), startOffset: start };
     }
   }
   return null;
@@ -185,7 +207,7 @@ function locateQuote(
   speaker: TelefunTranscriptSpeaker,
   line: unknown,
   quote: string,
-): { startMs: number; quote: string } | null {
+): { startMs: number; quote: string; startOffset: number } | null {
   const candidates = transcript.filter((entry) => entry.speaker === speaker);
   const named =
     typeof line === "number" && Number.isInteger(line)
@@ -197,7 +219,7 @@ function locateQuote(
       : candidates;
   for (const entry of ordered) {
     const exact = findQuote(entry.text, quote);
-    if (exact) return { startMs: entry.startMs, quote: exact };
+    if (exact) return { startMs: entry.startMs, ...exact };
   }
   return null;
 }
@@ -254,15 +276,57 @@ function readAgentNote(
   const note = readAiText(item.note);
   if (!quote || !note) return null;
   if (!isOneOf(TELEFUN_AGENT_NOTE_VERDICTS, item.verdict)) return null;
-  const located = locateQuote(transcript, "agent", item.line, quote);
+  const category = item.category == null ? undefined : item.category;
+  if (
+    category !== undefined &&
+    !isOneOf(TELEFUN_AGENT_NOTE_CATEGORIES, category)
+  )
+    return null;
+  const example = item.verdict === "fix" ? readAiText(item.example) : null;
+  if (category && item.verdict === "fix" && !example) return null;
+  let located = locateQuote(transcript, "agent", item.line, quote);
   if (!located) return null;
 
+  let comparison: TelefunAgentNote["comparison"];
+  if (category === "repetition") {
+    // Repetition requires two explicit, ordered agent occurrences. Do not use
+    // locateQuote's legacy search fallback to invent the missing comparison.
+    if (!Number.isInteger(item.line) || !Number.isInteger(item.relatedLine))
+      return null;
+    const line = item.line as number;
+    const relatedLine = item.relatedLine as number;
+    if (relatedLine < 1 || line < relatedLine) return null;
+    const previous = transcript[relatedLine - 1];
+    const current = transcript[line - 1];
+    const relatedQuote = readText(
+      item.relatedQuote,
+      TELEFUN_CONTENT_REVIEW_LIMITS.quote,
+    );
+    if (
+      previous?.speaker !== "agent" ||
+      current?.speaker !== "agent" ||
+      !relatedQuote
+    )
+      return null;
+    const earlier = findQuote(previous.text, relatedQuote);
+    if (!earlier) return null;
+    const later = findQuote(
+      current.text,
+      quote,
+      line === relatedLine ? earlier.startOffset + earlier.quote.length : 0,
+    );
+    if (!later) return null;
+    comparison = { startMs: previous.startMs, ...earlier };
+    located = { startMs: current.startMs, ...later };
+  }
+
   return {
-    startMs: located.startMs,
-    quote: located.quote,
+    ...located,
+    ...(category ? { category } : {}),
+    ...(comparison ? { comparison } : {}),
     verdict: item.verdict,
     note,
-    example: item.verdict === "fix" ? readAiText(item.example) : null,
+    example,
   };
 }
 

@@ -83,14 +83,25 @@ export function buildTelefunQuoteMarks(
       selectLabel: `Lihat pertanyaan konsumen ${pointLetter(index)}`,
     }),
   );
-  review.agentNotes.forEach((note, index) =>
+  review.agentNotes.forEach((note, index) => {
     add(note.startMs, {
       quote: note.quote,
+      startOffset: note.startOffset,
       label: String(index + 1),
       className: agentMarkClass(note.verdict),
       onSelect: onSelect && (() => onSelect({ kind: "line", index })),
       selectLabel: `Lihat kalimat agen ${index + 1}`,
-    }),
-  );
+    });
+    if (note.comparison) {
+      add(note.comparison.startMs, {
+        quote: note.comparison.quote,
+        startOffset: note.comparison.startOffset,
+        label: `${index + 1}a`,
+        className: agentMarkClass(note.verdict),
+        onSelect: onSelect && (() => onSelect({ kind: "line", index })),
+        selectLabel: `Lihat pembanding kalimat agen ${index + 1}`,
+      });
+    }
+  });
   return marks;
 }

@@ -1294,6 +1294,183 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("kategori bahasa: pengulangan punya dua bukti, offset satu baris, dan tanda tumpang tindih tetap bisa dibuka", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const repeated = "Saya akan memeriksa tagihan Ibu.";
+    const row: TelefunRow = {
+      ...ANNOTATED_ROW,
+      messages: [
+        {
+          speaker: "consumer",
+          text: "Kenapa tagihan saya belum berubah?",
+          startMs: 4000,
+        },
+        { speaker: "agent", text: repeated, startMs: 11000 },
+        { speaker: "agent", text: repeated, startMs: 24000 },
+        {
+          speaker: "agent",
+          text: "Untuk dapat bisa memeriksa, mohon nomor tiketnya.",
+          startMs: 36000,
+        },
+        {
+          speaker: "agent",
+          text: "Mohon tunggu. Mohon tunggu.",
+          startMs: 78000,
+        },
+        { speaker: "agent", text: "Baik, terima kasih.", startMs: 150000 },
+      ],
+      voice_assessment: {
+        ...voiceAssessment(),
+        contentReview: {
+          caseCore: "Tagihan belum berubah.",
+          consumerPoints: [],
+          agentNotes: [
+            {
+              category: "repetition",
+              startMs: 24000,
+              startOffset: 0,
+              quote: repeated,
+              comparison: { startMs: 11000, startOffset: 0, quote: repeated },
+              verdict: "fix",
+              note: "Janji pemeriksaan diulang tanpa informasi baru.",
+              example:
+                "Mohon nomor tiketnya agar saya bisa memeriksa tagihan Ibu.",
+            },
+            {
+              category: "effectiveness",
+              startMs: 36000,
+              quote: "Untuk dapat bisa memeriksa",
+              verdict: "fix",
+              note: "Dapat dan bisa bermakna sama.",
+              example: "Untuk memeriksa, mohon nomor tiketnya.",
+            },
+            {
+              category: "repetition",
+              startMs: 78000,
+              startOffset: 14,
+              quote: "Mohon tunggu.",
+              comparison: {
+                startMs: 78000,
+                startOffset: 0,
+                quote: "Mohon tunggu.",
+              },
+              verdict: "fix",
+              note: "Permintaan menunggu diulang dalam satu ucapan.",
+              example: "Mohon tunggu sebentar.",
+            },
+            {
+              startMs: 150000,
+              quote: "Baik, terima kasih.",
+              verdict: "good",
+              note: "Catatan lama tetap terbaca.",
+              example: null,
+            },
+            {
+              category: "confirmation",
+              startMs: 11000,
+              quote: "Saya akan memeriksa",
+              verdict: "good",
+              note: "Memberi tahu langkah pemeriksaan.",
+              example: null,
+            },
+          ],
+        },
+      },
+    };
+    const audit = await openTelaah(page, row, [], [row]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(
+      result.getByText("Efektivitas kalimat", { exact: true }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(result.getByText("Pengulangan", { exact: true })).toHaveCount(
+      2,
+    );
+    const target = result.locator("#telefun-line-0");
+    for (const line of ["00.11", "00.24"]) {
+      const marker = transcript
+        .getByTestId(`telefun-line-${line}`)
+        .getByRole("button", {
+          name:
+            line === "00.11"
+              ? "Lihat pembanding kalimat agen 1"
+              : "Lihat kalimat agen 1",
+          exact: true,
+        });
+      for (let round = 0; round < 2; round++) {
+        await marker.click();
+        await expect(target).toBeFocused();
+        await target
+          .getByRole("button", {
+            name: new RegExp(
+              line === "00.11" ? "Pembanding 00\\.11" : "Agen 00\\.24",
+            ),
+          })
+          .click();
+        await expect(
+          transcript.getByTestId(`telefun-line-${line}`),
+        ).toBeFocused();
+      }
+    }
+    // Partial overlap retains both labels and never duplicates the spoken text.
+    expect(
+      await transcript
+        .getByTestId("telefun-line-00.11")
+        .locator("mark")
+        .evaluate((el) => {
+          const copy = el.cloneNode(true) as HTMLElement;
+          copy.querySelectorAll("button, sup").forEach((button) => button.remove());
+          return copy.textContent;
+        }),
+    ).toBe(repeated);
+    await transcript
+      .getByTestId("telefun-line-00.11")
+      .getByRole("button", { name: "Lihat kalimat agen 5", exact: true })
+      .click();
+    await expect(result.locator("#telefun-line-4")).toBeFocused();
+    const sameLine = transcript.getByTestId("telefun-line-01.18");
+    await expect(sameLine.locator("mark")).toHaveCount(2);
+    await expect(sameLine.locator("mark").nth(0)).toContainText("3a");
+    await expect(sameLine.locator("mark").nth(1)).toContainText("3");
+    await expect(result.locator("#telefun-line-3")).toContainText(
+      "Catatan lama tetap terbaca.",
+    );
+    await expect(result.locator("#telefun-line-3")).not.toContainText(
+      "Konfirmasi dan penggalian",
+    );
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const theme of ["light", "dark"] as const) {
+        await setDocumentTheme(page, theme);
+        await transcript
+          .getByTestId("telefun-line-00.24")
+          .getByRole("button", { name: "Lihat kalimat agen 1", exact: true })
+          .click();
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth <=
+              document.documentElement.clientWidth,
+          ),
+        ).toBe(true);
+        expect(
+          await result.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+        ).toBe(true);
+        await page.screenshot({
+          path: test
+            .info()
+            .outputPath(`telefun-language-${width}-${theme}.png`),
+        });
+      }
+    }
+    await waitForMockedApi(audit, ["/telefun/settings", "/telefun/sessions"]);
+    expectHermetic(audit);
+  });
+
   test("anotasi isi: inti kasus, pertanyaan konsumen berstatus, kalimat agen, dan tanda di transkrip", async ({
     page,
   }) => {

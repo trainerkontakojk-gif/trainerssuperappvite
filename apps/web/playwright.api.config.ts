@@ -50,6 +50,10 @@ export default defineConfig({
       testMatch: "telefun-history-list-api.spec.ts",
     },
     {
+      name: "telefun-language-evidence-stub",
+      testMatch: "telefun-language-evidence-api.spec.ts",
+    },
+    {
       name: "telefun-scoring-real-backend",
       testMatch: "telefun-scoring-api.spec.ts",
     },

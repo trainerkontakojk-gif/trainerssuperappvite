@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { TELEFUN_AGENT_NOTE_LABELS } from "@trainers/types";
 import type { TelefunAgentNote, TelefunConsumerPoint } from "@trainers/types";
 import { cn } from "cn";
 import {
@@ -139,6 +140,11 @@ function AgentNoteItem({
         <span className="font-mono text-xs font-bold text-foreground">
           {number}
         </span>
+        {note.category && (
+          <span className="text-sm font-semibold text-foreground">
+            {TELEFUN_AGENT_NOTE_LABELS[note.category]}
+          </span>
+        )}
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
           {isFix ? (
             <span
@@ -159,6 +165,15 @@ function AgentNoteItem({
         clockOf={clockOf}
       />
       <p className="text-[13px] leading-6 text-fg2">{note.note}</p>
+      {note.comparison && (
+        <QuoteButton
+          label="Pembanding"
+          startMs={note.comparison.startMs}
+          quote={note.comparison.quote}
+          onShowLine={onShowLine}
+          clockOf={clockOf}
+        />
+      )}
       {isFix && note.example && (
         <p className="rounded-lg border border-chart-green/40 px-3 py-2 text-[13px] leading-6 text-foreground">
           <span className="font-semibold">Kalimat yang lebih tepat: </span>
