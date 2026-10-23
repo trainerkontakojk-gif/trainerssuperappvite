@@ -12,7 +12,7 @@ Penyebab di prompt (`apps/web/src/routes/telefun/services/promptBuilder.ts`):
 
 Perilaku yang diminta:
 
-- Konsumen memanggil agen dengan sapaan netral "Kak" atau tanpa sapaan, dan tidak menebak Mas/Mbak/Pak/Bu dari suara atau nama.
+- Konsumen memilih Mas/Mbak atau Pak/Bu dari suara agen, seperti perilaku Agustus (prompt Agustus tidak punya contoh kalimat bergender); kalau ragu, "Kak" atau tanpa sapaan. Versi pertama (selalu "Kak", `4c01ca9f`) dikoreksi setelah Fajar mencatat bahwa tebakan dari suara dulu tepat.
 - Tidak ada contoh kalimat yang memakai sapaan bergender untuk agen.
 - Identitas gender konsumen sendiri (KARAKTER: PRIA/WANITA) tidak berubah.
 
@@ -20,7 +20,7 @@ Di luar scope (butuh persetujuan terpisah): memakai `profiler_peserta.jenis_kela
 
 ## Design
 
-- `promptBuilder.ts`: satu aturan `SAPAAN UNTUK AGEN` di blok etika untuk semua tipe; hapus perintah Pak/Bu dan Mas/Mbak; ganti sapaan di contoh dengan "Kak" atau tanpa sapaan.
+- `promptBuilder.ts`: satu aturan `SAPAAN UNTUK AGEN` di blok etika untuk semua tipe (dari suara agen, "Kak" saat ragu); hapus perintah Pak/Bu dan Mas/Mbak; ganti sapaan di contoh dengan "Kak" atau tanpa sapaan.
 - Tidak ada perubahan server, skema, atau kontrak API.
 
 ## Tasklist

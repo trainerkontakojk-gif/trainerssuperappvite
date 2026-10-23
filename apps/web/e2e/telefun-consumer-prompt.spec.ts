@@ -242,7 +242,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
   });
 
   for (const consumerTypeId of ["marah", "ramah"]) {
-    test(`sapaan agen netral (${consumerTypeId}): konsumen tidak menebak agen pria atau wanita`, async ({
+    test(`sapaan agen (${consumerTypeId}): mengikuti suara agen, bukan meniru contoh kalimat`, async ({
       page,
     }) => {
       const messages: Record<string, unknown>[] = [];
@@ -260,8 +260,10 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       const rule = prompt
         .split("\n")
         .find((line) => line.startsWith("SAPAAN UNTUK AGEN:"));
-      expect(rule).toContain('"Kak"');
-      expect(rule).toContain("Jangan menebak");
+      // Sapaan mengikuti suara agen seperti dulu; "Kak" hanya saat ragu.
+      expect(rule).toContain("suara agen");
+      expect(rule).toContain('ragu, panggil "Kak"');
+      expect(rule).toContain("bukan dari contoh kalimat");
       // Di luar aturan itu tidak ada sapaan bergender untuk agen yang bisa ditiru.
       const rest = prompt.replace(rule!, "");
       expect(rest).not.toMatch(/\b(Mas|Mbak|Pak|Bu)\b/);
