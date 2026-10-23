@@ -172,6 +172,75 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("konsumen marah ngotot: solusi pertama tidak langsung diterima, patuh prosedur bukan berarti setuju", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks(),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    expect(prompt).toContain("TUNTUTAN DAN PENOLAKAN SOLUSI (MARAH)");
+    expect(prompt).toContain(
+      "Solusi pertama dari agen JANGAN langsung diterima",
+    );
+    expect(prompt).toContain("bukan berarti menerima solusinya");
+    expect(prompt).toContain("berat hati");
+    // Tuntutan tetap dari skenario dan tidak berdebat tanpa akhir.
+    expect(prompt).toContain("Jangan mengarang tuntutan");
+    expect(prompt).toContain("Jangan berdebat tanpa akhir");
+    // Percaya penjelasan agen tidak lagi berarti langsung menerima.
+    expect(prompt).not.toContain("kamu percaya saja");
+    // Domisili bawaan sudah spesifik, jadi tidak ada aturan probing domisili.
+    expect(prompt).not.toContain("DOMISILI BELUM SPESIFIK");
+    expectHermetic(audit);
+  });
+
+  test("domisili provinsi: konsumen menyebut Lampung dulu, kota/kabupaten spesifik hanya saat diprobing", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks({
+        identitySettings: {
+          displayName: "Rahmat Hidayat",
+          gender: "male",
+          phoneNumber: "0812-1111-2222",
+          city: "Lampung",
+          signatureName: "",
+          voiceName: "",
+        },
+      }),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    expect(prompt).toContain("LOKASI/DOMISILI: Lampung\n");
+    const contract = prompt.indexOf("KONTRAK VERIFIKASI IDENTITAS");
+    const block = prompt.indexOf("DOMISILI BELUM SPESIFIK:");
+    expect(block).toBeGreaterThan(contract);
+    // Kontrak verifikasi memberi ruang menjawab probing kota/kabupaten.
+    expect(prompt).toContain("kecuali rincian kota/kabupaten");
+    const domicile = prompt.slice(block, prompt.indexOf("\n\n", block));
+    expect(domicile).toContain('"Lampung"');
+    expect(domicile).toContain('"Bandar Lampung"');
+    expect(domicile).toContain("sebelum agen menanyakannya");
+    expect(domicile).toContain("sampai akhir panggilan");
+    // Konsumen marah tetap menjawab probing, tidak menolak memberi data.
+    expect(domicile).toContain("tetap jawab");
+    expectHermetic(audit);
+  });
+
   test("sinyal hold: urutan hold dan lamanya dikirim ke konsumen saat hold selesai", async ({
     page,
   }) => {

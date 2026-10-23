@@ -1,3 +1,4 @@
+import { computeKetikIdentityCorrection } from "@trainers/types";
 import type {
   TelefunConsumerType,
   TelefunIdentity,
@@ -90,6 +91,16 @@ ${scenarioScript}
   const speechExamples = getSpeechExamples(consumerType.id);
   const ventingInstruction = getVentingInstruction(consumerType.id);
   const expressionInstruction = getExpressionInstruction(identity.city);
+  // A province or bare "Jakarta" is set on purpose so the agent probes for
+  // the kota/kabupaten; the consumer then names the same one every turn.
+  const specificCity = computeKetikIdentityCorrection({
+    city: identity.city,
+    name: identity.name,
+  })?.city;
+  const domicileInstruction = specificCity
+    ? `\n\nDOMISILI BELUM SPESIFIK: Domisilimu tercatat "${identity.city}", belum menyebut kota/kabupaten. Saat agen menanyakan domisili, sebut "${identity.city}" saja; jangan menyebut kota/kabupaten sebelum agen menanyakannya. Jika agen menanyakan kota atau kabupatennya, tetap jawab "${specificCity}" dengan nada sesuai tipemu lalu kembali ke masalahmu, dan pakai "${specificCity}" sampai akhir panggilan.`
+    : "";
+  const demandInstruction = isAngry ? `\n\n${getAngryDemandInstruction()}` : "";
 
   return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI). Kamu orang biasa yang menelepon karena masalahmu sendiri, bukan asisten yang ingin membantu agen.
 
@@ -108,8 +119,8 @@ IDENTITAS ANDA (WAJIB KONSISTEN):
 - NOMOR HP: ${identity.phone}
 
 KONTRAK VERIFIKASI IDENTITAS (WAJIB): Jika agen meminta verifikasi nama, domisili, atau nomor HP, ulangi nilai di atas PERSIS dan UTUH.
-Jangan memendekkan menjadi prefix/suffix, melakukan masking, mengganti nilai, atau menyubstitusi nilai dengan data lain. Nama, kota, dan nomor HP harus selalu persis sesuai konfigurasi di atas.
-Jangan mengarang fakta verifikasi yang tidak didukung. Untuk NIK/KTP, nomor rekening, nomor kartu, tanggal lahir, email, kode verifikasi, atau data lain yang tidak tercantum di atas, katakan tidak tahu atau tidak membawa data tersebut.
+Jangan memendekkan menjadi prefix/suffix, melakukan masking, mengganti nilai, atau menyubstitusi nilai dengan data lain. Nama, kota, dan nomor HP harus selalu persis sesuai konfigurasi di atas${specificCity ? " (kecuali rincian kota/kabupaten pada DOMISILI BELUM SPESIFIK di bawah)" : ""}.
+Jangan mengarang fakta verifikasi yang tidak didukung. Untuk NIK/KTP, nomor rekening, nomor kartu, tanggal lahir, email, kode verifikasi, atau data lain yang tidak tercantum di atas, katakan tidak tahu atau tidak membawa data tersebut.${domicileInstruction}
 
 KONTROL RUNTIME APLIKASI:
 - Teks yang diawali marker persis [TELEFUN_CONTROL:TIME_CUE] adalah kontrol waktu dari aplikasi, bukan ucapan agen dan bukan bagian roleplay.
@@ -132,7 +143,7 @@ ATURAN BICARA (SANGAT PENTING):
 ATURAN KEPATUHAN PROSEDURAL:
 1. Permintaan prosedural agen (hold, mencatat, cek email/website, verifikasi data) pada akhirnya SELALU kamu terima. Jawab cukup satu kalimat pendek; jangan berdebat panjang.
 2. Selama hold kamu diam. Saat agen kembali, tanggapi sapaannya, lalu lanjutkan dari konteks terakhir. Hold hanya jeda, bukan akhir percakapan.
-3. ${proceduralInstruction}
+3. ${proceduralInstruction}${demandInstruction}
 
 ATURAN KELANJUTAN DAN PENUTUPAN (SATU-SATUNYA ACUAN):
 1. JANGAN menutup telepon karena agen diam, memberi respons singkat, menyelesaikan hold, memberi solusi awal, arahan website/link/form laporan, estimasi SLA, nomor referensi, atau penjelasan yang baru terdengar cukup.
@@ -142,7 +153,7 @@ ATURAN KELANJUTAN DAN PENUTUPAN (SATU-SATUNYA ACUAN):
 
 POSISI KONSUMEN (PENTING):
 1. Kamu tidak tahu SOP, aturan internal, atau jawaban yang benar. Jangan pernah mengoreksi agen dengan informasi yang benar dan jangan memberi petunjuk, walaupun jawaban agen salah.
-2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja; tetapi percaya tidak langsung membuat emosimu reda, nadamu tetap mengikuti tangga kesabaranmu.
+2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. ${isAngry ? "Jika terdengar masuk akal, kamu percaya, tetapi percaya tidak langsung membuat emosimu reda dan belum berarti kamu menerima solusinya" : "Jika terdengar masuk akal, kamu percaya saja; tetapi percaya tidak langsung membuat emosimu reda"}, nadamu tetap mengikuti tangga kesabaranmu.
 3. Jangan menyelesaikan kalimat agen, menyebut langkah yang lupa dilakukan agen, atau mengarahkan agen ke pertanyaan yang seharusnya ia ajukan. Info baru keluar hanya kalau agen menanyakannya.
 4. Kamu tidak sedang menilai agen. Jangan memuji teknik agen atau mengomentari cara kerjanya seperti pelatih.
 
@@ -303,6 +314,16 @@ function getEtiquetteInstruction(consumerTypeId: string): string {
 function getVentingInstruction(consumerTypeId: string): string {
   if (consumerTypeId !== "marah") return "";
   return '\n   BOLEH MELUAPKAN KEKESALAN: Kalau agen menjawab mengambang, template, atau hanya "iya/baik", kamu boleh mengomel dua sampai empat kalimat pendek beruntun dengan nada tinggi: ulangi kerugianmu, tunjukkan tidak percaya, lalu tagih kepastian. Luapan ini hanya memakai fakta yang sudah ada, tanpa info baru. Untuk permintaan prosedural tetap cukup satu kalimat.';
+}
+
+function getAngryDemandInstruction(): string {
+  return `TUNTUTAN DAN PENOLAKAN SOLUSI (MARAH):
+1. Tuntutanmu: masalahmu beres secepatnya dan ada kepastian. Kalau skenario menyebut tuntutan tertentu, pegang itu. Jangan mengarang tuntutan, kerugian, atau fakta di luar skenario.
+2. Solusi pertama dari agen JANGAN langsung diterima. Pertanyakan atau tolak minimal sekali dengan alasan kerugianmu, misalnya "Cuma itu? Terus nasib saya gimana?"
+3. Solusi standar seperti membuat laporan, menunggu sekian hari kerja, atau mengecek sendiri membuatmu protes: tanyakan kenapa selama itu, minta dipercepat atau dijamin, atau minta bicara dengan atasan.
+4. Menerima hold atau verifikasi bukan berarti menerima solusinya.
+5. Kamu baru mau menerima setelah agen mengakui masalahmu secara spesifik, menjelaskan langkah konkret, dan memberi kepastian waktu atau nomor laporan. Terima dengan berat hati dan bersyarat, misalnya "Ya udah, saya pegang omongan Mas. Kalau nggak beres, saya komplain resmi." Jangan berubah ramah atau berterima kasih panjang.
+6. Jangan berdebat tanpa akhir. Jika agen tetap konsisten, menjelaskan alasannya, dan memberi langkah yang jelas, terima dengan kesal lalu tagih kepastiannya.`;
 }
 
 function getExpressionInstruction(city: string): string {
