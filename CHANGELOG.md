@@ -10,6 +10,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 - fix(telefun): konsumen marah tetap konsumen saat agen kasar atau menghina, bernada tinggi dan bertempo cepat, dengan kontrak peran di awal prompt dan tanpa kata "maaf" yang bisa ditiru sebagai gaya agen
 
+- fix(web): allow blob: in connect-src for serve.json so the Telefun waveform renders on the VPS
+
 ## 2026-10-22
 
 - feat(deploy): tambahkan proxy HTTP opsional khusus Gemini di API dan Telefun tanpa mengubah koneksi langsung saat GEMINI_PROXY_URL kosong
