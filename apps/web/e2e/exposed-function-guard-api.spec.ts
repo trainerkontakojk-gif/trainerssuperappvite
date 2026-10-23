@@ -60,6 +60,12 @@ const GROUP_B = [
   "upsert_telefun_coaching_summary(uuid,jsonb,integer,text)",
 ] as const;
 
+// New reply-time attribution RPC deliberately denies anon EXECUTE. The focused
+// pdkt-replier-attribution API E2E proves its JWT/role/participant denial matrix.
+const AUTHENTICATED_ONLY_BY_DESIGN = [
+  "public.submit_pdkt_mailbox_reply_with_subject(uuid,jsonb,integer,text,uuid)",
+] as const;
+
 // KETIK backend RPCs are service_role-only by design (docs/architecture.md,
 // "Batas snapshot D5.1"): they were added after D5.1, keep EXECUTE revoked from
 // anon/authenticated, and ketik-*-api specs prove their own denial matrix. On
@@ -124,7 +130,12 @@ type RevokedRow = ReturnType<typeof readRevoked>[number];
 // which must still be present and revoked from both client roles.
 function partitionRevoked(revoked: RevokedRow[]) {
   const allowed = new Set<string>(SERVICE_ROLE_ONLY_BY_DESIGN);
-  const unexpected = revoked.filter((f) => !allowed.has(f.signature));
+  const authenticatedOnly = new Set<string>(AUTHENTICATED_ONLY_BY_DESIGN);
+  const unexpected = revoked.filter(
+    (f) =>
+      !allowed.has(f.signature) &&
+      !(authenticatedOnly.has(f.signature) && !f.anon && f.authenticated),
+  );
   const byDesign = revoked
     .filter((f) => allowed.has(f.signature) && !f.anon && !f.authenticated)
     .map((f) => f.signature);

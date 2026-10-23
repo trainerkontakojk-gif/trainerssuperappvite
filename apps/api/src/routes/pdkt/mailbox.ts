@@ -221,10 +221,14 @@ mailbox.post(
     const userClient = getUserClient(c);
 
     try {
+      const simulationSubject = await resolveRequestSimulationSubject(
+        c,
+        body.simulationSubject,
+      );
       await ensurePdktReplyCounted(c.get("user").id, body.mailboxId);
       const reply = await pdktService.submitMailboxReplyWithOutcome(
         userClient,
-        body,
+        { ...body, simulationSubjectSnapshot: simulationSubject },
       );
       const historyId = reply.historyId;
 
@@ -255,6 +259,15 @@ mailbox.post(
     } catch (error: unknown) {
       if (error instanceof PracticeQuotaError)
         return c.json(error.toBody(), error.status);
+      if (error instanceof SimulationSubjectError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: error.code, message: error.message },
+          },
+          error.status as 400,
+        );
+      }
       console.error("[PDKT /mailbox/reply] Raw error:", error);
       console.error("[PDKT /mailbox/reply] Error detail:", {
         message: error instanceof Error ? error.message : String(error),

@@ -44,6 +44,8 @@ Mapping service scope leader:
 
 `module=all` hanya mengembalikan modul yang dipetakan dari scope leader. Detail modul di luar scope ditolak sebelum history dibaca. Leader dengan `call` yang disetujui dapat menerima signed URL Telefun; TTL tetap 3.600 detik. URL yang sudah diterbitkan tetap berlaku sampai kedaluwarsa setelah approval dicabut, tetapi penerbitan URL baru dihentikan.
 
+Untuk balasan PDKT baru setelah migration `20261023090000_pdkt_reply_replier_attribution.sql`, participant berasal dari picker saat membalas, bukan snapshot saat email dibuat. Riwayat dan Monitoring membaca subject history yang sama; metadata pembuat tetap di mailbox. Riwayat lama tidak diubah.
+
 Sesi `self`, legacy tanpa atribusi, participant yang FK-nya sudah `NULL`, dan history dari tabel `results` tidak masuk quick list ini. Snapshot nama/batch/tim tetap dipakai untuk tampilan ketika peserta berganti nama atau dipindahkan.
 
 ## Frontend behavior

@@ -527,15 +527,21 @@ export async function softDeleteMailboxItem(
  */
 export async function submitMailboxReplyWithOutcome(
   supabaseClient: SupabaseClient,
-  payload: PdktMailboxReply,
-  _actorId?: string,
+  payload: PdktMailboxReply & {
+    simulationSubjectSnapshot?: SimulationSubjectSnapshot;
+  },
 ): Promise<{ historyId: string; created: boolean }> {
+  const simulationSubject = payload.simulationSubjectSnapshot;
   const { data: outcome, error } = await supabaseClient.rpc(
-    "submit_pdkt_mailbox_reply_with_outcome",
+    "submit_pdkt_mailbox_reply_with_subject",
     {
       p_mailbox_id: payload.mailboxId,
       p_agent_reply: payload.reply,
       p_time_taken: payload.timeTaken,
+      // Only the validated selection crosses this boundary. The RPC resolves
+      // current profile/participant metadata, never browser-supplied snapshots.
+      p_subject_type: simulationSubject?.type ?? "self",
+      p_subject_peserta_id: simulationSubject?.participantId ?? null,
     },
   );
 

@@ -11,7 +11,7 @@ type ParticipantSource = Pick<
   "simulationSubject" | "created_by_user"
 >;
 
-/** Teks "Peserta" dan "Pelaksana" dari snapshot email (bukan data peserta terkini). */
+/** Metadata pembuat email, terpisah dari peserta yang dipilih saat membalas. */
 function describePdktParticipant(item: ParticipantSource) {
   const subject = item.simulationSubject;
   const participant =
@@ -36,10 +36,10 @@ function ParticipantInfo({ item }: { item: ParticipantSource }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg2">
       <span>
-        Peserta:{" "}
+        Email dibuat untuk:{" "}
         <strong className="font-semibold text-foreground">{participant}</strong>
       </span>
-      <span>Pelaksana: {executor}</span>
+      <span>Pembuat email: {executor}</span>
     </p>
   );
 }

@@ -495,6 +495,7 @@ export default function PdktSimulation({
             mailboxId,
             reply,
             timeTaken,
+            simulationSubject,
           },
         }),
       );

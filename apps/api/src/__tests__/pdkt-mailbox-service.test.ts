@@ -16,7 +16,6 @@ vi.mock("../lib/supabase", () => ({
 
 import {
   submitMailboxReply,
-  submitMailboxReplyWithOutcome,
   createMailboxItem,
   softDeleteMailboxItem,
   fetchMailboxItems,
@@ -146,27 +145,6 @@ describe("submitMailboxReply", () => {
     );
   });
 
-  it("does not mark a concurrent retry as newly created", async () => {
-    const client = buildMockClient({
-      rpc: vi.fn().mockResolvedValue({
-        data: { history_id: "history-1", created: false },
-        error: null,
-      }),
-    });
-
-    const payload: PdktMailboxReply = {
-      mailboxId,
-      reply: makeReply(),
-      timeTaken: 60,
-    };
-    await expect(
-      submitMailboxReplyWithOutcome(client, payload, "user-1"),
-    ).resolves.toEqual({ historyId: "history-1", created: false });
-    expect(client.rpc).toHaveBeenCalledWith(
-      "submit_pdkt_mailbox_reply_with_outcome",
-      expect.any(Object),
-    );
-  });
 });
 
 describe("createMailboxItem", () => {

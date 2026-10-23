@@ -643,6 +643,8 @@ export const pdktMailboxBatchPromptSchema = pdktMailboxBatchSchema.extend({
 });
 
 export const pdktMailboxReplySchema = z.object({
+  // Reply-time participant; omission is verified self, never the creator snapshot.
+  simulationSubject: simulationSubjectSelectionSchema.optional(),
   mailboxId: z.string().uuid(),
   reply: emailMessageSchema,
   timeTaken: z.number().int().positive(),

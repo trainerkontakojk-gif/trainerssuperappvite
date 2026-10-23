@@ -1877,9 +1877,9 @@ test.describe("PDKT (hermetic)", () => {
     await expect(reading).toContainText(OPEN_MAIL.detail.inbound_email.body);
     await expect(reading).toContainText("rina@local.test");
     await expect(reading.getByText("Lampiran (1)")).toBeVisible();
-    // Data peserta dan pelaksana pindah dari panel baca ke header ruang kerja.
+    // Header menjelaskan pembuat email, bukan peserta yang membalas nanti.
     await expect(
-      page.getByText("Pelaksana: Siti Aminah · Trainer"),
+      page.getByText("Pembuat email: Siti Aminah · Trainer"),
     ).toBeVisible();
     await expect(
       reading.getByRole("button", { name: "Lampiran 1" }),

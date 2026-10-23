@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-23
 
+- fix(pdkt): catat peserta yang dipilih saat membalas pada Riwayat, Monitoring, dan SIDAK tanpa mengubah snapshot pembuat email atau riwayat lama
+
 - fix(telefun): konsumen marah tetap konsumen saat agen kasar atau menghina, bernada tinggi dan bertempo cepat, dengan kontrak peran di awal prompt dan tanpa kata "maaf" yang bisa ditiru sebagai gaya agen
 
 ## 2026-10-22
