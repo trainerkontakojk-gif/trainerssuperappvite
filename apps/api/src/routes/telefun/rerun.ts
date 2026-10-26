@@ -8,11 +8,13 @@ import {
 } from "../../lib/telefun-analysis";
 import { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../../lib/telefun-openai-assessment";
+import { isTelefunCaptureScoringReady } from "../../lib/telefun-capture-readiness";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import { requireCapability } from "../../middleware/role";
 import {
   claimCompletedScoringForRerun,
   completeScoringAssessment,
+  isWebRtcScoringReady,
   restoreScoringAfterFailedRerun,
 } from "../../services/telefun-scoring-service";
 
@@ -51,7 +53,9 @@ telefunRerun.post(
 
     const { data: session, error: sessionError } = await adminClient
       .from("telefun_history")
-      .select("user_id, scoring_status, telefun_model_id, telefun_transport")
+      .select(
+        "user_id, status, scoring_status, telefun_model_id, telefun_transport, recording_status, recording_error, recording_path, agent_recording_path, scoring_ready_at",
+      )
       .eq("id", id)
       .maybeSingle();
     if (sessionError) {
@@ -105,6 +109,23 @@ telefunRerun.post(
       );
     }
 
+    if (
+      !isTelefunCaptureScoringReady(session, user.id, id) ||
+      (session.telefun_transport === "openai-webrtc" &&
+        !isWebRtcScoringReady(session, user.id, id))
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "SCORING_NOT_READY",
+            message: "Rekaman wajib belum siap untuk telaah ulang.",
+          },
+        },
+        409,
+      );
+    }
+
     let claimTokenHash: string | null;
     try {
       claimTokenHash =
@@ -124,6 +145,30 @@ telefunRerun.post(
       );
     }
     if (!claimTokenHash) {
+      const { data: current } = await adminClient
+        .from("telefun_history")
+        .select(
+          "user_id, status, recording_status, recording_error, recording_path, agent_recording_path, scoring_ready_at",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (
+        current &&
+        (!isTelefunCaptureScoringReady(current, user.id, id) ||
+          (session.telefun_transport === "openai-webrtc" &&
+            !isWebRtcScoringReady(current, user.id, id)))
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SCORING_NOT_READY",
+              message: "Rekaman wajib belum siap untuk telaah ulang.",
+            },
+          },
+          409,
+        );
+      }
       return c.json(
         {
           success: false,
@@ -141,6 +186,7 @@ telefunRerun.post(
     try {
       const result = await analyzeVoiceQuality(id, user.id, undefined, {
         fresh: true,
+        claimTokenHash,
       });
       if (
         result.success &&

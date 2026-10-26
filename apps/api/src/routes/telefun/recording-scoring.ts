@@ -33,10 +33,11 @@ import {
   buildTelefunHistoryScoringView,
 } from "../../lib/telefun-feedback";
 import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../../lib/telefun-openai-assessment";
+import { isTelefunCaptureScoringReady } from "../../lib/telefun-capture-readiness";
 import type { TelefunRecordingVariables } from "./recordings";
 
 const SCORING_STATE_SELECT =
-  "telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, scoring_attempt_count, scoring_next_attempt_at, score, voice_assessment";
+  "telefun_transport, status, recording_status, recording_error, recording_path, agent_recording_path, scoring_ready_at, scoring_status, scoring_attempt_count, scoring_next_attempt_at, score, voice_assessment";
 
 function cachedScoringResponse(session: {
   score?: number | null;
@@ -117,7 +118,7 @@ export async function scoreRecording(
     const { data: sessionOwner, error: ownerError } = await adminClient
       .from("telefun_history")
       .select(
-        "user_id, status, telefun_model_id, telefun_transport, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, score, voice_assessment",
+        "user_id, status, telefun_model_id, telefun_transport, recording_status, recording_error, recording_path, agent_recording_path, scoring_ready_at, scoring_status, score, voice_assessment",
       )
       .eq("id", id)
       .maybeSingle();
@@ -228,9 +229,14 @@ export async function scoreRecording(
       return retiredOpenAiScoringResponse(c);
     }
 
+    if (isCanonicalCachedAssessment(sessionOwner)) {
+      return c.json(cachedScoringResponse(sessionOwner));
+    }
+
     if (
-      sessionOwner.telefun_transport === "openai-webrtc" &&
-      !isWebRtcScoringReady(sessionOwner, user.id, id)
+      !isTelefunCaptureScoringReady(sessionOwner, user.id, id) ||
+      (sessionOwner.telefun_transport === "openai-webrtc" &&
+        !isWebRtcScoringReady(sessionOwner, user.id, id))
     ) {
       return c.json(
         {
@@ -320,8 +326,9 @@ export async function scoreRecording(
       }
 
       if (
-        session.telefun_transport === "openai-webrtc" &&
-        !isWebRtcScoringReady(session, user.id, id)
+        !isTelefunCaptureScoringReady(session, user.id, id) ||
+        (session.telefun_transport === "openai-webrtc" &&
+          !isWebRtcScoringReady(session, user.id, id))
       ) {
         return c.json(
           {
@@ -353,7 +360,9 @@ export async function scoreRecording(
     }
 
     // === Claim succeeded — proceed with analysis ===
-    const result = await analyzeVoiceQuality(id, user.id);
+    const result = await analyzeVoiceQuality(id, user.id, undefined, {
+      claimTokenHash: manualClaim.claimTokenHash,
+    });
     if (!result.success || !result.assessment) {
       // A failed WebRTC capture owns the terminal scoring latch. Re-read it
       // before writing a generic analysis failure so it cannot be overwritten.
@@ -375,8 +384,10 @@ export async function scoreRecording(
         );
       }
       if (
-        failedState?.telefun_transport === "openai-webrtc" &&
-        !isWebRtcScoringReady(failedState, user.id, id)
+        failedState &&
+        (!isTelefunCaptureScoringReady(failedState, user.id, id) ||
+          (failedState.telefun_transport === "openai-webrtc" &&
+            !isWebRtcScoringReady(failedState, user.id, id)))
       ) {
         return c.json(
           {
@@ -481,8 +492,9 @@ export async function scoreRecording(
       }
 
       if (
-        current.telefun_transport === "openai-webrtc" &&
-        !isWebRtcScoringReady(current, user.id, id)
+        !isTelefunCaptureScoringReady(current, user.id, id) ||
+        (current.telefun_transport === "openai-webrtc" &&
+          !isWebRtcScoringReady(current, user.id, id))
       ) {
         return c.json(
           {
@@ -548,8 +560,10 @@ export async function scoreRecording(
         .maybeSingle();
       if (
         !stateError &&
-        current?.telefun_transport === "openai-webrtc" &&
-        !isWebRtcScoringReady(current, user.id, id)
+        current &&
+        (!isTelefunCaptureScoringReady(current, user.id, id) ||
+          (current.telefun_transport === "openai-webrtc" &&
+            !isWebRtcScoringReady(current, user.id, id)))
       ) {
         return c.json(
           {

@@ -462,6 +462,14 @@ export async function serveRecording(page: Page, seconds = 252) {
  * tangan Gemini Live secukupnya: autentikasi, konfigurasi, setup, dan akhir
  * sesi. Tidak ada audio model; agen berada di status "Giliran Anda".
  */
+export interface MockTelefunPcmResponse {
+  sampleRateHz: number;
+  chunks: readonly Uint8Array[];
+  transport: "inline" | "binary";
+  afterFirstInput?: boolean;
+  interruptAfterMs?: number;
+}
+
 export async function mockTelefunVoiceServer(
   page: Page,
   sessionId: string,
@@ -470,13 +478,69 @@ export async function mockTelefunVoiceServer(
   options: {
     failAttempt?: number;
     failAfterPickup?: boolean;
+    audioResponse?: MockTelefunPcmResponse;
+    audioResponseAfterText?: MockTelefunPcmResponse;
+    onClientMessage?: (message: Record<string, unknown>) => void;
+    onConnection?: (connectionNumber: number) => void;
+    closeAfterFirstInput?: boolean;
+    drainAckDelayMs?: number;
+    drainUnrelatedMessage?: boolean;
+    drainUnrelatedDelayMs?: number;
+    suppressDrainAck?: boolean;
   } = {},
 ) {
   const received: string[] = [];
   let attempt = 0;
   await page.routeWebSocket(`${E2E_TELEFUN_WS_URL}/ws`, (ws) => {
     const currentAttempt = ++attempt;
+    options.onConnection?.(currentAttempt);
     let failed = false;
+    let audioSent = false;
+    let followupAudioSent = false;
+    const sendAudioResponse = (
+      response: MockTelefunPcmResponse | undefined,
+    ) => {
+      if (!response) return;
+      if (response === options.audioResponse) {
+        if (audioSent) return;
+        audioSent = true;
+      }
+      if (response === options.audioResponseAfterText) {
+        if (followupAudioSent) return;
+        followupAudioSent = true;
+      }
+      for (const chunk of response.chunks) {
+        const bytes = Buffer.from(chunk);
+        if (response.transport === "binary") {
+          ws.send(bytes);
+        } else {
+          ws.send(
+            JSON.stringify({
+              serverContent: {
+                modelTurn: {
+                  parts: [
+                    {
+                      inlineData: {
+                        mimeType: `audio/pcm;rate=${response.sampleRateHz}`,
+                        data: bytes.toString("base64"),
+                      },
+                    },
+                  ],
+                },
+              },
+            }),
+          );
+        }
+      }
+      ws.send(JSON.stringify({ serverContent: { turnComplete: true } }));
+      if (response.interruptAfterMs !== undefined) {
+        setTimeout(
+          () =>
+            ws.send(JSON.stringify({ serverContent: { interrupted: true } })),
+          response.interruptAfterMs,
+        );
+      }
+    };
     const fail = () => {
       failed = true;
       // The active client reports terminal errors through WebSocket close,
@@ -494,6 +558,17 @@ export async function mockTelefunVoiceServer(
       const type = typeof parsed.type === "string" ? parsed.type : "setup";
       received.push(type);
       messages.push(parsed);
+      options.onClientMessage?.(parsed);
+      if (
+        options.closeAfterFirstInput &&
+        currentAttempt === 1 &&
+        parsed.realtimeInput &&
+        typeof parsed.realtimeInput === "object" &&
+        "audio" in parsed.realtimeInput
+      ) {
+        ws.close({ code: 1011, reason: "E2E server ended after input" });
+        return;
+      }
       if (
         currentAttempt === options.failAttempt &&
         !failed &&
@@ -512,13 +587,47 @@ export async function mockTelefunVoiceServer(
         ws.send(JSON.stringify({ type: "telefun_session_configured" }));
       } else if ("setup" in parsed) {
         ws.send(JSON.stringify({ setupComplete: {} }));
+        if (!options.audioResponse?.afterFirstInput) {
+          sendAudioResponse(options.audioResponse);
+        }
+      } else if (
+        options.audioResponse?.afterFirstInput &&
+        parsed.realtimeInput &&
+        typeof parsed.realtimeInput === "object" &&
+        "audio" in parsed.realtimeInput
+      ) {
+        sendAudioResponse(options.audioResponse);
+      } else if (
+        options.audioResponseAfterText &&
+        parsed.realtimeInput &&
+        typeof parsed.realtimeInput === "object" &&
+        "text" in parsed.realtimeInput
+      ) {
+        sendAudioResponse(options.audioResponseAfterText);
       } else if (parsed.type === "session_end_request") {
-        ws.send(
-          JSON.stringify({
-            type: "session_end_complete",
-            outcome: "completed",
-          }),
-        );
+        const sendAck = () => {
+          if (options.suppressDrainAck) return;
+          ws.send(
+            JSON.stringify({
+              type: "session_end_complete",
+              outcome: "completed",
+            }),
+          );
+        };
+        if (options.drainUnrelatedMessage) {
+          const sendUnrelated = () =>
+            ws.send(JSON.stringify({ type: "server_notice" }));
+          if (options.drainUnrelatedDelayMs) {
+            setTimeout(sendUnrelated, options.drainUnrelatedDelayMs);
+          } else {
+            sendUnrelated();
+          }
+        }
+        if (options.drainAckDelayMs) {
+          setTimeout(sendAck, options.drainAckDelayMs);
+        } else {
+          sendAck();
+        }
       }
     });
   });
@@ -545,7 +654,54 @@ export async function mockTelefunAvatar(page: Page, fail = false) {
  * supaya hanya jalur storage ini yang dijawab; jalur Supabase lain tetap
  * diblokir oleh harness.
  */
-export async function mockRecordingUpload(page: Page) {
+export interface CapturedTelefunRecordingUpload {
+  path: string;
+  contentType: string | undefined;
+  fileContentType: string | undefined;
+  body: Buffer;
+  requestBody: Buffer;
+}
+
+function extractUploadedRecording(
+  requestBody: Buffer,
+  contentType: string | undefined,
+): { body: Buffer; fileContentType: string | undefined } {
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType ?? "");
+  if (!boundary) return { body: requestBody, fileContentType: contentType };
+  const marker = Buffer.from(`--${(boundary[1] ?? boundary[2]).trim()}`);
+  let cursor = 0;
+  while (cursor < requestBody.length) {
+    const markerStart = requestBody.indexOf(marker, cursor);
+    if (markerStart < 0) break;
+    const partStart = markerStart + marker.length;
+    const nextMarker = requestBody.indexOf(marker, partStart);
+    if (nextMarker < 0) break;
+    const part = requestBody.subarray(partStart, nextMarker);
+    const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
+    if (headerEnd >= 0) {
+      const headers = part.subarray(0, headerEnd).toString("latin1");
+      if (/filename="/i.test(headers)) {
+        let body = part.subarray(headerEnd + 4);
+        if (body.length >= 2 && body.subarray(-2).equals(Buffer.from("\r\n"))) {
+          body = body.subarray(0, -2);
+        }
+        const fileType = /content-type:\s*([^\r\n]+)/i
+          .exec(headers)?.[1]
+          ?.trim();
+        return { body, fileContentType: fileType };
+      }
+    }
+    cursor = nextMarker;
+  }
+  throw new Error(
+    "Telefun storage upload did not contain a multipart file part.",
+  );
+}
+
+export async function mockRecordingUpload(
+  page: Page,
+  captures?: CapturedTelefunRecordingUpload[],
+) {
   const uploads: string[] = [];
   await page.route(
     `${E2E_SUPABASE_URL}/storage/v1/object/telefun-recordings/**`,
@@ -555,6 +711,18 @@ export async function mockRecordingUpload(page: Page) {
         "",
       );
       uploads.push(path);
+      const requestBody = route.request().postDataBuffer();
+      const contentType = route.request().headers()["content-type"];
+      if (captures && requestBody) {
+        const file = extractUploadedRecording(requestBody, contentType);
+        captures.push({
+          path,
+          contentType,
+          fileContentType: file.fileContentType,
+          body: file.body,
+          requestBody,
+        });
+      }
       return route.fulfill({
         status: 200,
         contentType: "application/json",

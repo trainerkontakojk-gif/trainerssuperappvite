@@ -197,6 +197,30 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expect(prompt).toContain("Jangan berdebat tanpa akhir");
     // Percaya penjelasan agen tidak lagi berarti langsung menerima.
     expect(prompt).not.toContain("kamu percaya saja");
+    // Respons singkat bukan alasan konsumen marah menunggu pasif.
+    expect(prompt).toContain("tagih agen dengan nada kesal");
+    expect(prompt).not.toContain("atau tunggu agen bicara");
+    // Pengingat paling akhir menjaga emosi tanpa mengalahkan hold/penutupan.
+    const reminder =
+      prompt
+        .split("\n")
+        .find((line) => line.startsWith("PENGINGAT NADA (MARAH):")) ?? "";
+    expect(reminder).not.toBe("");
+    expect(prompt.split("PENGINGAT NADA (MARAH):").length - 1).toBe(1);
+    expect(prompt.slice(-600)).toContain("PENGINGAT NADA (MARAH):");
+    const technicalVoicePosition = prompt.indexOf(
+      "Pemilihan voice teknis diatur aplikasi.",
+    );
+    expect(technicalVoicePosition).toBeGreaterThanOrEqual(0);
+    expect(prompt.indexOf(reminder)).toBeGreaterThan(technicalVoicePosition);
+    expect(reminder).toContain("Tetap sebagai konsumen");
+    expect(reminder).toContain("Emosi turun bertahap");
+    expect(reminder).toContain("Jangan mengarang fakta");
+    expect(reminder).toContain("Selama hold tetap diam");
+    expect(reminder).toContain(
+      "aturan hold, isyarat waktu, dan penutupan dari aplikasi tetap diutamakan di atas pengingat ini.",
+    );
+    expect(prompt.trimEnd().endsWith(reminder.trimEnd())).toBe(true);
     // Domisili bawaan sudah spesifik, jadi tidak ada aturan probing domisili.
     expect(prompt).not.toContain("DOMISILI BELUM SPESIFIK");
     expectHermetic(audit);
@@ -268,6 +292,15 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       const rest = prompt.replace(rule!, "");
       expect(rest).not.toMatch(/\b(Mas|Mbak|Pak|Bu)\b/);
       expect(rest).toContain("KARAKTER: ");
+      if (consumerTypeId === "ramah") {
+        expect(prompt).toContain(
+          'tagih agen sesuai tipemu, misalnya "Terus gimana?", atau tunggu agen bicara.',
+        );
+        expect(prompt).not.toContain("PENGINGAT NADA (MARAH):");
+        expect(prompt.trimEnd()).toMatch(
+          /Pemilihan voice teknis diatur aplikasi\. Jangan membahas atau mencoba mengubah voice teknis dalam percakapan\.$/,
+        );
+      }
       expectHermetic(audit);
     });
   }

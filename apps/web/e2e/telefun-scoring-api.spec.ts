@@ -20,7 +20,9 @@ const env = readLoopbackEnv();
 const ns = `telefun-score-${randomUUID().slice(0, 8)}`;
 let agent: Awaited<ReturnType<typeof createUserWithJwt>>;
 let app: Hono;
+let guardedFetch: typeof fetch;
 const providerCalls: string[] = [];
+const sessionIds: string[] = [];
 
 const FEEDBACK =
   "Tempo bicara stabil dan jelas sehingga konsumen mudah mengikuti.";
@@ -58,7 +60,7 @@ test.beforeAll(async () => {
   });
   installLoopbackFetchGuard();
   // Gemini yang tidak pernah menjawab; selain itu tetap lewat guard loopback.
-  const guarded = globalThis.fetch;
+  guardedFetch = globalThis.fetch;
   globalThis.fetch = ((input: any, init?: any) => {
     const raw =
       typeof input === "string" ? input : (input?.url ?? String(input));
@@ -66,28 +68,50 @@ test.beforeAll(async () => {
       providerCalls.push(raw);
       return new Promise<Response>(() => {});
     }
-    return guarded(input, init);
+    return guardedFetch(input, init);
   }) as typeof fetch;
   agent = await createUserWithJwt(env, "agent", ns);
   app = (await import("../../api/src/app")).default as unknown as Hono;
 });
 
 test.afterAll(async () => {
-  if (agent)
-    expect(
-      (await createAdmin(env).auth.admin.deleteUser(agent.userId)).error,
-    ).toBeNull();
+  if (guardedFetch) globalThis.fetch = guardedFetch;
+  if (!agent) return;
+  const admin = createAdmin(env);
+  if (sessionIds.length > 0) {
+    const deleted = await admin
+      .from("telefun_history")
+      .delete()
+      .in("id", sessionIds);
+    expect(deleted.error, "delete run scoring session").toBeNull();
+    const remaining = await admin
+      .from("telefun_history")
+      .select("id")
+      .in("id", sessionIds);
+    expect(remaining.error, "read back deleted scoring session").toBeNull();
+    expect(remaining.data).toEqual([]);
+  }
+  const deletedUser = await admin.auth.admin.deleteUser(agent.userId);
+  expect(deletedUser.error, "delete run scoring auth user").toBeNull();
 });
 
 test("the score returns without waiting for the coaching summary", async () => {
+  const id = randomUUID();
+  sessionIds.push(id);
   const { data: row, error } = await createAdmin(env)
     .from("telefun_history")
     .insert({
+      id,
       user_id: agent.userId,
       scenario_title: `${ns} skor`,
       consumer_name: "Konsumen Uji",
       status: "completed",
       scoring_status: "pending",
+      recording_status: "ready",
+      recording_error: null,
+      recording_path: `${agent.userId}/${id}/full_call.webm`,
+      agent_recording_path: `${agent.userId}/${id}/agent_only.webm`,
+      recording_ready_at: new Date().toISOString(),
       voice_assessment: CACHED_ASSESSMENT,
     })
     .select("id")

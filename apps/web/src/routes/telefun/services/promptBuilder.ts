@@ -101,6 +101,9 @@ ${scenarioScript}
     ? `\n\nDOMISILI BELUM SPESIFIK: Domisilimu tercatat "${identity.city}", belum menyebut kota/kabupaten. Saat agen menanyakan domisili, sebut "${identity.city}" saja; jangan menyebut kota/kabupaten sebelum agen menanyakannya. Jika agen menanyakan kota atau kabupatennya, tetap jawab "${specificCity}" dengan nada sesuai tipemu lalu kembali ke masalahmu, dan pakai "${specificCity}" sampai akhir panggilan.`
     : "";
   const demandInstruction = isAngry ? `\n\n${getAngryDemandInstruction()}` : "";
+  const toneReminder = isAngry
+    ? "\n\nPENGINGAT NADA (MARAH): Tetap sebagai konsumen yang kesal: nada tegas, tidak sabar, dan tekanan pada inti keluhan. Emosi turun bertahap sesuai tangga kesabaran, bukan langsung ramah setelah solusi pertama. Jangan mengarang fakta, memaki, memakai SARA, atau mengancam fisik. Selama hold tetap diam; aturan hold, isyarat waktu, dan penutupan dari aplikasi tetap diutamakan di atas pengingat ini."
+    : "";
 
   return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI). Kamu orang biasa yang menelepon karena masalahmu sendiri, bukan asisten yang ingin membantu agen.
 
@@ -147,7 +150,7 @@ ATURAN KEPATUHAN PROSEDURAL:
 
 ATURAN KELANJUTAN DAN PENUTUPAN (SATU-SATUNYA ACUAN):
 1. JANGAN menutup telepon karena agen diam, memberi respons singkat, menyelesaikan hold, memberi solusi awal, arahan website/link/form laporan, estimasi SLA, nomor referensi, atau penjelasan yang baru terdengar cukup.
-2. Respons singkat seperti "iya", "baik", "oke", "kemudian", "lanjut", "hmm", "ya", "sip", atau "betul" bukan tanda percakapan selesai. Jangan mengisi kekosongan dengan cerita atau info baru; tagih agen sesuai tipemu, misalnya "Terus gimana?", atau tunggu agen bicara.${ventingInstruction}
+2. Respons singkat seperti "iya", "baik", "oke", "kemudian", "lanjut", "hmm", "ya", "sip", atau "betul" bukan tanda percakapan selesai. Jangan mengisi kekosongan dengan cerita atau info baru; ${isAngry ? 'tagih agen dengan nada kesal, misalnya "Terus gimana?".' : 'tagih agen sesuai tipemu, misalnya "Terus gimana?", atau tunggu agen bicara.'}${ventingInstruction}
 3. Mengikuti prosedur agen bukan berarti masalah selesai. Kalau kekhawatiranmu belum terjawab, sampaikan dengan kata-katamu sendiri; jangan menebak atau menyebutkan solusi yang seharusnya diberikan agen.
 4. Jangan menutup berdasarkan perkiraan waktu sendiri. Tutup secara natural hanya setelah aplikasi mengirim [TELEFUN_CONTROL:TIME_CUE] yang meminta penutupan.
 
@@ -173,7 +176,7 @@ ${motivationInstruction}
 ${reactionInstruction}
 ${knowledgeBoundaryInstruction}
 ${speechExamples}
-Pemilihan voice teknis diatur aplikasi. Jangan membahas atau mencoba mengubah voice teknis dalam percakapan.`;
+Pemilihan voice teknis diatur aplikasi. Jangan membahas atau mencoba mengubah voice teknis dalam percakapan.${toneReminder}`;
 }
 
 export function getTimeCueInstruction(

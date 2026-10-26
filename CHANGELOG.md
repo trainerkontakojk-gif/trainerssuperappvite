@@ -4,6 +4,16 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-26
+
+- fix(telefun): cegah scoring jika salah satu rekaman gagal, pertahankan rekaman valid, gagalkan enqueue/claim/hasil terlambat, dan lindungi retry sampai cleanup selesai
+
+- fix(telefun): pisahkan input Gemini 16 kHz dari playback/rekaman full-call pada rate output native, pertahankan agent-only mic dan 32 kbps, serta finalisasi kedua recorder sebelum membersihkan graph
+
+## 2026-10-25
+
+- fix(telefun): konsumen marah menagih respons agen alih-alih menunggu pasif, dengan pengingat nada di akhir prompt yang tetap tunduk pada hold dan kontrol penutupan aplikasi; tipe lain dan pilihan suara tidak berubah
+
 ## 2026-10-23
 
 - feat(telefun): telaah menandai kategori bahasa termasuk pengulangan dan efektivitas kalimat, memverifikasi dua bukti pengulangan, serta menjaga navigasi kutipan bertumpang tindih dan hasil lama

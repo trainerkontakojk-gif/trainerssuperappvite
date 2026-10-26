@@ -20,8 +20,16 @@ const validAssessment = {
     verdict: "Perlu perbaikan",
     feedback: "Perlu perbaikan.",
   },
-  intonation: { score: 0, verdict: "Perlu perbaikan", feedback: "Perlu perbaikan." },
-  articulation: { score: 0, verdict: "Perlu perbaikan", feedback: "Perlu perbaikan." },
+  intonation: {
+    score: 0,
+    verdict: "Perlu perbaikan",
+    feedback: "Perlu perbaikan.",
+  },
+  articulation: {
+    score: 0,
+    verdict: "Perlu perbaikan",
+    feedback: "Perlu perbaikan.",
+  },
   fillerWords: {
     score: 0,
     count: 10,
@@ -73,6 +81,11 @@ const mockMaybeSingle = vi.hoisted(() =>
           }
         : {
             user_id: "user-1",
+            status: "completed",
+            recording_status: "ready",
+            recording_error: null,
+            recording_path: "user-1/session-1/full_call.webm",
+            agent_recording_path: "user-1/session-1/agent_only.webm",
             scoring_status: state.status,
             score: null,
             voice_assessment: null,

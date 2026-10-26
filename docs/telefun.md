@@ -58,6 +58,18 @@ voice registry. The approved gender mapping used by the identity picker is:
 application mapping; Google documents the voice names and characteristics but
 does not publish a first-party gender field for the full catalog.
 
+## Ekspresi konsumen
+
+Prompt tipe `marah` menagih respons dengan nada kesal setelah jawaban agen yang
+singkat, tanpa pilihan menunggu pasif. Pengingat singkat di akhir prompt menjaga
+peran konsumen dan penurunan emosi bertahap, melarang fakta baru serta makian/SARA/
+ancaman fisik, dan menyatakan bahwa hold, isyarat waktu, serta penutupan aplikasi
+harus didahulukan di atas pengingat tersebut.
+Tipe lain, katalog/pilihan suara, model, dan transport tidak berubah. E2E hermetic
+memverifikasi isi konfigurasi yang terkirim serta lifecycle lokal; bukan bukti
+bahwa nada suara model sungguhan sudah lebih ekspresif. Evaluasi audio langsung
+memerlukan panggilan provider terpisah yang diotorisasi.
+
 ## Session flow
 
 1. The browser creates or resumes an owned Telefun session through the API.
@@ -87,6 +99,57 @@ normalization never rewrites historical history rows.
 - Headset yang hilang setelah cek membuat panggilan gagal, bukan beralih diam-diam
   ke mikrofon laptop. Pesan meminta pengguna memeriksa headset atau memilih
   mikrofon lain; kembali ke Telefun untuk membuka cek mikrofon lagi.
+
+## Audio graph (Plan v2 phase 1)
+
+- The browser keeps a dedicated 16 kHz input `AudioContext` for microphone
+  processing and the existing Gemini `audio/pcm;rate=16000` input contract.
+  Agent-only capture remains sourced from that input graph.
+- Playback uses a second `AudioContext` with no requested sample rate, so the
+  browser/device chooses its native output rate. Incoming 24 kHz PCM buffers
+  retain their source rate and are scheduled on the output context's clock. The
+  original microphone stream is mixed into the full-call recording there; the
+  mic is not connected to the speaker, and nodes never cross contexts.
+- Both recordings retain the existing WebM/Opus 32 kbps setting. Recorder errors
+  are observed for the recorder lifetime, not only during shutdown. Disconnect
+  waits for both recorder `stop` events (including final `dataavailable` chunks)
+  within the existing bounded end-call budget. A failed track is marked failed
+  and is not uploaded as complete; its valid sibling recording is preserved.
+  End, unmount and partial-startup failure share a small audio disposal owner
+  outside React. It stops microphone tracks before awaiting context close,
+  joins pending close promises, and retries rejected closes at most three times
+  per context (100/200 ms backoff). The caller's deadline does not abandon
+  disposal. New call graphs/mics wait up to 10 seconds for confirmed release,
+  then report the existing cleanup-pending error. Exhausted closes retain the
+  owner and block new calls for that page lifetime; reload is required if the
+  browser cannot release them. Finalization/upload remains owned by the
+  existing exactly-once recording callback. Upload/save can complete while
+  release is pending; navigation to Telaah waits for release and is suppressed
+  when the originating phone has unmounted.
+- A browser that exposes an output rate below 24 kHz continues the call; this is
+  a capability limitation, not a fidelity guarantee or a reason to force another
+  rate. Actual rates are logged locally. If autoplay resume is blocked, the
+  existing **Aktifkan audio** retry remains the user recovery path.
+- Synthetic, hermetic Chromium E2E covers 16 kHz provider MIME/pitch, 24 kHz
+  playback scheduling, decoded full-call versus agent-only uploads, recorder
+  finalization, server interruption/queue cancellation, hold/mute, a bounded
+  stalled-Worklet fallback, blocked-playback retry, partial startup cleanup and
+  a mocked 22.05 kHz native output. It makes no Gemini provider call. The frozen
+  direct 32 kbps codec control measured a 10 kHz RMS of `0.09886`; the old 16
+  kHz graph control measured no 10 kHz component and a strong 6 kHz alias. A
+  separate synthetic output-context tap measured 10 kHz RMS `0.10695` and 6 kHz
+  alias RMS `0.000168` at 48 kHz in one run, passing the graph-path threshold.
+- **The uploaded recording is a separate, unresolved fidelity gate.** In that
+  same run, the 32 kbps full-call WebM decoded to 48 kHz but measured 10 kHz RMS
+  `0.00814` (retention `0.082` versus the frozen direct-codec control). Five
+  captures measured retention `0.082`, `0.100`, `0.406`, `0.676` and `0.691`; two
+  met the pre-RED `0.5` criterion and three did not. The 6 kHz recording alias
+  remained low. This is an inconsistent/unaccepted full-call recording result,
+  not a graph pass: the recording threshold and both 32 kbps settings have not
+  been changed. The implementation does not claim that the uploaded full-call
+  recording reliably preserves the 10 kHz acceptance target. These synthetic
+  Chromium results do not establish performance on Safari, iPhone, Android or
+  physical audio devices.
 
 ## Scoring runtime
 
@@ -141,6 +204,31 @@ bukan target arsitektur final. Service tersebut baru boleh di-scale-to-zero
 setelah API embedded worker dan migration fencing terbukti drain queue, retry,
 dan tidak menghasilkan duplicate claim/completion. Tidak ada queue, assessment,
 usage log, recording, atau history yang dihapus.
+
+## Capture readiness and scoring safety
+
+A Gemini voice assessment requires both owned recordings: the full-call capture
+and the agent-only capture. If either recorder fails, the attempt is marked
+failed and does not enter or continue scoring. The browser still uploads and
+keeps any valid sibling track. A failed attempt is finalized before retry, and a
+new attempt waits until the old audio contexts, recorders and microphone tracks
+are confirmed released.
+
+The API enforces this policy at enqueue/finalization, worker claim, direct or
+manual scoring, rerun and result completion. Failed capture state fences late
+`recording-ready` callbacks and token-fenced results from in-flight claims;
+existing completed assessments remain readable and are not erased. Score and
+feedback edits outside the canonical scoring service are rejected. The additive
+migration `20261026150000_telefun_failed_capture_scoring_policy.sql` updates the
+SQL readiness, claim, enqueue, recording-transition and completion guards; its
+rollback is `supabase/rollbacks/rollback_20261026150000_telefun_failed_capture_scoring_policy.sql`.
+
+The local real-backend E2E exercises Hono, PostgREST/RPC, and the scoring worker
+against disposable loopback fixtures. Recording downloads use an in-memory
+Storage fixture because the local Storage gateway was unavailable; the provider
+is intercepted fail-closed, and no provider request leaves the test. Migration
+and rollback rehearsal ran only against the verified local Postgres container;
+no remote database was changed.
 
 ## Historical OpenAI Realtime compatibility
 

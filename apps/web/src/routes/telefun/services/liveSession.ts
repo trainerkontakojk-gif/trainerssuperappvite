@@ -20,6 +20,12 @@ import {
 } from "./holdMetrics";
 import { LiveSessionDrain } from "./liveSessionDrain";
 import {
+  AudioCleanupPendingError,
+  acquireTelefunAudio,
+  closeTelefunAudioContexts,
+  type TelefunAudioOwner,
+} from "./audioDisposal";
+import {
   normalizeTelefunWebSocketUrl,
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
@@ -57,9 +63,13 @@ export class LiveSession {
     typeof getTelefunAudioConfiguration
   >;
   private ws: WebSocket | null = null;
+  /** Provider input and agent-only capture remain at the canonical 16 kHz. */
   private audioContext: AudioContext | null = null;
+  /** Playback and full-call mix follow the browser's native output rate. */
+  private outputAudioContext: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private inputSource: MediaStreamAudioSourceNode | null = null;
+  private outputMicSource: MediaStreamAudioSourceNode | null = null;
   private processor: ScriptProcessorNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private analyser: AnalyserNode | null = null;
@@ -70,6 +80,16 @@ export class LiveSession {
   private agentRecordedChunks: Blob[] = [];
   private recordingDestination: MediaStreamAudioDestinationNode | null = null;
   private agentOnlyDestination: MediaStreamAudioDestinationNode | null = null;
+  private readonly stoppedRecorders = new WeakSet<MediaRecorder>();
+  private readonly failedRecorderTracks = new Set<"full_call" | "agent_only">();
+  private pendingRecorderStops = new Map<
+    MediaRecorder,
+    "full_call" | "agent_only"
+  >();
+  private recorderStopPromise: Promise<void> = Promise.resolve();
+  private recordingCaptureFailed = false;
+  private captureFailureReported = false;
+  private hasEmittedRecording = false;
 
   private isMuted: boolean = false;
   private isHeld: boolean = false;
@@ -112,12 +132,20 @@ export class LiveSession {
   private readonly STALLED_RESPONSE_START_MS = 20000;
   private readonly STALLED_RESPONSE_MID_MS = 25000;
   private readonly RECORDING_FINALIZATION_TIMEOUT_MS = 10_000;
+  private readonly AUDIO_CLEANUP_RESERVE_MS = 2_000;
+  private readonly AUDIO_CONTEXT_RESUME_TIMEOUT_MS = 1_500;
+  private readonly AUDIO_WORKLET_LOAD_TIMEOUT_MS = 5_000;
 
   private intentionalClose = false;
   private hasStoppedRecording = false;
   private hasCleanedUpAudio = false;
+  private audioOwner: TelefunAudioOwner | null = null;
+  private microphoneRequest: Promise<MediaStream> | null = null;
   private lastLocalError: Error | null = null;
-  private disconnectPromise: Promise<void> | null = null;
+  private shutdownPromise: Promise<void> | null = null;
+  private shutdownFailed = false;
+  private shutdownDeadline = 0;
+  private activeDrain: LiveSessionDrain | null = null;
 
   // Recording finalization promise ensures disconnect waits for onRecordingComplete.
   private recordingFinalizationPromise: Promise<void> = Promise.resolve();
@@ -162,9 +190,7 @@ export class LiveSession {
       telefunModelId: selection.model.id,
       telefunTransport: "gemini-live",
     };
-    this.audioConfiguration = getTelefunAudioConfiguration(
-      selection.model.id,
-    );
+    this.audioConfiguration = getTelefunAudioConfiguration(selection.model.id);
   }
 
   public async connect(
@@ -183,8 +209,46 @@ export class LiveSession {
         throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
       }
 
-      // 1. Get User Media
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      // Admission is held outside the component, including after unmount or
+      // failed startup. Never create another graph/mic over retained audio.
+      this.audioOwner = await acquireTelefunAudio();
+      if (this.intentionalClose) {
+        await this.cleanupAudio(Date.now() + 1_000);
+        return;
+      }
+
+      // Create and ask both contexts to resume before awaiting microphone
+      // permission, while the call-start gesture is still available.
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as WebkitAudioContextWindow).webkitAudioContext;
+      if (!AudioContextCtor) {
+        throw new Error("Browser tidak mendukung AudioContext.");
+      }
+      this.audioContext = new AudioContextCtor({
+        sampleRate: this.audioConfiguration.inputSampleRateHz,
+      });
+      this.outputAudioContext = new AudioContextCtor();
+      const inputResume = this.resumeAudioContext(this.audioContext);
+      const outputResume = this.resumeAudioContext(this.outputAudioContext);
+      const outputSampleRateHz = this.outputAudioContext.sampleRate;
+      console.info(
+        "[Telefun] Audio graph sample rates:",
+        JSON.stringify({
+          inputSampleRateHz: this.audioContext.sampleRate,
+          outputSampleRateHz,
+          providerOutputSampleRateHz:
+            this.audioConfiguration.outputSampleRateHz,
+          outputRateCapability:
+            outputSampleRateHz < 24_000
+              ? "native_below_24khz"
+              : "native_at_least_24khz",
+        }),
+      );
+
+      // 1. Get User Media. The browser may resample the device track into the
+      // fixed input context; the provider contract remains PCM 16 kHz.
+      this.microphoneRequest = navigator.mediaDevices.getUserMedia({
         audio: {
           ...(options.microphoneDeviceId
             ? { deviceId: { exact: options.microphoneDeviceId } }
@@ -196,6 +260,7 @@ export class LiveSession {
           sampleRate: this.audioConfiguration.inputSampleRateHz,
         },
       });
+      this.stream = await this.microphoneRequest;
       // Closed while the microphone was opening (e.g. left during the ring).
       if (this.intentionalClose) {
         this.stream.getTracks().forEach((track) => track.stop());
@@ -204,26 +269,24 @@ export class LiveSession {
       this.applyMicrophoneCaptureStateToTracks();
       this.onLocalStream(this.stream);
 
-      // 2. Setup Audio Context
-      const AudioContextCtor =
-        window.AudioContext ||
-        (window as WebkitAudioContextWindow).webkitAudioContext;
-      if (!AudioContextCtor) {
-        throw new Error("Browser tidak mendukung AudioContext.");
-      }
-      this.audioContext = new AudioContextCtor({
-        sampleRate: this.audioConfiguration.inputSampleRateHz,
-      });
-
-      // 3. Setup Recording
+      // 2. Setup Recording on the independent input and native output graphs.
       this.setupRecorders();
 
-      // 4. Setup Input Processing
+      // 3. Setup Input Processing
       await this.setupInputProcessing();
-      // disconnect() already released the microphone and audio context.
+      // disconnect() may close either context while addModule() is pending.
       if (this.intentionalClose) return;
+      const [inputRunning, outputRunning] = await Promise.all([
+        inputResume,
+        outputResume,
+      ]);
+      if (this.intentionalClose) {
+        await this.abortAudioStartup();
+        return;
+      }
+      if (!inputRunning || !outputRunning) this.onPlaybackBlocked();
 
-      // 5. Connect WebSocket
+      // 4. Connect WebSocket
       const wsBase = normalizeTelefunWebSocketUrl(
         import.meta.env.VITE_TELEFUN_WS_URL,
       );
@@ -237,10 +300,27 @@ export class LiveSession {
         transport: this.config.telefunTransport,
       });
 
-      this.ws = new WebSocket(wsUrl.toString());
-      this.ws.binaryType = "arraybuffer";
+      const socket = new WebSocket(wsUrl.toString());
+      this.ws = socket;
+      socket.binaryType = "arraybuffer";
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
+        if (
+          this.intentionalClose ||
+          this.ws !== socket ||
+          socket.readyState !== WebSocket.OPEN
+        ) {
+          if (
+            socket.readyState === WebSocket.CONNECTING ||
+            socket.readyState === WebSocket.OPEN
+          ) {
+            socket.close(
+              TELEFUN_CLIENT_CLOSE_CODE,
+              TELEFUN_CLIENT_CLOSE_REASON,
+            );
+          }
+          return;
+        }
         this.isSetupComplete = false;
         this.hasAuthenticated = false;
         this.hasConfigured = false;
@@ -250,7 +330,7 @@ export class LiveSession {
         this.lastModelActivityMs = Date.now();
         this.setSessionState("connecting");
         this.onStatusChange("Mengautentikasi sesi...");
-        this.ws?.send(
+        socket.send(
           JSON.stringify(
             buildTelefunAuthMessage(accessToken, this.config.sessionId),
           ),
@@ -260,7 +340,8 @@ export class LiveSession {
         this.startStalledWatchdog();
       };
 
-      this.ws.onmessage = async (event) => {
+      socket.onmessage = async (event) => {
+        if (this.intentionalClose || this.ws !== socket) return;
         if (event.data instanceof ArrayBuffer) {
           this.playPcm(
             new Uint8Array(event.data),
@@ -276,11 +357,13 @@ export class LiveSession {
         }
       };
 
-      this.ws.onerror = (_event) => {
-        this.onError(new Error("WebSocket Error"));
+      socket.onerror = (_event) => {
+        if (!this.intentionalClose && this.ws === socket) {
+          this.onError(new Error("WebSocket Error"));
+        }
       };
 
-      this.ws.onclose = (event) => {
+      socket.onclose = (event) => {
         this.clearSetupTimeout();
         this.stopStalledWatchdog();
         const mapped = mapTelefunCloseEvent(event);
@@ -303,8 +386,13 @@ export class LiveSession {
           this.onError(this.lastLocalError ?? new Error(mapped.message));
         }
 
-        this.stopRecordingOnce();
-        this.cleanupAudio();
+        this.activeDrain?.complete();
+        this.intentionalClose = true;
+        void this.beginShutdown(() => this.finishAfterSocketClose()).catch(
+          () => {
+            this.onError(new AudioCleanupPendingError());
+          },
+        );
         this.emitTimelineEvent("ws_close", {
           code: event.code,
           reason: event.reason,
@@ -312,6 +400,10 @@ export class LiveSession {
         });
       };
     } catch (err) {
+      if (this.intentionalClose) {
+        await this.abortAudioStartup();
+        return;
+      }
       if (
         options.microphoneDeviceId &&
         !this.stream &&
@@ -328,17 +420,20 @@ export class LiveSession {
         );
         // Fail closed before any socket/recording starts. Never retry another mic.
         this.intentionalClose = true;
-        this.cleanupAudio();
+        await this.abortAudioStartup();
         this.onError(error);
         this.onStatusChange("Gagal");
         this.setSessionState("ended");
         return;
       }
+      this.intentionalClose = true;
+      await this.abortAudioStartup();
       this.onError(err as Error);
     }
   }
 
   private handleJsonMessage(msg: any) {
+    if (this.intentionalClose) return;
     if (msg.type === "auth_ok") {
       if (this.intentionalClose) return;
       if (this.hasAuthenticated) return;
@@ -446,15 +541,21 @@ export class LiveSession {
   }
 
   private setupRecorders() {
-    if (!this.audioContext || !this.stream) return;
+    if (!this.audioContext || !this.outputAudioContext || !this.stream) {
+      return;
+    }
 
     this.recordingDestination =
-      this.audioContext.createMediaStreamDestination();
+      this.outputAudioContext.createMediaStreamDestination();
     this.agentOnlyDestination =
       this.audioContext.createMediaStreamDestination();
 
     const agentSource = this.audioContext.createMediaStreamSource(this.stream);
     agentSource.connect(this.agentOnlyDestination);
+    this.outputMicSource = this.outputAudioContext.createMediaStreamSource(
+      this.stream,
+    );
+    this.outputMicSource.connect(this.recordingDestination);
 
     const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
       ? "audio/webm;codecs=opus"
@@ -466,29 +567,86 @@ export class LiveSession {
       mimeType,
       audioBitsPerSecond: RECORDING_BITS_PER_SECOND,
     };
-    this.mediaRecorder = new MediaRecorder(
+    const fullCallRecorder = new MediaRecorder(
       this.recordingDestination.stream,
       recorderOptions,
     );
-    this.mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.recordedChunks.push(e.data);
+    this.mediaRecorder = fullCallRecorder;
+    fullCallRecorder.addEventListener("error", () =>
+      this.failRecorderTrack("full_call"),
+    );
+    fullCallRecorder.addEventListener("stop", () => {
+      this.stoppedRecorders.add(fullCallRecorder);
+      if (
+        !this.hasEmittedRecording &&
+        !this.pendingRecorderStops.has(fullCallRecorder)
+      ) {
+        this.failRecorderTrack("full_call");
+      }
+    });
+    fullCallRecorder.ondataavailable = (e) => {
+      if (
+        !this.hasEmittedRecording &&
+        !this.failedRecorderTracks.has("full_call") &&
+        e.data.size > 0
+      ) {
+        this.recordedChunks.push(e.data);
+      }
     };
 
-    this.agentMediaRecorder = new MediaRecorder(
+    const agentRecorder = new MediaRecorder(
       this.agentOnlyDestination.stream,
       recorderOptions,
     );
-    this.agentMediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) this.agentRecordedChunks.push(e.data);
+    this.agentMediaRecorder = agentRecorder;
+    agentRecorder.addEventListener("error", () =>
+      this.failRecorderTrack("agent_only"),
+    );
+    agentRecorder.addEventListener("stop", () => {
+      this.stoppedRecorders.add(agentRecorder);
+      if (
+        !this.hasEmittedRecording &&
+        !this.pendingRecorderStops.has(agentRecorder)
+      ) {
+        this.failRecorderTrack("agent_only");
+      }
+    });
+    agentRecorder.ondataavailable = (e) => {
+      if (
+        !this.hasEmittedRecording &&
+        !this.failedRecorderTracks.has("agent_only") &&
+        e.data.size > 0
+      ) {
+        this.agentRecordedChunks.push(e.data);
+      }
     };
 
     if (this.isPickedUp) this.startRecorders();
   }
 
+  private failRecorderTrack(track: "full_call" | "agent_only"): void {
+    if (this.hasEmittedRecording || this.failedRecorderTracks.has(track))
+      return;
+    this.failedRecorderTracks.add(track);
+    this.recordingCaptureFailed = true;
+    if (track === "full_call") this.recordedChunks = [];
+    else this.agentRecordedChunks = [];
+    this.reportCaptureFailure();
+  }
+
   private startRecorders() {
-    if (this.mediaRecorder?.state === "inactive") this.mediaRecorder.start(1000);
-    if (this.agentMediaRecorder?.state === "inactive")
-      this.agentMediaRecorder.start(1000);
+    try {
+      if (this.mediaRecorder?.state === "inactive")
+        this.mediaRecorder.start(1000);
+      if (this.agentMediaRecorder?.state === "inactive")
+        this.agentMediaRecorder.start(1000);
+    } catch (error) {
+      this.lastLocalError =
+        error instanceof Error ? error : new Error("Recording startup failed");
+      this.onError(this.lastLocalError);
+      this.ws?.close(1011, "Recording startup failed");
+      void this.abortAudioStartup();
+    }
   }
 
   /** The ring ended: start the call on the connection prepared meanwhile. */
@@ -498,48 +656,72 @@ export class LiveSession {
     this.isPickedUp = true;
     this.sessionStartTime = Date.now();
     this.startRecorders();
+    if (this.intentionalClose) return;
     if (this.isSetupComplete) this.announceReady();
   }
 
   private async setupInputProcessing() {
-    if (!this.audioContext || !this.stream || !this.recordingDestination)
-      return;
+    const context = this.audioContext;
+    if (!context || !this.stream) return;
 
-    this.inputSource = this.audioContext.createMediaStreamSource(this.stream);
-    this.analyser = this.audioContext.createAnalyser();
+    this.inputSource = context.createMediaStreamSource(this.stream);
+    this.analyser = context.createAnalyser();
     this.analyser.fftSize = 256;
 
     this.inputSource.connect(this.analyser);
-    this.inputSource.connect(this.recordingDestination);
 
-    if (this.audioContext.audioWorklet) {
+    if (context.audioWorklet) {
       try {
-        await this.audioContext.audioWorklet.addModule(
-          "/audio-input-processor.js",
-        );
-        this.workletNode = new AudioWorkletNode(
-          this.audioContext,
+        await this.loadAudioWorkletModule(context);
+        if (this.intentionalClose || context.state === "closed") return;
+        const workletNode = new AudioWorkletNode(
+          context,
           "telefun-audio-input-processor",
         );
-        this.workletNode.port.onmessage = (event) => {
+        this.workletNode = workletNode;
+        workletNode.port.onmessage = (event) => {
           this.handleInputAudioFrame(event.data as Float32Array);
         };
-        this.inputSource.connect(this.workletNode);
-        this.workletNode.connect(this.audioContext.destination);
+        this.inputSource.connect(workletNode);
+        workletNode.connect(context.destination);
         this.emitTimelineEvent("audio_worklet_enabled");
         return;
       } catch (error) {
+        if (this.intentionalClose || context.state === "closed") return;
         this.emitTimelineEvent("audio_worklet_fallback", {
           reason: error instanceof Error ? error.message : "unknown",
         });
       }
     }
 
-    this.setupInputProcessingFallback();
+    if (!this.intentionalClose) this.setupInputProcessingFallback();
+  }
+
+  private async loadAudioWorkletModule(context: AudioContext): Promise<void> {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      await Promise.race([
+        context.audioWorklet.addModule("/audio-input-processor.js"),
+        new Promise<void>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("AudioWorklet module load timed out.")),
+            this.AUDIO_WORKLET_LOAD_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   private setupInputProcessingFallback() {
-    if (!this.audioContext || !this.inputSource) return;
+    if (
+      !this.audioContext ||
+      this.audioContext.state === "closed" ||
+      !this.inputSource
+    ) {
+      return;
+    }
 
     this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
     this.processor.onaudioprocess = (event) => {
@@ -639,8 +821,10 @@ export class LiveSession {
   }
 
   private playPcm(data: Uint8Array, sampleRate = 24000) {
+    const context = this.outputAudioContext;
     if (
-      !this.audioContext ||
+      !context ||
+      context.state === "closed" ||
       !this.recordingDestination ||
       this.isHeld ||
       this.intentionalClose
@@ -648,39 +832,48 @@ export class LiveSession {
       return;
     }
 
-    const float32 = new Float32Array(data.length / 2);
-    const view = new DataView(data.buffer);
+    const byteLength = data.byteLength - (data.byteLength % 2);
+    if (byteLength === 0) return;
+    const float32 = new Float32Array(byteLength / 2);
+    const view = new DataView(data.buffer, data.byteOffset, byteLength);
     for (let i = 0; i < float32.length; i++) {
       float32[i] = view.getInt16(i * 2, true) / 32768.0;
     }
 
-    const buffer = this.audioContext.createBuffer(
-      1,
-      float32.length,
-      sampleRate,
-    );
-    buffer.getChannelData(0).set(float32);
+    let source: AudioBufferSourceNode | null = null;
+    try {
+      const buffer = context.createBuffer(1, float32.length, sampleRate);
+      buffer.getChannelData(0).set(float32);
 
-    const source = this.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.audioContext.destination);
-    source.connect(this.recordingDestination);
-    this.activeSources.add(source);
-    source.onended = () => {
-      this.activeSources.delete(source);
-      if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
-        this.pendingTurnCompletion = false;
-        this.setIsAiSpeaking(false);
-        this.setSessionState("idle");
+      const scheduledSource = context.createBufferSource();
+      source = scheduledSource;
+      scheduledSource.buffer = buffer;
+      scheduledSource.connect(context.destination);
+      scheduledSource.connect(this.recordingDestination);
+      this.activeSources.add(scheduledSource);
+      scheduledSource.onended = () => {
+        this.activeSources.delete(scheduledSource);
+        if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
+          this.pendingTurnCompletion = false;
+          this.setIsAiSpeaking(false);
+          this.setSessionState("idle");
+        }
+      };
+
+      const startTime = Math.max(context.currentTime, this.nextStartTime);
+      scheduledSource.start(startTime);
+      this.nextStartTime = startTime + buffer.duration;
+    } catch {
+      if (source) {
+        this.activeSources.delete(source);
+        try {
+          source.disconnect();
+        } catch {
+          /* output context closed while scheduling */
+        }
       }
-    };
-
-    const startTime = Math.max(
-      this.audioContext.currentTime,
-      this.nextStartTime,
-    );
-    source.start(startTime);
-    this.nextStartTime = startTime + buffer.duration;
+      if (!this.intentionalClose) this.onPlaybackBlocked();
+    }
   }
 
   private completeSetup() {
@@ -834,6 +1027,31 @@ export class LiveSession {
     });
   }
 
+  private async resumeAudioContext(
+    context: AudioContext | null,
+  ): Promise<boolean> {
+    if (!context) return false;
+    if (context.state === "running") return true;
+    if (context.state !== "suspended") return false;
+
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const resumed = context
+      .resume()
+      .then(() => true)
+      .catch(() => false);
+    const result = await Promise.race([
+      resumed,
+      new Promise<boolean>((resolve) => {
+        timeout = setTimeout(
+          () => resolve(false),
+          this.AUDIO_CONTEXT_RESUME_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    if (timeout) clearTimeout(timeout);
+    return result && (context.state as AudioContextState) === "running";
+  }
+
   /** Waktu sejak autentikasi; mute sebelum autentikasi dihitung dari 0. */
   private sessionRelativeNow(): number {
     return this.sessionStartTime > 0
@@ -915,110 +1133,308 @@ export class LiveSession {
     });
   }
 
+  public waitForAudioRelease(): Promise<void> {
+    return this.audioOwner?.released ?? Promise.resolve();
+  }
+
   public disconnect(
     reason: "user" | "timeout" | "cleanup" = "user",
   ): Promise<void> {
-    if (!this.disconnectPromise) {
-      this.disconnectPromise = this.performDisconnect(reason);
+    return this.beginShutdown(
+      () => this.performDisconnect(reason),
+      reason === "user",
+    );
+  }
+
+  private beginShutdown(
+    start: () => Promise<void>,
+    retryFailed = false,
+  ): Promise<void> {
+    // Socket-close, timeout and unmount observers join the last attempt,
+    // including its rejection. Only an explicit user retry opens another batch.
+    if (retryFailed && this.shutdownFailed) this.shutdownPromise = null;
+    if (!this.shutdownPromise) {
+      this.shutdownFailed = false;
+      this.intentionalClose = true;
+      this.shutdownDeadline =
+        Date.now() + this.RECORDING_FINALIZATION_TIMEOUT_MS;
+      const attempt = Promise.resolve().then(start);
+      this.shutdownPromise = attempt;
+      void attempt.then(undefined, () => {
+        if (this.shutdownPromise === attempt) this.shutdownFailed = true;
+      });
     }
-    return this.disconnectPromise;
+    return this.shutdownPromise;
   }
 
   private async performDisconnect(
     reason: "user" | "timeout" | "cleanup",
   ): Promise<void> {
-    if (this.intentionalClose) return;
-    const recordingFinalizationDeadline =
-      Date.now() + this.RECORDING_FINALIZATION_TIMEOUT_MS;
-    this.intentionalClose = true;
+    const deadline = this.shutdownDeadline;
     this.clearSetupTimeout();
     this.stopStalledWatchdog();
     this.clearAiPlayback("disconnect");
+    const recorderStop = this.stopRecordingOnce();
+    const socket = this.ws;
 
-    // Stop sending audio
-    this.stopRecordingOnce();
-
-    // Send drain handshake
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      if (this.hasConfigured) {
-        this.ws.send(JSON.stringify(buildAudioStreamEndMessage()));
-      }
-      this.ws.send(JSON.stringify(buildSessionEndRequest(reason)));
-
+    if (socket?.readyState === WebSocket.CONNECTING) {
+      socket.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
+    } else if (socket?.readyState === WebSocket.OPEN) {
       const drain = new LiveSessionDrain(5000);
-      this.ws.addEventListener(
-        "message",
-        (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "session_end_complete") {
-              drain.complete();
-            }
-          } catch {
-            /* skip */
-          }
-        },
-        { once: true },
-      );
-
-      await drain.start();
+      const onDrainMessage = (event: MessageEvent) => {
+        if (typeof event.data !== "string") return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "session_end_complete") drain.complete();
+        } catch {
+          /* ignore non-JSON messages while draining */
+        }
+      };
+      const onDrainClose = () => drain.complete();
+      this.activeDrain = drain;
+      socket.addEventListener("message", onDrainMessage);
+      socket.addEventListener("close", onDrainClose);
+      const drainComplete = drain.start();
+      try {
+        if (this.hasConfigured) {
+          socket.send(JSON.stringify(buildAudioStreamEndMessage()));
+        }
+        socket.send(JSON.stringify(buildSessionEndRequest(reason)));
+      } catch (error) {
+        console.warn("[Telefun] Session drain request failed:", error);
+        drain.complete();
+      }
+      await drainComplete;
+      socket.removeEventListener("message", onDrainMessage);
+      socket.removeEventListener("close", onDrainClose);
+      if (this.activeDrain === drain) this.activeDrain = null;
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
+      }
     }
 
-    // Close WebSocket after drain
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
-    }
-
-    // Cleanup after drain
-    this.cleanupAudio();
+    await this.finishRecordingAndCleanup(recorderStop, deadline);
     this.emitTimelineEvent("disconnect", { reason });
-
-    // Drain and recording finalization share one end-call budget. Starting a new
-    // timeout here would make the worst case 5s drain + 10s callback wait.
-    const remainingFinalizationMs = Math.max(
-      0,
-      recordingFinalizationDeadline - Date.now(),
-    );
-    if (remainingFinalizationMs === 0) return;
-
-    let finalizationTimeout: ReturnType<typeof setTimeout> | null = null;
-    await Promise.race([
-      this.recordingFinalizationPromise.catch(() => {}),
-      new Promise<void>((resolve) => {
-        finalizationTimeout = setTimeout(resolve, remainingFinalizationMs);
-      }),
-    ]);
-    if (finalizationTimeout) clearTimeout(finalizationTimeout);
   }
 
-  private stopRecordingOnce() {
-    if (this.hasStoppedRecording) return;
+  private async finishRecordingAndCleanup(
+    recorderStop: Promise<void>,
+    deadline: number,
+  ): Promise<void> {
+    const recorderDeadline = Math.max(
+      Date.now(),
+      deadline - this.AUDIO_CLEANUP_RESERVE_MS,
+    );
+    const recorderStopped = await this.waitForRecorderStopUntil(
+      recorderStop,
+      recorderDeadline,
+    );
+    if (!recorderStopped) this.discardIncompleteRecording();
+    const audioCleaned = await this.cleanupAudio(deadline);
+    if (!audioCleaned) {
+      throw new AudioCleanupPendingError();
+    }
+    const recordingFinalized = await this.waitForPromiseUntil(
+      this.recordingFinalizationPromise,
+      deadline,
+    );
+    if (!recordingFinalized) {
+      throw new AudioCleanupPendingError();
+    }
+  }
+
+  private stopRecordingOnce(): Promise<void> {
+    if (this.hasStoppedRecording) return this.recorderStopPromise;
     this.hasStoppedRecording = true;
     // Ended before pickup: there is no call to record or save.
-    if (!this.isPickedUp) return;
-    this.stopRecording();
+    if (!this.isPickedUp) return Promise.resolve();
+    return this.stopRecording();
   }
 
-  private stopRecording() {
-    if (this.mediaRecorder && this.mediaRecorder.state !== "inactive") {
-      this.mediaRecorder.stop();
-    }
-    if (
-      this.agentMediaRecorder &&
-      this.agentMediaRecorder.state !== "inactive"
-    ) {
-      this.agentMediaRecorder.stop();
-    }
-
-    // Create a new finalization promise that disconnect can await
+  private stopRecording(): Promise<void> {
     this.recordingFinalizationPromise = new Promise<void>((resolve) => {
       this.resolveRecordingFinalization = resolve;
     });
 
-    // Give MediaRecorder onstop handlers time to flush their final chunks before building blobs.
-    setTimeout(() => {
-      this.emitRecording();
-    }, 500);
+    const recorders: Array<{
+      recorder: MediaRecorder;
+      track: "full_call" | "agent_only";
+    }> = [
+      ...(this.mediaRecorder
+        ? [{ recorder: this.mediaRecorder, track: "full_call" as const }]
+        : []),
+      ...(this.agentMediaRecorder
+        ? [{ recorder: this.agentMediaRecorder, track: "agent_only" as const }]
+        : []),
+    ];
+    const pending = new Map(
+      recorders
+        .filter(({ recorder }) => !this.stoppedRecorders.has(recorder))
+        .map(({ recorder, track }) => [recorder, track] as const),
+    );
+    this.pendingRecorderStops = pending;
+
+    const stopped = new Promise<void>((resolve) => {
+      const finish = (
+        recorder: MediaRecorder,
+        track: "full_call" | "agent_only",
+        failed: boolean,
+      ) => {
+        if (!pending.has(recorder)) return;
+        pending.delete(recorder);
+        if (failed) {
+          this.failRecorderTrack(track);
+        } else {
+          this.stoppedRecorders.add(recorder);
+        }
+        if (pending.size === 0) resolve();
+      };
+
+      for (const { recorder, track } of recorders) {
+        if (!pending.has(recorder)) continue;
+        recorder.addEventListener(
+          "stop",
+          () => finish(recorder, track, false),
+          { once: true },
+        );
+        recorder.addEventListener(
+          "error",
+          () => finish(recorder, track, true),
+          { once: true },
+        );
+        if (recorder.state === "inactive") {
+          finish(recorder, track, false);
+          continue;
+        }
+        try {
+          recorder.stop();
+        } catch {
+          finish(recorder, track, true);
+        }
+      }
+      if (pending.size === 0) resolve();
+    });
+
+    this.recorderStopPromise = stopped.then(() => {
+      this.pendingRecorderStops.clear();
+      void this.emitRecording();
+    });
+    return this.recorderStopPromise;
+  }
+
+  private async waitForPromiseUntil(
+    promise: Promise<unknown>,
+    deadline: number,
+  ): Promise<boolean> {
+    const remainingMs = Math.max(0, deadline - Date.now());
+    if (remainingMs === 0) return false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const completed = await Promise.race([
+      promise.then(
+        () => true,
+        () => true,
+      ),
+      new Promise<boolean>((resolve) => {
+        timeout = setTimeout(() => resolve(false), remainingMs);
+      }),
+    ]);
+    if (timeout) clearTimeout(timeout);
+    return completed;
+  }
+
+  private waitForRecorderStopUntil(
+    recorderStop: Promise<void>,
+    deadline: number,
+  ): Promise<boolean> {
+    return this.waitForPromiseUntil(recorderStop, deadline);
+  }
+
+  private discardIncompleteRecording(): void {
+    if (this.hasEmittedRecording) return;
+    for (const [recorder, track] of this.pendingRecorderStops) {
+      this.failRecorderTrack(track);
+      if (recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {
+          /* the source graph is closed immediately below */
+        }
+      }
+    }
+    this.pendingRecorderStops.clear();
+    this.recordingCaptureFailed = true;
+    this.reportCaptureFailure();
+    console.error(
+      "[Telefun] MediaRecorder stop timed out; incomplete tracks discarded independently.",
+    );
+    void this.emitRecording();
+  }
+
+  private reportCaptureFailure(): void {
+    if (this.captureFailureReported) return;
+    this.captureFailureReported = true;
+    const error = new Error(
+      "Rekaman panggilan tidak lengkap. Panggilan tidak akan dinilai.",
+    );
+    this.lastLocalError = error;
+    this.onError(error);
+    this.onStatusChange("Gagal");
+  }
+
+  private async finishAfterSocketClose(): Promise<void> {
+    const recorderStop = this.stopRecordingOnce();
+    await this.finishRecordingAndCleanup(
+      recorderStop,
+      this.shutdownDeadline ||
+        Date.now() + this.RECORDING_FINALIZATION_TIMEOUT_MS,
+    );
+    this.emitTimelineEvent("disconnect", { reason: "server_close" });
+  }
+
+  private async abortAudioStartup(): Promise<void> {
+    this.intentionalClose = true;
+    this.activeDrain?.complete();
+    const socket = this.ws;
+    if (
+      socket &&
+      (socket.readyState === WebSocket.CONNECTING ||
+        socket.readyState === WebSocket.OPEN)
+    ) {
+      socket.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
+    }
+    this.clearSetupTimeout();
+    this.stopStalledWatchdog();
+    this.stopActiveSources();
+    this.hasStoppedRecording = true;
+    this.hasEmittedRecording = true;
+
+    const activeRecorders = [
+      this.mediaRecorder,
+      this.agentMediaRecorder,
+    ].filter(
+      (recorder): recorder is MediaRecorder =>
+        recorder !== null && recorder.state !== "inactive",
+    );
+    const stopped = Promise.all(
+      activeRecorders.map(
+        (recorder) =>
+          new Promise<void>((resolve) => {
+            recorder.addEventListener("stop", () => resolve(), { once: true });
+            try {
+              recorder.stop();
+            } catch {
+              resolve();
+            }
+          }),
+      ),
+    );
+    await this.waitForRecorderStopUntil(
+      stopped.then(() => {}),
+      Date.now() + 1_000,
+    );
+    this.recordedChunks = [];
+    this.agentRecordedChunks = [];
+    await this.cleanupAudio(Date.now() + 1_000);
   }
 
   private buildSessionMetrics(): SessionMetrics {
@@ -1044,6 +1460,8 @@ export class LiveSession {
   }
 
   private async emitRecording(): Promise<void> {
+    if (this.hasEmittedRecording) return;
+    this.hasEmittedRecording = true;
     const fullBlob =
       this.recordedChunks.length > 0
         ? new Blob(this.recordedChunks, { type: "audio/webm" })
@@ -1052,6 +1470,10 @@ export class LiveSession {
       this.agentRecordedChunks.length > 0
         ? new Blob(this.agentRecordedChunks, { type: "audio/webm" })
         : null;
+    if (this.recordingCaptureFailed || !fullBlob || !agentBlob) {
+      this.recordingCaptureFailed = true;
+      this.reportCaptureFailure();
+    }
     const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
 
     const metrics = this.buildSessionMetrics();
@@ -1079,24 +1501,105 @@ export class LiveSession {
     return Math.max(0, Math.min(100, 100 * (1 - stdDev / mean)));
   }
 
-  private cleanupAudio() {
-    if (this.hasCleanedUpAudio) return;
-    this.hasCleanedUpAudio = true;
-    this.clearAiPlayback("cleanup");
-    if (this.workletNode) {
-      this.workletNode.port.onmessage = null;
-      this.workletNode.disconnect();
-    }
-    if (this.processor) this.processor.disconnect();
-    if (this.analyser) this.analyser.disconnect();
-    if (this.inputSource) this.inputSource.disconnect();
-    if (this.audioContext) void this.audioContext.close().catch(() => {});
-    if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-    this.onLocalStream(null);
+  private async cleanupAudio(deadline: number): Promise<boolean> {
+    if (this.hasCleanedUpAudio || !this.audioOwner) return true;
+    const disposal = this.audioOwner.dispose(async () => {
+      await this.performAudioCleanup();
+      this.hasCleanedUpAudio = true;
+    });
+    // The caller's deadline does not cancel or relinquish the retained owner.
+    await this.waitForPromiseUntil(disposal, deadline);
+    return this.hasCleanedUpAudio;
   }
 
-  public retryPlayback(): Promise<boolean> {
-    return Promise.resolve(false);
+  private async performAudioCleanup(): Promise<void> {
+    this.clearAiPlayback("cleanup");
+    try {
+      if (this.workletNode) {
+        this.workletNode.port.onmessage = null;
+        this.workletNode.disconnect();
+      }
+    } catch {
+      /* worklet already disconnected during partial startup */
+    }
+    for (const node of [
+      this.processor,
+      this.analyser,
+      this.inputSource,
+      this.outputMicSource,
+    ]) {
+      try {
+        node?.disconnect();
+      } catch {
+        /* node already disconnected */
+      }
+    }
+    const activeRecorders = [
+      this.mediaRecorder,
+      this.agentMediaRecorder,
+    ].filter(
+      (recorder): recorder is MediaRecorder =>
+        recorder !== null && recorder.state !== "inactive",
+    );
+    const stopped = Promise.all(
+      activeRecorders.map(
+        (recorder) =>
+          new Promise<void>((resolve) => {
+            recorder.addEventListener("stop", () => resolve(), { once: true });
+            try {
+              recorder.stop();
+            } catch {
+              resolve();
+            }
+          }),
+      ),
+    );
+    await this.waitForPromiseUntil(stopped, Date.now() + 1_000);
+
+    // Once recorder stop has settled (or its bounded failure was handled),
+    // stop tracks before waiting for close. A rejected/pending context cannot
+    // keep the microphone alive. Also own any permission request still open.
+    this.stream?.getTracks().forEach((track) => track.stop());
+    this.onLocalStream(null);
+    const microphoneReleased = this.microphoneRequest?.then(
+      (stream) => {
+        stream.getTracks().forEach((track) => track.stop());
+      },
+      () => {
+        /* a rejected request owns no microphone */
+      },
+    );
+    const contexts = [this.audioContext, this.outputAudioContext].filter(
+      (context): context is AudioContext => context !== null,
+    );
+    const results = await Promise.allSettled([
+      microphoneReleased,
+      closeTelefunAudioContexts(contexts),
+    ]);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    this.workletNode = null;
+    this.processor = null;
+    this.analyser = null;
+    this.inputSource = null;
+    this.outputMicSource = null;
+    this.recordingDestination = null;
+    this.agentOnlyDestination = null;
+    this.stream = null;
+    this.audioContext = null;
+    this.outputAudioContext = null;
+    this.microphoneRequest = null;
+  }
+
+  public async retryPlayback(): Promise<boolean> {
+    if (this.intentionalClose) return false;
+    const [inputRunning, outputRunning] = await Promise.all([
+      this.resumeAudioContext(this.audioContext),
+      this.resumeAudioContext(this.outputAudioContext),
+    ]);
+    const resumed = inputRunning && outputRunning && !this.intentionalClose;
+    if (!resumed && !this.intentionalClose) this.onPlaybackBlocked();
+    return resumed;
   }
 
   public sendTimeCue(remainingSeconds: number) {

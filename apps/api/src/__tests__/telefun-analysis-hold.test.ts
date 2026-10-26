@@ -4,11 +4,15 @@ import type { VoiceQualityAssessment } from "@trainers/types";
 // Shared mutable state accessible from vi.mock factory
 const mockState: {
   row: Record<string, any> | null;
+  currentRow: Record<string, any> | null;
+  reads: number;
   geminiResponse: any;
   updates: Array<Record<string, unknown>>;
   updateError: Error | null;
 } = {
   row: null,
+  currentRow: null,
+  reads: 0,
   geminiResponse: null,
   updates: [],
   updateError: null,
@@ -19,12 +23,14 @@ vi.mock("../lib/supabase", () => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          maybeSingle: vi.fn(() =>
-            Promise.resolve({
-              data: mockState.row,
-              error: mockState.row ? null : new Error("not found"),
-            }),
-          ),
+          maybeSingle: vi.fn(() => {
+            const row =
+              mockState.reads++ === 0 ? mockState.row : mockState.currentRow;
+            return Promise.resolve({
+              data: row,
+              error: row ? null : new Error("not found"),
+            });
+          }),
         })),
       })),
       update: vi.fn((payload: Record<string, unknown>) => {
@@ -103,7 +109,9 @@ const DEFAULT_AI_RESPONSE = {
         "Nada dominan tenang dengan empati cukup terasa saat menyampaikan solusi. Hal ini membantu konsumen merasa didengar dan aman. Tambahkan kehangatan pada sapaan awal dan penutup dengan senyum vokal agar empati lebih tulus terasa.",
     },
     transcript:
-      "Selamat siang, terima kasih telah menghubungi OJK 157. Perkenalkan saya agen yang bertugas. Bisa saya bantu jelaskan kendala yang dialami terkait layanan?".repeat(2),
+      "Selamat siang, terima kasih telah menghubungi OJK 157. Perkenalkan saya agen yang bertugas. Bisa saya bantu jelaskan kendala yang dialami terkait layanan?".repeat(
+        2,
+      ),
     highlights: [
       "Pembukaan dengan sapaan sopan dan perkenalan jelas yang membangun kepercayaan awal konsumen dalam 30 detik pertama percakapan.",
       "Penggalian kebutuhan dengan pertanyaan terbuka yang relevan sehingga konsumen dapat menjelaskan kronologi kendala secara runtut dan lengkap.",
@@ -121,6 +129,12 @@ const BASE_ROW = {
   id: "s1",
   user_id: "u1",
   scenario_title: "Test",
+  status: "completed",
+  recording_status: "ready",
+  recording_error: null,
+  recording_path: "u1/s1/full_call.webm",
+  scoring_status: "processing",
+  scoring_claim_token_hash: "active-claim-hash",
   agent_recording_path: "u1/s1/agent_only.webm",
   session_metrics: {},
   voice_assessment: null,
@@ -130,6 +144,8 @@ describe("Telefun analysis with hold assessment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockState.row = { ...BASE_ROW };
+    mockState.currentRow = { ...BASE_ROW };
+    mockState.reads = 0;
     mockState.geminiResponse = null;
     mockState.updates = [];
     mockState.updateError = null;
@@ -142,7 +158,9 @@ describe("Telefun analysis with hold assessment", () => {
     };
     mockState.geminiResponse = DEFAULT_AI_RESPONSE;
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(true);
     const { generateGeminiContent } = await import("../lib/gemini");
@@ -156,17 +174,21 @@ describe("Telefun analysis with hold assessment", () => {
       agent_recording_path: null,
     };
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("No agent audio available for assessment");
+    expect(result.error).toBe("Scoring not ready");
   });
 
   it("returns a generated assessment without persisting it directly", async () => {
     mockState.row = BASE_ROW;
     mockState.geminiResponse = DEFAULT_AI_RESPONSE;
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(true);
     expect(mockState.updates).toEqual([]);
@@ -180,7 +202,9 @@ describe("Telefun analysis with hold assessment", () => {
     };
     mockState.updates = [];
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Format hasil analisis tidak valid.");
@@ -193,7 +217,9 @@ describe("Telefun analysis with hold assessment", () => {
     mockState.geminiResponse = DEFAULT_AI_RESPONSE;
     mockState.updateError = new Error("database unavailable");
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(true);
     expect(result.assessment?.overallScore).toBe(8);
@@ -204,7 +230,9 @@ describe("Telefun analysis with hold assessment", () => {
     mockState.row = { ...BASE_ROW, session_metrics: {} };
     mockState.geminiResponse = { ...DEFAULT_AI_RESPONSE };
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
     expect(result.success).toBe(true);
     expect(result.assessment?.holdManagement).toBeDefined();
     expect(result.assessment?.holdManagement?.verdict).toBe("N/A");
@@ -231,11 +259,70 @@ describe("Telefun analysis with hold assessment", () => {
     };
     mockState.geminiResponse = { ...DEFAULT_AI_RESPONSE };
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
     expect(result.success).toBe(true);
     expect(result.assessment?.holdManagement?.verdict).toBe("Kurang");
     expect(result.assessment?.holdManagement?.score).toBe(4);
     expect(result.assessment?.overallScore).toBe(7.3);
+  });
+
+  it.each([undefined, null, ""])(
+    "denies provider admission without a claim hash (%s)",
+    async (claimTokenHash) => {
+      mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+      const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+        claimTokenHash,
+      });
+      expect(result).toEqual({
+        success: false,
+        error: "Scoring claim is no longer active",
+      });
+      const { generateGeminiContent } = await import("../lib/gemini");
+      expect(generateGeminiContent).not.toHaveBeenCalled();
+      expect(mockState.updates).toEqual([]);
+    },
+  );
+
+  it("denies provider admission when the claim changes during audio preparation", async () => {
+    mockState.currentRow = {
+      ...BASE_ROW,
+      scoring_claim_token_hash: "replacement-claim-hash",
+    };
+    mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
+    expect(result).toEqual({
+      success: false,
+      error: "Scoring claim is no longer active",
+    });
+    expect(mockState.reads).toBe(2);
+    const { generateGeminiContent } = await import("../lib/gemini");
+    expect(generateGeminiContent).not.toHaveBeenCalled();
+    expect(mockState.updates).toEqual([]);
+  });
+
+  it("denies provider admission when capture fails during audio preparation", async () => {
+    // Leave the old hash in place: capture readiness alone must deny admission.
+    mockState.currentRow = {
+      ...BASE_ROW,
+      recording_status: "failed",
+      recording_error: "capture_failed",
+    };
+    mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
+    expect(result).toEqual({
+      success: false,
+      error: "Scoring claim is no longer active",
+    });
+    expect(mockState.reads).toBe(2);
+    const { generateGeminiContent } = await import("../lib/gemini");
+    expect(generateGeminiContent).not.toHaveBeenCalled();
+    expect(mockState.updates).toEqual([]);
   });
 
   it("enriches cached assessment without Gemini call", async () => {
@@ -259,7 +346,9 @@ describe("Telefun analysis with hold assessment", () => {
       voice_assessment: cached,
     };
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
     expect(result.success).toBe(true);
     expect(mockState.geminiResponse).toBeNull(); // no gemini call
     expect(result.assessment?.holdManagement).toBeDefined();
@@ -275,7 +364,9 @@ describe("Telefun analysis with hold assessment", () => {
     };
     mockState.updateError = new Error("database unavailable");
 
-    const result = await analyzeVoiceQuality("s1", "u1");
+    const result = await analyzeVoiceQuality("s1", "u1", undefined, {
+      claimTokenHash: BASE_ROW.scoring_claim_token_hash,
+    });
 
     expect(result.success).toBe(true);
     expect(result.assessment?.holdManagement).toBeDefined();

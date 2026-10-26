@@ -212,9 +212,7 @@ describe("processScoringJob OpenAI retirement routing", () => {
       error: DISABLED_REASON,
     });
 
-    expect(mockRpcs.map((call) => call.name)).toEqual([
-      "fail_telefun_scoring",
-    ]);
+    expect(mockRpcs.map((call) => call.name)).toEqual(["fail_telefun_scoring"]);
     expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
     expect(generateGeminiContent).not.toHaveBeenCalled();
   });
@@ -263,9 +261,7 @@ describe("processScoringJob OpenAI retirement routing", () => {
       error: DISABLED_REASON,
     });
 
-    expect(mockRpcs.map((call) => call.name)).toEqual([
-      "fail_telefun_scoring",
-    ]);
+    expect(mockRpcs.map((call) => call.name)).toEqual(["fail_telefun_scoring"]);
     expect(mockUpdates).toEqual([]);
   });
 
@@ -313,7 +309,11 @@ describe("processScoringJob OpenAI retirement routing", () => {
       status: "completed",
       telefun_model_id: "gemini-3.1-flash-live-preview",
       telefun_transport: "gemini-live",
+      recording_status: "ready",
+      recording_error: null,
+      recording_path: "u1/s1/full_call.webm",
       agent_recording_path: "u1/s1/agent_only.webm",
+      scoring_claim_token_hash: "gemini-claim",
       scoring_status: "processing",
       voice_assessment: null,
     });
@@ -322,7 +322,11 @@ describe("processScoringJob OpenAI retirement routing", () => {
       text: JSON.stringify(VALID_ASSESSMENT),
     });
 
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "gemini-claim",
+    });
 
     expect(result).toMatchObject({ success: true, status: "completed" });
     expect(generateGeminiContent).toHaveBeenCalledWith(
