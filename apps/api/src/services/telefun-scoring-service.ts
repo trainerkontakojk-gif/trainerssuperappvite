@@ -22,6 +22,8 @@ import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../lib/telefun-openai-as
 export interface ScoringJob {
   sessionId: string;
   userId: string;
+  /** Classification snapshot used to route retired rows before normal claim. */
+  retiredOpenAi?: boolean;
   /** Fencing hash of the claim that owns this job (set by the claimer). */
   claimTokenHash?: string | null;
 }
@@ -210,9 +212,45 @@ async function ensureFailed(
 }
 
 /**
- * The fail RPC atomically records the permanent terminal state and clears any
- * retry eligibility. Do not append a best-effort update: a post-failure error
- * must never resurrect this retired job through the transient catch path.
+ * Retire a terminal historical row administratively, before any scoring claim.
+ * A false result means the row is no longer eligible (for example, a live
+ * claim, future retry, or completed non-null assessment); RPC errors fail closed.
+ * Expected status/assessment arguments are retained for signature compatibility;
+ * they never authorize a downgrade, including for malformed completed caches.
+ */
+export async function retireHistoricalOpenAiScoring(
+  sessionId: string,
+  expectedScoringStatus?: string | null,
+  expectedVoiceAssessment?: unknown,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient.rpc(
+    "retire_telefun_openai_scoring",
+    {
+      p_session_id: sessionId,
+      p_expected_scoring_status: expectedScoringStatus ?? null,
+      p_expected_voice_assessment: expectedVoiceAssessment ?? null,
+    },
+  );
+  if (error) {
+    throw new TransientScoringError(
+      "Scoring retirement persistence unavailable",
+      "SCORING_PERSISTENCE_UNAVAILABLE",
+    );
+  }
+  const retired = readRpcBoolean(data);
+  if (retired === null) {
+    throw new TransientScoringError(
+      "Scoring retirement persistence unavailable",
+      "SCORING_PERSISTENCE_UNAVAILABLE",
+    );
+  }
+  return retired;
+}
+
+/**
+ * The claim-token-fenced fail RPC remains for a retired row already owned by
+ * an existing scoring claim. It cannot replace administrative pre-claim work.
  */
 export async function permanentlyFailRetiredOpenAiScoring(
   sessionId: string,
@@ -652,6 +690,7 @@ export async function fetchPendingJobs(
     .map((row: any) => ({
       sessionId: row.id,
       userId: row.user_id,
+      retiredOpenAi: isHistoricalOpenAiScoringModel(row),
     }));
 }
 

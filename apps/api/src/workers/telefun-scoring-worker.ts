@@ -1,8 +1,9 @@
 /**
  * Telefun Scoring Worker — pure batch processor
  *
- * Fetches pending scoring jobs, claims and processes them, one batch at a
- * time. This module stays free of environment parsing, process signals, HTTP
+ * Fetches pending scoring jobs, administratively retires terminal historical
+ * OpenAI rows without a claim, and claims/processes the remaining batch. This
+ * module stays free of environment parsing, process signals, HTTP
  * and shutdown logic so it can be unit-tested directly; the executable
  * production runtime (env validation, poll loop, graceful shutdown, internal
  * health endpoint) lives in telefun-scoring-worker-runtime.ts and is started
@@ -22,6 +23,7 @@ import {
   claimJob,
   checkCachedAssessment,
   processScoringJob,
+  retireHistoricalOpenAiScoring,
 } from "../services/telefun-scoring-service";
 import type { ScoringJob, ScoringResult } from "../services/telefun-scoring-service";
 import type { VoiceQualityAssessment } from "@trainers/types";
@@ -39,6 +41,8 @@ export interface ScoringWorkerDeps {
   ) => Promise<{ claimed: boolean; claimTokenHash?: string | null; session?: any }>;
   checkCachedAssessment: (sessionId: string) => Promise<VoiceQualityAssessment | null>;
   processScoringJob: ScoringJobProcessor;
+  /** Administrative terminalization that does not acquire a scoring claim. */
+  retireHistoricalOpenAiScoring?: (sessionId: string) => Promise<boolean>;
   /** Atomic release of a just-won claim back to retryable state. Required
    *  when shutdown fires after claim but before provider admission, otherwise
    *  the row stays processing until the 300s lease expires. */
@@ -76,6 +80,8 @@ function defaultDeps(): ScoringWorkerDeps {
     claimJob: (sessionId) => claimJob(sessionId),
     checkCachedAssessment: (sessionId) => checkCachedAssessment(sessionId),
     processScoringJob: callScoringJobProcessor,
+    retireHistoricalOpenAiScoring: (sessionId) =>
+      retireHistoricalOpenAiScoring(sessionId),
   };
 }
 
@@ -108,6 +114,15 @@ export async function processNextBatch(
     }
 
     if (options.signal?.aborted) break;
+
+    if (job.retiredOpenAi) {
+      // Runtime adapters may omit the optional test seam; production still uses
+      // the service RPC, which rechecks state under a row lock.
+      const retire =
+        deps.retireHistoricalOpenAiScoring ?? retireHistoricalOpenAiScoring;
+      if (await retire(job.sessionId)) stats.failed++;
+      continue;
+    }
 
     const { claimed, claimTokenHash, session } = await deps.claimJob(job.sessionId);
     if (!claimed) {

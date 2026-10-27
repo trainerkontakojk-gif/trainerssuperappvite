@@ -156,8 +156,9 @@ normalization never rewrites historical history rows.
 Post-session voice scoring memakai queue durable di Supabase dan kini diproses oleh
 **embedded worker dalam `apps/api`**, bukan process Railway terpisah sebagai
 arsitektur utama. API tetap menerima request sementara loop worker melakukan
-polling setiap 30 detik dengan batch default 5; retry/backoff dan status scoring
-historis tidak berubah.
+polling setiap 30 detik dengan batch default 5; retry/backoff Gemini tidak
+berubah, sedangkan riwayat OpenAI terminal yang belum tercache dipensiunkan
+secara durable sebelum claim.
 
 - API worker aktif bila `TELEFUN_SCORING_WORKER_ENABLED="true"`.
 - `TELEFUN_SCORING_WORKER_INTERVAL_MS` default deployment: `30000`.
@@ -167,6 +168,19 @@ historis tidak berubah.
 - Setiap claim menyimpan hash token + owner. Completion/failure/reschedule
   ditolak bila token tidak cocok, sehingga stale worker tidak dapat menimpa
   claim baru atau menyelesaikan job dua kali.
+- Riwayat OpenAI Realtime terminal yang belum punya cache valid dipensiunkan
+  sebelum claim lewat RPC administratif service-role-only
+  `retire_telefun_openai_scoring(uuid, text, jsonb)`. RPC hanya mengubah sesi
+  `completed`/`failed`, memakai alasan disabled kanonis tanpa menambah attempt atau
+  memanggil provider, menjaga hasil selesai yang valid dan rekamannya, serta
+  tidak menyentuh retry masa depan atau claim aktif dalam lease 300 detik.
+  Assessment non-null pada baris scoring `completed` selalu dilindungi, termasuk
+  JSON malformed; parameter expected status/assessment hanya dipertahankan untuk
+  kompatibilitas signature dan tidak memberi izin downgrade.
+  Manual scoring untuk riwayat terminal pending/failed/stale-processing memberi
+  410 setelah pensiun durable. Cache historis valid tetap dibaca tanpa perubahan;
+  riwayat terminal scoring `completed` dengan cache malformed atau kosong memberi
+  410 langsung tanpa RPC retirement atau mutasi.
 - `analyzeVoiceQuality()` hanya membaca audio, memanggil Gemini, dan
   mengembalikan assessment. Persistensi hasil dilakukan oleh service scoring
   melalui RPC completion yang token-fenced.
@@ -222,6 +236,13 @@ feedback edits outside the canonical scoring service are rejected. The additive
 migration `20261026150000_telefun_failed_capture_scoring_policy.sql` updates the
 SQL readiness, claim, enqueue, recording-transition and completion guards; its
 rollback is `supabase/rollbacks/rollback_20261026150000_telefun_failed_capture_scoring_policy.sql`.
+The additive migration
+`20261027073000_telefun_retired_scoring_administrative_retirement.sql` defines
+`public.retire_telefun_openai_scoring(uuid, text, jsonb)`; its matching rollback
+is `supabase/rollbacks/rollback_20261027073000_telefun_retired_scoring_administrative_retirement.sql`.
+The failed-capture migration's forward/rollback rehearsal used only local
+Postgres. The new retirement migration's forward/rollback rehearsal and focused
+real-backend E2E are pending parent verification; no remote database was changed.
 
 The local real-backend E2E exercises Hono, PostgREST/RPC, and the scoring worker
 against disposable loopback fixtures. Recording downloads use an in-memory

@@ -79,6 +79,9 @@ export async function cleanupTelefunQueueFixtures(
   sessionIds: string[],
   storagePaths: string[],
 ) {
+  // All mutations below are bounded to UUIDs created by this fixture run.
+  expect(userId).toMatch(/^[0-9a-f-]{36}$/i);
+  for (const id of sessionIds) expect(id).toMatch(/^[0-9a-f-]{36}$/i);
   const admin = createAdmin(env);
   // Soft checks allow all cleanup steps to run even if an earlier delete fails.
   if (storagePaths.length > 0) {
@@ -88,9 +91,29 @@ export async function cleanupTelefunQueueFixtures(
     expect.soft(removed.error, "remove Storage fixtures").toBeNull();
   }
   if (sessionIds.length > 0) {
+    // Contract assertions have finished. These direct-insert fixtures have no
+    // broker attempts; terminalize only this run's still-nonterminal history so
+    // the active-WebRTC delete guard remains enforced during teardown.
+    const terminalized = await admin
+      .from("telefun_history")
+      .update({ status: "failed" })
+      .eq("user_id", userId)
+      .in("id", sessionIds)
+      .in("status", ["active", "pending"])
+      .select("id, status");
+    expect.soft(terminalized.error, "terminalize run sessions").toBeNull();
+    expect
+      .soft(
+        (terminalized.data ?? []).every(
+          (row) => sessionIds.includes(row.id) && row.status === "failed",
+        ),
+        "only exact run sessions may be terminalized",
+      )
+      .toBe(true);
     const deleted = await admin
       .from("telefun_history")
       .delete()
+      .eq("user_id", userId)
       .in("id", sessionIds);
     expect.soft(deleted.error, "delete run sessions").toBeNull();
   }
@@ -102,8 +125,6 @@ export async function cleanupTelefunQueueFixtures(
   const userDeleted = await admin.auth.admin.deleteUser(userId);
   expect.soft(userDeleted.error, "delete run auth user").toBeNull();
 
-  // UUIDs originate from local fixture creation. Validate before SQL interpolation.
-  expect(userId).toMatch(/^[0-9a-f-]{36}$/i);
   // Storage download errors could mean 503, not absence. Count persisted rows.
   const remaining = JSON.parse(
     runSql(

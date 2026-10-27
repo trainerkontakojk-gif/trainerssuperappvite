@@ -45,12 +45,15 @@ export async function fetchOwnedTelefunQueueJobs<
   env: LoopbackEnv,
   userId: string,
   ids: string[],
-  expectedIds: string[],
+  expectedIds: string[] | null,
   fetchPendingJobs: (limit: number) => Promise<Job[]>,
+  limit = ids.length,
 ): Promise<Job[]> {
   expect(ids.length, "nonempty fixture queue scope").toBeGreaterThan(0);
   for (const id of ids) expect(id).toMatch(/^[0-9a-f-]{36}$/i);
-  expect(expectedIds.every((id) => ids.includes(id))).toBe(true);
+  if (expectedIds !== null) {
+    expect(expectedIds.every((id) => ids.includes(id))).toBe(true);
+  }
   const { data: owned, error } = await createAdmin(env)
     .from("telefun_history")
     .select("id")
@@ -76,6 +79,9 @@ export async function fetchOwnedTelefunQueueJobs<
       url.searchParams.has("limit")
     ) {
       expect(observedQuery, "exactly one production queue query").toBeNull();
+      expect(url.searchParams.get("limit"), "preserve worker batch limit").toBe(
+        String(limit),
+      );
       expect(
         url.searchParams.has("id"),
         "no existing ID filter overwritten",
@@ -94,7 +100,7 @@ export async function fetchOwnedTelefunQueueJobs<
   let jobs: Job[];
   try {
     // Keep a bounded real query; never increase the limit to escape old data.
-    jobs = await fetchPendingJobs(ids.length);
+    jobs = await fetchPendingJobs(limit);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -103,7 +109,15 @@ export async function fetchOwnedTelefunQueueJobs<
     "production queue SELECT must be observed",
   ).not.toBeNull();
   const returnedIds = jobs.map((job) => job.sessionId).sort();
-  if (JSON.stringify(returnedIds) !== JSON.stringify([...expectedIds].sort())) {
+  expect(
+    jobs.length,
+    "queue query must respect the requested page size",
+  ).toBeLessThanOrEqual(limit);
+  expect(returnedIds.every((id) => ids.includes(id))).toBe(true);
+  if (
+    expectedIds !== null &&
+    JSON.stringify(returnedIds) !== JSON.stringify([...expectedIds].sort())
+  ) {
     const state = await createAdmin(env)
       .from("telefun_history")
       .select(

@@ -24,7 +24,7 @@ import {
   failScoringJob,
   isWebRtcScoringReady,
   newScoringClaim,
-  permanentlyFailRetiredOpenAiScoring,
+  retireHistoricalOpenAiScoring,
   TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE,
   TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
 } from "../../services/telefun-scoring-service";
@@ -184,37 +184,20 @@ export async function scoreRecording(
         return retiredOpenAiScoringResponse(c);
       }
 
-      const retiredClaim = newScoringClaim();
-      activeClaimTokenHash = retiredClaim.claimTokenHash;
-      const { data: retiredClaimed, error: retiredClaimError } =
-        await adminClient.rpc("claim_telefun_scoring", {
-          p_session_id: id,
-          p_claim_timeout_seconds: TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
-          p_claim_token_hash: retiredClaim.claimTokenHash,
-          p_claim_owner: TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE,
-        });
-      if (retiredClaimError) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "SCORING_STATE_UNAVAILABLE",
-              message: "Status scoring belum dapat disimpan.",
-            },
-          },
-          503,
-        );
+      // A terminal completed row is immutable historical evidence even when
+      // its assessment is malformed or absent. Report retirement without a
+      // claim or administrative write; canonical caches were returned above.
+      if (sessionOwner.scoring_status === "completed") {
+        return retiredOpenAiScoringResponse(c);
       }
-      const claimed = Array.isArray(retiredClaimed)
-        ? retiredClaimed[0]
-        : retiredClaimed;
-      if (
-        claimed !== true ||
-        !(await permanentlyFailRetiredOpenAiScoring(
-          id,
-          retiredClaim.claimTokenHash,
-        ))
-      ) {
+
+      let retired = false;
+      try {
+        retired = await retireHistoricalOpenAiScoring(id);
+      } catch (_error: unknown) {
+        // The administrative RPC fails closed; never fall through to Gemini.
+      }
+      if (!retired) {
         return c.json(
           {
             success: false,
