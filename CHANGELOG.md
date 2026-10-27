@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-27
 
+- fix(telefun): susun ulang prompt konsumen dan selaraskan arahan ekspresi dengan tipe serta de-eskalasi
+
 - test(telefun): tetapkan gate energi pita full-call sejajar sumber untuk semua channel, validasi kontrol direct dan guard band CELT, tanpa mengubah bitrate atau ambang retensi
 
 - fix(telefun): pensiunkan riwayat OpenAI terminal tanpa claim/provider, pertahankan cache completed dan lease aktif, serta lanjutkan antrean Gemini
