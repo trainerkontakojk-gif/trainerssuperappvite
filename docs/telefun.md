@@ -69,8 +69,10 @@ Kontrak peran tetap terdepan, diikuti identitas, kontrol runtime, penutupan, dan
 batas pengetahuan sebelum panduan ekspresi; data skenario tetap disanitasi dan
 diposisikan sesudah contoh. Tempo marah turun bertahap, konsumen terburu-buru
 tetap mendesak saat menunggu, dan respons kritis setelah hold panjang tidak
-dipaksa bernada datar. Contoh ucapan, katalog/pilihan suara, model, dan transport
-tidak berubah. E2E hermetic memverifikasi isi konfigurasi yang terkirim serta lifecycle lokal; bukan bukti
+dipaksa bernada datar. Masing-masing dari enam tipe mendapat tiga contoh lisan
+tambahan sebagai acuan nada, bukan kutipan wajib atau kuota. Contoh tidak
+mengubah fakta skenario maupun prioritas kontrol panggilan. Katalog/pilihan
+suara, model, dan transport tidak berubah. E2E hermetic memverifikasi isi konfigurasi yang terkirim serta lifecycle lokal; bukan bukti
 bahwa nada suara model sungguhan sudah lebih ekspresif. Evaluasi audio langsung
 memerlukan panggilan provider terpisah yang diotorisasi.
 

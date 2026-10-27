@@ -151,6 +151,39 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     },
   ];
 
+  const phase4Examples: Record<string, string[]> = {
+    marah: [
+      "Jawab yang jelas, dong. Saya butuh kepastian.",
+      "Iya, saya dengar. Tapi langkah konkretnya apa?",
+      "Ya udah, jelaskan satu-satu. Saya masih butuh kepastian.",
+    ],
+    "terburu-buru": [
+      "Sebentar, intinya yang bisa dilakukan sekarang apa?",
+      "Iya, yang paling singkat aja.",
+      "Oke, lanjut langkah berikutnya.",
+    ],
+    pasrah: [
+      "Saya... bingung mau bilang apa lagi.",
+      "Pelan-pelan ya, saya mau dengar dulu.",
+      "Iya... coba jelaskan satu langkah dulu.",
+    ],
+    bingung: [
+      "Sebentar... yang tadi maksudnya apa ya?",
+      "Satu-satu dulu, boleh?",
+      "Oh, berarti yang ini dulu, ya?",
+    ],
+    ramah: [
+      "Oh, iya. Boleh dijelaskan, saya dengarkan.",
+      "Oke, terus langkah berikutnya bagaimana?",
+      "Iya, saya mau pastikan dulu supaya nggak salah.",
+    ],
+    kritis: [
+      "Sebentar. Dasarnya apa, ya?",
+      "Yang bisa dipastikan sekarang bagian mana?",
+      "Oke, saya dengar. Batas kepastiannya sampai mana?",
+    ],
+  };
+
   test("F3 urutan kontrak sebelum ekspresi", async ({ page }) => {
     const messages: Record<string, unknown>[] = [];
     await mockTelefunVoiceServer(page, NEW_ID, messages);
@@ -289,8 +322,20 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
         .filter((line) => line.startsWith('- "'))
         .map((line) => line.slice(3, -1));
       expect
-        .soft(examples, "existing utterances, no additions")
-        .toEqual(profile.examples);
+        .soft(examples, "legacy and approved F4 examples")
+        .toEqual([...profile.examples, ...phase4Examples[profile.id]]);
+      expect
+        .soft(prompt)
+        .toContain(
+          "contoh nada saja; JANGAN diucapkan persis dan jangan diulang-ulang",
+        );
+      for (const [id, approved] of Object.entries(phase4Examples)) {
+        for (const line of approved) {
+          if (id !== profile.id) expect.soft(examples).not.toContain(line);
+          expect.soft(line).not.toMatch(/\b(?:pak|bu|mas|mbak)\b|[0-9*[\]()]/i);
+          if (id === "marah") expect.soft(line).not.toMatch(/\bmaaf\b/i);
+        }
+      }
       expect.soft(prompt).not.toContain("TANTANGAN PERCAKAPAN");
       expect.soft(prompt).not.toContain("MENYELA KONDISIONAL");
       expect.soft(prompt).not.toContain("pernyataan ambigu");
