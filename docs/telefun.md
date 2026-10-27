@@ -139,17 +139,36 @@ normalization never rewrites historical history rows.
   kHz graph control measured no 10 kHz component and a strong 6 kHz alias. A
   separate synthetic output-context tap measured 10 kHz RMS `0.10695` and 6 kHz
   alias RMS `0.000168` at 48 kHz in one run, passing the graph-path threshold.
-- **The uploaded recording is a separate, unresolved fidelity gate.** In that
-  same run, the 32 kbps full-call WebM decoded to 48 kHz but measured 10 kHz RMS
-  `0.00814` (retention `0.082` versus the frozen direct-codec control). Five
-  captures measured retention `0.082`, `0.100`, `0.406`, `0.676` and `0.691`; two
-  met the pre-RED `0.5` criterion and three did not. The 6 kHz recording alias
-  remained low. This is an inconsistent/unaccepted full-call recording result,
-  not a graph pass: the recording threshold and both 32 kbps settings have not
-  been changed. The implementation does not claim that the uploaded full-call
-  recording reliably preserves the 10 kHz acceptance target. These synthetic
-  Chromium results do not establish performance on Safari, iPhone, Android or
-  physical audio devices.
+- **Full-call recording acceptance measures band energy, not exact-tone coherence.**
+  At the unchanged 32 kbps bitrate, each decoded product channel must retain at
+  least `0.5` of its corresponding direct-codec channel's RMS energy in
+  9.8–10.2 kHz. Both use a periodic Hann periodogram with one-sided power
+  `2|DFT(xw)|² / (N Σw²)`, summed over the same frequency bins. The exact-10k
+  projection remains a coherence diagnostic; it is not the retention gate.
+- **Windows and channels are fixed before acceptance.** The first three
+  consecutive 20 ms blocks with synthetic 1 kHz marker RMS >= `0.02` identify
+  source onset per channel. Measure four consecutive, non-overlapping 200 ms
+  windows from onset + 0.4 s through onset + 1.2 s, averaging their powers before
+  taking RMS. This central source plateau excludes startup and the final 3 kHz
+  tail. Missing onset/windows fail; no maximum-window selection is permitted.
+  Every channel must pass, and product/direct channel counts must match.
+- **A valid direct control is a prerequisite.** CELT band 18 covers
+  [9.6, 12.0) kHz; 10.6–11.0 kHz lies inside that same coding band, so it is not
+  an independent noise reference ([RFC 6716, Table 55](https://www.rfc-editor.org/rfc/rfc6716.html)).
+  Product and direct both require codec-band power per Hz divided by silent
+  reference-band power per Hz >= `4`. The reference [4.2, 4.8) kHz excludes the
+  injected 1 kHz/3 kHz tones, their integer harmonics (including 4/5 kHz boundaries),
+  and the 6 kHz alias. A `1e-6` RMS floor on reference power prevents division by
+  zero; bandwidth normalization prevents broadband noise benefiting from the
+  wider codec band. A direct-control failure invalidates the gate, rather than
+  allowing product acceptance against a degraded denominator.
+- The old 16 kHz graph remains a negative control and must fail the same band
+  retention and localization criteria. Existing 6 kHz alias, mic RMS `0.02`,
+  full-call/agent-only isolation, tail/drain, and 32 kbps checks remain mandatory.
+  Agent scoring still uses its separate 16 kHz track. Guard v2 passed offline
+  validation on both channels of all five saved synthetic captures; new browser
+  acceptance is tracked separately in the verification artifacts. These checks
+  do not establish fidelity on physical devices or other browser engines.
 
 ## Scoring runtime
 
