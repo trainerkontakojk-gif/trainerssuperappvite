@@ -85,7 +85,7 @@ describe("dashboard batch forecast service", () => {
       vi.mocked(geminiLib.generateGeminiContent).mock.calls[0][0],
     ).not.toHaveProperty("temperature");
     expect(geminiLib.generateGeminiContent).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-3.1-flash-lite" }),
+      expect.objectContaining({ model: "gemini-3.8-flash" }),
     );
     expect(forecastStore.saveForecastSnapshot).toHaveBeenCalledTimes(1);
     expect(result.snapshot!.cache.status).toBe("generated");

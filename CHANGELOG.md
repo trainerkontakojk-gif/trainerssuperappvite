@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-28
 
+- test(api): perbarui assertion basi di unit test KETIK timing (frasa "fase akhir" kini ada di panduan penutupan persona) dan SIDAK forecast (model kini gemini-3.8-flash)
+
 - refactor(api): hapus opsi temperature yang tidak terpakai dari jalur Gemini sehingga KETIK, PDKT, dan SIDAK forecast hanya mengirim temperature ke OpenAI, sesuai deprecation parameter sampling Gemini
 
 ## 2026-10-23

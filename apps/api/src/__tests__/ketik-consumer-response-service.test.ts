@@ -235,7 +235,10 @@ describe("generateConsumerResponse", () => {
       expect(result.success).toBe(true);
       const callArgs = mockGeminiContent.mock.calls[0][0];
       expect(callArgs.systemInstruction).toContain("mendekati akhir");
-      expect(callArgs.systemInstruction).not.toContain("fase akhir");
+      // Persona closing guidance always mentions "Di fase akhir"; check the timing block only.
+      expect(callArgs.systemInstruction).not.toContain(
+        "benar-benar fase akhir",
+      );
     });
 
     it("generates still-long instruction when remaining is above thresholds", async () => {
@@ -276,7 +279,9 @@ describe("generateConsumerResponse", () => {
       );
       expect(result.success).toBe(true);
       const callArgs = mockGeminiContent.mock.calls[0][0];
-      expect(callArgs.systemInstruction).not.toContain("fase akhir");
+      expect(callArgs.systemInstruction).not.toContain(
+        "benar-benar fase akhir",
+      );
       expect(callArgs.systemInstruction).toContain("dibatasi maksimal");
     });
 
