@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-28
 
+- docs(telefun): tandai Task 0 plan arahan nada lulus beserta bukti dan catatan urutan byte audio TTS
+
 - docs(telefun): tambahkan plan arahan nada per giliran, suara per tipe konsumen, dan klip nonverbal untuk dikerjakan Codex
 
 - test(telefun): amati audio setelah hold pada audio thread agar respons singkat tidak terlewat

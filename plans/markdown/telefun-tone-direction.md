@@ -146,6 +146,7 @@ Skrip dev `scripts/telefun/generate-nonverbal-clips.mjs`: dijalankan manual seka
   - Style marah: `"konsumen yang sedang kesal dan tidak sabar di telepon, tanpa kata"`. Style sedih: `"orang yang menahan tangis, napas basah, sengau"`.
   - Batas 10 permintaan/menit: jeda ≥ 7 dtk antarpanggilan; saat 429 tunggu sesuai "retry in" lalu ulang sekali.
   - Pangkas hening depan/belakang (ambang amplitudo ±400, padding 30 ms).
+  - **Urutan byte:** walau berlabel `audio/l16`, PCM dari endpoint ini sudah **little-endian**. Tulis apa adanya ke WAV; **jangan** di-byte-swap (Task 0 run 1–2 membalik byte dan menghasilkan derau). Validasi tiap file: zero-crossing rate dibaca little-endian harus lebih rendah daripada dibaca big-endian (ucapan ±0,07–0,12; klip napas ±0,22–0,27; derau ≥ 0,35).
 
 ### Suara per tipe (R3, R6)
 
@@ -161,17 +162,21 @@ Skrip dev `scripts/telefun/generate-nonverbal-clips.mjs`: dijalankan manual seka
 
 ## Tasklist
 
-### Task 0 — Bukti protokol (spike di luar repo) · STOP gate
+### Task 0 — Bukti protokol (spike di luar repo) · STOP gate — ✅ LULUS 2026-10-28
 
 Tujuan: pastikan `clientContent` dengan `turnComplete: false` **tidak** menahan jawaban model atas audio mikrofon, dan catatan tidak diucapkan.
 
-- [ ] Tulis skrip di `~/Downloads/Telefun Sampel Suara/10 Spike TONE + audio/` (bukan di repo). Kunci dibaca dari `.env.local`/`.env` repo saat runtime, tidak pernah dicetak.
-- [ ] Buat audio trainee: satu panggilan TTS (endpoint seperti di atas, suara `Puck`, teks `"Mohon maaf Bu, untuk gangguannya kami perlu cek dulu ya, mohon ditunggu."`), resample 24 kHz → 16 kHz.
-- [ ] Buka WebSocket `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=…` dengan `setup` yang meniru produksi: salin `generationConfig`, `realtimeInputConfig`, `inputAudioTranscription`, `outputAudioTranscription` dari `buildCanonicalGeminiSetup()` (`apps/telefun/src/providers/GeminiLiveAdapter.ts:564`), model `models/gemini-3.8-live`, suara `Kore`, system instruction = prompt produksi tipe `marah` (bangun via `apps/web/node_modules/.bin/tsx` yang mengimpor `buildTelefunLiveSystemInstruction` + `DEFAULT_CONSUMER_TYPES`) ditambah aturan marker TONE di atas.
-- [ ] Setelah `setupComplete`: kirim catatan TONE (`clientContent`, `turnComplete: false`), lalu alirkan audio trainee sebagai `realtimeInput.audio` (`mimeType: "audio/pcm;rate=16000"`) per 100 ms secara real-time, lalu 2 dtk hening (nol). Ulangi 3 kali dalam satu sesi (3 giliran).
-- [ ] Catat per giliran: apakah ada `modelTurn` audio, waktu sampai audio pertama, `outputTranscription`. Simpan WAV jawaban dan `HASIL.md`.
-- [ ] **Lulus** bila 3/3 giliran dijawab dalam < 3 dtk setelah audio selesai dan transkrip tidak memuat isi catatan/marker. **STOP** bila tidak lulus: laporkan ke Fajar dengan HASIL.md; jangan lanjut ke Task 2 dengan mekanisme lain.
-- [ ] Biaya: ≤ 1 panggilan TTS + 1 sesi Live.
+**Hasil (jangan diulang):** `~/Downloads/Telefun Sampel Suara/10 Spike TONE + audio/HASIL.md` — 3/3 giliran dijawab 976–1.494 ms setelah audio trainee selesai, `turnComplete` 3/3, marker/isi catatan tidak terucap. Pembanding satu giliran di `diagnostik/`: tanpa TONE 1.386 ms, dengan TONE 1.390 ms (tidak ada penundaan). Run 1–2 gagal karena bug skrip, bukan protokol: (1) WebSocket Node menerima frame biner Gemini sebagai `Blob` → set `socket.binaryType = "arraybuffer"`; (2) audio TTS di-byte-swap sehingga jadi derau (lihat catatan urutan byte di "Sumber klip"). Arsip: `HASIL-run1-…`, `HASIL-run2-…`, `trainee-puck-16k-RUSAK-byte-order.wav`.
+
+Langkah asli (sudah dikerjakan):
+
+- [x] Tulis skrip di `~/Downloads/Telefun Sampel Suara/10 Spike TONE + audio/` (bukan di repo). Kunci dibaca dari `.env.local`/`.env` repo saat runtime, tidak pernah dicetak.
+- [x] Buat audio trainee: satu panggilan TTS (endpoint seperti di atas, suara `Puck`, teks `"Mohon maaf Bu, untuk gangguannya kami perlu cek dulu ya, mohon ditunggu."`), resample 24 kHz → 16 kHz.
+- [x] Buka WebSocket `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=…` dengan `setup` yang meniru produksi: salin `generationConfig`, `realtimeInputConfig`, `inputAudioTranscription`, `outputAudioTranscription` dari `buildCanonicalGeminiSetup()` (`apps/telefun/src/providers/GeminiLiveAdapter.ts:564`), model `models/gemini-3.8-live`, suara `Kore`, system instruction = prompt produksi tipe `marah` (bangun via `apps/web/node_modules/.bin/tsx` yang mengimpor `buildTelefunLiveSystemInstruction` + `DEFAULT_CONSUMER_TYPES`) ditambah aturan marker TONE di atas.
+- [x] Setelah `setupComplete`: kirim catatan TONE (`clientContent`, `turnComplete: false`), lalu alirkan audio trainee sebagai `realtimeInput.audio` (`mimeType: "audio/pcm;rate=16000"`) per 100 ms secara real-time, lalu 2 dtk hening (nol). Ulangi 3 kali dalam satu sesi (3 giliran).
+- [x] Catat per giliran: apakah ada `modelTurn` audio, waktu sampai audio pertama, `outputTranscription`. Simpan WAV jawaban dan `HASIL.md`.
+- [x] **Lulus** bila 3/3 giliran dijawab dalam < 3 dtk setelah audio selesai dan transkrip tidak memuat isi catatan/marker. **STOP** bila tidak lulus: laporkan ke Fajar dengan HASIL.md; jangan lanjut ke Task 2 dengan mekanisme lain.
+- [x] Biaya: ≤ 1 panggilan TTS + 1 sesi Live.
 
 ### Task 1 — Suara per tipe dan perbaikan daftar (R3, R6)
 
