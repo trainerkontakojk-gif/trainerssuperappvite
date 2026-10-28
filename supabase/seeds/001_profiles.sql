@@ -16,6 +16,19 @@ VALUES
   ('a1b2c3d4-e5f6-7890-abcd-ef1234567807', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'maya.putri@bankmuamalat.co.id', crypt('password123', gen_salt('bf')), now(), '2024-04-01 09:00:00+07', '2024-05-30 17:00:00+07', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Maya Putri Rahayu"}')
 ON CONFLICT (id) DO NOTHING;
 
+-- GoTrue scans these token columns as non-null strings; NULL breaks password
+-- login with "Database error querying schema".
+UPDATE auth.users
+SET
+  email_change = COALESCE(email_change, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  email_change_token_current = COALESCE(email_change_token_current, ''),
+  recovery_token = COALESCE(recovery_token, ''),
+  phone_change = COALESCE(phone_change, ''),
+  phone_change_token = COALESCE(phone_change_token, ''),
+  reauthentication_token = COALESCE(reauthentication_token, '')
+WHERE id::text LIKE 'a1b2c3d4-e5f6-7890-abcd-ef12345678%';
+
 -- Now insert profiles (references auth.users)
 INSERT INTO public.profiles (id, email, full_name, role, status, is_deleted, created_at, updated_at)
 VALUES
@@ -26,4 +39,5 @@ VALUES
   ('a1b2c3d4-e5f6-7890-abcd-ef1234567805', 'siti.nurhaliza@bankmuamalat.co.id', 'Siti Nurhaliza', 'agent', 'active', false, '2024-03-15 08:00:00+07', '2024-06-08 09:00:00+07'),
   ('a1b2c3d4-e5f6-7890-abcd-ef1234567806', 'hendra.gunawan@bankmuamalat.co.id', 'Hendra Gunawan', 'agent', 'active', false, '2024-03-20 08:15:00+07', '2024-06-07 13:30:00+07'),
   ('a1b2c3d4-e5f6-7890-abcd-ef1234567807', 'maya.putri@bankmuamalat.co.id', 'Maya Putri Rahayu', 'agent', 'inactive', false, '2024-04-01 09:00:00+07', '2024-05-30 17:00:00+07')
-ON CONFLICT (id) DO NOTHING;
+-- on_auth_user_created already made a default pending profile for each user.
+ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role, status = EXCLUDED.status, full_name = EXCLUDED.full_name;

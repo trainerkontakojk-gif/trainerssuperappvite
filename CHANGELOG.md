@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-28
 
+- chore(dev): tambahkan scripts/dev-local.mjs untuk menjalankan dev ke Supabase lokal dan perbaiki seed akun lokal agar bisa login dengan peran yang benar
+
 - docs(telefun): track rencana investigasi crackle playback live beserta bukti verifikasi lokal
 
 - fix(telefun): jaga kontinuitas playback PCM dengan lead 240 ms dan antrean antar-turn

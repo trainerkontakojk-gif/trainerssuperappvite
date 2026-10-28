@@ -418,6 +418,8 @@ Supabase client (`apps/api/src/lib/supabase.ts`) menggunakan nilai dari modul `e
 
 API dan Telefun menolak menyala (exit 1) bila Supabase-nya proyek produksi `ruosnjmtywcrghjgqugz` dan proses tidak berjalan di Railway atau Vercel (dikenali dari `RAILWAY_ENVIRONMENT`, `RAILWAY_PROJECT_ID`, `RAILWAY_SERVICE_ID`, `RAILWAY_DEPLOYMENT_ID`, atau `VERCEL`). Alasannya: proses lokal menjalankan pekerjaan latar belakang yang menulis ke produksi, dan pembacaannya menghabiskan kuota egress Free (13–16 Okt 2026 hampir habis karena ini). Pakai Supabase lokal (`apps/api/.env.integration`). Bila memang sengaja, setel `ALLOW_PROD_DB_IN_DEV=1`; proses menyala dengan peringatan. Aturan ada di `packages/types/src/dev-database-guard.ts`; E2E `apps/web/e2e/dev-database-guard-api.spec.ts`.
 
+Menjalankan semua app ke Supabase lokal tanpa mengubah `.env.local`: `supabase start`, lalu `node scripts/dev-local.mjs` (atau konfigurasi `dev-local` di `.claude/launch.json`). Script mengambil URL dan key dari `supabase status`, menjalankan Turbo dengan `--env-mode=loose` (mode strict membuang override env), dan membiarkan tiap app memakai port bawaannya (web 3005, API 3001, Telefun 3002). Akun seed lokal ada di `supabase/seeds/001_profiles.sql`; Gemini tetap memakai `GEMINI_API_KEY` dari `.env.local`.
+
 ### Root `.env.local`
 
 ```env
