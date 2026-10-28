@@ -81,11 +81,11 @@ describe("dashboard batch forecast service", () => {
       result.snapshot!.series.parameters["Verifikasi Data"].summary.direction,
     ).toBe("down");
     expect(geminiLib.generateGeminiContent).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(geminiLib.generateGeminiContent).mock.calls[0][0],
+    ).not.toHaveProperty("temperature");
     expect(geminiLib.generateGeminiContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "gemini-3.1-flash-lite",
-        temperature: 0.3,
-      }),
+      expect.objectContaining({ model: "gemini-3.1-flash-lite" }),
     );
     expect(forecastStore.saveForecastSnapshot).toHaveBeenCalledTimes(1);
     expect(result.snapshot!.cache.status).toBe("generated");

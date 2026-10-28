@@ -22,14 +22,17 @@ export async function callAI(options: {
     model: modelId,
     systemInstruction: options.systemInstruction,
     contents: [{ role: "user" as const, parts: [{ text: options.prompt }] }],
-    temperature: options.temperature ?? 0.7,
     responseMimeType: options.responseMimeType,
     usageContext: options.usageContext,
     userId: options.userId,
   };
 
+  // Temperature is OpenAI-only; Gemini deprecated sampling parameters.
   return provider === "openai"
-    ? await generateOpenAIContent(payload)
+    ? await generateOpenAIContent({
+        ...payload,
+        temperature: options.temperature ?? 0.7,
+      })
     : await generateGeminiContent(payload);
 }
 

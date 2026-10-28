@@ -337,7 +337,6 @@ ${parameterSummary || "- Tidak ada parameter."}`,
         ],
       },
     ],
-    temperature: 0.3,
   });
 
   if (!response.success || !response.text) {

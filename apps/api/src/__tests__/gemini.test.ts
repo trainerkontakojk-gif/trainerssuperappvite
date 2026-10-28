@@ -34,16 +34,6 @@ afterEach(() => {
 describe("Gemini sampling parameter compatibility", () => {
   const contents = [{ role: "user", parts: [{ text: "Hello" }] }];
 
-  it("omits temperature from the main request even when explicitly supplied", async () => {
-    const result = await generateGeminiContent({ contents, temperature: 0.3 });
-
-    expect(result).toMatchObject({ success: true, text: "ok" });
-    expect(generateContent).toHaveBeenCalledTimes(1);
-    expect(generateContent.mock.calls[0][0].config).not.toHaveProperty(
-      "temperature",
-    );
-  });
-
   it("omits temperature from the developer-instruction retry request", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     generateContent.mockRejectedValueOnce(
@@ -53,7 +43,6 @@ describe("Gemini sampling parameter compatibility", () => {
     const result = await generateGeminiContent({
       contents,
       systemInstruction: "Return a short answer.",
-      temperature: 0.3,
     });
 
     expect(result).toMatchObject({ success: true, text: "ok" });

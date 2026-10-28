@@ -53,8 +53,6 @@ export async function generateGeminiContent(options: {
   responseMimeType?: string;
   responseSchema?: any;
   responseModalities?: Modality[];
-  /** Ignored for Gemini; kept for caller compatibility with the OpenAI path. */
-  temperature?: number;
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;

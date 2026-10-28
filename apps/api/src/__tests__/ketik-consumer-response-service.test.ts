@@ -155,7 +155,6 @@ describe("generateConsumerResponse", () => {
       expect(result.success).toBe(true);
       expect(result.text).toBe("Saya mau lapor pinjol ilegal.");
       expect(mockGeminiContent).toHaveBeenCalledTimes(1);
-
     });
 
     it("calls OpenAI when provider is openai", async () => {
@@ -169,7 +168,9 @@ describe("generateConsumerResponse", () => {
       expect(result.success).toBe(true);
       expect(result.text).toBe("Saya mau lapor penipuan.");
       expect(mockOpenAIContent).toHaveBeenCalledTimes(1);
-      expect(mockOpenAIContent.mock.calls[0][0]).toMatchObject({ model: "gpt-5.4-mini" });
+      expect(mockOpenAIContent.mock.calls[0][0]).toMatchObject({
+        model: "gpt-5.4-mini",
+      });
       expect(mockGeminiContent).not.toHaveBeenCalled();
     });
 
@@ -185,7 +186,6 @@ describe("generateConsumerResponse", () => {
       expect(result.text).toBe("Saya mau lapor masalah saya.");
       expect(mockOpenAIContent).toHaveBeenCalledTimes(1);
       expect(mockGeminiContent).not.toHaveBeenCalled();
-
     });
   });
 
@@ -399,7 +399,7 @@ describe("generateConsumerResponse", () => {
       expect(result.success).toBe(true);
       const callArgs = mockGeminiContent.mock.calls[0][0];
       expect(callArgs.systemInstruction).not.toContain("MODEL SCRIPT MODE");
-      expect(callArgs.temperature).toBe(0.82);
+      expect(callArgs).not.toHaveProperty("temperature");
     });
   });
 

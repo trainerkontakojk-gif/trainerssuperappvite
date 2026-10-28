@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-28
+
+- refactor(api): hapus opsi temperature yang tidak terpakai dari jalur Gemini sehingga KETIK, PDKT, dan SIDAK forecast hanya mengirim temperature ke OpenAI, sesuai deprecation parameter sampling Gemini
+
 ## 2026-10-23
 
 - feat(telefun): telaah menandai kategori bahasa termasuk pengulangan dan efektivitas kalimat, memverifikasi dua bukti pengulangan, serta menjaga navigasi kutipan bertumpang tindih dan hasil lama
