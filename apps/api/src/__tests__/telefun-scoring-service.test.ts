@@ -57,9 +57,7 @@ function buildChain(rowOrList: any, isList: boolean) {
   });
   chain.limit = vi.fn(() =>
     Promise.resolve(
-      mockFetchQueryError
-        ? { data: null, error: mockFetchQueryError }
-        : result,
+      mockFetchQueryError ? { data: null, error: mockFetchQueryError } : result,
     ),
   );
 
@@ -202,7 +200,9 @@ const VALID_ASSESSMENT: VoiceQualityAssessment = {
       "Nada dominan tenang dengan empati cukup terasa saat menyampaikan solusi. Hal ini membantu konsumen merasa didengar dan aman. Tambahkan kehangatan pada sapaan awal dan penutup dengan senyum vokal agar empati lebih tulus terasa.",
   },
   transcript:
-    "Selamat siang, terima kasih telah menghubungi OJK 157. Perkenalkan saya agen yang bertugas. Bisa saya bantu jelaskan kendala yang dialami terkait layanan?".repeat(2),
+    "Selamat siang, terima kasih telah menghubungi OJK 157. Perkenalkan saya agen yang bertugas. Bisa saya bantu jelaskan kendala yang dialami terkait layanan?".repeat(
+      2,
+    ),
   highlights: [
     "Pembukaan dengan sapaan sopan dan perkenalan jelas yang membangun kepercayaan awal konsumen dalam 30 detik pertama percakapan.",
     "Penggalian kebutuhan dengan pertanyaan terbuka yang relevan sehingga konsumen dapat menjelaskan kronologi kendala secara runtut dan lengkap.",
@@ -216,7 +216,18 @@ const VALID_ASSESSMENT: VoiceQualityAssessment = {
 };
 
 function seedSession(id: string, data: Record<string, any>) {
-  mockRows.set(id, { id, user_id: "u1", ...data });
+  const userId = data.user_id ?? "u1";
+  mockRows.set(id, {
+    id,
+    user_id: userId,
+    status: "completed",
+    recording_status: "ready",
+    recording_error: null,
+    recording_path: `${userId}/${id}/full_call.webm`,
+    agent_recording_path: `${userId}/${id}/agent_only.webm`,
+    scoring_claim_token_hash: "owned-token",
+    ...data,
+  });
 }
 
 describe("claimJob", () => {
@@ -250,7 +261,13 @@ describe("claimJob", () => {
   });
 
   it("rejects invalid or sub-floor lease values before the RPC boundary", async () => {
-    for (const timeoutSeconds of [Number.NaN, Number.POSITIVE_INFINITY, 120, 180, 299]) {
+    for (const timeoutSeconds of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      120,
+      180,
+      299,
+    ]) {
       await expect(claimJob("session-1", timeoutSeconds)).rejects.toThrow(
         "integer >= 300",
       );
@@ -328,8 +345,16 @@ describe("fetchPendingJobs", () => {
   });
 
   it("returns jobs from pending/failed sessions due for retry", async () => {
-    seedSession("s1", { user_id: "u1", scoring_status: "pending", scoring_next_attempt_at: null });
-    seedSession("s2", { user_id: "u2", scoring_status: "failed", scoring_next_attempt_at: "2026-01-01T00:00:00Z" });
+    seedSession("s1", {
+      user_id: "u1",
+      scoring_status: "pending",
+      scoring_next_attempt_at: null,
+    });
+    seedSession("s2", {
+      user_id: "u2",
+      scoring_status: "failed",
+      scoring_next_attempt_at: "2026-01-01T00:00:00Z",
+    });
 
     const result = await fetchPendingJobs(5);
     expect(result).toHaveLength(2);
@@ -373,9 +398,7 @@ describe("fetchPendingJobs", () => {
 
     const result = await fetchPendingJobs(5);
 
-    expect(result).toEqual([
-      { sessionId: "webrtc-ready", userId: "u2" },
-    ]);
+    expect(result).toEqual([{ sessionId: "webrtc-ready", userId: "u2" }]);
   });
 
   it("includes terminal historical OpenAI jobs before the retired WebRTC readiness gate", async () => {
@@ -468,7 +491,8 @@ describe("processScoringJob", () => {
       scoring_attempt_count: 0,
     });
 
-    const geminiMock = (await import("../lib/gemini")).generateGeminiContent as any;
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
     geminiMock.mockResolvedValue({
       success: true,
       text: JSON.stringify(VALID_ASSESSMENT),
@@ -482,8 +506,9 @@ describe("processScoringJob", () => {
     });
     expect(result.success).toBe(true);
     expect(result.status).toBe("completed");
-    expect(mockRpcs.find((rpc) => rpc.name === "complete_telefun_scoring")?.args)
-      .toMatchObject({ p_claim_token_hash: "owned-token" });
+    expect(
+      mockRpcs.find((rpc) => rpc.name === "complete_telefun_scoring")?.args,
+    ).toMatchObject({ p_claim_token_hash: "owned-token" });
   });
 
   it("permanently disables a terminal transport-only WebRTC row even after failed capture", async () => {
@@ -500,7 +525,8 @@ describe("processScoringJob", () => {
       voice_assessment: null,
       session_metrics: null,
     });
-    const geminiMock = (await import("../lib/gemini")).generateGeminiContent as any;
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
     geminiMock.mockResolvedValue({
       success: true,
       text: JSON.stringify(VALID_ASSESSMENT),
@@ -517,9 +543,7 @@ describe("processScoringJob", () => {
       status: "failed",
       error: "Penilaian OpenAI Realtime tidak lagi tersedia untuk Telefun.",
     });
-    expect(mockRpcs.map((rpc) => rpc.name)).toEqual([
-      "fail_telefun_scoring",
-    ]);
+    expect(mockRpcs.map((rpc) => rpc.name)).toEqual(["fail_telefun_scoring"]);
   });
 
   it("reads the complete RPC state with the full readiness snapshot", async () => {
@@ -535,9 +559,9 @@ describe("processScoringJob", () => {
     });
     mockRpcResult = { data: false, error: null };
 
-    await expect(persistScoringAssessment("s1", VALID_ASSESSMENT)).rejects.toThrow(
-      "SCORING_NOT_READY",
-    );
+    await expect(
+      persistScoringAssessment("s1", VALID_ASSESSMENT),
+    ).rejects.toThrow("SCORING_NOT_READY");
   });
 
   it("reschedules transient failures", async () => {
@@ -565,12 +589,16 @@ describe("processScoringJob", () => {
       claimTokenHash: "owned-token",
     });
     expect(result.status).toBe("rescheduled");
-    const rescheduleRpc = mockRpcs.find((r) => r.name === "reschedule_telefun_scoring");
+    const rescheduleRpc = mockRpcs.find(
+      (r) => r.name === "reschedule_telefun_scoring",
+    );
     expect(rescheduleRpc).toBeDefined();
-    expect(rescheduleRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
+    expect(rescheduleRpc?.args).toMatchObject({
+      p_claim_token_hash: "owned-token",
+    });
   });
 
-  it("fails permanently on permanent error", async () => {
+  it("rejects a missing required recording without mutating the claim", async () => {
     seedSession("s1", {
       user_id: "u1",
       scenario_title: "Test",
@@ -589,9 +617,10 @@ describe("processScoringJob", () => {
       claimTokenHash: "owned-token",
     });
     expect(result.status).toBe("failed");
-    const failRpc = mockRpcs.find((r) => r.name === "fail_telefun_scoring");
-    expect(failRpc).toBeDefined();
-    expect(failRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
+    expect(result.error).toBe("SCORING_NOT_READY");
+    expect(mockRpcs).toEqual([]);
+    const geminiMock = (await import("../lib/gemini")).generateGeminiContent;
+    expect(geminiMock).not.toHaveBeenCalled();
   });
 
   it("keeps the claim token on the exception retry path", async () => {
@@ -616,24 +645,38 @@ describe("processScoringJob", () => {
     });
 
     expect(result.status).toBe("rescheduled");
-    const rescheduleRpc = mockRpcs.find((r) => r.name === "reschedule_telefun_scoring");
-    expect(rescheduleRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
+    const rescheduleRpc = mockRpcs.find(
+      (r) => r.name === "reschedule_telefun_scoring",
+    );
+    expect(rescheduleRpc?.args).toMatchObject({
+      p_claim_token_hash: "owned-token",
+    });
   });
 
   it("fails permanently after max attempts exceeded", async () => {
     seedSession("s1", {
       user_id: "u1",
       scenario_title: "Test",
-      agent_recording_path: null,
+      agent_recording_path: "u1/s1/agent_only.webm",
       voice_assessment: null,
       session_metrics: null,
       scoring_status: "processing",
       scoring_attempt_count: 3, // Max
     });
 
+    // Reach the attempt limit through a real transient preparation failure;
+    // a missing required recording now correctly stops at the readiness guard.
+    mockDownloadResult = {
+      data: null,
+      error: new Error("network unavailable"),
+    };
     mockRpcResult = { data: true, error: null };
 
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "owned-token",
+    });
     expect(result.status).toBe("failed");
     expect(result.error).toContain("Max attempts");
   });
@@ -654,7 +697,7 @@ describe("processScoringJob", () => {
     controller.abort();
 
     const result = await processScoringJob(
-      { sessionId: "s1", userId: "u1" },
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
 
@@ -682,13 +725,13 @@ describe("processScoringJob", () => {
     const controller = new AbortController();
 
     const pending = processScoringJob(
-      { sessionId: "s1", userId: "u1" },
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
     await vi.waitFor(() => expect(mockInitialReadStarted).toBe(true));
 
     controller.abort();
-    resolveInitialRead({ data: { id: "s1", ...row }, error: null });
+    resolveInitialRead({ data: mockRows.get("s1"), error: null });
 
     const result = await pending;
     expect(result).toEqual({
@@ -718,7 +761,7 @@ describe("processScoringJob", () => {
     const controller = new AbortController();
 
     const pending = processScoringJob(
-      { sessionId: "s1", userId: "u1" },
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
     await vi.waitFor(() => expect(mockDownloadStarted).toBe(true));
@@ -759,7 +802,7 @@ describe("processScoringJob", () => {
     const controller = new AbortController();
 
     const pending = processScoringJob(
-      { sessionId: "s1", userId: "u1" },
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
     await vi.waitFor(() => expect(geminiMock).toHaveBeenCalledTimes(1));
@@ -794,14 +837,15 @@ describe("processScoringJob", () => {
     mockDeferredMaybeSingle = new Promise((resolve) => {
       resolveStateRead = resolve;
     });
-    mockDeferredMaybeSingleAt = 3;
+    // Initial worker read, analysis read, admission re-read, then diagnosis.
+    mockDeferredMaybeSingleAt = 4;
     const controller = new AbortController();
 
     const pending = processScoringJob(
       { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
-    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(3));
+    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(4));
 
     controller.abort();
     resolveStateRead({
@@ -834,14 +878,15 @@ describe("processScoringJob", () => {
     mockDeferredMaybeSingle = new Promise((resolve) => {
       resolveDiagnosticRead = resolve;
     });
-    mockDeferredMaybeSingleAt = 3;
+    // Initial worker read, analysis read, admission re-read, then diagnosis.
+    mockDeferredMaybeSingleAt = 4;
     const controller = new AbortController();
 
     const pending = processScoringJob(
       { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
       controller.signal,
     );
-    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(3));
+    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(4));
 
     controller.abort();
     resolveDiagnosticRead({

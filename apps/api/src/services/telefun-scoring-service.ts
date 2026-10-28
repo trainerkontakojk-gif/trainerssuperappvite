@@ -4,6 +4,7 @@ import {
   analyzeVoiceQuality,
   isTelefunWebRtcSeekableAgentPath,
 } from "../lib/telefun-analysis";
+import { isTelefunCaptureScoringReady } from "../lib/telefun-capture-readiness";
 import {
   classifyScoringError,
   calculateNextAttemptAt,
@@ -12,16 +13,17 @@ import {
 } from "../lib/telefun-scoring-errors";
 import {
   isRetiredTelefunOpenAiRealtimeSelection,
+  TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS,
   parseVoiceQualityAssessment,
 } from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
-import {
-  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
-} from "../lib/telefun-openai-assessment";
+import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../lib/telefun-openai-assessment";
 
 export interface ScoringJob {
   sessionId: string;
   userId: string;
+  /** Classification snapshot used to route retired rows before normal claim. */
+  retiredOpenAi?: boolean;
   /** Fencing hash of the claim that owns this job (set by the claimer). */
   claimTokenHash?: string | null;
 }
@@ -34,7 +36,9 @@ export const TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS = 300;
 /** Validate the lease at every TypeScript helper boundary, including callers
  * that bypass the environment parser. A shorter lease can reclaim a slow
  * provider call and admit duplicate billable work. */
-export function validateScoringClaimTimeoutSeconds(timeoutSeconds: number): number {
+export function validateScoringClaimTimeoutSeconds(
+  timeoutSeconds: number,
+): number {
   if (
     !Number.isFinite(timeoutSeconds) ||
     !Number.isInteger(timeoutSeconds) ||
@@ -52,7 +56,10 @@ export const TELEFUN_SCORING_CLAIM_OWNER_WORKER = "scoring-worker";
 export const TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE = "api-route";
 
 /** Generates a per-claim secret token; only the SHA-256 hash is persisted. */
-export function newScoringClaim(): { claimToken: string; claimTokenHash: string } {
+export function newScoringClaim(): {
+  claimToken: string;
+  claimTokenHash: string;
+} {
   const claimToken = randomUUID();
   const claimTokenHash = createHash("sha256").update(claimToken).digest("hex");
   return { claimToken, claimTokenHash };
@@ -72,13 +79,15 @@ export interface ScoringResult {
 }
 
 type ScoringStateSnapshot = {
+  user_id: string | null;
   telefun_model_id: string | null;
   telefun_transport: string | null;
   status: string | null;
   recording_status: string | null;
   recording_error: string | null;
-  scoring_ready_at: string | null;
+  recording_path: string | null;
   agent_recording_path: string | null;
+  scoring_ready_at: string | null;
   scoring_status: string | null;
   scoring_next_attempt_at: string | null;
   score: number | null;
@@ -101,9 +110,8 @@ export function isWebRtcScoringReady(
 ): boolean {
   if (state?.telefun_transport !== "openai-webrtc") return true;
   return (
-    state.status === "completed" &&
-    (state.recording_status === "partial" || state.recording_status === "ready") &&
-    state.recording_error == null &&
+    isTelefunCaptureScoringReady(state, userId, sessionId) &&
+    state.recording_path === `${userId}/${sessionId}/full_call.seekable.webm` &&
     state.scoring_ready_at != null &&
     isTelefunWebRtcSeekableAgentPath({
       path: state.agent_recording_path,
@@ -124,7 +132,7 @@ function isHistoricalOpenAiScoringModel(state: {
 }
 
 const SCORING_STATE_SELECT =
-  "telefun_model_id, telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, scoring_next_attempt_at, score, voice_assessment";
+  "user_id, telefun_model_id, telefun_transport, status, recording_status, recording_error, recording_path, agent_recording_path, scoring_ready_at, scoring_status, scoring_next_attempt_at, score, voice_assessment";
 
 function readRpcBoolean(data: unknown): boolean | null {
   const value = Array.isArray(data) ? data[0] : data;
@@ -156,7 +164,9 @@ export async function claimJob(
   if (!claimed) {
     const { data: session } = await adminClient
       .from("telefun_history")
-      .select("scoring_status, score, voice_assessment, scoring_next_attempt_at")
+      .select(
+        "scoring_status, score, voice_assessment, scoring_next_attempt_at",
+      )
       .eq("id", sessionId)
       .maybeSingle();
     return { claimed: false, session };
@@ -202,15 +212,55 @@ async function ensureFailed(
 }
 
 /**
- * The fail RPC atomically records the permanent terminal state and clears any
- * retry eligibility. Do not append a best-effort update: a post-failure error
- * must never resurrect this retired job through the transient catch path.
+ * Retire a terminal historical row administratively, before any scoring claim.
+ * A false result means the row is no longer eligible (for example, a live
+ * claim, future retry, or completed non-null assessment); RPC errors fail closed.
+ * Expected status/assessment arguments are retained for signature compatibility;
+ * they never authorize a downgrade, including for malformed completed caches.
+ */
+export async function retireHistoricalOpenAiScoring(
+  sessionId: string,
+  expectedScoringStatus?: string | null,
+  expectedVoiceAssessment?: unknown,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient.rpc(
+    "retire_telefun_openai_scoring",
+    {
+      p_session_id: sessionId,
+      p_expected_scoring_status: expectedScoringStatus ?? null,
+      p_expected_voice_assessment: expectedVoiceAssessment ?? null,
+    },
+  );
+  if (error) {
+    throw new TransientScoringError(
+      "Scoring retirement persistence unavailable",
+      "SCORING_PERSISTENCE_UNAVAILABLE",
+    );
+  }
+  const retired = readRpcBoolean(data);
+  if (retired === null) {
+    throw new TransientScoringError(
+      "Scoring retirement persistence unavailable",
+      "SCORING_PERSISTENCE_UNAVAILABLE",
+    );
+  }
+  return retired;
+}
+
+/**
+ * The claim-token-fenced fail RPC remains for a retired row already owned by
+ * an existing scoring claim. It cannot replace administrative pre-claim work.
  */
 export async function permanentlyFailRetiredOpenAiScoring(
   sessionId: string,
   claimTokenHash?: string | null,
 ): Promise<boolean> {
-  return ensureFailed(sessionId, TELEFUN_OPENAI_SCORING_DISABLED_REASON, claimTokenHash);
+  return ensureFailed(
+    sessionId,
+    TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+    claimTokenHash,
+  );
 }
 
 async function ensureRescheduled(
@@ -292,10 +342,7 @@ export async function persistScoringAssessment(
   );
   if (accepted) return true;
 
-  const {
-    data: current,
-    error: readbackError,
-  } = await adminClient
+  const { data: current, error: readbackError } = await adminClient
     .from("telefun_history")
     .select(SCORING_STATE_SELECT)
     .eq("id", sessionId)
@@ -308,18 +355,18 @@ export async function persistScoringAssessment(
     );
   }
   if (current.scoring_status === "completed") return true;
-  if (current.telefun_transport === "openai-webrtc") {
-    const ownedAgentPath = userId
-      ? isWebRtcScoringReady(current, userId, sessionId)
-      : current.status === "completed" &&
-        (current.recording_status === "partial" ||
-          current.recording_status === "ready") &&
-        current.recording_error == null &&
-        current.scoring_ready_at != null &&
-        new RegExp(`^[^/]+/${sessionId}/agent_only\\.seekable\\.webm$`).test(
-          current.agent_recording_path ?? "",
-        );
-    if (!ownedAgentPath) throw new ScoringNotReadyError();
+  const captureOwnerId = userId ?? current.user_id;
+  if (
+    !captureOwnerId ||
+    !isTelefunCaptureScoringReady(current, captureOwnerId, sessionId)
+  ) {
+    throw new ScoringNotReadyError();
+  }
+  if (
+    current.telefun_transport === "openai-webrtc" &&
+    !isWebRtcScoringReady(current, captureOwnerId, sessionId)
+  ) {
+    throw new ScoringNotReadyError();
   }
   return false;
 }
@@ -335,7 +382,11 @@ export async function processScoringJob(
     if (signal?.aborted) {
       // Bounded abort: stop admission before the provider boundary. The
       // caller (worker runtime) releases/reschedules the claim atomically.
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
 
     const { data: initialState } = await adminClient
@@ -344,7 +395,11 @@ export async function processScoringJob(
       .eq("id", job.sessionId)
       .maybeSingle();
     if (signal?.aborted) {
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
     if (initialState && isHistoricalOpenAiScoringModel(initialState)) {
       if (parseVoiceQualityAssessment(initialState.voice_assessment)) {
@@ -360,7 +415,12 @@ export async function processScoringJob(
           error: "SCORING_NOT_READY",
         };
       }
-      if (!(await permanentlyFailRetiredOpenAiScoring(job.sessionId, claimTokenHash))) {
+      if (
+        !(await permanentlyFailRetiredOpenAiScoring(
+          job.sessionId,
+          claimTokenHash,
+        ))
+      ) {
         throw new TransientScoringError(
           "Scoring result persistence unavailable",
           "SCORING_PERSISTENCE_UNAVAILABLE",
@@ -372,13 +432,28 @@ export async function processScoringJob(
         error: TELEFUN_OPENAI_SCORING_DISABLED_REASON,
       };
     }
-    const result = await analyzeVoiceQuality(job.sessionId, job.userId, signal);
+    if (
+      initialState &&
+      !isTelefunCaptureScoringReady(initialState, job.userId, job.sessionId)
+    ) {
+      return { success: false, status: "failed", error: "SCORING_NOT_READY" };
+    }
+    const result = await analyzeVoiceQuality(
+      job.sessionId,
+      job.userId,
+      signal,
+      { claimTokenHash },
+    );
 
     if (signal?.aborted) {
       // Bounded abort: a late provider result must not be persisted (no late
       // write). The claim stays processing and is released/rescheduled by the
       // caller or reclaimed after the stale-claim timeout.
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
 
     if (result.success && result.assessment) {
@@ -404,7 +479,11 @@ export async function processScoringJob(
       .maybeSingle();
 
     if (signal?.aborted) {
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
 
     if (!session) {
@@ -416,8 +495,9 @@ export async function processScoringJob(
     }
 
     if (
-      session.telefun_transport === "openai-webrtc" &&
-      !isWebRtcScoringReady(session, job.userId, job.sessionId)
+      !isTelefunCaptureScoringReady(session, job.userId, job.sessionId) ||
+      (session.telefun_transport === "openai-webrtc" &&
+        !isWebRtcScoringReady(session, job.userId, job.sessionId))
     ) {
       return {
         success: false,
@@ -432,7 +512,11 @@ export async function processScoringJob(
 
     if (errorType === "permanent" || attemptCount >= MAX_SCORING_ATTEMPTS) {
       if (signal?.aborted) {
-        return { success: false, status: "rescheduled", error: "Scoring aborted" };
+        return {
+          success: false,
+          status: "rescheduled",
+          error: "Scoring aborted",
+        };
       }
       await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
       return {
@@ -447,16 +531,29 @@ export async function processScoringJob(
 
     const nextAttemptAt = calculateNextAttemptAt(attemptCount);
     if (signal?.aborted) {
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
-    await ensureRescheduled(job.sessionId, errorMsg, nextAttemptAt, claimTokenHash);
+    await ensureRescheduled(
+      job.sessionId,
+      errorMsg,
+      nextAttemptAt,
+      claimTokenHash,
+    );
 
     return { success: false, status: "rescheduled", error: errorMsg };
   } catch (error: unknown) {
     if (signal?.aborted) {
       // Bounded abort: never write a failure/retry state for an aborted job;
       // the shutdown path owns the atomic release.
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
 
     if (error instanceof ScoringNotReadyError) {
@@ -480,8 +577,10 @@ export async function processScoringJob(
         .maybeSingle();
       if (
         !stateError &&
-        current?.telefun_transport === "openai-webrtc" &&
-        !isWebRtcScoringReady(current, job.userId, job.sessionId)
+        current &&
+        (!isTelefunCaptureScoringReady(current, job.userId, job.sessionId) ||
+          (current.telefun_transport === "openai-webrtc" &&
+            !isWebRtcScoringReady(current, job.userId, job.sessionId)))
       ) {
         return {
           success: false,
@@ -495,19 +594,31 @@ export async function processScoringJob(
     }
 
     if (signal?.aborted) {
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
 
     if (errorType === "permanent") {
       if (signal?.aborted) {
-        return { success: false, status: "rescheduled", error: "Scoring aborted" };
+        return {
+          success: false,
+          status: "rescheduled",
+          error: "Scoring aborted",
+        };
       }
       await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
       return { success: false, status: "failed", error: errorMsg };
     }
 
     if (signal?.aborted) {
-      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      return {
+        success: false,
+        status: "rescheduled",
+        error: "Scoring aborted",
+      };
     }
     await ensureRescheduled(
       job.sessionId,
@@ -525,14 +636,27 @@ export async function fetchPendingJobs(
   const adminClient = createAdminClient();
   const now = new Date().toISOString();
 
+  // Match the historical detector, including unknown old GPT model IDs.
+  // NULLs belong to the active branch; SQL NOT alone would discard them.
+  // Raw logical filters require quoted values for PostgREST punctuation.
+  // JSON string quoting also escapes embedded double quotes/backslashes.
+  const historicalIds = TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS.map((model) =>
+    JSON.stringify(model.id),
+  ).join(",");
+  const retired = `or(telefun_transport.in.(openai-audio,openai-webrtc),telefun_model_id.in.(${historicalIds}),telefun_model_id.like.gpt-realtime-*)`;
+  const active = `and(or(telefun_transport.is.null,telefun_transport.not.in.(openai-audio,openai-webrtc)),or(telefun_model_id.is.null,and(telefun_model_id.not.in.(${historicalIds}),telefun_model_id.not.like.gpt-realtime-*)))`;
+  // Failed captures and terminal retired failures must not consume the page.
+  // Preserve historical terminal rows' intentional capture-readiness bypass.
+  const eligible = `or(and(${retired},status.in.(completed,failed),or(scoring_status.neq.failed,scoring_next_attempt_at.not.is.null)),and(${active},or(recording_status.is.null,recording_status.neq.failed),recording_error.is.null))`;
+
   const { data, error } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, status, telefun_model_id, telefun_transport, scoring_status, scoring_next_attempt_at, scoring_ready_at, agent_recording_path",
+      "id, user_id, status, telefun_model_id, telefun_transport, recording_status, recording_error, recording_path, agent_recording_path, scoring_status, scoring_next_attempt_at, scoring_ready_at",
     )
     .in("scoring_status", ["pending", "failed", "processing"])
     .or(
-      `scoring_next_attempt_at.lte.${now},scoring_next_attempt_at.is.null`,
+      `and(or(scoring_next_attempt_at.lte.${now},scoring_next_attempt_at.is.null),${eligible})`,
     )
     .order("scoring_next_attempt_at", {
       ascending: true,
@@ -559,20 +683,14 @@ export async function fetchPendingJobs(
         }
         return row.status === "completed" || row.status === "failed";
       }
+      if (!isTelefunCaptureScoringReady(row, row.user_id, row.id)) return false;
       if (row.telefun_transport !== "openai-webrtc") return true;
-      return (
-        row.status === "completed" &&
-        Boolean(row.scoring_ready_at) &&
-        isTelefunWebRtcSeekableAgentPath({
-          path: row.agent_recording_path,
-          userId: row.user_id,
-          sessionId: row.id,
-        })
-      );
+      return isWebRtcScoringReady(row, row.user_id, row.id);
     })
     .map((row: any) => ({
       sessionId: row.id,
       userId: row.user_id,
+      retiredOpenAi: isHistoricalOpenAiScoringModel(row),
     }));
 }
 
@@ -601,6 +719,11 @@ export async function claimCompletedScoringForRerun(
       scoring_next_attempt_at: null,
     })
     .eq("id", sessionId)
+    .eq("status", "completed")
+    .in("recording_status", ["uploaded", "partial", "ready"])
+    .is("recording_error", null)
+    .not("recording_path", "is", null)
+    .not("agent_recording_path", "is", null)
     .eq("scoring_status", "completed")
     .select("id");
   if (error) throw error;

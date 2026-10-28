@@ -55,6 +55,7 @@ interface PhoneInterfaceProps {
     fullCallBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: SessionMetrics,
+    canNavigate: () => Promise<boolean>,
   ) => void | Promise<void>;
   onSessionCreated?: (sessionId: string) => void;
   /** Nama peserta bila trainer menjalankan panggilan untuk peserta. */
@@ -320,10 +321,20 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             }
           };
           session.onError = (e) => {
+            const message = mapTelefunTransportError(e);
+            // Pending release is retryable, not evidence of capture failure.
+            // The socket-close observer can run after handleEndCall's catch.
+            if (message === CLEANUP_PENDING_MESSAGE) {
+              if (isActive) {
+                setCleanupRetryable(true);
+                setError(message);
+              }
+              return;
+            }
             terminalFailureRef.current = true;
             if (isActive) {
               setTerminalFailure(true);
-              setError(mapTelefunTransportError(e));
+              setError(message);
             }
           };
           session.onPlaybackBlocked = () => {
@@ -359,6 +370,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                     fullBlob,
                     agentBlob,
                     metrics,
+                    async () => {
+                      if (!mountedRef.current) return false;
+                      await session.waitForAudioRelease();
+                      return mountedRef.current && !terminalFailureRef.current;
+                    },
                   );
                 } catch (err) {
                   console.error("onRecordingReady failed:", err);
@@ -442,13 +458,16 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       isActive = false;
       mountedRef.current = false;
       stopHoldMusic();
-      if (!endCallStartedRef.current) {
-        const disconnect = sessionRef.current?.disconnect("cleanup");
-        if (disconnect) {
-          void disconnect.catch((cleanupError: unknown) => {
-            console.warn("[Telefun] cleanup disconnect failed:", cleanupError);
-          });
-        }
+      // Join shutdown even when end-call already began. LiveSession's disposal
+      // owner survives this component and retains pending/rejected closes.
+      const disconnect = sessionRef.current?.disconnect("cleanup");
+      if (disconnect) {
+        void disconnect.catch((cleanupError: unknown) => {
+          console.warn(
+            "[Telefun] unmount cleanup remains owned:",
+            cleanupError,
+          );
+        });
       }
       setLocalStream(null);
       if (
@@ -559,8 +578,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       }
 
       setCleanupRetryable(false);
-      if (mountedRef.current) onEndSessionRef.current(reason);
-      if (reason === "failed") {
+      // Recorder completion can fail while disconnect is awaited. Use the
+      // terminal result so the deferred failed recording is delivered too.
+      const endReason = terminalFailureRef.current ? "failed" : reason;
+      if (mountedRef.current) onEndSessionRef.current(endReason);
+      if (endReason === "failed") {
         // Notify the route before recording delivery so it saves the failed
         // attempt without navigating to Telaah over the recovery action.
         failedCleanupCompleteRef.current = true;
@@ -577,7 +599,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     if (!onRetry || retryStartedRef.current) return;
     retryStartedRef.current = true;
     try {
-      await onRetry(() => handleEndCall("failed"));
+      await onRetry(() =>
+        handleEndCall(terminalFailureRef.current ? "failed" : undefined),
+      );
     } finally {
       retryStartedRef.current = false;
     }
@@ -848,9 +872,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                   </h3>
                   <p className="text-sm leading-relaxed text-fg2">
                     {(() => {
-                      const mappedError = error || mapTelefunTransportError(null);
+                      const mappedError =
+                        error || mapTelefunTransportError(null);
                       const title = "Panggilan belum dapat dimulai";
-                      return mappedError === title || mappedError.startsWith(title)
+                      return mappedError === title ||
+                        mappedError.startsWith(title)
                         ? "Sambungan suara tidak berhasil dibuka. Periksa koneksi internet, lalu coba panggil lagi."
                         : mappedError;
                     })()}
@@ -874,7 +900,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                   variant="outline"
                   className="min-h-[44px]"
                   disabled={isDisconnecting}
-                  onClick={() => void handleEndCall("failed")}
+                  onClick={() =>
+                    void handleEndCall(
+                      terminalFailureRef.current ? "failed" : undefined,
+                    )
+                  }
                 >
                   Kembali ke Telefun
                 </Button>
@@ -908,7 +938,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               ref={cleanupRetryButtonRef}
               type="button"
               variant="outline"
-              onClick={() => void handleEndCall(failed ? "failed" : undefined)}
+              onClick={() =>
+                void handleEndCall(
+                  terminalFailureRef.current ? "failed" : undefined,
+                )
+              }
               disabled={isDisconnecting}
               aria-busy={isDisconnecting}
               className="min-h-[44px]"

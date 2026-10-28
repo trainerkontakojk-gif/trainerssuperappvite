@@ -723,6 +723,19 @@ telefunSessions.patch(
         );
       }
 
+      if (body.score !== undefined || body.feedback !== undefined) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SCORING_SERVER_OWNED",
+              message: "Hasil penilaian hanya dapat disimpan oleh backend.",
+            },
+          },
+          409,
+        );
+      }
+
       const webRtcLifecycleFields = [
         "status",
         "messages",

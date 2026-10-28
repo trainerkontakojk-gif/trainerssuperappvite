@@ -58,6 +58,10 @@ export default defineConfig({
       testMatch: "telefun-scoring-api.spec.ts",
     },
     {
+      name: "telefun-scoring-queue-real-backend",
+      testMatch: "telefun-scoring-queue-api.spec.ts",
+    },
+    {
       name: "scenario-attachments-real-backend",
       testMatch: "scenario-attachments-api.spec.ts",
     },
@@ -67,7 +71,10 @@ export default defineConfig({
     },
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     { name: "dev-database-guard", testMatch: "dev-database-guard-api.spec.ts" },
-    { name: "gemini-egress-proxy", testMatch: "gemini-egress-proxy-api.spec.ts" },
+    {
+      name: "gemini-egress-proxy",
+      testMatch: "gemini-egress-proxy-api.spec.ts",
+    },
     {
       name: "pdkt-consumer-email-stub",
       testMatch: "pdkt-consumer-email-api.spec.ts",

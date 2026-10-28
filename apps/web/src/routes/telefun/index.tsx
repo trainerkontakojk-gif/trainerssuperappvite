@@ -430,7 +430,8 @@ export default function TelefunLanding() {
     fullBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: SessionMetrics,
-    call = activeCallRef.current,
+    call: ActiveCall,
+    canNavigate: () => Promise<boolean>,
   ) => {
     if (!call) return;
     const { config, scenarioTitle } = call;
@@ -440,6 +441,8 @@ export default function TelefunLanding() {
         : call.sessionId;
     const usageRunId = sessionRunIdRef.current;
     const usageBaseline = sessionBaselineRef.current;
+    const captureFailed = !fullBlob || !agentBlob;
+    if (captureFailed) failedSessionIdsRef.current.add(sessionId);
 
     let saved: Awaited<ReturnType<typeof saveTelefunSession>> | null = null;
     try {
@@ -447,6 +450,7 @@ export default function TelefunLanding() {
         sessionId,
         fullBlob,
         agentBlob,
+        captureStatus: captureFailed ? "failed" : "ready",
         duration,
         metrics,
         localUrl: url,
@@ -458,7 +462,18 @@ export default function TelefunLanding() {
       console.error("[Telefun] Failed to finalize session", error);
     }
 
-    if (saved && !saved.saveFailed) {
+    const incompleteCapture = captureFailed || Boolean(saved?.captureFailed);
+    if (saved && incompleteCapture && !saved.saveFailed) {
+      notify.error("Rekaman tidak lengkap. Panggilan tidak akan dinilai.");
+      upsert({
+        ...saved.record,
+        consumerCity: config.resolvedIdentity?.city,
+        score: undefined,
+        feedback: "",
+        voiceAssessment: undefined,
+        scoringStatus: "failed",
+      });
+    } else if (saved && !saved.saveFailed) {
       if (saved.uploadFailed) {
         notify.warning(
           "Rekaman gagal diunggah, tetapi panggilan tetap tersimpan.",
@@ -467,7 +482,7 @@ export default function TelefunLanding() {
       upsert({ ...saved.record, consumerCity: config.resolvedIdentity?.city });
     } else {
       notify.error(
-        "Panggilan belum tersimpan di server. Rekaman hanya ada di perangkat ini.",
+        "Panggilan belum tersimpan di server. Periksa riwayat sebelum mencoba ulang.",
       );
       upsert({
         id: sessionId,
@@ -485,7 +500,10 @@ export default function TelefunLanding() {
 
     // A failed recording still saves normally, but must not replace a retry
     // (or the return-to-landing action) with the old attempt's Telaah screen.
-    if (!failedSessionIdsRef.current.has(sessionId)) {
+    // Upload/save may finish while audio close is pending or the phone has
+    // unmounted. Only the still-mounted owner may navigate after audio release.
+    const navigationAllowed = await canNavigate();
+    if (navigationAllowed && !failedSessionIdsRef.current.has(sessionId)) {
       setActiveCall(null);
       void navigate({
         to: "/telefun",
@@ -493,7 +511,8 @@ export default function TelefunLanding() {
       });
     }
 
-    const savedForScoring = saved && !saved.saveFailed ? saved : null;
+    const savedForScoring =
+      saved && !saved.saveFailed && !incompleteCapture ? saved : null;
     const scoring = savedForScoring?.agentRecordingPath
       ? scoreTelefunSession({
           sessionId,
@@ -700,6 +719,7 @@ export default function TelefunLanding() {
                 fullBlob,
                 agentBlob,
                 metrics,
+                canNavigate,
               ) =>
                 handleRecordingReady(
                   url,
@@ -709,6 +729,7 @@ export default function TelefunLanding() {
                   agentBlob,
                   metrics,
                   activeCall,
+                  canNavigate,
                 )
               }
               participantLabel={

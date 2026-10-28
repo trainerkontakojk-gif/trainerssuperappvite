@@ -26,6 +26,8 @@ export interface GeminiTelefunTransportSession {
   setHold(held: boolean): void;
   sendTimeCue(remainingSeconds: number): void;
   disconnect(reason: TelefunEndReason): Promise<void>;
+  /** Audio-only release; does not wait on the recording callback itself. */
+  waitForAudioRelease(): Promise<void>;
   onStatusChange: (status: string) => void;
   onStateChange: (state: TelefunSessionState) => void;
   onError: (error: Error) => void;

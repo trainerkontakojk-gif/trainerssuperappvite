@@ -10,6 +10,32 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 - refactor(api): hapus opsi temperature yang tidak terpakai dari jalur Gemini sehingga KETIK, PDKT, dan SIDAK forecast hanya mengirim temperature ke OpenAI, sesuai deprecation parameter sampling Gemini
 
+- chore(dev): tambahkan scripts/dev-local.mjs untuk menjalankan dev ke Supabase lokal dan perbaiki seed akun lokal agar bisa login dengan peran yang benar
+
+- docs(telefun): track rencana investigasi crackle playback live beserta bukti verifikasi lokal
+
+- fix(telefun): jaga kontinuitas playback PCM dengan lead 240 ms dan antrean antar-turn
+
+## 2026-10-27
+
+- feat(telefun): tambahkan tiga contoh acuan nada untuk setiap tipe konsumen tanpa mengubah kontrol panggilan atau pilihan suara
+
+- fix(telefun): susun ulang prompt konsumen dan selaraskan arahan ekspresi dengan tipe serta de-eskalasi
+
+- test(telefun): tetapkan gate energi pita full-call sejajar sumber untuk semua channel, validasi kontrol direct dan guard band CELT, tanpa mengubah bitrate atau ambang retensi
+
+- fix(telefun): pensiunkan riwayat OpenAI terminal tanpa claim/provider, pertahankan cache completed dan lease aktif, serta lanjutkan antrean Gemini
+
+## 2026-10-26
+
+- fix(telefun): cegah scoring jika salah satu rekaman gagal, pertahankan rekaman valid, gagalkan enqueue/claim/hasil terlambat, dan lindungi retry sampai cleanup selesai
+
+- fix(telefun): pisahkan input Gemini 16 kHz dari playback/rekaman full-call pada rate output native, pertahankan agent-only mic dan 32 kbps, serta finalisasi kedua recorder sebelum membersihkan graph
+
+## 2026-10-25
+
+- fix(telefun): konsumen marah menagih respons agen alih-alih menunggu pasif, dengan pengingat nada di akhir prompt yang tetap tunduk pada hold dan kontrol penutupan aplikasi; tipe lain dan pilihan suara tidak berubah
+
 ## 2026-10-23
 
 - feat(telefun): telaah menandai kategori bahasa termasuk pengulangan dan efektivitas kalimat, memverifikasi dua bukti pengulangan, serta menjaga navigasi kutipan bertumpang tindih dan hasil lama

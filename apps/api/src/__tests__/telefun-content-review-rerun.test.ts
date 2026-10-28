@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   parseVoiceQualityAssessment,
+  TELEFUN_AGENT_NOTE_LIMIT,
   type TelefunTranscriptEntry,
 } from "@trainers/types";
 
@@ -193,7 +194,7 @@ describe("normalizeTelefunContentReview", () => {
     ]);
   });
 
-  it("membatasi 5 poin konsumen dan 8 catatan agen", () => {
+  it("membatasi 5 poin konsumen dan catatan agen sesuai kontrak", () => {
     const point = {
       line: 1,
       quote: "Kok klaim",
@@ -204,12 +205,12 @@ describe("normalizeTelefunContentReview", () => {
     const review = normalizeTelefunContentReview(
       {
         consumerPoints: Array(9).fill(point),
-        agentNotes: Array(12).fill(note),
+        agentNotes: Array(TELEFUN_AGENT_NOTE_LIMIT + 4).fill(note),
       },
       TRANSCRIPT,
     );
     expect(review.consumerPoints).toHaveLength(5);
-    expect(review.agentNotes).toHaveLength(8);
+    expect(review.agentNotes).toHaveLength(TELEFUN_AGENT_NOTE_LIMIT);
   });
 
   it("kutipan cocok walau huruf besar dan tanda baca berbeda; disimpan persis seperti di transkrip", () => {
@@ -226,7 +227,8 @@ describe("normalizeTelefunContentReview", () => {
         agentNotes: [
           {
             line: 4,
-            quote: "perusahaan wajib menjelaskan dasar penolakannya secara tertulis",
+            quote:
+              "perusahaan wajib menjelaskan dasar penolakannya secara tertulis",
             verdict: "fix",
             note: "Belum memberi langkah.",
             example: "Ibu bisa meminta surat penolakan.",
@@ -306,9 +308,8 @@ function fakeDatabase(initial: Row) {
   });
   const from = vi.fn(() => {
     let patch: Row | null = null;
-    const filters: Array<[string, unknown]> = [];
-    const matches = () =>
-      filters.every(([column, value]) => row[column] === value);
+    const filters: Array<() => boolean> = [];
+    const matches = () => filters.every((matches) => matches());
     const builder = {
       select: () => builder,
       update: (values: Row) => {
@@ -316,7 +317,21 @@ function fakeDatabase(initial: Row) {
         return builder;
       },
       eq: (column: string, value: unknown) => {
-        filters.push([column, value]);
+        filters.push(() => row[column] === value);
+        return builder;
+      },
+      in: (column: string, values: unknown[]) => {
+        filters.push(() => values.includes(row[column]));
+        return builder;
+      },
+      is: (column: string, value: unknown) => {
+        filters.push(() => row[column] === value);
+        return builder;
+      },
+      not: (column: string, operator: string, value: unknown) => {
+        if (operator !== "is" || value !== null)
+          throw new Error("Unsupported mock filter");
+        filters.push(() => row[column] != null);
         return builder;
       },
       maybeSingle: async () => ({
@@ -342,6 +357,11 @@ function completedRow(overrides: Row = {}): Row {
   return {
     id: SESSION_ID,
     user_id: USER_ID,
+    status: "completed",
+    recording_status: "ready",
+    recording_error: null,
+    recording_path: `${USER_ID}/${SESSION_ID}/full_call.webm`,
+    agent_recording_path: `${USER_ID}/${SESSION_ID}/agent_only.webm`,
     scoring_status: "completed",
     telefun_model_id: "gemini-3.1-flash-live-preview",
     telefun_transport: "gemini-live",
@@ -413,7 +433,7 @@ describe("POST /score/:id/rerun", () => {
       SESSION_ID,
       USER_ID,
       undefined,
-      { fresh: true },
+      { fresh: true, claimTokenHash: claimedToken },
     );
     expect(typeof claimedToken).toBe("string");
     expect(db.client.rpc).toHaveBeenCalledWith(

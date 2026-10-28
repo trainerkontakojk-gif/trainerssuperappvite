@@ -13,7 +13,8 @@ const RETIRED_PRICING = {
   success: false,
   error: {
     code: "TELEFUN_REALTIME_MODEL_RETIRED",
-    message: "Harga model realtime OpenAI Telefun hanya tersedia untuk riwayat.",
+    message:
+      "Harga model realtime OpenAI Telefun hanya tersedia untuk riwayat.",
   },
 };
 
@@ -34,9 +35,9 @@ vi.mock("../lib/openai", () => ({
 }));
 
 vi.mock("../lib/telefun-analysis", async () => {
-  const actual = await vi.importActual<typeof import("../lib/telefun-analysis")>(
-    "../lib/telefun-analysis",
-  );
+  const actual = await vi.importActual<
+    typeof import("../lib/telefun-analysis")
+  >("../lib/telefun-analysis");
   return {
     ...actual,
     analyzeVoiceQuality: mocks.analyzeVoiceQuality,
@@ -50,10 +51,16 @@ import {
   isTelefunRecordingPathOwnedBySession,
 } from "../routes/telefun";
 import { ai } from "../routes/ai";
-import { telefunCapabilities, resolveTelefunOpenAiWebRtcCapabilities } from "../routes/telefun/capabilities";
+import {
+  telefunCapabilities,
+  resolveTelefunOpenAiWebRtcCapabilities,
+} from "../routes/telefun/capabilities";
 import { telefunSessions } from "../routes/telefun/sessions";
 import { telefunRecordings } from "../routes/telefun/recordings";
-import { telefunSettings, buildTelefunSettingsUpsertPayload } from "../routes/telefun/settings";
+import {
+  telefunSettings,
+  buildTelefunSettingsUpsertPayload,
+} from "../routes/telefun/settings";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   parseTelefunTranscript,
@@ -102,7 +109,9 @@ describe("Gemini-only Telefun public model and capability reads", () => {
     const response = await buildApp(ai).request("/models?module=telefun");
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data.map((model: { id: string }) => model.id)).toEqual([
+    expect(
+      (await response.json()).data.map((model: { id: string }) => model.id),
+    ).toEqual([
       "gemini-3.8-live",
       "gemini-3.1-flash-live-preview",
       "gemini-3.0-flash-live-preview",
@@ -150,9 +159,8 @@ describe("Gemini-only Telefun public model and capability reads", () => {
       },
     });
 
-    const response = await buildApp(telefunCapabilities).request(
-      "/capabilities",
-    );
+    const response =
+      await buildApp(telefunCapabilities).request("/capabilities");
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       success: true,
@@ -171,8 +179,16 @@ describe("Gemini-only Telefun public model and capability reads", () => {
 
 describe("Telefun OpenAI settings and session admission", () => {
   it.each([
-    ["model-only", { telefun_model_id: "gpt-realtime-2.1" }, { telefunModelId: "gpt-realtime-2.1" }],
-    ["transport-only", { telefun_transport: "openai-audio" }, { telefunTransport: "openai-audio" }],
+    [
+      "model-only",
+      { telefun_model_id: "gpt-realtime-2.1" },
+      { telefunModelId: "gpt-realtime-2.1" },
+    ],
+    [
+      "transport-only",
+      { telefun_transport: "openai-audio" },
+      { telefunTransport: "openai-audio" },
+    ],
     [
       "paired",
       {
@@ -261,7 +277,9 @@ describe("Telefun OpenAI settings and session admission", () => {
       },
     };
     const maybeSingle = vi.fn(async () => ({
-      data: { settings: { ketik: { preserved: true }, telefun: rawTelefunSettings } },
+      data: {
+        settings: { ketik: { preserved: true }, telefun: rawTelefunSettings },
+      },
       error: null,
     }));
     const upsert = vi.fn();
@@ -356,17 +374,20 @@ describe("historical OpenAI realtime pricing", () => {
 
   it("keeps a persisted realtime pricing row readable but display-only", async () => {
     mocks.createAdminClient.mockReturnValue({
-      from: vi.fn(() => ({
+      from: vi.fn((table: string) => ({
         select: vi.fn(() => ({
           order: vi.fn(async () => ({
-            data: [
-              {
-                model_id: "gpt-realtime-2.1",
-                input_price_usd_per_million: 4,
-                output_price_usd_per_million: 24,
-                ...historicalRates,
-              },
-            ],
+            data:
+              table === "ai_pricing_schedule"
+                ? []
+                : [
+                    {
+                      model_id: "gpt-realtime-2.1",
+                      input_price_usd_per_million: 4,
+                      output_price_usd_per_million: 24,
+                      ...historicalRates,
+                    },
+                  ],
             error: null,
           })),
         })),
@@ -440,7 +461,8 @@ describe("active Gemini scoring failure fencing", () => {
       recording_status: "ready",
       recording_error: null,
       scoring_ready_at: null,
-      agent_recording_path: "u1/session-1/agent_only.webm",
+      recording_path: `${USER_ID}/session-1/full_call.webm`,
+      agent_recording_path: `${USER_ID}/session-1/agent_only.webm`,
       scoring_status: "pending",
       score: null,
       voice_assessment: null,
@@ -478,9 +500,15 @@ describe("active Gemini scoring failure fencing", () => {
       },
     });
     expect(mocks.analyzeVoiceQuality).toHaveBeenCalledTimes(1);
-    const claimCall = rpc.mock.calls.find(([name]) => name === "claim_telefun_scoring");
-    const failCall = rpc.mock.calls.find(([name]) => name === "fail_telefun_scoring");
-    expect(claimCall?.[1]).toMatchObject({ p_claim_token_hash: expect.any(String) });
+    const claimCall = rpc.mock.calls.find(
+      ([name]) => name === "claim_telefun_scoring",
+    );
+    const failCall = rpc.mock.calls.find(
+      ([name]) => name === "fail_telefun_scoring",
+    );
+    expect(claimCall?.[1]).toMatchObject({
+      p_claim_token_hash: expect.any(String),
+    });
     expect(failCall?.[1]).toMatchObject({
       p_claim_token_hash: claimCall?.[1].p_claim_token_hash,
     });
@@ -542,11 +570,27 @@ describe("historical OpenAI scoring suppression", () => {
   it("returns a transport-only cached historical assessment unchanged before the retired readiness gate", async () => {
     const assessment = {
       overallScore: 8,
-      speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Baik", feedback: "Ok" },
+      speakingRate: {
+        score: 7,
+        wordsPerMinute: 130,
+        verdict: "Baik",
+        feedback: "Ok",
+      },
       intonation: { score: 8, verdict: "Baik", feedback: "Ok" },
       articulation: { score: 8, verdict: "Baik", feedback: "Ok" },
-      fillerWords: { score: 8, count: 0, examples: [], verdict: "Baik", feedback: "Ok" },
-      emotionalTone: { score: 8, dominant: "netral", verdict: "Baik", feedback: "Ok" },
+      fillerWords: {
+        score: 8,
+        count: 0,
+        examples: [],
+        verdict: "Baik",
+        feedback: "Ok",
+      },
+      emotionalTone: {
+        score: 8,
+        dominant: "netral",
+        verdict: "Baik",
+        feedback: "Ok",
+      },
       transcript: "",
       highlights: [],
       strengths: [],

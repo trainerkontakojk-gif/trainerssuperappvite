@@ -1,6 +1,7 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
 import { TELEFUN_ASSESSMENT_MODEL } from "./ai-models";
+import { isTelefunCaptureScoringReady } from "./telefun-capture-readiness";
 import {
   parseTelefunTranscript,
   parseVoiceQualityAssessment,
@@ -14,9 +15,7 @@ import {
   evaluateTelefunHoldAssessment,
   applyHoldAssessmentToOverallScore,
 } from "./telefun-hold-assessment";
-import {
-  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
-} from "./telefun-openai-assessment";
+import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "./telefun-openai-assessment";
 import {
   buildTelefunContentReviewPrompt,
   canReviewTelefunContent,
@@ -27,7 +26,9 @@ import {
 
 export type { VoiceQualityAssessment };
 
-function isTelefunAssessmentDetailed(assessment: VoiceQualityAssessment): boolean {
+function isTelefunAssessmentDetailed(
+  assessment: VoiceQualityAssessment,
+): boolean {
   const feedbacks = [
     assessment.speakingRate?.feedback,
     assessment.intonation?.feedback,
@@ -44,11 +45,14 @@ function isTelefunAssessmentDetailed(assessment: VoiceQualityAssessment): boolea
     assessment.emotionalTone?.verdict,
   ];
   if (verdicts.some((v) => !v || v.trim().length < 10)) return false;
-  if (!assessment.transcript || assessment.transcript.trim().length < 20) return false;
+  if (!assessment.transcript || assessment.transcript.trim().length < 20)
+    return false;
   if (!assessment.highlights || assessment.highlights.length < 3) return false;
-  if (assessment.highlights.some((h) => !h || h.trim().length < 12)) return false;
+  if (assessment.highlights.some((h) => !h || h.trim().length < 12))
+    return false;
   if (!assessment.strengths || assessment.strengths.length < 3) return false;
-  if (assessment.strengths.some((s) => !s || s.trim().length < 10)) return false;
+  if (assessment.strengths.some((s) => !s || s.trim().length < 10))
+    return false;
   return true;
 }
 
@@ -59,7 +63,8 @@ export function isTelefunWebRtcSeekableAgentPath(params: {
 }): boolean {
   return (
     typeof params.path === "string" &&
-    params.path === `${params.userId}/${params.sessionId}/agent_only.seekable.webm`
+    params.path ===
+      `${params.userId}/${params.sessionId}/agent_only.seekable.webm`
   );
 }
 
@@ -68,7 +73,7 @@ export async function analyzeVoiceQuality(
   userId: string,
   signal?: AbortSignal,
   /** `fresh`: abaikan hasil tersimpan (Telaah ulang). */
-  options: { fresh?: boolean } = {},
+  options: { fresh?: boolean; claimTokenHash?: string | null } = {},
 ): Promise<{
   success: boolean;
   assessment?: VoiceQualityAssessment;
@@ -80,7 +85,7 @@ export async function analyzeVoiceQuality(
   const { data: row, error: fetchError } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, status, scenario_title, agent_recording_path, voice_assessment, session_metrics, messages, telefun_model_id, telefun_transport, scoring_ready_at",
+      "id, user_id, status, scenario_title, recording_status, recording_error, recording_path, agent_recording_path, voice_assessment, session_metrics, messages, telefun_model_id, telefun_transport, scoring_ready_at, scoring_status, scoring_claim_token_hash",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -153,10 +158,15 @@ export async function analyzeVoiceQuality(
     return { success: false, error: TELEFUN_OPENAI_SCORING_DISABLED_REASON };
   }
 
+  if (!isTelefunCaptureScoringReady(row, userId, sessionId)) {
+    return { success: false, error: "Scoring not ready" };
+  }
+
   if (
     isWebRtc &&
     (row.status !== "completed" ||
       !row.scoring_ready_at ||
+      row.recording_path !== `${userId}/${sessionId}/full_call.seekable.webm` ||
       !isTelefunWebRtcSeekableAgentPath({
         path: row.agent_recording_path,
         userId,
@@ -191,6 +201,44 @@ export async function analyzeVoiceQuality(
   );
 
   if (signal?.aborted) return { success: false, error: "Scoring aborted" };
+
+  // Storage download and arrayBuffer() are asynchronous preparation boundaries.
+  // Re-read durable capture state and the claim immediately before provider
+  // admission so a failed capture or superseded claim cannot start new work.
+  const expectedClaimTokenHash = options.claimTokenHash;
+  if (!expectedClaimTokenHash) {
+    return { success: false, error: "Scoring claim is no longer active" };
+  }
+  const { data: currentRow, error: currentError } = await adminClient
+    .from("telefun_history")
+    .select(
+      "id, user_id, status, recording_status, recording_error, recording_path, agent_recording_path, telefun_transport, scoring_ready_at, scoring_status, scoring_claim_token_hash",
+    )
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (signal?.aborted) return { success: false, error: "Scoring aborted" };
+  if (
+    currentError ||
+    !currentRow ||
+    currentRow.user_id !== userId ||
+    currentRow.scoring_status !== "processing" ||
+    currentRow.scoring_claim_token_hash !== expectedClaimTokenHash ||
+    !isTelefunCaptureScoringReady(currentRow, userId, sessionId) ||
+    currentRow.recording_path !== row.recording_path ||
+    currentRow.agent_recording_path !== agentPath ||
+    (currentRow.telefun_transport === "openai-webrtc" &&
+      (currentRow.status !== "completed" ||
+        !currentRow.scoring_ready_at ||
+        currentRow.recording_path !==
+          `${userId}/${sessionId}/full_call.seekable.webm` ||
+        !isTelefunWebRtcSeekableAgentPath({
+          path: currentRow.agent_recording_path,
+          userId,
+          sessionId,
+        })))
+  ) {
+    return { success: false, error: "Scoring claim is no longer active" };
+  }
 
   const transcript = parseTelefunTranscript(row.messages);
   const reviewContent = canReviewTelefunContent(transcript);
@@ -262,7 +310,7 @@ export async function analyzeVoiceQuality(
   const response = await generateGeminiContent({
     model: TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:
-      "Anda adalah pelatih vokal senior dan analis wicara profesional dengan 15 tahun pengalaman melatih agent contact center OJK 157 dan telemarketing. Tugas Anda adalah memberikan penilaian yang MENDALAM, DETAIL, dan KONSTRUKTIF — bukan ringkasan singkat. Setiap penilaian harus spesifik, mengutip perilaku aktual dari rekaman, menjelaskan dampaknya ke konsumen, dan memberikan langkah perbaikan yang actionable. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia yang natural, profesional, dan kritis-membangun (50% apresiasi, 50% kritik). Jangan pernah memberikan jawaban generik, singkat, atau asal-asalan.", 
+      "Anda adalah pelatih vokal senior dan analis wicara profesional dengan 15 tahun pengalaman melatih agent contact center OJK 157 dan telemarketing. Tugas Anda adalah memberikan penilaian yang MENDALAM, DETAIL, dan KONSTRUKTIF — bukan ringkasan singkat. Setiap penilaian harus spesifik, mengutip perilaku aktual dari rekaman, menjelaskan dampaknya ke konsumen, dan memberikan langkah perbaikan yang actionable. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia yang natural, profesional, dan kritis-membangun (50% apresiasi, 50% kritik). Jangan pernah memberikan jawaban generik, singkat, atau asal-asalan.",
     contents: [
       {
         role: "user",
@@ -364,7 +412,7 @@ export async function generateCoachingSummary(
   const response = await generateGeminiContent({
     model: TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:
-      "Anda adalah pelatih customer service senior dan mentor QA OJK 157 dengan pengalaman coaching agent. Berikan rekomendasi yang TAJAM, SPESIFIK, dan MEMBANGUN — setiap saran harus actionable, merujuk ke indikator penilaian Telefun yang sudah ditentukan, dan dapat langsung dipraktikkan agen. Hindari saran generik atau singkat. Semua balasan WAJIB Bahasa Indonesia.", 
+      "Anda adalah pelatih customer service senior dan mentor QA OJK 157 dengan pengalaman coaching agent. Berikan rekomendasi yang TAJAM, SPESIFIK, dan MEMBANGUN — setiap saran harus actionable, merujuk ke indikator penilaian Telefun yang sudah ditentukan, dan dapat langsung dipraktikkan agen. Hindari saran generik atau singkat. Semua balasan WAJIB Bahasa Indonesia.",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     responseMimeType: "application/json",
     responseSchema: {

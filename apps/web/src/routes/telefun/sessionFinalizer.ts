@@ -161,6 +161,7 @@ export interface SavedTelefunSession {
   recordingStatus?: TelefunRecordingTransitionResult["recordingStatus"];
   recordingReady?: boolean;
   scoringReady?: boolean;
+  captureFailed: boolean;
 }
 
 export interface TelefunScoringResult {
@@ -296,7 +297,8 @@ export async function saveTelefunSession(
   const captureFailed =
     status.uploadFailed ||
     params.captureStatus === "failed" ||
-    (!recordingPath && !agentRecordingPath);
+    !params.fullBlob ||
+    !params.agentBlob;
 
   if (isWebRtcSession) {
     if (captureFailed) markSaveFailed(status);
@@ -359,18 +361,20 @@ export async function saveTelefunSession(
     }
   } else {
     let recordingTransitionPersisted = true;
-    if (recordingPath || agentRecordingPath) {
+    if (recordingPath || agentRecordingPath || captureFailed) {
       try {
         const transition = await retryOnce(() =>
           deps.finalizeRecording({
             sessionId: params.sessionId,
             recordingPath,
             agentRecordingPath,
+            captureStatus: captureFailed ? "failed" : "ready",
           }),
         );
         if (transition) recordingTransition = transition;
       } catch (err) {
         recordingTransitionPersisted = false;
+        markSaveFailed(status);
         console.error("Finalize recording paths failed:", err);
       }
     }
@@ -436,6 +440,7 @@ export async function saveTelefunSession(
     recordingStatus: recordingTransition?.recordingStatus,
     recordingReady: recordingTransition?.recordingReady,
     scoringReady: recordingTransition?.scoringReady,
+    captureFailed,
   };
 }
 
@@ -461,15 +466,9 @@ export async function scoreTelefunSession(params: {
   }
 
   try {
+    // The scoring endpoint owns durable score persistence. A follow-up client
+    // PATCH would create a second, unfenced scoring write path.
     const scoring = await deps.scoreSession(params.sessionId);
-    try {
-      await deps.patchSession(params.sessionId, {
-        score: scoring.score,
-        feedback: scoring.feedback,
-      });
-    } catch (err) {
-      console.error("Failed to patch score and feedback:", err);
-    }
 
     return {
       scoringStatus: "succeeded",
@@ -496,17 +495,22 @@ export async function finalizeTelefunSession(
   remuxed: boolean;
 }> {
   const saved = await saveTelefunSession(params);
-  const scoring = await scoreTelefunSession({
-    sessionId: params.sessionId,
-    agentRecordingPath: saved.agentRecordingPath,
-    transport: params.sessionConfig?.telefunTransport,
-    dependencies: params.dependencies,
-  });
+  const scoring =
+    saved.captureFailed || saved.saveFailed
+      ? { scoringStatus: "skipped" as const, feedback: "" }
+      : await scoreTelefunSession({
+          sessionId: params.sessionId,
+          agentRecordingPath: saved.agentRecordingPath,
+          transport: params.sessionConfig?.telefunTransport,
+          dependencies: params.dependencies,
+        });
 
   const finalScoringStatus =
-    scoring.scoringStatus === "succeeded"
-      ? "completed"
-      : saved.record.scoringStatus;
+    saved.captureFailed || saved.saveFailed
+      ? "failed"
+      : scoring.scoringStatus === "succeeded"
+        ? "completed"
+        : saved.record.scoringStatus;
 
   return {
     ...saved,

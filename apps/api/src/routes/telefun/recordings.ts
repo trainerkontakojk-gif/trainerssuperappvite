@@ -144,13 +144,16 @@ telefunRecordings.post(
           400,
         );
       }
-      if (captureStatus === "ready" && !recordingPath && !agentRecordingPath) {
+      if (
+        captureStatus === "ready" &&
+        (!recordingPath || !agentRecordingPath)
+      ) {
         return c.json(
           {
             success: false,
             error: {
               code: "INVALID_RECORDING_PATH",
-              message: "Setidaknya satu path rekaman diperlukan.",
+              message: "Kedua rekaman wajib tersedia sebelum scoring.",
             },
           },
           400,
@@ -240,9 +243,7 @@ telefunRecordings.post(
       const row = normalizeRecordingRpcRow(
         firstRpcRow(
           rpcResult.data as
-            | TelefunRecordingRpcRow
-            | TelefunRecordingRpcRow[]
-            | null,
+            TelefunRecordingRpcRow | TelefunRecordingRpcRow[] | null,
         ),
       );
       if (!row) {
@@ -281,9 +282,14 @@ telefunRecordings.post(
         );
       }
 
-      // Legacy sessions retain the existing enqueue behavior. WebRTC scoring
-      // is enqueued only by the seekable readiness RPC after remux.
-      if (session.telefun_transport !== "openai-webrtc" && agentRecordingPath) {
+      // Admit scoring only when this transition durably supplied both required
+      // tracks. The RPC is still authoritative against stale/late callbacks.
+      if (
+        captureStatus === "ready" &&
+        session.telefun_transport !== "openai-webrtc" &&
+        recordingPath &&
+        agentRecordingPath
+      ) {
         void enqueueScoring(sessionId).catch(() => undefined);
       }
 
