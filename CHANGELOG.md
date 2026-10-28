@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-28
 
+- docs(telefun): track rencana investigasi crackle playback live beserta bukti verifikasi lokal
+
 - fix(telefun): jaga kontinuitas playback PCM dengan lead 240 ms dan antrean antar-turn
 
 ## 2026-10-27
