@@ -16,6 +16,7 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTargetAt } from "./helpers/sidakJadwalShiftingHarness";
+import { measureRenderedFrequency } from "./helpers/telefunAudioRender";
 import {
   mockRecordingUpload,
   mockTelefunAvatar,
@@ -220,6 +221,7 @@ async function prepareAudioCall(
   audioResponse?: MockTelefunPcmResponse,
   voiceOptions: {
     audioResponseAfterText?: MockTelefunPcmResponse;
+    beforeAudioResponse?: () => Promise<void>;
     onConnection?: (connectionNumber: number) => void;
     closeAfterFirstInput?: boolean;
     drainAckDelayMs?: number;
@@ -407,6 +409,7 @@ type FallbackInputBlock = {
 
 type AudioProbeMode =
   | "native"
+  | "stream-jitter"
   | "low-native-output"
   | "block-output"
   | "retry-resume-pending"
@@ -2202,25 +2205,8 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
       };
     });
     // Measure the central 80 ms of each scheduled source on the render thread.
-    const tone = (start: number, frequency: number) => {
-      let real = 0,
-        imaginary = 0,
-        count = 0;
-      const from = Math.round((start + 0.02) * captured.rate);
-      const to = Math.round((start + 0.1) * captured.rate);
-      captured.frames.forEach((frame, block) => {
-        for (let i = 0; i < 128; i += 1) {
-          const at = frame + i;
-          if (at < from || at >= to) continue;
-          const sample = captured.samples[block * 128 + i];
-          const phase = (2 * Math.PI * frequency * at) / captured.rate;
-          real += sample * Math.cos(phase);
-          imaginary += sample * Math.sin(phase);
-          count++;
-        }
-      });
-      return { rms: (Math.hypot(real, imaginary) * Math.SQRT2) / count, count };
-    };
+    const tone = (start: number, frequency: number) =>
+      measureRenderedFrequency(captured, frequency, start + 0.02, start + 0.1);
     const measurements = captured.starts.map((s: { when: number }) => [
       tone(s.when, 500),
       tone(s.when, 1000),
@@ -5175,9 +5161,15 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
     };
     const { audit, call } = await prepareAudioCall(
       page,
-      "native",
+      "stream-jitter",
       initialResponse,
-      { audioResponseAfterText: followupResponse },
+      {
+        audioResponseAfterText: followupResponse,
+        beforeAudioResponse: () =>
+          page.evaluate(async () => {
+            await (window as any).__telefunAudioProbe.renderReady;
+          }),
+      },
       false,
       true,
     );
@@ -5223,12 +5215,49 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
         ),
       )
       .toBeGreaterThan(initialResponse.chunks.length);
-    const resumedSpeaker = await measureAudioTaps(
-      page,
-      "speaker",
+    // Source.start() schedules playback; a main-thread analyser can miss the
+    // entire 400 ms response under load. Inspect its audio-thread render instead.
+    await page.waitForFunction((initialCount) => {
+      const probe = (window as any).__telefunAudioProbe;
+      const starts = probe.sourceStarts.filter(
+        (entry: any) => entry.role === "telefun-output",
+      );
+      const last = starts.at(-1);
+      const lastFrame = probe.renderFrames.at(-1);
+      return (
+        starts.length > initialCount &&
+        last &&
+        typeof lastFrame === "number" &&
+        lastFrame + 128 >= (last.when + last.duration) * probe.renderSampleRate
+      );
+    }, initialResponse.chunks.length);
+    const resumed = await page.evaluate(() => {
+      const probe = (window as any).__telefunAudioProbe;
+      return {
+        rate: probe.renderSampleRate as number,
+        frames: probe.renderFrames as number[],
+        samples: probe.renderedSamples as number[],
+        lastStart: probe.sourceStarts
+          .filter((entry: any) => entry.role === "telefun-output")
+          .at(-1) as { when: number; duration: number },
+        speakerConnections: probe.sourceConnections.filter(
+          (entry: any) =>
+            entry.role === "telefun-output" && entry.destination === "speaker",
+        ).length as number,
+      };
+    });
+    expect(resumed.speakerConnections).toBeGreaterThan(initialStarts);
+    const signal = measureRenderedFrequency(
+      resumed,
       TAIL_MARKER_HZ,
+      resumed.lastStart.when + 0.1,
+      resumed.lastStart.when + 0.3,
     );
-    expect(Math.max(0, ...Object.values(resumedSpeaker))).toBeGreaterThan(0.02);
+    expect(
+      signal.count,
+      "complete post-hold observation window",
+    ).toBeGreaterThan(resumed.rate * 0.195);
+    expect(signal.rms).toBeGreaterThan(0.02);
     await endCall(page, call);
     await expectAudioResourcesReleased(page);
     expectHermetic(audit);
