@@ -468,6 +468,11 @@ export interface MockTelefunPcmResponse {
   transport: "inline" | "binary";
   afterFirstInput?: boolean;
   interruptAfterMs?: number;
+  /** Realistic packet spacing; omitted keeps the existing burst fixture. */
+  chunkIntervalMs?: number;
+
+  /** Treat each chunk as a separate completed model turn. */
+  completeEachChunk?: boolean;
 }
 
 export async function mockTelefunVoiceServer(
@@ -480,6 +485,8 @@ export async function mockTelefunVoiceServer(
     failAfterPickup?: boolean;
     audioResponse?: MockTelefunPcmResponse;
     audioResponseAfterText?: MockTelefunPcmResponse;
+    beforeAudioResponse?: () => Promise<void>;
+
     onClientMessage?: (message: Record<string, unknown>) => void;
     onConnection?: (connectionNumber: number) => void;
     closeAfterFirstInput?: boolean;
@@ -497,7 +504,7 @@ export async function mockTelefunVoiceServer(
     let failed = false;
     let audioSent = false;
     let followupAudioSent = false;
-    const sendAudioResponse = (
+    const sendAudioResponse = async (
       response: MockTelefunPcmResponse | undefined,
     ) => {
       if (!response) return;
@@ -509,7 +516,8 @@ export async function mockTelefunVoiceServer(
         if (followupAudioSent) return;
         followupAudioSent = true;
       }
-      for (const chunk of response.chunks) {
+      await options.beforeAudioResponse?.();
+      const sendChunk = (chunk: Uint8Array, index: number) => {
         const bytes = Buffer.from(chunk);
         if (response.transport === "binary") {
           ws.send(bytes);
@@ -531,8 +539,24 @@ export async function mockTelefunVoiceServer(
             }),
           );
         }
+        if (
+          response.completeEachChunk ||
+          index === response.chunks.length - 1
+        ) {
+          ws.send(JSON.stringify({ serverContent: { turnComplete: true } }));
+        }
+      };
+      response.chunks.forEach((chunk, index) => {
+        const delayMs = index * (response.chunkIntervalMs ?? 0);
+        if (delayMs > 0) {
+          setTimeout(() => sendChunk(chunk, index), delayMs);
+        } else {
+          sendChunk(chunk, index);
+        }
+      });
+      if (response.chunks.length === 0) {
+        ws.send(JSON.stringify({ serverContent: { turnComplete: true } }));
       }
-      ws.send(JSON.stringify({ serverContent: { turnComplete: true } }));
       if (response.interruptAfterMs !== undefined) {
         setTimeout(
           () =>

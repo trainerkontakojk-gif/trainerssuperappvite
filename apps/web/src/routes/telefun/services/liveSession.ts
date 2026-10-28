@@ -53,6 +53,9 @@ import { resolveVoiceForModel } from "../telefunVoiceRegistry";
 /** Opus at 32 kbps is clear for speech and ~4x smaller than the default. */
 const RECORDING_BITS_PER_SECOND = 32_000;
 
+/** Small initial/recovery runway; queued PCM itself remains sample-adjacent. */
+const PLAYBACK_START_LEAD_SECONDS = 0.24;
+
 interface WebkitAudioContextWindow extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
@@ -484,9 +487,9 @@ export class LiveSession {
     }
 
     if (msg.serverContent?.modelTurn?.parts) {
-      if (this.pendingTurnCompletion) {
-        this.stopActiveSources();
-      }
+      // A new ordinary turn extends the playback queue; only explicit
+      // interruption/hold/disconnect cancels already scheduled audio.
+      this.pendingTurnCompletion = false;
       this.lastModelActivityMs = Date.now();
       this.setIsAiSpeaking(true);
       this.setSessionState("ai_speaking");
@@ -860,7 +863,10 @@ export class LiveSession {
         }
       };
 
-      const startTime = Math.max(context.currentTime, this.nextStartTime);
+      const startTime =
+        this.nextStartTime > context.currentTime
+          ? this.nextStartTime
+          : context.currentTime + PLAYBACK_START_LEAD_SECONDS;
       scheduledSource.start(startTime);
       this.nextStartTime = startTime + buffer.duration;
     } catch {

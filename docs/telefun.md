@@ -116,6 +116,12 @@ normalization never rewrites historical history rows.
   retain their source rate and are scheduled on the output context's clock. The
   original microphone stream is mixed into the full-call recording there; the
   mic is not connected to the speaker, and nodes never cross contexts.
+- Playback reserves a bounded 240 ms lead when playback starts or recovers after
+  its queue empties; already queued chunks remain adjacent. An ordinary completed
+  model turn preserves ordered queued audio, while explicit interruption, hold,
+  or end cancels playback. The lead can add up to 240 ms of initial/recovery
+  latency and only covers finite delivery jitter; it is not a physical-device
+  certification (coverage is synthetic and hermetic).
 - Both recordings retain the existing WebM/Opus 32 kbps setting. Recorder errors
   are observed for the recorder lifetime, not only during shutdown. Disconnect
   waits for both recorder `stop` events (including final `dataavailable` chunks)

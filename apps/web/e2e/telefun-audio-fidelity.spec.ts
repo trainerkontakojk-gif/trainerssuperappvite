@@ -15,7 +15,7 @@ import {
   waitForMockedApi,
   type ApiMock,
 } from "./helpers/hermeticShell";
-import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
+import { assertLocalDevOnlyTargetAt } from "./helpers/sidakJadwalShiftingHarness";
 import {
   mockRecordingUpload,
   mockTelefunAvatar,
@@ -85,7 +85,9 @@ test.use({
 });
 
 test.beforeAll(async () => {
-  await assertLocalDevOnlyTarget();
+  await assertLocalDevOnlyTargetAt(
+    process.env.E2E_APP_ORIGIN ?? "http://localhost:3005",
+  );
 });
 
 const SESSION_ID = "telefun-audio-fidelity-1";
@@ -517,6 +519,18 @@ function installAudioProbe({
     }>,
     recorderTiming: [] as Array<Record<string, unknown>>,
     sourceTiming: [] as Array<Record<string, unknown>>,
+    pcmIngress: [] as Array<{
+      audioTime: number;
+      duration: number;
+      sampleRate: number;
+      contextState: string;
+    }>,
+    installPcmIngress: null as null | ((holdFourth?: boolean) => void),
+    renderedSamples: [] as number[],
+    renderProcessor: null as AudioWorkletNode | null,
+    renderReady: Promise.resolve(),
+    renderFrames: [] as number[],
+    renderSampleRate: 0,
     lateControl: null as MatchedControlRecorder | null,
     lateError: null as string | null,
     lateDone: null as Promise<void> | null,
@@ -570,6 +584,77 @@ function installAudioProbe({
     window as Window & { __telefunAudioProbe?: typeof probe }
   ).__telefunAudioProbe = probe;
 
+  if (mode === "stream-jitter")
+    probe.installPcmIngress = (holdFourth = false) => {
+      const NativeSocket = window.WebSocket;
+      window.WebSocket = class extends NativeSocket {
+        constructor(url: string | URL, protocols?: string | string[]) {
+          super(url, protocols);
+          const deferred: string[] = [];
+          let holding = false;
+          let released = false;
+          // Registered in the constructor, before the product onmessage handler.
+          this.addEventListener("message", (event) => {
+            if (typeof event.data !== "string") return;
+            if (holding && !released) {
+              deferred.push(event.data);
+              event.stopImmediatePropagation();
+              return;
+            }
+            let message;
+            try {
+              message = JSON.parse(event.data);
+            } catch {
+              return;
+            }
+            for (const part of message.serverContent?.modelTurn?.parts ?? []) {
+              const inline = part.inlineData;
+              if (
+                !inline?.mimeType?.startsWith("audio/pcm") ||
+                typeof inline.data !== "string"
+              )
+                continue;
+              const context = probe.contexts.find(
+                (item) => item.role === "telefun-output",
+              )?.context;
+              const audioTime = context?.currentTime ?? Number.NaN;
+              if (holdFourth && !released && probe.pcmIngress.length === 3) {
+                // Controlled receiver delivery only: keep packet and completion
+                // order, then observe ingress immediately before product dispatch.
+                // No CDP/Node round-trip occurs at this audio-clock deadline.
+                holding = true;
+                deferred.push(event.data);
+                event.stopImmediatePropagation();
+                const deadline = audioTime + 0.16;
+                const flush = () => {
+                  if (
+                    context?.state === "running" &&
+                    context.currentTime < deadline
+                  ) {
+                    setTimeout(flush, 2);
+                    return;
+                  }
+                  released = true;
+                  for (const data of deferred.splice(0))
+                    this.dispatchEvent(new MessageEvent("message", { data }));
+                };
+                setTimeout(flush, 2);
+                return;
+              }
+              const sampleRate = Number(
+                /rate=(\d+)/.exec(inline.mimeType)?.[1],
+              );
+              probe.pcmIngress.push({
+                audioTime,
+                sampleRate,
+                duration: atob(inline.data).length / 2 / sampleRate,
+                contextState: context?.state ?? "missing",
+              });
+            }
+          });
+        }
+      } as typeof WebSocket;
+    };
   const OriginalAudioContext = window.AudioContext;
   const outputResumeAttempts = new WeakMap<AudioContext, number>();
   let stateDescriptor: PropertyDescriptor | undefined;
@@ -608,12 +693,89 @@ function installAudioProbe({
           ? { sampleRate: 22_050 }
           : options;
       super(effectiveOptions);
+      if ((window as any).__inputClockEvidence && role === "telefun-input") {
+        const worklet = this.audioWorklet;
+        const addModule = worklet.addModule.bind(worklet);
+        worklet.addModule = async (url, options) => {
+          if (url !== "/audio-input-processor.js")
+            return addModule(url, options);
+          const source = await (await fetch(url)).text();
+          const marker = "this.port.postMessage(this.frame);";
+          if (source.split(marker).length !== 2)
+            throw new Error("unexpected worklet source");
+          const instrumented = source.replace(
+            marker,
+            `this.port.postMessage({diagnosticInputFrame: true, endFrame: currentFrame + sourceOffset, audioTime: currentTime, sampleRate}); ${marker}`,
+          );
+          const blobUrl = URL.createObjectURL(
+            new Blob([instrumented], { type: "application/javascript" }),
+          );
+          try {
+            await addModule(blobUrl, options);
+          } finally {
+            URL.revokeObjectURL(blobUrl);
+          }
+        };
+      }
       probe.contexts.push({
         context: this,
         role,
         requestedSampleRate: options?.sampleRate ?? null,
         actualSampleRate: this.sampleRate,
       });
+      if (mode === "stream-jitter" && role === "telefun-output") {
+        const moduleUrl = URL.createObjectURL(
+          new Blob(
+            [
+              `
+          class PlaybackRenderProbe extends AudioWorkletProcessor {
+            constructor() {
+              super();
+              this.samples = new Float32Array(2048);
+              this.frames = [];
+              this.offset = 0;
+            }
+            process(inputs, outputs) {
+              const size = outputs[0][0].length;
+              const samples = inputs[0]?.[0] ?? new Float32Array(size);
+              this.samples.set(samples, this.offset);
+              this.frames.push(currentFrame);
+              this.offset += size;
+              if (this.offset === this.samples.length) {
+                this.port.postMessage({ frames: this.frames, samples: this.samples });
+                this.samples = new Float32Array(2048);
+                this.frames = [];
+                this.offset = 0;
+              }
+              return true;
+            }
+          }
+          registerProcessor("playback-render-probe", PlaybackRenderProbe);
+        `,
+            ],
+            { type: "application/javascript" },
+          ),
+        );
+        probe.renderReady = this.audioWorklet
+          .addModule(moduleUrl)
+          .then(() => {
+            const processor = new AudioWorkletNode(
+              this,
+              "playback-render-probe",
+            );
+            const sink = this.createGain();
+            sink.gain.value = 0;
+            processor.port.onmessage = ({ data }) => {
+              probe.renderFrames.push(...data.frames);
+              probe.renderedSamples.push(...data.samples);
+            };
+            processor.connect(sink);
+            sink.connect(this.destination);
+            probe.renderProcessor = processor;
+            probe.renderSampleRate = this.sampleRate;
+          })
+          .finally(() => URL.revokeObjectURL(moduleUrl));
+      }
       if (
         [
           "reject-all-telefun-closes",
@@ -1166,6 +1328,16 @@ function installAudioProbe({
     const entry = probe.contexts.find(
       ({ context }) => context === this.context,
     );
+    if (mode === "stream-jitter" && entry?.role === "telefun-output") {
+      if (!probe.renderProcessor) throw new Error("render observer not ready");
+      originalConnect.call(source, probe.renderProcessor);
+      probe.sourceTiming.push({
+        receivedAtAudioTime: this.context.currentTime,
+        scheduledAudioTime: when,
+        duration: source.buffer?.duration,
+        sampleRate: source.buffer?.sampleRate,
+      });
+    }
     if (diagnostic10k && entry?.role === "telefun-output") {
       startLateDiagnostic();
       probe.sourceTiming.push({
@@ -1650,7 +1822,653 @@ function getAudioPayload(message: Record<string, unknown>) {
   return input?.audio;
 }
 
+const INPUT_FRAME_SAMPLES = 4096;
+const INPUT_DRIFT_LIMIT_SECONDS = 0.4;
+// Tolerance + one frame + 200 ms margin, rounded up to 100 ms.
+const INPUT_FAULT_STALL_MS =
+  Math.ceil(
+    (INPUT_DRIFT_LIMIT_SECONDS + INPUT_FRAME_SAMPLES / INPUT_RATE_HZ + 0.2) *
+      10,
+  ) * 100;
+const RECEIPT_OBSERVER_LAG_MS = 600;
+const PLAYBACK_LEAD_SECONDS = 0.24;
+const RENDER_SILENCE_LIMIT_SECONDS = 0.006;
+
+type InputFaultMode =
+  "none" | "receipt-lag" | "drop-send" | "stall-send" | "stall-before-callback";
+interface InputReceipt {
+  audio: { mimeType?: string; data?: string };
+  atMs: number;
+  arrivedMs: number;
+  observerDelayed: boolean;
+}
+interface InputClockEvidence {
+  faultInjected?: string;
+  dropOrdinal?: number;
+  sendStall?: { startMs: number; endMs: number; ordinal: number };
+  preCallbackStall?: { startMs: number; endMs: number; ordinal: number };
+  errors?: string[];
+  frames: Array<{
+    endFrame: number;
+    sampleRate: number;
+    receivedMs: number;
+    rawFloatBase64: string;
+  }>;
+  sends: Array<{
+    atMs: number;
+    frameIndex: number;
+    audio: { mimeType?: string; data?: string };
+  }>;
+}
+
+function evaluateInputClock(
+  evidence: InputClockEvidence,
+  receipts: InputReceipt[],
+) {
+  const violations: Array<{
+    rule: string;
+    index?: number;
+    value: unknown;
+    limit?: number;
+  }> = [];
+  const reject = (
+    rule: string,
+    value: unknown,
+    index?: number,
+    limit?: number,
+  ) => violations.push({ rule, index, value, limit });
+  if (evidence.errors?.length) reject("probe-errors", evidence.errors);
+  if (!evidence.frames.length || evidence.sends.length < 3)
+    reject("missing-clock-evidence", {
+      frames: evidence.frames.length,
+      sends: evidence.sends.length,
+    });
+  if (receipts.length !== evidence.sends.length)
+    reject("receipt-count", {
+      sends: evidence.sends.length,
+      receipts: receipts.length,
+    });
+
+  // Receipts must be an exact ordered subsequence. A deliberate lost packet
+  // produces receipt-count, not cascading false payload mismatches afterwards.
+  let receiptCursor = 0;
+  for (const [index, receipt] of receipts.entries()) {
+    const match = evidence.sends.findIndex(
+      (send, ordinal) =>
+        ordinal >= receiptCursor &&
+        send.audio.mimeType === receipt.audio.mimeType &&
+        send.audio.data === receipt.audio.data,
+    );
+    if (match < 0) reject("receipt-payload-order", index, index);
+    else receiptCursor = match + 1;
+  }
+  let previousIndex = -1;
+  let previousEndFrame = -1;
+  const offsets: number[] = [];
+  const processingDelays: number[] = [];
+  const actualSendGaps: number[] = [];
+  for (const [index, send] of evidence.sends.entries()) {
+    if (send.audio.mimeType !== "audio/pcm;rate=16000")
+      reject("mime-type", send.audio.mimeType, index);
+    const frame = evidence.frames[send.frameIndex];
+    if (
+      !Number.isInteger(send.frameIndex) ||
+      send.frameIndex < 0 ||
+      !frame ||
+      frame.sampleRate !== INPUT_RATE_HZ ||
+      !Number.isInteger(frame.endFrame) ||
+      !Number.isFinite(frame.receivedMs) ||
+      !Number.isFinite(send.atMs)
+    ) {
+      reject("source-clock-metadata", send.frameIndex, index);
+      continue;
+    }
+    const raw = Buffer.from(frame.rawFloatBase64, "base64");
+    if (raw.length !== INPUT_FRAME_SAMPLES * 4)
+      reject("source-frame-size", raw.length, index);
+    else {
+      const converted = Buffer.alloc(INPUT_FRAME_SAMPLES * 2);
+      for (let sample = 0; sample < INPUT_FRAME_SAMPLES; sample += 1) {
+        const value = raw.readFloatLE(sample * 4);
+        if (!Number.isFinite(value))
+          reject("source-nonfinite-sample", sample, index);
+        converted.writeInt16LE(
+          Math.trunc(Math.max(-1, Math.min(1, value)) * 32767),
+          sample * 2,
+        );
+      }
+      if (
+        typeof send.audio.data !== "string" ||
+        !Buffer.from(send.audio.data, "base64").equals(converted)
+      )
+        reject("source-payload", send.frameIndex, index);
+    }
+    if (index > 0) {
+      if (send.frameIndex !== previousIndex + 1)
+        reject("source-index-order", send.frameIndex, index);
+      if (frame.endFrame - previousEndFrame !== INPUT_FRAME_SAMPLES)
+        reject(
+          "source-frame-continuity",
+          frame.endFrame - previousEndFrame,
+          index,
+        );
+      const gap = (send.atMs - evidence.sends[index - 1].atMs) / 1000;
+      actualSendGaps.push(gap);
+      if (gap < 0) reject("send-time-order", gap, index);
+    }
+    previousIndex = send.frameIndex;
+    previousEndFrame = frame.endFrame;
+    offsets.push(send.atMs / 1000 - frame.endFrame / INPUT_RATE_HZ);
+    const processingDelay = (send.atMs - frame.receivedMs) / 1000;
+    processingDelays.push(processingDelay);
+    if (processingDelay < 0)
+      reject("callback-time-order", processingDelay, index);
+  }
+  const offsetSpreadSeconds = offsets.length
+    ? Math.max(...offsets) - Math.min(...offsets)
+    : Number.POSITIVE_INFINITY;
+  if (
+    !Number.isFinite(offsetSpreadSeconds) ||
+    offsetSpreadSeconds >= INPUT_DRIFT_LIMIT_SECONDS
+  )
+    reject(
+      "offset-spread",
+      offsetSpreadSeconds,
+      undefined,
+      INPUT_DRIFT_LIMIT_SECONDS,
+    );
+  const first = evidence.sends[0];
+  const last = evidence.sends.at(-1);
+  const firstFrame = first && evidence.frames[first.frameIndex];
+  const lastFrame = last && evidence.frames[last.frameIndex];
+  const sourceDurationSeconds =
+    firstFrame && lastFrame
+      ? (lastFrame.endFrame - firstFrame.endFrame + INPUT_FRAME_SAMPLES) /
+        INPUT_RATE_HZ
+      : 0;
+  const payloadDurationSeconds =
+    receipts.reduce(
+      (sum, receipt) =>
+        sum + Buffer.from(receipt.audio.data ?? "", "base64").length / 2,
+      0,
+    ) / INPUT_RATE_HZ;
+  const browserSendDurationSeconds =
+    first && last
+      ? (last.atMs - first.atMs) / 1000 + INPUT_FRAME_SAMPLES / INPUT_RATE_HZ
+      : 0;
+  return {
+    violations,
+    sourceDurationSeconds,
+    payloadDurationSeconds,
+    browserSendDurationSeconds,
+    offsetSpreadSeconds,
+    offsetsSeconds: offsets,
+    maxProcessingDelaySeconds: Math.max(0, ...processingDelays),
+    maxActualSendGapSeconds: Math.max(0, ...actualSendGaps),
+  };
+}
+
+function assertInputFaultRealized(
+  mode: InputFaultMode,
+  evidence: InputClockEvidence,
+  receipts: InputReceipt[],
+) {
+  const invalid = `INVALID-CONTROL ${mode}`;
+  if (mode === "none") {
+    expect(evidence.faultInjected, invalid).toBeUndefined();
+    expect(
+      receipts.every((item) => !item.observerDelayed),
+      invalid,
+    ).toBe(true);
+    return { mode, realized: false };
+  }
+  if (mode === "receipt-lag") {
+    expect(receipts.length, invalid).toBe(evidence.sends.length);
+    expect(receipts.length, invalid).toBeGreaterThanOrEqual(3);
+    expect(receipts[0].observerDelayed, invalid).toBe(false);
+    const delayed = receipts.filter((item) => item.observerDelayed);
+    expect(delayed.length, invalid).toBe(evidence.sends.length - 1);
+    for (const receipt of delayed)
+      expect(receipt.atMs - receipt.arrivedMs, invalid).toBeGreaterThanOrEqual(
+        RECEIPT_OBSERVER_LAG_MS,
+      );
+    return { mode, realized: true, delayedReceipts: delayed.length };
+  }
+  expect(evidence.faultInjected, invalid).toBe(mode);
+  if (mode === "drop-send") {
+    expect(evidence.dropOrdinal, invalid).toBe(2);
+    expect(receipts.length, invalid).toBe(evidence.sends.length - 1);
+    return { mode, realized: true, ordinal: evidence.dropOrdinal };
+  }
+  const stall =
+    mode === "stall-send" ? evidence.sendStall : evidence.preCallbackStall;
+  expect(stall, invalid).toBeDefined();
+  expect(stall!.ordinal, invalid).toBe(2);
+  expect(stall!.endMs - stall!.startMs, invalid).toBeGreaterThanOrEqual(
+    INPUT_FAULT_STALL_MS,
+  );
+  const recoveryIndex = evidence.sends.findIndex(
+    (send) => send.atMs >= stall!.endMs,
+  );
+  expect(recoveryIndex, invalid).toBeGreaterThanOrEqual(
+    mode === "stall-send" ? 2 : 3,
+  );
+  expect(recoveryIndex, invalid).toBeLessThanOrEqual(evidence.sends.length - 2);
+  expect(evidence.sends[recoveryIndex - 1].atMs, invalid).toBeLessThanOrEqual(
+    stall!.startMs,
+  );
+  const before = evidence.sends
+    .slice(0, recoveryIndex)
+    .map(
+      (send) =>
+        send.atMs / 1000 -
+        evidence.frames[send.frameIndex].endFrame / INPUT_RATE_HZ,
+    )
+    .sort((a, b) => a - b);
+  expect(Math.max(...before) - Math.min(...before), invalid).toBeLessThan(
+    INPUT_DRIFT_LIMIT_SECONDS,
+  );
+  const baseline = before[Math.floor(before.length / 2)];
+  const recoveryFrame =
+    evidence.frames[evidence.sends[recoveryIndex].frameIndex];
+  const predictedDelaySeconds =
+    stall!.endMs / 1000 - (recoveryFrame.endFrame / INPUT_RATE_HZ + baseline);
+  expect(predictedDelaySeconds, invalid).toBeGreaterThanOrEqual(
+    INPUT_DRIFT_LIMIT_SECONDS,
+  );
+  return { mode, realized: true, stall, recoveryIndex, predictedDelaySeconds };
+}
+
+function classifyJitterStimulus(
+  arrivals: Array<{
+    audioTime: number;
+    duration: number;
+    sampleRate: number;
+    contextState: string;
+  }>,
+  renderRate: number,
+) {
+  if (
+    arrivals.length !== 4 ||
+    renderRate < AUDIO_RATE_HZ ||
+    arrivals.some(
+      (item) =>
+        !Number.isFinite(item.audioTime) ||
+        item.contextState !== "running" ||
+        item.sampleRate !== AUDIO_RATE_HZ ||
+        Math.abs(item.duration - 0.08) > 1e-5,
+    )
+  )
+    return {
+      classification: "INVALID-STIMULUS",
+      reason: "count/rate/duration/clock",
+      latenessSeconds: [],
+      zeroLeadGapsSeconds: [],
+    };
+  let duration = 0;
+  const latenessSeconds = arrivals.map((item) => {
+    const late = item.audioTime - arrivals[0].audioTime - duration;
+    duration += item.duration;
+    return late;
+  });
+  // A fast earlier chunk can leave queued audio. Compare ingress with the
+  // simulated queue end, not just the preceding packet's arrival + duration.
+  let zeroLeadEnd = arrivals[0].audioTime + arrivals[0].duration;
+  const zeroLeadGapsSeconds = arrivals.slice(1).map((item) => {
+    const gap = item.audioTime - zeroLeadEnd;
+    zeroLeadEnd = Math.max(item.audioTime, zeroLeadEnd) + item.duration;
+    return gap;
+  });
+  const maximumLatenessSeconds = Math.max(...latenessSeconds);
+  const maxAllowedLatenessSeconds = PLAYBACK_LEAD_SECONDS - 128 / renderRate;
+  const classification =
+    Math.max(...zeroLeadGapsSeconds) <= RENDER_SILENCE_LIMIT_SECONDS
+      ? "INVALID-STIMULUS"
+      : maximumLatenessSeconds > maxAllowedLatenessSeconds
+        ? "OUT-OF-CONTRACT"
+        : "VALID";
+  return {
+    classification,
+    latenessSeconds,
+    zeroLeadGapsSeconds,
+    maximumLatenessSeconds,
+    maxAllowedLatenessSeconds,
+  };
+}
+
 test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
+  test("consecutive completed turns preserve ordered rendered audio during initial lead", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.addInitScript(installAudioProbe, { mode: "stream-jitter" });
+    const chunks = [500, 1000].map((frequency) => {
+      const bytes = Buffer.alloc(AUDIO_RATE_HZ * 0.12 * 2);
+      for (let i = 0; i < bytes.length / 2; i += 1) {
+        bytes.writeInt16LE(
+          Math.round(
+            0.24 *
+              32767 *
+              Math.sin((2 * Math.PI * frequency * i) / AUDIO_RATE_HZ),
+          ),
+          i * 2,
+        );
+      }
+      return bytes;
+    });
+    await mockTelefunVoiceServer(page, SESSION_ID, [], {
+      audioResponse: {
+        sampleRateHz: AUDIO_RATE_HZ,
+        chunks,
+        transport: "inline",
+        afterFirstInput: true,
+        completeEachChunk: true,
+      },
+      beforeAudioResponse: () =>
+        page.evaluate(async () => {
+          await (window as any).__telefunAudioProbe.renderReady;
+        }),
+    });
+    const audit = await openTelefun(page);
+    await page.evaluate(() =>
+      (window as any).__telefunAudioProbe.installPcmIngress(),
+    );
+    await mockRecordingUpload(page);
+    const call = await startRingingCall(page);
+    await page.waitForFunction(() => {
+      const p = (window as any).__telefunAudioProbe;
+      const output = p.contexts.find(
+        (item: any) => item.role === "telefun-output",
+      );
+      const starts = p.sourceStarts.filter(
+        (item: any) => item.role === "telefun-output",
+      );
+      return (
+        starts.length === 2 &&
+        output.context.currentTime > starts[1].when + starts[1].duration + 0.15
+      );
+    });
+    const captured = await page.evaluate(() => {
+      const p = (window as any).__telefunAudioProbe;
+      return {
+        samples: p.renderedSamples as number[],
+        frames: p.renderFrames as number[],
+        rate: p.renderSampleRate as number,
+        starts: p.sourceStarts.filter(
+          (item: any) => item.role === "telefun-output",
+        ),
+        arrivals: p.sourceTiming,
+        stops: p.sourceStops,
+      };
+    });
+    // Measure the central 80 ms of each scheduled source on the render thread.
+    const tone = (start: number, frequency: number) => {
+      let real = 0,
+        imaginary = 0,
+        count = 0;
+      const from = Math.round((start + 0.02) * captured.rate);
+      const to = Math.round((start + 0.1) * captured.rate);
+      captured.frames.forEach((frame, block) => {
+        for (let i = 0; i < 128; i += 1) {
+          const at = frame + i;
+          if (at < from || at >= to) continue;
+          const sample = captured.samples[block * 128 + i];
+          const phase = (2 * Math.PI * frequency * at) / captured.rate;
+          real += sample * Math.cos(phase);
+          imaginary += sample * Math.sin(phase);
+          count++;
+        }
+      });
+      return { rms: (Math.hypot(real, imaginary) * Math.SQRT2) / count, count };
+    };
+    const measurements = captured.starts.map((s: { when: number }) => [
+      tone(s.when, 500),
+      tone(s.when, 1000),
+    ]);
+    await saveJson(testInfo, "consecutive-turn-render.json", {
+      ...captured,
+      samples: undefined,
+      measurements,
+    });
+    console.log(
+      "[consecutive-turn-render]",
+      JSON.stringify({
+        starts: captured.starts,
+        arrivals: captured.arrivals,
+        stops: captured.stops,
+        measurements,
+      }),
+    );
+    expectHermetic(audit);
+    expect(captured.arrivals[1].receivedAtAudioTime).toBeLessThan(
+      captured.starts[0].when,
+    );
+    expect(measurements[0][0].count).toBeGreaterThan(captured.rate * 0.079);
+    expect(measurements[1][1].count).toBeGreaterThan(captured.rate * 0.079);
+    expect(
+      measurements[0][0].rms,
+      "first completed turn must render",
+    ).toBeGreaterThan(0.1);
+    expect(measurements[0][1].rms).toBeLessThan(0.02);
+    expect(
+      measurements[1][1].rms,
+      "second completed turn must render after first",
+    ).toBeGreaterThan(0.1);
+    expect(measurements[1][0].rms).toBeLessThan(0.02);
+    await endCall(page, call);
+  });
+  test("live playback preserves rendered continuity across modest PCM delivery jitter", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(60_000);
+    const frontLoadedControl =
+      process.env.E2E_JITTER_STIMULUS === "front-loaded";
+    await page.addInitScript(installAudioProbe, { mode: "stream-jitter" });
+    const samplesPerChunk = Math.round(AUDIO_RATE_HZ * 0.08);
+    const chunks = Array.from({ length: 4 }, (_, chunkIndex) => {
+      const bytes = Buffer.alloc(samplesPerChunk * 2);
+      for (let i = 0; i < samplesPerChunk; i += 1) {
+        const phase =
+          (2 * Math.PI * 500 * (chunkIndex * samplesPerChunk + i)) /
+          AUDIO_RATE_HZ;
+        bytes.writeInt16LE(Math.round(0.24 * 32767 * Math.sin(phase)), i * 2);
+      }
+      return bytes;
+    });
+    await mockTelefunVoiceServer(page, SESSION_ID, [], {
+      audioResponse: {
+        sampleRateHz: AUDIO_RATE_HZ,
+        chunks,
+        transport: "inline",
+        afterFirstInput: true,
+        chunkIntervalMs: frontLoadedControl ? 0 : 100,
+      },
+      beforeAudioResponse: () =>
+        page.evaluate(async () => {
+          await (window as any).__telefunAudioProbe.renderReady;
+        }),
+    });
+    const audit = await openTelefun(page);
+    // Playwright socket mocking may replace WebSocket after init scripts.
+    // Normal mode is read-only ingress observation. The negative control holds
+    // receiver delivery locally; it does not claim to reproduce network jitter.
+    await page.evaluate(
+      (hold) => (window as any).__telefunAudioProbe.installPcmIngress(hold),
+      frontLoadedControl,
+    );
+    await mockRecordingUpload(page);
+    const call = await startRingingCall(page);
+    // startRingingCall returns while ringing; only evaluate playback readiness
+    // after the user-facing connection transition has actually completed.
+    await expect(call.getByText("Tersambung", { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as any).__telefunAudioProbe.sourceStarts.filter(
+              (item: any) => item.role === "telefun-output",
+            ).length,
+        ),
+      )
+      .toBe(chunks.length);
+    await page.waitForFunction(() => {
+      const probe = (window as any).__telefunAudioProbe;
+      const output = probe.contexts.find(
+        (item: any) => item.role === "telefun-output",
+      );
+      const starts = probe.sourceStarts.filter(
+        (item: any) => item.role === "telefun-output",
+      );
+      const last = starts.at(-1);
+      return (
+        last && output.context.currentTime > last.when + last.duration + 0.15
+      );
+    });
+    const captured = await page.evaluate(() => {
+      const probe = (window as any).__telefunAudioProbe;
+      return {
+        sampleRate: probe.renderSampleRate as number,
+        samples: probe.renderedSamples as number[],
+        frames: probe.renderFrames as number[],
+        arrivals: probe.sourceTiming,
+        ingress: probe.pcmIngress,
+        speakerConnections: probe.sourceConnections.filter(
+          (item: any) =>
+            item.role === "telefun-output" && item.destination === "speaker",
+        ),
+        starts: probe.sourceStarts.filter(
+          (item: any) => item.role === "telefun-output",
+        ) as Array<{ when: number; duration: number }>,
+      };
+    });
+    const first = captured.samples.findIndex(
+      (value) => Math.abs(value) > 0.001,
+    );
+    const last = captured.samples.findLastIndex(
+      (value) => Math.abs(value) > 0.001,
+    );
+    let silentRun = 0;
+    let maxSilentRun = 0;
+    let peak = 0;
+    for (let i = first; i <= last && first >= 0; i += 1) {
+      const absolute = Math.abs(captured.samples[i]);
+      peak = Math.max(peak, absolute);
+      silentRun = absolute < 0.001 ? silentRun + 1 : 0;
+      maxSilentRun = Math.max(maxSilentRun, silentRun);
+    }
+    const scheduleGaps = captured.starts
+      .slice(1)
+      .map(
+        (item, index) =>
+          item.when -
+          (captured.starts[index].when + captured.starts[index].duration),
+      );
+    const metrics = {
+      label: frontLoadedControl
+        ? "synthetic front-loaded non-discriminating control; no provider call"
+        : "synthetic 500 Hz phase-continuous PCM, 80 ms chunks spaced 100 ms; no provider call",
+      renderedSampleRate: captured.sampleRate,
+      renderedSamples: captured.samples.length,
+      firstSignalSample: first,
+      lastSignalSample: last,
+      peak,
+      scheduleGapsSeconds: scheduleGaps,
+      arrivals: captured.arrivals,
+      ingress: captured.ingress,
+      stimulus: classifyJitterStimulus(captured.ingress, captured.sampleRate),
+      maxRenderedSilenceSeconds: maxSilentRun / captured.sampleRate,
+      observerMissingBlocks: captured.frames
+        .slice(1)
+        .filter((frame, index) => frame - captured.frames[index] !== 128)
+        .length,
+      observerMissingSignalBlocks: captured.frames
+        .slice(Math.floor(first / 128) + 1, Math.floor(last / 128) + 1)
+        .filter(
+          (frame, index) =>
+            frame - captured.frames[Math.floor(first / 128) + index] !== 128,
+        ).length,
+    };
+    await saveJson(testInfo, "live-playback-jitter.json", metrics);
+    await writeFile(
+      testInfo.outputPath("rendered-speaker.f32"),
+      Buffer.from(new Float32Array(captured.samples).buffer),
+    );
+    await writeFile(
+      testInfo.outputPath("source-24khz.pcm"),
+      Buffer.concat(chunks),
+    );
+    console.log("[telefun-playback-jitter]", JSON.stringify(metrics));
+    expectHermetic(audit);
+    expect(captured.arrivals).toHaveLength(4);
+    expect(captured.speakerConnections).toHaveLength(4);
+    for (const arrival of captured.arrivals) {
+      expect(arrival.sampleRate).toBe(24_000);
+      expect(arrival.duration).toBeCloseTo(0.08, 5);
+    }
+    if (frontLoadedControl) {
+      expect(
+        metrics.stimulus.maximumLatenessSeconds,
+        "INVALID-CONTROL: every chunk must arrive before the zero-lead queue drains",
+      ).toBe(0);
+      expect(
+        captured.ingress[3].audioTime - captured.ingress[2].audioTime - 0.08,
+        "INVALID-CONTROL: adjacent-arrival oracle must report a false hole",
+      ).toBeGreaterThan(RENDER_SILENCE_LIMIT_SECONDS);
+    }
+    expect(
+      metrics.stimulus.classification,
+      `${metrics.stimulus.classification}: ${JSON.stringify(metrics.stimulus)}`,
+    ).toBe(frontLoadedControl ? "INVALID-STIMULUS" : "VALID");
+    const quantumSeconds = 128 / captured.sampleRate;
+    for (let index = 0; index < captured.ingress.length; index += 1) {
+      expect(
+        captured.arrivals[index].receivedAtAudioTime,
+        "scheduler observation follows actual browser PCM ingress",
+      ).toBeGreaterThanOrEqual(captured.ingress[index].audioTime);
+    }
+    // Scheduler reads currentTime between ingress and source.start observation.
+    // Use that measured interval, not equality across different clock reads.
+    expect(
+      captured.starts[0].when,
+      "PRODUCT FAILURE: initial playback lead missing",
+    ).toBeGreaterThanOrEqual(
+      captured.ingress[0].audioTime + PLAYBACK_LEAD_SECONDS - quantumSeconds,
+    );
+    expect(
+      captured.starts[0].when,
+      "PRODUCT FAILURE: unexplained initial playback delay",
+    ).toBeLessThanOrEqual(
+      captured.arrivals[0].receivedAtAudioTime +
+        PLAYBACK_LEAD_SECONDS +
+        quantumSeconds,
+    );
+    expect(
+      first,
+      "parallel audio-thread render contains the injected tone",
+    ).toBeGreaterThanOrEqual(0);
+    expect(captured.sampleRate).toBeGreaterThanOrEqual(24_000);
+    expect(peak).toBeGreaterThan(0.2);
+    expect(peak).toBeLessThan(0.3);
+    expect(
+      metrics.observerMissingSignalBlocks,
+      "audio-thread observer cannot drop render quanta inside the utterance",
+    ).toBe(0);
+    expect(
+      Math.abs((last - first + 1) / captured.sampleRate - 0.32),
+      "complete utterance captured by the audio thread",
+    ).toBeLessThan(0.004);
+    expect(
+      metrics.maxRenderedSilenceSeconds,
+      "short transport jitter must not create audible holes inside the utterance",
+    ).toBeLessThan(0.006);
+    expect(
+      Math.max(...scheduleGaps.map(Math.abs)),
+      "scheduled PCM chunks stay adjacent",
+    ).toBeLessThan(0.001);
+    await endCall(page, call);
+  });
   test.afterEach(async ({ page }) => {
     if (page.isClosed()) return;
     await page.evaluate(async () => {
@@ -1872,260 +2690,489 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
     page,
   }, testInfo) => {
     test.setTimeout(60_000);
-    const calibration = await runCodecCalibration(page);
-    const positiveControl = calibration.direct.metrics;
-    expect(positiveControl.high10kRms).not.toBeNull();
-    expect(positiveControl.high10kRms!).toBeGreaterThan(0.03);
-
-    await page.addInitScript(installAudioProbe, {
-      mode: "delayed-full-stop",
-      diagnostic10k: true,
-    });
     const clientMessages: Array<{
       message: Record<string, unknown>;
       atMs: number;
+      arrivedMs: number;
+      observerDelayed: boolean;
     }> = [];
-    const pcmResponse: MockTelefunPcmResponse = {
-      sampleRateHz: AUDIO_RATE_HZ,
-      chunks: pcmToneChunks(),
-      transport: "inline",
-      afterFirstInput: true,
-    };
-    await mockTelefunVoiceServer(page, SESSION_ID, [], {
-      audioResponse: pcmResponse,
-      onClientMessage: (message) =>
-        clientMessages.push({ message, atMs: Date.now() }),
-    });
-    const audit = await openTelefun(page, {
-      identitySettings: {
-        displayName: "Dian Permana",
-        gender: "male",
-        phoneNumber: "0823-3456-7890",
-        city: "Depok",
-        signatureName: "Dian",
-        voiceName: "Fenrir",
-      },
-    });
-    const uploads: CapturedTelefunRecordingUpload[] = [];
-    await mockRecordingUpload(page, uploads);
-    const call = await startRingingCall(page);
-    await expect(call.getByRole("status").first()).toHaveText(
-      "Konsumen berbicara",
-      { timeout: 20_000 },
-    );
-
-    await expect
-      .poll(
-        () =>
-          clientMessages.filter((entry) => getAudioPayload(entry.message))
-            .length,
-        { timeout: 15_000 },
-      )
-      .toBeGreaterThanOrEqual(3);
-    await expect
-      .poll(
-        () =>
-          page.evaluate(
-            () =>
-              (window as any).__telefunAudioProbe.sourceStarts.filter(
-                (entry: any) => entry.role === "telefun-output",
-              ).length,
-          ),
-        { timeout: 10_000 },
-      )
-      .toBe(pcmResponse.chunks.length);
-    const modelOutput = await page.evaluate<{
-      currentTime: number | null;
-      contexts: ContextSummary[];
-      sourceConnections: SourceConnectionSummary[];
-      sourceStarts: SourceStartSummary[];
-      micSources: MicSourceSummary[];
-      micTracks: MicTrackSummary[];
-    }>(() => {
-      const probe = (window as any).__telefunAudioProbe;
-      const output = [...probe.contexts]
-        .reverse()
-        .find(
-          (entry: any) =>
-            entry.role === "telefun-output" && entry.context.state !== "closed",
+    const inputFault = (process.env.E2E_INPUT_FAULT ??
+      "none") as InputFaultMode;
+    if (
+      ![
+        "none",
+        "receipt-lag",
+        "drop-send",
+        "stall-send",
+        "stall-before-callback",
+      ].includes(inputFault)
+    ) {
+      throw new Error(`Unknown E2E_INPUT_FAULT: ${inputFault}`);
+    }
+    const receiptWaiters: Array<Promise<void>> = [];
+    let audioReceiptCount = 0;
+    const diagnosticSession =
+      process.env.E2E_INPUT_DIAGNOSTIC === "1"
+        ? await page.context().newCDPSession(page)
+        : null;
+    let profilingInput = false;
+    await page.addInitScript(
+      ({ fault, stallMs }) => {
+        const evidence: any = {
+          frames: [],
+          sends: [],
+          errors: [],
+          longTasks: [],
+          milestones: [],
+        };
+        (window as any).__inputClockEvidence = evidence;
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (evidence.longTasks.length < 512)
+              evidence.longTasks.push({
+                startMs: entry.startTime,
+                durationMs: entry.duration,
+              });
+          }
+        });
+        observer.observe({ type: "longtask", buffered: true });
+        document.addEventListener(
+          "click",
+          () => {
+            evidence.milestones.push({
+              phase: "ui-click",
+              atMs: performance.now(),
+            });
+          },
+          true,
         );
-      return {
-        currentTime: output?.context.currentTime ?? null,
-        contexts: probe.contexts
-          .filter((entry: any) => entry.role.startsWith("telefun-"))
-          .map((entry: any) => ({
-            role: entry.role,
-            requestedSampleRate: entry.requestedSampleRate,
-            actualSampleRate: entry.context.sampleRate,
-            state: entry.context.state,
-          })),
-        sourceConnections: probe.sourceConnections,
-        sourceStarts: probe.sourceStarts.filter(
-          (entry: any) => entry.role === "telefun-output",
-        ),
-        micSources: probe.micSources.map((entry: any) => ({
-          role: entry.role,
-          streamId: entry.stream.id,
-        })),
-        micTracks: probe.micTracks.map((entry: any) => ({
-          requestedSampleRate: entry.requestedSampleRate,
-          actualSampleRate: entry.actualSampleRate,
-          readyState: entry.track.readyState,
-        })),
+        const NativeNode = window.AudioWorkletNode;
+        window.AudioWorkletNode = class extends NativeNode {
+          constructor(
+            context: BaseAudioContext,
+            name: string,
+            options?: AudioWorkletNodeOptions,
+          ) {
+            super(context, name, options);
+            if (name !== "telefun-audio-input-processor") return;
+            let pending: any = null;
+            this.port.addEventListener("message", (event) => {
+              if (event.data?.diagnosticInputFrame) {
+                pending = event.data;
+                event.stopImmediatePropagation();
+              } else if (event.data instanceof Float32Array) {
+                const bytes = new Uint8Array(
+                  event.data.buffer,
+                  event.data.byteOffset,
+                  event.data.byteLength,
+                );
+                let binary = "";
+                for (const byte of bytes) binary += String.fromCharCode(byte);
+                evidence.frames.push({
+                  ...pending,
+                  receivedMs: performance.now(),
+                  wallMs: Date.now(),
+                  rawFloatBase64: btoa(binary),
+                });
+                pending = null;
+              }
+            });
+            const proto = window.WebSocket.prototype;
+            const originalSend = proto.send;
+            proto.send = function (data) {
+              if (typeof data === "string") {
+                try {
+                  const audio = JSON.parse(data).realtimeInput?.audio;
+                  if (audio?.data) {
+                    const ordinal = evidence.sends.length;
+                    if (fault === "stall-send" && ordinal === 2) {
+                      const startMs = performance.now();
+                      while (performance.now() - startMs < stallMs) {
+                        /* controlled main-thread stall */
+                      }
+                      evidence.sendStall = {
+                        startMs,
+                        endMs: performance.now(),
+                        ordinal,
+                      };
+                      evidence.faultInjected = fault;
+                    }
+                    evidence.sends.push({
+                      atMs: performance.now(),
+                      wallMs: Date.now(),
+                      frameIndex: evidence.frames.length - 1,
+                      audio,
+                    });
+                    if (fault === "drop-send" && ordinal === 2) {
+                      evidence.dropOrdinal = ordinal;
+                      evidence.faultInjected = fault;
+                      return;
+                    }
+                    if (fault === "stall-before-callback" && ordinal === 2) {
+                      setTimeout(() => {
+                        const startMs = performance.now();
+                        while (performance.now() - startMs < stallMs) {
+                          /* source Worklet continues on its own thread */
+                        }
+                        evidence.preCallbackStall = {
+                          startMs,
+                          endMs: performance.now(),
+                          ordinal,
+                        };
+                        evidence.faultInjected = fault;
+                      }, 32);
+                    }
+                  }
+                } catch (error) {
+                  evidence.errors.push(String(error));
+                }
+              }
+              return originalSend.call(this, data);
+            };
+          }
+        } as typeof AudioWorkletNode;
+      },
+      { fault: inputFault, stallMs: INPUT_FAULT_STALL_MS },
+    );
+    try {
+      const calibration = await runCodecCalibration(page);
+      const positiveControl = calibration.direct.metrics;
+      expect(positiveControl.high10kRms).not.toBeNull();
+      expect(positiveControl.high10kRms!).toBeGreaterThan(0.03);
+
+      await page.addInitScript(installAudioProbe, {
+        mode: "delayed-full-stop",
+        diagnostic10k: true,
+      });
+      const pcmResponse: MockTelefunPcmResponse = {
+        sampleRateHz: AUDIO_RATE_HZ,
+        chunks: pcmToneChunks(),
+        transport: "inline",
+        afterFirstInput: true,
       };
-    });
-    const playbackDrain = await page.evaluate(
-      async ({ aliasToneHz, tailMarkerHz }) => {
+      await mockTelefunVoiceServer(page, SESSION_ID, [], {
+        audioResponse: pcmResponse,
+        onClientMessage: (message) => {
+          const arrivedMs = performance.now();
+          const observerDelayed =
+            Boolean(getAudioPayload(message)) &&
+            audioReceiptCount++ > 0 &&
+            inputFault === "receipt-lag";
+          const observe = () =>
+            clientMessages.push({
+              message,
+              arrivedMs,
+              atMs: performance.now(),
+              observerDelayed,
+            });
+          if (observerDelayed) {
+            receiptWaiters.push(
+              new Promise<void>((resolve) => {
+                const observeAfterDeadline = () => {
+                  const remaining =
+                    RECEIPT_OBSERVER_LAG_MS - (performance.now() - arrivedMs);
+                  if (remaining > 0) {
+                    setTimeout(observeAfterDeadline, Math.ceil(remaining));
+                    return;
+                  }
+                  observe();
+                  resolve();
+                };
+                setTimeout(observeAfterDeadline, RECEIPT_OBSERVER_LAG_MS);
+              }),
+            );
+          } else observe();
+        },
+      });
+      const audit = await openTelefun(page, {
+        identitySettings: {
+          displayName: "Dian Permana",
+          gender: "male",
+          phoneNumber: "0823-3456-7890",
+          city: "Depok",
+          signatureName: "Dian",
+          voiceName: "Fenrir",
+        },
+      });
+      const uploads: CapturedTelefunRecordingUpload[] = [];
+      await mockRecordingUpload(page, uploads);
+      if (diagnosticSession) {
+        await diagnosticSession.send("Profiler.enable");
+        await diagnosticSession.send("Profiler.start");
+        profilingInput = true;
+      }
+      const call = await startRingingCall(page);
+      await expect(call.getByRole("status").first()).toHaveText(
+        "Konsumen berbicara",
+        { timeout: 20_000 },
+      );
+
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => (window as any).__inputClockEvidence.sends.length,
+            ),
+          { timeout: 15_000 },
+        )
+        .toBeGreaterThanOrEqual(3);
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () =>
+                (window as any).__telefunAudioProbe.sourceStarts.filter(
+                  (entry: any) => entry.role === "telefun-output",
+                ).length,
+            ),
+          { timeout: 10_000 },
+        )
+        .toBe(pcmResponse.chunks.length);
+      const modelOutput = await page.evaluate<{
+        currentTime: number | null;
+        contexts: ContextSummary[];
+        sourceConnections: SourceConnectionSummary[];
+        sourceStarts: SourceStartSummary[];
+        micSources: MicSourceSummary[];
+        micTracks: MicTrackSummary[];
+      }>(() => {
         const probe = (window as any).__telefunAudioProbe;
         const output = [...probe.contexts]
           .reverse()
-          .find((entry: any) => entry.role === "telefun-output");
-        const starts = probe.sourceStarts.filter(
-          (entry: any) => entry.role === "telefun-output",
-        );
-        const queuedPlaybackEndSec = Math.max(
-          ...starts.map((entry: any) => entry.when + entry.duration),
-        );
-        const measureToneRms = (
-          samples: Float32Array,
-          sampleRate: number,
-          frequency: number,
-        ) => {
-          let real = 0;
-          let imaginary = 0;
-          for (let index = 0; index < samples.length; index += 1) {
-            const phase = (2 * Math.PI * frequency * index) / sampleRate;
-            real += samples[index] * Math.cos(phase);
-            imaginary -= samples[index] * Math.sin(phase);
-          }
-          return (Math.hypot(real, imaginary) * Math.SQRT2) / samples.length;
-        };
-        const deadline = performance.now() + 5_000;
-        let high10kRms = 0;
-        let alias6kRms = 0;
-        let analyzerWindows = 0;
-        const preEncoderPeaks = probe.recordingTaps.map((tap: any) => ({
-          role: tap.role,
-          contextRate: tap.contextRate,
-          mic440HzRms: 0,
-          low1kHzRms: 0,
-          high10kHzRms: 0,
-          tail3kHzRms: 0,
-        }));
-        while (
-          output?.context.currentTime < queuedPlaybackEndSec + 0.05 &&
-          performance.now() < deadline
-        ) {
-          for (const tap of probe.speakerTaps) {
-            const samples = new Float32Array(tap.analyser.fftSize);
-            tap.analyser.getFloatTimeDomainData(samples);
-            high10kRms = Math.max(
-              high10kRms,
-              measureToneRms(samples, tap.contextRate, 10_000),
-            );
-            alias6kRms = Math.max(
-              alias6kRms,
-              measureToneRms(samples, tap.contextRate, aliasToneHz),
-            );
-            analyzerWindows += 1;
-          }
-          probe.recordingTaps.forEach((tap: any, index: number) => {
-            const samples = new Float32Array(tap.analyser.fftSize);
-            tap.analyser.getFloatTimeDomainData(samples);
-            const measure = (frequency: number) =>
-              measureToneRms(samples, tap.contextRate, frequency);
-            preEncoderPeaks[index].mic440HzRms = Math.max(
-              preEncoderPeaks[index].mic440HzRms,
-              measure(440),
-            );
-            preEncoderPeaks[index].low1kHzRms = Math.max(
-              preEncoderPeaks[index].low1kHzRms,
-              measure(1_000),
-            );
-            preEncoderPeaks[index].high10kHzRms = Math.max(
-              preEncoderPeaks[index].high10kHzRms,
-              measure(10_000),
-            );
-            preEncoderPeaks[index].tail3kHzRms = Math.max(
-              preEncoderPeaks[index].tail3kHzRms,
-              measure(tailMarkerHz),
-            );
-          });
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        }
+          .find(
+            (entry: any) =>
+              entry.role === "telefun-output" &&
+              entry.context.state !== "closed",
+          );
         return {
-          queuedPlaybackEndSec,
-          observedAudioClockSec: output?.context.currentTime ?? null,
-          speakerGraph: {
-            contextRate: probe.speakerTaps[0]?.contextRate ?? null,
-            high10kRms,
-            alias6kRms,
-            analyzerWindows,
-          },
-          preEncoderFullMix: preEncoderPeaks,
+          currentTime: output?.context.currentTime ?? null,
+          contexts: probe.contexts
+            .filter((entry: any) => entry.role.startsWith("telefun-"))
+            .map((entry: any) => ({
+              role: entry.role,
+              requestedSampleRate: entry.requestedSampleRate,
+              actualSampleRate: entry.context.sampleRate,
+              state: entry.context.state,
+            })),
+          sourceConnections: probe.sourceConnections,
+          sourceStarts: probe.sourceStarts.filter(
+            (entry: any) => entry.role === "telefun-output",
+          ),
+          micSources: probe.micSources.map((entry: any) => ({
+            role: entry.role,
+            streamId: entry.stream.id,
+          })),
+          micTracks: probe.micTracks.map((entry: any) => ({
+            requestedSampleRate: entry.requestedSampleRate,
+            actualSampleRate: entry.actualSampleRate,
+            readyState: entry.track.readyState,
+          })),
         };
-      },
-      { aliasToneHz: ALIAS_TONE_HZ, tailMarkerHz: TAIL_MARKER_HZ },
-    );
-    expect(playbackDrain.observedAudioClockSec).toBeGreaterThanOrEqual(
-      playbackDrain.queuedPlaybackEndSec,
-    );
-    await expect(call.getByRole("status").first()).toHaveText("Giliran Anda", {
-      timeout: 5_000,
-    });
-    await endCall(page, call);
-    await expectAudioResourcesReleased(page);
-    await waitForMockedApi(audit, [
-      "POST /api/v1/telefun/sessions",
-      `PATCH /api/v1/telefun/sessions/${SESSION_ID}`,
-    ]);
-    const recorderStopEvidence = await page.evaluate(() => {
-      const probe = (window as any).__telefunAudioProbe;
-      return {
-        delayedStopInjected: probe.delayedStopInjected,
-        delayedStopObservedMs: probe.delayedStopObservedMs,
-        recorderStates: probe.recorders.map((entry: any) => ({
-          role: entry.role,
-          state: entry.recorder.state,
-        })),
-      };
-    });
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as any).__telefunAudioProbe.matchedControl?.base64,
-        ),
-      )
-      .not.toBeNull();
-    const matchedControlBase64 = await page.evaluate(
-      () => (window as any).__telefunAudioProbe.matchedControl?.base64,
-    );
-    const matchedControlBytes = Buffer.from(matchedControlBase64!, "base64");
-    const matchedControl = await decodeWebmMetrics(page, matchedControlBytes);
+      });
+      const playbackDrain = await page.evaluate(
+        async ({ aliasToneHz, tailMarkerHz }) => {
+          const probe = (window as any).__telefunAudioProbe;
+          const output = [...probe.contexts]
+            .reverse()
+            .find((entry: any) => entry.role === "telefun-output");
+          const starts = probe.sourceStarts.filter(
+            (entry: any) => entry.role === "telefun-output",
+          );
+          const queuedPlaybackEndSec = Math.max(
+            ...starts.map((entry: any) => entry.when + entry.duration),
+          );
+          const measureToneRms = (
+            samples: Float32Array,
+            sampleRate: number,
+            frequency: number,
+          ) => {
+            let real = 0;
+            let imaginary = 0;
+            for (let index = 0; index < samples.length; index += 1) {
+              const phase = (2 * Math.PI * frequency * index) / sampleRate;
+              real += samples[index] * Math.cos(phase);
+              imaginary -= samples[index] * Math.sin(phase);
+            }
+            return (Math.hypot(real, imaginary) * Math.SQRT2) / samples.length;
+          };
+          const drainStartedMs = performance.now();
+          const deadline = drainStartedMs + 5_000;
+          const iterationTiming: Array<{
+            startMs: number;
+            endMs: number;
+            durationMs: number;
+          }> = [];
+          let high10kRms = 0;
+          let alias6kRms = 0;
+          let analyzerWindows = 0;
+          const preEncoderPeaks = probe.recordingTaps.map((tap: any) => ({
+            role: tap.role,
+            contextRate: tap.contextRate,
+            mic440HzRms: 0,
+            low1kHzRms: 0,
+            high10kHzRms: 0,
+            tail3kHzRms: 0,
+          }));
+          while (
+            output?.context.currentTime < queuedPlaybackEndSec + 0.05 &&
+            performance.now() < deadline
+          ) {
+            const iterationStartMs = performance.now();
+            for (const tap of probe.speakerTaps) {
+              const samples = new Float32Array(tap.analyser.fftSize);
+              tap.analyser.getFloatTimeDomainData(samples);
+              high10kRms = Math.max(
+                high10kRms,
+                measureToneRms(samples, tap.contextRate, 10_000),
+              );
+              alias6kRms = Math.max(
+                alias6kRms,
+                measureToneRms(samples, tap.contextRate, aliasToneHz),
+              );
+              analyzerWindows += 1;
+            }
+            probe.recordingTaps.forEach((tap: any, index: number) => {
+              const samples = new Float32Array(tap.analyser.fftSize);
+              tap.analyser.getFloatTimeDomainData(samples);
+              const measure = (frequency: number) =>
+                measureToneRms(samples, tap.contextRate, frequency);
+              preEncoderPeaks[index].mic440HzRms = Math.max(
+                preEncoderPeaks[index].mic440HzRms,
+                measure(440),
+              );
+              preEncoderPeaks[index].low1kHzRms = Math.max(
+                preEncoderPeaks[index].low1kHzRms,
+                measure(1_000),
+              );
+              preEncoderPeaks[index].high10kHzRms = Math.max(
+                preEncoderPeaks[index].high10kHzRms,
+                measure(10_000),
+              );
+              preEncoderPeaks[index].tail3kHzRms = Math.max(
+                preEncoderPeaks[index].tail3kHzRms,
+                measure(tailMarkerHz),
+              );
+            });
+            const iterationEndMs = performance.now();
+            iterationTiming.push({
+              startMs: iterationStartMs,
+              endMs: iterationEndMs,
+              durationMs: iterationEndMs - iterationStartMs,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return {
+            drainStartedMs,
+            drainEndedMs: performance.now(),
+            iterationTiming,
+            queuedPlaybackEndSec,
+            observedAudioClockSec: output?.context.currentTime ?? null,
+            speakerGraph: {
+              contextRate: probe.speakerTaps[0]?.contextRate ?? null,
+              high10kRms,
+              alias6kRms,
+              analyzerWindows,
+            },
+            preEncoderFullMix: preEncoderPeaks,
+          };
+        },
+        { aliasToneHz: ALIAS_TONE_HZ, tailMarkerHz: TAIL_MARKER_HZ },
+      );
+      expect(playbackDrain.observedAudioClockSec).toBeGreaterThanOrEqual(
+        playbackDrain.queuedPlaybackEndSec,
+      );
+      await expect(call.getByRole("status").first()).toHaveText(
+        "Giliran Anda",
+        {
+          timeout: 5_000,
+        },
+      );
+      if (
+        inputFault === "stall-send" ||
+        inputFault === "stall-before-callback"
+      ) {
+        // The perturbation must finish with a subsequent evaluated source send.
+        await page.waitForFunction(() => {
+          const e = (window as any).__inputClockEvidence;
+          const stall = e.sendStall ?? e.preCallbackStall;
+          return (
+            stall &&
+            e.sends.filter((send: any) => send.atMs >= stall.endMs).length >= 2
+          );
+        });
+      }
+      await endCall(page, call);
+      await expectAudioResourcesReleased(page);
+      await waitForMockedApi(audit, [
+        "POST /api/v1/telefun/sessions",
+        `PATCH /api/v1/telefun/sessions/${SESSION_ID}`,
+      ]);
+      const recorderStopEvidence = await page.evaluate(() => {
+        const probe = (window as any).__telefunAudioProbe;
+        return {
+          delayedStopInjected: probe.delayedStopInjected,
+          delayedStopObservedMs: probe.delayedStopObservedMs,
+          recorderStates: probe.recorders.map((entry: any) => ({
+            role: entry.role,
+            state: entry.recorder.state,
+          })),
+        };
+      });
+      if (diagnosticSession && profilingInput) {
+        const profile = await diagnosticSession.send("Profiler.stop");
+        profilingInput = false;
+        await saveJson(testInfo, "input-cpu-profile.json", profile);
+      }
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => (window as any).__telefunAudioProbe.matchedControl?.base64,
+          ),
+        )
+        .not.toBeNull();
+      const matchedControlBase64 = await page.evaluate(
+        () => (window as any).__telefunAudioProbe.matchedControl?.base64,
+      );
+      const matchedControlBytes = Buffer.from(matchedControlBase64!, "base64");
+      const matchedControl = await decodeWebmMetrics(page, matchedControlBytes);
 
-    const fullUpload = uploads.find((upload) =>
-      upload.path.endsWith("full_call.webm"),
-    );
-    const agentUpload = uploads.find((upload) =>
-      upload.path.endsWith("agent_only.webm"),
-    );
-    expect(fullUpload, "full-call recording body was uploaded").toBeDefined();
-    expect(agentUpload, "agent-only recording body was uploaded").toBeDefined();
-    await writeFile(
-      testInfo.outputPath("predecode-full-call.webm"),
-      fullUpload!.body,
-    );
-    await writeFile(
-      testInfo.outputPath("predecode-agent-only.webm"),
-      agentUpload!.body,
-    );
-    await writeFile(
-      testInfo.outputPath("matched-full-mix-codec-control.webm"),
-      matchedControlBytes,
-    );
-    console.log(
-      "[telefun-audio-predecode]",
-      JSON.stringify({
+      const fullUpload = uploads.find((upload) =>
+        upload.path.endsWith("full_call.webm"),
+      );
+      const agentUpload = uploads.find((upload) =>
+        upload.path.endsWith("agent_only.webm"),
+      );
+      expect(fullUpload, "full-call recording body was uploaded").toBeDefined();
+      expect(
+        agentUpload,
+        "agent-only recording body was uploaded",
+      ).toBeDefined();
+      await writeFile(
+        testInfo.outputPath("predecode-full-call.webm"),
+        fullUpload!.body,
+      );
+      await writeFile(
+        testInfo.outputPath("predecode-agent-only.webm"),
+        agentUpload!.body,
+      );
+      await writeFile(
+        testInfo.outputPath("matched-full-mix-codec-control.webm"),
+        matchedControlBytes,
+      );
+      console.log(
+        "[telefun-audio-predecode]",
+        JSON.stringify({
+          modelOutput,
+          matchedControl,
+          uploads: uploads.map((upload) => ({
+            path: upload.path,
+            contentType: upload.contentType,
+            bytes: upload.body.byteLength,
+            prefixHex: upload.body.subarray(0, 16).toString("hex"),
+          })),
+        }),
+      );
+      await saveJson(testInfo, "telefun-audio-predecode.json", {
         modelOutput,
         matchedControl,
         uploads: uploads.map((upload) => ({
@@ -2134,402 +3181,476 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
           bytes: upload.body.byteLength,
           prefixHex: upload.body.subarray(0, 16).toString("hex"),
         })),
-      }),
-    );
-    await saveJson(testInfo, "telefun-audio-predecode.json", {
-      modelOutput,
-      matchedControl,
-      uploads: uploads.map((upload) => ({
-        path: upload.path,
-        contentType: upload.contentType,
-        bytes: upload.body.byteLength,
-        prefixHex: upload.body.subarray(0, 16).toString("hex"),
-      })),
-    });
-    const lateEvidence = await page.evaluate(async () => {
-      const probe = (window as any).__telefunAudioProbe;
-      if (probe.lateDone) await probe.lateDone;
-      return {
-        base64: probe.lateControl?.base64 ?? null,
-        error: probe.lateError,
-        state: probe.lateControl?.recorder.state ?? null,
-        recorderTiming: probe.recorderTiming,
-        sourceTiming: probe.sourceTiming,
+      });
+      const lateEvidence = await page.evaluate(async () => {
+        const probe = (window as any).__telefunAudioProbe;
+        if (probe.lateDone) await probe.lateDone;
+        return {
+          base64: probe.lateControl?.base64 ?? null,
+          error: probe.lateError,
+          state: probe.lateControl?.recorder.state ?? null,
+          recorderTiming: probe.recorderTiming,
+          sourceTiming: probe.sourceTiming,
+        };
+      });
+      await saveJson(testInfo, "10khz-timing.json", {
+        ...lateEvidence,
+        base64: undefined,
+      });
+      expect(lateEvidence.error).toBeNull();
+      expect(lateEvidence.state).toBe("inactive");
+      expect(lateEvidence.base64).not.toBeNull();
+      const lateBytes = Buffer.from(lateEvidence.base64!, "base64");
+      await writeFile(testInfo.outputPath("late-full-mix.webm"), lateBytes);
+      const diagnosticRecorders = [];
+      for (const [label, bytes] of [
+        ["product", fullUpload!.body],
+        ["matched", matchedControlBytes],
+        ["agent", agentUpload!.body],
+        ["late", lateBytes],
+        ["direct", Buffer.from(calibration.direct.webmBase64, "base64")],
+        ["old16k", Buffer.from(calibration.oldGraph.webmBase64, "base64")],
+      ] as const) {
+        await writeFile(testInfo.outputPath(`${label}-10khz.webm`), bytes);
+        diagnosticRecorders.push(
+          await save10kDiagnostics(page, bytes, label, testInfo),
+        );
+      }
+      await saveJson(testInfo, "10khz-diagnostics.json", {
+        recorderTiming: lateEvidence.recorderTiming,
+        sourceTiming: lateEvidence.sourceTiming,
+        recorders: diagnosticRecorders,
+      });
+      const full = await decodeWebmMetrics(page, fullUpload!.body);
+      const agent = await decodeWebmMetrics(page, agentUpload!.body);
+      await Promise.all(receiptWaiters);
+      const inputPackets = clientMessages
+        .map(({ message, atMs, arrivedMs, observerDelayed }) => ({
+          audio: getAudioPayload(message),
+          atMs,
+          arrivedMs,
+          observerDelayed,
+        }))
+        .filter(
+          (
+            entry,
+          ): entry is {
+            audio: NonNullable<ReturnType<typeof getAudioPayload>>;
+            atMs: number;
+            arrivedMs: number;
+            observerDelayed: boolean;
+          } => Boolean(entry.audio?.data),
+        );
+      const inputFrames = inputPackets.map((entry) =>
+        Buffer.from(entry.audio.data!, "base64"),
+      );
+      const inputSamples = inputFrames.reduce(
+        (total, frame) => total + Math.floor(frame.byteLength / 2),
+        0,
+      );
+      const providerDurationSeconds = inputSamples / INPUT_RATE_HZ;
+      const providerObservedSeconds =
+        inputPackets.length > 0
+          ? (inputPackets.at(-1)!.atMs - inputPackets[0].atMs + 256) / 1_000
+          : 0;
+      const inputRms440Hz = rmsAtPcmFrequency(inputFrames, INPUT_RATE_HZ, 440);
+      const browserInputEvidence = await page.evaluate<InputClockEvidence>(
+        () => (window as any).__inputClockEvidence,
+      );
+      const inputClock = evaluateInputClock(browserInputEvidence, inputPackets);
+      await saveJson(testInfo, "input-clock-integrity.json", {
+        ...inputClock,
+        receiptObserverDurationSeconds: providerObservedSeconds,
+        receiptObserverErrorSeconds:
+          providerObservedSeconds - providerDurationSeconds,
+        fault: inputFault,
+        evidence: browserInputEvidence,
+        receipts: inputPackets,
+        playbackDrainTiming: playbackDrain.iterationTiming,
+      });
+      const realizedControl = assertInputFaultRealized(
+        inputFault,
+        browserInputEvidence,
+        inputPackets,
+      );
+      const expectedRules: Record<InputFaultMode, string[]> = {
+        none: [],
+        "receipt-lag": [],
+        "drop-send": ["receipt-count"],
+        "stall-send": ["offset-spread"],
+        "stall-before-callback": ["offset-spread"],
       };
-    });
-    await saveJson(testInfo, "10khz-timing.json", {
-      ...lateEvidence,
-      base64: undefined,
-    });
-    expect(lateEvidence.error).toBeNull();
-    expect(lateEvidence.state).toBe("inactive");
-    expect(lateEvidence.base64).not.toBeNull();
-    const lateBytes = Buffer.from(lateEvidence.base64!, "base64");
-    await writeFile(testInfo.outputPath("late-full-mix.webm"), lateBytes);
-    const diagnosticRecorders = [];
-    for (const [label, bytes] of [
-      ["product", fullUpload!.body],
-      ["matched", matchedControlBytes],
-      ["agent", agentUpload!.body],
-      ["late", lateBytes],
-      ["direct", Buffer.from(calibration.direct.webmBase64, "base64")],
-      ["old16k", Buffer.from(calibration.oldGraph.webmBase64, "base64")],
-    ] as const) {
-      await writeFile(testInfo.outputPath(`${label}-10khz.webm`), bytes);
-      diagnosticRecorders.push(
-        await save10kDiagnostics(page, bytes, label, testInfo),
+      const actualRules = [
+        ...new Set(inputClock.violations.map((item) => item.rule)),
+      ].sort();
+      await saveJson(testInfo, "input-control-verdict.json", {
+        realizedControl,
+        actualRules,
+        expectedRules: expectedRules[inputFault],
+        offsetSpreadSeconds: inputClock.offsetSpreadSeconds,
+      });
+      console.log(
+        "[input-clock-control]",
+        JSON.stringify({
+          inputFault,
+          realizedControl,
+          actualRules,
+          offsetSpreadSeconds: inputClock.offsetSpreadSeconds,
+        }),
       );
-    }
-    await saveJson(testInfo, "10khz-diagnostics.json", {
-      recorderTiming: lateEvidence.recorderTiming,
-      sourceTiming: lateEvidence.sourceTiming,
-      recorders: diagnosticRecorders,
-    });
-    const full = await decodeWebmMetrics(page, fullUpload!.body);
-    const agent = await decodeWebmMetrics(page, agentUpload!.body);
-    const inputPackets = clientMessages
-      .map(({ message, atMs }) => ({ audio: getAudioPayload(message), atMs }))
-      .filter(
-        (
-          entry,
-        ): entry is {
-          audio: NonNullable<ReturnType<typeof getAudioPayload>>;
-          atMs: number;
-        } => Boolean(entry.audio?.data),
+      expect(
+        actualRules,
+        `unexpected input integrity violation(s): ${JSON.stringify(inputClock.violations)}`,
+      ).toEqual(expectedRules[inputFault]);
+      const captureTypes = uploads.map((upload) =>
+        upload.path.split("/").at(-1),
       );
-    const inputFrames = inputPackets.map((entry) =>
-      Buffer.from(entry.audio.data!, "base64"),
-    );
-    const inputSamples = inputFrames.reduce(
-      (total, frame) => total + Math.floor(frame.byteLength / 2),
-      0,
-    );
-    const providerDurationSeconds = inputSamples / INPUT_RATE_HZ;
-    const providerObservedSeconds =
-      inputPackets.length > 0
-        ? (inputPackets.at(-1)!.atMs - inputPackets[0].atMs + 256) / 1_000
-        : 0;
-    const inputRms440Hz = rmsAtPcmFrequency(inputFrames, INPUT_RATE_HZ, 440);
-    const captureTypes = uploads.map((upload) => upload.path.split("/").at(-1));
-    const micStreamIds = new Set(
-      modelOutput.micSources
-        .filter((source) => source.role.startsWith("telefun-"))
-        .map((source) => source.streamId),
-    );
-    const speakerPath = modelOutput.sourceConnections.some(
-      (connection) =>
-        connection.destination === "speaker" &&
-        connection.bufferRate === AUDIO_RATE_HZ,
-    );
-    const outputSpeakerConnections = modelOutput.sourceConnections.filter(
-      (connection) =>
-        connection.role === "telefun-output" &&
-        connection.destination === "speaker" &&
-        connection.bufferRate === AUDIO_RATE_HZ,
-    );
-    const productOutput = [...modelOutput.contexts]
-      .reverse()
-      .find((context) => context.role === "telefun-output");
-    const productBand = diagnosticRecorders.find(
-      (recorder) => recorder.label === "product",
-    )!;
-    const directBand = diagnosticRecorders.find(
-      (recorder) => recorder.label === "direct",
-    )!;
-    const old16kBand = diagnosticRecorders.find(
-      (recorder) => recorder.label === "old16k",
-    )!;
-    const bandChannels = productBand.channels.map((channel, index) => {
-      const direct = directBand.channels[index]?.sourceAlignedBand;
-      const negative = old16kBand.channels[index]?.sourceAlignedBand;
-      const product = channel.sourceAlignedBand;
-      const directValid = Boolean(
-        direct?.complete &&
-        direct.targetRms > 0 &&
-        direct.localizationPowerRatio >=
-          BAND_GATE.minimumLocalizationPowerRatio,
+      const micStreamIds = new Set(
+        modelOutput.micSources
+          .filter((source) => source.role.startsWith("telefun-"))
+          .map((source) => source.streamId),
       );
-      return {
-        channel: index,
-        product,
-        direct,
-        negative,
-        directValid,
-        retention: directValid ? product.targetRms / direct!.targetRms : 0,
-        negativeRetention:
-          directValid && negative
-            ? negative.targetRms / direct!.targetRms
-            : Number.POSITIVE_INFINITY,
+      const speakerPath = modelOutput.sourceConnections.some(
+        (connection) =>
+          connection.destination === "speaker" &&
+          connection.bufferRate === AUDIO_RATE_HZ,
+      );
+      const outputSpeakerConnections = modelOutput.sourceConnections.filter(
+        (connection) =>
+          connection.role === "telefun-output" &&
+          connection.destination === "speaker" &&
+          connection.bufferRate === AUDIO_RATE_HZ,
+      );
+      const productOutput = [...modelOutput.contexts]
+        .reverse()
+        .find((context) => context.role === "telefun-output");
+      const productBand = diagnosticRecorders.find(
+        (recorder) => recorder.label === "product",
+      )!;
+      const directBand = diagnosticRecorders.find(
+        (recorder) => recorder.label === "direct",
+      )!;
+      const old16kBand = diagnosticRecorders.find(
+        (recorder) => recorder.label === "old16k",
+      )!;
+      const bandChannels = productBand.channels.map((channel, index) => {
+        const direct = directBand.channels[index]?.sourceAlignedBand;
+        const negative = old16kBand.channels[index]?.sourceAlignedBand;
+        const product = channel.sourceAlignedBand;
+        const directValid = Boolean(
+          direct?.complete &&
+          direct.targetRms > 0 &&
+          direct.localizationPowerRatio >=
+            BAND_GATE.minimumLocalizationPowerRatio,
+        );
+        return {
+          channel: index,
+          product,
+          direct,
+          negative,
+          directValid,
+          retention: directValid ? product.targetRms / direct!.targetRms : 0,
+          negativeRetention:
+            directValid && negative
+              ? negative.targetRms / direct!.targetRms
+              : Number.POSITIVE_INFINITY,
+        };
+      });
+      const bandGate = {
+        contract: BAND_GATE,
+        channels: bandChannels,
+        pass:
+          productBand.channelCount > 0 &&
+          productBand.channelCount === directBand.channelCount &&
+          productBand.channelCount === old16kBand.channelCount &&
+          bandChannels.every(
+            (channel) =>
+              channel.directValid &&
+              channel.product.complete &&
+              channel.retention >= HIGH_TONE_MIN_CODEC_RETENTION &&
+              channel.product.localizationPowerRatio >=
+                BAND_GATE.minimumLocalizationPowerRatio &&
+              channel.negative?.complete &&
+              channel.negativeRetention < HIGH_TONE_MIN_CODEC_RETENTION &&
+              channel.negative.localizationPowerRatio <
+                BAND_GATE.minimumLocalizationPowerRatio,
+          ),
       };
-    });
-    const bandGate = {
-      contract: BAND_GATE,
-      channels: bandChannels,
-      pass:
-        productBand.channelCount > 0 &&
-        productBand.channelCount === directBand.channelCount &&
-        productBand.channelCount === old16kBand.channelCount &&
-        bandChannels.every(
-          (channel) =>
-            channel.directValid &&
-            channel.product.complete &&
-            channel.retention >= HIGH_TONE_MIN_CODEC_RETENTION &&
-            channel.product.localizationPowerRatio >=
-              BAND_GATE.minimumLocalizationPowerRatio &&
-            channel.negative?.complete &&
-            channel.negativeRetention < HIGH_TONE_MIN_CODEC_RETENTION &&
-            channel.negative.localizationPowerRatio <
-              BAND_GATE.minimumLocalizationPowerRatio,
-        ),
-    };
-    await saveJson(testInfo, "telefun-audio-band-gate.json", bandGate);
-    const recordingHighToneRetention =
-      full.high10kRms !== null && positiveControl.high10kRms
-        ? full.high10kRms / positiveControl.high10kRms
-        : 0;
-    const recordingAliasRatio =
-      full.high10kRms && full.high10kRms > 0
-        ? (full.alias6kRms ?? 0) / full.high10kRms
-        : Number.POSITIVE_INFINITY;
-    const speakerGraph = playbackDrain.speakerGraph;
-    const preEncoderFullMix = playbackDrain.preEncoderFullMix;
-    const matchedControlHighToneRetention =
-      matchedControl.high10kRms !== null && positiveControl.high10kRms
-        ? matchedControl.high10kRms / positiveControl.high10kRms
-        : 0;
-    const speakerHighToneRetention =
-      positiveControl.high10kRms && speakerGraph.high10kRms > 0
-        ? speakerGraph.high10kRms / positiveControl.high10kRms
-        : 0;
-    const speakerAliasRatio =
-      speakerGraph.high10kRms > 0
-        ? speakerGraph.alias6kRms / speakerGraph.high10kRms
-        : Number.POSITIVE_INFINITY;
-    const recordingHighFrequencyCriterionMet = bandGate.pass;
-    const recordingHighFrequencyStatus = recordingHighFrequencyCriterionMet
-      ? "meets source-aligned band-energy and localization criterion on every channel"
-      : "invalid direct control or failed source-aligned band-energy criterion";
-    const metrics = {
-      label:
-        "synthetic PCM fixture and fake WAV microphone; no Gemini/provider response",
-      input: {
-        mimeTypes: [
-          ...new Set(inputPackets.map((entry) => entry.audio.mimeType)),
-        ],
-        frameCount: inputPackets.length,
-        sampleCount: inputSamples,
-        sampleRateHz: INPUT_RATE_HZ,
-        payloadDurationSeconds: providerDurationSeconds,
-        observedWallClockSeconds: providerObservedSeconds,
-        rms440Hz: inputRms440Hz,
-        requestedTrackRatesHz: modelOutput.micTracks.map(
-          (track) => track.requestedSampleRate,
-        ),
-        actualTrackRatesHz: modelOutput.micTracks.map(
-          (track) => track.actualSampleRate,
-        ),
-      },
-      output: {
-        context: productOutput
-          ? {
-              requestedSampleRateHz: productOutput.requestedSampleRate,
-              actualSampleRateHz: productOutput.actualSampleRate,
-              stateAtMeasurement: productOutput.state,
-            }
-          : null,
-        speakerPath,
-        sourceCount: outputSpeakerConnections.length,
-        sourceBufferRatesHz: outputSpeakerConnections.map(
-          (connection) => connection.bufferRate,
-        ),
-        playbackDrain,
-        preEncoderFullMix,
-        recorderStopEvidence,
-        matchedFullMixCodecControl: {
-          ...matchedControl,
-          high10kRetentionVsFrozenDirectControl:
+      await saveJson(testInfo, "telefun-audio-band-gate.json", bandGate);
+      const recordingHighToneRetention =
+        full.high10kRms !== null && positiveControl.high10kRms
+          ? full.high10kRms / positiveControl.high10kRms
+          : 0;
+      const recordingAliasRatio =
+        full.high10kRms && full.high10kRms > 0
+          ? (full.alias6kRms ?? 0) / full.high10kRms
+          : Number.POSITIVE_INFINITY;
+      const speakerGraph = playbackDrain.speakerGraph;
+      const preEncoderFullMix = playbackDrain.preEncoderFullMix;
+      const matchedControlHighToneRetention =
+        matchedControl.high10kRms !== null && positiveControl.high10kRms
+          ? matchedControl.high10kRms / positiveControl.high10kRms
+          : 0;
+      const speakerHighToneRetention =
+        positiveControl.high10kRms && speakerGraph.high10kRms > 0
+          ? speakerGraph.high10kRms / positiveControl.high10kRms
+          : 0;
+      const speakerAliasRatio =
+        speakerGraph.high10kRms > 0
+          ? speakerGraph.alias6kRms / speakerGraph.high10kRms
+          : Number.POSITIVE_INFINITY;
+      const recordingHighFrequencyCriterionMet = bandGate.pass;
+      const recordingHighFrequencyStatus = recordingHighFrequencyCriterionMet
+        ? "meets source-aligned band-energy and localization criterion on every channel"
+        : "invalid direct control or failed source-aligned band-energy criterion";
+      const metrics = {
+        label:
+          "synthetic PCM fixture and fake WAV microphone; no Gemini/provider response",
+        input: {
+          mimeTypes: [
+            ...new Set(inputPackets.map((entry) => entry.audio.mimeType)),
+          ],
+          frameCount: inputPackets.length,
+          sampleCount: inputSamples,
+          sampleRateHz: INPUT_RATE_HZ,
+          payloadDurationSeconds: providerDurationSeconds,
+          observedWallClockSeconds: providerObservedSeconds,
+          rms440Hz: inputRms440Hz,
+          requestedTrackRatesHz: modelOutput.micTracks.map(
+            (track) => track.requestedSampleRate,
+          ),
+          actualTrackRatesHz: modelOutput.micTracks.map(
+            (track) => track.actualSampleRate,
+          ),
+        },
+        output: {
+          context: productOutput
+            ? {
+                requestedSampleRateHz: productOutput.requestedSampleRate,
+                actualSampleRateHz: productOutput.actualSampleRate,
+                stateAtMeasurement: productOutput.state,
+              }
+            : null,
+          speakerPath,
+          sourceCount: outputSpeakerConnections.length,
+          sourceBufferRatesHz: outputSpeakerConnections.map(
+            (connection) => connection.bufferRate,
+          ),
+          playbackDrain,
+          preEncoderFullMix,
+          recorderStopEvidence,
+          matchedFullMixCodecControl: {
+            ...matchedControl,
+            high10kRetentionVsFrozenDirectControl:
+              matchedControlHighToneRetention,
+          },
+          speakerGraph: {
+            ...speakerGraph,
+            high10kRetentionVsCodecControl: speakerHighToneRetention,
+            alias6kTo10kRatio: speakerAliasRatio,
+          },
+          fullCall: full,
+          agentOnly: agent,
+          // Exact-frequency projection is a coherence diagnostic, not retention acceptance.
+          recordingExact10kRetentionVsCodecControl: recordingHighToneRetention,
+          sourceAlignedBandGate: bandGate,
+          recordingAlias6kTo10kRatio: recordingAliasRatio,
+          recordingHighFrequencyCriterionMet,
+          recordingHighFrequencyStatus,
+          uploadRequestContentTypes: uploads.map(
+            (upload) => upload.contentType,
+          ),
+          uploadFileContentTypes: uploads.map(
+            (upload) => upload.fileContentType,
+          ),
+          uploadTypes: captureTypes,
+        },
+        controls: {
+          directCodecHigh10kRms: positiveControl.high10kRms,
+          matchedFullMixHigh10kRms: matchedControl.high10kRms,
+          matchedFullMixRetentionVsDirectControl:
             matchedControlHighToneRetention,
+          old16kGraphHigh10kRms: calibration.oldGraph.metrics.high10kRms,
         },
-        speakerGraph: {
-          ...speakerGraph,
-          high10kRetentionVsCodecControl: speakerHighToneRetention,
-          alias6kTo10kRatio: speakerAliasRatio,
-        },
-        fullCall: full,
-        agentOnly: agent,
-        // Exact-frequency projection is a coherence diagnostic, not retention acceptance.
-        recordingExact10kRetentionVsCodecControl: recordingHighToneRetention,
-        sourceAlignedBandGate: bandGate,
-        recordingAlias6kTo10kRatio: recordingAliasRatio,
-        recordingHighFrequencyCriterionMet,
-        recordingHighFrequencyStatus,
-        uploadRequestContentTypes: uploads.map((upload) => upload.contentType),
-        uploadFileContentTypes: uploads.map((upload) => upload.fileContentType),
-        uploadTypes: captureTypes,
-      },
-      controls: {
-        directCodecHigh10kRms: positiveControl.high10kRms,
-        matchedFullMixHigh10kRms: matchedControl.high10kRms,
-        matchedFullMixRetentionVsDirectControl: matchedControlHighToneRetention,
-        old16kGraphHigh10kRms: calibration.oldGraph.metrics.high10kRms,
-      },
-    };
-    await saveJson(testInfo, "telefun-audio-fidelity-metrics.json", metrics);
-    await writeFile(
-      testInfo.outputPath("synthetic-full-call.webm"),
-      fullUpload!.body,
-    );
-    await writeFile(
-      testInfo.outputPath("synthetic-agent-only.webm"),
-      agentUpload!.body,
-    );
-    await writeFile(
-      testInfo.outputPath("synthetic-model-output-24khz.pcm"),
-      Buffer.concat(pcmResponse.chunks.map((chunk) => Buffer.from(chunk))),
-    );
-    await writeFile(
-      testInfo.outputPath("synthetic-provider-input-16khz.pcm"),
-      Buffer.concat(inputFrames),
-    );
-    console.log("[telefun-audio-fidelity]", JSON.stringify(metrics));
+      };
+      await saveJson(testInfo, "telefun-audio-fidelity-metrics.json", metrics);
+      await writeFile(
+        testInfo.outputPath("synthetic-full-call.webm"),
+        fullUpload!.body,
+      );
+      await writeFile(
+        testInfo.outputPath("synthetic-agent-only.webm"),
+        agentUpload!.body,
+      );
+      await writeFile(
+        testInfo.outputPath("synthetic-model-output-24khz.pcm"),
+        Buffer.concat(pcmResponse.chunks.map((chunk) => Buffer.from(chunk))),
+      );
+      await writeFile(
+        testInfo.outputPath("synthetic-provider-input-16khz.pcm"),
+        Buffer.concat(inputFrames),
+      );
+      console.log("[telefun-audio-fidelity]", JSON.stringify(metrics));
 
-    expectHermetic(audit);
-    expect(inputPackets.length).toBeGreaterThanOrEqual(3);
-    expect(
-      inputPackets.every(
-        (entry) => entry.audio.mimeType === "audio/pcm;rate=16000",
-      ),
-    ).toBe(true);
-    expect(inputSamples).toBeGreaterThanOrEqual(INPUT_RATE_HZ * 0.7);
-    expect(
-      Math.abs(providerDurationSeconds - providerObservedSeconds),
-    ).toBeLessThan(0.4);
-    expect(inputRms440Hz).toBeGreaterThan(0.02);
-    expect(
-      modelOutput.contexts.some(
-        (context) =>
-          context.role === "telefun-input" &&
-          context.actualSampleRate === INPUT_RATE_HZ,
-      ),
-    ).toBe(true);
-    expect(
-      modelOutput.micTracks.some(
-        (track) => track.requestedSampleRate === INPUT_RATE_HZ,
-      ),
-    ).toBe(true);
-    expect(micStreamIds.size).toBe(1);
-    expect(speakerPath).toBe(true);
-    const speakerGraphPass =
-      productOutput !== undefined &&
-      productOutput.actualSampleRate >= 24_000 &&
-      speakerGraph.contextRate >= 24_000 &&
-      speakerGraph.analyzerWindows > 0 &&
-      speakerHighToneRetention >= HIGH_TONE_MIN_CODEC_RETENTION &&
-      speakerAliasRatio <= MAX_ALIAS_TO_HIGH_TONE_RATIO;
-    expect(
-      speakerGraphPass,
-      `expected native speaker graph to preserve the 10 kHz PCM tone independently of recordings; observed ${JSON.stringify(
-        {
-          speakerGraph,
-          speakerHighToneRetention,
-          speakerAliasRatio,
-          productOutput,
-        },
-      )}`,
-    ).toBe(true);
-    expect(productOutput?.requestedSampleRate).toBeNull();
-    expect(productOutput?.actualSampleRate).toBeGreaterThanOrEqual(24_000);
-    expect(outputSpeakerConnections.length).toBeGreaterThanOrEqual(3);
-    expect(modelOutput.sourceStarts).toHaveLength(pcmResponse.chunks.length);
-    expect(
-      modelOutput.sourceStarts.every(
-        (source) => source.bufferRate === AUDIO_RATE_HZ,
-      ),
-    ).toBe(true);
-    for (let index = 1; index < modelOutput.sourceStarts.length; index += 1) {
-      const previous = modelOutput.sourceStarts[index - 1];
-      const current = modelOutput.sourceStarts[index];
-      expect(current.when).not.toBeNull();
-      expect(previous.when).not.toBeNull();
+      expectHermetic(audit);
+      expect(inputPackets.length).toBeGreaterThanOrEqual(3);
       expect(
-        Math.abs(current.when! - (previous.when! + previous.duration)),
-      ).toBeLessThan(0.05);
-    }
-    expect(
-      outputSpeakerConnections.every(
-        (connection) => connection.contextRate >= 24_000,
-      ),
-    ).toBe(true);
-    expect(full.durationSeconds).toBeGreaterThanOrEqual(SYNTHETIC_SECONDS);
-    expect(agent.durationSeconds).toBeGreaterThanOrEqual(SYNTHETIC_SECONDS);
-    expect(full.low1kRms).toBeGreaterThan(0.03);
-    expect(agent.low1kRms).toBeLessThan(0.02);
-    expect(full.mic440HzRms).toBeGreaterThan(0.02);
-    expect(agent.mic440HzRms).toBeGreaterThan(0.02);
-    expect(full.tail3kHzRms).toBeGreaterThan(0.02);
-    expect(agent.tail3kHzRms).toBeLessThan(0.02);
-    expect(full.high10kRms).not.toBeNull();
-    expect(speakerGraph.high10kRms).toBeGreaterThan(0);
-    expect(speakerHighToneRetention).toBeGreaterThanOrEqual(
-      HIGH_TONE_MIN_CODEC_RETENTION,
-    );
-    expect(speakerAliasRatio).toBeLessThanOrEqual(MAX_ALIAS_TO_HIGH_TONE_RATIO);
-    expect(recordingAliasRatio).toBeLessThanOrEqual(
-      MAX_ALIAS_TO_HIGH_TONE_RATIO,
-    );
-    expect(recorderStopEvidence.delayedStopInjected).toBe(true);
-    expect(recorderStopEvidence.delayedStopObservedMs).toBeGreaterThanOrEqual(
-      700,
-    );
-    expect(
-      recorderStopEvidence.recorderStates.every(
-        (entry: { state: string }) => entry.state === "inactive",
-      ),
-    ).toBe(true);
-    expect(
-      recordingAliasRatio,
-      "full-call recording alias remains an independent recording-quality check",
-    ).toBeLessThanOrEqual(MAX_ALIAS_TO_HIGH_TONE_RATIO);
-    expect(productBand.channelCount).toBeGreaterThan(0);
-    expect(productBand.channelCount).toBe(directBand.channelCount);
-    expect(productBand.channelCount).toBe(old16kBand.channelCount);
-    for (const channel of bandChannels) {
+        inputPackets.every(
+          (entry) => entry.audio.mimeType === "audio/pcm;rate=16000",
+        ),
+      ).toBe(true);
+      expect(inputSamples).toBeGreaterThanOrEqual(INPUT_RATE_HZ * 0.7);
+      // Node receipt callback time includes Playwright/observer scheduling.
+      // The unchanged 0.4 s limits are enforced above against the independent
+      // Worklet clock and actual browser sends, with exact end-to-end payloads.
+      // Keep receipt span as diagnostic rather than confusing it with sample rate.
+      expect(inputRms440Hz).toBeGreaterThan(0.02);
       expect(
-        channel.directValid,
-        `INVALID gate: direct control ch${channel.channel}`,
+        modelOutput.contexts.some(
+          (context) =>
+            context.role === "telefun-input" &&
+            context.actualSampleRate === INPUT_RATE_HZ,
+        ),
       ).toBe(true);
       expect(
-        channel.product.complete,
-        `missing fixed source plateau ch${channel.channel}`,
+        modelOutput.micTracks.some(
+          (track) => track.requestedSampleRate === INPUT_RATE_HZ,
+        ),
+      ).toBe(true);
+      expect(micStreamIds.size).toBe(1);
+      expect(speakerPath).toBe(true);
+      const speakerGraphPass =
+        productOutput !== undefined &&
+        productOutput.actualSampleRate >= 24_000 &&
+        speakerGraph.contextRate >= 24_000 &&
+        speakerGraph.analyzerWindows > 0 &&
+        speakerHighToneRetention >= HIGH_TONE_MIN_CODEC_RETENTION &&
+        speakerAliasRatio <= MAX_ALIAS_TO_HIGH_TONE_RATIO;
+      expect(
+        speakerGraphPass,
+        `expected native speaker graph to preserve the 10 kHz PCM tone independently of recordings; observed ${JSON.stringify(
+          {
+            speakerGraph,
+            speakerHighToneRetention,
+            speakerAliasRatio,
+            productOutput,
+          },
+        )}`,
+      ).toBe(true);
+      expect(productOutput?.requestedSampleRate).toBeNull();
+      expect(productOutput?.actualSampleRate).toBeGreaterThanOrEqual(24_000);
+      expect(outputSpeakerConnections.length).toBeGreaterThanOrEqual(3);
+      expect(modelOutput.sourceStarts).toHaveLength(pcmResponse.chunks.length);
+      expect(
+        modelOutput.sourceStarts.every(
+          (source) => source.bufferRate === AUDIO_RATE_HZ,
+        ),
+      ).toBe(true);
+      for (let index = 1; index < modelOutput.sourceStarts.length; index += 1) {
+        const previous = modelOutput.sourceStarts[index - 1];
+        const current = modelOutput.sourceStarts[index];
+        expect(current.when).not.toBeNull();
+        expect(previous.when).not.toBeNull();
+        expect(
+          Math.abs(current.when! - (previous.when! + previous.duration)),
+        ).toBeLessThan(0.05);
+      }
+      expect(
+        outputSpeakerConnections.every(
+          (connection) => connection.contextRate >= 24_000,
+        ),
+      ).toBe(true);
+      expect(full.durationSeconds).toBeGreaterThanOrEqual(SYNTHETIC_SECONDS);
+      expect(agent.durationSeconds).toBeGreaterThanOrEqual(SYNTHETIC_SECONDS);
+      expect(full.low1kRms).toBeGreaterThan(0.03);
+      expect(agent.low1kRms).toBeLessThan(0.02);
+      expect(full.mic440HzRms).toBeGreaterThan(0.02);
+      expect(agent.mic440HzRms).toBeGreaterThan(0.02);
+      expect(full.tail3kHzRms).toBeGreaterThan(0.02);
+      expect(agent.tail3kHzRms).toBeLessThan(0.02);
+      expect(full.high10kRms).not.toBeNull();
+      expect(speakerGraph.high10kRms).toBeGreaterThan(0);
+      expect(speakerHighToneRetention).toBeGreaterThanOrEqual(
+        HIGH_TONE_MIN_CODEC_RETENTION,
+      );
+      expect(speakerAliasRatio).toBeLessThanOrEqual(
+        MAX_ALIAS_TO_HIGH_TONE_RATIO,
+      );
+      expect(recordingAliasRatio).toBeLessThanOrEqual(
+        MAX_ALIAS_TO_HIGH_TONE_RATIO,
+      );
+      expect(recorderStopEvidence.delayedStopInjected).toBe(true);
+      expect(recorderStopEvidence.delayedStopObservedMs).toBeGreaterThanOrEqual(
+        700,
+      );
+      expect(
+        recorderStopEvidence.recorderStates.every(
+          (entry: { state: string }) => entry.state === "inactive",
+        ),
       ).toBe(true);
       expect(
-        channel.retention,
-        `32 kbps source-aligned 9.8–10.2 kHz retention ch${channel.channel}`,
-      ).toBeGreaterThanOrEqual(HIGH_TONE_MIN_CODEC_RETENTION);
+        recordingAliasRatio,
+        "full-call recording alias remains an independent recording-quality check",
+      ).toBeLessThanOrEqual(MAX_ALIAS_TO_HIGH_TONE_RATIO);
+      expect(productBand.channelCount).toBeGreaterThan(0);
+      expect(productBand.channelCount).toBe(directBand.channelCount);
+      expect(productBand.channelCount).toBe(old16kBand.channelCount);
+      for (const channel of bandChannels) {
+        expect(
+          channel.directValid,
+          `INVALID gate: direct control ch${channel.channel}`,
+        ).toBe(true);
+        expect(
+          channel.product.complete,
+          `missing fixed source plateau ch${channel.channel}`,
+        ).toBe(true);
+        expect(
+          channel.retention,
+          `32 kbps source-aligned 9.8–10.2 kHz retention ch${channel.channel}`,
+        ).toBeGreaterThanOrEqual(HIGH_TONE_MIN_CODEC_RETENTION);
+        expect(
+          channel.product.localizationPowerRatio,
+          `codec-band vs silent-reference power/Hz ch${channel.channel}`,
+        ).toBeGreaterThanOrEqual(BAND_GATE.minimumLocalizationPowerRatio);
+        expect(channel.negative?.complete).toBe(true);
+        expect(
+          channel.negativeRetention,
+          `old16k negative retention ch${channel.channel}`,
+        ).toBeLessThan(HIGH_TONE_MIN_CODEC_RETENTION);
+        expect(
+          channel.negative!.localizationPowerRatio,
+          `old16k negative localization ch${channel.channel}`,
+        ).toBeLessThan(BAND_GATE.minimumLocalizationPowerRatio);
+      }
+      expect(captureTypes).toEqual(
+        expect.arrayContaining(["full_call.webm", "agent_only.webm"]),
+      );
+      expect(uploads.every((upload) => upload.body.byteLength > 1_000)).toBe(
+        true,
+      );
       expect(
-        channel.product.localizationPowerRatio,
-        `codec-band vs silent-reference power/Hz ch${channel.channel}`,
-      ).toBeGreaterThanOrEqual(BAND_GATE.minimumLocalizationPowerRatio);
-      expect(channel.negative?.complete).toBe(true);
-      expect(
-        channel.negativeRetention,
-        `old16k negative retention ch${channel.channel}`,
-      ).toBeLessThan(HIGH_TONE_MIN_CODEC_RETENTION);
-      expect(
-        channel.negative!.localizationPowerRatio,
-        `old16k negative localization ch${channel.channel}`,
-      ).toBeLessThan(BAND_GATE.minimumLocalizationPowerRatio);
+        uploads.every((upload) => upload.fileContentType === "audio/webm"),
+      ).toBe(true);
+      await expect(page).toHaveURL(new RegExp(`sesi=${SESSION_ID}`));
+    } finally {
+      if (diagnosticSession) {
+        if (profilingInput) {
+          const profile = await diagnosticSession
+            .send("Profiler.stop")
+            .catch(() => null);
+          if (profile)
+            await saveJson(testInfo, "input-cpu-profile.json", profile);
+        }
+        await diagnosticSession.detach();
+      }
+      const browser = await page
+        .evaluate(() => (window as any).__inputClockEvidence ?? null)
+        .catch(() => null);
+      await saveJson(testInfo, "input-clock-evidence.json", {
+        browser,
+        receipts: clientMessages,
+      });
     }
-    expect(captureTypes).toEqual(
-      expect.arrayContaining(["full_call.webm", "agent_only.webm"]),
-    );
-    expect(uploads.every((upload) => upload.body.byteLength > 1_000)).toBe(
-      true,
-    );
-    expect(
-      uploads.every((upload) => upload.fileContentType === "audio/webm"),
-    ).toBe(true);
-    await expect(page).toHaveURL(new RegExp(`sesi=${SESSION_ID}`));
   });
 
   test("server-close recovery joins delayed recorder shutdown before retry", async ({
@@ -3680,6 +4801,36 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
       "missing-agent-stop",
       audioResponse,
     );
+    // "Giliran Anda" may be the initial idle state before any model audio.
+    // Wait for every fixture chunk and the output clock to finish its tail.
+    await page.waitForFunction((count) => {
+      const p = (window as any).__telefunAudioProbe;
+      const output = p.contexts.find(
+        (item: any) => item.role === "telefun-output",
+      );
+      const starts = p.sourceStarts.filter(
+        (item: any) => item.role === "telefun-output",
+      );
+      const last = starts.at(-1);
+      return (
+        starts.length === count &&
+        last &&
+        output.context.currentTime >= last.when + last.duration
+      );
+    }, audioResponse.chunks.length);
+    const preEnd = await page.evaluate(() => {
+      const p = (window as any).__telefunAudioProbe;
+      const output = p.contexts.find(
+        (item: any) => item.role === "telefun-output",
+      );
+      return {
+        currentTime: output?.context.currentTime,
+        starts: p.sourceStarts.filter(
+          (item: any) => item.role === "telefun-output",
+        ),
+      };
+    });
+    console.log("[missing-stop-pre-end]", JSON.stringify(preEnd));
     await call.getByRole("button", { name: "Akhiri", exact: true }).click();
     await page
       .getByRole("dialog", { name: "Akhiri panggilan?" })
