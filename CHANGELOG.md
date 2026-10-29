@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- feat(web): buka Log Aktivitas di `/kegiatan` dengan guard yang sama dan pertahankan `/dashboard/activities` sebagai alias; tunggu href tautan SIDAK diperbarui di E2E tren beranda
+
 - test(telefun): tunggu giliran konsumen tiruan selesai diputar sebelum memajukan jam di E2E teguran agen diam agar tidak flaky
 
 - docs(telefun): catat uji dengar empat panggilan lokal oleh Fajar sebagai gate terakhir plan arahan nada

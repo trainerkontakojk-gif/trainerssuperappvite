@@ -9,7 +9,7 @@ import {
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
- * Log Aktivitas (`/dashboard/activities`) — hermetic.
+ * Log Aktivitas (`/kegiatan`, alias lama `/dashboard/activities`) — hermetic.
  *
  * Kontrak: header + tabel log, pencarian menyaring baris, dan empty state saat
  * tidak ada yang cocok. Endpoint `GET /api/v1/admin/activity-logs` membalas
@@ -52,7 +52,7 @@ test.describe("Log Aktivitas (hermetic)", () => {
 
   test("header dan tabel log dirender dari data lokal", async ({ page }) => {
     const audit = await openHermeticShell(page, {
-      path: "/dashboard/activities",
+      path: "/kegiatan",
       apiMocks: ACTIVITIES_MOCKS,
     });
     console.log("[audit]", formatAudit(audit));

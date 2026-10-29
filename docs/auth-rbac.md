@@ -264,7 +264,7 @@ Ringkasan QA pribadi agent (`GET /v1/home/agent-summary`) memakai service-role *
 
 Gate induk Telefun: `apps/api/src/routes/telefun.ts:15`, capability usulan `telefun.use`, admin/trainer saja. Karena itu seluruh pengecekan `isManager` yang masih menyebut `qa` di subrouter **tidak memberikan akses qa** lewat mount produksi. Matriks E2E harus mount facade Telefun, bukan hanya subrouter, agar tidak membuktikan hak palsu.
 
-#### Router web (seluruh 48 deklarasi route)
+#### Router web
 
 `Ya` di tabel ini berlaku terhadap **beforeLoad** saat profil valid, bukan akses backend. `—` menandai redirect/halaman auth tanpa gate role di deklarasi itu. Layout dan `LeaderAccessGate` tetap perlu dikarakterisasi terpisah.
 
@@ -275,7 +275,8 @@ Gate induk Telefun: `apps/api/src/routes/telefun.ts:15`, capability usulan `tele
 | `/dashboard/users`           | `admin.users`                               | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:76`  |
 | `/dashboard/access-groups`   | `admin.accessGroups`                        | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:83`  |
 | `/dashboard/access-approval` | `admin.leaderAccess`                        | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:90`  |
-| `/dashboard/activities`      | `admin.activityLogs.read`                   | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:97`  |
+| `/dashboard/activities`      | `admin.activityLogs.read`                   | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:135` |
+| `/kegiatan`                  | `admin.activityLogs.read`                   | Ya    | Ya      | Tidak  | Tidak | tidak                          | `apps/web/src/router.tsx:142` |
 | `/profiler`                  | `profiler.landing`                          | Ya    | Ya      | Ya     | Tidak | tidak                          | `apps/web/src/router.tsx:125` |
 | `/profiler/table`            | `profiler.view`                             | Ya    | Ya      | Ya     | Tidak | ktp                            | `apps/web/src/router.tsx:132` |
 | `/profiler/slides`           | `redirect → /profiler`                      | —     | —       | —      | —     | —                              | `apps/web/src/router.tsx:143` |

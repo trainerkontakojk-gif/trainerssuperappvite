@@ -40,7 +40,7 @@ function normalizeActionText(action: string | null | undefined): string {
     .replace(/Profiler/gi, "KTP");
 }
 
-/** Aktivitas terakhir, hanya baca. Menghapus log ada di `/dashboard/activities`. */
+/** Aktivitas terakhir, hanya baca; halaman lengkap tersedia di `/kegiatan`. */
 export function ActivityFeed() {
   const [state, setState] = useState<
     | { status: "loading" }
@@ -70,7 +70,7 @@ export function ActivityFeed() {
         <h2 id="home-activity-title" className="home-section-title">
           Aktivitas terakhir
         </h2>
-        <Link to="/dashboard/activities" className="home-link">
+        <Link to="/kegiatan" className="home-link">
           Lihat semua<span className="sr-only"> aktivitas</span>
           <ArrowRight aria-hidden="true" />
         </Link>

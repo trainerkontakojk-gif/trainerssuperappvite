@@ -294,7 +294,7 @@ test.describe("Beranda staff", () => {
     await expect(main.getByText("Rina Kusuma", { exact: true })).toBeVisible();
     await expect(
       main.getByRole("link", { name: "Lihat semua aktivitas" }),
-    ).toHaveAttribute("href", "/dashboard/activities");
+    ).toHaveAttribute("href", "/kegiatan");
     expectHermetic(audit);
   });
 
@@ -495,8 +495,9 @@ test.describe("Beranda staff", () => {
       .getByRole("combobox", { name: "Bulan akhir" })
       .selectOption({ label: "Agu" });
     await expect(card).toContainText("Jul–Agu 2026");
-    expect(await link.getAttribute("href")).toContain("dari=8");
-    expect(await link.getAttribute("href")).toContain("sampai=8");
+    // Label rentang langsung berganti, tautan menunggu data tren baru.
+    await expect(link).toHaveAttribute("href", /dari=8/);
+    await expect(link).toHaveAttribute("href", /sampai=8/);
 
     // Kalimat dan angka baru tetap terbaca di terang/gelap dan tanpa overflow.
     for (const width of [390, 1280]) {

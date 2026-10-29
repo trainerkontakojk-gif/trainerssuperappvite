@@ -103,7 +103,7 @@ export const MANAGEMENT_LINKS = [
     capability: "monitoring.read" as const,
   },
   {
-    to: "/dashboard/activities",
+    to: "/kegiatan",
     label: "Log Aktivitas",
     icon: History,
     capability: "admin.activityLogs.read" as const,
@@ -434,7 +434,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
       { label: "Batas latihan" },
     ];
   }
-  if (pathname === "/dashboard/activities") {
+  if (pathname === "/kegiatan" || pathname === "/dashboard/activities") {
     return [
       { label: "Beranda", href: "/dashboard" },
       { label: "Log Aktivitas" },
