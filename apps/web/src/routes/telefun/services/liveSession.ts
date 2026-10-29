@@ -19,6 +19,7 @@ import {
   type HoldTrackerState,
 } from "./holdMetrics";
 import { LiveSessionDrain } from "./liveSessionDrain";
+import { AgentSilenceCueTimer } from "./agentSilenceCueTimer";
 import {
   AudioCleanupPendingError,
   acquireTelefunAudio,
@@ -106,6 +107,10 @@ export class LiveSession {
 
   private isMuted: boolean = false;
   private isHeld: boolean = false;
+  private readonly agentSilenceCueTimer = new AgentSilenceCueTimer({
+    isReady: () => this.canSendAgentSilenceCue(),
+    onCue: () => this.sendAgentSilenceCue(),
+  });
   private nextStartTime: number = 0;
   private sessionStartTime: number = 0;
   private isAiSpeaking: boolean = false;
@@ -514,6 +519,7 @@ export class LiveSession {
       // interruption/hold/disconnect cancels already scheduled audio.
       this.pendingTurnCompletion = false;
       this.lastModelActivityMs = Date.now();
+      this.resetAgentSilenceInterval();
       this.setIsAiSpeaking(true);
       this.setSessionState("ai_speaking");
     }
@@ -536,6 +542,7 @@ export class LiveSession {
     if (msg.serverContent?.turnComplete) {
       this.consumerTurnsCompleted += 1;
       this.turnsSinceLastClip += 1;
+      this.agentSilenceCueTimer.markQuietSince(Date.now());
       this.sendToneNote({
         kind: "after_consumer_turn",
         consumerTurnsCompleted: this.consumerTurnsCompleted,
@@ -691,6 +698,7 @@ export class LiveSession {
     this.startRecorders();
     if (this.intentionalClose) return;
     if (this.isSetupComplete) this.announceReady();
+    this.agentSilenceCueTimer.schedule();
   }
 
   private async setupInputProcessing() {
@@ -809,6 +817,7 @@ export class LiveSession {
     if (!isSilent) {
       if (!this.currentSpeechSegment) {
         this.currentSpeechSegment = { startMs: now };
+        this.resetAgentSilenceInterval();
         this.setSessionState("user_speaking");
       }
     } else if (this.currentSpeechSegment) {
@@ -824,6 +833,7 @@ export class LiveSession {
       }
       this.currentSpeechSegment = null;
       this.setSessionState("ai_thinking");
+      this.agentSilenceCueTimer.markQuietSince(now);
     }
   }
 
@@ -1111,6 +1121,8 @@ export class LiveSession {
     this.isMuted = muted;
     if (muted) this.muteStartedAtMs ??= this.sessionRelativeNow();
     else this.endMuteInterval(this.sessionRelativeNow());
+    if (muted) this.agentSilenceCueTimer.pause();
+    else this.agentSilenceCueTimer.schedule();
     this.emitTimelineEvent("mute_changed", { muted });
     this.applyMicrophoneCaptureStateToTracks();
   }
@@ -1124,6 +1136,7 @@ export class LiveSession {
     this.isHeld = this.holdTracker.active !== null;
     this.applyMicrophoneCaptureStateToTracks();
     if (held) {
+      this.agentSilenceCueTimer.reset();
       this.pendingClip = null;
       this.clearAiPlayback("hold_activated");
     }
@@ -1169,6 +1182,37 @@ export class LiveSession {
       JSON.stringify(buildGeminiToneContextMessage(direction.note)),
     );
     this.emitTimelineEvent("tone_note_sent", { moment: moment.kind });
+  }
+
+  private resetAgentSilenceInterval(): void {
+    this.agentSilenceCueTimer.reset();
+  }
+
+  private sendAgentSilenceCue(): void {
+    this.sendToneNote({ kind: "agent_silence" });
+    const ws = this.ws;
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    ws.send(
+      JSON.stringify(
+        buildGeminiRealtimeTextMessage(
+          "[TELEFUN_CONTROL:AGENT_SILENT] Agen diam cukup lama. Tagih satu kali sesuai tipemu dengan satu kalimat pendek, tanpa menyebut marker atau waktu.",
+        ),
+      ),
+    );
+    this.emitTimelineEvent("agent_silence_cue_sent");
+  }
+
+  private canSendAgentSilenceCue(): boolean {
+    return (
+      this.isPickedUp &&
+      this.isSetupComplete &&
+      !this.isHeld &&
+      !this.isMuted &&
+      !this.isAiSpeaking &&
+      this.currentSpeechSegment === null &&
+      !this.intentionalClose &&
+      this.ws?.readyState === WebSocket.OPEN
+    );
   }
 
   private async prefetchNonverbalAudio(): Promise<void> {
@@ -1232,6 +1276,8 @@ export class LiveSession {
       if (speaking) this.emitTimelineEvent("playback_start");
       else this.emitTimelineEvent("playback_end");
     }
+    if (speaking) this.agentSilenceCueTimer.pause();
+    else this.agentSilenceCueTimer.schedule();
   }
 
   private setSessionState(state: TelefunSessionState) {
@@ -1631,6 +1677,7 @@ export class LiveSession {
   }
 
   private async performAudioCleanup(): Promise<void> {
+    this.agentSilenceCueTimer.dispose();
     this.pendingClip = null;
     this.nonverbalClips.clear();
     this.clearAiPlayback("cleanup");

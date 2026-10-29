@@ -48,15 +48,15 @@ Telefun exposes the 30 official Gemini Live/TTS voice names through the shared
 voice registry. The approved gender mapping used by the identity picker is:
 
 - **Female:** `Zephyr`, `Kore`, `Leda`, `Aoede`, `Callirrhoe`, `Autonoe`,
-  `Despina`, `Erinome`, `Laomedeia`, `Achernar`, `Gacrux`, `Pulcherrima`,
-  `Vindemiatrix`, `Sulafat`
+  `Despina`, `Erinome`, `Laomedeia`, `Achernar`, `Gacrux`, `Vindemiatrix`,
+  `Sulafat`
 - **Male:** `Puck`, `Charon`, `Fenrir`, `Orus`, `Enceladus`, `Iapetus`,
   `Umbriel`, `Algieba`, `Algenib`, `Rasalgethi`, `Schedar`, `Alnilam`,
   `Achird`, `Zubenelgenubi`, `Sadachbia`, `Sadaltager`
 
-`Kore` remains the default voice. The gender labels are the approved
-application mapping; Google documents the voice names and characteristics but
-does not publish a first-party gender field for the full catalog.
+`Kore` remains the default voice. `Pulcherrima` is omitted from the gender
+picker because the Gemini voice catalog reports it as neutral. Google does not
+publish a first-party gender field for the full catalog.
 
 ## Ekspresi konsumen
 
@@ -75,6 +75,70 @@ mengubah fakta skenario maupun prioritas kontrol panggilan. Katalog/pilihan
 suara, model, dan transport tidak berubah. E2E hermetic memverifikasi isi konfigurasi yang terkirim serta lifecycle lokal; bukan bukti
 bahwa nada suara model sungguhan sudah lebih ekspresif. Evaluasi audio langsung
 memerlukan panggilan provider terpisah yang diotorisasi.
+
+### Suara berdasarkan tipe konsumen
+
+Untuk `marah` dan `pasrah`, tipe konsumen menentukan suara Live dan
+mengalahkan pilihan suara manual. Suara yang tercantum untuk tiap kombinasi
+gender sudah dipilih untuk membawa karakter emosinya.
+
+| Tipe konsumen | Wanita | Pria |
+| --- | --- | --- |
+| `marah` | Kore | Orus atau Alnilam (acak) |
+| `pasrah` | Kore | Algieba |
+| Tipe lain | Pilihan suara tersimpan | Pilihan suara tersimpan |
+
+### Arahan nada dan kontrol saat jeda
+
+- Untuk `marah` dan `pasrah`, aplikasi mengirim `[TELEFUN_CONTROL:TONE]` sebagai
+  `clientContent` dengan `turnComplete: false`. Ini konteks nada untuk jawaban
+  konsumen berikutnya dan tidak memicu jawaban tersendiri. Arahan mengikuti
+  fase panggilan, giliran konsumen, hold, atau jeda agen; keputusan menurunkan
+  emosi tetap mengikuti tangga kesabaran di prompt.
+- Semua tipe memahami `[TELEFUN_CONTROL:AGENT_SILENT]`. Setelah konsumen selesai
+  bicara, `LiveSession` menunggu lima detik hening dari trainee di luar hold dan
+  mute, lalu mengirim satu kontrol lewat `realtimeInput.text` agar konsumen
+  menagih satu kali sesuai tipenya. Timer berhenti saat trainee bicara atau
+  konsumen mulai bicara lagi, dan hanya satu kontrol dikirim untuk tiap jeda
+  hening.
+
+### Klip nonverbal
+
+Klip WAV PCM16 mono 24 kHz diprefetch untuk suara yang sedang dipakai, lalu
+diputar sebelum audio Gemini Live pada awal jawaban konsumen. Klip masuk ke
+speaker dan rekaman panggilan penuh. Prefetch atau pemutaran yang gagal tidak
+menghentikan panggilan.
+
+| Tipe konsumen | Bunyi klip |
+| --- | --- |
+| `marah` | Hela napas (`sigh`), erang (`groan`), decak (`tsk`), dengus (`pff`), napas berat (`exhale`) |
+| `pasrah` | Sedot ingus (`sniffle`), isak (`sob`), rengekan lirih (`whimper`) |
+
+Klip tersimpan di `apps/web/public/telefun/nonverbal/<voice>/<kind>-<n>.wav`.
+Giliran biasa menerima paling banyak satu klip setiap dua giliran konsumen;
+pembukaan dan respons setelah hold mengikuti aturan momennya. Provenance aset
+dan daftar sumber yang disetujui dicatat dalam `README.md` di folder aset.
+
+Pemeriksaan input generator tanpa membuat file atau memanggil provider:
+
+```bash
+node scripts/telefun/generate-nonverbal-clips.mjs \
+  --out apps/web/public/telefun/nonverbal --preflight-only
+```
+
+Pembuatan atau penggantian aset dijalankan manual dari root repo, bukan dari
+build, CI, atau runtime aplikasi:
+
+```bash
+node scripts/telefun/generate-nonverbal-clips.mjs \
+  --out apps/web/public/telefun/nonverbal
+```
+
+Generator membaca `GEMINI_API_KEY` dari environment atau file env lokal tanpa
+mencetak nilainya. Karena skrip ini membuat aset dev yang ditinjau sebelum
+masuk repo dan bukan panggilan AI produk, skrip tidak memanggil `logAiUsage()`.
+Perintah pembuatan melakukan panggilan Gemini TTS berbayar; gunakan hanya saat
+perlu memperbarui aset.
 
 ## Session flow
 

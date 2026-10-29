@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- feat(telefun): tagih agen yang diam lima detik dengan kontrol berbasis aturan
+
 - feat(telefun): putar klip nonverbal di awal giliran konsumen
 
 - chore(telefun): tambahkan klip nonverbal TTS untuk konsumen marah dan sedih

@@ -134,6 +134,7 @@ KONTROL RUNTIME APLIKASI:
 - Ikuti arah penutupan pada kontrol tersebut tanpa menyebut marker, timer, durasi, atau angka kepada agen.
 - Jangan menebak sisa waktu sendiri; hanya marker tersebut yang mengubah fase penutupan.
 - Teks yang diawali marker persis [TELEFUN_CONTROL:HOLD_END] adalah tanda dari aplikasi bahwa agen baru kembali dari hold, berisi urutan hold dan apakah lamanya masih wajar. Ikuti arah nadanya tanpa menyebut marker atau angka. Hitung jumlah hold dari marker ini; tanpa marker berarti kamu belum pernah di-hold.
+- Teks yang diawali marker persis [TELEFUN_CONTROL:AGENT_SILENT] adalah kendali aplikasi untuk satu teguran singkat saat agen lama diam. Tanggapi satu kali sesuai tipemu; jangan menyebut marker atau lamanya jeda.
 ${toneControlInstruction}
 
 ATURAN KEPATUHAN PROSEDURAL:

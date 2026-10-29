@@ -222,21 +222,24 @@ Progress 2026-10-29: generator preflight passed; all 16 approved sources and 24/
 
 ### Task 5 — Agen diam (R7)
 
-- [ ] RED: "agen diam 5 detik: konsumen ditagih sekali, tidak saat hold". Pakai `page.clock.install()` + `fastForward` seperti test hold. Asersi: tepat satu teks `[TELEFUN_CONTROL:AGENT_SILENT]` setelah 5 dtk tanpa suara trainee; tidak terkirim lagi sebelum trainee bicara; tidak terkirim selama hold; untuk `marah` didahului catatan TONE.
-- [ ] GREEN sesuai Design.
-- [ ] Commit: `feat(telefun): tagih agen yang diam dengan kontrol berbasis aturan`.
+- [x] RED: `telefun-agent-silence.spec.ts` gagal karena tidak ada `[TELEFUN_CONTROL:AGENT_SILENT]` setelah lima detik; hold control lulus sebelum implementasi.
+- [x] GREEN: `AgentSilenceCueTimer` mengirim satu pemicu setelah lima detik di luar hold/mute saat sesi siap; reset ketika trainee mulai bicara atau konsumen mulai bicara; catatan TONE marah dikirim lebih dulu. Prompt runtime menjelaskan marker untuk semua tipe dan event timeline `agent_silence_cue_sent` dipancarkan.
+- [x] E2E terfokus: `pnpm exec playwright test e2e/telefun-agent-silence.spec.ts` — 2/2 lulus; menguji batas 4,9/5 detik, satu pemicu per jeda, reset setelah trainee bicara, urutan TONE, prompt, dan hold.
+- [x] Commit: `feat(telefun): tagih agen yang diam dengan kontrol berbasis aturan`.
 
 ### Task 6 — Review, dokumentasi, verifikasi akhir
 
-- [ ] Review `thermo-nuclear`: baca `.claude/skills/thermo-nuclear/SKILL.md` dan terapkan pada seluruh diff; perbaiki temuan.
-- [ ] Dokumentasi: `docs/telefun.md` — marker `TONE` dan `AGENT_SILENT`, tabel suara per tipe, klip nonverbal + cara regenerasi, keputusan "skrip dev tanpa logAiUsage".
-- [ ] Verifikasi serial (satu per satu), catat perintah dan hasil persisnya:
-  - semua test baru + `telefun-consumer-prompt.spec.ts`, `telefun-call.spec.ts`, `telefun-audio-fidelity.spec.ts` (per file);
-  - `pnpm --filter @trainers/web exec tsc --noEmit`; `pnpm --dir apps/telefun exec tsc --noEmit -p tsconfig.json`; `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json`;
-  - ESLint pada file yang diubah; `git diff --check`.
-- [ ] Jalankan `graphify update .` sekali setelah semua kode selesai (tidak di-commit; `graphify-out/` lokal).
+- [x] Review `thermo-nuclear`: baca `.claude/skills/thermo-nuclear/SKILL.md` dan terapkan pada seluruh diff; perbaiki temuan.
+- [x] Dokumentasi: `docs/telefun.md` — marker `TONE` dan `AGENT_SILENT`, tabel suara per tipe, klip nonverbal + cara regenerasi, keputusan "skrip dev tanpa logAiUsage".
+- [x] Verifikasi serial (satu per satu), catat perintah dan hasil persisnya:
+  - E2E `telefun-agent-silence.spec.ts` 2/2; `telefun-nonverbal.spec.ts` 4/4; `telefun-consumer-prompt.spec.ts` 23/23; `telefun-call.spec.ts` 12/12; `telefun-audio-fidelity.spec.ts` 26/26.
+  - `pnpm --filter @trainers/web exec tsc --noEmit`, `pnpm --dir apps/telefun exec tsc --noEmit -p tsconfig.json`, `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json` — semuanya exit 0.
+  - ESLint pada file yang diubah — exit 0, dua warning unused pada helper playback di perubahan lokal `telefun-call.spec.ts`; `git diff --check` — exit 0.
+- [x] Jalankan `graphify update .` sekali setelah semua kode selesai (tidak di-commit; `graphify-out/` lokal): exit 0, 18.216 node dan 34.855 edge; visual HTML dilewati karena melewati batas 5.000 node.
 - [ ] **Uji dengar manual oleh Fajar** di `pnpm` dev lokal (`scripts/dev-local.mjs`): satu panggilan `marah` (Kore), satu `marah` pria, satu `pasrah` (Kore), satu `pasrah` (Algieba). Worker tidak boleh mengklaim hasil dengar.
-- [ ] Laporan akhir: lane, plan ini, file yang diubah, perintah + exit status, bukti Task 0, hasil keputusan Pulcherrima, hal yang belum diverifikasi.
+- [x] Laporan akhir: lane, plan ini, file yang diubah, perintah + exit status, bukti Task 0, hasil keputusan Pulcherrima, hal yang belum diverifikasi.
+
+Progress 2026-10-29: Task 5 RED/GREEN passed. The hermetic E2E uses a silent fake microphone and pauses the page clock immediately before its mocked consumer turn, then verifies one cue at 5 seconds, no repeat before trainee speech, a fresh interval afterward, TONE ordering for `marah`, and no cue while held. Final serial verification passed: 67/67 tests across five E2E files; web, Telefun, and API typechecks all exit 0; ESLint has only two pre-existing unused-helper warnings in the preserved dirty `telefun-call.spec.ts` hunk. The first audio-fidelity run reported eight extra-source/count failures because the suite used default `marah` and now correctly prefetches an opening clip; setting this PCM-only harness to `ramah` isolated the model-audio assertions and the full suite passed 26/26. Graphify update exited 0. The remaining gate is Fajar's four-call local listening check; no real-provider or physical-device result is claimed.
 
 ## Risiko dan catatan
 

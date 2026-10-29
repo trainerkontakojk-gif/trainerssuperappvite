@@ -93,9 +93,19 @@ test.beforeAll(async () => {
 
 const SESSION_ID = "telefun-audio-fidelity-1";
 
-function callMocks(settings: unknown = {}, sessionId = SESSION_ID): ApiMock[] {
+function callMocks(
+  settings: Record<string, unknown> = {},
+  sessionId = SESSION_ID,
+): ApiMock[] {
   return [
-    ...telefunMocks([], settings),
+    ...telefunMocks(
+      [],
+      {
+        // Fidelity probes count model PCM; nonverbal assets have their own E2E.
+        preferredConsumerTypeId: "ramah",
+        ...settings,
+      },
+    ),
     {
       method: "POST",
       path: "/api/v1/telefun/sessions",
@@ -174,7 +184,7 @@ function callMocks(settings: unknown = {}, sessionId = SESSION_ID): ApiMock[] {
 
 async function openTelefun(
   page: Page,
-  settings: unknown = {},
+  settings: Record<string, unknown> = {},
   extraSessionIds: string[] = [],
 ) {
   return openHermeticShell(page, {
