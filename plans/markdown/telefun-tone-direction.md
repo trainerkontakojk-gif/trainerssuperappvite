@@ -203,12 +203,14 @@ Langkah asli (sudah dikerjakan):
 
 ### Task 3 — Aset klip nonverbal (R5) · STOP gate dengar
 
-- [ ] Tulis `scripts/telefun/generate-nonverbal-clips.mjs` (lihat "Sumber klip"). Argumen: `--out <dir>`. Tidak dipanggil dari `package.json` script mana pun.
-- [ ] Salin klip lama yang disetujui + buat klip baru (24 panggilan). Simpan ke `apps/web/public/telefun/nonverbal/<voice>/<kind>-<n>.wav` dan salinan dengar di `~/Downloads/Telefun Sampel Suara/11 Klip final/`.
-- [ ] `README.md` provenance di folder aset.
-- [ ] Cek: semua file PCM16 mono 24 kHz, durasi dalam batas, total ukuran folder < 3 MB.
-- [ ] **STOP:** minta Fajar mendengar `11 Klip final/` (terutama klip baru Orus, Alnilam, Algieba). Lanjut hanya setelah Fajar setuju; buang/regenerasi yang ditolak.
-- [ ] Commit: `chore(telefun): tambahkan klip nonverbal TTS untuk konsumen marah dan sedih`.
+- [x] Tulis `scripts/telefun/generate-nonverbal-clips.mjs` dengan argumen `--out <dir>` dan `--preflight-only`; tidak dipanggil dari script package mana pun. Preflight memvalidasi 16 sumber, tepat 24 job TTS, dan key lokal tanpa menulis file atau memanggil API.
+- [x] Salin klip lama yang disetujui + buat semua 24 klip baru. 16/16 sumber dan 24/24 job baru tersedia di `apps/web/public/telefun/nonverbal/<voice>/<kind>-<n>.wav`; set dengar lengkap disalin ke `~/Downloads/Telefun Sampel Suara/11 Klip final/`.
+- [x] `README.md` provenance dibuat di folder aset; status lengkap dan persetujuan Fajar dicatat.
+- [x] Cek: semua file PCM16 mono 24 kHz, durasi dalam batas, total ukuran folder < 3 MB. Generator memvalidasi 40 WAV, total 1.82 MiB.
+- [x] **STOP:** Fajar mendengar dan menyetujui seluruh klip di `11 Klip final/` pada 2026-10-29; lanjut ke Task 4.
+- [x] Commit: `chore(telefun): tambahkan klip nonverbal TTS untuk konsumen marah dan sedih`.
+
+Progress 2026-10-29: generator preflight passed; all 16 approved sources and 24/24 generated jobs are present. The final three Algieba clips were generated after the earlier cooldown window. The generator validated all 40 WAVs (PCM16 mono 24 kHz, duration and byte-order checks) at 1.82 MiB total. The complete set was copied to `~/Downloads/Telefun Sampel Suara/11 Klip final/` and Fajar approved all clips. Task 3 is complete.
 
 ### Task 4 — Pemutaran klip (R5)
 
