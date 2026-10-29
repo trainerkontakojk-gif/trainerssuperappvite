@@ -109,6 +109,43 @@ function installInputWorkletProbe() {
   window.AudioWorkletNode = CapturedAudioWorkletNode;
 }
 
+function installPlaybackDrainProbe() {
+  const probe = { started: 0, ended: 0 };
+  (window as any).__telefunPlaybackDrain = probe;
+  const originalStart = AudioBufferSourceNode.prototype.start;
+  AudioBufferSourceNode.prototype.start = function (
+    this: AudioBufferSourceNode,
+    ...args: Parameters<AudioBufferSourceNode["start"]>
+  ) {
+    probe.started += 1;
+    this.addEventListener("ended", () => {
+      probe.ended += 1;
+    });
+    return originalStart.apply(this, args);
+  };
+}
+
+/**
+ * "Giliran Anda" is also the status before the consumer has spoken, so wait
+ * until the mocked consumer turn has actually played and drained. Only then
+ * has the session marked the quiet interval and scheduled its timer.
+ */
+async function waitForConsumerTurnDrained(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const probe = (window as any).__telefunPlaybackDrain as {
+            started: number;
+            ended: number;
+          };
+          return probe.started > 0 && probe.ended === probe.started;
+        }),
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+}
+
 function agentSilenceCues(messages: Record<string, unknown>[]) {
   return messages
     .map((message, index) => ({
@@ -174,6 +211,7 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
   }) => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await page.addInitScript(installInputWorkletProbe);
+    await page.addInitScript(installPlaybackDrainProbe);
     const messages: Record<string, unknown>[] = [];
     await mockTelefunVoiceServer(page, SESSION_ID, messages, {
       audioResponse: openingAudioResponse(),
@@ -187,6 +225,7 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
     expect(setupPrompt(messages)).toContain(
       "[TELEFUN_CONTROL:AGENT_SILENT]",
     );
+    await waitForConsumerTurnDrained(page);
 
     await page.clock.fastForward(4_900);
     expect(agentSilenceCues(messages)).toHaveLength(0);
@@ -220,6 +259,7 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
 
   test("tidak menagih agen selama hold", async ({ page }) => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await page.addInitScript(installPlaybackDrainProbe);
     const messages: Record<string, unknown>[] = [];
     await mockTelefunVoiceServer(page, SESSION_ID, messages, {
       audioResponse: openingAudioResponse(),
@@ -230,6 +270,7 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
     await expect(call.getByRole("status").first()).toHaveText("Giliran Anda", {
       timeout: 20000,
     });
+    await waitForConsumerTurnDrained(page);
     await call.getByRole("button", { name: "Tahan", exact: true }).click();
     await expect(call.getByText("Panggilan ditahan")).toBeVisible();
     await page.clock.fastForward(6_000);

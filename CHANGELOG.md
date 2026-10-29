@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- test(telefun): tunggu giliran konsumen tiruan selesai diputar sebelum memajukan jam di E2E teguran agen diam agar tidak flaky
+
 - docs(telefun): catat uji dengar empat panggilan lokal oleh Fajar sebagai gate terakhir plan arahan nada
 
 - feat(telefun): tagih agen yang diam lima detik dengan kontrol berbasis aturan
