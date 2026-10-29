@@ -42,13 +42,19 @@ CREATE POLICY trainer_activities_admin_trainer_read
 CREATE POLICY trainer_activities_admin_trainer_insert
   ON public.trainer_activities
   FOR INSERT TO authenticated
-  WITH CHECK (public.is_admin_or_trainer());
+  WITH CHECK (
+    public.is_admin_or_trainer()
+    AND created_by = auth.uid()
+  );
 
 CREATE POLICY trainer_activities_admin_trainer_update
   ON public.trainer_activities
   FOR UPDATE TO authenticated
   USING (public.is_admin_or_trainer())
-  WITH CHECK (public.is_admin_or_trainer());
+  WITH CHECK (
+    public.is_admin_or_trainer()
+    AND updated_by = auth.uid()
+  );
 
 CREATE POLICY trainer_activities_admin_trainer_delete
   ON public.trainer_activities

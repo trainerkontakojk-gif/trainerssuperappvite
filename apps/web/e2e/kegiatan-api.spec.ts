@@ -23,7 +23,9 @@ function readLocalSupabaseEnv(): LoopbackEnv {
       }),
     ) as Record<string, string>;
   } catch {
-    throw new Error("Supabase lokal tidak dapat diverifikasi dari harness E2E.");
+    throw new Error(
+      "Supabase lokal tidak dapat diverifikasi dari harness E2E.",
+    );
   }
 
   const apiUrl = status.API_URL;
@@ -31,10 +33,15 @@ function readLocalSupabaseEnv(): LoopbackEnv {
   const anonKey = status.ANON_KEY;
   const serviceRoleKey = status.SERVICE_ROLE_KEY;
   if (!apiUrl || !dbUrl || !anonKey || !serviceRoleKey) {
-    throw new Error("Environment Supabase lokal dari Playwright tidak lengkap.");
+    throw new Error(
+      "Environment Supabase lokal dari Playwright tidak lengkap.",
+    );
   }
   const loopback = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
-  if (!loopback.has(new URL(apiUrl).hostname) || !loopback.has(new URL(dbUrl).hostname)) {
+  if (
+    !loopback.has(new URL(apiUrl).hostname) ||
+    !loopback.has(new URL(dbUrl).hostname)
+  ) {
     throw new Error("E2E Kegiatan hanya boleh memakai Supabase loopback.");
   }
   return { apiUrl, dbUrl, anonKey, serviceRoleKey };
@@ -52,6 +59,8 @@ type ActivityInput = {
   is_published: boolean;
   image?: string;
   image_url?: string;
+  created_by?: string;
+  updated_by?: string | null;
 };
 
 const env = readLocalSupabaseEnv();
@@ -72,7 +81,10 @@ function imageData(label: string): string {
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }
 
-function input(title: string, overrides: Partial<ActivityInput> = {}): ActivityInput {
+function input(
+  title: string,
+  overrides: Partial<ActivityInput> = {},
+): ActivityInput {
   return {
     year: 2026,
     program: "sobat",
@@ -92,7 +104,9 @@ function trackImageUrl(value: string): void {
   const pathname = new URL(value).pathname;
   const markerIndex = pathname.indexOf(marker);
   if (markerIndex >= 0)
-    uploadedObjects.add(decodeURIComponent(pathname.slice(markerIndex + marker.length)));
+    uploadedObjects.add(
+      decodeURIComponent(pathname.slice(markerIndex + marker.length)),
+    );
 }
 
 async function api(
@@ -105,7 +119,9 @@ async function api(
   return tnaApiRequest(app, `http://localhost${path}`, {
     method: options.method ?? "GET",
     headers,
-    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+    ...(options.body === undefined
+      ? {}
+      : { body: JSON.stringify(options.body) }),
   });
 }
 
@@ -114,7 +130,9 @@ async function expectFriendlyError(response: Response, expectedText: string) {
   const json = await response.json();
   const message = json.error?.message;
   expect(message).toContain(expectedText);
-  expect(message).not.toMatch(/postgrest|violates|invalid input syntax|duplicate key/i);
+  expect(message).not.toMatch(
+    /postgrest|violates|invalid input syntax|duplicate key/i,
+  );
 }
 
 test.describe.configure({ mode: "default" });
@@ -144,7 +162,10 @@ test.afterAll(async () => {
     .from("trainer_activities")
     .delete()
     .like("title", `${namespace}%`);
-  if (rowsError && !/trainer_activities|schema cache|does not exist/i.test(rowsError.message))
+  if (
+    rowsError &&
+    !/trainer_activities|schema cache|does not exist/i.test(rowsError.message)
+  )
     throw rowsError;
 
   if (uploadedObjects.size > 0) {
@@ -165,7 +186,10 @@ test.afterAll(async () => {
 test("admin dan trainer bisa membuat, mengubah, menyembunyikan, dan menghapus kegiatan", async () => {
   for (const role of ["admin", "trainer"] as const) {
     const identity = users[role]!;
-    const createBody = input(`${role}-crud`);
+    const createBody = input(`${role}-crud`, {
+      created_by: users.leader!.userId,
+      updated_by: users.leader!.userId,
+    });
     const created = await api("/api/v1/kegiatan", {
       method: "POST",
       token: identity.token,
@@ -174,16 +198,19 @@ test("admin dan trainer bisa membuat, mengubah, menyembunyikan, dan menghapus ke
     expect(created.status).toBe(201);
     const createdJson = await created.json();
     expect(createdJson.success).toBe(true);
-    expect(createdJson.data.created_by).toBe(identity.userId);
+    expect(createdJson.data).toMatchObject({
+      created_by: identity.userId,
+      updated_by: null,
+    });
     trackImageUrl(createdJson.data.image_url);
 
     const listed = await api("/api/v1/kegiatan?tahun=2026", {
       token: identity.token,
     });
     expect(listed.status).toBe(200);
-    expect((await listed.json()).data.map((row: { id: string }) => row.id)).toContain(
-      createdJson.data.id,
-    );
+    expect(
+      (await listed.json()).data.map((row: { id: string }) => row.id),
+    ).toContain(createdJson.data.id);
 
     const updateBody: ActivityInput = {
       ...createBody,
@@ -201,12 +228,16 @@ test("admin dan trainer bisa membuat, mengubah, menyembunyikan, dan menghapus ke
     expect((await updated.json()).data).toMatchObject({
       title: updateBody.title,
       is_published: false,
+      created_by: identity.userId,
+      updated_by: identity.userId,
     });
 
     const publicItems = await api("/api/public/kegiatan?tahun=2026");
     expect(publicItems.status).toBe(200);
     expect(
-      (await publicItems.json()).data.items.map((row: { id: string }) => row.id),
+      (await publicItems.json()).data.items.map(
+        (row: { id: string }) => row.id,
+      ),
     ).not.toContain(createdJson.data.id);
 
     const removed = await api(`/api/v1/kegiatan/${createdJson.data.id}`, {
@@ -282,7 +313,8 @@ test("link selain Google Drive dan gambar di luar PNG/JPEG/WebP 5 MB ditolak den
     method: "POST",
     token: identity.token,
     body: input("bad-type", {
-      image: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+      image:
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
     }),
   });
   await expectFriendlyError(invalidType, "PNG, JPEG, atau WebP");
@@ -336,4 +368,81 @@ test("anon tidak bisa menulis tabel langsung lewat PostgREST", async () => {
     .eq("title", title);
   expect(error).toBeNull();
   expect(data).toHaveLength(0);
+
+  const owner = users.admin!;
+  const forgedCreatorTitle = `${namespace}-direct-forged-creator`;
+  const forgedCreator = await fetch(
+    `${env.apiUrl}/rest/v1/trainer_activities`,
+    {
+      method: "POST",
+      headers: {
+        apikey: env.anonKey,
+        Authorization: `Bearer ${owner.token}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        year: 2026,
+        program: "sobat",
+        kind: "poster",
+        title: forgedCreatorTitle,
+        drive_url: "https://drive.google.com/file/d/forged-creator/view",
+        image_url: `${env.apiUrl}/storage/v1/object/public/${bucketName}/direct.png`,
+        created_by: users.leader!.userId,
+      }),
+    },
+  );
+  expect(forgedCreator.ok).toBe(false);
+
+  const validTitle = `${namespace}-direct-valid-creator`;
+  const validInsert = await fetch(`${env.apiUrl}/rest/v1/trainer_activities`, {
+    method: "POST",
+    headers: {
+      apikey: env.anonKey,
+      Authorization: `Bearer ${owner.token}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      year: 2026,
+      program: "sobat",
+      kind: "poster",
+      title: validTitle,
+      drive_url: "https://drive.google.com/file/d/valid-owner/view",
+      image_url: `${env.apiUrl}/storage/v1/object/public/${bucketName}/direct.png`,
+      created_by: owner.userId,
+    }),
+  });
+  expect(validInsert.ok).toBe(true);
+  const [inserted] = (await validInsert.json()) as Array<{ id: string }>;
+  expect(inserted?.id).toBeTruthy();
+
+  const forgedUpdater = await fetch(
+    `${env.apiUrl}/rest/v1/trainer_activities?id=eq.${encodeURIComponent(inserted.id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: env.anonKey,
+        Authorization: `Bearer ${owner.token}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        title: `${namespace}-direct-forged-updater`,
+        updated_by: users.leader!.userId,
+      }),
+    },
+  );
+  expect(forgedUpdater.ok).toBe(false);
+  const { data: unchanged, error: unchangedError } = await createAdmin(env)
+    .from("trainer_activities")
+    .select("title, created_by, updated_by")
+    .eq("id", inserted.id)
+    .single();
+  expect(unchangedError).toBeNull();
+  expect(unchanged).toMatchObject({
+    title: validTitle,
+    created_by: owner.userId,
+    updated_by: null,
+  });
 });

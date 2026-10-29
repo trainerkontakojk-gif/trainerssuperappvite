@@ -25,6 +25,8 @@ import { telefun } from "./routes/telefun";
 import { getLeaderAccessStatus } from "./services/admin-service";
 import { revokeOwnSessions } from "./services/account-service";
 import { getPracticeQuotaStatus } from "./services/practice-quota";
+import { kegiatan } from "./routes/kegiatan";
+import { publicKegiatan } from "./routes/public-kegiatan";
 
 
 if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
@@ -49,6 +51,7 @@ app.use(
 );
 app.use(requestLogger);
 app.use("/v1/*", rateLimitMiddleware);
+app.use("/public/*", rateLimitMiddleware);
 
 app.onError((err, c) => {
   console.error(`[ERROR] ${err.message}`);
@@ -130,7 +133,8 @@ const healthCheck = new Hono()
       },
       410,
     );
-  });
+  })
+  .route("/public", publicKegiatan);
 
 // ── V1 routes (behind auth middleware) ──
 const v1Api = new Hono<{ Variables: AuthVariables }>()
@@ -233,7 +237,8 @@ const v1Api = new Hono<{ Variables: AuthVariables }>()
   .route("/ai", ai)
   .route("/profiler", profiler)
   .route("/admin", adminRouter)
-  .route("/telefun", telefun);
+  .route("/telefun", telefun)
+  .route("/kegiatan", kegiatan);
 
 // Combined for RPC type export — no `.use()` calls, clean type inference
 const _allRoutes = new Hono().route("/", healthCheck).route("/v1", v1Api);
