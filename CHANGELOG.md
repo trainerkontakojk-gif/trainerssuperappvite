@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- fix(efek): tab EFEK dari rincian program mempertahankan filter dan toggle proper input, dan Sesuaikan analisis diberi penanda buka-tutup
+
 - feat(efek): anggap proper input APPK sesuai secara default dan sediakan toggle skor SIDAK resmi
 
 - feat(efek): tampilkan kesimpulan lebih dulu dengan median dan sumbu grafik yang jujur

@@ -64,7 +64,10 @@ export default function EfekProgramPage() {
           : undefined
       }
     >
-      <TnaTabs current="efek" />
+      <TnaTabs
+        current="efek"
+        efekSearch={{ ...filters, exclusions: undefined }}
+      />
       <State
         loading={report.loading}
         error={report.error}

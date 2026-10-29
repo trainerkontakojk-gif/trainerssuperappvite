@@ -1081,3 +1081,43 @@ test("toggle proper input tersimpan di tautan, terbawa ke rincian, dan ikut eksp
   await expect(page).toHaveURL(/proper_input=include/);
   expectHermetic(audit);
 });
+
+test("tab EFEK dari rincian program mempertahankan filter dan Sesuaikan analisis punya penanda buka-tutup", async ({
+  page,
+}) => {
+  const audit = await openTna(
+    page,
+    "/tna/efek/program/ketik?window=4&proper_input=include",
+    efekMocks,
+  );
+  await expect(
+    page.getByRole("heading", { name: "KETIK · layanan Chat" }),
+  ).toBeVisible({ timeout: 20000 });
+
+  const adjustments = page.locator("summary", {
+    hasText: "Sesuaikan analisis",
+  });
+  const marker = adjustments.locator("svg");
+  await expect(marker).toBeVisible();
+  // Tailwind v4 rotates through the CSS `rotate` property, not `transform`.
+  const rotation = () =>
+    marker.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return `${style.rotate}|${style.transform}`;
+    });
+  const closed = await rotation();
+  await adjustments.click();
+  await expect.poll(rotation).not.toBe(closed);
+
+  await page
+    .getByRole("navigation", { name: "Bagian TNA" })
+    .getByRole("link", { name: "EFEK" })
+    .click();
+  await expect(page).toHaveURL(/\/tna\/efek\?/);
+  await expect(page).toHaveURL(/proper_input=include/);
+  await expect(page).toHaveURL(/window=4/);
+  await expect(
+    page.getByRole("checkbox", { name: "Hitung proper input (APPK)" }),
+  ).toBeChecked();
+  expectHermetic(audit);
+});

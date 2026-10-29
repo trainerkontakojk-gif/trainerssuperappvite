@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   EFEK_MAX_EXCLUSIONS,
   efekReportQuerySchema,
@@ -61,8 +62,15 @@ export function EfekExclusions({
         </section>
       )}
       <section aria-label="Pengecualian analisis" className="space-y-4">
-        <details open={exclusions.length > 0 ? true : undefined}>
-          <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+        <details
+          className="group"
+          open={exclusions.length > 0 ? true : undefined}
+        >
+          <summary className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden="true"
+              className="size-4 shrink-0 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+            />
             Sesuaikan analisis
           </summary>
           <div className="mt-3 space-y-3 rounded-lg border border-border bg-card p-4">
