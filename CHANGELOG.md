@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- docs(kegiatan): tambahkan plan laman Kegiatan Trainers dan menu Kelola Kegiatan untuk dikerjakan Codex
+
 - revert(web): kembalikan Log Aktivitas ke `/dashboard/activities`; `/kegiatan` disiapkan untuk laman publik Kegiatan Trainers (perbaikan race tautan SIDAK di E2E beranda tetap dipertahankan)
 
 - feat(web): buka Log Aktivitas di `/kegiatan` dengan guard yang sama dan pertahankan `/dashboard/activities` sebagai alias; tunggu href tautan SIDAK diperbarui di E2E tren beranda
