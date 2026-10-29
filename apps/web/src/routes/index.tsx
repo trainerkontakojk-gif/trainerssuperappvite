@@ -20,6 +20,9 @@ import "./landing.css";
 
 const WORDMARK = ["Trainers", "SuperApp"] as const;
 
+/** Public Kegiatan Trainers page; a plain href until its route exists. */
+const KEGIATAN_HREF = "/kegiatan";
+
 const HERO_INTRO: readonly FlapFrame[] = [
   {
     name: "modul-1",
@@ -107,11 +110,10 @@ function LandingHeader() {
           </span>
           <span className="brand-name">Trainers SuperApp</span>
         </a>
-        <nav className="desktop-nav" aria-label="Navigasi utama">
-          <a href="#modul">Modul</a>
-          <a href="#alur-kerja">Alur kerja</a>
-        </nav>
         <div className="header-actions">
+          <a className="header-link" href={KEGIATAN_HREF}>
+            Kegiatan Trainers
+          </a>
           {isCheckingAuth ? null : isLoggedIn ? (
             <Link to="/dashboard" className="button primary">
               Dashboard
@@ -171,11 +173,8 @@ function LandingHeader() {
         aria-label="Navigasi mobile"
         hidden={!menuOpen}
       >
-        <a href="#modul" onClick={closeMenu}>
-          Modul
-        </a>
-        <a href="#alur-kerja" onClick={closeMenu}>
-          Alur kerja
+        <a href={KEGIATAN_HREF} onClick={closeMenu}>
+          Kegiatan Trainers
         </a>
         {isCheckingAuth ? null : isLoggedIn ? (
           <Link to="/dashboard" onClick={closeMenu}>
@@ -323,6 +322,9 @@ function FinalCta() {
             </button>
           </>
         )}
+        <a className="button ghost large" href={KEGIATAN_HREF}>
+          Kegiatan Trainers
+        </a>
       </div>
     </section>
   );

@@ -224,12 +224,7 @@ html:has(.landing-wrapper) {
   font-weight: 800;
   font-size: 18px;
 }
-.landing-wrapper .desktop-nav {
-  display: flex;
-  gap: 4px;
-  margin-left: 8px;
-}
-.landing-wrapper .desktop-nav a {
+.landing-wrapper .header-link {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -239,7 +234,7 @@ html:has(.landing-wrapper) {
   font-size: 14px;
   font-weight: 500;
 }
-.landing-wrapper .desktop-nav a:hover {
+.landing-wrapper .header-link:hover {
   color: var(--fg);
   background: var(--surface);
 }
@@ -590,7 +585,7 @@ html:has(.landing-wrapper) {
   color: var(--fg);
 }
 @media (max-width: 760px) {
-  .landing-wrapper .desktop-nav,
+  .landing-wrapper .header-link,
   .landing-wrapper .header-register {
     display: none;
   }

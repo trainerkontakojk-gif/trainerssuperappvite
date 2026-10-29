@@ -190,7 +190,45 @@ test.describe("Landing publik — split-flap", () => {
     expectHermetic(reopened);
   });
 
-  test("tanpa overflow horizontal 320–1440 px; menu mobile menuju modul", async ({
+  test("header hanya punya tombol Kegiatan Trainers; ajakan bawah juga menautkan Kegiatan Trainers", async ({
+    page,
+  }) => {
+    const audit = await openGuestLanding(page, "reduce");
+
+    const banner = page.getByRole("banner");
+    const nav = banner.getByRole("navigation", { name: "Navigasi utama" });
+    await expect(nav).toHaveCount(0);
+    await expect(banner.getByRole("link", { name: "Modul" })).toHaveCount(0);
+    await expect(banner.getByRole("link", { name: "Alur kerja" })).toHaveCount(
+      0,
+    );
+
+    // Urutan tombol header: Kegiatan Trainers lalu Masuk dan Ajukan Akses.
+    const headerKegiatan = banner.getByRole("link", {
+      name: "Kegiatan Trainers",
+    });
+    await expect(headerKegiatan).toBeVisible();
+    await expect(headerKegiatan).toHaveAttribute("href", "/kegiatan");
+    const kegiatanBox = (await headerKegiatan.boundingBox())!;
+    const masukBox = (await banner
+      .getByRole("button", { name: "Masuk" })
+      .boundingBox())!;
+    expect(kegiatanBox.x).toBeLessThan(masukBox.x);
+
+    const cta = page.getByRole("region", { name: /Mulai dari/ });
+    await expect(
+      cta.getByRole("button", { name: "Masuk ke Platform" }),
+    ).toBeVisible();
+    await expect(
+      cta.getByRole("button", { name: "Ajukan Akses" }),
+    ).toBeVisible();
+    const ctaKegiatan = cta.getByRole("link", { name: "Kegiatan Trainers" });
+    await expect(ctaKegiatan).toBeVisible();
+    await expect(ctaKegiatan).toHaveAttribute("href", "/kegiatan");
+    expectHermetic(audit);
+  });
+
+  test("tanpa overflow horizontal 320–1440 px; menu mobile menuju Kegiatan Trainers", async ({
     page,
   }) => {
     const audit = await openGuestLanding(page, "reduce");
@@ -209,13 +247,16 @@ test.describe("Landing publik — split-flap", () => {
     const menu = page.getByRole("button", { name: "Buka navigasi" });
     await menu.click();
     await expect(menu).toHaveAttribute("aria-expanded", "true");
-    await page
-      .getByRole("navigation", { name: "Navigasi mobile" })
-      .getByRole("link", { name: "Modul" })
-      .click();
+    const mobileNav = page.getByRole("navigation", { name: "Navigasi mobile" });
+    await expect(mobileNav.getByRole("link", { name: "Modul" })).toHaveCount(0);
+    await expect(
+      mobileNav.getByRole("link", { name: "Alur kerja" }),
+    ).toHaveCount(0);
+    await expect(
+      mobileNav.getByRole("link", { name: "Kegiatan Trainers" }),
+    ).toHaveAttribute("href", "/kegiatan");
+    await page.keyboard.press("Escape");
     await expect(menu).toHaveAttribute("aria-expanded", "false");
-    await expect(page).toHaveURL(/#modul$/);
-    await activateStep(page, "telefun");
     expectHermetic(audit);
   });
 
