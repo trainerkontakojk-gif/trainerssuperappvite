@@ -50,7 +50,15 @@ import {
   getTimeCueInstruction,
 } from "./promptBuilder";
 import { resolveVoiceForModel } from "../telefunVoiceRegistry";
-import { directTone, type ToneMoment } from "./toneDirector";
+import {
+  getNonverbalClipKinds,
+  prefetchNonverbalClips,
+} from "./nonverbalClips";
+import {
+  directTone,
+  type NonverbalClipKind,
+  type ToneMoment,
+} from "./toneDirector";
 
 /** Opus at 32 kbps is clear for speech and ~4x smaller than the default. */
 const RECORDING_BITS_PER_SECOND = 32_000;
@@ -123,6 +131,10 @@ export class LiveSession {
   private hasSentOpeningTone: boolean = false;
   private consumerTurnsCompleted: number = 0;
   private turnsSinceLastClip: number = 0;
+  private nonverbalClips = new Map<string, Uint8Array>();
+  private pendingClip: NonverbalClipKind | null = null;
+  private readonly nextClipVariant = new Map<NonverbalClipKind, 1 | 2>();
+  private nonverbalUnavailableEmitted = false;
 
   // Volume Throttling
   private lastVolumeEmitMs: number = 0;
@@ -220,6 +232,11 @@ export class LiveSession {
       // Admission is held outside the component, including after unmount or
       // failed startup. Never create another graph/mic over retained audio.
       this.audioOwner = await acquireTelefunAudio();
+      if (this.intentionalClose) {
+        await this.cleanupAudio(Date.now() + 1_000);
+        return;
+      }
+      await this.prefetchNonverbalAudio();
       if (this.intentionalClose) {
         await this.cleanupAudio(Date.now() + 1_000);
         return;
@@ -351,6 +368,7 @@ export class LiveSession {
       socket.onmessage = async (event) => {
         if (this.intentionalClose || this.ws !== socket) return;
         if (event.data instanceof ArrayBuffer) {
+          this.playPendingNonverbalClip();
           this.playPcm(
             new Uint8Array(event.data),
             this.audioConfiguration.outputSampleRateHz,
@@ -504,6 +522,7 @@ export class LiveSession {
       msg,
       this.audioConfiguration.outputSampleRateHz,
     );
+    if (chunks.length > 0) this.playPendingNonverbalClip();
     for (const chunk of chunks) {
       this.playPcm(chunk.data, chunk.sampleRate);
       this.lastModelActivityMs = Date.now();
@@ -834,7 +853,7 @@ export class LiveSession {
     this.setSessionState("idle");
   }
 
-  private playPcm(data: Uint8Array, sampleRate = 24000) {
+  private playPcm(data: Uint8Array, sampleRate = 24000): boolean {
     const context = this.outputAudioContext;
     if (
       !context ||
@@ -843,11 +862,11 @@ export class LiveSession {
       this.isHeld ||
       this.intentionalClose
     ) {
-      return;
+      return false;
     }
 
     const byteLength = data.byteLength - (data.byteLength % 2);
-    if (byteLength === 0) return;
+    if (byteLength === 0) return false;
     const float32 = new Float32Array(byteLength / 2);
     const view = new DataView(data.buffer, data.byteOffset, byteLength);
     for (let i = 0; i < float32.length; i++) {
@@ -880,6 +899,7 @@ export class LiveSession {
           : context.currentTime + PLAYBACK_START_LEAD_SECONDS;
       scheduledSource.start(startTime);
       this.nextStartTime = startTime + buffer.duration;
+      return true;
     } catch {
       if (source) {
         this.activeSources.delete(source);
@@ -890,6 +910,7 @@ export class LiveSession {
         }
       }
       if (!this.intentionalClose) this.onPlaybackBlocked();
+      return false;
     }
   }
 
@@ -1103,6 +1124,7 @@ export class LiveSession {
     this.isHeld = this.holdTracker.active !== null;
     this.applyMicrophoneCaptureStateToTracks();
     if (held) {
+      this.pendingClip = null;
       this.clearAiPlayback("hold_activated");
     }
     this.emitTimelineEvent("hold_state_changed", {
@@ -1141,10 +1163,66 @@ export class LiveSession {
     });
     if (!direction.note || this.ws?.readyState !== WebSocket.OPEN) return;
 
+    if (direction.clip) this.pendingClip = direction.clip;
+
     this.ws.send(
       JSON.stringify(buildGeminiToneContextMessage(direction.note)),
     );
     this.emitTimelineEvent("tone_note_sent", { moment: moment.kind });
+  }
+
+  private async prefetchNonverbalAudio(): Promise<void> {
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const consumerTypeId = activeConsumer?.id ?? "";
+    if (getNonverbalClipKinds(consumerTypeId).length === 0) return;
+
+    const identity = this.config.resolvedIdentity;
+    const gender =
+      identity?.gender ??
+      (this.config.consumerGender === "male" ? "male" : "female");
+    const voiceName = resolveVoiceForModel({
+      modelId: this.config.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID,
+      requestedVoice: identity?.voiceName ?? this.config.voiceName,
+      gender,
+    });
+
+    try {
+      this.nonverbalClips = await prefetchNonverbalClips(
+        voiceName,
+        consumerTypeId,
+      );
+    } catch {
+      this.nonverbalClips.clear();
+      this.emitNonverbalClipUnavailable({ reason: "prefetch" });
+    }
+  }
+
+  private playPendingNonverbalClip(): void {
+    const kind = this.pendingClip;
+    this.pendingClip = null;
+    if (!kind || this.isHeld || this.intentionalClose) return;
+
+    const variant = this.nextClipVariant.get(kind) ?? 1;
+    const clip = this.nonverbalClips.get(`${kind}-${variant}`);
+    if (!clip) {
+      this.emitNonverbalClipUnavailable({ kind });
+      return;
+    }
+
+    if (!this.playPcm(clip, 24_000)) {
+      this.emitNonverbalClipUnavailable({ kind });
+      return;
+    }
+    this.nextClipVariant.set(kind, variant === 1 ? 2 : 1);
+    this.turnsSinceLastClip = 0;
+    this.emitTimelineEvent("nonverbal_clip_played", { kind });
+  }
+
+  private emitNonverbalClipUnavailable(meta: Record<string, unknown>): void {
+    if (this.nonverbalUnavailableEmitted) return;
+    this.nonverbalUnavailableEmitted = true;
+    this.emitTimelineEvent("nonverbal_clip_unavailable", meta);
   }
 
   private setIsAiSpeaking(speaking: boolean) {
@@ -1553,6 +1631,8 @@ export class LiveSession {
   }
 
   private async performAudioCleanup(): Promise<void> {
+    this.pendingClip = null;
+    this.nonverbalClips.clear();
     this.clearAiPlayback("cleanup");
     try {
       if (this.workletNode) {

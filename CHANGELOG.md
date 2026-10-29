@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- feat(telefun): putar klip nonverbal di awal giliran konsumen
+
 - chore(telefun): tambahkan klip nonverbal TTS untuk konsumen marah dan sedih
 
 - fix(efek): tab EFEK dari rincian program mempertahankan filter dan toggle proper input, dan Sesuaikan analisis diberi penanda buka-tutup

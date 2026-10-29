@@ -214,12 +214,11 @@ Progress 2026-10-29: generator preflight passed; all 16 approved sources and 24/
 
 ### Task 4 — Pemutaran klip (R5)
 
-- [ ] RED (di `telefun-call.spec.ts` atau spec baru `telefun-nonverbal.spec.ts`): "konsumen marah: klip diputar sebelum jawaban pertama dan tidak saat hold". Pakai `page.waitForRequest(/\/telefun\/nonverbal\/kore\//)` untuk prefetch, dan probe `AudioBufferSourceNode.start` (pola `installAudioProbe` di `telefun-audio-fidelity.spec.ts`) untuk memastikan buffer klip dijadwalkan **sebelum** buffer audio model pada giliran pertama, serta tidak ada klip baru selama hold.
-- [ ] RED: "klip gagal dimuat: panggilan tetap berjalan tanpa klip" (route aset → 404; audio model tetap diputar, tidak ada dialog error).
-- [ ] RED: "tipe ramah tidak memuat klip" (tidak ada request ke `/telefun/nonverbal/`).
-- [ ] GREEN: `nonverbalClips.ts`, `parsePcm16MonoWav()`, prefetch, `pendingClip`, event `nonverbal_clip_played` / `nonverbal_clip_unavailable`.
-- [ ] Pastikan `hermeticShell` tidak menganggap request aset same-origin sebagai pelanggaran.
-- [ ] Commit: `feat(telefun): putar klip nonverbal di awal giliran konsumen`.
+- [x] RED: E2E membuktikan klip marah dijadwalkan sebelum audio Live, tidak dijadwalkan saat hold, kegagalan aset tidak menghentikan audio Live, dan tipe ramah tidak meminta klip. Baseline: tiga kasus marah gagal karena tidak ada request klip; kontrol ramah lulus.
+- [x] GREEN: `nonverbalClips.ts`, `parsePcm16MonoWav()`, prefetch suara aktif, `pendingClip`, dan event `nonverbal_clip_played` / `nonverbal_clip_unavailable`.
+- [x] `hermeticShell` menerima request aset same-origin; seluruh test melakukan `expectHermetic`.
+- [x] E2E terfokus: `pnpm exec playwright test e2e/telefun-nonverbal.spec.ts` — 4/4 lulus.
+- [x] Commit: `feat(telefun): putar klip nonverbal di awal giliran konsumen`.
 
 ### Task 5 — Agen diam (R7)
 
