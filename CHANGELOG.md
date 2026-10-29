@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- feat(kegiatan): kontrak bersama dan capability pengelolaan kegiatan
+
 - feat(kegiatan): tabel trainer_activities, RLS, dan bucket media
 
 - feat(landing): ganti menu Modul dan Alur kerja dengan tombol Kegiatan Trainers di header dan ajakan bawah

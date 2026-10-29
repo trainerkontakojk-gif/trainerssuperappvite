@@ -32,6 +32,7 @@ export const CAPABILITIES = {
   "ketik.templates.shared.write": ["admin"],
   "ketik.use": ["admin", "trainer", "leader", "agent"],
   "ketik.worker.process": ["admin", "trainer"],
+  "kegiatan.manage": ["admin", "trainer"],
   "monitoring.billing.read": ["admin", "trainer"],
   "monitoring.billing.write": ["admin", "trainer"],
   "monitoring.history.delete": ["admin", "trainer"],
