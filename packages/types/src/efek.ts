@@ -145,6 +145,7 @@ export const efekReportQuerySchema = z
     year: z.coerce.number().int().min(2000).max(2100).optional(),
     tim: z.string().trim().min(1).max(100).optional(),
     session: z.string().uuid().optional(),
+    proper_input: z.literal("include").optional(),
     exclusions: exclusionQuerySchema.optional(),
   })
   .strict();
@@ -213,6 +214,8 @@ export interface EfekProgramSummary {
   avg_delta: number | null;
   /** Rerata Δ peserta − Δ rata-rata layanan pada bulan kalender yang sama (termasuk peserta). */
   avg_relative_delta: number | null;
+  median_delta: number | null;
+  median_relative_delta: number | null;
   findings_per_session_before: number | null;
   findings_per_session_after: number | null;
 }
@@ -247,6 +250,7 @@ export interface EfekChartPoint {
 export interface EfekReport {
   data_until: EfekMonth;
   window: number;
+  include_proper_input: boolean;
   teams: string[];
   years: number[];
   programs: EfekProgramSummary[];

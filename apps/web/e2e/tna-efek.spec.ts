@@ -70,6 +70,8 @@ const summary = (
   turun: 0,
   avg_delta: null,
   avg_relative_delta: null,
+  median_delta: null,
+  median_relative_delta: null,
   findings_per_session_before: null,
   findings_per_session_after: null,
   ...patch,
@@ -107,6 +109,7 @@ const ketikSummary = summary(programs[0]!, {
 const report: EfekReport = {
   data_until: { year: 2026, month: 9 },
   window: 3,
+  include_proper_input: false,
   teams: ["Tim A", "Tim B"],
   years: [2026],
   programs: [
@@ -159,6 +162,7 @@ const participant = (
 const programReport: EfekProgramReport = {
   data_until: report.data_until,
   window: 3,
+  include_proper_input: false,
   teams: report.teams,
   years: report.years,
   program: ketikSummary,
@@ -813,5 +817,102 @@ test("unduh laporan program menghasilkan HTML siap cetak dengan teks yang di-esc
   expect(html).not.toContain("<img");
   expect(html).not.toContain("<script");
   expect(html).toContain("Tim &lt;B&gt;");
+  expectHermetic(audit);
+});
+
+test("toggle proper input tersimpan di tautan, terbawa ke rincian, dan ikut ekspor", async ({
+  page,
+}) => {
+  const reportRequests: URL[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/v1/tna/efek/report") reportRequests.push(url);
+  });
+  const includedModeMocks = [
+    ...efekMocks.filter(
+      (mock) => mock.path !== "/api/v1/tna/efek/report/ketik",
+    ),
+    {
+      method: "GET" as const,
+      path: "/api/v1/tna/efek/report/ketik",
+      body: ok({ ...programReport, include_proper_input: true }),
+    },
+  ];
+  const audit = await openTna(page, "/tna/efek", includedModeMocks);
+  const toggle = page.getByRole("checkbox", {
+    name: "Hitung proper input (APPK)",
+  });
+  const defaultNote =
+    "Proper input (APPK) dianggap sesuai, jadi skor fokus pada interaksi dengan konsumen. Nyalakan untuk melihat skor SIDAK resmi.";
+  const includedNote = "Skor SIDAK resmi, termasuk proper input (APPK).";
+
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByText(defaultNote, { exact: true })).toBeVisible();
+  await expect(page).not.toHaveURL(/proper_input/);
+  await expect.poll(() => reportRequests.length).toBeGreaterThan(0);
+  expect(reportRequests[0]!.searchParams.has("proper_input")).toBe(false);
+
+  const summaryRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/v1/tna/efek/report" &&
+      url.searchParams.get("proper_input") === "include"
+    );
+  });
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  const summaryResponseRequest = await summaryRequest;
+  expect(
+    new URL(summaryResponseRequest.url()).searchParams.get("proper_input"),
+  ).toBe("include");
+  await expect(page).toHaveURL(/proper_input=include/);
+  await expect(toggle).toBeChecked();
+  await expect(page.getByText(includedNote, { exact: true })).toBeVisible();
+
+  const detailRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/v1/tna/efek/report/ketik" &&
+      url.searchParams.get("proper_input") === "include"
+    );
+  });
+  await page.getByRole("link", { name: "Rincian KETIK" }).click();
+  const detailApiRequest = await detailRequest;
+  expect(new URL(detailApiRequest.url()).searchParams.get("proper_input")).toBe(
+    "include",
+  );
+  await expect(page).toHaveURL(
+    /\/tna\/efek\/program\/ketik\?.*proper_input=include/,
+  );
+  await expect(
+    page.getByRole("heading", { name: "KETIK · layanan Chat" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(toggle).toBeChecked();
+  await expect(page.getByText(includedNote, { exact: true })).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Unduh laporan" }).click();
+  const file = await download;
+  const html = await (
+    await file.createReadStream()
+  )
+    .toArray()
+    .then((parts) => Buffer.concat(parts).toString("utf8"));
+  expect(html).toContain(includedNote);
+
+  const reloadRequest = page.waitForRequest((request) => {
+    const url = new URL(request.url());
+    return (
+      url.pathname === "/api/v1/tna/efek/report/ketik" &&
+      url.searchParams.get("proper_input") === "include"
+    );
+  });
+  await page.reload();
+  await reloadRequest;
+  await expect(
+    page.getByRole("checkbox", { name: "Hitung proper input (APPK)" }),
+  ).toBeChecked();
+  await expect(page.getByText(includedNote, { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/proper_input=include/);
   expectHermetic(audit);
 });

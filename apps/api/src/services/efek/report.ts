@@ -30,6 +30,7 @@ import {
 } from "../sidak/period-scoring-context";
 import { isCountableFinding } from "../sidak/shared-constants";
 import { TnaServiceError } from "../tna/errors";
+import { isProperInputIndicator } from "./proper-input";
 import { listEfekPrograms } from "./sessions";
 
 /**
@@ -143,6 +144,7 @@ async function loadScores(
   services: ServiceType[],
   first: number,
   last: number,
+  includeProperInput: boolean,
 ) {
   const byAgent = new Map<string, MonthStat>();
   const byMonth = new Map<string, (MonthStat & { agent: string })[]>();
@@ -189,9 +191,22 @@ async function loadScores(
           ),
         );
       const context = await contexts.get(periodId)!;
+      const properInputIds = new Set(
+        context.indicators
+          .filter((indicator) => isProperInputIndicator(indicator.name))
+          .map((indicator) => indicator.id),
+      );
+      const normalizedRows = normalizePeriodScoringRows(
+        getScoreRows(group),
+        context,
+      );
       const score = calculateQAScoreFromTemuan(
         context.indicators,
-        normalizePeriodScoringRows(getScoreRows(group), context),
+        includeProperInput
+          ? normalizedRows
+          : normalizedRows.map((row) =>
+              properInputIds.has(row.indicator_id) ? { ...row, nilai: 3 } : row,
+            ),
         context.weight,
       );
       if (!score.sessionCount) continue;
@@ -199,7 +214,14 @@ async function loadScores(
       const stat = {
         score: score.finalScore,
         sessions: score.sessionCount,
-        findings: group.filter((r) => isCountableFinding(r)).length,
+        findings: group.filter((row) => {
+          const rawId = row.rule_indicator_id || row.indicator_id;
+          const scoreId = context.scoreIdByAnyId.get(rawId) ?? rawId;
+          return (
+            isCountableFinding(row) &&
+            (includeProperInput || !properInputIds.has(scoreId))
+          );
+        }).length,
       };
       byAgent.set(`${service}|${agent}|${index}`, stat);
       // QA, trainers, leaders and other excluded staff never enter the service average.
@@ -248,6 +270,7 @@ async function loadTemuan(
 interface Built {
   current: number;
   window: number;
+  includeProperInput: boolean;
   sessions: SessionRow[];
   allSessions: SessionRow[];
   results: Result[];
@@ -286,7 +309,14 @@ async function build(
     Math.max(...sessions.map((s) => dateMonth(s.end_date) + window)),
   );
   const services = [...new Set(sessions.map((s) => s.service_type))];
-  const scores = await loadScores(supabase, services, first, last);
+  const includeProperInput = query.proper_input === "include";
+  const scores = await loadScores(
+    supabase,
+    services,
+    first,
+    last,
+    includeProperInput,
+  );
 
   const averages = new Map<string, ServiceAverage>();
   const serviceAverage = (service: string, index: number) => {
@@ -421,12 +451,27 @@ async function build(
       });
     }
   }
-  return { current, window, sessions, allSessions, results };
+  return {
+    current,
+    window,
+    includeProperInput,
+    sessions,
+    allSessions,
+    results,
+  };
 }
 
 const isEvaluated = (r: Result) => r.raw_delta !== null;
 const included = (results: Result[]) =>
   results.filter((r) => !r.exclusion_reason);
+const median = (values: number[]) => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2;
+};
 
 function summarize(
   program: EfekProgram,
@@ -448,8 +493,16 @@ function summarize(
     stabil: count("stabil"),
     turun: count("turun"),
     avg_delta: roundOrNull(mean(evaluated.map((r) => r.raw_delta!))),
+    median_delta: roundOrNull(median(evaluated.map((r) => r.raw_delta!))),
     avg_relative_delta: roundOrNull(
       mean(
+        evaluated
+          .map((r) => r.raw_relative)
+          .filter((v): v is number => v !== null),
+      ),
+    ),
+    median_relative_delta: roundOrNull(
+      median(
         evaluated
           .map((r) => r.raw_relative)
           .filter((v): v is number => v !== null),
@@ -506,6 +559,7 @@ function header(built: Built) {
   return {
     data_until: toMonth(built.current - 1),
     window: built.window,
+    include_proper_input: built.includeProperInput,
     teams: [...teams].sort((a, b) => a.localeCompare(b, "id")),
     years: [
       ...new Set(

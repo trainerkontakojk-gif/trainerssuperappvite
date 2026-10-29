@@ -110,6 +110,7 @@ const audits: Audit[] = [
   ]),
 ];
 const indicators = { critical: randomUUID(), nonCritical: randomUUID() };
+const properInputIndicator = randomUUID();
 const ruleVersion = randomUUID();
 const serviceFixtures = (
   [
@@ -662,4 +663,199 @@ test("SIDAK agent quickview lists the agent's EFEK training for admin and traine
   if (leaderView.status === 200)
     expect(leaderView.body.data!.efekTraining).toBeUndefined();
   else expect(leaderView.status).toBe(403);
+});
+
+test.describe("proper input report mode", () => {
+  test.beforeAll(() => {
+    const name = "Proper Input: Efek " + tag;
+    sql(
+      "INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES ('" +
+        properInputIndicator +
+        "','chat','" +
+        name +
+        "','critical',1);" +
+        "INSERT INTO qa_service_rule_indicators(id,rule_version_id,legacy_indicator_id,service_type,name,category,bobot,sort_order) VALUES ('" +
+        randomUUID() +
+        "','" +
+        ruleVersion +
+        "','" +
+        properInputIndicator +
+        "','chat','" +
+        name +
+        "','critical',1,2);" +
+        "INSERT INTO qa_temuan(peserta_id,period_id,indicator_id,service_type,no_tiket,nilai,ketidaksesuaian) VALUES " +
+        "('" +
+        people.sari.id +
+        "',(SELECT id FROM qa_periods WHERE year=2019 AND month=6),'" +
+        properInputIndicator +
+        "','chat','T-" +
+        tag +
+        "-proper-sari',0,'Input APPK tidak sesuai')," +
+        "('" +
+        people.budi.id +
+        "',(SELECT id FROM qa_periods WHERE year=2019 AND month=6),'" +
+        properInputIndicator +
+        "','chat','T-" +
+        tag +
+        "-proper-service-only',0,'Input APPK tidak sesuai');",
+    );
+  });
+
+  test.afterAll(() => {
+    sql(
+      "BEGIN; DELETE FROM qa_temuan WHERE indicator_id='" +
+        properInputIndicator +
+        "'; DELETE FROM qa_service_rule_indicators WHERE rule_version_id='" +
+        ruleVersion +
+        "' AND legacy_indicator_id='" +
+        properInputIndicator +
+        "'; DELETE FROM qa_indicators WHERE id='" +
+        properInputIndicator +
+        "'; COMMIT;",
+    );
+  });
+
+  test("proper input counts as compliant by default and the toggle restores the SIDAK score", async () => {
+    const defaultResult = await call<EfekProgramReport>(
+      "/report/ketik?year=2019",
+    );
+    expect(defaultResult.status).toBe(200);
+    const defaultSari = defaultResult.data.participants.find(
+      (p) => p.peserta_id === people.sari.id && p.session_id === mei,
+    )!;
+    expect(defaultSari).toMatchObject({
+      score_after: 90,
+      sessions_after: 10,
+      findings_after: 3,
+      findings_per_session_after: 0.3,
+    });
+    expect(defaultSari.months.find((m) => m.offset === 1)).toMatchObject({
+      score: 90,
+      sessions: 4,
+      findings: 1,
+    });
+    expect(
+      (
+        defaultResult.data as EfekProgramReport & {
+          include_proper_input?: boolean;
+        }
+      ).include_proper_input,
+    ).toBe(false);
+
+    const includedResult = await call<EfekProgramReport>(
+      "/report/ketik?year=2019&proper_input=include",
+    );
+    expect(includedResult.status).toBe(200);
+    const includedSari = includedResult.data.participants.find(
+      (p) => p.peserta_id === people.sari.id && p.session_id === mei,
+    )!;
+    expect(includedSari).toMatchObject({
+      score_after: 88.33,
+      sessions_after: 10,
+      findings_after: 4,
+      findings_per_session_after: 0.4,
+    });
+    expect(includedSari.months.find((m) => m.offset === 1)).toMatchObject({
+      score: 85,
+      sessions: 4,
+      findings: 2,
+    });
+    expect(
+      (
+        includedResult.data as EfekProgramReport & {
+          include_proper_input?: boolean;
+        }
+      ).include_proper_input,
+    ).toBe(true);
+  });
+
+  test("the service average follows the proper input mode including agents outside the program", async () => {
+    const defaultResult = await call<EfekProgramReport>(
+      "/report/ketik?year=2019",
+    );
+    const includedResult = await call<EfekProgramReport>(
+      "/report/ketik?year=2019&proper_input=include",
+    );
+    expect(defaultResult.status).toBe(200);
+    expect(includedResult.status).toBe(200);
+    expect(
+      defaultResult.data.participants.some(
+        (p) => p.peserta_id === people.budi.id,
+      ),
+    ).toBe(false);
+    expect(defaultResult.data.chart.find((p) => p.offset === 1)).toMatchObject({
+      comparison_score: 90,
+      comparison_findings_per_session: 0.27,
+    });
+    expect(includedResult.data.chart.find((p) => p.offset === 1)).toMatchObject(
+      {
+        comparison_score: 87.5,
+        comparison_findings_per_session: 0.4,
+      },
+    );
+  });
+
+  test("program summary reports medians for even and odd participant counts", async () => {
+    const cases = [
+      {
+        program: "ketik",
+        parity: 0,
+        deltas: [0, 10],
+        relativeDeltas: [-7.5, 4.17],
+        medianDelta: 5,
+        // Raw fixture values are -7.5 and 4.1667, so their median rounds to -1.67.
+        medianRelativeDelta: -1.67,
+      },
+      {
+        program: "telefun",
+        parity: 1,
+        deltas: [20],
+        relativeDeltas: [20],
+        medianDelta: 20,
+        medianRelativeDelta: 20,
+      },
+    ] as const;
+
+    for (const expected of cases) {
+      const result = await call<EfekProgramReport>(
+        "/report/" + expected.program + "?year=2019",
+      );
+      expect(result.status).toBe(200);
+      const evaluated = result.data.participants.filter(
+        (p) => p.delta !== null,
+      );
+      const relative = evaluated
+        .map((p) => p.relative_delta)
+        .filter((v): v is number => v !== null);
+      expect(evaluated.length % 2).toBe(expected.parity);
+      expect(relative.length % 2).toBe(expected.parity);
+      expect(evaluated.map((p) => p.delta!).sort((a, b) => a - b)).toEqual(
+        [...expected.deltas].sort((a, b) => a - b),
+      );
+      expect([...relative].sort((a, b) => a - b)).toEqual(
+        [...expected.relativeDeltas].sort((a, b) => a - b),
+      );
+      const summary = result.data.program as EfekProgramReport["program"] & {
+        median_delta?: number | null;
+        median_relative_delta?: number | null;
+      };
+      expect(summary.median_delta).toBe(expected.medianDelta);
+      expect(summary.median_relative_delta).toBe(expected.medianRelativeDelta);
+    }
+  });
+
+  test("proper_input accepts only include", async () => {
+    expect(
+      (
+        await call<EfekProgramReport>(
+          "/report/ketik?year=2019&proper_input=include",
+        )
+      ).status,
+    ).toBe(200);
+    for (const value of ["false", "1"]) {
+      expect(
+        (await call("/report/ketik?year=2019&proper_input=" + value)).status,
+      ).toBe(400);
+    }
+  });
 });

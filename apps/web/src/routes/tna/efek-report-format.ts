@@ -50,6 +50,7 @@ export const reportQuery = (s: EfekReportSearch) => {
   if (s.year) q.set("year", String(s.year));
   if (s.tim) q.set("tim", s.tim);
   if (s.session) q.set("session", s.session);
+  if (s.proper_input === "include") q.set("proper_input", "include");
   if (s.exclusions) q.set("exclusions", s.exclusions);
   const text = q.toString();
   return text ? `?${text}` : "";

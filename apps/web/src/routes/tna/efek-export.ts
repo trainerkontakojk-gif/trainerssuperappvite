@@ -82,6 +82,9 @@ export function buildEfekProgramHtml(
   const service = SERVICE_LABELS[p.service_type];
   const session = report.sessions.find((s) => s.id === search.session);
   const filters = [
+    report.include_proper_input
+      ? "Skor SIDAK resmi, termasuk proper input (APPK)."
+      : "Proper input (APPK) dianggap sesuai; skor berfokus pada interaksi dengan konsumen.",
     `Jendela banding ${report.window} bulan`,
     `Tahun sesi: ${search.year ?? "semua"}`,
     `Tim: ${search.tim ?? "semua"}`,

@@ -65,58 +65,78 @@ export function ReportFilters({
       replace: true,
     } as never);
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Field label="Jendela banding">
-        <select
-          className={selectClass}
-          value={search.window ?? 3}
-          onChange={(e) =>
-            set({
-              window:
-                Number(e.target.value) === 3
-                  ? undefined
-                  : Number(e.target.value),
-            })
-          }
-        >
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <option key={n} value={n}>
-              {n} bulan
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Tahun sesi">
-        <select
-          className={selectClass}
-          value={search.year ?? ""}
-          onChange={(e) =>
-            set({ year: e.target.value ? Number(e.target.value) : undefined })
-          }
-        >
-          <option value="">Semua tahun</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Tim">
-        <select
-          className={selectClass}
-          value={search.tim ?? ""}
-          onChange={(e) => set({ tim: e.target.value || undefined })}
-        >
-          <option value="">Semua tim</option>
-          {teams.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {children}
+    <div className="space-y-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Jendela banding">
+          <select
+            className={selectClass}
+            value={search.window ?? 3}
+            onChange={(e) =>
+              set({
+                window:
+                  Number(e.target.value) === 3
+                    ? undefined
+                    : Number(e.target.value),
+              })
+            }
+          >
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <option key={n} value={n}>
+                {n} bulan
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Tahun sesi">
+          <select
+            className={selectClass}
+            value={search.year ?? ""}
+            onChange={(e) =>
+              set({ year: e.target.value ? Number(e.target.value) : undefined })
+            }
+          >
+            <option value="">Semua tahun</option>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Tim">
+          <select
+            className={selectClass}
+            value={search.tim ?? ""}
+            onChange={(e) => set({ tim: e.target.value || undefined })}
+          >
+            <option value="">Semua tim</option>
+            {teams.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {children}
+        <label className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground">
+          <input
+            type="checkbox"
+            className="size-4 shrink-0 accent-module-tna focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            checked={search.proper_input === "include"}
+            onChange={(e) =>
+              set({
+                proper_input: e.currentTarget.checked ? "include" : undefined,
+              })
+            }
+          />
+          <span>Hitung proper input (APPK)</span>
+        </label>
+      </div>
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        {search.proper_input === "include"
+          ? "Skor SIDAK resmi, termasuk proper input (APPK)."
+          : "Proper input (APPK) dianggap sesuai, jadi skor fokus pada interaksi dengan konsumen. Nyalakan untuk melihat skor SIDAK resmi."}
+      </p>
     </div>
   );
 }
