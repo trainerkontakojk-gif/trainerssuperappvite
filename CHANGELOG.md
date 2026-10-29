@@ -10,6 +10,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 - fix(ketik): tahan balasan konsumen sampai agen selesai mengetik
 
+- docs(efek): tambahkan plan proper input dianggap sesuai secara default dengan toggle, plus penataan tampilan, untuk dikerjakan Codex
+
 - docs(ketik): tambahkan plan konsumen menunggu agen selesai mengetik untuk dikerjakan Codex
 
 - feat(telefun): kirim arahan nada per giliran untuk konsumen marah dan sedih
