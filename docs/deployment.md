@@ -35,8 +35,11 @@ Web; Vercel adalah Web PRODUCTION kanonik.
 
 ## Prerequisites
 
-- Node.js >= 22
-- pnpm >= 9
+- Node.js `^22.23.4 || ^24.22.1 || ^26.12.1` (patched supported release lines).
+  CI uses `.node-version` = `22.23.4`; the Render image pins the same Node patch.
+  A repository pin does not update an already-running production process: verify
+  the deployed runtime separately before claiming the Node security fixes are live.
+- pnpm `12.9.1`, matching the root `packageManager` field.
 - Supabase project (with all migrations applied)
 
 ## Railway Service Settings (per service)

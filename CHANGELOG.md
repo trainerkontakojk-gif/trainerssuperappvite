@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- fix(deps): tambal advisory produksi (undici, body-parser, qs, dompurify, fast-uri, dll.) lewat override pnpm, naikkan minimum Node ke rilis yang sudah ditambal (22.23.4 untuk CI dan image Render), dan tambahkan probe keamanan respons undici
+
 - fix(ketik): tahan balasan konsumen sampai agen selesai mengetik
 
 - docs(ketik): tambahkan plan konsumen menunggu agen selesai mengetik untuk dikerjakan Codex

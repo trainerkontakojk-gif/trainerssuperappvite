@@ -2,7 +2,7 @@
   "name": "@trainers/telefun",
   "version": "0.0.1",
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
   },
   "private": true,
   "type": "module",
@@ -30,6 +30,6 @@
     "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "4.1.12"
   }
 }

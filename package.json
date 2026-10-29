@@ -2,7 +2,7 @@
   "name": "trainers-superapp",
   "private": true,
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
