@@ -1,10 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearch,
-} from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import type { EfekParticipantResult, EfekProgramReport } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
 import QaStatePanel from "../../components/ui/QaStatePanel";
@@ -29,6 +24,7 @@ import {
   monthLabel,
   monthShort,
   offsetText,
+  relativeDeltaDescription,
   reportQuery,
 } from "./efek-report-format";
 
@@ -41,6 +37,13 @@ export default function EfekProgramPage() {
   const { code } = useParams({ from: "/tna/efek/program/$code" });
   const search = useSearch({ from: "/tna/efek/program/$code" });
   const navigate = useNavigate();
+  const resetExclusions = () =>
+    navigate({
+      to: "/tna/efek/program/$code",
+      params: { code },
+      search: { ...search, exclusions: undefined },
+      replace: true,
+    });
   const { program: _program, ...filters } = search;
   const report = useApi<EfekProgramReport>(
     `/tna/efek/report/${code}${reportQuery(filters)}`,
@@ -62,47 +65,23 @@ export default function EfekProgramPage() {
       }
     >
       <TnaTabs current="efek" />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          to="/tna/efek"
-          search={{ ...filters, exclusions: undefined }}
-          className="inline-flex min-h-[44px] items-center text-sm underline underline-offset-4"
-        >
-          Kembali ke EFEK
-        </Link>
-        {search.exclusions && (
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-[44px]"
-            onClick={() =>
-              navigate({
-                to: "/tna/efek/program/$code",
-                params: { code },
-                search: { ...search, exclusions: undefined },
-                replace: true,
-              })
-            }
-          >
-            Reset pengecualian
-          </Button>
-        )}
-        {data && data.participants.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-[44px]"
-            onClick={() => downloadEfekProgramHtml(data, search)}
-          >
-            Unduh laporan
-          </Button>
-        )}
-      </div>
       <State
         loading={report.loading}
         error={report.error}
         retry={report.refetch}
       />
+      {!data && search.exclusions && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={resetExclusions}
+          >
+            Reset pengecualian
+          </Button>
+        </div>
+      )}
       {data && (
         <>
           <ReportFilters
@@ -134,37 +113,80 @@ export default function EfekProgramPage() {
               </select>
             </Field>
           </ReportFilters>
-          <EfekExclusions
-            report={data}
-            value={search.exclusions}
-            onChange={(rows) =>
-              navigate({
-                to: "/tna/efek/program/$code",
-                params: { code },
-                search: {
-                  ...search,
-                  exclusions: rows.length ? JSON.stringify(rows) : undefined,
-                },
-                replace: true,
-              })
-            }
-          />
+          <div className="flex flex-wrap justify-end gap-2">
+            {search.exclusions && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={resetExclusions}
+              >
+                Reset pengecualian
+              </Button>
+            )}
+            {data.participants.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => downloadEfekProgramHtml(data, search)}
+              >
+                Unduh laporan
+              </Button>
+            )}
+          </div>
           {data.participants.length === 0 ? (
-            <QaStatePanel
-              type="empty"
-              title="Belum ada peserta untuk filter ini"
-              description="Ubah filter, atau tambah sesi pelatihan untuk program ini."
-            />
+            <>
+              <QaStatePanel
+                type="empty"
+                title="Belum ada peserta untuk filter ini"
+                description="Ubah filter, atau tambah sesi pelatihan untuk program ini."
+              />
+              <EfekExclusions
+                report={data}
+                value={search.exclusions}
+                onChange={(rows) =>
+                  navigate({
+                    to: "/tna/efek/program/$code",
+                    params: { code },
+                    search: {
+                      ...search,
+                      exclusions: rows.length
+                        ? JSON.stringify(rows)
+                        : undefined,
+                    },
+                    replace: true,
+                  })
+                }
+              />
+            </>
           ) : (
             <>
               {!data.analysis && (
                 <section
                   aria-label="Ringkasan program"
-                  className="max-w-sm rounded-lg border border-border bg-card p-4"
+                  className="max-w-lg rounded-lg border border-border bg-card p-4"
                 >
                   <ProgramStats program={data.program} />
                 </section>
               )}
+              <EfekExclusions
+                report={data}
+                value={search.exclusions}
+                onChange={(rows) =>
+                  navigate({
+                    to: "/tna/efek/program/$code",
+                    params: { code },
+                    search: {
+                      ...search,
+                      exclusions: rows.length
+                        ? JSON.stringify(rows)
+                        : undefined,
+                    },
+                    replace: true,
+                  })
+                }
+              />
               {data.program.participants === 0 && (
                 <p role="status" className="text-sm">
                   Semua peserta dikecualikan. Sertakan kembali agent untuk
@@ -180,6 +202,7 @@ export default function EfekProgramPage() {
                     title="Skor QA rata-rata, dihitung dari bulan pelatihan"
                     points={data.chart}
                     pick={(p) => [p.score, p.comparison_score]}
+                    scale="score"
                     participantsLabel={`Peserta ${data.program.name}`}
                     comparisonLabel={`Rata-rata layanan ${service}`}
                   />
@@ -190,6 +213,7 @@ export default function EfekProgramPage() {
                       p.findings_per_session,
                       p.comparison_findings_per_session,
                     ]}
+                    scale="findings"
                     participantsLabel={`Peserta ${data.program.name}`}
                     comparisonLabel={`Rata-rata layanan ${service}`}
                   />
@@ -239,7 +263,12 @@ function ParticipantTable({
       }),
     [participants, sort],
   );
-  const header = (key: SortKey, label: string, right = false) => (
+  const header = (
+    key: SortKey,
+    label: string,
+    right = false,
+    title?: string,
+  ) => (
     <th
       className={`whitespace-nowrap px-3 py-2 font-semibold ${right ? "text-right" : ""}`}
       aria-sort={
@@ -249,6 +278,7 @@ function ParticipantTable({
       <button
         type="button"
         className="inline-flex min-h-[32px] items-center gap-1 underline-offset-4 hover:underline"
+        title={title}
         onClick={() =>
           setSort((s) => ({
             key,
@@ -273,6 +303,9 @@ function ParticipantTable({
         Pilih nama untuk melihat rincian bulanan: skor, sesi audit, dan temuan
         per bulan.
       </p>
+      <p className="text-xs text-muted-foreground">
+        {relativeDeltaDescription}
+      </p>
       <div className="sm:overflow-x-auto sm:rounded-lg sm:border sm:border-border">
         <table className="w-full text-sm tabular-nums sm:min-w-[860px] max-sm:block">
           <thead className="bg-muted text-left text-xs text-muted-foreground max-sm:sr-only">
@@ -286,7 +319,12 @@ function ParticipantTable({
                 Skor QA sebelum → sesudah
               </th>
               {header("delta", "Δ skor", true)}
-              {header("relative_delta", "Δ relatif", true)}
+              {header(
+                "relative_delta",
+                "Dibanding layanan",
+                true,
+                relativeDeltaDescription,
+              )}
               <th className="px-3 py-2 font-semibold">Status</th>
             </tr>
           </thead>
@@ -337,7 +375,7 @@ function ParticipantTable({
                     </td>
                     <td
                       className={`${cell} text-right ${deltaClass(p.relative_delta)}`}
-                      data-label="Δ relatif"
+                      data-label="Dibanding layanan"
                     >
                       {fmtDelta(p.relative_delta)}
                     </td>

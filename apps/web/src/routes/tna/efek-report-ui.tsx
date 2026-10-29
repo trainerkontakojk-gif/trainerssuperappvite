@@ -143,59 +143,43 @@ export function ReportFilters({
 
 /** Naik / stabil / turun counts, evaluated share, comparison, findings. */
 export function ProgramStats({ program: p }: { program: EfekProgramSummary }) {
-  const total = p.naik + p.stabil + p.turun;
   return (
     <div className="space-y-3">
       {p.evaluated > 0 ? (
-        <p
-          className={`font-heading text-3xl font-bold tabular-nums ${deltaClass(p.avg_delta)}`}
-        >
-          {fmtDelta(p.avg_delta)}
-          <span className="ml-1.5 text-xs font-medium text-muted-foreground">
-            poin QA rata-rata
-          </span>
-        </p>
+        <div>
+          <p
+            className={`font-heading text-3xl font-bold tabular-nums ${deltaClass(p.median_relative_delta)}`}
+          >
+            {fmtDelta(p.median_relative_delta)}
+          </p>
+          <p className="text-sm font-medium text-foreground">
+            Dibanding rata-rata layanan
+          </p>
+          <p className="text-xs text-muted-foreground">Median Δ</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {p.evaluated} dari {p.participants} dievaluasi
+          </p>
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           Belum ada peserta yang bisa dievaluasi.
         </p>
       )}
-      {total > 0 && (
-        <div
-          className="flex h-2 gap-0.5 overflow-hidden rounded-full"
-          aria-hidden="true"
-        >
-          <i
-            className="block bg-emerald-600"
-            style={{ width: `${(p.naik / total) * 100}%` }}
-          />
-          <i
-            className="block bg-muted-foreground/40"
-            style={{ width: `${(p.stabil / total) * 100}%` }}
-          />
-          <i
-            className="block bg-destructive"
-            style={{ width: `${(p.turun / total) * 100}%` }}
-          />
-        </div>
-      )}
-      <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-        <dt>Naik / stabil / turun</dt>
-        <dd className="text-right font-semibold text-foreground">
-          {p.naik} / {p.stabil} / {p.turun}
-        </dd>
-        <dt>Bisa dievaluasi</dt>
-        <dd className="text-right font-semibold text-foreground">
-          {p.evaluated} dari {p.participants}
-        </dd>
-        <dt>Δ relatif rata-rata layanan</dt>
-        <dd className="text-right font-semibold text-foreground">
-          {fmtDelta(p.avg_relative_delta)}
-        </dd>
-        <dt>Temuan per sesi</dt>
-        <dd className="text-right font-semibold text-foreground">
+      <dl className="grid grid-cols-1 gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums sm:grid-cols-[1fr_auto]">
+        <dt className="pt-2 sm:pt-0">Temuan per sesi</dt>
+        <dd className="-mt-1 text-left font-semibold text-foreground sm:mt-0 sm:text-right">
           {fmt(p.findings_per_session_before)} →{" "}
           {fmt(p.findings_per_session_after)}
+        </dd>
+        <dt className="pt-2 sm:pt-0">Naik / stabil / turun</dt>
+        <dd className="-mt-1 text-left font-semibold text-foreground sm:mt-0 sm:text-right">
+          {p.naik} / {p.stabil} / {p.turun}
+        </dd>
+        <dt className="pt-2 sm:pt-0">Rata-rata Δ skor</dt>
+        <dd
+          className={`-mt-1 text-left font-semibold sm:mt-0 sm:text-right ${deltaClass(p.avg_delta)}`}
+        >
+          {fmtDelta(p.avg_delta)}
         </dd>
       </dl>
     </div>
@@ -212,16 +196,18 @@ export function RelativeChart({
   title,
   points,
   pick,
+  scale,
   participantsLabel,
   comparisonLabel,
 }: {
   title: string;
   points: EfekChartPoint[];
   pick: (p: EfekChartPoint) => [number | null, number | null];
+  scale: "score" | "findings";
   participantsLabel: string;
   comparisonLabel: string;
 }) {
-  const g = chartGeometry(points, pick);
+  const g = chartGeometry(points, pick, scale);
   return (
     <figure className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-4">
       <figcaption className="text-sm font-semibold">{title}</figcaption>

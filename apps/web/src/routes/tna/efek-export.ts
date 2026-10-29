@@ -37,10 +37,11 @@ function chartSvg(
   title: string,
   points: EfekChartPoint[],
   pick: (p: EfekChartPoint) => [number | null, number | null],
+  scale: "score" | "findings",
   participants: string,
   comparison: string,
 ) {
-  const g = chartGeometry(points, pick);
+  const g = chartGeometry(points, pick, scale);
   return `<figure class="chart"><figcaption>${esc(title)}</figcaption>
 <p class="legend"><span class="sw solid"></span>${esc(participants)} <span class="sw dash"></span>${esc(comparison)} <span class="sw band"></span>Bulan pelatihan</p>
 <svg viewBox="0 0 ${g.width} ${g.height}" role="img" aria-label="${esc(title)}">
@@ -113,11 +114,11 @@ ${
     : ""
 }
 <div class="grid">
-${stat(fmtDelta(p.avg_delta), "poin QA rata-rata", tone(p.avg_delta))}
-${stat(`${p.naik} / ${p.stabil} / ${p.turun}`, "naik / stabil / turun")}
-${stat(`${p.evaluated} dari ${p.participants}`, "bisa dievaluasi")}
-${stat(fmtDelta(p.avg_relative_delta), "Δ relatif rata-rata layanan", tone(p.avg_relative_delta))}
+${stat(fmtDelta(p.median_relative_delta), "Dibanding rata-rata layanan", tone(p.median_relative_delta))}
+${stat(`${p.evaluated} dari ${p.participants}`, "dievaluasi")}
 ${stat(`${fmt(p.findings_per_session_before)} → ${fmt(p.findings_per_session_after)}`, "temuan per sesi audit")}
+${stat(`${p.naik} / ${p.stabil} / ${p.turun}`, "naik / stabil / turun")}
+${stat(fmtDelta(p.avg_delta), "rata-rata Δ skor", tone(p.avg_delta))}
 </div>
 <h2>Cara hitung</h2>
 <ul>
@@ -129,8 +130,8 @@ ${stat(`${fmt(p.findings_per_session_before)} → ${fmt(p.findings_per_session_a
 <h2>Grafik relatif bulan pelatihan</h2>
 <p>Garis putus-putus = rata-rata semua agent ${esc(service)} yang diaudit pada bulan yang sama, termasuk peserta.</p>
 <div class="charts">
-${chartSvg("Skor QA rata-rata", report.chart, (c) => [c.score, c.comparison_score], participantsLabel, comparisonLabel)}
-${chartSvg("Temuan per sesi audit", report.chart, (c) => [c.findings_per_session, c.comparison_findings_per_session], participantsLabel, comparisonLabel)}
+${chartSvg("Skor QA rata-rata", report.chart, (c) => [c.score, c.comparison_score], "score", participantsLabel, comparisonLabel)}
+${chartSvg("Temuan per sesi audit", report.chart, (c) => [c.findings_per_session, c.comparison_findings_per_session], "findings", participantsLabel, comparisonLabel)}
 </div>
 <h2>Sesi pelatihan</h2>
 <table><thead><tr><th>Sesi</th><th>Tanggal</th><th class="n">Peserta</th><th class="n">Dievaluasi</th><th class="n">Rerata Δ skor</th><th>Status</th></tr></thead><tbody>

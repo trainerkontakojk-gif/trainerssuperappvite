@@ -38,6 +38,8 @@ const signed = new Intl.NumberFormat("id-ID", {
 export const fmt = (n: number | null) => (n === null ? "–" : one.format(n));
 export const fmtDelta = (n: number | null) =>
   n === null ? "–" : signed.format(n).replace("-", "−");
+export const relativeDeltaDescription =
+  "Perubahan skor peserta dikurangi perubahan rata-rata layanan pada periode yang sama.";
 export const deltaClass = (n: number | null) =>
   n === null || Math.abs(n) < 1
     ? "text-muted-foreground"
@@ -86,6 +88,7 @@ export function sessionStatusLabel(s: EfekSessionSummary) {
 export function chartGeometry(
   points: EfekChartPoint[],
   pick: (p: EfekChartPoint) => [number | null, number | null],
+  scale: "score" | "findings",
 ) {
   const width = 480;
   const height = 200;
@@ -95,9 +98,28 @@ export function chartGeometry(
     .filter((v): v is number => v !== null);
   const min = values.length ? Math.min(...values) : 0;
   const max = values.length ? Math.max(...values) : 1;
-  const span = max - min || 1;
-  const lo = min - span * 0.15;
-  const hi = max + span * 0.15;
+  let lo: number;
+  let hi: number;
+  if (scale === "findings") {
+    lo = 0;
+    hi = max > 0 ? max * 1.15 : 1;
+  } else {
+    const dataSpan = max - min;
+    const range = Math.min(100, Math.max(dataSpan * 1.3, 10));
+    const center = (min + max) / 2;
+    lo = center - range / 2;
+    hi = center + range / 2;
+    if (lo < 0) {
+      hi -= lo;
+      lo = 0;
+    }
+    if (hi > 100) {
+      lo -= hi - 100;
+      hi = 100;
+    }
+    lo = Math.max(0, lo);
+    hi = Math.min(100, hi);
+  }
   const step = (width - pad.left - pad.right) / Math.max(1, points.length - 1);
   const x = (i: number) => pad.left + i * step;
   const y = (v: number) =>
@@ -129,15 +151,13 @@ export function chartGeometry(
             height: height - pad.top - pad.bottom,
           }
         : null,
-    grid: [lo + (hi - lo) * 0.15, (lo + hi) / 2, hi - (hi - lo) * 0.15].map(
-      (v) => ({
-        y: y(v),
-        x1: pad.left,
-        x2: width - pad.right,
-        label: one.format(v),
-        labelX: pad.left - 6,
-      }),
-    ),
+    grid: [lo, (lo + hi) / 2, hi].map((v) => ({
+      y: y(v),
+      x1: pad.left,
+      x2: width - pad.right,
+      label: one.format(v),
+      labelX: pad.left - 6,
+    })),
     ticks: points.map((p, i) => ({
       key: p.offset,
       x: x(i),
