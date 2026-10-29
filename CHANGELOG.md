@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- feat(telefun): kirim arahan nada per giliran untuk konsumen marah dan sedih
+
 - feat(telefun): pilih suara konsumen sesuai tipe marah dan sedih
 
 ## 2026-10-28

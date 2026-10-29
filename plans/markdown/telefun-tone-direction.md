@@ -188,18 +188,18 @@ Langkah asli (sudah dikerjakan):
 
 ### Task 2 — Catatan nada per giliran (R1, R2, R4)
 
-- [ ] RED (spec yang sama): "konsumen marah: catatan nada dikirim sebagai konteks pada pembukaan, setiap akhir giliran, dan sebelum HOLD_END". Kirim `audioResponse` dari mock supaya ada `turnComplete`. Asersi:
+- [x] RED (spec yang sama): "konsumen marah: catatan nada dikirim sebagai konteks pada pembukaan, setiap akhir giliran, dan sebelum HOLD_END". Kirim `audioResponse` dari mock supaya ada `turnComplete`. Asersi:
   - ada pesan `clientContent` dengan `turnComplete === false` dan teks diawali `[TELEFUN_CONTROL:TONE]` sebelum `realtimeInput` audio pertama;
   - satu catatan baru setelah setiap `turnComplete`;
   - pada hold selesai, catatan TONE muncul **sebelum** teks `HOLD_END`;
   - tidak ada catatan yang dikirim lewat `realtimeInput.text`;
   - setiap catatan: tanpa tanda kutip, tanpa digit, tidak memuat kata `sesenggukan`.
-- [ ] RED: "tipe ramah tidak menerima catatan nada" (tidak ada pesan `[TELEFUN_CONTROL:TONE]`, prompt tanpa aturan marker TONE).
-- [ ] RED: "konsumen sedih: blok arahan vokal menahan tangis di paling atas instruksi" — instruksi `pasrah` diawali blok arahan vokal; tipe `marah` tidak memuatnya. Isi blok (tanpa tanda kutip berisi kalimat yang bisa diucapkan):
+- [x] RED: "tipe ramah tidak menerima catatan nada" (tidak ada pesan `[TELEFUN_CONTROL:TONE]`, prompt tanpa aturan marker TONE).
+- [x] RED: "konsumen sedih: blok arahan vokal menahan tangis di paling atas instruksi" — instruksi `pasrah` diawali blok arahan vokal; tipe `marah` tidak memuatnya. Isi blok (tanpa tanda kutip berisi kalimat yang bisa diucapkan):
   > ARAHAN VOKAL (PALING PENTING UNTUK SUARAMU): Kamu pengisi suara yang memerankan konsumen ini di telepon. Kamu sedang menahan tangis: suara basah, bergetar, sengau, sesekali tercekat; napas tersendat sebelum kalimat; kata kadang terputus. Bicara lirih tanpa getaran adalah kesalahan terbesar. Lakukan dengan suaramu; jangan mengucapkan arahan panggung apa pun.
-- [ ] GREEN: `toneDirector.ts`, `buildGeminiToneContextMessage()`, aturan marker di `promptBuilder.ts`, pemanggilan di `LiveSession`, event timeline `tone_note_sent`.
-- [ ] Jalankan juga test lama di spec ini dan `telefun-call.spec.ts` (satu per satu) untuk memastikan tidak ada regresi pada urutan prompt dan alur panggilan.
-- [ ] Commit: `feat(telefun): kirim arahan nada per giliran untuk konsumen marah dan sedih`.
+- [x] GREEN: `toneDirector.ts`, `buildGeminiToneContextMessage()`, aturan marker di `promptBuilder.ts`, pemanggilan di `LiveSession`, event timeline `tone_note_sent`.
+- [x] Jalankan juga test lama di spec ini dan `telefun-call.spec.ts` (satu per satu) untuk memastikan tidak ada regresi pada urutan prompt dan alur panggilan. `telefun-call.spec.ts`: 12/12 lulus. Prompt spec: 22/23 pada run penuh; assertion lama bahwa prompt `pasrah` harus diawali `ROLEPLAY` disesuaikan, lalu kasus pasrah lulus terfokus. Run penuh terakhir tetap menjadi gate Task 6.
+- [x] Commit: `feat(telefun): kirim arahan nada per giliran untuk konsumen marah dan sedih`.
 
 ### Task 3 — Aset klip nonverbal (R5) · STOP gate dengar
 

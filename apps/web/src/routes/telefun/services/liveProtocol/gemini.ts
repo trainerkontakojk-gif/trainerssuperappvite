@@ -67,6 +67,15 @@ export function buildGeminiRealtimeTextMessage(text: string) {
   };
 }
 
+export function buildGeminiToneContextMessage(text: string) {
+  return {
+    clientContent: {
+      turns: [{ role: "user", parts: [{ text }] }],
+      turnComplete: false,
+    },
+  };
+}
+
 export function parsePcmSampleRate(
   mimeType: string | undefined,
   fallback = 24000,

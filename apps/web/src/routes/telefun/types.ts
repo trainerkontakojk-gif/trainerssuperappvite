@@ -126,6 +126,7 @@ export type TelefunTimelineEventName =
   | "playback_end"
   | "time_cue_prompt_sent"
   | "hold_end_cue_sent"
+  | "tone_note_sent"
   | "stalled_response_detected"
   | "stalled_response_watchdog"
   | "no_model_response_after_audio_end"

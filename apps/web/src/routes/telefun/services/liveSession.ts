@@ -42,6 +42,7 @@ import {
   getTelefunAudioConfiguration,
   buildTelefunSessionConfigure,
   buildGeminiRealtimeTextMessage,
+  buildGeminiToneContextMessage,
 } from "./liveProtocol";
 import {
   buildTelefunLiveSystemInstruction,
@@ -49,6 +50,7 @@ import {
   getTimeCueInstruction,
 } from "./promptBuilder";
 import { resolveVoiceForModel } from "../telefunVoiceRegistry";
+import { directTone, type ToneMoment } from "./toneDirector";
 
 /** Opus at 32 kbps is clear for speech and ~4x smaller than the default. */
 const RECORDING_BITS_PER_SECOND = 32_000;
@@ -118,6 +120,9 @@ export class LiveSession {
   private pendingTurnCompletion: boolean = false;
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
+  private hasSentOpeningTone: boolean = false;
+  private consumerTurnsCompleted: number = 0;
+  private turnsSinceLastClip: number = 0;
 
   // Volume Throttling
   private lastVolumeEmitMs: number = 0;
@@ -510,6 +515,12 @@ export class LiveSession {
 
     // Turn complete → defer isAiSpeaking(false) until queued sources drain
     if (msg.serverContent?.turnComplete) {
+      this.consumerTurnsCompleted += 1;
+      this.turnsSinceLastClip += 1;
+      this.sendToneNote({
+        kind: "after_consumer_turn",
+        consumerTurnsCompleted: this.consumerTurnsCompleted,
+      });
       this.pendingTurnCompletion = true;
       if (this.activeSources.size === 0) {
         this.setIsAiSpeaking(false);
@@ -885,6 +896,10 @@ export class LiveSession {
   private completeSetup() {
     this.isSetupComplete = true;
     this.clearSetupTimeout();
+    if (!this.hasSentOpeningTone) {
+      this.hasSentOpeningTone = true;
+      this.sendToneNote({ kind: "opening" });
+    }
     if (this.isPickedUp) this.announceReady();
   }
 
@@ -1104,6 +1119,11 @@ export class LiveSession {
     const activeConsumer =
       this.config.activeConsumerType ?? this.config.consumerTypes[0];
     const text = getHoldEndInstruction(activeConsumer, hold);
+    this.sendToneNote({
+      kind: "hold_end",
+      sequence: hold.sequence,
+      exceeded: hold.exceededByMs > 0,
+    });
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(buildGeminiRealtimeTextMessage(text)));
     }
@@ -1111,6 +1131,20 @@ export class LiveSession {
       sequence: hold.sequence,
       exceeded: hold.exceededByMs > 0,
     });
+  }
+
+  private sendToneNote(moment: ToneMoment) {
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const direction = directTone(activeConsumer?.id ?? "", moment, {
+      turnsSinceLastClip: this.turnsSinceLastClip,
+    });
+    if (!direction.note || this.ws?.readyState !== WebSocket.OPEN) return;
+
+    this.ws.send(
+      JSON.stringify(buildGeminiToneContextMessage(direction.note)),
+    );
+    this.emitTimelineEvent("tone_note_sent", { moment: moment.kind });
   }
 
   private setIsAiSpeaking(speaking: boolean) {

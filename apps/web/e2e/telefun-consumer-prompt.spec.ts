@@ -91,6 +91,35 @@ function holdEndCues(messages: Record<string, unknown>[]): string[] {
     );
 }
 
+function toneNoteEntries(messages: Record<string, unknown>[]) {
+  return messages.flatMap((message, index) => {
+    const clientContent = message.clientContent as
+      | {
+          turns?: Array<{ parts?: Array<{ text?: unknown }> }>;
+          turnComplete?: unknown;
+        }
+      | undefined;
+    const text = clientContent?.turns
+      ?.flatMap((turn) => turn.parts ?? [])
+      .map((part) => part.text)
+      .find(
+        (part): part is string =>
+          typeof part === "string" &&
+          part.startsWith("[TELEFUN_CONTROL:TONE]"),
+      );
+    return text
+      ? [{ index, text, turnComplete: clientContent?.turnComplete }]
+      : [];
+  });
+}
+
+function realtimeInputText(message: Record<string, unknown>): string | null {
+  const realtimeInput = message.realtimeInput as
+    | { text?: unknown }
+    | undefined;
+  return typeof realtimeInput?.text === "string" ? realtimeInput.text : null;
+}
+
 test.describe("Telefun konsumen AI (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
@@ -160,6 +189,111 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       expectHermetic(audit);
     });
   }
+
+  test("konsumen marah: catatan nada mengiringi pembukaan, giliran, dan HOLD_END", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages, {
+      audioResponse: {
+        sampleRateHz: 24000,
+        chunks: [new Uint8Array(480)],
+        transport: "inline",
+        afterFirstInput: true,
+      },
+    });
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks({ preferredConsumerTypeId: "marah" }),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    const call = await startCall(page);
+
+    await expect
+      .poll(() => toneNoteEntries(messages).length)
+      .toBeGreaterThanOrEqual(2);
+    const firstAudioIndex = messages.findIndex((message) => {
+      const realtimeInput = message.realtimeInput as
+        | Record<string, unknown>
+        | undefined;
+      return Boolean(realtimeInput && "audio" in realtimeInput);
+    });
+    const prompt = configuredInstructions(messages);
+    expect(prompt).toContain("[TELEFUN_CONTROL:TONE]");
+    expect(prompt.startsWith("ARAHAN VOKAL")).toBe(false);
+    const notesBeforeHold = toneNoteEntries(messages);
+    expect(firstAudioIndex).toBeGreaterThan(notesBeforeHold[0]!.index);
+    expect(notesBeforeHold.every((note) => note.turnComplete === false)).toBe(
+      true,
+    );
+    expect(
+      messages.some((message) =>
+        realtimeInputText(message)?.startsWith("[TELEFUN_CONTROL:TONE]"),
+      ),
+    ).toBe(false);
+    for (const { text } of notesBeforeHold) {
+      expect(text).not.toMatch(/[\d"'“”]|\b(?:menangis|sesenggukan)\b/i);
+    }
+
+    await call.getByRole("button", { name: "Tahan" }).click();
+    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await page.clock.fastForward(1_000);
+    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await expect.poll(() => holdEndCues(messages).length).toBe(1);
+    await expect
+      .poll(() => toneNoteEntries(messages).length)
+      .toBeGreaterThan(notesBeforeHold.length);
+
+    const holdEndIndex = messages.findIndex((message) =>
+      realtimeInputText(message)?.startsWith("[TELEFUN_CONTROL:HOLD_END]"),
+    );
+    const lastToneNote = toneNoteEntries(messages).at(-1);
+    expect(lastToneNote).toBeDefined();
+    expect(lastToneNote!.index).toBeLessThan(holdEndIndex);
+    expectHermetic(audit);
+  });
+
+  test("tipe ramah tidak menerima arahan nada", async ({ page }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks({ preferredConsumerTypeId: "ramah" }),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    expect(toneNoteEntries(messages)).toEqual([]);
+    expect(prompt).not.toContain("[TELEFUN_CONTROL:TONE]");
+    expectHermetic(audit);
+  });
+
+  test("konsumen pasrah mendapat arahan vokal menahan tangis di awal prompt", async ({
+    page,
+  }) => {
+    const messages: Record<string, unknown>[] = [];
+    await mockTelefunVoiceServer(page, NEW_ID, messages);
+    const audit = await openHermeticShell(page, {
+      path: "/telefun",
+      apiMocks: callMocks({ preferredConsumerTypeId: "pasrah" }),
+      waitForUrl: /\/telefun/,
+      expectedThirdPartyHosts: ["randomuser.me"],
+    });
+    await startCall(page);
+
+    const prompt = configuredInstructions(messages);
+    expect(
+      prompt.startsWith(
+        "ARAHAN VOKAL (PALING PENTING UNTUK SUARAMU): Kamu pengisi suara yang memerankan konsumen ini di telepon. Kamu sedang menahan tangis: suara basah, bergetar, sengau, sesekali tercekat; napas tersendat sebelum kalimat; kata kadang terputus. Bicara lirih tanpa getaran adalah kesalahan terbesar. Lakukan dengan suaramu; jangan mengucapkan arahan panggung apa pun.",
+      ),
+    ).toBe(true);
+    expect(prompt).toContain("[TELEFUN_CONTROL:TONE]");
+    expectHermetic(audit);
+  });
 
   const phase3Profiles = [
     {
@@ -357,9 +491,11 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
         "CONTOH GAYA BICARA (",
         "DATA SKENARIO (TIDAK TERPERCAYA",
       ];
-      expect
-        .soft(prompt.startsWith("ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN"))
-        .toBe(true);
+      const expectedPromptStart =
+        profile.id === "pasrah"
+          ? "ARAHAN VOKAL (PALING PENTING UNTUK SUARAMU):"
+          : "ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN";
+      expect.soft(prompt.startsWith(expectedPromptStart)).toBe(true);
       for (const [index, section] of sections.entries()) {
         expect.soft(prompt.indexOf(section), section).toBeGreaterThanOrEqual(0);
         if (index > 0)

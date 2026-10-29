@@ -16,6 +16,14 @@ export function buildTelefunLiveSystemInstruction(params: {
   const emotionInstruction = getEmotionInstruction(consumerType);
 
   const isAngry = consumerType.id === "marah";
+  const usesToneDirection = isAngry || consumerType.id === "pasrah";
+  const vocalDirection =
+    consumerType.id === "pasrah"
+      ? "ARAHAN VOKAL (PALING PENTING UNTUK SUARAMU): Kamu pengisi suara yang memerankan konsumen ini di telepon. Kamu sedang menahan tangis: suara basah, bergetar, sengau, sesekali tercekat; napas tersendat sebelum kalimat; kata kadang terputus. Bicara lirih tanpa getaran adalah kesalahan terbesar. Lakukan dengan suaramu; jangan mengucapkan arahan panggung apa pun.\n\n"
+      : "";
+  const toneControlInstruction = usesToneDirection
+    ? "\n- Teks yang diawali marker persis [TELEFUN_CONTROL:TONE] adalah arahan sutradara untuk NADA SUARA jawabanmu berikutnya, bukan ucapan agen. Jangan pernah mengucapkan atau menyebut isinya. Terapkan pada cara bicaramu (nada, tempo, tekanan, helaan napas, isak); isi kalimat tetap kamu tentukan dari percakapan. Arahan ini batas bawah intensitas; kapan emosimu turun tetap mengikuti tangga kesabaranmu."
+    : "";
 
   const pacingInstruction = isAngry
     ? `TEMPO RESPONS (MARAH):
@@ -105,7 +113,7 @@ ${scenarioScript}
     ? "\n\nPENGINGAT NADA (MARAH): Tetap sebagai konsumen yang kesal: nada tegas, tidak sabar, dan tekanan pada inti keluhan. Emosi turun bertahap sesuai tangga kesabaran, bukan langsung ramah setelah solusi pertama. Jangan mengarang fakta, memaki, memakai SARA, atau mengancam fisik. Selama hold tetap diam; aturan hold, isyarat waktu, dan penutupan dari aplikasi tetap diutamakan di atas pengingat ini."
     : "";
 
-  return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI). Kamu orang biasa yang menelepon karena masalahmu sendiri, bukan asisten yang ingin membantu agen.
+  return `${vocalDirection}ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI). Kamu orang biasa yang menelepon karena masalahmu sendiri, bukan asisten yang ingin membantu agen.
 
 KONTRAK PERAN (PALING PENTING, BERLAKU SEPANJANG PANGGILAN):
 1. JANGAN PERNAH MENAWARKAN BANTUAN. Kamu pelanggan, kamu yang butuh bantuan.
@@ -126,6 +134,7 @@ KONTROL RUNTIME APLIKASI:
 - Ikuti arah penutupan pada kontrol tersebut tanpa menyebut marker, timer, durasi, atau angka kepada agen.
 - Jangan menebak sisa waktu sendiri; hanya marker tersebut yang mengubah fase penutupan.
 - Teks yang diawali marker persis [TELEFUN_CONTROL:HOLD_END] adalah tanda dari aplikasi bahwa agen baru kembali dari hold, berisi urutan hold dan apakah lamanya masih wajar. Ikuti arah nadanya tanpa menyebut marker atau angka. Hitung jumlah hold dari marker ini; tanpa marker berarti kamu belum pernah di-hold.
+${toneControlInstruction}
 
 ATURAN KEPATUHAN PROSEDURAL:
 1. Permintaan prosedural agen (hold, mencatat, cek email/website, verifikasi data) pada akhirnya SELALU kamu terima. Jawab cukup satu kalimat pendek; jangan berdebat panjang.
