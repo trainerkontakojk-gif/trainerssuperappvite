@@ -520,7 +520,10 @@ test.describe("KETIK landing (hermetic)", () => {
   test("bagian data dihitung dari riwayat: progres, tindak lanjut, fokus, hasil terbaru", async ({
     page,
   }) => {
-    const audit = await open(page, "/ketik", ketikMocks(FULL_HISTORY));
+    const audit = await open(page, "/ketik", [
+      ...ketikMocks(FULL_HISTORY),
+      reviewDetailMock,
+    ]);
 
     const progress = page.getByTestId("ketik-progress-summary");
     // 4 sesi dalam 3 hari terakhir: semuanya masuk bulan ini kecuali bila

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-29
 
+- fix(ketik): tahan balasan konsumen sampai agen selesai mengetik
+
 - docs(ketik): tambahkan plan konsumen menunggu agen selesai mengetik untuk dikerjakan Codex
 
 - feat(telefun): kirim arahan nada per giliran untuk konsumen marah dan sedih

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import type { KetikServerSession } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import {
@@ -74,6 +74,96 @@ const base: ApiMock[] = [
     },
   },
 ];
+
+async function openTypingChat(
+  page: Page,
+  options: {
+    initial?: KetikServerSession;
+    responseMessages?: Array<{ id: string; text: string }>;
+  } = {},
+) {
+  let live = options.initial ?? session();
+  const audit = await openHermeticShell(page, {
+    path: "/ketik",
+    apiMocks: base,
+    expectedThirdPartyHosts: ["randomuser.me"],
+  });
+  const sessionPath = "**/api/v1/ketik/sessions/" + id;
+  await page.route(sessionPath, (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  await page.route("**/api/v1/ketik/sessions", (route) =>
+    route.fulfill({ json: { success: true, data: live } }),
+  );
+  await page.route(sessionPath + "/messages", async (route) => {
+    const body = route.request().postDataJSON() as {
+      requestId: string;
+      text: string;
+    };
+    live = {
+      ...live,
+      version: live.version + 1,
+      agentVersion: live.agentVersion + 1,
+      awaitingResponse: true,
+      messages: [
+        ...live.messages,
+        {
+          id: body.requestId,
+          sender: "agent",
+          text: body.text,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+  let responseAt: number | null = null;
+  let responseCalls = 0;
+  let resolveResponseStarted!: () => void;
+  const responseStarted = new Promise<void>((resolve) => {
+    resolveResponseStarted = resolve;
+  });
+  await page.route(sessionPath + "/respond", async (route) => {
+    responseAt = Date.now();
+    responseCalls++;
+    resolveResponseStarted();
+    const replies = options.responseMessages ?? [
+      { id: "reply-default", text: "Saya sudah membaca penjelasanmu." },
+    ];
+    live = {
+      ...live,
+      version: live.version + replies.length,
+      awaitingResponse: false,
+      messages: [
+        ...live.messages,
+        ...replies.map((reply) => ({
+          id: reply.id,
+          sender: "consumer" as const,
+          text: reply.text,
+          timestamp: new Date().toISOString(),
+        })),
+      ],
+    };
+    await route.fulfill({ json: { success: true, data: live } });
+  });
+
+  await page.getByRole("button", { name: /^Mulai simulasi/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Mulai|Lanjutkan/ })
+    .click();
+  const room = page.getByRole("region", { name: "Ruang chat" });
+  const input = room.getByRole("textbox", { name: "Tulis balasan" });
+  return {
+    audit,
+    input,
+    responseAt: () => responseAt,
+    responseCalls: () => responseCalls,
+    responseStarted,
+    room,
+  };
+}
+
 test.beforeAll(() => assertLocalDevOnlyTarget());
 test("failed turn resumes without automatic generation; retry uses the same ID and no duplicate agent message", async ({
   page,
@@ -1114,4 +1204,135 @@ test("consumer replies published by one response are still typed out one at a ti
   await expect(second).toHaveCount(1);
   await expect(typing).toHaveCount(0);
   expectHermetic(audit);
+});
+
+test("the consumer waits while the agent is still typing a follow-up", async ({
+  page,
+}) => {
+  const chat = await openTypingChat(page);
+  const { input, room } = chat;
+  await input.fill("Pesan pertama");
+  await input.press("Enter");
+  await expect(room.getByText("Pesan pertama", { exact: true })).toBeVisible({
+    timeout: 1000,
+  });
+  await input.pressSequentially("abcdefgh", { delay: 1000 });
+  await input.press("i");
+  const stoppedAt = Date.now();
+
+  expect(chat.responseAt()).toBeNull();
+  await expect.poll(() => chat.responseAt(), { timeout: 7000 }).not.toBeNull();
+  const idleDelay = chat.responseAt()! - stoppedAt;
+  expect(idleDelay).toBeGreaterThanOrEqual(4000);
+  expect(idleDelay).toBeLessThanOrEqual(6000);
+  expectHermetic(chat.audit);
+});
+
+test("clearing the draft releases the consumer", async ({ page }) => {
+  const chat = await openTypingChat(page);
+  await chat.input.fill("Pesan pertama");
+  await chat.input.press("Enter");
+  await chat.input.fill("Saya sedang menulis lanjutan");
+  await page.waitForTimeout(1800);
+  expect(chat.responseAt()).toBeNull();
+
+  const clearedAt = Date.now();
+  await chat.input.fill("");
+  await expect
+    .poll(() => chat.responseAt(), { timeout: 1500 })
+    .not.toBeNull();
+  expect(chat.responseAt()! - clearedAt).toBeLessThanOrEqual(1000);
+  expectHermetic(chat.audit);
+});
+
+test("the consumer interrupts once the typing hold runs out", async ({
+  page,
+}) => {
+  const initial = session();
+  const chat = await openTypingChat(page, {
+    initial: {
+      ...initial,
+      config: {
+        ...initial.config,
+        consumerType: { ...initial.config.consumerType, id: "custom-test" },
+      },
+    },
+  });
+  await chat.input.fill("Pesan pertama");
+  await chat.input.press("Enter");
+  const sentAt = Date.now();
+  await chat.input.pressSequentially("abcdefghijklmnopqrstuv", { delay: 850 });
+
+  await expect.poll(() => chat.responseAt(), { timeout: 1000 }).not.toBeNull();
+  const responseDelay = chat.responseAt()! - sentAt;
+  expect(responseDelay).toBeGreaterThanOrEqual(17000);
+  expect(responseDelay).toBeLessThanOrEqual(19000);
+  expect(chat.responseCalls()).toBe(1);
+  expectHermetic(chat.audit);
+});
+
+test("a ready reply stays hidden while the agent types", async ({ page }) => {
+  const initial = session({
+    messages: [
+      {
+        id: "consumer-greeting",
+        sender: "consumer",
+        text: "Halo kak, saya mau tanya.",
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+  const longReply =
+    "Saya sudah membaca penjelasannya dan sedang memastikan rincian laporan ini sebelum menentukan langkah yang perlu dilakukan.";
+  const chat = await openTypingChat(page, {
+    initial,
+    responseMessages: [{ id: "reply-ready", text: longReply }],
+  });
+  const reply = chat.room.getByText(longReply, { exact: true });
+  await chat.input.fill("Saya jelaskan langkahnya dulu");
+  await chat.input.press("Enter");
+  await chat.responseStarted;
+  await chat.input.pressSequentially("abcdefgh", { delay: 1000 });
+  await chat.input.press("i");
+  const stoppedAt = Date.now();
+
+  expect(await reply.count()).toBe(0);
+  let revealedAt: number | null = null;
+  await expect
+    .poll(
+      async () => {
+        const count = await reply.count();
+        if (count && revealedAt === null) revealedAt = Date.now();
+        return count;
+      },
+      { timeout: 7000 },
+    )
+    .toBe(1);
+  const idleDelay = revealedAt! - stoppedAt;
+  expect(idleDelay).toBeGreaterThanOrEqual(4000);
+  expect(idleDelay).toBeLessThanOrEqual(6000);
+  expectHermetic(chat.audit);
+});
+
+test("realistic mode waits eight seconds after a send", async ({ page }) => {
+  const initial = session();
+  const chat = await openTypingChat(page, {
+    initial: {
+      ...initial,
+      config: {
+        ...initial.config,
+        consumerType: { ...initial.config.consumerType, id: "custom-test" },
+        responsePacingMode: "realistic",
+      },
+    },
+  });
+  await chat.input.fill("Pesan singkat");
+  await chat.input.press("Enter");
+  const sentAt = Date.now();
+
+  await expect.poll(() => chat.responseAt(), { timeout: 11000 }).not.toBeNull();
+  const responseDelay = chat.responseAt()! - sentAt;
+  expect(responseDelay).toBeGreaterThanOrEqual(7000);
+  expect(responseDelay).toBeLessThanOrEqual(10000);
+  expectHermetic(chat.audit);
 });

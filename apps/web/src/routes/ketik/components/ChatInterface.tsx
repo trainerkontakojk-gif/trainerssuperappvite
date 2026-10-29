@@ -89,6 +89,7 @@ export function ChatInterface({
     retry,
     retryLabel,
     send,
+    noteDraft,
     sessionPhase,
   } = useServerKetikChat(session);
   const avatarUrl = getKetikConsumerAvatarUrl(config.identity);
@@ -114,6 +115,9 @@ export function ChatInterface({
   const filteredTemplates = templates.filter((t) =>
     t.keyword.toLowerCase().includes(templateSearchQuery.toLowerCase()),
   );
+  useEffect(() => {
+    noteDraft(inputText);
+  }, [inputText, noteDraft]);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isConsumerTyping]);

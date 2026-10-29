@@ -6,11 +6,14 @@ import {
   boundedRandom,
   classifyTextBand,
   consumerSpeedFactor,
+  DRAFT_IDLE_MS,
   isSlowEligible,
+  MAX_TYPING_HOLD_MS,
   QUIET_WINDOW_MS,
   readingMs,
   REALISTIC_RANGES,
   TRAINING_FAST_RANGES,
+  TYPING_HOLD_EXPIRY_THRESHOLD_MS,
 } from "../lib/pacing";
 
 interface QueuedMessage {
@@ -39,6 +42,15 @@ function owesClosing(session: KetikServerSession): boolean {
     !session.consumerClosed &&
     Date.parse(session.expiresAt) <= Date.now()
   );
+}
+
+interface AgentDraftState {
+  active: boolean;
+  at: number;
+}
+
+function isAgentTyping(draft: AgentDraftState, now: number): boolean {
+  return draft.active && now - draft.at < DRAFT_IDLE_MS;
 }
 
 function agentTextsSinceConsumer(
@@ -131,7 +143,9 @@ export function useServerKetikChat(initial: KetikServerSession) {
   const pause = useRef<{
     timer: ReturnType<typeof setTimeout>;
     resolve: () => void;
+    draftHold: boolean;
   } | null>(null);
+  const agentDraft = useRef<AgentDraftState>({ active: false, at: 0 });
   /** Closing requests the server did not answer with a goodbye yet. */
   const closingAttempts = useRef(0);
   const requestResponseRef = useRef<() => void>(() => {});
@@ -181,6 +195,21 @@ export function useServerKetikChat(initial: KetikServerSession) {
   const [closed, setClosed] = useState(
     initial.consumerClosed || initial.state !== "active",
   );
+
+  const noteDraft = useCallback((text: string) => {
+    const wasActive = agentDraft.current.active;
+    const active = text.trim().length > 0;
+    agentDraft.current = { active, at: Date.now() };
+    if (wasActive && !active) {
+      scheduleResponseRef.current();
+      if (pause.current?.draftHold) {
+        const pending = pause.current;
+        clearTimeout(pending.timer);
+        pause.current = null;
+        pending.resolve();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -235,9 +264,37 @@ export function useServerKetikChat(initial: KetikServerSession) {
     const texts = agentTextsSinceConsumer(session.messages, []);
     const dueAt =
       lastSendAt.current +
-      Math.max(QUIET_WINDOW_MS[mode], readingMs(texts, mode) * factor);
+      Math.max(
+        QUIET_WINDOW_MS[mode] * factor,
+        readingMs(texts, mode) * factor,
+      );
+    const holdUntil = Math.min(
+      dueAt + MAX_TYPING_HOLD_MS[mode],
+      Date.parse(session.expiresAt),
+    );
+    const requestWhenReady = () => {
+      responseTimer.current = null;
+      const now = Date.now();
+      const latest = current.current;
+      const remainingMs = Date.parse(latest.expiresAt) - now;
+      const draft = agentDraft.current;
+      if (
+        !owesClosing(latest) &&
+        remainingMs >= TYPING_HOLD_EXPIRY_THRESHOLD_MS &&
+        now < holdUntil &&
+        isAgentTyping(draft, now)
+      ) {
+        const nextAt = Math.min(draft.at + DRAFT_IDLE_MS, holdUntil);
+        responseTimer.current = setTimeout(
+          requestWhenReady,
+          Math.max(0, nextAt - now),
+        );
+        return;
+      }
+      requestResponseRef.current();
+    };
     responseTimer.current = setTimeout(
-      () => requestResponseRef.current(),
+      requestWhenReady,
       Math.max(0, dueAt - Date.now()),
     );
   }, []);
@@ -332,19 +389,40 @@ export function useServerKetikChat(initial: KetikServerSession) {
       (message) => message.sender === "consumer",
     ).length;
     /** Resolves early on unmount, so a pending reveal never leaks a timer. */
-    const wait = (ms: number) =>
+    const wait = (ms: number, draftHold = false) =>
       new Promise<void>((resolve) => {
-        pause.current = {
-          timer: setTimeout(
-            () => {
+        const timer = setTimeout(
+          () => {
+            if (pause.current?.timer === timer) {
               pause.current = null;
-              resolve();
-            },
-            Math.max(0, ms),
-          ),
+            }
+            resolve();
+          },
+          Math.max(0, ms),
+        );
+        pause.current = {
+          timer,
           resolve,
+          draftHold,
         };
       });
+    const waitForAgentIdle = async (holdUntil: number) => {
+      while (mounted.current) {
+        const now = Date.now();
+        const latest = current.current;
+        const remainingMs = Date.parse(latest.expiresAt) - now;
+        const draft = agentDraft.current;
+        if (
+          owesClosing(latest) ||
+          remainingMs < TYPING_HOLD_EXPIRY_THRESHOLD_MS ||
+          now >= holdUntil ||
+          !isAgentTyping(draft, now)
+        )
+          return;
+        const nextAt = Math.min(draft.at + DRAFT_IDLE_MS, holdUntil);
+        await wait(Math.max(0, nextAt - now), true);
+      }
+    };
     const requestId = responseRequestId.current ?? crypto.randomUUID();
     responseRequestId.current = requestId;
     try {
@@ -401,6 +479,12 @@ export function useServerKetikChat(initial: KetikServerSession) {
           await wait(
             Math.min(planned, Date.parse(result.expiresAt) - Date.now()),
           );
+          if (!mounted.current) return;
+          const revealHoldUntil = Math.min(
+            showAt + MAX_TYPING_HOLD_MS[mode],
+            Date.parse(result.expiresAt) - 5000,
+          );
+          await waitForAgentIdle(revealHoldUntil);
           if (!mounted.current) return;
           hidden.current.delete(reply.id);
           setMessages(present(current.current.messages));
@@ -550,6 +634,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
     retryLabel:
       retryKind === "append" ? "Coba simpan lagi" : "Coba minta balasan lagi",
     send,
+    noteDraft,
     sessionPhase: closed
       ? ("closed" as const)
       : expired

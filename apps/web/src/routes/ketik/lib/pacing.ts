@@ -20,8 +20,20 @@ export function readingMs(
     : Math.min(20000, chars * 45);
 }
 
-/** Pause after the agent's last send before the turn goes out, so back-to-back messages are answered once. */
-export const QUIET_WINDOW_MS = { realistic: 3000, training_fast: 1200 } as const;
+/** Pause after the agent's last send before the turn goes out. */
+export const QUIET_WINDOW_MS = { realistic: 8000, training_fast: 3000 } as const;
+
+/** A non-empty agent draft is idle after this much time without edits. */
+export const DRAFT_IDLE_MS = 5000;
+
+/** Maximum extra time a draft may hold a consumer response. */
+export const MAX_TYPING_HOLD_MS = {
+  realistic: 30000,
+  training_fast: 15000,
+} as const;
+
+/** Skip typing holds when the simulation has less time remaining than this. */
+export const TYPING_HOLD_EXPIRY_THRESHOLD_MS = 20000;
 
 /** Reading and typing speed per built-in consumer type; custom types use 1. */
 const SPEED_FACTORS: Record<string, number> = {
