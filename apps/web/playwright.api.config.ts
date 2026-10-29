@@ -66,6 +66,10 @@ export default defineConfig({
       testMatch: "scenario-attachments-api.spec.ts",
     },
     {
+      name: "kegiatan-real-backend",
+      testMatch: "kegiatan-api.spec.ts",
+    },
+    {
       name: "user-controls-real-backend",
       testMatch: ["user-controls-api.spec.ts", "account-controls-api.spec.ts"],
     },
