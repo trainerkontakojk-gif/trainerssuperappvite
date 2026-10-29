@@ -180,11 +180,11 @@ Langkah asli (sudah dikerjakan):
 
 ### Task 1 — Suara per tipe dan perbaikan daftar (R3, R6)
 
-- [ ] RED: di `apps/web/e2e/telefun-consumer-prompt.spec.ts`, test baru "suara mengikuti tipe: marah/pasrah memakai suara teruji, menimpa pilihan manual". Pakai `mockTelefunVoiceServer` + `messages`; baca `voice` dari pesan `telefun_session_configure`. Kasus: (a) `marah` + wanita → `Kore`; (b) `marah` + pria → `Orus` atau `Alnilam`; (c) `pasrah` + pria → `Algieba`; (d) `marah` + wanita + suara manual `Aoede` di pengaturan → tetap `Kore`; (e) tipe `ramah` + suara manual `Aoede` → `Aoede`. Set tipe dan gender lewat settings mock seperti test lain di spec itu.
-- [ ] GREEN: `resolveConsumerTypeVoice()` + pemanggilan di `index.tsx`.
-- [ ] R6 sesuai Design. Bila memindah Pulcherrima, cari test/fixture yang mengandalkannya dan sesuaikan.
-- [ ] Typecheck: `pnpm --filter @trainers/web exec tsc --noEmit` dan, karena `packages/types` berubah, `pnpm --dir apps/telefun exec tsc --noEmit -p tsconfig.json` serta `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json`.
-- [ ] Commit: `feat(telefun): pilih suara konsumen sesuai tipe marah dan sedih` (+ CHANGELOG).
+- [x] RED: di `apps/web/e2e/telefun-consumer-prompt.spec.ts`, test baru "suara mengikuti tipe: marah/pasrah memakai suara teruji, menimpa pilihan manual". Pakai `mockTelefunVoiceServer` + `messages`; baca `voice` dari pesan `telefun_session_configure`. Kasus: (a) `marah` + wanita → `Kore`; (b) `marah` + pria → `Orus` atau `Alnilam`; (c) `pasrah` + pria → `Algieba`; (d) `marah` + wanita + suara manual `Aoede` di pengaturan → tetap `Kore`; (e) tipe `ramah` + suara manual `Aoede` → `Aoede`. RED gagal pada empat kasus yang berubah; kontrol `ramah` lulus. GREEN: kelima skenario lulus.
+- [x] GREEN: `resolveConsumerTypeVoice()` + pemanggilan di `index.tsx`.
+- [x] R6 sesuai Design. GET katalog suara Gemini mengembalikan HTTP 200 dengan `id: pulcherrima`, `display_name: Pulcherrima`, `gender: neutral`; sesuai aturan, Pulcherrima dikeluarkan dari daftar wanita saja. Pemakai dan assertion katalog diperbarui.
+- [x] Typecheck: `pnpm --filter @trainers/web exec tsc --noEmit`, `pnpm --dir apps/telefun exec tsc --noEmit -p tsconfig.json`, dan `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json` lulus.
+- [x] Commit: `feat(telefun): pilih suara konsumen sesuai tipe marah dan sedih` (+ CHANGELOG).
 
 ### Task 2 — Catatan nada per giliran (R1, R2, R4)
 

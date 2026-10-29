@@ -33,6 +33,7 @@ import { TelefunReviewStage } from "./components/TelefunReviewStage";
 import { TelefunStageDemo } from "./components/TelefunStageDemo";
 import { useTelefunHistory } from "./hooks/useTelefunHistory";
 import { saveTelefunSession, scoreTelefunSession } from "./sessionFinalizer";
+import { resolveConsumerTypeVoice } from "./telefunVoiceRegistry";
 import {
   createTelefunSessionReconciler,
   type TelefunSessionReconciler,
@@ -301,6 +302,16 @@ export default function TelefunLanding() {
         settings.identitySettings,
         normalizedSelection.model.id,
       );
+    const sessionIdentity = retryConfig
+      ? identity
+      : {
+          ...identity,
+          voiceName: resolveConsumerTypeVoice({
+            consumerTypeId: consumerType.id,
+            gender: identity.gender,
+            fallbackVoice: identity.voiceName,
+          }),
+        };
 
     const config: ActiveTelefunSessionConfig = retryConfig
       ? { ...retryConfig }
@@ -312,10 +323,10 @@ export default function TelefunLanding() {
           activeScenario: scenario,
           activeConsumerType: consumerType,
           scenarioTitle: scenario.title,
-          consumerName: identity.name,
-          consumerGender: identity.gender,
-          voiceName: identity.voiceName || settings.voiceName,
-          resolvedIdentity: identity,
+          consumerName: sessionIdentity.name,
+          consumerGender: sessionIdentity.gender,
+          voiceName: sessionIdentity.voiceName || settings.voiceName,
+          resolvedIdentity: sessionIdentity,
         };
 
     let sessionId: string;

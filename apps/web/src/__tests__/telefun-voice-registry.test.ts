@@ -47,7 +47,6 @@ describe("Telefun provider-aware voice registry", () => {
       "Laomedeia",
       "Achernar",
       "Gacrux",
-      "Pulcherrima",
       "Vindemiatrix",
       "Sulafat",
     ]);
@@ -71,8 +70,8 @@ describe("Telefun provider-aware voice registry", () => {
     ]);
 
     const allVoices = Object.values(GEMINI_LIVE_VOICES_BY_GENDER).flat();
-    expect(allVoices).toHaveLength(30);
-    expect(new Set(allVoices).size).toBe(30);
+    expect(allVoices).toHaveLength(29);
+    expect(new Set(allVoices).size).toBe(29);
   });
 
   it("keeps Gemini voices gender-aware and normalizes an incompatible voice", () => {

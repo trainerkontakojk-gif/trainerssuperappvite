@@ -31,7 +31,6 @@ export const GEMINI_LIVE_VOICES_BY_GENDER = {
     "Laomedeia",
     "Achernar",
     "Gacrux",
-    "Pulcherrima",
     "Vindemiatrix",
     "Sulafat",
   ],

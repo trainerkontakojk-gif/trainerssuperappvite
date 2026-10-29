@@ -70,6 +70,14 @@ function configuredInstructions(messages: Record<string, unknown>[]): string {
   return configure!.instructions as string;
 }
 
+function configuredVoice(messages: Record<string, unknown>[]): string {
+  const configure = messages.find(
+    (message) => message.type === "telefun_session_configure",
+  ) as { voice?: unknown } | undefined;
+  expect(typeof configure?.voice).toBe("string");
+  return configure!.voice as string;
+}
+
 function holdEndCues(messages: Record<string, unknown>[]): string[] {
   return messages
     .map(
@@ -87,6 +95,71 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
   });
+
+  const voiceCases = [
+    {
+      title: "marah wanita memakai Kore",
+      consumerTypeId: "marah",
+      gender: "female",
+      manualVoice: "",
+      expected: ["Kore"],
+    },
+    {
+      title: "marah pria memakai Orus atau Alnilam",
+      consumerTypeId: "marah",
+      gender: "male",
+      manualVoice: "",
+      expected: ["Orus", "Alnilam"],
+    },
+    {
+      title: "pasrah pria memakai Algieba",
+      consumerTypeId: "pasrah",
+      gender: "male",
+      manualVoice: "",
+      expected: ["Algieba"],
+    },
+    {
+      title: "marah menimpa pilihan manual Aoede dengan Kore",
+      consumerTypeId: "marah",
+      gender: "female",
+      manualVoice: "Aoede",
+      expected: ["Kore"],
+    },
+    {
+      title: "ramah mempertahankan pilihan manual Aoede",
+      consumerTypeId: "ramah",
+      gender: "female",
+      manualVoice: "Aoede",
+      expected: ["Aoede"],
+    },
+  ] as const;
+
+  for (const voiceCase of voiceCases) {
+    test(`suara mengikuti tipe: ${voiceCase.title}`, async ({ page }) => {
+      const messages: Record<string, unknown>[] = [];
+      await mockTelefunVoiceServer(page, NEW_ID, messages);
+      const audit = await openHermeticShell(page, {
+        path: "/telefun",
+        apiMocks: callMocks({
+          preferredConsumerTypeId: voiceCase.consumerTypeId,
+          identitySettings: {
+            displayName: "Sari Wulandari",
+            gender: voiceCase.gender,
+            phoneNumber: "0812-1111-2222",
+            city: "Jakarta",
+            signatureName: "",
+            voiceName: voiceCase.manualVoice,
+          },
+        }),
+        waitForUrl: /\/telefun/,
+        expectedThirdPartyHosts: ["randomuser.me"],
+      });
+      await startCall(page);
+
+      expect(voiceCase.expected).toContain(configuredVoice(messages));
+      expectHermetic(audit);
+    });
+  }
 
   const phase3Profiles = [
     {

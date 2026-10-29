@@ -93,3 +93,24 @@ export function resolveVoiceForModel(params: {
     random: params.random,
   });
 }
+
+export function resolveConsumerTypeVoice(params: {
+  consumerTypeId: string;
+  gender: TelefunGender;
+  fallbackVoice: string;
+  random?: () => number;
+}): string {
+  if (params.consumerTypeId === "marah") {
+    if (params.gender === "female") return "Kore";
+    return resolveVoiceFromPool({
+      pool: ["Orus", "Alnilam"],
+      random: params.random,
+    });
+  }
+
+  if (params.consumerTypeId === "pasrah") {
+    return params.gender === "female" ? "Kore" : "Algieba";
+  }
+
+  return params.fallbackVoice;
+}
