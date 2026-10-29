@@ -317,7 +317,7 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 ## Batasan v1
 
 - tidak ada backfill histori lama
-- tidak ada export CSV/XLSX untuk tab usage token; CSV export tersedia di `/kegiatan` untuk activity logs
+- tidak ada export CSV/XLSX untuk tab usage token; CSV export tersedia di `/dashboard/activities` untuk activity logs
 - quick-view tersedia untuk KETIK, PDKT, dan TELEFUN; QA Analyzer hanya lewat monitoring pusat
 - jika model belum punya pricing atau provider tidak memberi metadata token, request user tetap berjalan tetapi usage tidak tercatat
 

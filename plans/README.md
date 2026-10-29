@@ -6,7 +6,6 @@ honor its STOP conditions, and update your row when done.
 
 ## Per-feature plans
 
-- [`kegiatan-route.md`](markdown/kegiatan-route.md) — Lane C; `/kegiatan` membuka Log Aktivitas dengan guard yang sama; typecheck/lint/diff dan E2E terfokus 5/5 lulus; race assertion tautan SIDAK di `home-staff` diperbaiki, run dua spec 18/18 lulus.
 - [PDKT Integrity & Resilience](markdown/pdkt-integrity-resilience.md) — Lane D; all eight findings fixed locally, E2E/rollback/replay/root checks complete. Commit/push to main authorized; deployment and remote migration remain outside scope.
 
 Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked in Git. The git-ignored `plan/markdown/` directory is a legacy local archive; do not add new plans there.

@@ -294,7 +294,7 @@ test.describe("Beranda staff", () => {
     await expect(main.getByText("Rina Kusuma", { exact: true })).toBeVisible();
     await expect(
       main.getByRole("link", { name: "Lihat semua aktivitas" }),
-    ).toHaveAttribute("href", "/kegiatan");
+    ).toHaveAttribute("href", "/dashboard/activities");
     expectHermetic(audit);
   });
 

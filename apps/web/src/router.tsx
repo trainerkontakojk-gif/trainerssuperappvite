@@ -139,13 +139,6 @@ const dashboardActivitiesRoute = createRoute({
   beforeLoad: requireCapability("admin.activityLogs.read"),
 });
 
-const kegiatanRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/kegiatan",
-  component: DashboardActivities,
-  beforeLoad: requireCapability("admin.activityLogs.read"),
-});
-
 /**
  * Statistik, Slide, dan Ekspor kini tab di workspace `/profiler`
  * (`?view=`). Route lama tetap ada sebagai deep link dan diteruskan ke tab
@@ -871,7 +864,6 @@ const routeTree = rootRoute.addChildren([
   dashboardAccessGroupsRoute,
   dashboardAccessApprovalRoute,
   dashboardActivitiesRoute,
-  kegiatanRoute,
   profilerRoute,
   profilerTableRoute,
   profilerSlidesRoute,

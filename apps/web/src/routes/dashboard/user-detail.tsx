@@ -598,7 +598,7 @@ export default function UserDetailPage() {
           title="Riwayat perubahan"
           action={
             <Link
-              to="/kegiatan"
+              to="/dashboard/activities"
               className="inline-flex min-h-11 items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:min-h-8"
             >
               Lihat di Log Aktivitas
