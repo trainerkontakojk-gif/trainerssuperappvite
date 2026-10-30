@@ -21,7 +21,11 @@ Follow-up to [Coolify Traffic Analytics Hardening](coolify-traffic-analytics-har
 - [x] Implement API and Telefun robots routes; run GREEN (2/2).
 - [x] Focused typecheck/lint for API, Telefun, and the spec; `thermo-nuclear` review. Review moved the duplicated loopback boot into `e2e/helpers/bootLocalService.ts`, shared with `gemini-egress-proxy-api.spec.ts`; both projects pass (14/14).
 - [x] Update `docs/deployment.md`, CHANGELOG; commit and push to `main`.
-- [ ] After Coolify redeploys API and Telefun, smoke `/robots.txt` on both production hosts.
+- [x] After Coolify redeploys API and Telefun, smoke `/robots.txt` on both production hosts. Commit `a51fb444` deployed at 09:17–09:18Z; both hosts return 200 `text/plain` `Disallow: /` with `nosniff`, `HEAD` 200; `POST` is 404 on API and 405 on Telefun; health endpoints, API 404 JSON, and Web robots are unchanged.
+
+## Follow-up: Coolify Watch Paths
+
+Every push to `main` redeployed all three Coolify resources, including docs-only commits, which can drop live Telefun calls. On 2026-10-30 each resource got Watch Paths: its own `apps/<name>/**` (Web also watches `apps/api/**`, since its build compiles the API types), `packages/types/**`, and the root install/build files (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json`, `.node-version`). Markdown, unit tests, and Web E2E/Playwright files are excluded. This docs-only commit is the trigger test.
 
 ## Non-goals
 
