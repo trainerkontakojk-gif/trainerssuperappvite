@@ -2,13 +2,15 @@ import React, { useMemo, useState } from "react";
 import { Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
+import {
+  CATEGORY_LABELS,
+  MOMENT_LABELS,
+  momentLabel,
+} from "../utils/annotationDisplay";
 import { annotationItemId } from "../utils/contentMarks";
 
 export type ReplayAnnotationCategory =
-  | "strength"
-  | "improvement_area"
-  | "critical_moment"
-  | "technique_used";
+  "strength" | "improvement_area" | "critical_moment" | "technique_used";
 
 export type AnnotationMoment =
   | "missed_empathy"
@@ -52,13 +54,6 @@ export interface ReplayAnnotatorProps {
   onPlayFrom?: (ms: number) => void;
 }
 
-const CATEGORY_LABELS: Record<ReplayAnnotationCategory, string> = {
-  strength: "Kekuatan",
-  improvement_area: "Perlu diperbaiki",
-  critical_moment: "Momen kritis",
-  technique_used: "Teknik dipakai",
-};
-
 /** Titik kategori; label teks selalu menyertai warnanya. */
 const CATEGORY_DOT: Record<ReplayAnnotationCategory, string> = {
   strength: "bg-chart-green",
@@ -66,21 +61,6 @@ const CATEGORY_DOT: Record<ReplayAnnotationCategory, string> = {
   critical_moment: "bg-destructive",
   technique_used: "bg-module-telefun",
 };
-
-const MOMENT_LABELS: Record<AnnotationMoment, string> = {
-  missed_empathy: "Empati terlewat",
-  good_de_escalation: "De-eskalasi baik",
-  long_pause: "Jeda panjang",
-  interruption: "Interupsi",
-  technique_usage: "Penggunaan teknik",
-};
-
-/** Form menyimpan kunci momen; catatan lain bisa berisi teks bebas. */
-function momentLabel(moment: string): string {
-  return Object.hasOwn(MOMENT_LABELS, moment)
-    ? MOMENT_LABELS[moment as AnnotationMoment]
-    : moment;
-}
 
 const MAX_CHAR_COUNT = 500;
 

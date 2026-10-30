@@ -1,27 +1,13 @@
 import type {
-  CommunicationMetric,
   TelefunTranscriptEntry,
   VoiceQualityAssessment,
 } from "@trainers/types";
-import { getCommunicationProfileFromAssessment } from "../../../lib/voiceAssessmentUtils";
 import {
-  firstFillerLine,
   TELEFUN_FIX_THRESHOLD,
   formatTelefunScore,
-  readTelefunAspects,
-  type TelefunAspect,
 } from "../utils/reviewDisplay";
+import { buildTelefunScoreDetails } from "../utils/reviewView";
 import type { LineClock } from "./TelefunContentReview";
-
-const PROFILE_KEY: Partial<
-  Record<TelefunAspect["key"], CommunicationMetric["key"]>
-> = {
-  speakingRate: "speakingRate",
-  intonation: "intonation",
-  articulation: "articulation",
-  fillerWords: "fillers",
-  emotionalTone: "tone",
-};
 
 export function TelefunScoreDetails({
   assessment,
@@ -34,29 +20,10 @@ export function TelefunScoreDetails({
   onShowLine: (startMs: number) => void;
   clockOf: LineClock;
 }) {
-  const aspects = readTelefunAspects(assessment);
-  const profile = getCommunicationProfileFromAssessment(assessment);
-  const fillerLine = firstFillerLine(
-    transcript,
-    assessment.fillerWords.examples,
-  );
-  const metricOf = (aspect: TelefunAspect) => {
-    const key = PROFILE_KEY[aspect.key];
-    return key
-      ? profile?.metrics.find((metric) => metric.key === key)
-      : undefined;
-  };
+  const details = buildTelefunScoreDetails(assessment, transcript);
   return (
     <ol className="flex flex-col gap-3">
-      {aspects.map((aspect) => {
-        const metric = metricOf(aspect);
-        const line = aspect.key === "fillerWords" ? fillerLine : null;
-        const tip =
-          metric?.improvementTip ??
-          metric?.drill ??
-          (aspect.key === "holdManagement"
-            ? assessment.holdManagement?.drill
-            : undefined);
+      {details.map(({ aspect, metric, line, tip }) => {
         return (
           <li key={aspect.key}>
             <details

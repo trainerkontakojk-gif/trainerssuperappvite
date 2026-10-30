@@ -1,7 +1,7 @@
 # PDF Hasil Telaah per Sesi — KETIK, Telefun, PDKT
 
 **Lane:** C (frontend saja, multi-file, tiga modul; tidak ada perubahan API, schema, RLS, atau izin).
-**Status:** Fase 0–1 selesai secara lokal; menunggu Fajar memeriksa sampel PDF KETIK. Fase 1 (KETIK) dulu; Fase 2–3 **tertahan** sampai Fajar menyetujui hasil PDF KETIK.
+**Status:** Fase 0–1 selesai dan sampel KETIK disetujui Fajar. Fase 2 Telefun selesai; Fase 3 tertahan sampai Fajar memeriksa sampel PDF Telefun.
 **Dibuat:** 2026-10-30, dari keputusan Fajar di sesi yang sama.
 
 ## Requirement
@@ -122,13 +122,13 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 - [x] Verifikasi SIDAK tidak berubah: jalankan `sidak-agent-report-download.spec.ts` sekali lagi bila ada modul `agentReportPdf*` yang disentuh.
 - [x] Entri `CHANGELOG.md` di bawah tanggal hari itu (`- feat(ketik): ...`), commit, push ke `main` (sudah diizinkan). Tidak deploy production.
 - [x] Perbarui Status di plan ini + baris di `plans/README.md` dengan evidence (perintah persis + hasil).
-- [ ] **STOP.** Laporkan ke Fajar dengan lokasi sampel PDF. Fase 2 baru dimulai setelah Fajar menyetujui tampilan/isi.
+- [x] **STOP.** Laporkan ke Fajar dengan lokasi sampel PDF. Fase 2 baru dimulai setelah Fajar menyetujui tampilan/isi.
 
-### Fase 2 — Telefun (tertahan)
+### Fase 2 — Telefun
 
-- [ ] RED `apps/web/e2e/telefun-review-pdf.spec.ts` (fixture dari `e2e/helpers/telefunFixtures.ts`), kasus setara Fase 1 + **Catatan trainer tercetak** + skor dimensi sebagai tabel.
-- [ ] Ekstrak view-model Telefun; spec Telefun Telaah yang ada tetap hijau.
-- [ ] `telefunReviewPdf.ts` + tombol di `TelefunReviewStage.tsx`; GREEN; gate; changelog; commit/push; STOP untuk review.
+- [x] RED `apps/web/e2e/telefun-review-pdf.spec.ts` (fixture dari `e2e/helpers/telefunFixtures.ts`), kasus setara Fase 1 + **Catatan trainer tercetak** + skor dimensi sebagai tabel.
+- [x] Ekstrak view-model Telefun; spec Telefun Telaah yang ada tetap hijau.
+- [x] `telefunReviewPdf.ts` + tombol di `TelefunReviewStage.tsx`; GREEN; gate; changelog; commit/push; STOP untuk review.
 
 ### Fase 3 — PDKT (tertahan)
 
@@ -159,3 +159,7 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 - Audit `thermo-nuclear`: review ukuran dan batas modul, reuse view-model serta label dan primitive SIDAK, pemisahan chunk dan alur status; tidak ada temuan struktural tersisa yang diidentifikasi. Audit `impeccable`: detector `impeccable detect --json apps/web/src/routes/ketik/components/KetikReviewStage.tsx` menghasilkan `[]`; screenshot 390/1280 dan keempat halaman sampel diperiksa, tombol minimal 44×44 px. Pemeriksaan PDF SIDAK tambahan: dari `apps/web`, `pnpm exec playwright test sidak-agent-report-download.spec.ts -g 'Menu Unduh Laporan menghasilkan PDF asli'` lulus 1/1. Analisis impor build menunjukkan chunk `vendor-export` tidak lagi menjadi dependensi statis halaman KETIK.
 
 - `GRAPHIFY_MAX_WORKERS=1 graphify update .` — exit 0 setelah batch awal; dijalankan lagi setelah batch konfigurasi Vite, exit 0 tanpa perubahan topologi. `apps/web/vite.config.ts` memisahkan `vite/preload-helper.js` dari `vendor-export`; audit impor statis build KETIK tidak menemukan dependensi awal ke chunk ekspor.
+
+- Fase 2: Fajar menyetujui sampel KETIK dan mengizinkan pemuatan catatan/rekomendasi menggunakan endpoint Telefun yang sudah ada saat tombol PDF diklik; unduhan dibatalkan jika pemuatan gagal. Dari `apps/web`, `pnpm exec playwright test telefun-review-pdf.spec.ts` lulus 9/9 dan `pnpm exec playwright test telefun-flow.spec.ts -g 'Telefun Telaah'` lulus 29/29. RED pertama gagal karena tombol belum ada; kasus score-only juga diuji RED lalu GREEN.
+- Fase 2: `pnpm typecheck` 4/4, `pnpm lint` 4/4 (warning tanpa error), `pnpm build` 3/3; `impeccable detect --json apps/web/src/routes/telefun/components/TelefunReviewStage.tsx` menghasilkan `[]`. Screenshot 390/1280 dan PDF A4 tiga halaman diperiksa; audit `thermo-nuclear` memeriksa pemisahan view-model, akses catatan, status, dan pembatalan unduhan saat hasil berubah. Build Telefun tidak mengimpor chunk generator atau vendor-export secara statis. Sampel: `plans/markdown/session-review-pdf-telefun-sample.pdf`.
+- Fase 2: `GRAPHIFY_MAX_WORKERS=1 graphify update .` lulus; `git diff --check` lulus.

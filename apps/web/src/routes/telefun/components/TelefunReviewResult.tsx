@@ -1,20 +1,18 @@
 import { useRef, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import type {
-  TelefunContentReview,
   TelefunTranscriptEntry,
   VoiceQualityAssessment,
 } from "@trainers/types";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
 import { focusReviewTarget } from "../utils/contentMarks";
-import { getCommunicationProfileFromAssessment } from "../../../lib/voiceAssessmentUtils";
+import { buildTelefunReviewView } from "../utils/reviewView";
 import type { CallRecord } from "../types";
 import {
   TELEFUN_FIX_THRESHOLD,
   formatClock,
   formatTelefunScore,
-  readTelefunAspects,
   readTelefunScore,
   telefunScoreVerdict,
 } from "../utils/reviewDisplay";
@@ -34,16 +32,6 @@ function barColor(score: number): string {
   if (score < TELEFUN_FIX_THRESHOLD) return "bg-chart-orange";
   if (score >= 8.5) return "bg-chart-green";
   return "bg-fg2";
-}
-
-function scoreChange(score: number, previous: number | null): string | null {
-  if (previous === null) return null;
-  const delta = Math.round((score - previous) * 10) / 10;
-  if (delta > 0)
-    return `naik ${formatTelefunScore(delta)} dari panggilan sebelumnya`;
-  if (delta < 0)
-    return `turun ${formatTelefunScore(-delta)} dari panggilan sebelumnya`;
-  return "sama dengan panggilan sebelumnya";
 }
 
 /** Sesi lama yang punya skor tetapi tanpa rincian penilaian. */
@@ -134,16 +122,8 @@ export function ReviewResult({
   highlightedId?: string | null;
   clockOf?: LineClock;
 }) {
-  const content: TelefunContentReview | null | undefined =
-    assessment.contentReview;
-  const score = readTelefunScore(record) ?? assessment.overallScore;
-  const aspects = readTelefunAspects(assessment);
-  const profile = getCommunicationProfileFromAssessment(assessment);
-  const toFix =
-    content?.agentNotes.filter((note) => note.verdict === "fix") ?? [];
-  const good =
-    content?.agentNotes.filter((note) => note.verdict === "good") ?? [];
-  const nextSteps = assessment.overallNextSteps ?? [];
+  const { content, score, aspects, profile, toFix, good, nextSteps, change } =
+    buildTelefunReviewView(record, assessment, previous);
   const root = useRef<HTMLElement | null>(null);
   const jump = (id: string) => {
     const element = root.current?.querySelector<HTMLElement>(`#${id}`);
@@ -178,7 +158,7 @@ export function ReviewResult({
     <>
       <ScoreBlock
         score={score}
-        change={scoreChange(score, previous)}
+        change={change}
         action={
           onRerun && (
             <Button

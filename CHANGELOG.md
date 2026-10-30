@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-30
 
+- feat(telefun): unduh PDF telaah panggilan beserta catatan trainer dan transkrip
+
 - feat(ketik): unduh PDF hasil telaah dan transkrip per sesi
 
 - docs(plans): add the per-session review PDF plan for KETIK, Telefun, and PDKT

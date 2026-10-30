@@ -7,6 +7,7 @@ import {
   pointStatus,
   statusLine,
 } from "../../../components/simulation/quoteMarks";
+import { orderedConsumerPoints } from "../utils/reviewView";
 import { contentItemId } from "../utils/contentMarks";
 import { formatClock } from "../utils/reviewDisplay";
 
@@ -199,27 +200,19 @@ export function ConsumerPointList({
 }: ContentListProps & { points: readonly TelefunConsumerPoint[] }) {
   return (
     <ol aria-label="Pertanyaan konsumen" className="flex flex-col gap-3">
-      {points
-        .map((point, index) => ({ point, index }))
-        .sort((a, b) => {
-          const order = { unanswered: 0, partial: 1, answered: 2 };
-          return (
-            order[a.point.status] - order[b.point.status] || a.index - b.index
-          );
-        })
-        .map(({ point, index }) => (
-          <ConsumerPointItem
-            key={`${point.startMs}-${index}`}
-            point={point}
-            letter={pointLetter(index)}
-            id={contentItemId({ kind: "question", index })}
-            highlighted={
-              highlightedId === contentItemId({ kind: "question", index })
-            }
-            onShowLine={onShowLine}
-            clockOf={clockOf}
-          />
-        ))}
+      {orderedConsumerPoints(points).map(({ point, index }) => (
+        <ConsumerPointItem
+          key={`${point.startMs}-${index}`}
+          point={point}
+          letter={pointLetter(index)}
+          id={contentItemId({ kind: "question", index })}
+          highlighted={
+            highlightedId === contentItemId({ kind: "question", index })
+          }
+          onShowLine={onShowLine}
+          clockOf={clockOf}
+        />
+      ))}
     </ol>
   );
 }

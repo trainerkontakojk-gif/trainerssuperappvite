@@ -1,8 +1,6 @@
-import type {
-  CommunicationMetric,
-  TelefunCommunicationProfile,
-} from "@trainers/types";
+import type { TelefunCommunicationProfile } from "@trainers/types";
 import { cn } from "cn";
+import { TELEFUN_PROFILE_AXES } from "../utils/reviewView";
 import { formatTelefunScore } from "../utils/reviewDisplay";
 
 /**
@@ -10,14 +8,6 @@ import { formatTelefunScore } from "../utils/reviewDisplay";
  * 0–10 yang sama dengan bar skor per aspek (makin ke luar makin baik). Cincin
  * skala diberi angka supaya batasnya terbaca; tidak ada zona berwarna.
  */
-
-const AXES: readonly { key: CommunicationMetric["key"]; label: string }[] = [
-  { key: "speakingRate", label: "Kecepatan bicara" },
-  { key: "intonation", label: "Intonasi" },
-  { key: "articulation", label: "Artikulasi" },
-  { key: "fillers", label: "Filler" },
-  { key: "tone", label: "Nada emosi" },
-];
 
 const WIDTH = 360;
 const HEIGHT = 300;
@@ -27,7 +17,8 @@ const RADIUS = 96;
 const RINGS = [2, 4, 6, 8, 10] as const;
 
 function point(index: number, score: number): [number, number] {
-  const angle = -Math.PI / 2 + (index * 2 * Math.PI) / AXES.length;
+  const angle =
+    -Math.PI / 2 + (index * 2 * Math.PI) / TELEFUN_PROFILE_AXES.length;
   const r = (Math.max(0, Math.min(10, score)) / 10) * RADIUS;
   return [CX + r * Math.cos(angle), CY + r * Math.sin(angle)];
 }
@@ -43,7 +34,7 @@ function polygon(scores: readonly number[]): string {
 }
 
 function ringPath(score: number): string {
-  const points = AXES.map((_, index) => point(index, score));
+  const points = TELEFUN_PROFILE_AXES.map((_, index) => point(index, score));
   return `M${points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join("L")}Z`;
 }
 
@@ -58,11 +49,11 @@ export function TelefunProfileRadar({
 }: {
   profile: TelefunCommunicationProfile;
 }) {
-  const axes = AXES.flatMap((axis) => {
+  const axes = TELEFUN_PROFILE_AXES.flatMap((axis) => {
     const metric = profile.metrics.find((item) => item.key === axis.key);
     return metric ? [{ ...axis, score: metric.score }] : [];
   });
-  if (axes.length !== AXES.length) return null;
+  if (axes.length !== TELEFUN_PROFILE_AXES.length) return null;
   const scores = axes.map((axis) => axis.score);
   const summary = axes
     .map((axis) => `${axis.label} ${formatTelefunScore(axis.score)}`)
@@ -88,7 +79,7 @@ export function TelefunProfileRadar({
             )}
           />
         ))}
-        {AXES.map((axis, index) => {
+        {TELEFUN_PROFILE_AXES.map((axis, index) => {
           const [x, y] = point(index, 10);
           return (
             <line
@@ -123,8 +114,11 @@ export function TelefunProfileRadar({
         {RINGS.map((ring) => {
           // Di garis bagi antara dua sumbu pertama, di tepi cincin, supaya
           // angka skala tidak menimpa label sumbu atau titik hasil.
-          const angle = -Math.PI / 2 + Math.PI / AXES.length;
-          const r = (ring / 10) * RADIUS * Math.cos(Math.PI / AXES.length);
+          const angle = -Math.PI / 2 + Math.PI / TELEFUN_PROFILE_AXES.length;
+          const r =
+            (ring / 10) *
+            RADIUS *
+            Math.cos(Math.PI / TELEFUN_PROFILE_AXES.length);
           return (
             <text
               key={ring}

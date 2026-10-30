@@ -159,6 +159,8 @@ export function TelefunReviewStage({
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
   const [reviewVisible, setReviewVisible] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const pdfContext = useRef({ record, ready: false });
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesLoaded, setNotesLoaded] = useState(false);
   const openNotes = useCallback((open: boolean) => {
@@ -196,6 +198,14 @@ export function TelefunReviewStage({
   );
   const assessment = state === "scored" ? record.voiceAssessment : null;
   const voiceScore = readTelefunScore(record);
+  const pdfReady =
+    state === "scored" && rerunStartedAt === null && !rerunFailed;
+  useEffect(() => {
+    pdfContext.current = { record, ready: pdfReady };
+    return () => {
+      pdfContext.current.ready = false;
+    };
+  }, [record, pdfReady]);
   const fillerPattern = useMemo(
     () => buildFillerPattern(assessment?.fillerWords.examples ?? []),
     [assessment],
@@ -426,6 +436,57 @@ export function TelefunReviewStage({
           .filter((entry) => lineStart(entry.startMs) <= currentMs)
           .at(-1)?.startMs ?? null)
       : null;
+  const handleDownloadPdf = async () => {
+    if (downloadingPdf || !pdfContext.current.ready) return;
+    setDownloadingPdf(true);
+    try {
+      let pdfAnnotations: TelefunReplayAnnotation[];
+      let pdfSummary: TelefunCoachingSummary | null;
+      try {
+        const [annotationsResponse, summaryResponse] = await Promise.all([
+          telefunClient.annotations[":id"].$get({ param: { id: record.id } }),
+          telefunClient["coaching-summary"][":id"].$get({
+            param: { id: record.id },
+          }),
+        ]);
+        [pdfAnnotations, pdfSummary] = await Promise.all([
+          unwrapResponse(annotationsResponse) as Promise<
+            TelefunReplayAnnotation[]
+          >,
+          unwrapResponse(
+            summaryResponse,
+          ) as Promise<TelefunCoachingSummary | null>,
+        ]);
+      } catch {
+        notify.error("Catatan trainer belum bisa dimuat. Coba lagi.");
+        return;
+      }
+      const [{ generateTelefunReviewPdf }, { downloadPdf }] = await Promise.all(
+        [
+          import("../utils/telefunReviewPdf"),
+          import("../../../utils/sessionReviewPdf"),
+        ],
+      );
+      const bytes = await generateTelefunReviewPdf({
+        record,
+        assessment,
+        previous: previousScore(record, history),
+        transcript,
+        annotations: pdfAnnotations,
+        summary: pdfSummary,
+        clockOf,
+        canRerun,
+      });
+      if (pdfContext.current.record !== record || !pdfContext.current.ready)
+        return;
+      downloadPdf(bytes, `telefun_telaah_${record.id}.pdf`);
+    } catch {
+      notify.error("PDF belum bisa dibuat. Coba lagi.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const participant =
     record.simulationSubject?.type === "participant"
       ? formatSimulationSubjectLabel(record.simulationSubject, {
@@ -470,6 +531,18 @@ export function TelefunReviewStage({
           >
             <Download data-icon="inline-start" />
             <span className="max-sm:sr-only">Unduh transkrip</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={downloadingPdf || !pdfReady}
+            onClick={() => void handleDownloadPdf()}
+            className="min-h-[44px] min-w-[44px] gap-2 px-3 text-[13px]"
+          >
+            <Download data-icon="inline-start" />
+            <span>
+              <span className="max-sm:sr-only">Unduh </span>PDF
+            </span>
           </Button>
           <Button
             type="button"
