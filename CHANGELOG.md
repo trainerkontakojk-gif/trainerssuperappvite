@@ -10,6 +10,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 - docs(kegiatan): dokumentasikan modul Kegiatan Trainers dan laporan verifikasi akhir
 - fix(web): harden static routes with robots policy, secured 404s, and preserved SPA fallback
 - fix(web): reject percent-encoded hidden paths on Vercel
+- docs(web): record Preview smoke results and Vercel edge NUL behavior
 
 ## 2026-10-29
 
