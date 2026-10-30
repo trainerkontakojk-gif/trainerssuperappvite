@@ -40,6 +40,7 @@ import { windowsInRecording } from "../utils/recordingAudio";
 import {
   formatCallDuration,
   formatClock,
+  formatHoldLine,
   formatTelefunScore,
   holdIntervals,
   readTelefunScore,
@@ -475,6 +476,11 @@ export function TelefunReviewStage({
         annotations: pdfAnnotations,
         summary: pdfSummary,
         clockOf,
+        lineStart,
+        holds: holds.map((hold, index) => ({
+          atMs: hold.startedAtMs,
+          text: formatHoldLine(hold, holdWindows[index]),
+        })),
         canRerun,
       });
       if (pdfContext.current.record !== record || !pdfContext.current.ready)
@@ -661,12 +667,7 @@ export function TelefunReviewStage({
                         key={`hold-${hold.sequence}`}
                         className="mx-2 rounded-lg border border-dashed border-chart-orange px-3 py-1.5 text-xs text-fg2"
                       >
-                        Hold {formatClock(window.startMs)} –{" "}
-                        {formatClock(window.endMs)} ·{" "}
-                        {Math.round(hold.durationMs / 1000)} detik ·{" "}
-                        {hold.exceededByMs > 0
-                          ? `lewat ${Math.round(hold.exceededByMs / 1000)} detik dari batas`
-                          : "dalam batas"}
+                        {formatHoldLine(hold, window)}
                       </li>
                     ))}
                   </Fragment>

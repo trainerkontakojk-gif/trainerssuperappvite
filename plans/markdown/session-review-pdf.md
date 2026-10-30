@@ -1,7 +1,7 @@
 # PDF Hasil Telaah per Sesi — KETIK, Telefun, PDKT
 
 **Lane:** C (frontend saja, multi-file, tiga modul; tidak ada perubahan API, schema, RLS, atau izin).
-**Status:** Fase 0–1 selesai dan sampel KETIK disetujui Fajar. Fase 2 Telefun selesai; Fase 3 tertahan sampai Fajar memeriksa sampel PDF Telefun.
+**Status:** Fase 0–3 selesai. Revisi 2026-10-31 (lihat "Revisi: percakapan dengan AI") menggantikan lampiran transkrip polos dan menambah PDKT; menunggu Fajar memeriksa ketiga sampel.
 **Dibuat:** 2026-10-30, dari keputusan Fajar di sesi yang sama.
 
 ## Requirement
@@ -130,12 +130,22 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 - [x] Ekstrak view-model Telefun; spec Telefun Telaah yang ada tetap hijau.
 - [x] `telefunReviewPdf.ts` + tombol di `TelefunReviewStage.tsx`; GREEN; gate; changelog; commit/push; STOP untuk review.
 
-### Fase 3 — PDKT (tertahan)
+### Fase 3 — PDKT
 
-- [ ] RED `apps/web/e2e/pdkt-review-pdf.spec.ts`, kasus setara + email konsumen & balasan lengkap di lampiran + nama pembalas (bukan pembuat).
-- [ ] Ekstrak view-model PDKT; `pdkt-flow.spec.ts` dan `pdkt-replier-attribution.spec.ts` tetap hijau.
-- [ ] `pdktReviewPdf.ts` + tombol di `PdktReviewStage.tsx`; GREEN; gate; changelog; commit/push.
-- [ ] Di akhir Fase 3 saja: jalankan suite E2E default sekali (bukan paralel) dan catat hasilnya.
+- [x] RED `apps/web/e2e/pdkt-review-pdf.spec.ts`, kasus setara + email konsumen & balasan lengkap + nama pembalas (bukan pembuat).
+- [x] Ekstrak helper PDKT bersama (`pdktOtherFindings`, `PDKT_INCOMPLETE_REVIEW`); Telaah `pdkt-flow.spec.ts` dan `pdkt-replier-attribution.spec.ts` tetap hijau.
+- [x] `pdktReviewPdf.ts` + `PdktReviewPdfButton` di judul `PdktReviewStage.tsx`; GREEN; gate; changelog; commit/push.
+- [ ] Suite E2E default penuh sekali di akhir — belum dijalankan (Docker/Supabase lokal mati; lihat Evidence).
+
+## Revisi: percakapan dengan AI (2026-10-31)
+
+Fajar menilai hasil PDF sebelumnya kurang memuaskan: interaksi peserta dengan AI harus ikut, bukan hanya hasil telaah. Lampiran transkrip polos di akhir diganti dengan bagian utama **"Percakapan dengan AI"** di ketiga modul:
+
+- Urutan: Identitas → Skor → Ringkasan → **Percakapan dengan AI** → rincian telaah. Percakapan mulai di halaman yang sama bila sisa halaman ≥ 70 mm.
+- Gelembung chat (`drawConversation` di `sessionReviewPdf.ts`): konsumen AI di kiri (abu), agen di kanan (biru muda), lebar mengikuti isi, dipecah lintas halaman, paragraf dipertahankan. Label: `Pesan n · Konsumen AI · <nama> · jam` / `Pesan n · Agen · <peserta> · jam`.
+- Temuan telaah dicetak tepat di bawah pesan yang dimaksud dengan titik warna: poin konsumen (huruf + status), catatan agen (nomor sama dengan seksi rincian), "Menjawab poin …", ejaan (KETIK), catatan trainer/AI di jam rekamannya dan hold (Telefun), catatan balasan dan daftar lampiran (PDKT). Penanda verifikasi data KETIK dan pesan sistem tercetak sebagai garis putus di antara pesan.
+- Rincian telaah memakai blok temuan (`drawFinding`): judul tebal dengan penanda warna, kutipan menjorok; identitas menjadi kisi tiga kolom; judul seksi berjarak (`drawSection`).
+- PDKT: email konsumen buatan AI (subjek + isi + lampiran sebagai daftar) dan balasan peserta utuh; atribusi pembalas sesuai keputusan 2026-10-22.
 
 ## STOP conditions
 
@@ -163,3 +173,7 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 - Fase 2: Fajar menyetujui sampel KETIK dan mengizinkan pemuatan catatan/rekomendasi menggunakan endpoint Telefun yang sudah ada saat tombol PDF diklik; unduhan dibatalkan jika pemuatan gagal. Dari `apps/web`, `pnpm exec playwright test telefun-review-pdf.spec.ts` lulus 9/9 dan `pnpm exec playwright test telefun-flow.spec.ts -g 'Telefun Telaah'` lulus 29/29. RED pertama gagal karena tombol belum ada; kasus score-only juga diuji RED lalu GREEN.
 - Fase 2: `pnpm typecheck` 4/4, `pnpm lint` 4/4 (warning tanpa error), `pnpm build` 3/3; `impeccable detect --json apps/web/src/routes/telefun/components/TelefunReviewStage.tsx` menghasilkan `[]`. Screenshot 390/1280 dan PDF A4 tiga halaman diperiksa; audit `thermo-nuclear` memeriksa pemisahan view-model, akses catatan, status, dan pembatalan unduhan saat hasil berubah. Build Telefun tidak mengimpor chunk generator atau vendor-export secara statis. Sampel: `plans/markdown/session-review-pdf-telefun-sample.pdf`.
 - Fase 2: `GRAPHIFY_MAX_WORKERS=1 graphify update .` lulus; `git diff --check` lulus.
+
+- Revisi 2026-10-31 RED: `ketik-review-pdf.spec.ts -g 'PDF sesi memuat'` gagal karena "Percakapan dengan AI" belum tercetak; `pdkt-review-pdf.spec.ts` gagal karena tombol `Unduh PDF` belum ada (skor 85 sudah tampil).
+- Revisi 2026-10-31 GREEN, dari `apps/web`: `pnpm exec playwright test ketik-review-pdf.spec.ts telefun-review-pdf.spec.ts pdkt-review-pdf.spec.ts --workers=1` — 24 passed; `pnpm exec playwright test pdkt-flow.spec.ts -g "Telaah|telaah" --workers=1` — 12 passed; `pnpm exec playwright test pdkt-flow.spec.ts telefun-flow.spec.ts -g "Telaah|telaah" --workers=1` — 40 passed + 1 gagal yang kemudian diperbaiki (cakupan cek target sentuh memakai `h2.parentElement`, kini `[data-review-scroll]`); `ketik-review-worker-browser.spec.ts ketik-history-browser.spec.ts pdkt-replier-attribution.spec.ts` (bersama spec PDF) — 34/35, satu gagal `failed async rerun keeps previous result…` karena butuh Supabase lokal (`ECONNREFUSED 127.0.0.1:54321`, Docker/OrbStack mati); file yang diuji test itu tidak berubah.
+- Revisi 2026-10-31 gate: `pnpm typecheck` 4/4, `pnpm lint` 4/4 (0 error, warning lama), `pnpm build` 3/3; eslint file yang diubah bersih; `impeccable detect --json` untuk `PdktReviewStage.tsx`, `PdktReviewPdfButton.tsx`, `TelefunReviewStage.tsx` → `[]`; screenshot 390/1280 tombol PDKT diperiksa (≥ 44 px, tanpa geser horizontal); build: chunk `pdkt` hanya mengimpor `pdktReviewPdf` secara dinamis. Review `thermo-nuclear`: tombol PDKT dipisah ke komponen sendiri agar `PdktReviewStage.tsx` tidak melewati 1.000 baris (977), warna status poin disatukan (`POINT_STATUS_TONE`). Sampel baru: `plans/markdown/session-review-pdf-{ketik,telefun,pdkt}-sample.pdf`.

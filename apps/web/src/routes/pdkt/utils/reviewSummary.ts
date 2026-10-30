@@ -68,3 +68,38 @@ export function formatPdktDuration(seconds: number): string {
   if (minutes === 0) return `${rest} detik`;
   return rest === 0 ? `${minutes} menit` : `${minutes} menit ${rest} detik`;
 }
+
+/** Telaah tanpa penanda kalimat atau tanpa poin konsumen; bisa ditelaah ulang. */
+export const PDKT_INCOMPLETE_REVIEW = {
+  marks: {
+    label: "Telaah lama tanpa penanda",
+    text: "Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat tandanya di balasan Anda.",
+  },
+  points: {
+    label: "Telaah tanpa poin konsumen",
+    text: "Telaah ini belum menandai permintaan di email konsumen. Telaah ulang untuk melihat poin mana yang sudah dan belum Anda jawab.",
+  },
+} as const;
+
+/** Isi "Temuan lain"; ejaan dan kejelasan hanya untuk telaah tanpa penanda. */
+export function pdktOtherFindings(
+  evaluation: PdktEvaluationResult,
+): { kind: string; text: string }[] {
+  // Telaah bertanda sudah menampilkan ejaan dan kejelasan di "Catatan pada
+  // balasan"; hanya telaah lama yang masih membutuhkannya di sini.
+  const notedInReply = Array.isArray(evaluation.annotations);
+  return [
+    ...(notedInReply ? [] : (evaluation.typos ?? [])).map((text) => ({
+      kind: "Ejaan",
+      text,
+    })),
+    ...(notedInReply ? [] : (evaluation.clarityIssues ?? [])).map((text) => ({
+      kind: "Kejelasan",
+      text,
+    })),
+    ...(evaluation.contentGaps ?? []).map((text) => ({
+      kind: "Isi yang kurang",
+      text,
+    })),
+  ];
+}

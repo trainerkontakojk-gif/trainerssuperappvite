@@ -2607,7 +2607,8 @@ test.describe("PDKT (hermetic)", () => {
           .filter((el) =>
             [...document.querySelectorAll("h2")]
               .find((h) => h.textContent?.includes("Balasan untuk"))
-              ?.parentElement?.contains(el),
+              ?.closest("[data-review-scroll]")
+              ?.contains(el),
           )
           .map((el) => [
             el.textContent?.trim(),

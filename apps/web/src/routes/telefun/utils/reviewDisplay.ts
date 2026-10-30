@@ -280,3 +280,15 @@ export function firstFillerLine(
 export function holdIntervals(record: CallRecord): TelefunHoldInterval[] {
   return record.sessionMetrics?.hold?.intervals ?? [];
 }
+
+/** Baris hold di transkrip; `window` adalah jam rekamannya. */
+export function formatHoldLine(
+  hold: TelefunHoldInterval,
+  window: { startMs: number; endMs: number },
+): string {
+  return `Hold ${formatClock(window.startMs)} – ${formatClock(window.endMs)} · ${Math.round(hold.durationMs / 1000)} detik · ${
+    hold.exceededByMs > 0
+      ? `lewat ${Math.round(hold.exceededByMs / 1000)} detik dari batas`
+      : "dalam batas"
+  }`;
+}

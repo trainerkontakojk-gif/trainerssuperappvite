@@ -342,7 +342,7 @@ test("PDF sesi memuat telaah dan transkrip dengan skor yang sama", async ({
     "Ejaan",
     "Alasan skor",
     "Langkah berikutnya",
-    "Lampiran",
+    "Percakapan dengan AI",
     "saya cek tagihn Ibu",
     "Sebaiknya: Saya kabari dalam 10 menit.",
     "Sebagian",
@@ -356,13 +356,49 @@ test("PDF sesi memuat telaah dan transkrip dengan skor yang sama", async ({
     "[U+1F600]",
   ])
     expect(text).toContain(value);
-  const appendix = pages.texts.find((pageText) =>
-    pageText.includes("Lampiran: Transkrip"),
+  // Percakapan dengan AI tampil sesudah ringkasan dan sebelum rincian telaah.
+  const pageOf = (fact: string) =>
+    pages.texts.findIndex((pageText) => pageText.includes(fact));
+  const conversationPage = pageOf("Percakapan dengan AI");
+  expect(conversationPage).toBeGreaterThan(-1);
+  expect(text.indexOf("Ringkasan")).toBeLessThan(
+    text.indexOf("Percakapan dengan AI"),
   );
-  expect(appendix).toMatch(/Pesan 1 · Konsumen/);
-  expect(appendix).toMatch(/Pesan 2 · Agen/);
-  expect(appendix).toMatch(/Sistem .* Sesi berlanjut/);
-  expect(appendix).toMatch(/Pesan 4 · Konsumen .* Bukti transaksi/);
+  expect(text.indexOf("Percakapan dengan AI")).toBeLessThan(
+    text.indexOf("Perbaiki dulu"),
+  );
+  const conversation = text.slice(
+    text.indexOf("Percakapan dengan AI"),
+    text.indexOf("Perbaiki dulu"),
+  );
+  expect(conversation).toMatch(/Pesan 1 · Konsumen AI · Bu Rina/);
+  expect(conversation).toMatch(/Pesan 2 · Agen · Andi Peserta/);
+  expect(conversation).toMatch(/Sesi berlanjut/);
+  expect(conversation).toMatch(/Bukti transaksi \[Gambar: Bukti tagihan\]/);
+  expect(conversation).toContain("Pesan tambahan 27");
+  // Temuan telaah ditempel di bawah pesan yang dimaksud.
+  for (const tag of [
+    "Poin A · Sebagian: Tagihan ganda",
+    "Poin B · Belum terjawab: Penanganan cepat",
+    "Catatan 1 · Perlu diperbaiki: Belum ada estimasi.",
+    "Catatan 3 · Sudah tepat: Sapaan sopan.",
+    "Menjawab poin A",
+    "Ejaan: tagihn ke tagihan",
+    "Data tidak sesuai seharusnya dikonfirmasi di sini",
+  ])
+    expect(conversation.replace(/\s+/g, " ")).toContain(tag);
+  // Konsumen AI di kiri, agen di kanan, seperti layar percakapan.
+  const xOf = (fact: string) => {
+    for (const content of pages.contents)
+      for (const match of content.matchAll(
+        /([-\d.]+)\s+([-\d.]+)\s+Td\s*\(([^)]*)\)\s*Tj/g,
+      ))
+        if (match[3] === fact) return Number(match[1]);
+    throw new Error(`Teks tidak tercetak: ${fact}`);
+  };
+  expect(xOf("Baik Bu, saya cek tagihn Ibu.")).toBeGreaterThan(
+    xOf("Tolong cepat ya.") + 60,
+  );
   const runs = pages.runs.flat().map((run) => run.text);
   const firstLine = runs.findIndex((run) => run === "Tagihan saya dobel.");
   expect(firstLine).toBeGreaterThanOrEqual(0);

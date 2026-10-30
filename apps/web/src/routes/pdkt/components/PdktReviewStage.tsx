@@ -20,6 +20,7 @@ import {
   type PlacedConsumerPoint,
   renderHighlights,
 } from "../../../lib/pdkt-reply-marks";
+import { PdktReviewPdfButton } from "./PdktReviewPdfButton";
 import { PdktScoreBreakdown } from "./PdktScoreBreakdown";
 import { EmailAttachments } from "./EmailAttachments";
 import { EmailBody } from "./EmailDetailPane";
@@ -31,6 +32,8 @@ import {
 } from "../utils/emailDisplay";
 import {
   formatPdktDuration,
+  PDKT_INCOMPLETE_REVIEW,
+  pdktOtherFindings,
   pdktRankedActionItems,
   pdktScoreGrade,
 } from "../utils/reviewSummary";
@@ -488,23 +491,7 @@ function ReplyWithNotes({
 }
 
 function OtherFindings({ result }: { result: PdktEvaluationResult }) {
-  // Telaah bertanda sudah menampilkan ejaan dan kejelasan di "Catatan pada
-  // balasan"; hanya telaah lama yang masih membutuhkannya di sini.
-  const notedInReply = Array.isArray(result.annotations);
-  const otherFindings = [
-    ...(notedInReply ? [] : (result.typos ?? [])).map((text) => ({
-      kind: "Ejaan",
-      text,
-    })),
-    ...(notedInReply ? [] : (result.clarityIssues ?? [])).map((text) => ({
-      kind: "Kejelasan",
-      text,
-    })),
-    ...(result.contentGaps ?? []).map((text) => ({
-      kind: "Isi yang kurang",
-      text,
-    })),
-  ];
+  const otherFindings = pdktOtherFindings(result);
   const feedback = result.feedback?.trim();
   if (otherFindings.length === 0 && !feedback) return null;
 
@@ -663,17 +650,6 @@ function Comparison({
   );
 }
 
-const incompleteReview = {
-  marks: {
-    label: "Telaah lama tanpa penanda",
-    text: "Telaah ini dibuat sebelum fitur penanda kalimat ada, jadi AI belum menandai kalimat yang perlu diperbaiki. Telaah ulang untuk melihat tandanya di balasan Anda.",
-  },
-  points: {
-    label: "Telaah tanpa poin konsumen",
-    text: "Telaah ini belum menandai permintaan di email konsumen. Telaah ulang untuk melihat poin mana yang sudah dan belum Anda jawab.",
-  },
-} as const;
-
 /**
  * Telaah tanpa `annotations` (sebelum penanda kalimat ada) atau tanpa poin
  * konsumen bisa ditelaah ulang; backend mengizinkan keduanya.
@@ -681,17 +657,19 @@ const incompleteReview = {
 function IncompleteReviewNotice({
   missing,
   onRetry,
-}: Pick<Props, "onRetry"> & { missing: keyof typeof incompleteReview }) {
+}: Pick<Props, "onRetry"> & {
+  missing: keyof typeof PDKT_INCOMPLETE_REVIEW;
+}) {
   return (
     // Pemberitahuan statis: region berlabel, bukan role="alert" yang menyela.
     <Alert
       role="region"
-      aria-label={incompleteReview[missing].label}
+      aria-label={PDKT_INCOMPLETE_REVIEW[missing].label}
       className="items-start gap-y-3 px-4 py-3"
     >
       <Info aria-hidden="true" className="text-module-pdkt" />
       <p className="max-w-prose text-sm leading-6 text-foreground">
-        {incompleteReview[missing].text}
+        {PDKT_INCOMPLETE_REVIEW[missing].text}
       </p>
       <div className="col-start-2">
         <Button
@@ -850,14 +828,20 @@ export function PdktReviewStage({
   return (
     <div data-review-scroll className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-8 md:px-6">
-        <h2 className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground">
-            Balasan untuk {item.sender_name}
-          </span>
-          <span className="font-display text-2xl leading-8 font-bold tracking-tight text-balance">
-            {item.subject || PDKT_NO_SUBJECT}
-          </span>
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              Balasan untuk {item.sender_name}
+            </span>
+            <span className="font-display text-2xl leading-8 font-bold tracking-tight text-balance">
+              {item.subject || PDKT_NO_SUBJECT}
+            </span>
+          </h2>
+          <PdktReviewPdfButton
+            item={item}
+            result={completed ? result : null}
+          />
+        </div>
 
         {completed ? (
           <>

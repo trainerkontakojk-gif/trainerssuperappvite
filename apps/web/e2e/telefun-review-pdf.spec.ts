@@ -182,10 +182,35 @@ test("PDF Telefun memuat skor, catatan trainer dan transkrip lengkap", async ({
     "klaim asuransi saya ditolak",
     "Terus saya harus ngapain sekarang?",
     "[U+1F600]",
-    "Pesan 1 · Konsumen",
-    "Pesan 2 · Agen",
+    "Percakapan dengan AI",
   ])
     expect(text).toContain(part);
+  // Percakapan dengan AI tampil sesudah ringkasan dan sebelum rincian telaah.
+  const conversationAt = text.indexOf("Percakapan dengan AI");
+  expect(text.indexOf("Ringkasan")).toBeLessThan(conversationAt);
+  expect(conversationAt).toBeLessThan(text.indexOf("Perbaiki dulu"));
+  const conversation = text
+    .slice(conversationAt, text.indexOf("Perbaiki dulu"))
+    .replace(/\s+/g, " ");
+  for (const part of [
+    "Pesan 1 · Konsumen AI · Rina Susanti · 00.04",
+    "Pesan 2 · Agen · Sinta Maharani · 00.11",
+    "Terus saya harus ngapain sekarang?",
+    "Poin A · Sebagian: Alasan klaim ditolak",
+    "Poin B · Belum terjawab: Langkah berikutnya",
+    "Catatan 1 · Sudah tepat: Menggali data perusahaan sebelum menjawab.",
+    "Catatan 2 · Perlu diperbaiki: Konsumen tidak tahu berapa lama harus menunggu.",
+    "Menjawab poin A",
+    "Trainer · Perlu diperbaiki · Jeda panjang: Catatan trainer: ganti eee dengan jeda.",
+  ])
+    expect(conversation).toContain(part);
+  expect(conversation).toMatch(
+    /Hold \d\d\.\d\d – \d\d\.\d\d · 27 detik · dalam batas/,
+  );
+  // Catatan trainer menempel pada baris 00.36, bukan di akhir percakapan.
+  expect(conversation.indexOf("Catatan trainer: ganti eee")).toBeLessThan(
+    conversation.indexOf("Pesan 5 · Agen"),
+  );
   const runs = pages.runs.flat().map((run) => run.text);
   const firstLine = runs.findIndex((run) =>
     run.includes("Halo, saya mau tanya"),
