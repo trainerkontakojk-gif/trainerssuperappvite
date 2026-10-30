@@ -76,6 +76,30 @@
       },
       "continue": true
     },
+    {
+      "src": "^/.*%(?:25)*(?:00|2[fF]|5[cC]).*$",
+      "status": 400,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
+    {
+      "src": "^/(?:[^/]+/)*%(?:25)*2[eE](?!well-known(?:/|$))[^/]+(?:/.*)?$",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
     { "handle": "filesystem" },
     {
       "src": "^/assets(?:/.*)?$",

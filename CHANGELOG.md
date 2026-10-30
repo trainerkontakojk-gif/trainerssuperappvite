@@ -9,6 +9,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 - feat(kegiatan): laman publik /kegiatan dan menu admin Kelola Kegiatan dengan validasi kontrak bersama
 - docs(kegiatan): dokumentasikan modul Kegiatan Trainers dan laporan verifikasi akhir
 - fix(web): harden static routes with robots policy, secured 404s, and preserved SPA fallback
+- fix(web): reject percent-encoded hidden paths on Vercel
 
 ## 2026-10-29
 
