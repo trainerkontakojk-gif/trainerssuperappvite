@@ -304,9 +304,28 @@ test.describe("Kegiatan Trainers", () => {
         ].filter((field) => field.type !== "checkbox");
         const rects = fields.map((field) => {
           const rect = field.getBoundingClientRect();
-          return { id: field.id, left: rect.left, right: rect.right };
+          return {
+            id: field.id,
+            left: rect.left,
+            right: rect.right,
+            height: rect.height,
+            radius: getComputedStyle(field).borderTopLeftRadius,
+          };
         });
+        // Probe just outside the visible close icon: the hit area must still catch it.
+        const close = element.querySelector<HTMLElement>(
+          '[data-slot="dialog-close"]',
+        )!;
+        const closeBox = close.getBoundingClientRect();
+        const probe = document.elementFromPoint(
+          closeBox.left - 6,
+          closeBox.bottom + 6,
+        );
         return {
+          closeHit: Boolean(probe && close.contains(probe)),
+          rootFontSize: parseFloat(
+            getComputedStyle(document.documentElement).fontSize,
+          ),
           width: box.width,
           left: box.left,
           right: box.right,
@@ -327,6 +346,16 @@ test.describe("Kegiatan Trainers", () => {
           layout.right,
         );
       }
+      // Every field shares one height and corner, at the repo's min-h-11 touch target.
+      const touchTarget = 2.75 * layout.rootFontSize;
+      for (const rect of layout.rects) {
+        expect(
+          Math.abs(rect.height - touchTarget),
+          `${rect.id} tinggi ${rect.height}px @ ${width}px`,
+        ).toBeLessThanOrEqual(1);
+        expect(rect.radius, `${rect.id} sudut`).toBe(layout.rects[0].radius);
+      }
+      expect(layout.closeHit, `area klik tombol tutup @ ${width}px`).toBe(true);
       const program = layout.rects.find((r) => r.id === "activity-program")!;
       const kind = layout.rects.find((r) => r.id === "activity-kind")!;
       if (width === 1440) {

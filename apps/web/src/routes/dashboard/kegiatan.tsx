@@ -525,6 +525,7 @@ export default function DashboardKegiatan() {
                 <Label htmlFor="activity-title">Judul</Label>
                 <Input
                   id="activity-title"
+                  className="min-h-11"
                   value={form.title}
                   maxLength={120}
                   required
@@ -537,6 +538,7 @@ export default function DashboardKegiatan() {
                 <Label htmlFor="activity-year">Tahun</Label>
                 <Input
                   id="activity-year"
+                  className="min-h-11"
                   type="number"
                   min={2020}
                   max={2100}
@@ -558,7 +560,7 @@ export default function DashboardKegiatan() {
                       event.target.value as TrainerActivityProgram,
                     )
                   }
-                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
                 >
                   {TRAINER_ACTIVITY_PROGRAMS.map((program) => (
                     <option key={program.value} value={program.value}>
@@ -578,7 +580,7 @@ export default function DashboardKegiatan() {
                       event.target.value as ActivityForm["kind"],
                     )
                   }
-                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
                 >
                   <option value="poster">Poster</option>
                   <option value="foto">Foto</option>
@@ -590,6 +592,7 @@ export default function DashboardKegiatan() {
                 </Label>
                 <Input
                   id="activity-date"
+                  className="min-h-11"
                   type="date"
                   value={form.eventDate}
                   onChange={(event) =>
@@ -601,6 +604,7 @@ export default function DashboardKegiatan() {
                 <Label htmlFor="activity-order">Urutan</Label>
                 <Input
                   id="activity-order"
+                  className="min-h-11"
                   type="number"
                   value={form.sortOrder}
                   onChange={(event) =>
@@ -614,6 +618,7 @@ export default function DashboardKegiatan() {
               <Label htmlFor="activity-drive">Link Google Drive</Label>
               <Input
                 id="activity-drive"
+                className="min-h-11"
                 type="url"
                 value={form.driveUrl}
                 required
@@ -628,6 +633,7 @@ export default function DashboardKegiatan() {
               <Label htmlFor="activity-image">Gambar</Label>
               <Input
                 id="activity-image"
+                className="min-h-11"
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(event) => {
