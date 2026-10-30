@@ -12,6 +12,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 - fix(web): reject percent-encoded hidden paths on Vercel
 - docs(web): record Preview smoke results and Vercel edge NUL behavior
 - docs(ops): record Coolify Caddy log retention rollout and production crawler smoke
+- docs(web): record Vercel production crawler smoke and firewall 403 for scanner paths
 
 ## 2026-10-29
 
