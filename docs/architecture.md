@@ -386,6 +386,10 @@ Catatan:
 
 ## Security Model
 
+### API publik Kegiatan Trainers
+
+`GET /api/public/kegiatan` adalah route non-`/v1` tanpa autentikasi untuk laman `/kegiatan`. Handler memakai Supabase anon client sehingga RLS hanya mengembalikan item `trainer_activities` yang terbit; metadata actor dan status publikasi tidak ikut dikirim. Route publik dibatasi middleware rate limit `/public/*`. Mutasi tetap melalui `/api/v1/kegiatan` dengan capability `kegiatan.manage`, JWT pengguna, dan RLS.
+
 Keamanan aplikasi dijaga di beberapa sisi:
 
 1. **Frontend Route Guards**: TanStack Router dengan lazy loading dan auth checks di komponen Layout.

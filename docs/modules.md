@@ -313,3 +313,15 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - Ringkasan program menyediakan `median_delta` dan `median_relative_delta`, dihitung dari peserta yang dievaluasi dan tidak dikecualikan, dengan pembulatan dua desimal.
 - Kartu ringkasan dan rincian menonjolkan median perubahan dibanding rata-rata layanan serta jumlah peserta yang dievaluasi. Formulir pengecualian berada di disclosure "Sesuaikan analisis"; daftar pengecualian dan pembanding semua peserta tetap terlihat. Grafik skor menjaga rentang minimal 10 poin (maksimal 100), sedangkan grafik temuan per sesi selalu berawal dari nol.
 - Bukti dan cakupan: [rencana implementasi](../plans/markdown/efek-agent-exclusions.md), Playwright `tna-efek-report-api.spec.ts` (backend/DB lokal nyata) dan `tna-efek.spec.ts` (browser hermetic, 390/1280px, ekspor, pemulihan dan kegagalan).
+
+## 11. Kegiatan Trainers
+
+Laman publik untuk menemukan dokumentasi kegiatan pelatihan melalui poster atau foto per tahun dan program. Pengunjung membuka berkas di Google Drive; folder dapat meminta akses kepada pemiliknya.
+
+- **Routes**: `/kegiatan` untuk publik dan `/dashboard/kegiatan` untuk pengelolaan.
+- **Filter publik**: tahun terbaru dengan kegiatan terbit menjadi pilihan awal; `?tahun=` dan `&program=` disimpan di URL. Tanpa filter program, item dikelompokkan mengikuti urutan tetap SOBAT, KETIK, Telefun, PDKT, CERIWIS.
+- **Admin/trainer** dengan capability `kegiatan.manage` dapat menambah, mengubah, menghapus, menerbitkan, dan menyembunyikan item. Leader dan agent tidak mendapat akses.
+- **Data**: tabel `public.trainer_activities`, bucket Storage publik `trainer-activity-media`. RLS membuat item terbit dapat dibaca publik dan item tersembunyi hanya terbaca admin/trainer. Mutasi dilakukan melalui API backend; bucket tidak menerima penulisan langsung dari browser.
+- **Validasi**: tahun 2020–2100, judul 1–120 karakter setelah trim, tautan HTTPS Drive/Docs, serta gambar PNG/JPEG/WebP maksimal 5 MB.
+- **API**: `GET /api/public/kegiatan` tidak memerlukan login dan mengembalikan tahun terbit serta item pada tahun yang dipilih; CRUD ada pada `/api/v1/kegiatan` untuk admin/trainer.
+- **Batasan**: menghapus item tidak menghapus objek Storage, dan isi folder Drive tidak dibaca oleh aplikasi.
