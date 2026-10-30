@@ -300,7 +300,9 @@ test.describe("Kegiatan Trainers", () => {
       const layout = await dialog.evaluate((element) => {
         const box = element.getBoundingClientRect();
         const fields = [
-          ...element.querySelectorAll<HTMLElement>("input, select"),
+          ...element.querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+            "input, select",
+          ),
         ].filter((field) => field.type !== "checkbox");
         const rects = fields.map((field) => {
           const rect = field.getBoundingClientRect();

@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { measureDialogCloseHitArea } from "./helpers/dialogCloseHitArea";
 import {
   expectHermetic,
   openHermeticShell,
@@ -112,6 +113,70 @@ const quota = (
   note: override?.note ?? null,
 });
 
+const RINA_DETAIL: ApiMock = {
+  method: "GET",
+  path: `/api/v1/admin/users/${RINA_ID}`,
+  body: ok({
+    user: { ...USERS[0], last_sign_in_at: null },
+    peserta: null,
+    ketik_assignment: null,
+    leader_access: [],
+    history: [],
+    practice_limits: [
+      quota("ketik", 3, 1, 3),
+      quota("pdkt", 3, 0, 3),
+      quota("telefun", 2, 0, 0, {
+        ends_on: "2099-10-31",
+        note: "Persiapan sertifikasi",
+      }),
+    ],
+  }),
+};
+
+const APPROVE_LIST: ApiMock[] = [
+  { method: "GET", path: "/api/v1/admin/users", body: ok(USERS) },
+  {
+    method: "GET",
+    path: "/api/v1/admin/peserta-options",
+    body: ok([
+      {
+        id: BUDI_PESERTA,
+        nama: "Budi Santoso",
+        batch_name: "Batch Siang",
+        tim: "Tim Email",
+        linked_user: null,
+        email_match: true,
+      },
+    ]),
+  },
+  {
+    method: "GET",
+    path: "/api/v1/admin/practice-limits",
+    body: ok(OVERVIEW),
+  },
+];
+
+/** The enlarged close hit area covers no control and still closes the dialog. */
+async function expectCloseHitAreaClear(
+  page: Page,
+  dialog: Locator,
+  width: number,
+) {
+  const area = await measureDialogCloseHitArea(page, dialog);
+  expect(
+    area.overlaps,
+    `kontrol di area klik tombol tutup @ ${width}px`,
+  ).toEqual([]);
+  expect(
+    Math.min(area.width, area.height),
+    `area klik tombol tutup @ ${width}px`,
+  ).toBeGreaterThanOrEqual(area.touchTarget);
+  expect(area.bandHitsClose, `area klik tombol tutup @ ${width}px`).toBe(true);
+  expect(area.scrollsSideways, `dialog meluap @ ${width}px`).toBe(false);
+  await page.mouse.click(area.band.x, area.band.y);
+  await expect(dialog).toHaveCount(0);
+}
+
 test.describe("Batas latihan (hermetic)", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
@@ -220,25 +285,7 @@ test.describe("Batas latihan (hermetic)", () => {
     page,
   }) => {
     const mocks: ApiMock[] = [
-      {
-        method: "GET",
-        path: `/api/v1/admin/users/${RINA_ID}`,
-        body: ok({
-          user: { ...USERS[0], last_sign_in_at: null },
-          peserta: null,
-          ketik_assignment: null,
-          leader_access: [],
-          history: [],
-          practice_limits: [
-            quota("ketik", 3, 1, 3),
-            quota("pdkt", 3, 0, 3),
-            quota("telefun", 2, 0, 0, {
-              ends_on: "2099-10-31",
-              note: "Persiapan sertifikasi",
-            }),
-          ],
-        }),
-      },
+      RINA_DETAIL,
       {
         method: "PUT",
         path: `/api/v1/admin/users/${RINA_ID}/practice-limits/ketik`,
@@ -307,26 +354,7 @@ test.describe("Batas latihan (hermetic)", () => {
     page,
   }) => {
     const mocks: ApiMock[] = [
-      { method: "GET", path: "/api/v1/admin/users", body: ok(USERS) },
-      {
-        method: "GET",
-        path: "/api/v1/admin/peserta-options",
-        body: ok([
-          {
-            id: BUDI_PESERTA,
-            nama: "Budi Santoso",
-            batch_name: "Batch Siang",
-            tim: "Tim Email",
-            linked_user: null,
-            email_match: true,
-          },
-        ]),
-      },
-      {
-        method: "GET",
-        path: "/api/v1/admin/practice-limits",
-        body: ok(OVERVIEW),
-      },
+      ...APPROVE_LIST,
       {
         method: "POST",
         path: `/api/v1/admin/users/${BUDI_ID}/approve`,
@@ -391,6 +419,51 @@ test.describe("Batas latihan (hermetic)", () => {
     });
     await expect(dialog).toHaveCount(0);
 
+    expectHermetic(audit);
+  });
+
+  test("tombol tutup dialog Batas latihan tidak menutupi kontrol di desktop dan mobile", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: `/dashboard/users/${RINA_ID}`,
+      apiMocks: [RINA_DETAIL],
+    });
+    const panel = page.getByRole("region", { name: "Batas latihan" });
+    await expect(panel).toBeVisible({ timeout: 20000 });
+
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await panel.getByRole("button", { name: "Ubah batas Telefun" }).click();
+      const dialog = page.getByRole("dialog", {
+        name: "Batas Telefun untuk Rina Kartika",
+      });
+      await expect(dialog).toBeVisible();
+      await expectCloseHitAreaClear(page, dialog, width);
+    }
+    expectHermetic(audit);
+  });
+
+  test("tombol tutup dialog Setujui tidak menutupi kontrol di desktop dan mobile", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard/users",
+      apiMocks: APPROVE_LIST,
+    });
+
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page
+        .getByRole("row", { name: /Budi Santoso/ })
+        .getByRole("button", { name: "Setujui" })
+        .click({ timeout: 20000 });
+      const dialog = page.getByRole("dialog", {
+        name: "Setujui Budi Santoso?",
+      });
+      await expect(dialog).toBeVisible();
+      await expectCloseHitAreaClear(page, dialog, width);
+    }
     expectHermetic(audit);
   });
 });
