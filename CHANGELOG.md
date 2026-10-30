@@ -18,6 +18,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 - docs(web): record Vercel production crawler smoke and firewall 403 for scanner paths
 - feat(api,telefun): serve Disallow-all robots.txt at the API and Telefun host roots
 - docs(ops): record subdomain robots production smoke and Coolify Watch Paths
+- docs(ops): record Coolify panel port block and SSH key-only hardening on the VPS
 
 ## 2026-10-29
 

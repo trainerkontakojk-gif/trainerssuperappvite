@@ -41,7 +41,7 @@ Read-only VPS inspection at `2026-10-30T03:22:39Z` found three production resour
 
 A read-only `caddy adapt --validate` probe on v2.11.4 accepted `roll_interval 24h`, `roll_keep 30`, `roll_keep_for 336h`, `roll_size 20MiB`, and `mode 0640`. Daily rotation plus a 30-file cap makes the 14-day target practical at current traffic, but unusually high volume can hit the count cap earlier. No logs were deleted.
 
-Fajar approved the label update and resource recreation. The first browser attempt stalled on a blank Configuration/Source page, so nothing was saved then. The port 8000 panel is bound on `0.0.0.0` with UFW inactive; use the HTTPS panel, not that plain-HTTP port.
+Fajar approved the label update and resource recreation. The first browser attempt stalled on a blank Configuration/Source page, so nothing was saved then. Use the HTTPS panel at `https://coolify.trainerssuperapp.my.id`; the published ports 8000/6001/6002 are blocked from the internet (see VPS hardening below).
 
 Rollout (verified over SSH at `2026-10-30T08:49Z`):
 
@@ -55,3 +55,12 @@ Rollout (verified over SSH at `2026-10-30T08:49Z`):
 Hardening commits `d492b09f` and `7a9b8858` (Preview Ready at `https://trainerssuperappvite-ngd2zbdh2-trainers-superapp.vercel.app`) are on `main`; Coolify Web, API, and Telefun run `af4b605b`. Production crawler smoke on `https://trainerssuperapp.my.id` after the redeploy: `/` 200 without `X-Robots-Tag`; `/robots.txt` 200 `text/plain`; `/sitemap.xml` 200 listing only the homepage; `/.env`, `/%2eenv`, `/.git/config`, `/wp-login.php`, `/assets/nope.js` 404 with `noindex, nofollow`; `/dashboard`, `/dashboard/x`, `/telefun`, same-host `/api/` 200 shell with `noindex, nofollow`; `www` 302 to apex.
 
 Vercel production (`https://trainers-superapp.vercel.app`, project `trainerssuperappvite-api`, deployment `trainerssuperappvite-2bcd6v9l2` from `main`) smoke at `2026-10-30T08:54Z`: `/` 200 without `X-Robots-Tag`; robots/sitemap 200 with the same content as Coolify; `/.env`, `/%2eenv`, `/%252eenv`, `/.git/config`, `/assets/nope.js` 404 with CSP and `no-store`; `/%2f` and `/%5c` 400; `/dashboard`, `/dashboard/x`, `/telefun`, `/api/` 200 with `noindex, nofollow`; `/%00` 400 at the edge without project CSP (as on Preview). Scanner paths (`/wp-login.php`, `/wp-admin/`, `/xmlrpc.php`, `/phpmyadmin/`) return 403 with `x-vercel-mitigated: deny` because the Vercel Firewall blocks them before project routes run. Security headers and platform HSTS (`max-age=63072000; includeSubDomains; preload`) are present.
+
+## VPS hardening (2026-10-30)
+
+The VPS is a SumoPod (Tencent Cloud, ap-jakarta) instance with no provider security group or console access, and Hermes runs on the host itself. UFW stays inactive because Docker-published ports bypass it.
+
+- Coolify panel ports: `/usr/local/sbin/coolify-panel-firewall.sh`, run by `coolify-panel-firewall.service` (enabled; `After`/`PartOf` `docker.service`), idempotently inserts `DOCKER-USER -i eth0 -p tcp -m conntrack --ctorigdstport {8000,6001:6002} --ctdir ORIGINAL -j DROP`. Caddy still reaches `coolify:8080/6001/6002` over the internal Docker network. External check: 8000/6001/6002 closed; 443 open; panel `/login` 200; realtime `/app` over HTTPS answers `101 Switching Protocols`; Web/API/Telefun health 200.
+- SSH: `/etc/ssh/sshd_config.d/01-hardening.conf` (read before `50-cloud-init.conf`) sets `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`; applied with `systemctl reload ssh`. Before the change, the log showed about 17,900 failed SSH logins in 7 days. Coolify still logs in as root with its key (`Accepted publickey for root from 10.0.1.8`), and the server shows Ready. External check: `ubuntu` key login works; password and keyboard-interactive logins for `ubuntu` and `root` return `Permission denied (publickey)`.
+- Rollback: `systemctl disable --now coolify-panel-firewall.service` and delete the two `DOCKER-USER` rules; remove `01-hardening.conf`, run `sshd -t`, then `systemctl reload ssh`.
+- Port 80 is unreachable from the internet (provider side), so plain-HTTP requests do not redirect; HTTPS is unaffected.
