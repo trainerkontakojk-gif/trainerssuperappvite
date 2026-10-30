@@ -28,12 +28,12 @@
     "optimize:kegiatan-images": "tsx src/scripts/optimize-kegiatan-images.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.29.0",
+    "@google/genai": "^2.31.0",
     "@hono/node-server": "^2.1.5",
     "@hono/zod-validator": "^0.9.1",
     "@supabase/supabase-js": "^2.117.3",
     "@trainers/types": "workspace:*",
-    "hono": "^4.13.13",
+    "hono": "^4.13.14",
     "sharp": "0.35.5",
     "tsx": "^4.23.15",
     "undici": "7.30.1",
