@@ -3,6 +3,7 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { signOutLocalSession } from "../lib/session-logout";
+import { isPublicRoute } from "../lib/publicRoutes";
 import { useThemeMode } from "../hooks/useThemeMode";
 import { Sidebar, AppHeader, MobileTabBar, MobileDrawer } from "./layout/index";
 import { useRouteFocus } from "./layout/useRouteFocus";
@@ -16,21 +17,15 @@ function DashboardLayoutContent() {
   const contentRef = useRef<HTMLElement>(null);
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const isPublicRoute = [
-    "/",
-    "/auth/callback",
-    "/waiting-approval",
-    "/reset-password",
-  ].includes(pathname);
   // Halaman publik mengatur judul sendiri, tanpa shell.
-  useRouteFocus(pathname, contentRef, !isPublicRoute);
+  useRouteFocus(pathname, contentRef, !isPublicRoute(pathname));
 
   useEffect(() => {
     // Close mobile drawer on route change
     setMobileDrawerOpen(false);
   }, [pathname]);
 
-  if (isPublicRoute) {
+  if (isPublicRoute(pathname)) {
     return (
       <Suspense
         fallback={

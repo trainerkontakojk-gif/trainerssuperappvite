@@ -134,6 +134,8 @@
     --content-max-width: 1400px;
     --surface-elevated: #ffffff;
     --surface-sunken: #f0f0ef;
+    --module-sobat: #c35417;
+    --module-ceriwis: #bd2469;
 
     /* ── Module Identity Colors ──────────────────────── */
     /* Dipakai di dashboard card dan header modul          */
@@ -212,6 +214,8 @@
     /* ── New Layout Tokens ── */
     --surface-elevated: #1f1f23;
     --surface-sunken: #111113;
+    --module-sobat: #ff9b66;
+    --module-ceriwis: #ff82b4;
 
     /* ── Module Identity Colors (dark) ────────────────── */
     --module-ketik: #3b82f6;

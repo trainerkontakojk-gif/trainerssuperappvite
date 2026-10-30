@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import {
   TRAINER_ACTIVITY_PROGRAMS,
@@ -15,7 +16,7 @@ import {
   uploadTrainerActivityImage,
 } from "../lib/trainer-activity-media";
 
-type ActivityContext = Context<{ Variables: AuthVariables }>;
+type ActivityContext = Context;
 
 const yearQuerySchema = z.coerce.number().int().min(2020).max(2100);
 const activityIdSchema = z.string().uuid();
@@ -38,7 +39,7 @@ function invalidInput(c: ActivityContext, message?: string) {
   );
 }
 
-function validationMessage(error: z.ZodError) {
+function validationMessage(error: Pick<z.ZodError, "issues">) {
   const driveIssue = error.issues.find(
     (issue) => issue.path[0] === "drive_url",
   );
@@ -74,7 +75,14 @@ function sortActivities(items: TrainerActivity[]) {
   return items;
 }
 
-const body = (c: ActivityContext) => c.req.json().catch(() => null);
+const activityJson = zValidator(
+  "json",
+  trainerActivityInputSchema,
+  (result, c) => {
+    if (!result.success)
+      return invalidInput(c, validationMessage(result.error));
+  },
+);
 
 async function resolveActivityImage(
   input: ReturnType<typeof trainerActivityInputSchema.parse>,
@@ -108,15 +116,10 @@ export const kegiatan = new Hono<{ Variables: AuthVariables }>()
       data: sortActivities((data ?? []) as unknown as TrainerActivity[]),
     });
   })
-  .post("/", requireCapability("kegiatan.manage"), async (c) => {
-    const parsed = trainerActivityInputSchema.safeParse(await body(c));
-    if (!parsed.success)
-      return invalidInput(c, validationMessage(parsed.error));
-    if (!parsed.data.image) {
-      if (
-        parsed.data.image_url &&
-        !isTrainerActivityImageUrl(parsed.data.image_url)
-      )
+  .post("/", requireCapability("kegiatan.manage"), activityJson, async (c) => {
+    const input = c.req.valid("json");
+    if (!input.image) {
+      if (input.image_url && !isTrainerActivityImageUrl(input.image_url))
         return invalidInput(c, "Gambar harus berasal dari bucket kegiatan.");
       return invalidInput(
         c,
@@ -127,7 +130,7 @@ export const kegiatan = new Hono<{ Variables: AuthVariables }>()
     const actor = getActor(c);
     let imageUrl: string;
     try {
-      imageUrl = await resolveActivityImage(parsed.data);
+      imageUrl = await resolveActivityImage(input);
     } catch (error) {
       if (error instanceof TrainerActivityMediaValidationError)
         return invalidInput(c, error.message);
@@ -139,15 +142,15 @@ export const kegiatan = new Hono<{ Variables: AuthVariables }>()
     const { data, error } = await createUserClient(c.get("token"))
       .from("trainer_activities")
       .insert({
-        year: parsed.data.year,
-        program: parsed.data.program,
-        kind: parsed.data.kind,
-        title: parsed.data.title,
-        event_date: parsed.data.event_date,
+        year: input.year,
+        program: input.program,
+        kind: input.kind,
+        title: input.title,
+        event_date: input.event_date,
         image_url: imageUrl,
-        drive_url: parsed.data.drive_url,
-        sort_order: parsed.data.sort_order,
-        is_published: parsed.data.is_published,
+        drive_url: input.drive_url,
+        sort_order: input.sort_order,
+        is_published: input.is_published,
         created_by: actor.id,
         updated_by: null,
       })
@@ -156,56 +159,59 @@ export const kegiatan = new Hono<{ Variables: AuthVariables }>()
     if (error) return unavailable(c);
     return c.json({ success: true as const, data }, 201);
   })
-  .patch("/:id", requireCapability("kegiatan.manage"), async (c) => {
-    const id = activityIdSchema.safeParse(c.req.param("id"));
-    const parsed = trainerActivityInputSchema.safeParse(await body(c));
-    if (!id.success) return invalidInput(c, "ID kegiatan tidak valid.");
-    if (!parsed.success)
-      return invalidInput(c, validationMessage(parsed.error));
+  .patch(
+    "/:id",
+    requireCapability("kegiatan.manage"),
+    activityJson,
+    async (c) => {
+      const id = activityIdSchema.safeParse(c.req.param("id"));
+      if (!id.success) return invalidInput(c, "ID kegiatan tidak valid.");
+      const input = c.req.valid("json");
 
-    let imageUrl: string;
-    try {
-      imageUrl = await resolveActivityImage(parsed.data);
-    } catch (error) {
-      if (error instanceof TrainerActivityMediaValidationError)
-        return invalidInput(c, error.message);
-      if (error instanceof TrainerActivityMediaUploadError)
-        return unavailable(c, "KEGIATAN_IMAGE_UPLOAD_FAILED");
-      return unavailable(c);
-    }
+      let imageUrl: string;
+      try {
+        imageUrl = await resolveActivityImage(input);
+      } catch (error) {
+        if (error instanceof TrainerActivityMediaValidationError)
+          return invalidInput(c, error.message);
+        if (error instanceof TrainerActivityMediaUploadError)
+          return unavailable(c, "KEGIATAN_IMAGE_UPLOAD_FAILED");
+        return unavailable(c);
+      }
 
-    const actor = getActor(c);
-    const { data, error } = await createUserClient(c.get("token"))
-      .from("trainer_activities")
-      .update({
-        year: parsed.data.year,
-        program: parsed.data.program,
-        kind: parsed.data.kind,
-        title: parsed.data.title,
-        event_date: parsed.data.event_date,
-        image_url: imageUrl,
-        drive_url: parsed.data.drive_url,
-        sort_order: parsed.data.sort_order,
-        is_published: parsed.data.is_published,
-        updated_by: actor.id,
-      })
-      .eq("id", id.data)
-      .select("*")
-      .maybeSingle();
-    if (error) return unavailable(c);
-    if (!data)
-      return c.json(
-        {
-          success: false as const,
-          error: {
-            code: "KEGIATAN_NOT_FOUND",
-            message: "Kegiatan tidak ditemukan.",
+      const actor = getActor(c);
+      const { data, error } = await createUserClient(c.get("token"))
+        .from("trainer_activities")
+        .update({
+          year: input.year,
+          program: input.program,
+          kind: input.kind,
+          title: input.title,
+          event_date: input.event_date,
+          image_url: imageUrl,
+          drive_url: input.drive_url,
+          sort_order: input.sort_order,
+          is_published: input.is_published,
+          updated_by: actor.id,
+        })
+        .eq("id", id.data)
+        .select("*")
+        .maybeSingle();
+      if (error) return unavailable(c);
+      if (!data)
+        return c.json(
+          {
+            success: false as const,
+            error: {
+              code: "KEGIATAN_NOT_FOUND",
+              message: "Kegiatan tidak ditemukan.",
+            },
           },
-        },
-        404,
-      );
-    return c.json({ success: true as const, data });
-  })
+          404,
+        );
+      return c.json({ success: true as const, data });
+    },
+  )
   .delete("/:id", requireCapability("kegiatan.manage"), async (c) => {
     const id = activityIdSchema.safeParse(c.req.param("id"));
     if (!id.success) return invalidInput(c, "ID kegiatan tidak valid.");

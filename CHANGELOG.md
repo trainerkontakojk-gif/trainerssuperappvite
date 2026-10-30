@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-10-30
+
+- feat(kegiatan): laman publik /kegiatan dan menu admin Kelola Kegiatan dengan validasi kontrak bersama
+
 ## 2026-10-29
 
 - feat(kegiatan): API publik dan admin untuk Kegiatan Trainers

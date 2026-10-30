@@ -1,0 +1,428 @@
+.kegiatan-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.kegiatan-shell .kegiatan-page {
+  flex: 1;
+  width: min(100%, 1400px);
+  padding-block: 40px 64px;
+}
+
+.kegiatan-shell .kegiatan-page-header {
+  max-width: 720px;
+  margin-bottom: 32px;
+}
+
+.kegiatan-shell .kegiatan-page-header h1 {
+  margin: 0;
+  color: var(--fg);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.kegiatan-shell .kegiatan-page-header p {
+  max-width: 65ch;
+  margin: 12px 0 0;
+  color: var(--fg2);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.kegiatan-shell .kegiatan-controls {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.kegiatan-shell .kegiatan-filter-block h2 {
+  margin: 0 0 8px;
+  color: var(--fg2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kegiatan-shell .kegiatan-year-list,
+.kegiatan-shell .kegiatan-program-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.kegiatan-shell .kegiatan-year-button,
+.kegiatan-shell .kegiatan-program-button {
+  display: inline-flex;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg2);
+  cursor: pointer;
+  font: 500 14px/1.2 var(--font-body);
+  padding: 0 14px;
+  transition:
+    color 160ms ease-out,
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+  touch-action: manipulation;
+}
+
+.kegiatan-shell .kegiatan-year-button:hover,
+.kegiatan-shell .kegiatan-program-button:hover {
+  border-color: var(--fg3);
+  color: var(--fg);
+}
+
+.kegiatan-shell .kegiatan-year-button[aria-pressed="true"],
+.kegiatan-shell .kegiatan-program-button[aria-pressed="true"] {
+  border-color: var(--fg);
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="sobat"]::before,
+.kegiatan-shell .kegiatan-program-button[data-program="ketik"]::before,
+.kegiatan-shell .kegiatan-program-button[data-program="telefun"]::before,
+.kegiatan-shell .kegiatan-program-button[data-program="pdkt"]::before,
+.kegiatan-shell .kegiatan-program-button[data-program="ceriwis"]::before {
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--program-color);
+  content: "";
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="sobat"] {
+  --program-color: var(--module-sobat);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="ketik"] {
+  --program-color: var(--ketik);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="telefun"] {
+  --program-color: var(--telefun);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="pdkt"] {
+  --program-color: var(--pdkt);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="ceriwis"] {
+  --program-color: var(--module-ceriwis);
+}
+
+.kegiatan-shell .kegiatan-drive-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 720px;
+  margin: 0 0 40px;
+  color: var(--fg2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.kegiatan-shell .kegiatan-drive-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--fg);
+}
+
+.kegiatan-shell .kegiatan-groups {
+  display: grid;
+  gap: 48px;
+}
+
+.kegiatan-shell .kegiatan-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.kegiatan-shell .kegiatan-group-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
+.kegiatan-shell .kegiatan-group-name h2 {
+  margin: 0;
+  color: var(--fg);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kegiatan-shell .kegiatan-program-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  align-self: center;
+  border-radius: 50%;
+  background: var(--program-color);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="sobat"] {
+  --program-color: var(--module-sobat);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="ketik"] {
+  --program-color: var(--ketik);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="telefun"] {
+  --program-color: var(--telefun);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="pdkt"] {
+  --program-color: var(--pdkt);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="ceriwis"] {
+  --program-color: var(--module-ceriwis);
+}
+
+.kegiatan-shell .kegiatan-program-full-name,
+.kegiatan-shell .kegiatan-group-count {
+  color: var(--fg2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.kegiatan-shell .kegiatan-group-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.kegiatan-shell .kegiatan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 24px;
+}
+
+.kegiatan-shell .kegiatan-card {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--fg);
+  text-decoration: none;
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out;
+}
+
+.kegiatan-shell .kegiatan-card:hover {
+  border-color: var(--fg3);
+}
+
+.kegiatan-shell .kegiatan-card-image {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  background: var(--surface-sunken);
+}
+
+.kegiatan-shell .kegiatan-card-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease-out;
+}
+
+.kegiatan-shell .kegiatan-card:hover .kegiatan-card-image img,
+.kegiatan-shell .kegiatan-card:focus-visible .kegiatan-card-image img {
+  transform: scale(1.025);
+}
+
+.kegiatan-shell .kegiatan-card-open {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--inv-bg);
+  color: var(--inv-fg);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out;
+}
+
+.kegiatan-shell .kegiatan-card:hover .kegiatan-card-open,
+.kegiatan-shell .kegiatan-card:focus-visible .kegiatan-card-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .kegiatan-shell .kegiatan-card-open {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.kegiatan-shell .kegiatan-card-copy {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+.kegiatan-shell .kegiatan-card-title {
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.kegiatan-shell .kegiatan-card-date {
+  color: var(--fg2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.kegiatan-shell .kegiatan-empty,
+.kegiatan-shell .kegiatan-error {
+  max-width: 720px;
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+  color: var(--fg2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.kegiatan-shell .kegiatan-error p {
+  margin: 0 0 12px;
+}
+
+.kegiatan-shell .kegiatan-error button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font: 600 14px/1.2 var(--font-body);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.kegiatan-shell .kegiatan-loading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 24px;
+}
+
+.kegiatan-shell .kegiatan-loading span:not(.sr-only) {
+  display: block;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  animation: kegiatan-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes kegiatan-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.kegiatan-shell .kegiatan-footer {
+  padding-block: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--fg2);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .kegiatan-shell .kegiatan-page {
+    padding-top: 28px;
+  }
+
+  .kegiatan-shell .kegiatan-page-header {
+    margin-bottom: 28px;
+  }
+
+  .kegiatan-shell .kegiatan-controls {
+    gap: 18px;
+  }
+
+  .kegiatan-shell .kegiatan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .kegiatan-shell .kegiatan-card-copy {
+    gap: 4px;
+    padding: 10px 12px 12px;
+  }
+
+  .kegiatan-shell .kegiatan-card-title {
+    font-size: 14px;
+  }
+
+  .kegiatan-shell .kegiatan-card-date {
+    font-size: 12px;
+  }
+
+  .kegiatan-shell .kegiatan-group-name {
+    gap: 4px 8px;
+  }
+
+  .kegiatan-shell .kegiatan-group-name h2 {
+    font-size: 19px;
+  }
+
+  .kegiatan-shell .kegiatan-program-full-name {
+    flex-basis: 100%;
+    margin-left: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kegiatan-shell .kegiatan-card,
+  .kegiatan-shell .kegiatan-card-image img,
+  .kegiatan-shell .kegiatan-card-open,
+  .kegiatan-shell .kegiatan-year-button,
+  .kegiatan-shell .kegiatan-program-button {
+    transition-duration: 0.01ms;
+  }
+
+  .kegiatan-shell .kegiatan-loading span:not(.sr-only) {
+    animation: none;
+  }
+}

@@ -41,6 +41,11 @@ const trainerActivityProgramSchema = z.enum(
   ],
 );
 
+const TRAINER_ACTIVITY_YEAR_MESSAGE =
+  "Tahun harus berupa angka antara 2020 dan 2100";
+const TRAINER_ACTIVITY_TITLE_MESSAGE =
+  "Judul wajib diisi dan maksimal 120 karakter";
+
 const trainerActivityKindSchema = z.enum(["poster", "foto"]);
 const trainerActivityDateSchema = z
   .string()
@@ -79,10 +84,18 @@ const trainerActivityImageDataSchema = z
  */
 export const trainerActivityInputSchema = z
   .object({
-    year: z.number().int().min(2020).max(2100),
+    year: z
+      .number({ error: TRAINER_ACTIVITY_YEAR_MESSAGE })
+      .int(TRAINER_ACTIVITY_YEAR_MESSAGE)
+      .min(2020, TRAINER_ACTIVITY_YEAR_MESSAGE)
+      .max(2100, TRAINER_ACTIVITY_YEAR_MESSAGE),
     program: trainerActivityProgramSchema,
     kind: trainerActivityKindSchema,
-    title: z.string().trim().min(1).max(120),
+    title: z
+      .string()
+      .trim()
+      .min(1, TRAINER_ACTIVITY_TITLE_MESSAGE)
+      .max(120, TRAINER_ACTIVITY_TITLE_MESSAGE),
     event_date: trainerActivityDateSchema.nullable(),
     drive_url: trainerActivityDriveUrlSchema,
     sort_order: z.number().int(),

@@ -1,10 +1,11 @@
 import { Suspense, useContext, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Menu, Moon, RefreshCw, Sun, X } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import {
   LandingAuthProvider,
   AuthContext,
 } from "../components/LandingAuthClient";
+import { LandingHeader } from "../components/landing/LandingHeader";
 import { ModuleStory } from "../components/landing/ModuleStory";
 import { prefersReducedMotion } from "../components/landing/reducedMotion";
 import {
@@ -15,13 +16,9 @@ import {
   LANDING_MODULES,
   channelStyle,
 } from "../components/landing/landingModules";
-import { useThemeMode } from "../hooks/useThemeMode";
 import "./landing.css";
 
 const WORDMARK = ["Trainers", "SuperApp"] as const;
-
-/** Public Kegiatan Trainers page; a plain href until its route exists. */
-const KEGIATAN_HREF = "/kegiatan";
 
 const HERO_INTRO: readonly FlapFrame[] = [
   {
@@ -61,140 +58,6 @@ const CYCLE = [
 
 const moduleCode = (id: string) =>
   LANDING_MODULES.find((item) => item.id === id)?.code ?? id;
-
-function LandingHeader() {
-  const { isCheckingAuth, isLoggedIn, openAuth } = useContext(AuthContext);
-  const { theme, setTheme } = useThemeMode();
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const desktop = window.matchMedia("(min-width: 761px)");
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMenuOpen(false);
-      menuButton.current?.focus();
-    };
-    const onWide = (event: MediaQueryListEvent) => {
-      if (event.matches) setMenuOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    desktop.addEventListener("change", onWide);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      desktop.removeEventListener("change", onWide);
-    };
-  }, [menuOpen]);
-
-  const closeMenu = () => setMenuOpen(false);
-
-  return (
-    <header className="site-header" data-scrolled={scrolled || undefined}>
-      <div className="lp-container header-inner">
-        <a
-          className="brand"
-          href="#"
-          aria-label="Trainers SuperApp, kembali ke atas"
-        >
-          <span className="brand-mark" aria-hidden="true">
-            S
-          </span>
-          <span className="brand-name">Trainers SuperApp</span>
-        </a>
-        <div className="header-actions">
-          <a className="header-link" href={KEGIATAN_HREF}>
-            Kegiatan Trainers
-          </a>
-          {isCheckingAuth ? null : isLoggedIn ? (
-            <Link to="/dashboard" className="button primary">
-              Dashboard
-            </Link>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => openAuth("login")}
-              >
-                Masuk
-              </button>
-              <button
-                type="button"
-                className="button primary header-register"
-                onClick={() => openAuth("register")}
-              >
-                Ajukan Akses
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={
-              theme === "dark" ? "Gunakan tema terang" : "Gunakan tema gelap"
-            }
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? (
-              <Sun className="icon" aria-hidden="true" />
-            ) : (
-              <Moon className="icon" aria-hidden="true" />
-            )}
-          </button>
-          <button
-            ref={menuButton}
-            type="button"
-            className="icon-button menu-toggle"
-            aria-label="Buka navigasi"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-nav"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? (
-              <X className="icon" aria-hidden="true" />
-            ) : (
-              <Menu className="icon" aria-hidden="true" />
-            )}
-          </button>
-        </div>
-      </div>
-      <nav
-        className="lp-container mobile-nav"
-        id="mobile-nav"
-        aria-label="Navigasi mobile"
-        hidden={!menuOpen}
-      >
-        <a href={KEGIATAN_HREF} onClick={closeMenu}>
-          Kegiatan Trainers
-        </a>
-        {isCheckingAuth ? null : isLoggedIn ? (
-          <Link to="/dashboard" onClick={closeMenu}>
-            Dashboard
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              closeMenu();
-              openAuth("register");
-            }}
-          >
-            Ajukan Akses
-          </button>
-        )}
-      </nav>
-    </header>
-  );
-}
 
 function WorkflowCycle() {
   const ref = useRef<HTMLDivElement>(null);
@@ -322,9 +185,9 @@ function FinalCta() {
             </button>
           </>
         )}
-        <a className="button ghost large" href={KEGIATAN_HREF}>
+        <Link className="button ghost large" to="/kegiatan">
           Kegiatan Trainers
-        </a>
+        </Link>
       </div>
     </section>
   );

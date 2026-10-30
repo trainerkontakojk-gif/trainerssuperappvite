@@ -6,6 +6,7 @@ import {
   Activity,
   History,
   Gauge,
+  Images,
   type LucideIcon,
 } from "lucide-react";
 import { APP_MODULES, isCapabilityAllowed } from "../../lib/app-config";
@@ -95,6 +96,12 @@ export const MANAGEMENT_LINKS = [
     label: "Batas latihan",
     icon: Gauge,
     capability: "practice.limits.manage" as const,
+  },
+  {
+    to: "/dashboard/kegiatan",
+    label: "Kelola Kegiatan",
+    icon: Images,
+    capability: "kegiatan.manage" as const,
   },
   {
     to: "/monitoring",
@@ -432,6 +439,12 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     return [
       { label: "Beranda", href: "/dashboard" },
       { label: "Batas latihan" },
+    ];
+  }
+  if (pathname === "/dashboard/kegiatan") {
+    return [
+      { label: "Beranda", href: "/dashboard" },
+      { label: "Kelola Kegiatan" },
     ];
   }
   if (pathname === "/dashboard/activities") {

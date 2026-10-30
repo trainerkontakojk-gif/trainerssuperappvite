@@ -11,9 +11,11 @@ import {
   can,
   isAccountExpired,
   LEADER_APPROVAL_MODULE,
+  TRAINER_ACTIVITY_PROGRAMS,
   VALID_SERVICE_TYPES,
   type Capability,
   type ServiceType,
+  type TrainerActivityProgram,
 } from "@trainers/types";
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
@@ -27,6 +29,7 @@ import { validateSidakAgentsSearch } from "./utils/sidakAgentList";
 import { validateAgentDetailSearch } from "./components/sidak/sidak-agent-detail-tabs.constants";
 
 const IndexPage = lazy(() => import("./routes/index"));
+const KegiatanPage = lazy(() => import("./routes/kegiatan"));
 const DashboardPage = lazy(() => import("./routes/dashboard"));
 const DashboardUsers = lazy(() => import("./routes/dashboard/users"));
 const DashboardUserDetail = lazy(
@@ -39,6 +42,7 @@ const DashboardAccessApproval = lazy(
   () => import("./routes/dashboard/access-approval"),
 );
 const DashboardActivities = lazy(() => import("./routes/dashboard/activities"));
+const DashboardKegiatan = lazy(() => import("./routes/dashboard/kegiatan"));
 const DashboardPracticeLimits = lazy(
   () => import("./routes/dashboard/practice-limits"),
 );
@@ -90,6 +94,35 @@ const indexRoute = createRoute({
   component: IndexPage,
 });
 
+function isKnownKegiatanProgram(
+  value: unknown,
+): value is TrainerActivityProgram {
+  return (
+    typeof value === "string" &&
+    TRAINER_ACTIVITY_PROGRAMS.some((program) => program.value === value)
+  );
+}
+
+const kegiatanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/kegiatan",
+  validateSearch: (search: Record<string, unknown>) => {
+    const yearValue = Number(search.tahun);
+    const year =
+      Number.isInteger(yearValue) && yearValue >= 2020 && yearValue <= 2100
+        ? yearValue
+        : undefined;
+    const program = isKnownKegiatanProgram(search.program)
+      ? search.program
+      : undefined;
+    return {
+      ...(year === undefined ? {} : { tahun: year }),
+      ...(program ? { program } : {}),
+    };
+  },
+  component: KegiatanPage,
+});
+
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
@@ -137,6 +170,13 @@ const dashboardActivitiesRoute = createRoute({
   path: "/dashboard/activities",
   component: DashboardActivities,
   beforeLoad: requireCapability("admin.activityLogs.read"),
+});
+
+const dashboardKegiatanRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard/kegiatan",
+  component: DashboardKegiatan,
+  beforeLoad: requireCapability("kegiatan.manage"),
 });
 
 /**
@@ -857,6 +897,7 @@ const routeTree = rootRoute.addChildren([
   tnaNeedRoute,
   tnaPlanRoute,
   indexRoute,
+  kegiatanRoute,
   dashboardRoute,
   dashboardUsersRoute,
   dashboardUserDetailRoute,
@@ -864,6 +905,7 @@ const routeTree = rootRoute.addChildren([
   dashboardAccessGroupsRoute,
   dashboardAccessApprovalRoute,
   dashboardActivitiesRoute,
+  dashboardKegiatanRoute,
   profilerRoute,
   profilerTableRoute,
   profilerSlidesRoute,

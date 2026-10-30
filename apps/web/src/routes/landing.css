@@ -238,6 +238,10 @@ html:has(.landing-wrapper) {
   color: var(--fg);
   background: var(--surface);
 }
+.landing-wrapper .header-link[aria-current="page"] {
+  color: var(--fg);
+  background: var(--surface);
+}
 .landing-wrapper .header-actions {
   display: flex;
   align-items: center;

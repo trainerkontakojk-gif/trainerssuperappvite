@@ -52,9 +52,14 @@ async function activateStep(page: Page, name: string) {
 async function openGuestLanding(
   page: Page,
   reducedMotion: "reduce" | "no-preference",
+  apiMocks: Parameters<typeof openHermeticShell>[1]["apiMocks"] = [],
 ) {
   await page.emulateMedia({ reducedMotion });
-  const audit = await openHermeticShell(page, { path: "/", auth: false });
+  const audit = await openHermeticShell(page, {
+    path: "/",
+    auth: false,
+    apiMocks,
+  });
   console.log("[audit]", formatAudit(audit));
   return audit;
 }
@@ -193,7 +198,35 @@ test.describe("Landing publik — split-flap", () => {
   test("header hanya punya tombol Kegiatan Trainers; ajakan bawah juga menautkan Kegiatan Trainers", async ({
     page,
   }) => {
-    const audit = await openGuestLanding(page, "reduce");
+    const audit = await openGuestLanding(page, "reduce", [
+      {
+        method: "GET",
+        path: "/api/public/kegiatan",
+        body: {
+          success: true,
+          data: {
+            years: [2026],
+            year: 2026,
+            items: [
+              {
+                id: "landing-kegiatan",
+                year: 2026,
+                program: "sobat",
+                kind: "poster",
+                title: "Pelatihan Kolaborasi Tim",
+                event_date: "2026-06-12",
+                image_url:
+                  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/S3sAAAAASUVORK5CYII=",
+                drive_url: "https://drive.google.com/drive/folders/landing-e2e",
+                sort_order: 0,
+                created_at: "2026-06-01T00:00:00.000Z",
+                updated_at: "2026-06-01T00:00:00.000Z",
+              },
+            ],
+          },
+        },
+      },
+    ]);
 
     const banner = page.getByRole("banner");
     const nav = banner.getByRole("navigation", { name: "Navigasi utama" });
@@ -225,6 +258,17 @@ test.describe("Landing publik — split-flap", () => {
     const ctaKegiatan = cta.getByRole("link", { name: "Kegiatan Trainers" });
     await expect(ctaKegiatan).toBeVisible();
     await expect(ctaKegiatan).toHaveAttribute("href", "/kegiatan");
+    const documentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document")
+        documentRequests.push(request.url());
+    });
+    await headerKegiatan.click();
+    await expect(page).toHaveURL(/\/kegiatan(?:\?tahun=2026)?$/);
+    await expect(
+      page.getByRole("heading", { name: "Kegiatan Trainers", level: 1 }),
+    ).toBeVisible();
+    expect(documentRequests).toEqual([]);
     expectHermetic(audit);
   });
 

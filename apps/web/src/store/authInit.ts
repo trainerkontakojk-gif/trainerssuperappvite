@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase";
 import { useAuthStore } from "./authStore";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
 import { hasLogoutGuestLock, clearAuthLocalState } from "../lib/authLocalState";
+import { isPublicRoute } from "../lib/publicRoutes";
 
 export async function initAuth() {
   // Subscribe to authentication state changes
@@ -28,13 +29,7 @@ export async function initAuth() {
       useAuthStore.getState().setProfile(null);
 
       // If we are signed out and currently on a non-public route, redirect to landing
-      const publicRoutes = [
-        "/",
-        "/auth/callback",
-        "/waiting-approval",
-        "/reset-password",
-      ];
-      if (!publicRoutes.includes(window.location.pathname)) {
+      if (!isPublicRoute(window.location.pathname)) {
         window.location.href = "/";
       }
     }
