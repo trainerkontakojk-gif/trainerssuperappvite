@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-31
 
+- docs(plans): catat hasil suite E2E penuh untuk PDF telaah per sesi
 - feat(simulasi): PDF telaah KETIK, Telefun, dan PDKT memuat percakapan dengan AI beranotasi
 
 ## 2026-10-30
