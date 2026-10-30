@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-30
 
+- docs(plans): add the per-session review PDF plan for KETIK, Telefun, and PDKT
 - perf(kegiatan): store activity images as 800 px WebP and load the first cards eagerly
 - fix(tna): resolve Impeccable audit findings for contrast, touch targets, and EFEK filters
 - test(web): guard dialog close hit area on Batas latihan and Setujui dialogs

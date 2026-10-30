@@ -1,0 +1,149 @@
+# PDF Hasil Telaah per Sesi — KETIK, Telefun, PDKT
+
+**Lane:** C (frontend saja, multi-file, tiga modul; tidak ada perubahan API, schema, RLS, atau izin).
+**Status:** TODO — siap dieksekusi. Fase 1 (KETIK) dulu; Fase 2–3 **tertahan** sampai Fajar menyetujui hasil PDF KETIK.
+**Dibuat:** 2026-10-30, dari keputusan Fajar di sesi yang sama.
+
+## Requirement
+
+Trainer ingin membagikan hasil telaah satu sesi latihan kepada peserta dalam bentuk **PDF**. Saat ini ketiga modul hanya punya unduhan data mentah (CSV/TXT/WebM); hanya SIDAK yang punya laporan PDF.
+
+Keputusan Fajar (2026-10-30), jangan dinegosiasi ulang:
+
+1. **Unit laporan: per sesi.** Satu tombol "Unduh PDF" di halaman Telaah satu sesi. Bukan rekap per peserta.
+2. **Transkrip/percakapan lengkap ikut sebagai lampiran** di bagian akhir PDF; hasil telaah di depan.
+3. **Catatan trainer Telefun ikut dicetak.**
+4. **Urutan: KETIK dulu sebagai pola**, Fajar memeriksa hasilnya, baru Telefun lalu PDKT.
+
+### Kriteria penerimaan (berlaku per modul)
+
+- Tombol **Unduh PDF** muncul di header Telaah, di samping tombol unduh yang sudah ada, dengan target sentuh ≥ 44px (ikuti kelas tombol tetangganya). Di layar sempit label boleh `sr-only` seperti tombol "Unduh transkrip".
+- Tombol **nonaktif** (atau tidak tampil) selama telaah belum selesai (`pending`/`processing`/`failed`, atau hasil telaah belum termuat). PDF tidak pernah dibuat dari telaah setengah jadi.
+- PDF adalah **unduhan langsung** (Blob `application/pdf`, magic `%PDF-`, tanpa BOM), bukan `window.print()`, bukan screenshot/raster. A4 portrait, teks asli yang bisa diseleksi.
+- Isi PDF **sama dengan yang tampil di layar Telaah** — tidak ada skor, label, atau kesimpulan yang dihitung ulang atau dikarang. Bila suatu bagian kosong di layar, PDF menulis kalimat kosong yang jujur (salin dari copy UI, mis. "Tidak ada salah ketik yang ditemukan.").
+- Header tiap halaman: kiri nama laporan (mis. "Hasil Telaah KETIK"), kanan identitas singkat (peserta • tanggal sesi). Footer "Halaman x dari y" (sudah disediakan `PdfDocument.finalize()`).
+- Metadata dokumen (`setProperties`): title, subject, author = nama modul, creator = "Trainers SuperApp - Hasil Telaah <Modul>".
+- Nama file deterministik: `ketik_telaah_<sessionId>.pdf`, `telefun_telaah_<recordId>.pdf`, `pdkt_telaah_<sessionId>.pdf` (sejajar dengan pola nama file transkrip yang ada).
+- Karakter tanpa glyph di font standar (emoji, dll.) tercetak sebagai penanda `[U+XXXX]` lewat `pdfSafeText` — konvensi yang sudah disetujui untuk PDF SIDAK. Baris baru di pesan dipertahankan.
+- Kegagalan impor `jspdf` atau pembuatan PDF → toast error manusiawi (`notify.error`, mis. "PDF belum bisa dibuat. Coba lagi."), **tidak ada file yang terunduh**, tombol kembali aktif. Tidak ada fallback lain.
+- `jspdf` diimpor dinamis saat tombol diklik (bundle halaman Telaah tidak membesar).
+- Tidak ada perubahan backend, `packages/types`, migration, atau izin. Siapa pun yang sekarang bisa membuka halaman Telaah bisa mengunduh PDF-nya.
+
+## Design
+
+### Pakai ulang, jangan salin
+
+Generator PDF SIDAK sudah terpecah jadi modul generik. Pakai langsung dari `apps/web/src/utils/`:
+
+| Modul                     | Yang dipakai                                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agentReportPdfTheme.ts`  | konstanta halaman/margin, `FONT`, warna `INK*`, `TONE_*`, `mm`, `line`                                                                         |
+| `agentReportPdfText.ts`   | `pdfSafeText`, `createMeasurer`, `wrapPdfText`                                                                                                 |
+| `agentReportPdfLayout.ts` | `PdfDocument` (header kustom via konstruktor, `heading`, `paragraph`, `table`, `rule`, `ensureSpace`, `finalize`), `bullet`, `statRow`, `note` |
+
+Contoh pemakaian lengkap: `generateAgentReportPdf()` di `apps/web/src/utils/agentReportPdf.ts:658`. **Jangan** mengganti nama atau memindahkan modul SIDAK di plan ini (churn tanpa manfaat). Bila sebuah primitive perlu perilaku baru, tambahkan secara aditif dan pastikan PDF SIDAK tidak berubah (lihat Verifikasi).
+
+### Modul baru
+
+- `apps/web/src/utils/sessionReviewPdf.ts` — bagian yang **pasti** dipakai ketiga modul, dan hanya itu:
+  - `createSessionReviewPdf({ title, headerLeft, headerRight, metadata })` → impor dinamis `jspdf`, buat dokumen A4 mm, `setProperties`, kembalikan `PdfDocument` yang sudah `begin()`.
+  - `drawIdentityBlock(pdf, rows: [label, value][])` — blok identitas (peserta, tanggal, skenario, dsb.).
+  - `drawTranscriptAppendix(pdf, entries: { number, speaker, time, text }[])` — lampiran transkrip bernomor; nomor harus sama dengan nomor pesan yang dipakai kutipan di layar Telaah.
+  - `downloadPdf(bytes: ArrayBuffer, filename)` — Blob `application/pdf`, tanpa BOM, revoke URL setelah klik.
+  - Jangan menambah helper lain "untuk nanti"; Fase 2/3 menambah ke sini hanya bila benar-benar dipakai bersama.
+- Fase 1: `apps/web/src/routes/ketik/utils/ketikReviewPdf.ts` — `generateKetikReviewPdf(input): Promise<ArrayBuffer>`.
+- Fase 2: `apps/web/src/routes/telefun/utils/telefunReviewPdf.ts`.
+- Fase 3: `apps/web/src/routes/pdkt/utils/pdktReviewPdf.ts`.
+
+Generator menerima data yang **sudah ada di komponen Telaah** (tidak ada fetch baru). Label, verdict, dan urutan diambil dari helper yang dipakai UI agar layar dan PDF tidak bisa menyimpang:
+
+### Fase 1 — KETIK
+
+Sumber data: `KetikReviewStage` (`apps/web/src/routes/ketik/components/KetikReviewStage.tsx`) sudah memegang `session: KetikHistoryDetail`, `previousScore`, `review.review: KetikSessionReview`, `review.typos: KetikTypoFinding[]`, dan `numbers` (penomoran pesan dari `numberMessages`). Turunan yang dipakai UI ada di `ReviewResult` (`KetikReviewResult.tsx:44-110`): `fixes`/`good` dari `education.agentNotes`, `orderedPoints` dari `education.consumerPoints`, `nextSteps` (gabungan `coachingFocus` + `overallNextSteps`, unik), `guidance` dari `dimensionGuidance`.
+
+**Langkah pertama Fase 1:** ekstrak turunan itu ke fungsi murni (mis. `buildKetikReviewView(session, review, typos)` di `apps/web/src/routes/ketik/utils/reviewView.ts`) yang dipakai **bersama** oleh `ReviewResult` dan generator PDF. Ini refactor tanpa perubahan perilaku UI; E2E Telaah KETIK yang ada harus tetap hijau.
+
+Urutan isi PDF (ikuti urutan seksi layar Telaah):
+
+1. **Identitas** — peserta (`formatSimulationSubjectLabel(session.simulationSubject)`, plus batch/tim bila subjek peserta), tanggal sesi (`formatKetikDate`), skenario (`scenarioTitle`), konsumen (`consumerName`), durasi bila ada, waktu PDF dibuat.
+2. **Skor akhir** — `finalScore`, `scoreVerdict(score)`, perubahan vs sesi sebelumnya (kalimat sama dengan `scoreChange` di `KetikReviewResult.tsx:30`), lalu tabel skor per aspek dari `readAspectScores(session)` dengan penanda di bawah `KETIK_FIX_THRESHOLD`.
+3. **Ringkasan** — `review.aiSummary`, dan `education.caseCore` bila ada.
+4. **Perbaiki dulu** — tiap catatan `verdict: "fix"`: kutipan agen (dengan nomor pesan), catatan, dan "Sebaiknya:" `example`; lalu `review.weaknesses`.
+5. **Pertanyaan konsumen** — `orderedPoints`: kutipan, ringkasan, status (label yang sama dengan UI), jawaban agen bila ada, alasan.
+6. **Verifikasi data** — hanya bila `education.verification` ada; status per field seperti `KetikVerificationSummary`.
+7. **Sudah baik** — catatan `verdict: "good"` + `review.strengths`.
+8. **Ejaan** — dari `typosEnriched` bila ada, jika tidak dari `typos`: kata asli → koreksi, `typoSeverityLabel`.
+9. **Alasan skor** — `dimensionGuidance` terurut `priorityRank`.
+10. **Langkah berikutnya** — `nextSteps`.
+11. **Lampiran: Transkrip** — halaman baru; semua pesan `normalizeMessagesForDisplay(session.messages)` bernomor (`numbers`), pengirim (Agen/Konsumen/Sistem — label dari `transcript.ts`), waktu, teks. Lampiran gambar dicetak sebagai teks `[Gambar: <alt>]`, tidak di-embed.
+
+Telaah lama tanpa field anotasi (`consumerPoints`/`agentNotes` undefined) harus tetap menghasilkan PDF; seksi yang datanya tidak ada ditulis dengan copy kosong yang sama dengan UI (`NotAvailable`).
+
+Tombol: di `KetikReviewStage.tsx` header, tepat setelah "Unduh transkrip" (`:193-201`), dengan state `downloadingPdf` untuk mencegah klik ganda.
+
+### Fase 2 — Telefun (setelah Fajar menyetujui PDF KETIK)
+
+Sumber: `TelefunReviewStage.tsx` + `TelefunReviewResult.tsx` (seksi Ringkasan, Alasan skor, Perbaiki dulu, Pertanyaan konsumen, Sudah baik, **Catatan trainer**, Skor suara), `TelefunScoreDetails.tsx`, `VoiceMetricCards.tsx`, transkrip dari `TelefunTranscript.tsx` / `telefunTranscriptFormatters.ts` (ikuti format `downloadTranscript` di `TelefunReviewStage.tsx:109`). Grafik radar (`TelefunProfileRadar`) dicetak sebagai **tabel** skor dimensi, bukan gambar. Rekaman audio tidak ikut; cukup tulis durasi panggilan. Terapkan langkah ekstraksi view-model yang sama seperti KETIK sebelum menulis generator.
+
+### Fase 3 — PDKT (setelah Fase 2)
+
+Sumber: `PdktReviewStage.tsx` (Email konsumen, Balasan Anda, Poin konsumen + status Terjawab/Sebagian/Belum terjawab, Catatan pada balasan, Catatan AI, Temuan lain, Waktu pengerjaan) dan `PdktScoreBreakdown.tsx` (Rincian skor). "Lampiran transkrip" untuk PDKT = email konsumen lengkap + balasan peserta lengkap. Lampiran email (gambar/berkas) dicetak sebagai daftar nama berkas, tidak di-embed. Atribusi balasan mengikuti keputusan 2026-10-22: nama yang dicetak adalah **pembalas** yang dipilih saat membalas, bukan snapshot pembuat.
+
+### Di luar scope
+
+Rekap multi-sesi per peserta, kirim PDF via email/WhatsApp, PDF di halaman Riwayat (daftar), PDF dari Monitoring, perubahan backend/API, font kustom, embed gambar.
+
+## Tasklist
+
+Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers-superapp-tdd` sebelum edit; query `graphify` untuk `KetikReviewStage`/`ReviewResult`/`PdfDocument` sebelum edit lintas-file; `thermo-nuclear` setelah implementasi; `impeccable` audit untuk tombol + tampilan PDF. **Satu run Playwright pada satu waktu**; jalankan spec terfokus dari `apps/web`: `pnpm exec playwright test <spec> -g "<judul>"` (jangan `test:e2e -- -g`). Tidak ada unit test baru tanpa izin Fajar.
+
+### Fase 0 — Persiapan test
+
+- [ ] Pindahkan pembaca PDF dari `apps/web/e2e/sidak-agent-report-download.spec.ts` (`readPdfPages`, decoder CMap/WinAnsi, `readPdfInfo`, `recordDownloadBlobs`, `expectTextBasedPdf`, `expectPageFooters`, `printedReadBack`, `readPrintedMarkers`; ±baris 290–860) ke `apps/web/e2e/helpers/pdfReadback.ts`, ekspor apa adanya, dan impor balik di spec SIDAK. Tidak ada perubahan logika.
+- [ ] Jalankan `sidak-agent-report-download.spec.ts` sekali → harus tetap 25/25. Kalau tidak, STOP dan perbaiki pemindahan sebelum lanjut.
+
+### Fase 1 — KETIK
+
+- [ ] **RED:** tulis `apps/web/e2e/ketik-review-pdf.spec.ts` memakai `openHermeticShell` + mock seperti `ketik-review-worker-browser.spec.ts` (sesi `completed` dengan `education` lengkap: 2 `agentNotes` fix + 1 good, 2 `consumerPoints` berbeda status, 1 typo, `verification`, pesan berisi emoji dan baris baru, cukup banyak pesan agar ≥ 2 halaman). Test minimal:
+  1. Unduh PDF: nama file `ketik_telaah_<id>.pdf`, `%PDF-`, tanpa BOM, A4, metadata title/author, footer "Halaman x dari y" di tiap halaman.
+  2. Isi: nama peserta, skor akhir + verdict, setiap judul seksi, kutipan + "Sebaiknya" dari catatan fix, status poin konsumen, typo, langkah berikutnya, teks pesan transkrip bernomor; emoji → `[U+XXXX]`; baris baru dipertahankan.
+  3. Paritas layar: nilai skor dan label verdict di PDF sama dengan teks yang tampil di panel Telaah untuk fixture yang sama.
+  4. Telaah lama tanpa `consumerPoints`/`agentNotes` → PDF tetap terunduh dengan copy kosong yang jujur.
+  5. Telaah `pending`/`processing`/`failed` → tombol nonaktif/tidak ada.
+  6. Kegagalan generator (blokir chunk `jspdf` lewat `page.route` atau paksa throw) → toast error, tidak ada event download, tombol aktif lagi.
+     Jalankan → harus MERAH karena alasan yang benar (tombol belum ada).
+- [ ] Ekstrak view-model KETIK (`reviewView.ts`) dan pakai di `ReviewResult`; jalankan `ketik-review-worker-browser.spec.ts` dan `ketik-history-browser.spec.ts` → tetap hijau.
+- [ ] Tulis `apps/web/src/utils/sessionReviewPdf.ts` (empat fungsi di Design, tidak lebih).
+- [ ] Tulis `apps/web/src/routes/ketik/utils/ketikReviewPdf.ts` sesuai urutan isi.
+- [ ] Tambah tombol di `KetikReviewStage.tsx`.
+- [ ] **GREEN:** `ketik-review-pdf.spec.ts` hijau. Simpan satu PDF hasil fixture ke `plans/markdown/session-review-pdf-ketik-sample.pdf` sebagai artefak yang bisa diperiksa Fajar.
+- [ ] Refactor bila perlu; spec tetap hijau.
+- [ ] Gate: `thermo-nuclear`; `impeccable` audit (tombol + PDF); root typecheck, lint, build; `git diff --check`; `graphify update .` sekali setelah batch.
+- [ ] Verifikasi SIDAK tidak berubah: jalankan `sidak-agent-report-download.spec.ts` sekali lagi bila ada modul `agentReportPdf*` yang disentuh.
+- [ ] Entri `CHANGELOG.md` di bawah tanggal hari itu (`- feat(ketik): ...`), commit, push ke `main` (sudah diizinkan). Tidak deploy production.
+- [ ] Perbarui Status di plan ini + baris di `plans/README.md` dengan evidence (perintah persis + hasil).
+- [ ] **STOP.** Laporkan ke Fajar dengan lokasi sampel PDF. Fase 2 baru dimulai setelah Fajar menyetujui tampilan/isi.
+
+### Fase 2 — Telefun (tertahan)
+
+- [ ] RED `apps/web/e2e/telefun-review-pdf.spec.ts` (fixture dari `e2e/helpers/telefunFixtures.ts`), kasus setara Fase 1 + **Catatan trainer tercetak** + skor dimensi sebagai tabel.
+- [ ] Ekstrak view-model Telefun; spec Telefun Telaah yang ada tetap hijau.
+- [ ] `telefunReviewPdf.ts` + tombol di `TelefunReviewStage.tsx`; GREEN; gate; changelog; commit/push; STOP untuk review.
+
+### Fase 3 — PDKT (tertahan)
+
+- [ ] RED `apps/web/e2e/pdkt-review-pdf.spec.ts`, kasus setara + email konsumen & balasan lengkap di lampiran + nama pembalas (bukan pembuat).
+- [ ] Ekstrak view-model PDKT; `pdkt-flow.spec.ts` dan `pdkt-replier-attribution.spec.ts` tetap hijau.
+- [ ] `pdktReviewPdf.ts` + tombol di `PdktReviewStage.tsx`; GREEN; gate; changelog; commit/push.
+- [ ] Di akhir Fase 3 saja: jalankan suite E2E default sekali (bukan paralel) dan catat hasilnya.
+
+## STOP conditions
+
+- Data yang tampil di layar Telaah ternyata tidak tersedia di komponen (butuh fetch/endpoint baru) → STOP, laporkan; jangan menambah API tanpa persetujuan (itu menaikkan lane).
+- Memindahkan pembaca PDF membuat spec SIDAK merah dan penyebabnya bukan pemindahan → STOP.
+- Butuh dependency baru (font, library PDF lain, `html2canvas`) → STOP; jangan tambahkan.
+- Ada kebutuhan unit test → minta izin Fajar dulu dengan kontrak yang tidak bisa dibuktikan E2E.
+
+## Evidence
+
+_(diisi eksekutor: perintah persis, jumlah test lulus, hash commit, lokasi sampel PDF.)_
