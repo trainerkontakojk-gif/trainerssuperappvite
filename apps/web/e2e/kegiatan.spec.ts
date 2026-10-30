@@ -284,6 +284,62 @@ test.describe("Kegiatan Trainers", () => {
     expectHermetic(audit);
   });
 
+  test("formulir kegiatan tidak tumpang tindih atau meluap di desktop dan mobile", async ({
+    page,
+  }) => {
+    const audit = await openAdmin(page, "/dashboard/kegiatan", [adminList([])]);
+
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.getByRole("button", { name: "Tambah kegiatan" }).click();
+      const dialog = page.getByRole("dialog", { name: "Tambah kegiatan" });
+      await expect(dialog).toBeVisible();
+      // The longest program label stretches a native select to its intrinsic width.
+      await dialog.getByLabel("Program").selectOption("ketik");
+
+      const layout = await dialog.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const fields = [
+          ...element.querySelectorAll<HTMLElement>("input, select"),
+        ].filter((field) => field.type !== "checkbox");
+        const rects = fields.map((field) => {
+          const rect = field.getBoundingClientRect();
+          return { id: field.id, left: rect.left, right: rect.right };
+        });
+        return {
+          width: box.width,
+          left: box.left,
+          right: box.right,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          rects,
+        };
+      });
+
+      expect(layout.scrollWidth, `lebar ${width}px`).toBeLessThanOrEqual(
+        layout.clientWidth,
+      );
+      for (const rect of layout.rects) {
+        expect(rect.left, `${rect.id} @ ${width}px`).toBeGreaterThanOrEqual(
+          layout.left,
+        );
+        expect(rect.right, `${rect.id} @ ${width}px`).toBeLessThanOrEqual(
+          layout.right,
+        );
+      }
+      const program = layout.rects.find((r) => r.id === "activity-program")!;
+      const kind = layout.rects.find((r) => r.id === "activity-kind")!;
+      if (width === 1440) {
+        expect(layout.width).toBeGreaterThanOrEqual(500);
+        expect(program.right).toBeLessThanOrEqual(kind.left);
+      }
+
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+    }
+    expectHermetic(audit);
+  });
+
   test("validasi formulir: link bukan Drive dan gambar terlalu besar ditolak sebelum dikirim", async ({
     page,
   }) => {

@@ -506,7 +506,7 @@ export default function DashboardKegiatan() {
       </section>
 
       <Dialog open={formOpen} onOpenChange={closeForm}>
-        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto p-0">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-2xl">
           <DialogHeader className="px-5 pt-5 sm:px-6 sm:pt-6">
             <DialogTitle>
               {editing ? "Ubah kegiatan" : "Tambah kegiatan"}
@@ -558,7 +558,7 @@ export default function DashboardKegiatan() {
                       event.target.value as TrainerActivityProgram,
                     )
                   }
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {TRAINER_ACTIVITY_PROGRAMS.map((program) => (
                     <option key={program.value} value={program.value}>
@@ -578,7 +578,7 @@ export default function DashboardKegiatan() {
                       event.target.value as ActivityForm["kind"],
                     )
                   }
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="poster">Poster</option>
                   <option value="foto">Foto</option>
