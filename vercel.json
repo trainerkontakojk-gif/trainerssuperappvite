@@ -4,50 +4,125 @@
   "outputDirectory": "apps/web/dist",
   "installCommand": "CI=true pnpm install",
   "framework": null,
-  "headers": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(self), geolocation=()"
-        }
-      ]
+      "src": "^/.*$",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      },
+      "continue": true
     },
     {
-      "source": "/",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
+      "src": "^/$",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "continue": true
     },
     {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "src": "^/assets/.*$",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "continue": true
+    },
+    {
+      "src": "^/(?:[^/]+/)*\\.(?!well-known(?:/|$))[^/]+(?:/.*)?$",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
+    {
+      "src": "^/(?:wp-admin|wp-login\\.php|xmlrpc\\.php|phpmyadmin|administrator|actuator)(?:/.*)?$",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
+    {
+      "src": "^/(?:account|api|auth/callback|dashboard|ketik|monitoring|pdkt|pending|preview|profiler|qa-analyzer|reset-password|sidak|telefun|tna|unauthorized|waiting-approval)(?:/.*)?$",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+        "X-Robots-Tag": "noindex, nofollow"
+      },
+      "continue": true
+    },
+    { "handle": "filesystem" },
+    {
+      "src": "^/assets(?:/.*)?$",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
+    {
+      "src": "^/.*\\.(?:css|csv|docx?|html|ico|jpe?g|js|json|map|mjs|mp3|mp4|m4a|otf|pdf|png|pptx?|svg|ttf|txt|wasm|wav|webm|webmanifest|webp|woff2?|xls|xlsx|xml|zip)$",
+      "status": 404,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
+    },
+    {
+      "src": "^/(?:account|api|auth/callback|dashboard|ketik|monitoring|pdkt|pending|preview|profiler|qa-analyzer|reset-password|sidak|telefun|tna|unauthorized|waiting-approval)(?:/.*)?$",
+      "dest": "/index.html",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+        "X-Robots-Tag": "noindex, nofollow"
+      }
+    },
+    {
+      "src": "^/.*$",
+      "dest": "/index.html",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' blob: https://*.up.railway.app https://*.onrender.com https://*.vercel.app https://*.supabase.co https://*.trainerssuperapp.my.id wss://*.trainerssuperapp.my.id wss://*.up.railway.app wss://*.vercel.app wss://*.onrender.com; media-src 'self' blob: https://*.supabase.co; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()"
+      }
     }
-  ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  ]
 }

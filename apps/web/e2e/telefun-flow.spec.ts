@@ -806,10 +806,17 @@ test.describe("Telefun Telaah (hermetic)", () => {
       async (target) => {
         // Reproduce the real production fetch policy, including blob reads.
         // Other directives are omitted here for Vite's development bootstrap.
-        const connectSrc = vercelConfig.headers
-          .flatMap((entry) => entry.headers)
-          .find((header) => header.key === "Content-Security-Policy")!
-          .value.split(";")
+        const cspValues = vercelConfig.routes.flatMap((route) => {
+          if (!("headers" in route)) return [];
+          const policy = (
+            route.headers as Record<string, string | undefined>
+          )["Content-Security-Policy"];
+          return policy ? [policy] : [];
+        });
+        expect(cspValues.length).toBeGreaterThan(0);
+        expect(new Set(cspValues).size).toBe(1);
+        const connectSrc = cspValues[0]!
+          .split(";")
           .map((directive) => directive.trim())
           .find((directive) => directive.startsWith("connect-src "))!;
         await target.route(
