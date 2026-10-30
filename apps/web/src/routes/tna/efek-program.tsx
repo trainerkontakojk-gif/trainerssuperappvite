@@ -280,7 +280,7 @@ function ParticipantTable({
     >
       <button
         type="button"
-        className="inline-flex min-h-[32px] items-center gap-1 underline-offset-4 hover:underline"
+        className="inline-flex min-h-[32px] items-center gap-1 underline-offset-4 hover:underline max-sm:min-h-[44px]"
         title={title}
         onClick={() =>
           setSort((s) => ({

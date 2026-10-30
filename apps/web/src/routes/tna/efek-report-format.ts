@@ -44,7 +44,7 @@ export const deltaClass = (n: number | null) =>
   n === null || Math.abs(n) < 1
     ? "text-muted-foreground"
     : n > 0
-      ? "text-emerald-700 dark:text-emerald-400"
+      ? "text-success"
       : "text-destructive";
 export const reportQuery = (s: EfekReportSearch) => {
   const q = new URLSearchParams();

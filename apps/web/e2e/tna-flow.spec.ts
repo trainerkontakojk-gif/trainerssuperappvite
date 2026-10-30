@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { expectHermetic, waitForMockedApi } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
@@ -370,3 +371,62 @@ for (const width of [1440, 390]) {
     expectHermetic(audit);
   });
 }
+
+test("empty state /tna lolos kontras AA di tema terang", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => localStorage.setItem("theme", "light"));
+  const audit = await openTna(page, "/tna");
+  await expect(
+    page.getByText("Tidak ada parameter untuk filter ini"),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(
+    page.getByText("Tidak ada rencana yang perlu dievaluasi"),
+  ).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include("main")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    results.violations.map(
+      (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`,
+    ),
+  ).toEqual([]);
+  expectHermetic(audit);
+});
+
+test("tanpa periode pembanding, keterangannya tampil sekali", async ({
+  page,
+}) => {
+  const audit = await openTna(page, parameterUrl);
+  await expect(
+    page.getByRole("heading", { name: "Ketelitian verifikasi" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText("Belum ada periode pembanding")).toHaveCount(1);
+  await waitForMockedApi(audit, ["/tna/parameters/detail"]);
+  expectHermetic(audit);
+
+  // When the trend line talks about something else, the section still says it.
+  await page.unrouteAll();
+  const running = await openTna(page, parameterUrl, [
+    {
+      method: "GET",
+      path: "/api/v1/tna/parameters/detail",
+      body: {
+        success: true,
+        data: {
+          ...detail,
+          metrics: { ...metrics, trendStatus: "period_in_progress" },
+        },
+      },
+    },
+  ]);
+  await expect(
+    page.getByText("Tren belum dihitung; periode masih berjalan"),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(
+    page.getByRole("heading", { name: "Periode pembanding" }),
+  ).toBeVisible();
+  await expect(page.getByText("Belum ada periode pembanding")).toHaveCount(1);
+  await waitForMockedApi(running, ["/tna/parameters/detail"]);
+  expectHermetic(running);
+});

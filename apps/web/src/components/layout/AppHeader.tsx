@@ -37,9 +37,11 @@ export function AppHeader({ onOpenMobileMenu }: AppHeaderProps) {
               {crumb.href ? (
                 <Link
                   to={crumb.href as any}
-                  className="truncate transition-colors text-muted-foreground hover:text-foreground"
+                  // Below lg the link is a 44px touch target; the negative margin keeps the text in place,
+                  // except on the first crumb, which must not overlap the menu button.
+                  className="flex min-w-0 transition-colors text-muted-foreground hover:text-foreground max-lg:-mx-2 max-lg:min-h-[44px] max-lg:min-w-[44px] max-lg:items-center max-lg:justify-center max-lg:px-2 max-lg:first:ml-0 max-lg:first:justify-start max-lg:first:pl-0"
                 >
-                  {crumb.label}
+                  <span className="truncate">{crumb.label}</span>
                 </Link>
               ) : (
                 <span

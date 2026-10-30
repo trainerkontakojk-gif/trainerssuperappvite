@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-30
 
+- fix(tna): resolve Impeccable audit findings for contrast, touch targets, and EFEK filters
 - test(web): guard dialog close hit area on Batas latihan and Setujui dialogs
 - fix(kegiatan): align activity form controls and enlarge dialog close hit area
 - fix(kegiatan): stop activity form dialog from overlapping and overflowing

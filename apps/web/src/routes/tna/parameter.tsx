@@ -90,32 +90,43 @@ function ParameterContent({ detail: d }: { detail: TnaParameterDetail }) {
             Data belum cukup untuk kesimpulan kuat.
           </p>
         )}
-        <h2 className="font-heading text-lg font-bold">Periode pembanding</h2>
-        {d.metrics.comparePeriods.map((p, index) => (
-          <div
-            key={p.periodId}
-            className="space-y-2 border-b border-border py-3"
-          >
-            <p className="text-sm">
-              {(() => {
-                const period = periods.data?.find(
-                  (item) => item.id === p.periodId,
-                );
-                return period
-                  ? new Date(period.year, period.month - 1).toLocaleDateString(
-                      "id-ID",
-                      { month: "long", year: "numeric" },
-                    )
-                  : `Periode pembanding ${index + 1}`;
-              })()}
-            </p>
-            <Metrics metrics={p} />
-          </div>
-        ))}
-        {!d.metrics.comparePeriods.length && (
-          <p className="text-sm text-muted-foreground">
-            Belum ada periode pembanding.
-          </p>
+        {/* Skip the section only when the trend line above already says no comparison exists. */}
+        {(d.metrics.comparePeriods.length > 0 ||
+          d.metrics.trendStatus !== "no_comparison_data") && (
+          <>
+            <h2 className="font-heading text-lg font-bold">
+              Periode pembanding
+            </h2>
+            {d.metrics.comparePeriods.map((p, index) => (
+              <div
+                key={p.periodId}
+                className="space-y-2 border-b border-border py-3"
+              >
+                <p className="text-sm">
+                  {(() => {
+                    const period = periods.data?.find(
+                      (item) => item.id === p.periodId,
+                    );
+                    return period
+                      ? new Date(
+                          period.year,
+                          period.month - 1,
+                        ).toLocaleDateString("id-ID", {
+                          month: "long",
+                          year: "numeric",
+                        })
+                      : `Periode pembanding ${index + 1}`;
+                  })()}
+                </p>
+                <Metrics metrics={p} />
+              </div>
+            ))}
+            {!d.metrics.comparePeriods.length && (
+              <p className="text-sm text-muted-foreground">
+                Belum ada periode pembanding.
+              </p>
+            )}
+          </>
         )}
       </section>
       <section className="space-y-3">

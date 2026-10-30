@@ -58,6 +58,10 @@ Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel 
 --fg3: #8a8a8a; /* ≥4.5:1 di bg/surface */
 --inv-bg: #fafafa;
 --inv-fg: #0a0a0a;
+
+/* Status (dipetakan ke Tailwind `success` / `warning`; merah memakai `destructive`) */
+--success: #047857; /* terang — gelap: #34d399 */
+--warning: #b45309; /* terang — gelap: #fbbf24 */
 ```
 
 > **Aturan Implementasi CSS:**

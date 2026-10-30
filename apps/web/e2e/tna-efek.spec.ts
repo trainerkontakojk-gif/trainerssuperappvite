@@ -12,6 +12,7 @@ import { expectHermetic, waitForMockedApi } from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { setDocumentTheme } from "./helpers/textContrast";
 import { ids, openTna } from "./helpers/tnaHarness";
+import { findTargetsBelow } from "./helpers/touchTarget";
 
 // EFEK screens (plans/markdown/efek.md): TNA tab, report, session form, import.
 test.beforeAll(() => assertLocalDevOnlyTarget());
@@ -1119,5 +1120,51 @@ test("tab EFEK dari rincian program mempertahankan filter dan Sesuaikan analisis
   await expect(
     page.getByRole("checkbox", { name: "Hitung proper input (APPK)" }),
   ).toBeChecked();
+  expectHermetic(audit);
+});
+
+test("390 px: target sentuh EFEK minimal 44 px dan filter dua per baris", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  const audit = await openTna(page, "/tna/efek", efekMocks);
+  for (const [path, ready] of [
+    [
+      "/tna/efek",
+      page.getByRole("link", { name: "Rincian Level Up Week Mei" }),
+    ],
+    [
+      "/tna/efek/program/ketik",
+      page.getByRole("button", { name: "Peserta", exact: true }),
+    ],
+    ["/tna/efek/sesi/baru", page.getByRole("button", { name: "Simpan sesi" })],
+  ] as const) {
+    if (path !== "/tna/efek") await page.goto(path);
+    await expect(ready).toBeVisible({ timeout: 20000 });
+    for (const region of ["header", "main"])
+      expect(
+        await findTargetsBelow(page, page.locator(region).first()),
+        `${region} ${path}`,
+      ).toEqual([]);
+  }
+
+  // The first crumb's enlarged target must not cover the menu button beside it.
+  const menu = page.getByRole("button", { name: "Buka menu navigasi" });
+  expect(
+    await menu.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        box.right - 1,
+        box.top + box.height / 2,
+      );
+      return Boolean(hit && button.contains(hit));
+    }),
+  ).toBe(true);
+
+  // Back on the program report: the first two filters share one row.
+  await page.goto("/tna/efek/program/ketik");
+  const first = await page.getByLabel("Jendela banding").boundingBox();
+  const second = await page.getByLabel("Tahun sesi").boundingBox();
+  expect(second?.y).toBe(first?.y);
   expectHermetic(audit);
 });

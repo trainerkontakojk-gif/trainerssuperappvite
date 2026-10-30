@@ -208,7 +208,7 @@ export default function EfekIndex() {
                             params={{ code: s.program_code }}
                             search={{ ...filters, session: s.id }}
                             aria-label={`Rincian ${s.title}`}
-                            className="inline-flex min-h-[44px] items-center underline-offset-4 hover:underline"
+                            className="inline-flex min-h-[44px] min-w-[44px] items-center underline-offset-4 hover:underline"
                           >
                             {programName(s.program_code)}
                           </Link>

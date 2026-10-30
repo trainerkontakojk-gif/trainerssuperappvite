@@ -18,7 +18,7 @@ import {
 /** Shared EFEK report pieces for `/tna/efek` and `/tna/efek/program/$code`. */
 
 const STATUS_CLASS: Record<EfekParticipantStatus, string> = {
-  naik: "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400",
+  naik: "bg-success/10 text-success",
   stabil: "bg-muted text-muted-foreground",
   turun: "bg-destructive/10 text-destructive",
   menunggu: "bg-muted text-muted-foreground",
@@ -33,7 +33,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${status ? STATUS_CLASS[status] : "bg-amber-600/10 text-amber-700 dark:text-amber-400"}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${status ? STATUS_CLASS[status] : "bg-warning/10 text-warning"}`}
     >
       {children}
     </span>
@@ -66,7 +66,7 @@ export function ReportFilters({
     } as never);
   return (
     <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4">
         <Field label="Jendela banding">
           <select
             className={selectClass}
@@ -118,7 +118,7 @@ export function ReportFilters({
           </select>
         </Field>
         {children}
-        <label className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground">
+        <label className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground max-sm:col-span-2">
           <input
             type="checkbox"
             className="size-4 shrink-0 accent-module-tna focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"

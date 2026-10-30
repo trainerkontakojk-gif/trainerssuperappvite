@@ -25,6 +25,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -108,6 +110,8 @@
     --accent-foreground: var(--fg);
     --destructive: #dc2626;
     --destructive-foreground: #fafafa;
+    --success: #047857; /* status naik/membaik */
+    --warning: #b45309; /* status perlu perhatian */
     --input: var(--border);
     --ring: var(--fg);
 
@@ -195,6 +199,8 @@
     --accent-foreground: var(--fg);
     --destructive: #dc2626;
     --destructive-foreground: #fef2f2;
+    --success: #34d399;
+    --warning: #fbbf24;
     --input: var(--border);
     --ring: var(--fg);
 
