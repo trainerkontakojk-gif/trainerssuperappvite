@@ -24,7 +24,8 @@
     "start": "tsx src/index.ts",
     "start:telefun-scoring-worker": "tsx src/workers/telefun-scoring-worker-entrypoint.ts",
     "start:ketik-review-worker": "tsx src/workers/ketik-review-worker-entrypoint.ts",
-    "backfill:scenario-attachments": "tsx src/scripts/backfill-scenario-attachments.ts"
+    "backfill:scenario-attachments": "tsx src/scripts/backfill-scenario-attachments.ts",
+    "optimize:kegiatan-images": "tsx src/scripts/optimize-kegiatan-images.ts"
   },
   "dependencies": {
     "@google/genai": "^2.29.0",
@@ -33,6 +34,7 @@
     "@supabase/supabase-js": "^2.117.3",
     "@trainers/types": "workspace:*",
     "hono": "^4.13.13",
+    "sharp": "0.35.5",
     "tsx": "^4.23.15",
     "undici": "7.30.1",
     "zod": "^4.6.7"

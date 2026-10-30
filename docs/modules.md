@@ -321,7 +321,7 @@ Laman publik untuk menemukan dokumentasi kegiatan pelatihan melalui poster atau 
 - **Routes**: `/kegiatan` untuk publik dan `/dashboard/kegiatan` untuk pengelolaan.
 - **Filter publik**: tahun terbaru dengan kegiatan terbit menjadi pilihan awal; `?tahun=` dan `&program=` disimpan di URL. Tanpa filter program, item dikelompokkan mengikuti urutan tetap SOBAT, KETIK, Telefun, PDKT, CERIWIS.
 - **Admin/trainer** dengan capability `kegiatan.manage` dapat menambah, mengubah, menghapus, menerbitkan, dan menyembunyikan item. Leader dan agent tidak mendapat akses.
-- **Data**: tabel `public.trainer_activities`, bucket Storage publik `trainer-activity-media`. RLS membuat item terbit dapat dibaca publik dan item tersembunyi hanya terbaca admin/trainer. Mutasi dilakukan melalui API backend; bucket tidak menerima penulisan langsung dari browser.
+- **Data**: tabel `public.trainer_activities`, bucket Storage publik `trainer-activity-media`. RLS membuat item terbit dapat dibaca publik dan item tersembunyi hanya terbaca admin/trainer. Mutasi dilakukan melalui API backend; bucket tidak menerima penulisan langsung dari browser. Backend menyimpan setiap gambar sebagai WebP selebar maksimal 800 px (orientasi EXIF diterapkan, metadata dibuang); gambar lama dioptimalkan sekali lewat `pnpm --filter @trainers/api optimize:kegiatan-images`.
 - **Validasi**: tahun 2020–2100, judul 1–120 karakter setelah trim, tautan HTTPS Drive/Docs, serta gambar PNG/JPEG/WebP maksimal 5 MB.
 - **API**: `GET /api/public/kegiatan` tidak memerlukan login dan mengembalikan tahun terbit serta item pada tahun yang dipilih; CRUD ada pada `/api/v1/kegiatan` untuk admin/trainer.
 - **Batasan**: menghapus item tidak menghapus objek Storage, dan isi folder Drive tidak dibaca oleh aplikasi.

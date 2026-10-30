@@ -34,7 +34,16 @@ function programName(value: TrainerActivityProgram) {
   return PROGRAM_BY_VALUE.get(value)!;
 }
 
-function ActivityCard({ item }: { item: PublicTrainerActivity }) {
+/** Roughly the first row on wide screens; these sit above the fold. */
+const EAGER_IMAGE_COUNT = 4;
+
+function ActivityCard({
+  item,
+  eager,
+}: {
+  item: PublicTrainerActivity;
+  eager: boolean;
+}) {
   const program = programName(item.program);
   const formattedDate = displayDate(item.event_date);
 
@@ -47,7 +56,15 @@ function ActivityCard({ item }: { item: PublicTrainerActivity }) {
       aria-label={`${item.title} ${program.label} ${item.year}, buka di Google Drive (perlu akses)`}
     >
       <span className="kegiatan-card-image">
-        <img src={item.image_url} alt={item.title} loading="lazy" />
+        <img
+          src={item.image_url}
+          alt={item.title}
+          width={800}
+          height={1000}
+          decoding="async"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : undefined}
+        />
         <span className="kegiatan-card-open" aria-hidden="true">
           Buka di Drive
         </span>
@@ -115,6 +132,16 @@ function KegiatanContent() {
         items: filteredItems.filter((item) => item.program === program.value),
       })).filter(({ items }) => items.length > 0),
     [filteredItems],
+  );
+  const eagerIds = useMemo(
+    () =>
+      new Set(
+        grouped
+          .flatMap(({ items }) => items)
+          .slice(0, EAGER_IMAGE_COUNT)
+          .map((item) => item.id),
+      ),
+    [grouped],
   );
 
   const selectYear = (year: number) => {
@@ -247,7 +274,11 @@ function KegiatanContent() {
                 </header>
                 <div className="kegiatan-grid">
                   {items.map((item) => (
-                    <ActivityCard key={item.id} item={item} />
+                    <ActivityCard
+                      key={item.id}
+                      item={item}
+                      eager={eagerIds.has(item.id)}
+                    />
                   ))}
                 </div>
               </section>

@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { crc32, deflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 import type { Hono } from "hono";
 import {
@@ -327,6 +328,82 @@ test("link selain Google Drive dan gambar di luar PNG/JPEG/WebP 5 MB ditolak den
     }),
   });
   await expectFriendlyError(oversized, "5 MB");
+});
+
+function solidPng(width: number, height: number): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x++) row.set([200, 60, (x * 7) % 256], 1 + x * 3);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(Buffer.concat(Array(height).fill(row)))),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/** Reads the canvas size from a RIFF/WebP header (VP8, VP8L, or VP8X). */
+function webpSize(bytes: Buffer): { width: number; height: number } {
+  expect(bytes.toString("ascii", 0, 4)).toBe("RIFF");
+  expect(bytes.toString("ascii", 8, 12)).toBe("WEBP");
+  const kind = bytes.toString("ascii", 12, 16);
+  if (kind === "VP8 ")
+    return {
+      width: bytes.readUInt16LE(26) & 0x3fff,
+      height: bytes.readUInt16LE(28) & 0x3fff,
+    };
+  if (kind === "VP8L") {
+    const bits = bytes.readUInt32LE(21);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+  }
+  expect(kind).toBe("VP8X");
+  return {
+    width: bytes.readUIntLE(24, 3) + 1,
+    height: bytes.readUIntLE(27, 3) + 1,
+  };
+}
+
+test("gambar unggahan disimpan sebagai WebP maksimal 800 px dan gambar rusak ditolak", async () => {
+  const identity = users.admin!;
+  const original = solidPng(1600, 2000);
+  const created = await api("/api/v1/kegiatan", {
+    method: "POST",
+    token: identity.token,
+    body: input("optimized", {
+      image: `data:image/png;base64,${original.toString("base64")}`,
+    }),
+  });
+  expect(created.status).toBe(201);
+  const imageUrl: string = (await created.json()).data.image_url;
+  trackImageUrl(imageUrl);
+  expect(imageUrl).toMatch(/\.webp$/);
+
+  const stored = await fetch(imageUrl);
+  expect(stored.status).toBe(200);
+  expect(stored.headers.get("content-type")).toBe("image/webp");
+  const bytes = Buffer.from(await stored.arrayBuffer());
+  expect(bytes.length).toBeLessThan(original.length);
+  expect(webpSize(bytes)).toEqual({ width: 800, height: 1000 });
+
+  const corrupt = await api("/api/v1/kegiatan", {
+    method: "POST",
+    token: identity.token,
+    body: input("corrupt", {
+      image: `data:image/png;base64,${Buffer.from(`${namespace}-not-an-image`).toString("base64")}`,
+    }),
+  });
+  await expectFriendlyError(corrupt, "Gambar tidak valid");
 });
 
 test("image_url di luar bucket kegiatan ditolak", async () => {

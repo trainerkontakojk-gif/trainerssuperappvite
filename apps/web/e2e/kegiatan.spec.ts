@@ -190,6 +190,40 @@ test.describe("Kegiatan Trainers", () => {
     expectHermetic(audit);
   });
 
+  test("empat gambar kartu pertama dimuat langsung, sisanya lazy, semuanya berukuran", async ({
+    page,
+  }) => {
+    const items = (["sobat", "ketik"] as const).flatMap((program) =>
+      [0, 1, 2].map((index) => ({
+        ...PUBLIC_ITEM,
+        id: `kegiatan-${program}-${index}`,
+        program,
+        title: `Kegiatan ${program} ${index}`,
+        sort_order: index,
+      })),
+    );
+    const audit = await openPublic(page, "/kegiatan?tahun=2026", [
+      publicResponse(2026, items),
+    ]);
+
+    const images = page.locator(".kegiatan-card img");
+    await expect(images).toHaveCount(6);
+    for (let index = 0; index < 6; index++) {
+      const image = images.nth(index);
+      await expect(image).toHaveAttribute("width", "800");
+      await expect(image).toHaveAttribute("height", "1000");
+      if (index < 4) {
+        await expect(image).toHaveAttribute("loading", "eager");
+        await expect(image).toHaveAttribute("fetchpriority", "high");
+      } else {
+        await expect(image).toHaveAttribute("loading", "lazy");
+        await expect(image).not.toHaveAttribute("fetchpriority", /.*/);
+      }
+    }
+    await expect(images.nth(3)).toHaveAttribute("alt", "Kegiatan ketik 0");
+    expectHermetic(audit);
+  });
+
   test("tanpa data menampilkan empty state, bukan kartu palsu", async ({
     page,
   }) => {
