@@ -38,6 +38,10 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: "vite-preload",
+              test: /^\0vite\/preload-helper\.js$/,
+            },
+            {
               name: "vendor-react",
               test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
             },

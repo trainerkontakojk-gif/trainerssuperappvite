@@ -5,6 +5,7 @@ import type {
   KetikVerificationStatus,
 } from "@trainers/types";
 import { cn } from "cn";
+import { FIELD_LABELS, STATUS } from "../utils/verificationDisplay";
 import { QuoteButton } from "./KetikReviewAnnotations";
 
 /**
@@ -12,19 +13,6 @@ import { QuoteButton } from "./KetikReviewAnnotations";
  * deliberately malformed. Anomalies come from the session itself
  * (`detectKetikIdentityAnomalies`); the status comes from the review.
  */
-
-const FIELD_LABELS: Record<KetikIdentityAnomalyField, string> = {
-  nik: "NIK",
-  email: "Email",
-  city: "Domisili",
-};
-
-const STATUS: Record<KetikVerificationStatus, { label: string; dot: string }> =
-  {
-    confirmed: { label: "Dikonfirmasi", dot: "bg-chart-green" },
-    unconfirmed: { label: "Belum dikonfirmasi", dot: "bg-chart-orange" },
-    not_asked: { label: "Tidak ditanyakan", dot: "bg-chart-red" },
-  };
 
 function StatusLabel({
   status,

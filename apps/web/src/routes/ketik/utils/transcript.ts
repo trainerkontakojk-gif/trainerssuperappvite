@@ -31,7 +31,7 @@ function download(filename: string, csv: string): void {
   }
 }
 
-const SENDER_LABELS = {
+export const SENDER_LABELS = {
   agent: "Agen",
   consumer: "Konsumen",
   system: "Sistem",

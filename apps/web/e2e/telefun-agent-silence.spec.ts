@@ -244,8 +244,10 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
       for (let index = 0; index < speech.length; index += 1) {
         speech[index] = 0.25 * Math.sin((2 * Math.PI * 440 * index) / 16_000);
       }
-      receive({ data: speech } as MessageEvent);
-      receive({ data: new Float32Array(1024) } as MessageEvent);
+      receive.call(worklet.port, { data: speech } as MessageEvent);
+      receive.call(worklet.port, {
+        data: new Float32Array(1024),
+      } as MessageEvent);
     });
 
     await page.clock.fastForward(4_900);

@@ -68,6 +68,7 @@ export function KetikReviewStage({
     null,
   );
   const attachmentTrigger = useRef<HTMLButtonElement | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [replayOpen, setReplayOpen] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
   const [target, setTarget] = useState<KetikReviewTarget | null>(null);
@@ -143,6 +144,36 @@ export function KetikReviewStage({
     focusReviewTarget(element);
   };
 
+  const handleDownloadPdf = async () => {
+    if (
+      downloadingPdf ||
+      review.phase !== "ready" ||
+      !review.review ||
+      review.rerunFailed
+    )
+      return;
+    setDownloadingPdf(true);
+    try {
+      const [{ generateKetikReviewPdf }, { downloadPdf }] = await Promise.all([
+        import("../utils/ketikReviewPdf"),
+        import("../../../utils/sessionReviewPdf"),
+      ]);
+      const bytes = await generateKetikReviewPdf({
+        session,
+        review: review.review,
+        typos: review.typos,
+        previousScore,
+        numbers,
+        canRerun: canStartReview,
+      });
+      downloadPdf(bytes, `ketik_telaah_${session.id}.pdf`);
+    } catch {
+      notify.error("PDF belum bisa dibuat. Coba lagi.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const participant =
     session.simulationSubject?.type === "participant"
       ? formatSimulationSubjectLabel(session.simulationSubject)
@@ -198,6 +229,23 @@ export function KetikReviewStage({
           >
             <Download data-icon="inline-start" />
             <span className="max-sm:sr-only">Unduh transkrip</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              downloadingPdf ||
+              review.phase !== "ready" ||
+              !review.review ||
+              review.rerunFailed
+            }
+            onClick={() => void handleDownloadPdf()}
+            className="min-h-[44px] min-w-[44px] gap-2 px-3 text-[13px]"
+          >
+            <Download data-icon="inline-start" />
+            <span>
+              <span className="max-sm:sr-only">Unduh </span>PDF
+            </span>
           </Button>
           <Button
             type="button"

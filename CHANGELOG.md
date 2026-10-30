@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-10-30
 
+- feat(ketik): unduh PDF hasil telaah dan transkrip per sesi
+
 - docs(plans): add the per-session review PDF plan for KETIK, Telefun, and PDKT
 - perf(kegiatan): store activity images as 800 px WebP and load the first cards eagerly
 - fix(tna): resolve Impeccable audit findings for contrast, touch targets, and EFEK filters

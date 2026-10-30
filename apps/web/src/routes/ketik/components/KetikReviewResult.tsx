@@ -7,11 +7,11 @@ import type {
   KetikTypoFinding,
 } from "@trainers/types";
 import { cn } from "cn";
+import { buildKetikReviewView } from "../utils/reviewView";
 import { pointLetter } from "../utils/quoteMarks";
 import { Button } from "../../../components/ui/button";
 import {
   KETIK_FIX_THRESHOLD,
-  readAspectScores,
   scoreVerdict,
   typoSeverityLabel,
 } from "../utils/reviewDisplay";
@@ -26,14 +26,6 @@ import {
   NotAvailable,
   QuoteButton,
 } from "./KetikReviewAnnotations";
-
-function scoreChange(score: number, previous: number | null): string | null {
-  if (previous === null) return null;
-  const delta = score - previous;
-  if (delta > 0) return `naik ${delta} dari sesi sebelumnya`;
-  if (delta < 0) return `turun ${-delta} dari sesi sebelumnya`;
-  return "sama dengan sesi sebelumnya";
-}
 
 function barColor(score: number): string {
   if (score < KETIK_FIX_THRESHOLD) return "bg-chart-orange";
@@ -70,35 +62,19 @@ export function ReviewResult({
   rerunRefusal?: string | null;
 }) {
   const rerunUsed = rerunsLeft === 0;
-  const finalScore = session.finalScore ?? 0;
-  const change = scoreChange(finalScore, previousScore);
-  const aspects = readAspectScores(session);
-  const guidance = [...(review.education?.dimensionGuidance ?? [])].sort(
-    (a, b) => a.priorityRank - b.priorityRank,
-  );
-
-  const enriched = review.education?.typosEnriched ?? [];
-  // Telaah lama tidak punya field anotasi sama sekali.
-  const points = review.education?.consumerPoints;
-  const notes = review.education?.agentNotes;
-  const caseCore = review.education?.caseCore;
-  const fixes = (notes ?? [])
-    .map((note, index) => ({ note, index }))
-    .filter(({ note }) => note.verdict === "fix");
-  const good = (notes ?? [])
-    .map((note, index) => ({ note, index }))
-    .filter(({ note }) => note.verdict === "good");
-  const statusOrder = { unanswered: 0, partial: 1, answered: 2 };
-  const orderedPoints = (points ?? [])
-    .map((point, index) => ({ point, index }))
-    .sort((a, b) => statusOrder[a.point.status] - statusOrder[b.point.status]);
-  const nextSteps = [
-    ...new Set(
-      [...review.coachingFocus, ...(review.education?.overallNextSteps ?? [])]
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  ];
+  const {
+    finalScore,
+    change,
+    aspects,
+    guidance,
+    enriched,
+    points,
+    caseCore,
+    fixes,
+    good,
+    orderedPoints,
+    nextSteps,
+  } = buildKetikReviewView(session, review, previousScore);
   const [localTarget, setLocalTarget] = useState<KetikReviewTarget | null>(
     null,
   );

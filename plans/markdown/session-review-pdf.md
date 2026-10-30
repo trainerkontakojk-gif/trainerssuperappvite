@@ -1,7 +1,7 @@
 # PDF Hasil Telaah per Sesi — KETIK, Telefun, PDKT
 
 **Lane:** C (frontend saja, multi-file, tiga modul; tidak ada perubahan API, schema, RLS, atau izin).
-**Status:** TODO — siap dieksekusi. Fase 1 (KETIK) dulu; Fase 2–3 **tertahan** sampai Fajar menyetujui hasil PDF KETIK.
+**Status:** Fase 0–1 selesai secara lokal; menunggu Fajar memeriksa sampel PDF KETIK. Fase 1 (KETIK) dulu; Fase 2–3 **tertahan** sampai Fajar menyetujui hasil PDF KETIK.
 **Dibuat:** 2026-10-30, dari keputusan Fajar di sesi yang sama.
 
 ## Requirement
@@ -26,7 +26,7 @@ Keputusan Fajar (2026-10-30), jangan dinegosiasi ulang:
 - Nama file deterministik: `ketik_telaah_<sessionId>.pdf`, `telefun_telaah_<recordId>.pdf`, `pdkt_telaah_<sessionId>.pdf` (sejajar dengan pola nama file transkrip yang ada).
 - Karakter tanpa glyph di font standar (emoji, dll.) tercetak sebagai penanda `[U+XXXX]` lewat `pdfSafeText` — konvensi yang sudah disetujui untuk PDF SIDAK. Baris baru di pesan dipertahankan.
 - Kegagalan impor `jspdf` atau pembuatan PDF → toast error manusiawi (`notify.error`, mis. "PDF belum bisa dibuat. Coba lagi."), **tidak ada file yang terunduh**, tombol kembali aktif. Tidak ada fallback lain.
-- `jspdf` diimpor dinamis saat tombol diklik (bundle halaman Telaah tidak membesar).
+- `jspdf` diimpor dinamis saat tombol diklik (bundle halaman Telaah tidak membesar). Konfigurasi Vite memisahkan preload helper dari chunk `vendor-export` agar helper yang dipakai halaman tidak menarik library ekspor sejak awal.
 - Tidak ada perubahan backend, `packages/types`, migration, atau izin. Siapa pun yang sekarang bisa membuka halaman Telaah bisa mengunduh PDF-nya.
 
 ## Design
@@ -99,12 +99,12 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 
 ### Fase 0 — Persiapan test
 
-- [ ] Pindahkan pembaca PDF dari `apps/web/e2e/sidak-agent-report-download.spec.ts` (`readPdfPages`, decoder CMap/WinAnsi, `readPdfInfo`, `recordDownloadBlobs`, `expectTextBasedPdf`, `expectPageFooters`, `printedReadBack`, `readPrintedMarkers`; ±baris 290–860) ke `apps/web/e2e/helpers/pdfReadback.ts`, ekspor apa adanya, dan impor balik di spec SIDAK. Tidak ada perubahan logika.
-- [ ] Jalankan `sidak-agent-report-download.spec.ts` sekali → harus tetap 25/25. Kalau tidak, STOP dan perbaiki pemindahan sebelum lanjut.
+- [x] Pindahkan pembaca PDF dari `apps/web/e2e/sidak-agent-report-download.spec.ts` (`readPdfPages`, decoder CMap/WinAnsi, `readPdfInfo`, `recordDownloadBlobs`, `expectTextBasedPdf`, `expectPageFooters`, `printedReadBack`, `readPrintedMarkers`; ±baris 290–860) ke `apps/web/e2e/helpers/pdfReadback.ts`, ekspor apa adanya, dan impor balik di spec SIDAK. Tidak ada perubahan logika.
+- [x] Jalankan `sidak-agent-report-download.spec.ts` sekali → harus tetap 25/25. Kalau tidak, STOP dan perbaiki pemindahan sebelum lanjut.
 
 ### Fase 1 — KETIK
 
-- [ ] **RED:** tulis `apps/web/e2e/ketik-review-pdf.spec.ts` memakai `openHermeticShell` + mock seperti `ketik-review-worker-browser.spec.ts` (sesi `completed` dengan `education` lengkap: 2 `agentNotes` fix + 1 good, 2 `consumerPoints` berbeda status, 1 typo, `verification`, pesan berisi emoji dan baris baru, cukup banyak pesan agar ≥ 2 halaman). Test minimal:
+- [x] **RED:** tulis `apps/web/e2e/ketik-review-pdf.spec.ts` memakai `openHermeticShell` + mock seperti `ketik-review-worker-browser.spec.ts` (sesi `completed` dengan `education` lengkap: 2 `agentNotes` fix + 1 good, 2 `consumerPoints` berbeda status, 1 typo, `verification`, pesan berisi emoji dan baris baru, cukup banyak pesan agar ≥ 2 halaman). Test minimal:
   1. Unduh PDF: nama file `ketik_telaah_<id>.pdf`, `%PDF-`, tanpa BOM, A4, metadata title/author, footer "Halaman x dari y" di tiap halaman.
   2. Isi: nama peserta, skor akhir + verdict, setiap judul seksi, kutipan + "Sebaiknya" dari catatan fix, status poin konsumen, typo, langkah berikutnya, teks pesan transkrip bernomor; emoji → `[U+XXXX]`; baris baru dipertahankan.
   3. Paritas layar: nilai skor dan label verdict di PDF sama dengan teks yang tampil di panel Telaah untuk fixture yang sama.
@@ -112,16 +112,16 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
   5. Telaah `pending`/`processing`/`failed` → tombol nonaktif/tidak ada.
   6. Kegagalan generator (blokir chunk `jspdf` lewat `page.route` atau paksa throw) → toast error, tidak ada event download, tombol aktif lagi.
      Jalankan → harus MERAH karena alasan yang benar (tombol belum ada).
-- [ ] Ekstrak view-model KETIK (`reviewView.ts`) dan pakai di `ReviewResult`; jalankan `ketik-review-worker-browser.spec.ts` dan `ketik-history-browser.spec.ts` → tetap hijau.
-- [ ] Tulis `apps/web/src/utils/sessionReviewPdf.ts` (empat fungsi di Design, tidak lebih).
-- [ ] Tulis `apps/web/src/routes/ketik/utils/ketikReviewPdf.ts` sesuai urutan isi.
-- [ ] Tambah tombol di `KetikReviewStage.tsx`.
-- [ ] **GREEN:** `ketik-review-pdf.spec.ts` hijau. Simpan satu PDF hasil fixture ke `plans/markdown/session-review-pdf-ketik-sample.pdf` sebagai artefak yang bisa diperiksa Fajar.
-- [ ] Refactor bila perlu; spec tetap hijau.
-- [ ] Gate: `thermo-nuclear`; `impeccable` audit (tombol + PDF); root typecheck, lint, build; `git diff --check`; `graphify update .` sekali setelah batch.
-- [ ] Verifikasi SIDAK tidak berubah: jalankan `sidak-agent-report-download.spec.ts` sekali lagi bila ada modul `agentReportPdf*` yang disentuh.
-- [ ] Entri `CHANGELOG.md` di bawah tanggal hari itu (`- feat(ketik): ...`), commit, push ke `main` (sudah diizinkan). Tidak deploy production.
-- [ ] Perbarui Status di plan ini + baris di `plans/README.md` dengan evidence (perintah persis + hasil).
+- [x] Ekstrak view-model KETIK (`reviewView.ts`) dan pakai di `ReviewResult`; jalankan `ketik-review-worker-browser.spec.ts` dan `ketik-history-browser.spec.ts` → tetap hijau.
+- [x] Tulis `apps/web/src/utils/sessionReviewPdf.ts` (empat fungsi di Design, tidak lebih).
+- [x] Tulis `apps/web/src/routes/ketik/utils/ketikReviewPdf.ts` sesuai urutan isi.
+- [x] Tambah tombol di `KetikReviewStage.tsx`.
+- [x] **GREEN:** `ketik-review-pdf.spec.ts` hijau. Simpan satu PDF hasil fixture ke `plans/markdown/session-review-pdf-ketik-sample.pdf` sebagai artefak yang bisa diperiksa Fajar.
+- [x] Refactor bila perlu; spec tetap hijau.
+- [x] Gate: `thermo-nuclear`; `impeccable` audit (tombol + PDF); root typecheck, lint, build; `git diff --check`; `graphify update .` sekali setelah batch.
+- [x] Verifikasi SIDAK tidak berubah: jalankan `sidak-agent-report-download.spec.ts` sekali lagi bila ada modul `agentReportPdf*` yang disentuh.
+- [x] Entri `CHANGELOG.md` di bawah tanggal hari itu (`- feat(ketik): ...`), commit, push ke `main` (sudah diizinkan). Tidak deploy production.
+- [x] Perbarui Status di plan ini + baris di `plans/README.md` dengan evidence (perintah persis + hasil).
 - [ ] **STOP.** Laporkan ke Fajar dengan lokasi sampel PDF. Fase 2 baru dimulai setelah Fajar menyetujui tampilan/isi.
 
 ### Fase 2 — Telefun (tertahan)
@@ -146,4 +146,16 @@ Skill & gate wajib (lihat `AGENTS.md`, `docs/AGENT_WORKFLOW.md`): muat `trainers
 
 ## Evidence
 
-_(diisi eksekutor: perintah persis, jumlah test lulus, hash commit, lokasi sampel PDF.)_
+- Fase 0: dari `apps/web`, `pnpm exec playwright test sidak-agent-report-download.spec.ts` — 25 passed (exit 0). Percobaan awal gagal memuat ekspor `recordDownloadBlobs`; ekspor diperbaiki sebelum run yang lulus.
+- Fase 1 RED: dari `apps/web`, `pnpm exec playwright test ketik-review-pdf.spec.ts -g 'PDF sesi memuat'` — gagal karena tombol `Unduh PDF` belum ada.
+- Fase 1: dari `apps/web`, `pnpm exec playwright test ketik-review-pdf.spec.ts` — 11 passed; `pnpm exec playwright test ketik-review-worker-browser.spec.ts ketik-history-browser.spec.ts` — 10 passed. Sampel: `plans/markdown/session-review-pdf-ketik-sample.pdf` (4 halaman A4, diperiksa visual). Run 11/11 terbaru juga memeriksa metadata lengkap, pesan sistem, nomor transkrip, penanda lampiran gambar, kegagalan impor jspdf yang diblokir langsung, tombol nonaktif saat telaah ulang sedang berjalan, header untuk nama peserta panjang, tombol nonaktif ketika telaah ulang gagal dan hasil sebelumnya tetap terlihat, serta transisi nonaktif ke aktif saat hasil selesai dimuat. Kasus status gagal mula-mula RED karena tombol masih aktif, kemudian GREEN. Kasus header mula-mula RED (koordinat teks -948,96 pt), lalu lulus setelah identitas header dipersingkat dengan mengukur lebar cetak; nama lengkap tetap di blok identitas.
+- `pnpm --filter @trainers/web exec tsc --noEmit` dari root — lulus (exit 0) pada kode web saat ini. Ini tidak menggantikan gerbang root yang mencakup typecheck E2E.
+- Root `pnpm typecheck` lulus 4/4, `pnpm lint` lulus 4/4 (warning tanpa error), dan `pnpm build` lulus 3/3 setelah perbaikan callback spec Telefun yang disetujui Fajar dan pemisahan chunk preload Vite. `git diff --check` lulus.
+
+- Verifikasi sumber hambatan: SHA-256 spec Telefun di worktree sama persis dengan `git show HEAD:apps/web/e2e/telefun-agent-silence.spec.ts` (`6319e31c86834ffc051f0a7d183485ebefb2b4b9eacbb97b87afabbe16ac4ffb`); konfigurasi TypeScript dan lockfile tidak berubah.
+
+- Setelah izin Fajar, callback spec Telefun diperbaiki dengan `receive.call(worklet.port, ...)`: dari `apps/web`, `pnpm exec playwright test telefun-agent-silence.spec.ts -g 'diam 5 detik memicu'` lulus 1/1. Resource gate sebelumnya merah (swap bebas 747MB < 768MB); Fajar secara eksplisit mengizinkan melanjutkan dengan gate diabaikan dan pemeriksaan dijalankan berurutan. Prettier seluruh spec Telefun juga gagal pada `HEAD` karena format lama; perubahan tetap dibatasi pada dua pemanggilan.
+
+- Audit `thermo-nuclear`: review ukuran dan batas modul, reuse view-model serta label dan primitive SIDAK, pemisahan chunk dan alur status; tidak ada temuan struktural tersisa yang diidentifikasi. Audit `impeccable`: detector `impeccable detect --json apps/web/src/routes/ketik/components/KetikReviewStage.tsx` menghasilkan `[]`; screenshot 390/1280 dan keempat halaman sampel diperiksa, tombol minimal 44×44 px. Pemeriksaan PDF SIDAK tambahan: dari `apps/web`, `pnpm exec playwright test sidak-agent-report-download.spec.ts -g 'Menu Unduh Laporan menghasilkan PDF asli'` lulus 1/1. Analisis impor build menunjukkan chunk `vendor-export` tidak lagi menjadi dependensi statis halaman KETIK.
+
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` — exit 0 setelah batch awal; dijalankan lagi setelah batch konfigurasi Vite, exit 0 tanpa perubahan topologi. `apps/web/vite.config.ts` memisahkan `vite/preload-helper.js` dari `vendor-export`; audit impor statis build KETIK tidak menemukan dependensi awal ke chunk ekspor.
