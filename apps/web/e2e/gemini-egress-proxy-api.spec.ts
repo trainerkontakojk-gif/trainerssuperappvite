@@ -1,15 +1,13 @@
-import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
+import {
+  bootLocalService,
+  type LocalService,
+} from "./helpers/bootLocalService";
 
-const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
-const PRELOAD = fileURLToPath(
-  new URL("./helpers/geminiProxyBoot.mjs", import.meta.url),
-);
 const require = createRequire(
   new URL("../../telefun/package.json", import.meta.url),
 );
@@ -18,7 +16,6 @@ const { WebSocket } =
 const USER = "11111111-1111-4111-8111-111111111111";
 const SESSION = "22222222-2222-4222-8222-222222222222";
 const ORIGIN = "http://127.0.0.1:3005";
-type Service = "api" | "telefun";
 
 async function listen(server: Server) {
   server.listen(0, "127.0.0.1");
@@ -26,7 +23,7 @@ async function listen(server: Server) {
   return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 }
 
-async function fixtures(service: Service) {
+async function fixtures(service: LocalService) {
   const targets: string[] = [];
   const requests: string[] = [];
   const unexpected: string[] = [];
@@ -105,66 +102,12 @@ async function fixtures(service: Service) {
   };
 }
 
-function boot(service: Service, supabaseUrl: string, proxyUrl?: string) {
-  // Allowlist only OS runtime paths; never inherit credentials, hosted flags,
-  // worker enablement, proxy settings or provider targets from the parent.
-  const env: NodeJS.ProcessEnv = {};
-  for (const key of ["PATH", "HOME", "TMPDIR", "SYSTEMROOT"]) {
-    if (process.env[key]) env[key] = process.env[key];
-  }
-  Object.assign(env, {
-    NODE_ENV: "test",
-    PORT: "0",
-    SUPABASE_URL: supabaseUrl,
-    VITE_SUPABASE_URL: supabaseUrl,
-    VITE_SUPABASE_ANON_KEY: "e2e-anon",
-    SUPABASE_ANON_KEY: "e2e-anon",
-    SUPABASE_SERVICE_ROLE_KEY: "e2e-service",
-    GEMINI_API_KEY: "e2e-gemini-secret",
-    OPENAI_API_KEY: "e2e-openai",
-    ALLOWED_ORIGINS: ORIGIN,
-    TELEFUN_SCORING_WORKER_ENABLED: "false",
-    KETIK_REVIEW_WORKER_ENABLED: "false",
-    ...(proxyUrl === undefined ? {} : { GEMINI_PROXY_URL: proxyUrl }),
-  });
-  const child = spawn(
-    process.execPath,
-    [
-      "--import",
-      "tsx",
-      "--import",
-      PRELOAD,
-      `${ROOT}apps/${service}/src/${service === "api" ? "index" : "server"}.ts`,
-    ],
-    {
-      cwd: service === "api" ? ROOT : `${ROOT}apps/telefun`,
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-    },
+function boot(service: LocalService, supabaseUrl: string, proxyUrl?: string) {
+  return bootLocalService(
+    service,
+    supabaseUrl,
+    proxyUrl === undefined ? {} : { GEMINI_PROXY_URL: proxyUrl },
   );
-  let log = "";
-  child.stdout.on("data", (data) => (log += String(data)));
-  child.stderr.on("data", (data) => (log += String(data)));
-  const exited = once(child, "exit");
-  return {
-    child,
-    exited,
-    log: () => log,
-    async url() {
-      await expect
-        .poll(() => log.match(/\[e2e-listening\] (\d+)/)?.[1], {
-          timeout: 15000,
-          message: "Service must listen locally",
-        })
-        .toBeTruthy();
-      return `http://127.0.0.1:${log.match(/\[e2e-listening\] (\d+)/)![1]}`;
-    },
-    async close() {
-      if (child.exitCode === null && child.signalCode === null)
-        child.kill("SIGKILL");
-      await exited;
-    },
-  };
 }
 
 async function telefunCall(url: string) {

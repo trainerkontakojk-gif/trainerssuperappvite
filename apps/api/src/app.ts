@@ -38,7 +38,15 @@ if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   );
 }
 
-const app = new Hono().basePath("/api");
+// The API host has no crawlable content. robots.txt must sit at the host root,
+// outside /api; basePath() clones share one router, so app.fetch serves it.
+const host = new Hono();
+host.on(["GET", "HEAD"], "/robots.txt", (c) => {
+  applySecurityHeaders(c.res.headers);
+  return c.text("User-agent: *\nDisallow: /\n");
+});
+
+const app = host.basePath("/api");
 
 app.use("*", securityHeadersMiddleware);
 app.use(

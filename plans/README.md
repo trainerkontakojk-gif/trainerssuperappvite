@@ -7,7 +7,8 @@ honor its STOP conditions, and update your row when done.
 ## Per-feature plans
 
 - [PDKT Integrity & Resilience](markdown/pdkt-integrity-resilience.md) — Lane D; all eight findings fixed locally, E2E/rollback/replay/root checks complete. Commit/push to main authorized; deployment and remote migration remain outside scope.
-- [Coolify Traffic Analytics Hardening](markdown/coolify-traffic-analytics-hardening.md) — Lane D; local static E2E verified, Vercel config schema/rules checked (CLI runtime test blocked by missing Yarn); Coolify label change requires authorized resource recreation; production release awaits explicit approval.
+- [Coolify Traffic Analytics Hardening](markdown/coolify-traffic-analytics-hardening.md) — Lane D; released on `main`; Coolify log labels applied to Web/API/Telefun; production smoke on Coolify and Vercel passed.
+- [Subdomain robots.txt](markdown/subdomain-robots.md) — Lane C; `Disallow: /` robots for the API and Telefun hosts.
 
 Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked in Git. The git-ignored `plan/markdown/` directory is a legacy local archive; do not add new plans there.
 

@@ -191,6 +191,20 @@ const server = createServer((req, res) => {
     );
     return;
   }
+  if (req.url === "/robots.txt") {
+    // The Telefun host has no crawlable content.
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.writeHead(405, { Allow: "GET, HEAD" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+    });
+    res.end("User-agent: *\nDisallow: /\n");
+    return;
+  }
   res.writeHead(404);
   res.end();
 });
