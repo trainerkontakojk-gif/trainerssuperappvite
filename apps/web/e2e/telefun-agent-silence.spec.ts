@@ -196,9 +196,18 @@ function openingAudioResponse() {
   };
 }
 
+/** A busy page can overrun the 100 ms lead; retry from a fresh "now". */
 async function pauseClockBeforeModelTurn(page: Page): Promise<void> {
-  const pauseAt = await page.evaluate(() => Date.now() + 100);
-  await page.clock.pauseAt(pauseAt);
+  for (let attempt = 1; ; attempt += 1) {
+    const pauseAt = await page.evaluate(() => Date.now() + 100);
+    try {
+      await page.clock.pauseAt(pauseAt);
+      return;
+    } catch (error) {
+      const overran = String(error).includes("fast-forward to the past");
+      if (!overran || attempt === 5) throw error;
+    }
+  }
 }
 
 test.describe("Telefun teguran saat agen diam (hermetic)", () => {
@@ -256,6 +265,48 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
     await expect.poll(() => agentSilenceCues(messages)).toHaveLength(2);
     const secondCue = agentSilenceCues(messages)[1]!;
     expect(isToneNote(messages[secondCue.index - 1]!)).toBe(true);
+    expectHermetic(audit);
+  });
+
+  test("jeda 5 detik dihitung dari akhir suara konsumen, bukan dari turnComplete", async ({
+    page,
+  }) => {
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await page.addInitScript(installPlaybackDrainProbe);
+    const messages: Record<string, unknown>[] = [];
+    // Gemini streams faster than real time: turnComplete arrives while ~3 s of
+    // consumer audio is still queued for playback.
+    await mockTelefunVoiceServer(page, SESSION_ID, messages, {
+      audioResponse: {
+        ...openingAudioResponse(),
+        chunks: [new Uint8Array(24_000 * 3 * 2)],
+      },
+      beforeAudioResponse: () => pauseClockBeforeModelTurn(page),
+    });
+    const audit = await openTelefun(page);
+    await startCall(page);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const probe = (window as any).__telefunPlaybackDrain as {
+              started: number;
+              ended: number;
+            };
+            return probe.started > 0 && probe.ended < probe.started;
+          }),
+        { timeout: 20_000, intervals: [50] },
+      )
+      .toBe(true);
+
+    await page.clock.fastForward(6_000);
+    await waitForConsumerTurnDrained(page);
+    expect(agentSilenceCues(messages)).toHaveLength(0);
+
+    await page.clock.fastForward(4_900);
+    expect(agentSilenceCues(messages)).toHaveLength(0);
+    await page.clock.fastForward(100);
+    await expect.poll(() => agentSilenceCues(messages)).toHaveLength(1);
     expectHermetic(audit);
   });
 

@@ -542,17 +542,12 @@ export class LiveSession {
     if (msg.serverContent?.turnComplete) {
       this.consumerTurnsCompleted += 1;
       this.turnsSinceLastClip += 1;
-      this.agentSilenceCueTimer.markQuietSince(Date.now());
       this.sendToneNote({
         kind: "after_consumer_turn",
         consumerTurnsCompleted: this.consumerTurnsCompleted,
       });
       this.pendingTurnCompletion = true;
-      if (this.activeSources.size === 0) {
-        this.setIsAiSpeaking(false);
-        this.setSessionState("idle");
-        this.pendingTurnCompletion = false;
-      }
+      if (this.activeSources.size === 0) this.finishConsumerTurnPlayback();
     }
     if (msg.type === "silence") {
       this.deadAirCount++;
@@ -856,6 +851,18 @@ export class LiveSession {
     this.pendingTurnCompletion = false;
   }
 
+  /**
+   * The consumer's completed turn has finished playing. Gemini sends
+   * turnComplete before queued audio drains, so the agent's quiet interval
+   * starts here, when the consumer actually stops being heard.
+   */
+  private finishConsumerTurnPlayback() {
+    this.pendingTurnCompletion = false;
+    this.agentSilenceCueTimer.markQuietSince(Date.now());
+    this.setIsAiSpeaking(false);
+    this.setSessionState("idle");
+  }
+
   /** Stop all active sources AND mark AI as not speaking. */
   private clearAiPlayback(_reason: string) {
     this.stopActiveSources();
@@ -897,9 +904,7 @@ export class LiveSession {
       scheduledSource.onended = () => {
         this.activeSources.delete(scheduledSource);
         if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
-          this.pendingTurnCompletion = false;
-          this.setIsAiSpeaking(false);
-          this.setSessionState("idle");
+          this.finishConsumerTurnPlayback();
         }
       };
 
