@@ -104,8 +104,7 @@ function toneNoteEntries(messages: Record<string, unknown>[]) {
       .map((part) => part.text)
       .find(
         (part): part is string =>
-          typeof part === "string" &&
-          part.startsWith("[TELEFUN_CONTROL:TONE]"),
+          typeof part === "string" && part.startsWith("[TELEFUN_CONTROL:TONE]"),
       );
     return text
       ? [{ index, text, turnComplete: clientContent?.turnComplete }]
@@ -114,9 +113,7 @@ function toneNoteEntries(messages: Record<string, unknown>[]) {
 }
 
 function realtimeInputText(message: Record<string, unknown>): string | null {
-  const realtimeInput = message.realtimeInput as
-    | { text?: unknown }
-    | undefined;
+  const realtimeInput = message.realtimeInput as { text?: unknown } | undefined;
   return typeof realtimeInput?.text === "string" ? realtimeInput.text : null;
 }
 
@@ -216,8 +213,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       .toBeGreaterThanOrEqual(2);
     const firstAudioIndex = messages.findIndex((message) => {
       const realtimeInput = message.realtimeInput as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       return Boolean(realtimeInput && "audio" in realtimeInput);
     });
     const prompt = configuredInstructions(messages);
@@ -807,7 +803,7 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
   });
 
   for (const consumerTypeId of ["marah", "ramah"]) {
-    test(`sapaan agen (${consumerTypeId}): mengikuti suara agen, bukan meniru contoh kalimat`, async ({
+    test(`sapaan agen (${consumerTypeId}): membaca nama agen dan memakai Kak saat ambigu`, async ({
       page,
     }) => {
       const messages: Record<string, unknown>[] = [];
@@ -825,10 +821,30 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       const rule = prompt
         .split("\n")
         .find((line) => line.startsWith("SAPAAN UNTUK AGEN:"));
-      // Sapaan mengikuti suara agen seperti dulu; "Kak" hanya saat ragu.
-      expect(rule).toContain("suara agen");
+      expect(rule).toContain(
+        "nama yang agen perkenalkan dalam percakapan aktual",
+      );
       expect(rule).toContain('ragu, panggil "Kak"');
       expect(rule).toContain("bukan dari contoh kalimat");
+      expect(rule).toContain("Nama saja tidak memastikan gender");
+      expect(rule).toContain("Jangan menentukan gender hanya dari suara");
+      expect(rule).toContain(
+        'Sapaan awal selalu "Kak" atau tanpa sapaan SEBELUM nama agen diketahui',
+      );
+      expect(rule).toContain(
+        'nama jelas: "Budi Santoso" gunakan "Mas Budi" atau "Pak Budi"',
+      );
+      expect(rule).toContain(
+        '"Siti Aminah" gunakan "Mbak Siti" atau "Bu Siti"',
+      );
+      expect(rule).toContain('nama ambigu seperti "Dwi" tetap "Kak"');
+      expect(rule).toContain("Suara feminin/maskulin tidak mengubah fallback");
+      expect(rule).toContain("Periksa sebelum SETIAP balasan");
+      expect(prompt.indexOf(rule!)).toBeLessThan(
+        prompt.indexOf("IDENTITAS ANDA (WAJIB KONSISTEN):"),
+      );
+      expect(rule).toContain("segera perbaiki sapaan");
+      expect(rule).not.toContain("Begitu sudah memilih");
       // Di luar aturan itu tidak ada sapaan bergender untuk agen yang bisa ditiru.
       const rest = prompt.replace(rule!, "");
       expect(rest).not.toMatch(/\b(Mas|Mbak|Pak|Bu)\b/);

@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-02
+
+- fix(simulasi): sapaan agen KETIK dan Telefun mengikuti nama perkenalan, fallback netral saat ambigu, dan koreksi eksplisit; tambahkan regresi E2E serta bukti penerimaan AI nyata
+
 ## 2026-10-31
 
 - fix(telefun): jeda 5 detik teguran agen diam dihitung dari akhir suara konsumen, bukan dari turnComplete

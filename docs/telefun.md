@@ -76,17 +76,27 @@ suara, model, dan transport tidak berubah. E2E hermetic memverifikasi isi konfig
 bahwa nada suara model sungguhan sudah lebih ekspresif. Evaluasi audio langsung
 memerlukan panggilan provider terpisah yang diotorisasi.
 
+Sapaan untuk agen mengikuti nama yang diperkenalkan dalam percakapan aktual.
+Nama saja tidak memastikan gender; bila nama belum diketahui atau ambigu,
+konsumen memakai “Kak” atau berbicara tanpa sapaan. Suara, identitas konsumen,
+dan contoh skrip bukan kepastian gender agen. Koreksi nama atau sapaan dari
+agen langsung menggantikan perkiraan sebelumnya. Aturan sapaan ditempatkan
+sebelum identitas konsumen dengan urutan: koreksi/sapaan eksplisit agen,
+nama perkenalan yang jelas (Mas/Pak atau Mbak/Bu), lalu fallback netral.
+Fallback awal hanya berlaku sebelum nama diketahui atau ketika ambigu;
+bukan alasan mempertahankan “Kak” setelah nama yang jelas diperkenalkan.
+
 ### Suara berdasarkan tipe konsumen
 
 Untuk `marah` dan `pasrah`, tipe konsumen menentukan suara Live dan
 mengalahkan pilihan suara manual. Suara yang tercantum untuk tiap kombinasi
 gender sudah dipilih untuk membawa karakter emosinya.
 
-| Tipe konsumen | Wanita | Pria |
-| --- | --- | --- |
-| `marah` | Kore | Orus atau Alnilam (acak) |
-| `pasrah` | Kore | Algieba |
-| Tipe lain | Pilihan suara tersimpan | Pilihan suara tersimpan |
+| Tipe konsumen | Wanita                  | Pria                     |
+| ------------- | ----------------------- | ------------------------ |
+| `marah`       | Kore                    | Orus atau Alnilam (acak) |
+| `pasrah`      | Kore                    | Algieba                  |
+| Tipe lain     | Pilihan suara tersimpan | Pilihan suara tersimpan  |
 
 ### Arahan nada dan kontrol saat jeda
 
@@ -109,10 +119,10 @@ diputar sebelum audio Gemini Live pada awal jawaban konsumen. Klip masuk ke
 speaker dan rekaman panggilan penuh. Prefetch atau pemutaran yang gagal tidak
 menghentikan panggilan.
 
-| Tipe konsumen | Bunyi klip |
-| --- | --- |
-| `marah` | Hela napas (`sigh`), erang (`groan`), decak (`tsk`), dengus (`pff`), napas berat (`exhale`) |
-| `pasrah` | Sedot ingus (`sniffle`), isak (`sob`), rengekan lirih (`whimper`) |
+| Tipe konsumen | Bunyi klip                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| `marah`       | Hela napas (`sigh`), erang (`groan`), decak (`tsk`), dengus (`pff`), napas berat (`exhale`) |
+| `pasrah`      | Sedot ingus (`sniffle`), isak (`sob`), rengekan lirih (`whimper`)                           |
 
 Klip tersimpan di `apps/web/public/telefun/nonverbal/<voice>/<kind>-<n>.wav`.
 Giliran biasa menerima paling banyak satu klip setiap dua giliran konsumen;

@@ -381,6 +381,8 @@ ${scriptInstruction}
 ${timeLimitInstruction}
 ${imageInstruction}
 
+SAPAAN UNTUK AGEN: Baca nama yang agen perkenalkan dalam percakapan aktual sebelum memilih Mas/Mbak atau Pak/Bu, bukan dari contoh kalimat di instruksi ini, nama konsumen, atau nama pihak lain dalam skenario. Nama saja tidak memastikan gender; bila nama belum disebut, ambigu, atau kamu ragu, panggil "Kak" atau bicara tanpa sapaan. Jangan menentukan gender hanya dari suara. Utamakan sapaan yang agen nyatakan untuk dirinya; jika agen mengoreksi nama atau sapaan, segera perbaiki sapaan dan gunakan yang benar seterusnya. Jangan mempertahankan tebakan yang keliru.
+
 POSISI KONSUMEN (PENTING):
 1. Kamu tidak tahu SOP, aturan OJK, atau jawaban yang benar. Jangan pernah mengoreksi agen dengan informasi yang benar dan jangan memberi petunjuk, walaupun jawaban agen salah.
 2. Jika penjelasan agen terdengar aneh, berubah-ubah, atau bertentangan dengan pengalamanmu, tunjukkan reaksi manusia sesuai tipemu: bingung, ragu, tidak percaya, atau makin kesal. Jika terdengar masuk akal, kamu percaya saja; tetapi percaya tidak langsung membuat emosimu reda, nadamu tetap mengikuti karaktermu.

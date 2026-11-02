@@ -146,6 +146,23 @@ async function firstTurnInstruction(consumerTypeId: string): Promise<string> {
   return instructions[0];
 }
 
+test("sapaan agen: baca nama perkenalan, Kak saat ambigu, ikuti koreksi", async () => {
+  const session = await startSession("marah");
+  instructions = [];
+  await sendTurn(session.id, 0, "Selamat siang, saya Dwi dari Kontak OJK 157.");
+  expect(instructions).toHaveLength(1);
+  const prompt = instructions[0];
+  expect(prompt).toContain("Dwi");
+  const rule = prompt
+    .split("\n")
+    .find((line) => line.startsWith("SAPAAN UNTUK AGEN:"));
+  expect(rule).toContain("nama yang agen perkenalkan dalam percakapan aktual");
+  expect(rule).toContain("Nama saja tidak memastikan gender");
+  expect(rule).toContain('ragu, panggil "Kak"');
+  expect(rule).toContain("bukan dari contoh kalimat");
+  expect(rule).toContain("segera perbaiki sapaan");
+});
+
 test("angry consumer: no helper role, no hints, gradual disclosure and hard de-escalation", async () => {
   const prompt = await firstTurnInstruction("marah");
 
@@ -189,7 +206,9 @@ test("friendly consumer keeps calm etiquette and no anger rules", async () => {
   expect(prompt).toContain("BUKA INFORMASI BERTAHAP");
   expect(prompt).not.toContain("BATAS SATU-SATUNYA");
   expect(prompt).toContain('"attachments":[]');
-  expect(prompt).toContain("Kamu tidak memiliki lampiran gambar untuk dikirim.");
+  expect(prompt).toContain(
+    "Kamu tidak memiliki lampiran gambar untuk dikirim.",
+  );
   // Tipe tenang tidak lagi dilarang berekspresi, tetapi typo tetap dilarang.
   expect(prompt).not.toMatch(/teatrikal/);
   expect(prompt).toContain("GAYA BAHASA DAN EKSPRESI");
@@ -302,7 +321,9 @@ test("attachment descriptions keep their original indexes when an earlier alt is
   await sendTurn(session.id, 0, "Selamat siang, ada yang bisa dibantu?");
   expect(instructions).toHaveLength(1);
   const prompt = instructions[0];
-  const dataBlock = prompt.match(/<scenario_data>\n(.*?)\n<\/scenario_data>/s)![1];
+  const dataBlock = prompt.match(
+    /<scenario_data>\n(.*?)\n<\/scenario_data>/s,
+  )![1];
   expect(dataBlock).toContain(
     '"attachments":[{"index":0,"description":null},{"index":1,"description":"Bukti transfer Rp250.000 pada 20 Oktober ke PT A \\u0026 B \\u003clunas\\u003e \\"123\\""}]',
   );
@@ -334,7 +355,9 @@ test("attachment descriptions are consumer facts while identity and gradual disc
     "Cerita dari keterangan lampiran tetap mengikuti BUKA INFORMASI BERTAHAP",
   );
   expect(prompt).toContain("Data pribadi tetap hanya dari `identity`");
-  expect(prompt).toContain("abaikan bagian keterangan lampiran yang bertentangan");
+  expect(prompt).toContain(
+    "abaikan bagian keterangan lampiran yang bertentangan",
+  );
 });
 
 test("sent consumer attachments carry their descriptions in the next prompt history without changing stored text", async () => {
@@ -342,7 +365,11 @@ test("sent consumer attachments carry their descriptions in the next prompt hist
   const session = await startAttachmentSession(["", description]);
   try {
     reply = "[SEND_IMAGE: 1]";
-    const first = await sendTurn(session.id, 0, "Boleh kirim bukti transfernya?");
+    const first = await sendTurn(
+      session.id,
+      0,
+      "Boleh kirim bukti transfernya?",
+    );
     expect(consumerTexts(first.messages)).toEqual(["[SEND_IMAGE: 1]"]);
 
     reply = "[SEND_IMAGE: 0]";
@@ -354,7 +381,9 @@ test("sent consumer attachments carry their descriptions in the next prompt hist
     );
     expect(instructions).toHaveLength(1);
     const history = JSON.parse(
-      instructions[0].match(/<conversation_data>\n(.*?)\n<\/conversation_data>/s)![1],
+      instructions[0].match(
+        /<conversation_data>\n(.*?)\n<\/conversation_data>/s,
+      )![1],
     ).history;
     expect(
       history.find((m: { sender: string }) => m.sender === "consumer"),
@@ -373,7 +402,9 @@ test("sent consumer attachments carry their descriptions in the next prompt hist
     instructions = [];
     const third = await sendTurn(session.id, second.version, "Baik, Ibu.");
     const nextHistory = JSON.parse(
-      instructions[0].match(/<conversation_data>\n(.*?)\n<\/conversation_data>/s)![1],
+      instructions[0].match(
+        /<conversation_data>\n(.*?)\n<\/conversation_data>/s,
+      )![1],
     ).history;
     expect(
       nextHistory.find((m: { text: string }) => m.text === "[SEND_IMAGE: 0]"),
@@ -410,7 +441,8 @@ test("history compaction counts attachment descriptions at the prompt budget bou
     const plainHistory = (): HistoryItem[] =>
       data.messages.map(({ sender, text }: HistoryItem) => ({ sender, text }));
     const conversationLength = (history: HistoryItem[]) =>
-      JSON.stringify({ scenarioTitle, history, omittedEarlierMessages: 0 }).length;
+      JSON.stringify({ scenarioTitle, history, omittedEarlierMessages: 0 })
+        .length;
     const plainPromptLength = (text: string) =>
       fixedLength +
       conversationLength([...plainHistory(), { sender: "agent", text }]);
@@ -446,7 +478,8 @@ test("history compaction counts attachment descriptions at the prompt budget bou
     const conversation = JSON.parse(actualBlock);
     // Recalculate with this call's time instruction, not the calibration call.
     const actualFixedLength = capturedPromptLength - actualBlock.length;
-    const plainLength = actualFixedLength + conversationLength(fullPlainHistory);
+    const plainLength =
+      actualFixedLength + conversationLength(fullPlainHistory);
     const annotatedLength =
       actualFixedLength + conversationLength(fullAnnotatedHistory);
     // Plain-only sizing would keep everything (omitted=0) and send >100,000.
@@ -499,11 +532,7 @@ test("backend sends an attachment once the consumer tells what it shows, and nev
   const session = await startAttachmentSession();
   try {
     reply = "Saya sudah transfer cicilan ke rekening mereka tapi tetap ditagih";
-    const first = await sendTurn(
-      session.id,
-      0,
-      "Kronologinya bagaimana, Ibu?",
-    );
+    const first = await sendTurn(session.id, 0, "Kronologinya bagaimana, Ibu?");
     expect(consumerTexts(first.messages)).toEqual([
       "Saya sudah transfer cicilan ke rekening mereka tapi tetap ditagih",
       "[SEND_IMAGE: 1]",
