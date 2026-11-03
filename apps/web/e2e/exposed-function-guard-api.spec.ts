@@ -66,22 +66,39 @@ const AUTHENTICATED_ONLY_BY_DESIGN = [
   "public.submit_pdkt_mailbox_reply_with_subject(uuid,jsonb,integer,text,uuid)",
 ] as const;
 
-// KETIK backend RPCs are service_role-only by design (docs/architecture.md,
-// "Batas snapshot D5.1"): they were added after D5.1, keep EXECUTE revoked from
-// anon/authenticated, and ketik-*-api specs prove their own denial matrix. On
-// local Postgres 17.6.1.121 a revoked call returns 42501 without a crash.
-// Exact signatures only: any other revoked function still fails D5.1, and an
-// entry that stops being revoked-from-both must be removed here.
+// Backend RPCs added after D5.1 that are service_role-only by design
+// (docs/architecture.md, "Batas snapshot D5.1"): each migration revokes EXECUTE
+// from anon/authenticated and grants only service_role, and the D5.9 matrix
+// below proves every entry returns 42501 to anon and authenticated without a
+// crash or side effect. Owners: KETIK session/review/history/assignment
+// (ketik-*-api), scenario attachment backfill, practice quota/limits, monitoring
+// Riwayat, profiler account link, end-all-logins, and Telefun OpenAI scoring
+// retirement; ketik-session, practice-quota and telefun-scoring-queue specs also
+// assert the denial themselves. Exact signatures only: any other revoked
+// function still fails D5.1, and an entry that stops being revoked-from-both
+// must be removed here.
 const SERVICE_ROLE_ONLY_BY_DESIGN = [
+  "public.append_ketik_session_message(uuid,uuid,uuid,integer,text)",
   "public.assign_ketik_configuration(uuid,uuid,text,text,uuid,jsonb)",
   "public.can_access_ketik_review(uuid,uuid)",
   "public.claim_ketik_review(text,integer,uuid)",
+  "public.claim_ketik_session_response(uuid,uuid,uuid,integer)",
   "public.claim_ketik_session_turn(uuid,uuid,uuid,integer,text,integer)",
+  "public.consume_practice_quota(uuid,text,text)",
   "public.enqueue_ketik_review(uuid,uuid,uuid,boolean)",
+  "public.fail_ketik_session_response(uuid,uuid,uuid,uuid)",
   "public.finish_ketik_session(uuid,uuid)",
   "public.ketik_history_page(uuid,integer,text,text,timestamp with time zone,uuid)",
+  "public.link_profiler_peserta_account(uuid,uuid)",
+  "public.monitoring_sessions_page(text,text,timestamp with time zone,timestamp with time zone,text,uuid[],integer,integer)",
+  "public.practice_quota_status(uuid)",
+  "public.practice_today_summary()",
   "public.publish_ketik_session_turn(uuid,uuid,uuid,uuid,jsonb,boolean)",
   "public.read_ketik_review(uuid,uuid)",
+  "public.refund_practice_quota(uuid,text,text)",
+  "public.resolve_practice_limit(uuid,text,date)",
+  "public.retire_telefun_openai_scoring(uuid,text,jsonb)",
+  "public.revoke_user_sessions(uuid)",
   "public.scenario_attachment_backfill_apply(text,uuid[],text[],text[])",
   "public.scenario_attachment_backfill_columns(text)",
   "public.scenario_attachment_backfill_fetch(text,uuid[],text[])",
@@ -89,6 +106,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.scenario_attachment_literal_pattern()",
   "public.scenario_attachment_swap(text,text[],text[])",
   "public.settle_ketik_review(uuid,uuid,jsonb,boolean)",
+  "public.settle_ketik_session_response(uuid,uuid,uuid,uuid,jsonb,boolean,integer)",
   "public.start_ketik_session(uuid,uuid,jsonb,text,uuid)",
 ] as const;
 
@@ -393,6 +411,12 @@ function dummyArgs(row: GroupARow): Record<string, unknown> {
         case "text":
           value = "e2e-guard";
           break;
+        case "text[]":
+          value = [];
+          break;
+        case "date":
+          value = "2026-10-08";
+          break;
         case "bigint":
         case "integer":
         case "numeric":
@@ -417,6 +441,14 @@ function dummyArgs(row: GroupARow): Record<string, unknown> {
   );
 }
 
+type RpcSummaryRow = {
+  function: string;
+  role: string;
+  httpStatus: number;
+  code: string | null;
+  sentinelAlive: boolean;
+};
+
 // Include all mutable durable/mailbox/history tables, not just the minimum D5.5.
 const SIDE_EFFECT_TABLES = [
   "telefun_realtime_attempts",
@@ -432,6 +464,12 @@ const SIDE_EFFECT_TABLES = [
   "telefun_coaching_summary",
   "profiler_peserta",
   "qa_temuan",
+  "ketik_sessions",
+  "ketik_session_turns",
+  "ketik_session_responses",
+  "ketik_review_jobs",
+  "ketik_configuration_assignments",
+  "practice_usage",
 ] as const;
 function rowCounts(): Record<string, number> {
   return readCatalog(`SELECT json_object_agg(name, count) FROM (
@@ -443,13 +481,7 @@ test("D5.3–8 Group A rejection matrix, sentinel, side effects and positive con
   test.setTimeout(180000);
   assertGlobalPrecondition(); // RED stops here: zero RPC, zero users.
   const rows = assertGroupAPrecondition();
-  const summary: {
-    function: string;
-    role: string;
-    httpStatus: number;
-    code: string | null;
-    sentinelAlive: boolean;
-  }[] = [];
+  const summary: RpcSummaryRow[] = [];
   const userIds: string[] = [];
   const admin = createAdmin(env);
   const sentinel = startSentinel();
@@ -639,13 +671,7 @@ test("D5.3–5 Group B anon rejection matrix, sentinel and no side effects", asy
   expect(rows.every((row) => row.name && row.anon && row.authenticated)).toBe(
     true,
   );
-  const summary: {
-    function: string;
-    role: string;
-    httpStatus: number;
-    code: string | null;
-    sentinelAlive: boolean;
-  }[] = [];
+  const summary: RpcSummaryRow[] = [];
   const before = rowCounts();
   const sentinel = startSentinel();
   try {
@@ -678,9 +704,15 @@ test("D5.3–5 Group B anon rejection matrix, sentinel and no side effects", asy
           });
         }
       }
-      expect(response!.status).toBe(400);
-      expect(body).toMatchObject({
-        code: "P0001",
+      // Since the reply-attribution migration both legacy reply wrappers
+      // delegate to submit_pdkt_mailbox_reply_with_subject, whose guard raises
+      // "Unauthorized" with 42501 instead of P0001.
+      const delegated =
+        row.name === "submit_pdkt_mailbox_reply" ||
+        row.name === "submit_pdkt_mailbox_reply_with_outcome";
+      expect(response!.status, row.signature).toBe(delegated ? 401 : 400);
+      expect(body, row.signature).toMatchObject({
+        code: delegated ? "42501" : "P0001",
         message:
           row.name === "upsert_telefun_coaching_summary"
             ? "Access denied: Anonymous users cannot upsert coaching summaries."
@@ -707,5 +739,90 @@ test("D5.3–5 Group B anon rejection matrix, sentinel and no side effects", asy
       }),
     );
     await sentinel.close();
+  }
+});
+
+test("D5.9 service-role-only allowlist denies anon and authenticated, sentinel and no side effects", async () => {
+  test.setTimeout(120000);
+  assertGlobalPrecondition(); // No RPC while the allowlist drifts from the catalog.
+  const rows = readRpcCatalog(
+    SERVICE_ROLE_ONLY_BY_DESIGN.map((s) => s.slice("public.".length)),
+  );
+  expect(rows).toHaveLength(SERVICE_ROLE_ONLY_BY_DESIGN.length);
+  expect(
+    rows.filter(
+      (row) => !row.name || row.anon || row.authenticated || !row.serviceRole,
+    ),
+    "every allowlist entry must exist and be executable by service_role only",
+  ).toEqual([]);
+  const summary: RpcSummaryRow[] = [];
+  const admin = createAdmin(env);
+  // Highest application role: EXECUTE is checked per database role, so if an
+  // admin JWT is denied every authenticated JWT is.
+  const identity = await createUserWithJwt(env, "admin", randomUUID());
+  const roles = [
+    { role: "anon", token: undefined, status: 401 },
+    { role: "authenticated", token: identity.token, status: 403 },
+  ] as const;
+  const before = rowCounts();
+  const sentinel = startSentinel();
+  try {
+    await sentinel.ping();
+    for (const row of rows) {
+      for (const { role, token, status } of roles) {
+        let response: Response | undefined;
+        let body: { code?: string; message?: string } | undefined;
+        let sentinelAlive = false;
+        try {
+          response = await fetch(`${env.apiUrl}/rest/v1/rpc/${row.name!}`, {
+            method: "POST",
+            headers: {
+              apikey: env.anonKey,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(dummyArgs(row)),
+            redirect: "error",
+            signal: AbortSignal.timeout(15000),
+          });
+          body = await response.json();
+        } finally {
+          try {
+            sentinelAlive = await sentinel.ping();
+          } finally {
+            summary.push({
+              function: row.signature,
+              role,
+              httpStatus: response?.status ?? 0,
+              code: body?.code ?? null,
+              sentinelAlive,
+            });
+          }
+        }
+        expect(response!.status, `${role} ${row.signature}`).toBe(status);
+        expect(body, `${role} ${row.signature}`).toMatchObject({
+          code: "42501",
+          message: `permission denied for function ${row.name}`,
+        });
+      }
+    }
+    expect(
+      rowCounts(),
+      "Denied calls must not change any related table",
+    ).toEqual(before);
+    expect(summary).toHaveLength(SERVICE_ROLE_ONLY_BY_DESIGN.length * 2);
+    expect(summary.every((row) => row.sentinelAlive)).toBe(true);
+  } finally {
+    await attachJson("service-role-only-rpc-summary.json", summary);
+    console.log(
+      "D5.9",
+      JSON.stringify({
+        calls: summary.length,
+        sentinelAlive: summary.every((row) => row.sentinelAlive),
+      }),
+    );
+    await sentinel.close();
+    const { error } = await admin.auth.admin.deleteUser(identity.userId);
+    expect(error, "run-owned local auth user must be removed").toBeNull();
   }
 });
