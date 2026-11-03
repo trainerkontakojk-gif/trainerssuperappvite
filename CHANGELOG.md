@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- docs(plans): record the production apply and read-back of the search_path pin and legacy definer move migrations
 - test(db): reconcile the D5.1 service_role-only allowlist with the local catalog (30 exact signatures), add a D5.9 anon/authenticated denial matrix for every entry, and update Group B for the delegated PDKT reply wrappers
 - fix(db): move the unguarded legacy consume_rate_limit and get_service_trend_dashboard functions from public to app_internal; add production-shaped E2E
 - docs(plans): record the read-only production readback for the search_path pin and two unguarded legacy SECURITY DEFINER functions

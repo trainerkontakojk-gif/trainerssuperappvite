@@ -93,4 +93,11 @@ pg_temp`, used by policies on `profiles`, `activity_logs`,
       grants, preserved `search_path`, and that the trend body still runs; anon
       `/rpc` gets `PGRST202` for both names. Rollback round-trip on the same
       shape restores public + anon/authenticated EXECUTE.
-- [ ] T4 Production apply of `20261103090000` and `20261103100000` (Fajar's OK).
+- [x] T4 Production apply of `20261103090000` and `20261103100000` (Fajar's
+      OK, 2026-11-03): `supabase db push --linked` after a dry-run that listed
+      only these two. Read-back with `supabase db query --linked`: both
+      migrations recorded; `consume_rate_limit` and
+      `get_service_trend_dashboard` exist only in `app_internal` with client
+      EXECUTE revoked; `set_updated_at()` has `search_path=""` and the ten
+      legacy functions have `search_path=public, extensions, pg_temp`. The D5.1
+      revoked-function ACL set (31 rows) is identical to the local replay.
