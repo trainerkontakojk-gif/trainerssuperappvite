@@ -46,6 +46,35 @@ first).
   `pg_get_functiondef` for the ten production-only functions and confirm no
   body depends on an unqualified object outside `public`/`extensions`.
 
+## Production readback (2026-11-03, read-only, authorized by Fajar)
+
+`supabase db query --linked` with catalog-only `SELECT`s on
+`ruosnjmtywcrghjgqugz`:
+
+- All ten production-only functions are owned by `postgres` and have no
+  `proconfig`. Their bodies reference only `public` relations (most
+  unqualified), `auth.uid()` (qualified), CTE names and temp tables they
+  create themselves. No `public` relation shares a temp-table name
+  (`temp_qa_*`, `temp_period_base`, `session_data`), so `pg_temp` last still
+  resolves them. `public, extensions, pg_temp` therefore keeps behaviour.
+- `is_approved_trainer()` is SECURITY DEFINER with an unqualified `profiles`,
+  so the pin closes a real shadowing path. `is_super_admin()` compares a fixed
+  email. Neither is referenced by any policy.
+- No repo code calls the QA dashboard/score functions; Telefun's
+  `"consume_rate_limit"` string is only the operation label for
+  `consume_telefun_realtime_rate_limit`.
+- Already pinned on production (not touched): `get_auth_role` (`public,
+pg_temp`, used by policies on `profiles`, `activity_logs`,
+  `profiler_peserta`, `qa_temuan`, `storage.objects`), `consume_rate_limit`
+  and `get_service_trend_dashboard` (`''`), `publish_rule_version` x2
+  (`public`), `rls_auto_enable` (`pg_catalog`, event trigger).
+- Out-of-scope findings for a follow-up: `consume_rate_limit(text,int,int)`
+  and `get_service_trend_dashboard(uuid[])` are SECURITY DEFINER, executable
+  by `anon`, have no caller check and no repo caller. The first lets the anon
+  key upsert arbitrary `security_rate_limits` rows (6 rows today); the second
+  returns QA defect and audited-agent counts for any period ids.
+  `publish_rule_version` rejects callers without an admin/trainer profile.
+
 ## Tasklist
 
 - [x] T1 RED: `apps/web/e2e/function-search-path-api.spec.ts` (catalog
