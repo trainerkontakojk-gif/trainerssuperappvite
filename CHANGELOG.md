@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- fix(db): move the unguarded legacy consume_rate_limit and get_service_trend_dashboard functions from public to app_internal; add production-shaped E2E
 - docs(plans): record the read-only production readback for the search_path pin and two unguarded legacy SECURITY DEFINER functions
 - fix(db): pin search_path on set_updated_at and the production-only QA/role helpers flagged by advisor lint 0011; add catalog E2E guard
 

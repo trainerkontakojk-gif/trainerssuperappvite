@@ -148,6 +148,10 @@ export default defineConfig({
       testMatch: "function-search-path-api.spec.ts",
     },
     {
+      name: "function-move-legacy-definer-real-backend",
+      testMatch: "function-move-legacy-definer-api.spec.ts",
+    },
+    {
       name: "sidak-temuan-tahun-trigger-real-backend",
       testMatch: "sidak-temuan-tahun-trigger-api.spec.ts",
     },

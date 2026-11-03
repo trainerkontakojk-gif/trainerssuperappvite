@@ -68,7 +68,7 @@ pg_temp`, used by policies on `profiles`, `activity_logs`,
   `profiler_peserta`, `qa_temuan`, `storage.objects`), `consume_rate_limit`
   and `get_service_trend_dashboard` (`''`), `publish_rule_version` x2
   (`public`), `rls_auto_enable` (`pg_catalog`, event trigger).
-- Out-of-scope findings for a follow-up: `consume_rate_limit(text,int,int)`
+- Findings fixed by T5 (Fajar, 2026-11-03): `consume_rate_limit(text,int,int)`
   and `get_service_trend_dashboard(uuid[])` are SECURITY DEFINER, executable
   by `anon`, have no caller check and no repo caller. The first lets the anon
   key upsert arbitrary `security_rate_limits` rows (6 rows today); the second
@@ -82,4 +82,15 @@ pg_temp`, used by policies on `profiles`, `activity_logs`,
       `search_path`; `set_updated_at()` still stamps `updated_at`).
 - [x] T2 Migration, rollback, README row.
 - [x] T3 Local replay and GREEN, rollback round-trip.
-- [ ] T4 Production apply (Fajar).
+- [x] T5 Move `consume_rate_limit(text,integer,integer)` and
+      `get_service_trend_dashboard(uuid[])` to `app_internal` without client
+      EXECUTE (`20261103100000_move_legacy_unguarded_definer_functions.sql`,
+      rollback, README row). RED/GREEN in
+      `apps/web/e2e/function-move-legacy-definer-api.spec.ts`: it installs the
+      verbatim production definitions from
+      `apps/web/e2e/fixtures/legacy-unguarded-definer-functions.sql` in a
+      rolled-back transaction, runs the migration twice, and checks the move,
+      grants, preserved `search_path`, and that the trend body still runs; anon
+      `/rpc` gets `PGRST202` for both names. Rollback round-trip on the same
+      shape restores public + anon/authenticated EXECUTE.
+- [ ] T4 Production apply of `20261103090000` and `20261103100000` (Fajar's OK).
