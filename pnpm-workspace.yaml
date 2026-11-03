@@ -29,6 +29,18 @@ overrides:
   baseline-browser-mapping@<2.11.0: 2.11.0
   source-map-js: 1.2.2
   systeminformation@<5.33.16: 5.33.16
+  # GHSA-g3hv-75wg-m249: serve-handler is the prod static server; needs patches/serve-handler@6.1.7.patch
+  # because minimatch >=9 has no callable default export.
+  serve-handler@6.1.7>minimatch: 11.0.3
+
+audit:
+  ignore:
+    # GHSA-g3hv-75wg-m249 (minimatch <11.0.1). The remaining prod paths are exceljs 4.4.0 ->
+    # archiver 5 / unzipper 0.10 -> glob 7 (minimatch 3.1.5) and readdir-glob 1 (minimatch 5.1.9).
+    # Those versions do not contain the vulnerable firstPhasePreProcess/optimizationLevel code,
+    # glob 7 crashes on minimatch 11, and Vite ships exceljs's prebuilt browser bundle, so that
+    # tree never runs. Remove once exceljs ships a tree on minimatch >=11.0.1.
+    - GHSA-g3hv-75wg-m249
 
 allowBuilds:
   "@google/genai": true
@@ -52,3 +64,6 @@ minimumReleaseAgeExclude:
   - shadcn@4.21.3
   - typescript-eslint@8.71.1
   - vite@8.3.3
+
+patchedDependencies:
+  serve-handler@6.1.7: patches/serve-handler@6.1.7.patch

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- fix(deps): clear GHSA-g3hv-75wg-m249 in the prod audit by moving serve-handler to minimatch 11.0.3 (with a one-line pnpm patch for its named export) and ignoring the advisory for the exceljs glob 7 / readdir-glob tree, whose minimatch 3.x/5.x lacks the vulnerable code and has no compatible upgrade
 - docs(plans): record the production apply and read-back of the search_path pin and legacy definer move migrations
 - test(db): reconcile the D5.1 service_role-only allowlist with the local catalog (30 exact signatures), add a D5.9 anon/authenticated denial matrix for every entry, and update Group B for the delegated PDKT reply wrappers
 - fix(db): move the unguarded legacy consume_rate_limit and get_service_trend_dashboard functions from public to app_internal; add production-shaped E2E
