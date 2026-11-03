@@ -24,7 +24,18 @@ Satu sampel per endpoint; muat pertama sesudah deploy lebih lambat karena contai
 - **Data production (read-only):** `qa_temuan` 8.313 baris untuk 2026 (5.023 non-phantom), `profiler_peserta` 143, `qa_periods` 11, `qa_indicators` 78. Data ini kecil, jadi loop agregasi di memori bukan penyebab utama.
 - **Uji waktu (read-only, dari mesin developer):** membaca setahun `qa_temuan` butuh 3,39 detik bila halaman diambil berurutan, dan 0,96 detik bila empat halaman diambil bersamaan.
 - **Perbaikan:** halaman `qa_temuan` kini diambil empat sekaligus di direktori agen (Beranda "Perlu tindakan", `/sidak/agents`), tren, dan dashboard (termasuk forecast). Dashboard tetap memakai keyset paging, dibagi empat rentang `id`. Direktori agen kini memuat peserta, temuan, periode, dan indikator bersamaan.
-- **Belum diperbaiki:** forecast `cacheOnly` masih menghitung data penuh sebelum cek cache, dan kunjungan pertama SIDAK masih memuat dashboard dua kali (tanpa tim, lalu dengan tim bawaan).
+- **Batch 2 (commit `3d3b7098`, dideploy 06:23 UTC):** dashboard membaca temuan tanpa embed `profiler_peserta` (peserta dibaca sekali), forecast mencari fingerprint snapshot bersamaan dengan bacaan data, dan scope forecast dibaca bersamaan.
+
+| Endpoint (browser, sesudah batch 2, muat kedua) | Awal                 | Batch 1      | Batch 2    |
+| ----------------------------------------------- | -------------------- | ------------ | ---------- |
+| `sidak/dashboard/forecast` di Beranda           | 1,8 detik            | 1,8 detik    | 1,1 detik  |
+| `sidak/dashboard/forecast` di laman Forecast    | 1,18 detik           | belum diukur | 0,51 detik |
+| `sidak/dashboard` di laman Forecast             | 1,25 detik           | belum diukur | 0,68 detik |
+| `home/attention`                                | 1,4 sampai 2,3 detik | 0,9 detik    | 0,66 detik |
+| `sidak/dashboard/trend`                         | 1,1 sampai 1,8 detik | 0,8 detik    | 0,67 detik |
+| `sidak/ranking`                                 | 1,5 detik            | 1,2 detik    | 1,06 detik |
+
+- **Belum diperbaiki:** kunjungan pertama SIDAK dalam satu sesi masih memuat Dashboard, Forecast, dan Ranking dua kali (semua tim, lalu tim bawaan). Tim bawaan dipilih dari daftar tim tanpa scope yang dikirim `GET /sidak/dashboard` untuk semua peran, sedangkan `/sidak/folders` di-scope untuk leader, jadi perbaikannya butuh keputusan produk.
 
 ## Hasil ukur per laman
 

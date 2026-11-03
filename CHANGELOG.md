@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- docs(plans): record the post-deploy production timings for the second SIDAK performance batch
 - perf(sidak): read dashboard temuan without the peserta embed and look up forecast snapshot fingerprints while the data loads; resolve forecast scopes together
 - docs(plans): record the post-deploy production timings for the SIDAK parallel paging fix
 - perf(sidak): fetch year-wide qa_temuan pages in parallel for Beranda attention, agent directory, dashboard and trend, and load directory inputs concurrently; add real-backend E2E and the production performance report
