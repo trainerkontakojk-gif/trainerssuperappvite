@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- docs(plans): record the production check of the SIDAK first-visit single load
 - perf(sidak): pick the default team from the scoped team list before the first load so Dashboard, Ranking and Forecast load once on a first visit; leaders never get an out-of-scope default
 - docs(plans): record the post-deploy production timings for the second SIDAK performance batch
 - perf(sidak): read dashboard temuan without the peserta embed and look up forecast snapshot fingerprints while the data loads; resolve forecast scopes together

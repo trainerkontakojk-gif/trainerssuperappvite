@@ -35,7 +35,7 @@ Satu sampel per endpoint; muat pertama sesudah deploy lebih lambat karena contai
 | `sidak/dashboard/trend`                         | 1,1 sampai 1,8 detik | 0,8 detik    | 0,67 detik |
 | `sidak/ranking`                                 | 1,5 detik            | 1,2 detik    | 1,06 detik |
 
-- **Belum diperbaiki:** kunjungan pertama SIDAK dalam satu sesi masih memuat Dashboard, Forecast, dan Ranking dua kali (semua tim, lalu tim bawaan). Tim bawaan dipilih dari daftar tim tanpa scope yang dikirim `GET /sidak/dashboard` untuk semua peran, sedangkan `/sidak/folders` di-scope untuk leader, jadi perbaikannya butuh keputusan produk.
+- **Batch 3 (commit `3e039d19`, keputusan Fajar: tim bawaan dari daftar ber-scope):** pada kunjungan pertama SIDAK, tim bawaan dipilih dari `/sidak/folders` sebelum data dimuat. Diverifikasi di production: `/sidak/folders` (235 ms), lalu satu request `sidak/dashboard` langsung dengan tim bawaan (488 ms) dan heatmap dengan tim yang sama. Sebelumnya Dashboard, Ranking, dan Forecast memuat data dua kali. Leader tidak lagi mendapat tim bawaan di luar scope-nya.
 
 ## Hasil ukur per laman
 
