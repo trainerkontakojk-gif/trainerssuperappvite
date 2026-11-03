@@ -19,7 +19,11 @@ import {
  *   `/sidak/dashboard/trend` menjaga lebih dari satu request PostgREST
  *   `qa_temuan` berjalan bersamaan (bukan halaman satu per satu);
  * - hasil tetap lengkap: baris sesudah halaman ketiga ikut, total sama dengan
- *   oracle SQL.
+ *   oracle SQL;
+ * - dashboard membaca `qa_temuan` tanpa embed `profiler_peserta`; filter tim
+ *   tetap mempersempit hasil sama persis;
+ * - forecast `cacheOnly`: `missing` → refresh → `hit` → `stale` setelah data
+ *   berubah, dan pencarian snapshot berjalan bersamaan dengan bacaan temuan.
  *
  * Fixture memakai tahun 2097 (2.705 baris, lebih dari dua halaman 1.000) supaya
  * oracle hanya berisi data run ini, lalu dibersihkan di `afterAll`. Jumlah
@@ -36,12 +40,17 @@ const TICKETS = 9;
 const quoted = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 const inFlight = { current: 0, max: 0 };
+/** Request PostgREST yang dicatat sejak `get`/`post` terakhir. */
+const requestLog: { url: string; start: number; end: number }[] = [];
 
 let app: Hono;
 let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
 const created = {
   folderName: `e2e-sidak-paging-${ns}`,
   folderId: null as string | null,
+  /** Tim kedua: hanya agen ekor, supaya filter tim benar-benar mempersempit. */
+  otherFolderName: `e2e-sidak-paging-b-${ns}`,
+  otherFolderId: null as string | null,
   yearId: null as string | null,
   yearCreated: false,
   pesertaIds: [] as string[],
@@ -50,27 +59,64 @@ const created = {
   periodsCreated: [] as string[],
 };
 
-async function get(path: string) {
+async function call(path: string, init: { method: string; body?: unknown }) {
   inFlight.current = 0;
   inFlight.max = 0;
+  requestLog.length = 0;
   const response = await tnaApiRequest(app, `http://localhost/api/v1${path}`, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${trainer.token}` },
+    method: init.method,
+    headers: {
+      Authorization: `Bearer ${trainer.token}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(init.body ? { body: JSON.stringify(init.body) } : {}),
   });
-  expect(response.status).toBe(200);
   const body = await response.json();
+  expect(response.status, JSON.stringify(body)).toBe(200);
   expect(body.success).toBe(true);
   return body.data;
 }
 
-function countableOracle(): number {
+const get = (path: string) => call(path, { method: "GET" });
+
+function countableOracle(folderName?: string): number {
+  const folderFilter = folderName
+    ? ` AND peserta_id IN (SELECT id FROM profiler_peserta WHERE batch_name=${quoted(folderName)})`
+    : "";
   return Number(
     runSql(
       env,
-      `SELECT count(*) FROM qa_temuan WHERE tahun=${YEAR} AND NOT is_phantom_padding AND nilai < 3;`,
+      `SELECT count(*) FROM qa_temuan WHERE tahun=${YEAR} AND NOT is_phantom_padding AND nilai < 3${folderFilter};`,
     ),
   );
 }
+
+/** Ada request `a` yang mulai sebelum request `b` terakhir selesai. */
+function startsBeforeLastEnds(a: string, b: string): boolean {
+  const starts = requestLog
+    .filter((r) => r.url.includes(a))
+    .map((r) => r.start);
+  const ends = requestLog.filter((r) => r.url.includes(b)).map((r) => r.end);
+  expect(starts.length).toBeGreaterThan(0);
+  expect(ends.length).toBeGreaterThan(0);
+  return Math.min(...starts) < Math.max(...ends);
+}
+
+type ForecastLookup = {
+  status: "fresh" | "stale" | "missing";
+  snapshot: { cache: { status: string } } | null;
+};
+
+const forecast = (options: { cacheOnly?: boolean; forceRefresh?: boolean }) =>
+  call("/sidak/dashboard/forecast", {
+    method: "POST",
+    body: {
+      filters: { year: YEAR, serviceType: "chat" },
+      horizonMonths: 3,
+      cacheOnly: options.cacheOnly ?? false,
+      forceRefresh: options.forceRefresh ?? false,
+    },
+  }) as Promise<ForecastLookup>;
 
 test.beforeAll(async () => {
   Object.assign(process.env, {
@@ -92,10 +138,17 @@ test.beforeAll(async () => {
       inFlight.current += 1;
       inFlight.max = Math.max(inFlight.max, inFlight.current);
     }
+    const entry = url.includes("/rest/v1/")
+      ? { url: decodeURIComponent(url), start: performance.now(), end: 0 }
+      : null;
     try {
       return await guarded(input, init);
     } finally {
       if (tracked) inFlight.current -= 1;
+      if (entry) {
+        entry.end = performance.now();
+        requestLog.push(entry);
+      }
     }
   }) as typeof fetch;
 
@@ -136,6 +189,10 @@ test.beforeAll(async () => {
     env,
     `INSERT INTO profiler_folders (name, year_id) VALUES (${quoted(created.folderName)}, ${quoted(created.yearId)}) RETURNING id;`,
   );
+  created.otherFolderId = sqlOne(
+    env,
+    `INSERT INTO profiler_folders (name, year_id) VALUES (${quoted(created.otherFolderName)}, ${quoted(created.yearId)}) RETURNING id;`,
+  );
 
   for (let index = 0; index < AGENTS; index += 1)
     created.pesertaIds.push(
@@ -149,7 +206,7 @@ test.beforeAll(async () => {
   created.tailPesertaId = sqlOne(
     env,
     `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
-     VALUES (${quoted(created.folderName)}, ${quoted(`Agen Paging Ekor ${ns}`)}, 'Tim Uji', 'Agent', ${AGENTS + 1})
+     VALUES (${quoted(created.otherFolderName)}, ${quoted(`Agen Paging Ekor ${ns}`)}, 'Tim Uji', 'Agent', ${AGENTS + 1})
      RETURNING id;`,
   );
 
@@ -192,6 +249,11 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  if (trainer)
+    runSql(
+      env,
+      `DELETE FROM sidak_dashboard_forecast_snapshots WHERE generated_by=${quoted(trainer.userId)};`,
+    );
   const ids = [...created.pesertaIds, created.tailPesertaId].filter(
     (id): id is string => Boolean(id),
   );
@@ -201,11 +263,9 @@ test.afterAll(async () => {
       `DELETE FROM qa_temuan WHERE peserta_id IN (${ids.map(quoted).join(",")});
        DELETE FROM profiler_peserta WHERE id IN (${ids.map(quoted).join(",")});`,
     );
-  if (created.folderId)
-    runSql(
-      env,
-      `DELETE FROM profiler_folders WHERE id=${quoted(created.folderId)};`,
-    );
+  for (const folderId of [created.folderId, created.otherFolderId])
+    if (folderId)
+      runSql(env, `DELETE FROM profiler_folders WHERE id=${quoted(folderId)};`);
   if (created.yearCreated && created.yearId)
     runSql(
       env,
@@ -262,4 +322,76 @@ test("Beranda perlu tindakan: halaman paralel, tidak partial", async () => {
   const data = await get("/home/attention");
   expect(inFlight.max).toBeGreaterThan(1);
   expect(data.partial).toBe(false);
+});
+
+test("dashboard SIDAK: tanpa embed peserta, filter tim tetap sama dengan oracle", async () => {
+  const all = await get(`/sidak/dashboard?year=${YEAR}&service_type=chat`);
+  const temuanUrls = requestLog
+    .filter((r) => r.url.includes("/rest/v1/qa_temuan"))
+    .map((r) => r.url);
+  expect(temuanUrls.length).toBeGreaterThan(0);
+  for (const url of temuanUrls) expect(url).not.toContain("profiler_peserta");
+  expect(all.summary.totalDefects).toBe(countableOracle());
+
+  const team = await get(
+    `/sidak/dashboard?year=${YEAR}&service_type=chat&folder_ids=${created.folderId}`,
+  );
+  expect(team.summary.totalDefects).toBe(countableOracle(created.folderName));
+  expect(team.summary.totalDefects).toBeLessThan(all.summary.totalDefects);
+  expect(
+    team.topAgents.map((a: { agentId: string }) => a.agentId),
+  ).not.toContain(created.tailPesertaId);
+
+  const other = await get(
+    `/sidak/dashboard?year=${YEAR}&service_type=chat&folder_ids=${created.otherFolderId}`,
+  );
+  expect(other.summary.totalDefects).toBe(
+    countableOracle(created.otherFolderName),
+  );
+});
+
+test("forecast cacheOnly: missing → hit → stale, snapshot dicari bersamaan dengan temuan", async () => {
+  const missing = await forecast({ cacheOnly: true });
+  expect(missing).toEqual({ status: "missing", snapshot: null });
+  expect(
+    startsBeforeLastEnds(
+      "sidak_dashboard_forecast_snapshots",
+      "/rest/v1/qa_temuan",
+    ),
+  ).toBe(true);
+
+  const refreshed = await forecast({ forceRefresh: true });
+  expect(refreshed.status).toBe("fresh");
+  expect(refreshed.snapshot?.cache.status).toBe("refreshed");
+
+  const snapshotCount = () =>
+    runSql(
+      env,
+      `SELECT count(*) FROM sidak_dashboard_forecast_snapshots WHERE generated_by=${quoted(trainer.userId)};`,
+    );
+  expect(snapshotCount()).toBe("1");
+
+  const hit = await forecast({ cacheOnly: true });
+  expect(hit.status).toBe("fresh");
+  expect(hit.snapshot?.cache.status).toBe("hit");
+  // Cache hit membaca snapshot yang ada, tidak menulis snapshot baru.
+  expect(snapshotCount()).toBe("1");
+  expect(
+    startsBeforeLastEnds(
+      "sidak_dashboard_forecast_snapshots",
+      "/rest/v1/qa_temuan",
+    ),
+  ).toBe(true);
+
+  // Satu temuan baru mengubah data historis: snapshot lama jadi usang.
+  runSql(
+    env,
+    `INSERT INTO qa_temuan (peserta_id, period_id, indicator_id, service_type, no_tiket, is_phantom_padding, nilai, ketidaksesuaian, tahun)
+     SELECT ${quoted(created.pesertaIds[0]!)}, ${quoted(created.periodIds[1]!)}, id, 'chat', ${quoted(`e2e-paging-${ns}-baru`)}, false, 0, NULL, ${YEAR}
+     FROM qa_indicators WHERE service_type='chat' AND is_active LIMIT 1;`,
+  );
+  expect(await forecast({ cacheOnly: true })).toEqual({
+    status: "stale",
+    snapshot: null,
+  });
 });

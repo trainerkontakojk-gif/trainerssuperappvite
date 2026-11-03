@@ -52,22 +52,35 @@ export async function saveForecastSnapshot(params: {
   return params.payload;
 }
 
-export async function hasForecastSnapshotForFilter(params: {
+const FINGERPRINT_LIST_LIMIT = 500;
+
+/**
+ * Data fingerprints stored for this filter and horizon, newest first.
+ * `complete` is false when the filter has more snapshots than were listed, so
+ * an absent fingerprint must still be looked up directly.
+ */
+export async function listForecastFingerprints(params: {
   filterKey: string;
   horizonMonths: number;
-}): Promise<boolean> {
+}): Promise<{ fingerprints: string[]; complete: boolean }> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("sidak_dashboard_forecast_snapshots")
-    .select("id")
+    .select("data_fingerprint")
     .eq("filter_key", params.filterKey)
     .eq("horizon_months", params.horizonMonths)
-    .limit(1)
-    .maybeSingle();
+    .order("updated_at", { ascending: false })
+    .limit(FINGERPRINT_LIST_LIMIT);
 
   if (error) {
     throw new Error(`Gagal memeriksa snapshot prediksi: ${error.message}`);
   }
 
-  return Boolean(data);
+  const fingerprints = (data ?? []).map(
+    (row) => row.data_fingerprint as string,
+  );
+  return {
+    fingerprints,
+    complete: fingerprints.length < FINGERPRINT_LIST_LIMIT,
+  };
 }

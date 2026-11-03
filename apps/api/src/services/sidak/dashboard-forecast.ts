@@ -13,8 +13,8 @@ import { roundTo } from "../../lib/math-utils";
 import { getDashboardData } from "./dashboard-data";
 import {
   findForecastSnapshot,
+  listForecastFingerprints,
   saveForecastSnapshot,
-  hasForecastSnapshotForFilter,
 } from "./dashboard-forecast-store";
 
 const MONTHS_SHORT = [
@@ -56,16 +56,24 @@ export async function generateSidakTrendForecast(
   req: SidakTrendForecastRequest,
 ): Promise<SidakForecastLookupResult> {
   const horizonMonths = req.horizonMonths ?? 3;
-  const dashboardData = await getDashboardData({
-    period_ids: req.filters.periodIds,
-    service_type: req.filters.serviceType,
-    folder_ids: req.filters.folderIds,
-    year: req.filters.year,
-    startMonth: req.filters.startMonth,
-    endMonth: req.filters.endMonth,
-    agent_ids: req.filters.agentIds,
-    allowedServiceTypes: req.filters.allowedServiceTypes,
-  });
+  const filterKey = hashValue(canonicalizeFilters(req.filters));
+  // The stored fingerprints depend only on the filter, so they are read while
+  // the dashboard data loads; a cache-only miss then needs no further trip.
+  const [dashboardData, stored] = await Promise.all([
+    getDashboardData({
+      period_ids: req.filters.periodIds,
+      service_type: req.filters.serviceType,
+      folder_ids: req.filters.folderIds,
+      year: req.filters.year,
+      startMonth: req.filters.startMonth,
+      endMonth: req.filters.endMonth,
+      agent_ids: req.filters.agentIds,
+      allowedServiceTypes: req.filters.allowedServiceTypes,
+    }),
+    req.forceRefresh
+      ? { fingerprints: [] as string[], complete: true }
+      : listForecastFingerprints({ filterKey, horizonMonths }),
+  ]);
 
   const totalHistorical = extractTotalHistorical(dashboardData);
   if (totalHistorical.length < 2) {
@@ -75,7 +83,6 @@ export async function generateSidakTrendForecast(
   }
 
   const parameterHistorical = extractParameterHistorical(dashboardData);
-  const filterKey = hashValue(canonicalizeFilters(req.filters));
   const dataFingerprint = hashValue({
     contractVersion: FORECAST_CONTRACT_VERSION,
     total: totalHistorical,
@@ -83,11 +90,15 @@ export async function generateSidakTrendForecast(
   });
 
   if (!req.forceRefresh) {
-    const cached = await findForecastSnapshot({
-      filterKey,
-      dataFingerprint,
-      horizonMonths,
-    });
+    const mayBeStored =
+      stored.fingerprints.includes(dataFingerprint) || !stored.complete;
+    const cached = mayBeStored
+      ? await findForecastSnapshot({
+          filterKey,
+          dataFingerprint,
+          horizonMonths,
+        })
+      : null;
     if (cached) {
       return {
         status: "fresh",
@@ -98,12 +109,8 @@ export async function generateSidakTrendForecast(
       };
     }
     if (req.cacheOnly) {
-      const hasPriorSnapshot = await hasForecastSnapshotForFilter({
-        filterKey,
-        horizonMonths,
-      });
       return {
-        status: hasPriorSnapshot ? "stale" : "missing",
+        status: stored.fingerprints.length > 0 ? "stale" : "missing",
         snapshot: null,
       };
     }

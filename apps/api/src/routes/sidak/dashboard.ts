@@ -298,10 +298,10 @@ sidakDashboard.post(
       );
     }
 
-    const accessibleIds = await sidakService.getAccessibleAgentIds(
-      user.id,
-      profile?.role ?? "",
-    );
+    const [accessibleIds, filterScope] = await Promise.all([
+      sidakService.getAccessibleAgentIds(user.id, profile?.role ?? ""),
+      resolveSidakFilterScope(c),
+    ]);
     if (accessibleIds && accessibleIds.length === 0) {
       return c.json(
         {
@@ -314,7 +314,6 @@ sidakDashboard.post(
         403,
       );
     }
-    const filterScope = await resolveSidakFilterScope(c);
     const effectiveServiceType = sidakService.resolveScopedServiceType(
       parsed.data.filters.serviceType,
       filterScope,

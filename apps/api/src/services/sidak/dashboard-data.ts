@@ -36,7 +36,10 @@ import {
   SIDAK_COMPLIANCE_TARGET,
 } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
-import { fetchAllByIdPartitions } from "../../lib/supabase-pagination";
+import {
+  fetchAllByIdPartitions,
+  fetchAllPages,
+} from "../../lib/supabase-pagination";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds, isAgentExcluded } from "./agent-directory";
@@ -49,10 +52,12 @@ import {
 
 const PAGINATION_STEP = 1000;
 
-// Only the columns the dashboard reads; the joined peserta columns also drive
-// the SIDAK exclusion check.
+// Only the columns the dashboard reads. Peserta are read once and attached in
+// memory: embedding them in every temuan row made the read ~40% slower.
 const DASHBOARD_TEMUAN_COLUMNS =
-  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)";
+  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya";
+
+type DashboardPeserta = NonNullable<DashboardTemuanRow["profiler_peserta"]>;
 
 async function fetchAllTemuan(opts: {
   service_type?: string;
@@ -76,7 +81,7 @@ async function fetchAllTemuan(opts: {
   // Keyset pagination: each page starts after the last id, so later pages do
   // not rescan the rows earlier pages already returned (OFFSET does). The id
   // slices are walked in parallel to cut the sequential round trips.
-  const rows = await fetchAllByIdPartitions<DashboardTemuanRow>({
+  const temuanPromise = fetchAllByIdPartitions<DashboardTemuanRow>({
     pageSize: PAGINATION_STEP,
     build: ({ fromId, beforeId, afterId, limit }) => {
       let query = supabaseAdmin
@@ -107,9 +112,6 @@ async function fetchAllTemuan(opts: {
         pesertaScopeFromIds(opts.agent_ids),
         "peserta_id",
       );
-      if (opts.folderNames && opts.folderNames.length > 0) {
-        query = query.in("profiler_peserta.batch_name", opts.folderNames);
-      }
       if (opts.excludedIds.length > 0) {
         query = query.not(
           "peserta_id",
@@ -125,10 +127,34 @@ async function fetchAllTemuan(opts: {
     },
   });
 
-  return rows.filter((row) => {
-    const p = row.profiler_peserta;
-    return !isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan);
-  });
+  const [rows, peserta] = await Promise.all([
+    temuanPromise,
+    fetchAllPages<DashboardPeserta & { id: string }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("id, nama, batch_name, tim, jabatan")
+          .order("id", { ascending: true })
+          .range(from, to),
+    }),
+  ]);
+
+  const pesertaById = new Map(peserta.map((p) => [p.id, p]));
+  // Teams filter in memory rather than as a `peserta_id` list in the URL,
+  // which would grow with team size; the service filter already narrows rows.
+  const folderNames = opts.folderNames?.length
+    ? new Set(opts.folderNames)
+    : null;
+  const result: DashboardTemuanRow[] = [];
+  for (const row of rows) {
+    // Every row has its peserta (the FK cascades), as the former inner join kept.
+    const p = pesertaById.get(row.peserta_id);
+    if (!p) continue;
+    if (folderNames && !folderNames.has(p.batch_name ?? "")) continue;
+    if (isAgentExcluded(p.tim, p.batch_name, p.jabatan)) continue;
+    result.push({ ...row, profiler_peserta: p });
+  }
+  return result;
 }
 
 export async function getDashboardData(params: {
