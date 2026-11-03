@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-03
+
+- fix(db): pin search_path on set_updated_at and the production-only QA/role helpers flagged by advisor lint 0011; add catalog E2E guard
+
 ## 2026-11-02
 
 - fix(simulasi): sapaan agen KETIK dan Telefun mengikuti nama perkenalan, fallback netral saat ambigu, dan koreksi eksplisit; tambahkan regresi E2E serta bukti penerimaan AI nyata

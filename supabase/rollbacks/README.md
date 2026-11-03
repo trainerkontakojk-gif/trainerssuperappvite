@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261103090000_pin_function_search_path.sql` | No data loss: unpins `search_path` on `set_updated_at()` and the production-only QA/role helpers again (advisor lint 0011 returns); no code depends on the pinned path |
 | New | `rollback_20261029150511_trainer_activities.sql` | DATA LOSS: drops trainer activity rows; revert API and web first. After the SQL, delete the bucket through Storage API only if empty; non-empty buckets and objects remain. |
 | New | `rollback_20261023090000_pdkt_reply_replier_attribution.sql` | No data loss: restores creator-derived attribution for future replies only; revert API/web first; existing history and mailbox snapshots stay unchanged |
 | New | `rollback_20261021090000_ketik_post_expiry_closing.sql` | No data loss: appends and replies stop again at expiry or consumer close, so the agent cannot send closing messages and no closing reply is generated; revert the API and web first |

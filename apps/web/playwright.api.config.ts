@@ -144,6 +144,10 @@ export default defineConfig({
       testMatch: "access-groups-view-guard-api.spec.ts",
     },
     {
+      name: "function-search-path-real-backend",
+      testMatch: "function-search-path-api.spec.ts",
+    },
+    {
       name: "sidak-temuan-tahun-trigger-real-backend",
       testMatch: "sidak-temuan-tahun-trigger-api.spec.ts",
     },
