@@ -1,6 +1,9 @@
 import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
-import { fetchAllPages } from "../../lib/supabase-pagination";
+import {
+  fetchAllPages,
+  PARALLEL_PAGE_CONCURRENCY,
+} from "../../lib/supabase-pagination";
 import { isCountableFinding } from "./shared-constants";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { formatQAIndicatorName, type QAPeriod } from "@trainers/types";
@@ -25,44 +28,29 @@ export async function fetchPaginatedTrendData(
   year?: number,
   agent_ids?: string[],
 ) {
-  const allData: any[] = [];
-  let from = 0;
-  const step = 1000;
-  let hasMore = true;
+  return fetchAllPages<any>({
+    concurrency: PARALLEL_PAGE_CONCURRENCY,
+    build: ({ from, to }) => {
+      let query = supabaseAdmin
+        .from("qa_temuan")
+        .select(
+          "nilai, ketidaksesuaian, sebaiknya, period_id, service_type, peserta_id, no_tiket, indicator_id, tahun",
+        )
+        .in("period_id", pIds)
+        .eq("is_phantom_padding", false)
+        .order("id", { ascending: true })
+        .range(from, to);
 
-  while (hasMore) {
-    let query = supabaseAdmin
-      .from("qa_temuan")
-      .select(
-        "nilai, ketidaksesuaian, sebaiknya, period_id, service_type, peserta_id, no_tiket, indicator_id, tahun",
-      )
-      .in("period_id", pIds)
-      .eq("is_phantom_padding", false)
-      .order("id", { ascending: true })
-      .range(from, from + step - 1);
-
-    if (year) {
-      query = query.eq("tahun", year);
-    }
-    query = applyPesertaScope(
-      query,
-      pesertaScopeFromIds(agent_ids),
-      "peserta_id",
-    );
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData.push(...data);
-      hasMore = data.length === step;
-      from += step;
-    }
-  }
-
-  return allData;
+      if (year) {
+        query = query.eq("tahun", year);
+      }
+      return applyPesertaScope(
+        query,
+        pesertaScopeFromIds(agent_ids),
+        "peserta_id",
+      );
+    },
+  });
 }
 
 export async function calculateTopParameters(temuan: any[]) {

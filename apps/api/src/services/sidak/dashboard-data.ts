@@ -36,6 +36,7 @@ import {
   SIDAK_COMPLIANCE_TARGET,
 } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
+import { fetchAllByIdPartitions } from "../../lib/supabase-pagination";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds, isAgentExcluded } from "./agent-directory";
@@ -72,61 +73,62 @@ async function fetchAllTemuan(opts: {
     }
   }
 
-  const allData: DashboardTemuanRow[] = [];
-  let lastId: string | null = null;
-
   // Keyset pagination: each page starts after the last id, so later pages do
-  // not rescan the rows earlier pages already returned (OFFSET does).
-  while (true) {
-    let query = supabaseAdmin
-      .from("qa_temuan")
-      .select(DASHBOARD_TEMUAN_COLUMNS)
-      .order("id", { ascending: true })
-      .limit(PAGINATION_STEP);
-    if (lastId) query = query.gt("id", lastId);
+  // not rescan the rows earlier pages already returned (OFFSET does). The id
+  // slices are walked in parallel to cut the sequential round trips.
+  const rows = await fetchAllByIdPartitions<DashboardTemuanRow>({
+    pageSize: PAGINATION_STEP,
+    build: ({ fromId, beforeId, afterId, limit }) => {
+      let query = supabaseAdmin
+        .from("qa_temuan")
+        .select(DASHBOARD_TEMUAN_COLUMNS)
+        .gte("id", fromId)
+        .order("id", { ascending: true })
+        .limit(limit);
+      if (beforeId) query = query.lt("id", beforeId);
+      if (afterId) query = query.gt("id", afterId);
 
-    if (opts.service_type && opts.service_type !== "all") {
-      query = query.eq("service_type", opts.service_type);
-    } else if (opts.allowedSvcs) {
-      query = query.in("service_type", opts.allowedSvcs);
-    }
-    if (opts.period_ids && opts.period_ids.length > 0) {
-      query = query.in("period_id", opts.period_ids);
-    }
-    if (opts.year) {
-      query = query.eq("tahun", opts.year);
-    }
-    if (opts.peserta_id) {
-      query = query.eq("peserta_id", opts.peserta_id);
-    }
-    query = applyPesertaScope(
-      query,
-      pesertaScopeFromIds(opts.agent_ids),
-      "peserta_id",
-    );
-    if (opts.folderNames && opts.folderNames.length > 0) {
-      query = query.in("profiler_peserta.batch_name", opts.folderNames);
-    }
-    if (opts.excludedIds.length > 0) {
-      query = query.not("peserta_id", "in", `(${opts.excludedIds.join(",")})`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    const page = (data ?? []) as unknown as DashboardTemuanRow[];
-
-    for (const row of page) {
-      const p = row.profiler_peserta;
-      if (!isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan)) {
-        allData.push(row);
+      if (opts.service_type && opts.service_type !== "all") {
+        query = query.eq("service_type", opts.service_type);
+      } else if (opts.allowedSvcs) {
+        query = query.in("service_type", opts.allowedSvcs);
       }
-    }
-    if (page.length < PAGINATION_STEP) break;
-    lastId = page[page.length - 1]!.id ?? null;
-    if (!lastId) break;
-  }
+      if (opts.period_ids && opts.period_ids.length > 0) {
+        query = query.in("period_id", opts.period_ids);
+      }
+      if (opts.year) {
+        query = query.eq("tahun", opts.year);
+      }
+      if (opts.peserta_id) {
+        query = query.eq("peserta_id", opts.peserta_id);
+      }
+      query = applyPesertaScope(
+        query,
+        pesertaScopeFromIds(opts.agent_ids),
+        "peserta_id",
+      );
+      if (opts.folderNames && opts.folderNames.length > 0) {
+        query = query.in("profiler_peserta.batch_name", opts.folderNames);
+      }
+      if (opts.excludedIds.length > 0) {
+        query = query.not(
+          "peserta_id",
+          "in",
+          `(${opts.excludedIds.join(",")})`,
+        );
+      }
 
-  return allData;
+      return query as unknown as PromiseLike<{
+        data: DashboardTemuanRow[] | null;
+        error: { message: string } | null;
+      }>;
+    },
+  });
+
+  return rows.filter((row) => {
+    const p = row.profiler_peserta;
+    return !isAgentExcluded(p?.tim, p?.batch_name, p?.jabatan);
+  });
 }
 
 export async function getDashboardData(params: {
@@ -142,26 +144,22 @@ export async function getDashboardData(params: {
   allowedServiceTypes?: ServiceType[];
   limit?: number;
 }): Promise<DashboardData> {
-  const [periods, indicators, weights] = await Promise.all([
-    getPeriods(),
-    getIndicators(),
-    supabaseAdmin.from("qa_service_weights").select("*"),
-  ]);
-
   // SIDAK-excluded staff are dropped in fetchAllTemuan from the joined
   // peserta columns; only soft-deleted ids go to the database filter.
-  const excludedIds = params.showArchived
-    ? []
-    : await getSoftDeletedPesertaIds();
+  const [periods, indicators, weights, excludedIds, folderFilter] =
+    await Promise.all([
+      getPeriods(),
+      getIndicators(),
+      supabaseAdmin.from("qa_service_weights").select("*"),
+      params.showArchived ? [] : getSoftDeletedPesertaIds(),
+      params.folder_ids && params.folder_ids.length > 0
+        ? resolveFolderFiltersByIds(params.folder_ids)
+        : null,
+    ]);
 
   const allowedSvcs =
     params.allowedServiceTypes && params.allowedServiceTypes.length > 0
       ? params.allowedServiceTypes
-      : null;
-
-  const folderFilter =
-    params.folder_ids && params.folder_ids.length > 0
-      ? await resolveFolderFiltersByIds(params.folder_ids)
       : null;
 
   const folderNames = folderFilter?.filterNames ?? null;

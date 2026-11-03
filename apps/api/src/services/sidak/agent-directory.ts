@@ -1,6 +1,9 @@
 import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
-import { fetchAllPages } from "../../lib/supabase-pagination";
+import {
+  fetchAllPages,
+  PARALLEL_PAGE_CONCURRENCY,
+} from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import {
   EXCLUDED_FOLDERS,
@@ -110,15 +113,45 @@ export async function getAgentDirectorySummary(
   includeExcluded?: boolean,
   allowedServiceTypes?: ServiceType[],
 ): Promise<{ agents: AgentDirectoryEntry[]; batches: string[] }> {
-  const agents = await fetchAllPages<any>({
-    build: ({ from, to }) =>
-      supabaseAdmin
-        .from("profiler_peserta")
-        .select("id, nama, tim, batch_name, foto_url, jabatan")
-        .order("nama")
-        .order("id", { ascending: true })
-        .range(from, to),
-  });
+  const svcsToLoad =
+    allowedServiceTypes && allowedServiceTypes.length > 0
+      ? allowedServiceTypes
+      : VALID_SERVICE_TYPES;
+
+  // Independent reads, started together: each is at least one round trip.
+  const [agents, allTemuan, periods, indicatorLists] = await Promise.all([
+    fetchAllPages<any>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("id, nama, tim, batch_name, foto_url, jabatan")
+          .order("nama")
+          .order("id", { ascending: true })
+          .range(from, to),
+    }),
+    fetchAllPages<any>({
+      concurrency: PARALLEL_PAGE_CONCURRENCY,
+      build: ({ from, to }) => {
+        let query = supabaseAdmin
+          .from("qa_temuan")
+          .select(
+            "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
+          )
+          .eq("tahun", year)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to);
+
+        if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+          query = query.in("service_type", allowedServiceTypes);
+        }
+
+        return query;
+      },
+    }),
+    getPeriods(),
+    Promise.all(svcsToLoad.map((st) => getIndicators(st))),
+  ]);
 
   let filteredAgents = agents;
 
@@ -137,27 +170,6 @@ export async function getAgentDirectorySummary(
     ...new Set(filteredAgents.map((a: any) => a.batch_name).filter(Boolean)),
   ] as string[];
 
-  const allTemuan = await fetchAllPages<any>({
-    build: ({ from, to }) => {
-      let query = supabaseAdmin
-        .from("qa_temuan")
-        .select(
-          "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
-        )
-        .eq("tahun", year)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .range(from, to);
-
-      if (allowedServiceTypes && allowedServiceTypes.length > 0) {
-        query = query.in("service_type", allowedServiceTypes);
-      }
-
-      return query;
-    },
-  });
-
-  const periods = await getPeriods();
   const periodsMap = new Map(periods.map((p) => [p.id, p]));
 
   const temuanByAgent = new Map<string, any[]>();
@@ -166,14 +178,9 @@ export async function getAgentDirectorySummary(
     temuanByAgent.get(t.peserta_id)!.push(t);
   }
 
-  const indicatorCache = new Map<string, any[]>();
-  const svcsToLoad =
-    allowedServiceTypes && allowedServiceTypes.length > 0
-      ? allowedServiceTypes
-      : VALID_SERVICE_TYPES;
-  for (const st of svcsToLoad) {
-    indicatorCache.set(st, await getIndicators(st));
-  }
+  const indicatorCache = new Map<string, any[]>(
+    svcsToLoad.map((st, index) => [st, indicatorLists[index]!]),
+  );
 
   const entries: AgentDirectoryEntry[] = filteredAgents.map((a: any) => ({
     id: a.id,

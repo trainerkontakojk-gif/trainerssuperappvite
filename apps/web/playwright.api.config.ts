@@ -184,6 +184,10 @@ export default defineConfig({
       testMatch: "home-attention-api.spec.ts",
     },
     {
+      name: "sidak-parallel-paging-real-backend",
+      testMatch: "sidak-parallel-paging-api.spec.ts",
+    },
+    {
       name: "home-agent-summary-real-backend",
       testMatch: "home-agent-summary-api.spec.ts",
     },

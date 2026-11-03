@@ -40,11 +40,10 @@ sidakDashboard.get("/agents", requireCapability("sidak.read"), async (c) => {
     ? parseInt(c.req.query("year")!)
     : new Date().getFullYear();
   const showAll = c.req.query("show_all") === "true";
-  const accessibleIds = await sidakService.getAccessibleAgentIds(
-    user.id,
-    profile?.role ?? "",
-  );
-  const filterScope = await resolveSidakFilterScope(c);
+  const [accessibleIds, filterScope] = await Promise.all([
+    sidakService.getAccessibleAgentIds(user.id, profile?.role ?? ""),
+    resolveSidakFilterScope(c),
+  ]);
   const result = await sidakService.getAgentDirectorySummary(
     year,
     accessibleIds ?? undefined,
