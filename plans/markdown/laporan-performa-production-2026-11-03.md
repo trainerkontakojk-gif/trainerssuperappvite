@@ -8,7 +8,18 @@ Laman yang masih lambat di production hanya Beranda (`/dashboard`) dan halaman S
 
 ## Status perbaikan (3 November 2026)
 
-Diperbaiki di kode, belum dideploy. Rencana dan bukti: [`sidak-parallel-paging.md`](sidak-parallel-paging.md).
+Dideploy ke Railway production pada 3 November 2026 pukul 05:53 UTC (commit `d8f07770`). Rencana dan bukti: [`sidak-parallel-paging.md`](sidak-parallel-paging.md).
+
+| Endpoint (browser, sesudah deploy, muat kedua) | Sebelum              | Sesudah                |
+| ---------------------------------------------- | -------------------- | ---------------------- |
+| `home/attention`                               | 1,4 sampai 2,3 detik | 0,9 detik              |
+| `sidak/dashboard/trend`                        | 1,1 sampai 1,8 detik | 0,8 detik              |
+| `sidak/agents`                                 | 1,3 detik            | 0,5 detik              |
+| `sidak/dashboard`                              | sekitar 0,8 detik    | 0,57 sampai 0,67 detik |
+| `sidak/ranking` (tidak diubah)                 | 1,5 detik            | 1,2 detik              |
+| `sidak/dashboard/forecast` di Beranda          | 1,8 detik            | 1,8 detik              |
+
+Satu sampel per endpoint; muat pertama sesudah deploy lebih lambat karena container baru.
 
 - **Data production (read-only):** `qa_temuan` 8.313 baris untuk 2026 (5.023 non-phantom), `profiler_peserta` 143, `qa_periods` 11, `qa_indicators` 78. Data ini kecil, jadi loop agregasi di memori bukan penyebab utama.
 - **Uji waktu (read-only, dari mesin developer):** membaca setahun `qa_temuan` butuh 3,39 detik bila halaman diambil berurutan, dan 0,96 detik bila empat halaman diambil bersamaan.

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-03
 
+- docs(plans): record the post-deploy production timings for the SIDAK parallel paging fix
 - perf(sidak): fetch year-wide qa_temuan pages in parallel for Beranda attention, agent directory, dashboard and trend, and load directory inputs concurrently; add real-backend E2E and the production performance report
 - fix(deps): clear GHSA-g3hv-75wg-m249 in the prod audit by moving serve-handler to minimatch 11.0.3 (with a one-line pnpm patch for its named export) and ignoring the advisory for the exceljs glob 7 / readdir-glob tree, whose minimatch 3.x/5.x lacks the vulnerable code and has no compatible upgrade
 - docs(plans): record the production apply and read-back of the search_path pin and legacy definer move migrations
