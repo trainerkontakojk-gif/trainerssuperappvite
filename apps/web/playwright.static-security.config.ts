@@ -15,6 +15,10 @@ export default defineConfig({
   reporter: "list",
   use: {
     ...devices["Desktop Chrome"],
+    // Installed Chrome stable, not the bundled Chromium: Playwright 1.64.1 bundles
+    // Chrome for Testing 156.0.8078.4, which predates Chrome's late-October
+    // security fixes. Return to the bundled build once a release ships a patched one.
+    channel: "chrome",
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",

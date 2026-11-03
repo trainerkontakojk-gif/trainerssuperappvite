@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-04
+
+- test(e2e): run browser E2E on installed Chrome stable instead of the bundled Chromium 156.0.8078.4, which predates Chrome's late-October security fixes
+
 ## 2026-11-03
 
 - docs(plans): record the production check of the SIDAK first-visit single load

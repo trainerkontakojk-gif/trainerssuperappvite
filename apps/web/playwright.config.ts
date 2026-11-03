@@ -29,7 +29,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      // Installed Chrome stable, not the bundled Chromium: Playwright 1.64.1 bundles
+      // Chrome for Testing 156.0.8078.4, which predates Chrome's late-October
+      // security fixes. Return to the bundled build once a release ships a patched one.
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
     },
   ],
   // Web dev server only, with E2E env: never the root `pnpm dev`, whose API

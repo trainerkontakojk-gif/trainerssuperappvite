@@ -18,7 +18,15 @@ export default defineConfig({
     ["json", { outputFile: "test-results/access-web.json" }],
   ],
   use: { baseURL: "http://localhost:3005", trace: "retain-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Installed Chrome stable, not the bundled Chromium: Playwright 1.64.1 bundles
+  // Chrome for Testing 156.0.8078.4, which predates Chrome's late-October
+  // security fixes. Return to the bundled build once a release ships a patched one.
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
+    },
+  ],
   webServer: {
     command: "pnpm --filter @trainers/web dev --host 127.0.0.1 --strictPort",
     url: "http://localhost:3005",
