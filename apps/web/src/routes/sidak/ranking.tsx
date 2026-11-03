@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
 import { useApi } from "../../hooks/useApi";
 import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
@@ -8,6 +8,7 @@ import {
   SidakScopeLine,
 } from "../../components/sidak/SidakPageHeader";
 import { SIDAK_ALL_TEAMS, useSidakScope } from "../../hooks/useSidakScope";
+import { useSidakDefaultTeam } from "../../hooks/useSidakDefaultTeam";
 import {
   buildSidakFolderSelectGroups,
   findPrimarySidakFolderByName,
@@ -79,7 +80,6 @@ export default function SidakRankingPage() {
     [setScope],
   );
   const [sortKey, setSortKey] = useState<SortKey>("defects");
-  const initialFolderSetRef = useRef(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -92,9 +92,12 @@ export default function SidakRankingPage() {
     return p.toString();
   }, [selectedService, startMonth, endMonth, selectedYear, selectedFolder]);
 
-  const { data, loading } = useApi<RankingResponse>(
-    `/sidak/ranking?${queryParams}`,
+  const teamReady = useSidakDefaultTeam(scope, setScope);
+  const { data, loading: dataLoading } = useApi<RankingResponse>(
+    teamReady ? `/sidak/ranking?${queryParams}` : null,
   );
+  // Memilih tim bawaan bagian dari pemuatan pertama, bukan keadaan "kosong".
+  const loading = dataLoading || !teamReady;
 
   const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>([]);
 
@@ -139,27 +142,8 @@ export default function SidakRankingPage() {
         const valid = folders.some((f) => f.id === selectedFolder);
         if (!valid) setSelectedFolder("ALL");
       }
-
-      // Default folder pairing on initial load/mount when data is fetched
-      if (!initialFolderSetRef.current && scope.tim === null) {
-        const matchedFolder = findPrimarySidakFolderByName(
-          folders,
-          DEFAULT_SERVICE_FOLDER_MAP[effectiveService],
-        );
-        if (matchedFolder) {
-          setSelectedFolder(matchedFolder.id);
-          initialFolderSetRef.current = true;
-        }
-      }
     }
-  }, [
-    allFolders,
-    selectedFolder,
-    loading,
-    effectiveService,
-    scope.tim,
-    setSelectedFolder,
-  ]);
+  }, [allFolders, selectedFolder, loading, setSelectedFolder]);
 
   const rankings = data?.rankings;
   const [exporting, setExporting] = useState(false);

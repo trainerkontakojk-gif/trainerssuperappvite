@@ -39,6 +39,7 @@ import {
   defaultSidakScope,
   useSidakScope,
 } from "../../hooks/useSidakScope";
+import { useSidakDefaultTeam } from "../../hooks/useSidakDefaultTeam";
 
 function DashboardSkeleton() {
   return (
@@ -114,7 +115,6 @@ export default function SidakDashboardPage() {
     useState<SidakBatchForecastSnapshot | null>(null);
   const [showForecastPrediction, setShowForecastPrediction] = useState(true);
   const forecastRequestId = useRef(0);
-  const initialFolderSetRef = useRef(false);
 
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -126,9 +126,17 @@ export default function SidakDashboardPage() {
     return p.toString();
   }, [selectedService, selectedFolder, selectedYear, startMonth, endMonth]);
 
-  const { data, loading, error, refetch } = useApi<DashboardData>(
-    `/sidak/dashboard?${queryParams}`,
+  const teamReady = useSidakDefaultTeam(scope, setScope);
+  const {
+    data,
+    loading: dataLoading,
+    error,
+    refetch,
+  } = useApi<DashboardData>(
+    teamReady ? `/sidak/dashboard?${queryParams}` : null,
   );
+  // Memilih tim bawaan bagian dari pemuatan pertama, bukan keadaan "kosong".
+  const loading = dataLoading || !teamReady;
 
   const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>(
     [],
@@ -334,30 +342,8 @@ export default function SidakDashboardPage() {
         const valid = folders.some((f) => f.id === selectedFolder);
         if (!valid) setSelectedFolder("ALL");
       }
-
-      // Pasangan tim bawaan hanya bila cakupan belum memilih tim; "Semua tim"
-      // yang dipilih sengaja (`tim=ALL`) tidak ditimpa.
-      if (!initialFolderSetRef.current && scope.tim === null) {
-        const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
-        const matchedFolder = findPrimarySidakFolderByName(
-          folders,
-          targetFolderName,
-        );
-        if (matchedFolder) {
-          setSelectedFolder(matchedFolder.id);
-          initialFolderSetRef.current = true;
-        }
-      }
     }
-  }, [
-    folders,
-    selectedFolder,
-    loading,
-    data,
-    selectedService,
-    scope.tim,
-    setSelectedFolder,
-  ]);
+  }, [folders, selectedFolder, loading, data, setSelectedFolder]);
 
   // Compute leader locked service
   const leaderLockedService = useMemo(() => {
@@ -379,7 +365,6 @@ export default function SidakDashboardPage() {
   }, [forecastResult]);
 
   const handleReset = useCallback(() => {
-    initialFolderSetRef.current = false;
     setScope({
       ...defaultSidakScope(),
       layanan: (leaderLockedService ?? "call") as ServiceType,

@@ -20,6 +20,7 @@ import {
   SidakScopeLine,
 } from "../../components/sidak/SidakPageHeader";
 import { SIDAK_ALL_TEAMS, useSidakScope } from "../../hooks/useSidakScope";
+import { useSidakDefaultTeam } from "../../hooks/useSidakDefaultTeam";
 import ForecastFilterBar from "../../components/sidak/forecast/ForecastFilterBar";
 import ForecastLane from "../../components/sidak/forecast/ForecastLane";
 import ForecastSummary from "../../components/sidak/forecast/ForecastSummary";
@@ -74,7 +75,6 @@ export default function SidakForecastPage() {
   );
   const forecastRequestId = useRef(0);
   const agentRequestId = useRef(0);
-  const initialFolderSetRef = useRef(false);
 
   const dashboardQuery = useMemo(
     () =>
@@ -88,9 +88,17 @@ export default function SidakForecastPage() {
     [selectedYear, selectedService, selectedFolder, startMonth, endMonth],
   );
 
-  const { data, loading, error, refetch } = useApi<DashboardData>(
-    `/sidak/dashboard?${dashboardQuery}`,
+  const teamReady = useSidakDefaultTeam(scope, setScope);
+  const {
+    data,
+    loading: dataLoading,
+    error,
+    refetch,
+  } = useApi<DashboardData>(
+    teamReady ? `/sidak/dashboard?${dashboardQuery}` : null,
   );
+  // Memilih tim bawaan bagian dari pemuatan pertama, bukan keadaan "kosong".
+  const loading = dataLoading || !teamReady;
 
   const normalizedFolders = useMemo(
     () => normalizeSidakFolderOptions(data?.folders ?? []),
@@ -167,18 +175,7 @@ export default function SidakForecastPage() {
         setSelectedFolder("ALL");
       }
     }
-
-    if (!initialFolderSetRef.current && scope.tim === null) {
-      const matchedFolder = findPrimarySidakFolderByName(
-        folders,
-        DEFAULT_SERVICE_FOLDER_MAP[effectiveService] ?? null,
-      );
-      if (matchedFolder) {
-        setSelectedFolder(matchedFolder.id);
-        initialFolderSetRef.current = true;
-      }
-    }
-  }, [folders, selectedFolder, effectiveService, scope.tim, setSelectedFolder]);
+  }, [folders, selectedFolder, setSelectedFolder]);
 
   const serviceForecastFilters = useMemo(
     () => ({
@@ -385,7 +382,6 @@ export default function SidakForecastPage() {
       layanan: value as ServiceType,
       tim: matchedFolder?.id ?? SIDAK_ALL_TEAMS,
     });
-    initialFolderSetRef.current = true;
   };
 
   const hasHistory =

@@ -99,3 +99,37 @@ default before the first fetch changes leaders' default or needs an API change.
 2. GREEN in `dashboard-data.ts`, `dashboard-forecast.ts`,
    `dashboard-forecast-store.ts`, and the forecast route.
 3. Regression: KPI, brief, access-scope, home-attention specs.
+
+## Batch 3 — SIDAK first visit loads once (2026-11-03, approved by Fajar)
+
+### Requirement
+
+On the first SIDAK visit of a session (`tim` unset), Dashboard, Ranking, and
+Forecast load their data for all teams, then pick the default team from that
+response's unscoped team list and load again. Fajar chose (2026-11-03) to pick
+the default from the scoped list `/sidak/folders` instead.
+
+Acceptance:
+
+1. With `tim` unset, the page resolves the default team for the current
+   service from `/sidak/folders` before its first data request, so it loads
+   once, already filtered.
+2. A default team outside that list is never chosen; with no match the page
+   loads "Semua tim" (`tim` stays unset).
+3. If `/sidak/folders` fails, the page still loads "Semua tim".
+4. With `tim` already set (URL or session), `/sidak/folders` is not requested.
+5. If a leader's service is normalized to their locked service while `tim` is
+   unset, the default is resolved again for that service.
+
+### Design
+
+`useSidakDefaultTeam(scope, setScope)` in `apps/web/src/hooks/` returns
+`ready`. While `tim` is unset it reads `/sidak/folders`, sets `tim` on a match,
+and otherwise marks the service resolved. Pages pass a `null` path to `useApi`
+until `ready`, and drop their own post-load default pairing.
+
+### Tasklist
+
+1. RED: `apps/web/e2e/sidak-first-visit.spec.ts` (hermetic).
+2. GREEN: hook plus the three pages; `/sidak/folders` mock in shared fixtures.
+3. Regression: SIDAK browser specs that open these pages.

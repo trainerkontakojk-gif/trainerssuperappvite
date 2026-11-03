@@ -966,7 +966,9 @@ test.describe("Dashboard SIDAK insights (hermetic)", () => {
     );
     expect(heatmapRequest).toContain(`year=${YEAR}`);
     expect(heatmapRequest).toContain("service_type=call");
-    expect(heatmapRequest).not.toContain("folder_ids");
+    // Tim bawaan sudah dipilih sebelum data pertama dimuat, jadi heatmap
+    // memakai tim yang sama dengan dashboard.
+    expect(heatmapRequest).toContain("folder_ids=team-call");
     expect(heatmapRequest).toContain("start_month=1");
     expect(heatmapRequest).toContain(`end_month=${new Date().getMonth() + 1}`);
     const heatmap = page.getByRole("region", { name: "Pola temuan mingguan" });

@@ -143,6 +143,20 @@ export function practiceQuotaMock(
 
 const UNLIMITED_PRACTICE_QUOTA = practiceQuotaMock();
 
+/**
+ * Daftar tim SIDAK ber-scope yang dibaca halaman SIDAK saat tim belum dipilih
+ * (`useSidakDefaultTeam`). Bawaannya "Tim Call", sama dengan daftar tim pada
+ * fixture dashboard, jadi tim bawaan halaman tetap sama.
+ */
+const SIDAK_SCOPED_TEAMS: ApiMock = {
+  method: "GET",
+  path: "/api/v1/sidak/folders",
+  body: {
+    success: true,
+    data: [{ id: "team-call", name: "Tim Call", parent_id: null }],
+  },
+};
+
 function matchesApiMock(
   mock: ApiMock,
   method: string,
@@ -175,9 +189,14 @@ export async function openHermeticShell(
     options.auth === false
       ? null
       : await installMockAuthSession(page, options.auth);
-  // Spec yang tidak menguji batas latihan melihat akun tanpa batas. Mock milik
-  // spec dicocokkan lebih dulu, jadi spec batas latihan tetap bisa menggantinya.
-  const apiMocks = [...(options.apiMocks ?? []), UNLIMITED_PRACTICE_QUOTA];
+  // Spec yang tidak menguji batas latihan melihat akun tanpa batas, dan halaman
+  // SIDAK mendapat daftar tim bawaan. Mock milik spec dicocokkan lebih dulu,
+  // jadi spec yang menguji keduanya tetap bisa menggantinya.
+  const apiMocks = [
+    ...(options.apiMocks ?? []),
+    UNLIMITED_PRACTICE_QUOTA,
+    SIDAK_SCOPED_TEAMS,
+  ];
   const expectedAssetHosts = new Set([
     ...DEFAULT_EXPECTED_ASSET_HOSTS,
     ...(options.expectedThirdPartyHosts ?? []),

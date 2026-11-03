@@ -190,5 +190,11 @@ export function forecastMocks(
       path: AGENT_FORECAST_PATH,
       body: { success: true, data: options.agents ?? agentForecast() },
     },
+    {
+      // Daftar tim ber-scope untuk tim bawaan kunjungan pertama.
+      method: "GET",
+      path: "/api/v1/sidak/folders",
+      body: { success: true, data: dashboardData().folders },
+    },
   ];
 }
