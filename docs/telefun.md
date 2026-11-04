@@ -301,9 +301,9 @@ secara durable sebelum claim.
   Jeda antarsegmen serta waktu bicara konsumen tidak masuk penyebut; durasi sesi
   tidak dipakai. Total bicara <5 detik ditolak tanpa WPM palsu: `POST /telefun/score/:id`
   membalas 422 `AGENT_SPEECH_TOO_SHORT` dengan alasan itu, dan panel Telaah
-  menampilkannya tanpa tombol analisis ulang. Antrean tetap memperlakukannya
-  seperti kegagalan lain (diambil ulang sampai batas percobaan), karena status
-  gagal belum menyimpan tanda permanen; alasan tidak bertahan setelah muat ulang.
+  menampilkannya tanpa tombol analisis ulang. Kegagalan ini ditandai permanen
+  (`scoring_failed_permanently`), jadi antrean tidak mengambilnya ulang. Alasan
+  belum bertahan setelah muat ulang.
   Segmen kosong/rusak/bertumpang tindih atau tidak berurutan juga ditolak.
 - Kata pengisi dihitung kode dengan batas kata dan pemanjangan bunyi (`eh`, `hm`,
   `em`, `anu`, `gitu`, `apa ya`, `eee`); contoh merupakan ejaan aktual unik,
