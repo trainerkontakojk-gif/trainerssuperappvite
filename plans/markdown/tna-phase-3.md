@@ -1,6 +1,6 @@
 # TNA (Training Needs Analysis) — Fase 3: Penugasan Latihan Simulasi
 
-- **Status:** DISETUJUI rev. 2 — K17, K19, K21, K22 dipilih Fajar pada 2026-11-04 (semua sesuai usulan); K18, K20, K23, K24 memakai default yang dijelaskan ke Fajar tanpa koreksi. Siap mulai T0. Belum ada kode, migrasi, atau test.
+- **Status:** DISETUJUI rev. 2 — K17, K19, K21, K22 dipilih Fajar pada 2026-11-04 (semua sesuai usulan); K18, K20, K23, K24 memakai default yang dijelaskan ke Fajar tanpa koreksi. T0 **SELESAI** 2026-11-04 (`tna-phase-3-t0-report.md`): fakta terbukti, tidak ada STOP; penyesuaian P-1–P-4 dan pertanyaan Q-1–Q-3 menunggu Fajar sebelum rev. 3 dan T1. Belum ada kode, migrasi, atau test.
 - **Tanggal rencana:** 2026-11-04.
 - **Baseline saat perencanaan:** `1b366ee9` (`main`). Mulai implementasi dari `main` terbaru di branch baru, mis. `feat/tna-phase-3`.
 - **Fondasi:** Fase 1 ([`tna-phase-1.md`](tna-phase-1.md) rev. 7) dan Fase 2 ([`tna-phase-2.md`](tna-phase-2.md) rev. 2) selesai dan sudah di produksi. Kontrak keduanya tetap berlaku kecuali disebut lain.
