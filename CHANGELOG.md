@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-04
 
+- build(web): drop the unused shadcn devDependency (run the CLI with pnpm dlx) so the unpatched deepmerge advisory leaves the lockfile
 - build(web): bump shadcn to 4.23.0, which moves to zod 4 and removes the last zod 3 copy flagged by the zod memory-exhaustion advisory
 - test(e2e): run browser E2E on installed Chrome stable instead of the bundled Chromium 156.0.8078.4, which predates Chrome's late-October security fixes
 

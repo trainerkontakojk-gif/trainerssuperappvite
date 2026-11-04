@@ -124,6 +124,8 @@ Catatan transparansi:
 
 Tidak mengklaim full audit bersih. Jangan menjalankan tooling terkait pada input/registry yang tidak dipercaya sambil menunggu penyelesaian residual. Update rutin/major tetap ditunda sesuai scope.
 
+**Pembaruan 2026-11-04:** kedua residual selesai. `shadcn` 4.23.0 pindah ke Zod ^4.2.0 sehingga lockfile hanya berisi Zod 4.6.7. Setelah itu devDependency `shadcn` dihapus dari `apps/web` karena kode app tidak meng-import-nya; CLI dijalankan sesuai kebutuhan dengan `pnpm dlx shadcn@latest add <komponen>` dari `apps/web` (tetap membaca `components.json`). deepmerge ikut keluar dari lockfile, dan `pnpm audit` hanya menyisakan entri `audit.ignore` yang sudah ditinjau.
+
 ## Evidence dan hygiene
 
 Evidence lokal: `/Users/nadindyta/.hermes/cache/scratch/trainers-security-fix-20261029/`.
