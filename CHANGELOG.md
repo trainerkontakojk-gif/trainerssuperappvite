@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-04
 
+- docs(tna): record Fajar's phase 3 decisions K17–K24 (shared practice targets, both session sources, bounded service-role read, no agent view yet)
 - docs(tna): plan phases 3–6 (simulation practice targets, leader read access, program catalog UI, effectiveness dashboard) with decisions K17–K43 for Fajar
 
 - docs(telefun): note that too-short agent speech is now marked permanent and leaves the scoring queue
