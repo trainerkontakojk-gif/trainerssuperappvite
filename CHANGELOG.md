@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-04
 
+- feat(tna): add phase 3 practice targets table, frozen practice snapshot, and guarded writers (migration 20261104120000 with paired rollback and real-backend E2E)
+
 - docs(tna): add phase 3 T0 discovery report (simulation sources, RPC body changes, daily practice limit finding)
 
 - docs(tna): record Fajar's phase 3 decisions K17–K24 (shared practice targets, both session sources, bounded service-role read, no agent view yet)

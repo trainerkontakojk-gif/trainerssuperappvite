@@ -1,6 +1,6 @@
 # TNA (Training Needs Analysis) — Fase 3: Penugasan Latihan Simulasi
 
-- **Status:** DISETUJUI rev. 2 — K17, K19, K21, K22 dipilih Fajar pada 2026-11-04 (semua sesuai usulan); K18, K20, K23, K24 memakai default yang dijelaskan ke Fajar tanpa koreksi. T0 **SELESAI** 2026-11-04 (`tna-phase-3-t0-report.md`): fakta terbukti, tidak ada STOP; penyesuaian P-1–P-4 dan pertanyaan Q-1–Q-3 menunggu Fajar sebelum rev. 3 dan T1. Belum ada kode, migrasi, atau test.
+- **Status:** DISETUJUI rev. 3 — K17, K19, K21, K22 dipilih Fajar pada 2026-11-04 (semua sesuai usulan); K18, K20, K23, K24 memakai default yang dijelaskan ke Fajar tanpa koreksi. T0 **SELESAI** 2026-11-04 (`tna-phase-3-t0-report.md`): fakta terbukti, tidak ada STOP. Rev. 3 (2026-11-04): Fajar menyetujui usulan Q-1 dan Q-2 ("Setuju, lanjut T1"); penyesuaian T0 P-1–P-4 masuk D15/D16/D19. Q-3 (query produksi) tidak dijalankan. T1 **SELESAI lokal** 2026-11-04 (`tna-phase-3-t1-report.md`): migrasi `20261104120000` + rollback; RED → GREEN 6/6, rollback menolak data lalu bersih, rollback → RED, Fase 1/2 utuh 18/18 setelah rollback, replay bersih, regresi API TNA **93/93**. Belum diterapkan ke produksi. Berikutnya T2.
 - **Tanggal rencana:** 2026-11-04.
 - **Baseline saat perencanaan:** `1b366ee9` (`main`). Mulai implementasi dari `main` terbaru di branch baru, mis. `feat/tna-phase-3`.
 - **Fondasi:** Fase 1 ([`tna-phase-1.md`](tna-phase-1.md) rev. 7) dan Fase 2 ([`tna-phase-2.md`](tna-phase-2.md) rev. 2) selesai dan sudah di produksi. Kontrak keduanya tetap berlaku kecuali disebut lain.
@@ -76,14 +76,17 @@ tna_plan_participants (kolom baru, nullable)
 
 - RLS aktif; SELECT `is_admin_or_trainer()`; `REVOKE INSERT, UPDATE, DELETE` dari `anon, authenticated`. Tidak ada `REVOKE EXECUTE` pada fungsi (bug crash Postgres, K6).
 - Trigger imutabilitas: `tna_plan_practice_targets` hanya boleh INSERT/UPDATE/DELETE bila rencana induk `draft`. `practice_snapshot` hanya boleh diisi sekali, bersamaan transisi `evaluasi → selesai` (pola penanda transaksi Fase 1).
-- Fungsi `tna_create_plan`, `tna_update_draft_plan`, `tna_complete_plan` diganti dengan `CREATE OR REPLACE` dan **signature yang sama**: target dibawa di dalam `p_plan jsonb` (`practice_targets`), snapshot progres di payload peserta yang sudah ada. Guard service-role tetap pernyataan pertama. Bila signature harus berubah → STOP S15.
+- Fungsi `tna_create_plan`, `tna_update_draft_plan`, `tna_complete_plan`, dan trigger `tna_internal.guard_participant()` diganti dengan `CREATE OR REPLACE` dan **signature yang sama** (P-2): target dibawa di dalam `p_plan jsonb` (`practice_targets`; pada update, key tidak ada = target tidak berubah, array = ganti penuh). Guard service-role tetap pernyataan pertama. Bila signature harus berubah → STOP S15.
+- **P-1:** `tna_complete_plan` menerima key opsional kelima `practice` per objek peserta: objek dengan tepat satu entri per modul target, tiap entri tepat `{ sessions, avg_score, status }` (`sessions` bilangan bulat ≥ 0, `avg_score` angka ≥ 0 atau `null`, `status` `belum_mulai|berjalan|memenuhi` yang konsisten dengan `sessions` vs `min_sessions`). Wajib bila rencana punya target, dilarang bila tidak. Payload lama 4 key tetap diterima untuk rencana tanpa target (kompatibel selama jeda migrasi → deploy). Pelanggaran → `TNA_PRACTICE_SNAPSHOT_INVALID`.
+- `guard_participant` mengecualikan `practice_snapshot` di cabang `tna.completing_plan` (sekali tulis, dari `NULL`), dan menolak perubahannya di luar cabang itu.
 - Rollback wajib berpasangan dan diuji lokal (hapus tabel/kolom, kembalikan body fungsi Fase 2).
 
 ### D16. Mesin progres (`apps/api/src/services/tna/practice.ts`)
 
 - Masukan: rencana (jendela K18, target K17) + roster (peserta + `akun_id`). Keluaran per peserta per modul: `sessions`, `avg_score` (skala asli modul, dibulatkan 1 desimal, `null` bila tidak ada), `status` K23.
 - Query per modul dengan admin client (K21), dua cabang K19, filter jendela waktu, filter sesi selesai dinilai, **paginasi penuh** (pola `agent-simulations.ts`). Sesi yang cocok di kedua cabang dihitung sekali (dedupe `id`).
-- Pakai ulang `SOURCE_CONFIG`/`getScore` dari `agent-simulations.ts` bila bisa diekstrak tanpa mengubah perilaku; jika tidak, catat di laporan T0.
+- **P-3:** sumber dan arti "selesai dinilai" mengikuti laporan T0 §1 (KETIK `review_status = completed`; PDKT `evaluation_status = completed`; Telefun `scoring_status = completed`, atau `status = completed` dengan skor bila `scoring_status` NULL). Tabel lama `results` tidak dibaca. `SOURCE_CONFIG`/`getScore`/`getReviewStatus` diekstrak dari `agent-simulations.ts` sebagai pure lift; spec detail agen SIDAK yang ada harus tetap hijau.
+- **Q-2 (disetujui):** skor Telefun tetap skala 0–10 dan ditampilkan dengan satuan ("7,4 / 10"); KETIK/PDKT "/ 100". Tidak ada konversi.
 - Tidak ada isi sesi, transkrip, atau nama konsumen di keluaran.
 
 ### D17. API (`apps/api/src/routes/tna.ts`)
@@ -104,6 +107,8 @@ Perluas `buildTnaEvaluationNarrative` (deterministik): bila ada target latihan, 
 
 - `PlanForm.tsx`: bagian **Latihan simulasi** dengan checkbox modul (pra-centang dari saran program) dan input jumlah sesi.
 - `plan.tsx`: kartu **Progres latihan** (ringkasan per modul), kolom progres di tabel peserta (mobile: baris di kartu peserta), label "Data latihan mendukung, bukan pengganti hasil QA".
+- **P-4:** kartu progres menyebut "Progres dihitung dari riwayat saat ini; sesi yang dihapus tidak terhitung".
+- **Q-1 (disetujui):** Telefun tetap bisa dipilih sebagai target. Saat dipilih, form dan kartu progres menampilkan "Sesi Telefun dijalankan trainer atas nama peserta" (agent default tidak bisa memulai Telefun, batas harian 0). Fase 3 tidak mengubah batas latihan harian atau membuat override.
 - State memuat/kosong/gagal dengan **Coba lagi**; mobile satu kolom tanpa overflow; komponen shadcn + `QaStatePanel`.
 
 ## 3. Task
