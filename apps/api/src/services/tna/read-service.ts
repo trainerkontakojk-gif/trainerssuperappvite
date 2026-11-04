@@ -18,6 +18,13 @@ import {
   computeTnaEvaluation,
   getTnaEvaluationPeriodOptions,
 } from "./evaluation";
+import {
+  computeTnaPlanPractice,
+  frozenTnaPlanPractice,
+  loadTnaPracticeTargets,
+  TnaPracticeUnavailableError,
+  unavailableTnaPlanPractice,
+} from "./practice";
 
 export async function listTnaPrograms(supabase: SupabaseClient) {
   const { data, error } = await supabase
@@ -224,9 +231,31 @@ export async function getTnaPlanDetail(
           })),
         )
       : null;
+  const practiceTargets = await loadTnaPracticeTargets(supabase, plan.id);
+  let practice: TnaPlanDetail["practice"] = null;
+  if (practiceTargets.length > 0) {
+    if (plan.status === "selesai") {
+      practice = frozenTnaPlanPractice(participants, practiceTargets);
+    } else if (plan.status === "aktif" || plan.status === "evaluasi") {
+      try {
+        practice = await computeTnaPlanPractice({
+          plan,
+          participants,
+          targets: practiceTargets,
+        });
+      } catch (error) {
+        // Bounded, user-recoverable: the rest of the plan stays readable and
+        // the UI offers a retry. Any other failure still fails the request.
+        if (!(error instanceof TnaPracticeUnavailableError)) throw error;
+        practice = unavailableTnaPlanPractice();
+      }
+    }
+  }
   return {
     plan,
     participants,
+    practice_targets: practiceTargets,
+    practice,
     evaluation: evaluationSnapshot,
     evaluation_narrative: evaluationNarrative,
     participant_evaluation: evaluation?.participants ?? frozenParticipants,

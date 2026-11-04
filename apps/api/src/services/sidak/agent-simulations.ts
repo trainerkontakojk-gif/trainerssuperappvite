@@ -2,14 +2,22 @@ import { z } from "zod";
 import {
   ketikTranscriptDurationSeconds,
   mapSimulationSubjectRowToSnapshot,
-  type MonitoringReviewStatus,
   type SidakSimulationCursor,
   type SidakSimulationModule,
   type SidakSimulationPage,
   type SidakSimulationSummary,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { normalizeReviewStatus } from "../monitoring-history-service";
+import {
+  asNumber,
+  asObject,
+  asString,
+  getReviewStatus,
+  getScore,
+  occurredAt,
+  SIMULATION_SOURCES,
+  type RawSimulationRow,
+} from "../simulations/sources";
 import { getMonitoringReviewDetail } from "../monitoring-review-service";
 
 export type { SidakSimulationCursor } from "@trainers/types";
@@ -81,34 +89,6 @@ export function compareSidakSimulationItems(
   return leftId.localeCompare(rightId);
 }
 
-type RawSimulationRow = {
-  id?: unknown;
-  user_id?: unknown;
-  date?: unknown;
-  timestamp?: unknown;
-  created_at?: unknown;
-  scenario_title?: unknown;
-  first_message_at?: unknown;
-  last_message_at?: unknown;
-  time_taken?: unknown;
-  duration_seconds?: unknown;
-  final_score?: unknown;
-  score?: unknown;
-  review_status?: unknown;
-  evaluation_status?: unknown;
-  status?: unknown;
-  scoring_status?: unknown;
-  config?: unknown;
-  scenarios?: unknown;
-  evaluation?: unknown;
-  evaluation_score?: unknown;
-  simulation_subject_type?: unknown;
-  simulation_subject_peserta_id?: unknown;
-  simulation_subject_name?: unknown;
-  simulation_subject_batch_name?: unknown;
-  simulation_subject_team?: unknown;
-};
-
 type ProfileRow = {
   id?: unknown;
   email?: unknown;
@@ -120,46 +100,24 @@ const SOURCE_CONFIG: Record<
   { table: string; timeColumn: "date" | "timestamp" | "created_at"; select: string }
 > = {
   ketik: {
-    table: "ketik_history",
-    timeColumn: "date",
+    ...SIMULATION_SOURCES.ketik,
     select:
       "id, user_id, date, scenario_title, first_message_at:messages->0->>timestamp, last_message_at:messages->-1->>timestamp, final_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
   },
   pdkt: {
-    table: "pdkt_history",
-    timeColumn: "timestamp",
+    ...SIMULATION_SOURCES.pdkt,
     select:
       "id, user_id, timestamp, created_at, scenarios:config->scenarios, evaluation_score:evaluation->score, evaluation_status, time_taken, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
   },
   telefun: {
-    table: "telefun_history",
-    timeColumn: "created_at",
+    ...SIMULATION_SOURCES.telefun,
     select:
       "id, user_id, created_at, scenario_title, duration_seconds, score, status, scoring_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
   },
 };
 
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function asNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
 }
 
 function firstScenarioTitle(config: unknown): string {
@@ -168,40 +126,6 @@ function firstScenarioTitle(config: unknown): string {
     : asArray(asObject(config).scenarios);
   const firstScenario = asObject(scenarios[0]);
   return asString(firstScenario.title) ?? "Simulasi Email";
-}
-
-function occurredAt(row: RawSimulationRow, module: SidakSimulationModule): string {
-  const value =
-    module === "ketik"
-      ? row.date
-      : module === "pdkt"
-        ? row.timestamp ?? row.created_at
-        : row.created_at;
-  return asString(value) ?? "";
-}
-
-function getScore(row: RawSimulationRow, module: SidakSimulationModule): number | null {
-  if (module === "ketik") return asNumber(row.final_score);
-  if (module === "telefun") return asNumber(row.score);
-  return asNumber(row.evaluation_score ?? asObject(row.evaluation).score);
-}
-
-function getReviewStatus(
-  row: RawSimulationRow,
-  module: SidakSimulationModule,
-): MonitoringReviewStatus {
-  if (module === "ketik") return normalizeReviewStatus(row.review_status);
-  if (module === "pdkt") return normalizeReviewStatus(row.evaluation_status);
-
-  const scoringStatus = normalizeReviewStatus(row.scoring_status);
-  if (row.scoring_status !== null && row.scoring_status !== undefined) {
-    return scoringStatus;
-  }
-
-  if (row.status === "pending") return "pending";
-  if (row.status === "active") return "processing";
-  if (row.status === "failed") return "failed";
-  return getScore(row, module) === null ? "not_started" : "completed";
 }
 
 function getDuration(
