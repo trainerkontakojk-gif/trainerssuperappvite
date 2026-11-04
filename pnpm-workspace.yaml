@@ -45,7 +45,6 @@ audit:
 allowBuilds:
   "@google/genai": true
   "core-js": true
-  ecc-universal: set this to true or false
   "esbuild": true
   "protobufjs": true
 
