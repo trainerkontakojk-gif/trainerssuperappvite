@@ -1,4 +1,4 @@
-import { Content, Modality } from "@google/genai";
+import { Content, Modality, type ThinkingLevel } from "@google/genai";
 import { randomUUID } from "crypto";
 import {
   AI_MODELS,
@@ -53,6 +53,7 @@ export async function generateGeminiContent(options: {
   responseMimeType?: string;
   responseSchema?: any;
   responseModalities?: Modality[];
+  thinkingLevel?: ThinkingLevel;
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;
@@ -103,6 +104,9 @@ export async function generateGeminiContent(options: {
               responseMimeType: options.responseMimeType,
               responseSchema: options.responseSchema,
               responseModalities: options.responseModalities,
+              ...(options.thinkingLevel
+                ? { thinkingConfig: { thinkingLevel: options.thinkingLevel } }
+                : {}),
             } as any,
           }),
           timeoutPromise,
@@ -147,6 +151,9 @@ export async function generateGeminiContent(options: {
               responseMimeType: options.responseMimeType,
               responseSchema: options.responseSchema,
               responseModalities: options.responseModalities,
+              ...(options.thinkingLevel
+                ? { thinkingConfig: { thinkingLevel: options.thinkingLevel } }
+                : {}),
             } as any,
           }),
           retryTimeout,

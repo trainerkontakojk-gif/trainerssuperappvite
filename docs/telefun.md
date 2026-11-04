@@ -268,8 +268,11 @@ secara durable sebelum claim.
 - API worker aktif bila `TELEFUN_SCORING_WORKER_ENABLED="true"`.
 - `TELEFUN_SCORING_WORKER_INTERVAL_MS` default deployment: `30000`.
 - `TELEFUN_SCORING_WORKER_BATCH_SIZE` default deployment: `5`.
-- `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` default: `300` detik; nilai
-  eksplisit harus integer `>=300` di setiap helper/runtime boundary.
+- `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` default/minimum backend:
+  `600` detik, melindungi dua panggilan Gemini berurutan (masing-masing timeout
+  180 detik) beserta persiapan/logging. Nilai eksplisit `<600` ditolak saat startup.
+  Sebelum rollout, sesuaikan override worker lama dan pastikan semua caller
+  scoring memakai lease baru; jangan menjalankan worker versi lama bersamaan.
 - Setiap claim menyimpan hash token + owner. Completion/failure/reschedule
   ditolak bila token tidak cocok, sehingga stale worker tidak dapat menimpa
   claim baru atau menyelesaikan job dua kali.
@@ -286,9 +289,38 @@ secara durable sebelum claim.
   410 setelah pensiun durable. Cache historis valid tetap dibaca tanpa perubahan;
   riwayat terminal scoring `completed` dengan cache malformed atau kosong memberi
   410 langsung tanpa RPC retirement atau mutasi.
-- `analyzeVoiceQuality()` hanya membaca audio, memanggil Gemini, dan
-  mengembalikan assessment. Persistensi hasil dilakukan oleh service scoring
-  melalui RPC completion yang token-fenced.
+- `analyzeVoiceQuality()` membaca audio agen lalu memanggil `gemini-3.8-flash`
+  dua kali berurutan: transkripsi verbatim bersegmen (`startSec`, `endSec`, `text`),
+  lalu penilaian lima indikator dengan audio plus transkrip/metrik terhitung.
+  Transkripsi memakai `thinkingLevel: LOW`, tanpa parameter temperature/sampling;
+  kata pengisi, ejaan informal, pengulangan, dan ucapan terpotong dipertahankan.
+  Durasi segmen berasal dari model, bukan forced alignment; tes hermetic tidak
+  membuktikan akurasi timestamp maupun teks pada rekaman nyata.
+- WPM = jumlah token kata Unicode / jumlah durasi bicara segmen × 60, dibulatkan.
+  Token berhubung/apostrof dihitung satu; `[tidak jelas]` dan tanda baca diabaikan.
+  Jeda antarsegmen serta waktu bicara konsumen tidak masuk penyebut; durasi sesi
+  tidak dipakai. Total bicara <5 detik ditolak dengan pesan ramah, tanpa WPM palsu.
+  Segmen kosong/rusak/bertumpang tindih atau tidak berurutan juga ditolak.
+- Kata pengisi dihitung kode dengan batas kata dan pemanjangan bunyi (`eh`, `hm`,
+  `em`, `anu`, `gitu`, `apa ya`, `eee`); contoh merupakan ejaan aktual unik,
+  maksimal 10. **Batas diketahui:** semua `gitu` dihitung sebagai pengisi,
+  termasuk pemakaian yang sebenarnya bukan pengisi. Tidak ada klasifikasi AI tambahan.
+- Kode menimpa transkrip, WPM, jumlah dan contoh pengisi dari model penilaian.
+  Skor kecepatan dibatasi ke pita 130–150 → 9–10; 120–129/151–165 → 7–8;
+  selain itu maksimal 6 (skor parah 0–3 tetap boleh). Pengisi: 0 → 9–10;
+  1–2 → 7–8; 3–6 → 4–6; >6 → 0–3. Rata-rata lima skor dihitung ulang,
+  lalu normalisasi hold yang sama diterapkan. Communication profile dibangun
+  dari angka akhir, bukan tebakan provider.
+- Kedua panggilan dicatat lewat `logAiUsage()` dengan action `voice_transcription`
+  dan `voice_assessment`, kategori review/penilaian yang sama. Transkripsi gagal
+  menghentikan penilaian tanpa fallback; error transkripsi memakai retry/backoff
+  antrean. Query worker mengecualikan kegagalan yang sudah mencapai 3 attempt
+  sebelum LIMIT, agar status failed dengan retry date null tidak memicu retry
+  tanpa henti. Retry manual tetap tersedia. Abort dan claim/capture diperiksa sebelum setiap
+  panggilan; claim yang hilang saat transkripsi tidak boleh memulai penilaian.
+- Persistensi hasil tetap melalui RPC completion yang token-fenced. Bentuk JSON
+  `voice_assessment` tidak berubah; cache historis dibaca apa adanya, sedangkan
+  penilaian baru dan **Telaah ulang** memakai alur baru.
 - `SIGTERM`/`SIGINT` menghentikan admission, menunggu claim yang sedang settle,
   dan mencoba melepaskan claim aktif secara token-fenced setelah abort atau
   deadline. Penantian claim dan RPC release masing-masing dibatasi satu lease;
@@ -313,8 +345,8 @@ secara durable sebelum claim.
   `RERUN_FAILED`, `details.previousKept`). Bila pemulihan pun gagal, worker
   mengambil klaim basi setelah lease dan menyelesaikannya dari hasil lama yang
   tersimpan.
-  Ringkasan coaching (panggilan AI kedua) berjalan setelah respons, tidak
-  ditunggu.
+  Ringkasan coaching (panggilan ketiga setelah transkripsi dan penilaian)
+  berjalan setelah respons, tidak ditunggu.
 - `GET /api/health` hanya membuktikan liveness API. Kesehatan polling worker
   perlu dibuktikan lewat log runtime bounded dan queue readback.
 

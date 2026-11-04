@@ -238,7 +238,11 @@ test.beforeAll(async () => {
         providerGate.signalEntered();
         await providerGate.response;
       }
-      return providerResponse();
+      const payload = await new Request(input, init).json();
+      const prompt =
+        payload.contents[0].parts.find((part: { text?: string }) => part.text)
+          ?.text ?? "";
+      return providerResponse(prompt);
     }
     if (
       url.origin === new URL(env.apiUrl).origin &&
@@ -564,14 +568,14 @@ test("a valid two-track capture is claimed and completed by the real worker", as
     completed: 1,
     failed: 0,
   });
-  expect(providerCalls).toBe(1);
+  expect(providerCalls).toBe(2);
   const scored = await readSession(id);
   expect(scored.recording_status).toBe("uploaded");
   expect(scored.recording_path).toBe(fullPath(id));
   expect(scored.agent_recording_path).toBe(agentPath(id));
   expect(scored.scoring_status).toBe("completed");
-  expect(scored.score).toBe(8.3);
-  expect(scored.voice_assessment).toMatchObject({ overallScore: 8.3 });
+  expect(scored.score).toBe(8.4);
+  expect(scored.voice_assessment).toMatchObject({ overallScore: 8.4 });
 });
 
 test("failed captures ahead of a due job cannot starve the unscoped production queue", async () => {
@@ -656,7 +660,7 @@ test("failed captures ahead of a due job cannot starve the unscoped production q
     { batchSize },
   );
   expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0 });
-  expect(providerCalls).toBe(1);
+  expect(providerCalls).toBe(2);
   expect((await readSession(id)).scoring_status).toBe("completed");
   expect(await Promise.all(blockedIds.map(readSession))).toEqual(before);
   // afterAll deletes only sessionIds/user/Storage created by this run and
@@ -850,13 +854,13 @@ test("worker retires old terminal jobs so valid Gemini eventually scores", async
   }
   expect(await readSession(geminiId)).toMatchObject({
     scoring_status: "completed",
-    score: 8.3,
-    voice_assessment: { overallScore: 8.3 },
+    score: 8.4,
+    voice_assessment: { overallScore: 8.4 },
   });
   expect(
     providerCalls,
-    "only the valid Gemini control may reach the provider",
-  ).toBe(1);
+    "only the valid Gemini control may reach the provider (transcription + assessment)",
+  ).toBe(2);
 });
 
 test("manual score durably retires uncached terminal history with 410", async () => {

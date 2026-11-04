@@ -16,11 +16,16 @@ export class TransientScoringError extends Error {
   }
 }
 
+export const TELEFUN_AGENT_TRANSCRIPTION_ERROR =
+  "Transkrip rekaman agen gagal dibuat.";
+
 export function classifyScoringError(error: unknown): "transient" | "permanent" {
   if (error instanceof PermanentScoringError) return "permanent";
   if (error instanceof TransientScoringError) return "transient";
 
   const msg = error instanceof Error ? error.message : String(error);
+  // A malformed/failed transcription must use the bounded queue retry path.
+  if (msg === TELEFUN_AGENT_TRANSCRIPTION_ERROR) return "transient";
   const lower = msg.toLowerCase();
 
   const permanentPatterns = [

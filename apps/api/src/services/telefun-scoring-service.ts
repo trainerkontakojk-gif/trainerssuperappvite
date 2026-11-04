@@ -28,10 +28,9 @@ export interface ScoringJob {
   claimTokenHash?: string | null;
 }
 
-/** Shared claim lease: must exceed the provider timeout (gemini-3.8-flash
- *  timeoutMs = 180s) with margin, otherwise slow jobs get reclaimed mid-call
- *  and billed twice. */
-export const TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS = 300;
+/** Shared claim lease: covers transcription + assessment (2 × 180s provider
+ *  budgets) with preparation/logging margin so slow jobs are not billed twice. */
+export const TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS = 600;
 
 /** Validate the lease at every TypeScript helper boundary, including callers
  * that bypass the environment parser. A shorter lease can reclaim a slow
@@ -645,9 +644,12 @@ export async function fetchPendingJobs(
   ).join(",");
   const retired = `or(telefun_transport.in.(openai-audio,openai-webrtc),telefun_model_id.in.(${historicalIds}),telefun_model_id.like.gpt-realtime-*)`;
   const active = `and(or(telefun_transport.is.null,telefun_transport.not.in.(openai-audio,openai-webrtc)),or(telefun_model_id.is.null,and(telefun_model_id.not.in.(${historicalIds}),telefun_model_id.not.like.gpt-realtime-*)))`;
+  // Filter exhausted failures BEFORE LIMIT: fail RPC clears the retry date, and
+  // null is otherwise due. Explicit manual scoring does not use this queue filter.
+  const retryBudget = `or(scoring_status.neq.failed,scoring_attempt_count.is.null,scoring_attempt_count.lt.${MAX_SCORING_ATTEMPTS})`;
   // Failed captures and terminal retired failures must not consume the page.
   // Preserve historical terminal rows' intentional capture-readiness bypass.
-  const eligible = `or(and(${retired},status.in.(completed,failed),or(scoring_status.neq.failed,scoring_next_attempt_at.not.is.null)),and(${active},or(recording_status.is.null,recording_status.neq.failed),recording_error.is.null))`;
+  const eligible = `or(and(${retired},status.in.(completed,failed),or(scoring_status.neq.failed,scoring_next_attempt_at.not.is.null)),and(${active},${retryBudget},or(recording_status.is.null,recording_status.neq.failed),recording_error.is.null))`;
 
   const { data, error } = await adminClient
     .from("telefun_history")

@@ -58,8 +58,11 @@ async function score(notes: Record<string, unknown>[]) {
     status: "completed",
     scoring_status: "pending",
     scenario_title: "Tagihan uji",
-    telefun_transport: "gemini-ws",
-    agent_recording_path: `${actorId}/${sessionId}/agent.webm`,
+    telefun_transport: "gemini-live",
+    recording_status: "ready",
+    recording_error: null,
+    recording_path: `${actorId}/${sessionId}/full_call.webm`,
+    agent_recording_path: `${actorId}/${sessionId}/agent_only.webm`,
     session_metrics: null,
     voice_assessment: null,
     messages,
@@ -96,8 +99,11 @@ test.beforeAll(async () => {
       res.end(Buffer.from("local-audio-fixture"));
       return;
     }
-    if (url.pathname === "/rest/v1/rpc/claim_telefun_scoring")
+    if (url.pathname === "/rest/v1/rpc/claim_telefun_scoring") {
+      row.scoring_status = "processing";
+      row.scoring_claim_token_hash = payload.p_claim_token_hash;
       return reply(true);
+    }
     if (url.pathname === "/rest/v1/rpc/complete_telefun_scoring") {
       storedAssessment = payload.p_voice_assessment;
       row.voice_assessment = storedAssessment;
@@ -152,7 +158,23 @@ test.beforeAll(async () => {
       (p: { inlineData?: unknown }) => p.inlineData,
     );
     let result: unknown = [];
-    if (isAssessment) {
+    const requestPrompt =
+      payload.contents[0].parts.find((p: { text?: string }) => p.text)?.text ??
+      "";
+    if (requestPrompt.includes("TUGAS: TRANSKRIPSI VERBATIM AGEN")) {
+      result = {
+        segments: [
+          {
+            startSec: 0,
+            endSec: 10,
+            text: messages
+              .filter((message) => message.speaker === "agent")
+              .map((message) => message.text)
+              .join(" "),
+          },
+        ],
+      };
+    } else if (isAssessment) {
       prompt = payload.contents[0].parts.find(
         (p: { text?: string }) => p.text,
       ).text;
@@ -226,12 +248,13 @@ test("scoring persists categorized repetition with both quotes and effectiveness
     quote: "Untuk dapat bisa memeriksa",
   });
   expect(storedAssessment).toEqual(assessment);
-  expect(assessment.overallScore).toBe(7.6);
+  // 21 transcribed words / 10s = 126 WPM; zero fillers clamps to 9.
+  expect(assessment.overallScore).toBe(8.2);
   expect(prompt).toContain("konfirmasi");
   expect(prompt).toContain("repetition");
   expect(prompt).toContain("effectiveness");
   expect(responseSchema).toContain("relatedQuote");
-  expect(usage).toHaveLength(2); // Existing assessment + coaching; no extra AI call.
+  expect(usage).toHaveLength(3); // Transcription + assessment + coaching; annotations add no call.
   expect(usage.every((log) => log.user_id === actorId)).toBe(true);
 });
 
@@ -275,7 +298,8 @@ test("invalid repetition evidence is discarded while necessary confirmation and 
       (note: { comparison?: unknown }) => !note.comparison,
     ),
   ).toBe(true);
-  expect(assessment.overallScore).toBe(7.6);
+  // 21 transcribed words / 10s = 126 WPM; zero fillers clamps to 9.
+  expect(assessment.overallScore).toBe(8.2);
 });
 
 test("same-line repetitions retain distinct exact offsets and the stored note list is bounded at sixteen", async () => {

@@ -185,7 +185,7 @@ Env vars (nama exact; invalid/disabled config → proses **exit non-zero** denga
 | `TELEFUN_SCORING_WORKER_ENABLED` | ya | `true` | Harus persis `"true"`; selain itu = kill switch, worker exit non-zero tanpa memproses job |
 | `TELEFUN_SCORING_WORKER_INTERVAL_MS` | ya | `30000` | Integer positif `1000..600000` |
 | `TELEFUN_SCORING_WORKER_BATCH_SIZE` | ya | `5` | Integer positif `1..50` |
-| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `300` | Integer `>=300`; claim lease RPC sekaligus deadline shutdown in-flight |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `600` | Integer `>=600`; mencakup transkripsi + assessment dan deadline shutdown in-flight |
 | `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | `9100` | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik |
 | `TELEFUN_INTERNAL_TOKEN` | bila health aktif | `<random>` | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset |
 | `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/release worker (service-role, backend-only) |
@@ -223,15 +223,19 @@ API env (nama exact):
 | `TELEFUN_SCORING_WORKER_ENABLED` | ya untuk mengaktifkan | `true` | Harus persis `"true"`; unset/selain itu membuat API tetap hidup tanpa worker |
 | `TELEFUN_SCORING_WORKER_INTERVAL_MS` | saat aktif | `30000` | Integer `1000..600000`; polling tidak overlap |
 | `TELEFUN_SCORING_WORKER_BATCH_SIZE` | saat aktif | `5` | Integer `1..50` |
-| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `300` | Lease claim dan bounded shutdown deadline; integer `>=300`, default 300 detik |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `600` | Lease claim dan bounded shutdown deadline; integer `>=600`, default 600 detik |
 | `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/persist backend-only |
 | `GEMINI_API_KEY` | ya | Gemini credential | Voice scoring Gemini; usage dicatat via `logAiUsage()` |
 
 Claim menggunakan token hash + owner. Completion, failure, dan reschedule hanya
 boleh menulis bila token claim masih cocok, sehingga worker lama yang stale
-tidak dapat menimpa hasil claim baru. Lease 300 detik memberi margin di atas
-timeout provider Gemini sekitar 180 detik. Migration fencing bersifat additive;
-tidak menghapus queue, assessment, usage log, atau recording.
+tidak dapat menimpa hasil claim baru. Lease minimum 600 detik mencakup transkripsi
+agen dan assessment berurutan (masing-masing timeout Gemini 180 detik) beserta
+margin persiapan/logging. Sebelum rollout alur dua langkah, naikkan override
+worker lama ke >=600 dan hentikan semua caller versi lama sebelum mengaktifkan
+versi baru, agar lease 300 detik dari versi lama tidak merebut job aktif.
+Tidak ada migration baru untuk alur ini; migration fencing yang sudah ada tetap
+berlaku tanpa menghapus queue, assessment, usage log, atau recording.
 
 Startup/shutdown:
 
@@ -271,7 +275,7 @@ gagal. Checklist ini adalah bukti wajib sebelum worker Railway lama dinonaktifka
       `scoring_claim_owner`, dan signature RPC tokenized via hosted readback.
 - [ ] Set API env: `TELEFUN_SCORING_WORKER_ENABLED=true`,
       `TELEFUN_SCORING_WORKER_INTERVAL_MS=30000`, `TELEFUN_SCORING_WORKER_BATCH_SIZE=5`,
-      `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS=300`, lalu redeploy/restart.
+      `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS=600`, lalu redeploy/restart.
 - [ ] Verifikasi `GET /api/health` sehat sebagai API liveness, lalu buktikan
       poll loop embedded melalui event startup, log poll/recovery bounded, dan
       queue readback; HTTP health API saja bukan bukti worker sehat.

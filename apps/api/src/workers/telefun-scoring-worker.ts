@@ -45,7 +45,7 @@ export interface ScoringWorkerDeps {
   retireHistoricalOpenAiScoring?: (sessionId: string) => Promise<boolean>;
   /** Atomic release of a just-won claim back to retryable state. Required
    *  when shutdown fires after claim but before provider admission, otherwise
-   *  the row stays processing until the 300s lease expires. */
+   *  the row stays processing until the 600s lease expires. */
   releaseClaim?: (
     sessionId: string,
     error: string,
@@ -151,7 +151,7 @@ export async function processNextBatch(
             claimTokenHash ?? null,
           );
         } catch {
-          // Release is best-effort; the 300s lease remains the backstop.
+          // Release is best-effort; the 600s lease remains the backstop.
         }
       }
       break;

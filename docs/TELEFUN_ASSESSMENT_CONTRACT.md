@@ -52,8 +52,12 @@ AI diminta memeriksa setiap dimensi, bukan memenuhi kuota kesalahan. Catatan
 mengubah skor suara atau rumus radar, dan tidak menambah panggilan AI; field
 ini dihasilkan oleh panggilan assessment yang sudah ada. Ketepatan informasi
 hanya dinilai sejauh dapat dibuktikan oleh konteks; tidak ada sumber aturan
-eksternal baru. Intonasi, artikulasi dan tempo tetap dinilai dari audio, bukan
-dari transkrip. Keandalan klasifikasi semantik tetap bergantung pada model.
+eksternal baru. Intonasi, artikulasi, dan nada emosional tetap dinilai dari audio.
+Untuk penilaian baru/Telaah ulang, transkripsi agen terpisah menjadi sumber teks,
+WPM, dan hitungan kata pengisi; detail alur/clamp/batasnya ada di
+[Scoring runtime](telefun.md#scoring-runtime). Anotasi isi tetap memakai transkrip
+dua arah `messages` dan tidak menambah panggilan tersendiri. Keandalan klasifikasi
+semantik tetap bergantung pada model.
 
 Backend mencocokkan kutipan dengan ucapan pembicara yang benar. Field opsional
 `startOffset` menyimpan posisi karakter UTF-16 pada teks asli. Untuk kategori

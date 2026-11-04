@@ -21,7 +21,7 @@
  *   TELEFUN_SCORING_WORKER_ENABLED            "true" enables; anything else exits non-zero
  *   TELEFUN_SCORING_WORKER_INTERVAL_MS        positive integer in 1000..600000 (required)
  *   TELEFUN_SCORING_WORKER_BATCH_SIZE         positive integer in 1..50 (required)
- *   TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS  positive integer (optional, default 300);
+ *   TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS  positive integer (optional, default 600);
  *                                              also the shutdown deadline for an in-flight job
  *   TELEFUN_SCORING_WORKER_HEALTH_PORT        integer in 1024..65535 (optional; enables health)
  *   TELEFUN_INTERNAL_TOKEN                    required when the health server is enabled
@@ -51,7 +51,7 @@ export const TELEFUN_SCORING_WORKER_HEALTH_PORT_MIN = 1024;
 export const TELEFUN_SCORING_WORKER_HEALTH_PORT_MAX = 65535;
 export const TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_DEFAULT =
   TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS;
-/** Hard floor: the lease must exceed the Gemini provider timeout (~180s) with
+/** Hard floor: the lease must cover both Gemini calls (2 × 180s) with
  *  margin, otherwise a slow job is reclaimed mid-call and billed twice.
  *  Explicit env values below this are rejected fail-fast. */
 export const TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_MIN =

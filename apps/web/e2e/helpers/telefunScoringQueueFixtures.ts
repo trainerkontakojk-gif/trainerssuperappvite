@@ -53,13 +53,20 @@ export const telefunQueueAssessment = {
   holdManagement: null,
 };
 
-export function telefunQueueProviderResponse(): Response {
+export function telefunQueueProviderResponse(prompt = ""): Response {
+  const result = prompt.includes("TUGAS: TRANSKRIPSI VERBATIM AGEN")
+    ? {
+        segments: [
+          { startSec: 0, endSec: 5, text: telefunQueueAssessment.transcript },
+        ],
+      }
+    : telefunQueueAssessment;
   return Response.json({
     candidates: [
       {
         content: {
           role: "model",
-          parts: [{ text: JSON.stringify(telefunQueueAssessment) }],
+          parts: [{ text: JSON.stringify(result) }],
         },
         finishReason: "STOP",
       },

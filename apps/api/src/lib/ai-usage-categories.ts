@@ -24,6 +24,7 @@ export const USAGE_ACTION_DEFINITIONS: UsageActionDefinition[] = [
   { action: "async_evaluate_agent_response", category: "review", itemKey: "pdkt_review", itemLabel: "Penilaian AI" },
   { action: "evaluate_agent_response", category: "review", itemKey: "pdkt_review", itemLabel: "Penilaian AI" },
   { action: "voice_assessment", category: "review", itemKey: "telefun_assessment", itemLabel: "Penilaian AI" },
+  { action: "voice_transcription", category: "review", itemKey: "telefun_assessment", itemLabel: "Penilaian AI" },
   { action: "replay-annotation-generation", category: "review", itemKey: "telefun_assessment", itemLabel: "Penilaian AI" },
   { action: "coaching_summary", category: "review", itemKey: "coaching_summary", itemLabel: "Coaching Summary" },
 ];

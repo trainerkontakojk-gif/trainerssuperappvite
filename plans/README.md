@@ -9,7 +9,7 @@ honor its STOP conditions, and update your row when done.
 - [PDKT Integrity & Resilience](markdown/pdkt-integrity-resilience.md) — Lane D; all eight findings fixed locally, E2E/rollback/replay/root checks complete. Commit/push to main authorized; deployment and remote migration remain outside scope.
 - [Coolify Traffic Analytics Hardening](markdown/coolify-traffic-analytics-hardening.md) — Lane D; released on `main`; Coolify log labels applied to Web/API/Telefun; production smoke on Coolify and Vercel passed.
 - [Subdomain robots.txt](markdown/subdomain-robots.md) — Lane C; `Disallow: /` robots for the API and Telefun hosts.
-- [Akurasi transkrip agen Telefun](markdown/telefun-agent-transcript-accuracy.md) — Lane C; belum dikerjakan. Transkripsi terpisah dengan `gemini-3.8-flash`, WPM/kata pengisi dihitung kode.
+- [Akurasi transkrip agen Telefun](markdown/telefun-agent-transcript-accuracy.md) — Lane D saat eksekusi; implementasi/verifikasi lokal selesai: 42 E2E, root typecheck/lint/build, dan Graphify lulus. Transkripsi terpisah dengan `gemini-3.8-flash`, WPM/kata pengisi dihitung kode; lease minimum 600 detik. Belum deploy atau uji AI nyata.
 
 Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked in Git. The git-ignored `plan/markdown/` directory is a legacy local archive; do not add new plans there.
 
