@@ -72,9 +72,10 @@ const AUTHENTICATED_ONLY_BY_DESIGN = [
 // below proves every entry returns 42501 to anon and authenticated without a
 // crash or side effect. Owners: KETIK session/review/history/assignment
 // (ketik-*-api), scenario attachment backfill, practice quota/limits, monitoring
-// Riwayat, profiler account link, end-all-logins, and Telefun OpenAI scoring
-// retirement; ketik-session, practice-quota and telefun-scoring-queue specs also
-// assert the denial themselves. Exact signatures only: any other revoked
+// Riwayat, profiler account link, end-all-logins, Telefun OpenAI scoring
+// retirement and Telefun permanent scoring failure; ketik-session,
+// practice-quota and telefun-scoring-queue specs also assert the denial
+// themselves. Exact signatures only: any other revoked
 // function still fails D5.1, and an entry that stops being revoked-from-both
 // must be removed here.
 const SERVICE_ROLE_ONLY_BY_DESIGN = [
@@ -87,6 +88,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.consume_practice_quota(uuid,text,text)",
   "public.enqueue_ketik_review(uuid,uuid,uuid,boolean)",
   "public.fail_ketik_session_response(uuid,uuid,uuid,uuid)",
+  "public.fail_telefun_scoring_permanently(uuid,text,text)",
   "public.finish_ketik_session(uuid,uuid)",
   "public.ketik_history_page(uuid,integer,text,text,timestamp with time zone,uuid)",
   "public.link_profiler_peserta_account(uuid,uuid)",

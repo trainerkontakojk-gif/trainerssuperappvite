@@ -196,9 +196,15 @@ async function ensureFailed(
   sessionId: string,
   errorMsg: string,
   claimTokenHash?: string | null,
+  permanent = false,
 ): Promise<boolean> {
   const adminClient = createAdminClient();
-  const { data, error } = await adminClient.rpc("fail_telefun_scoring", {
+  // A permanent failure also leaves the worker queue (see fetchPendingJobs);
+  // both RPCs share the same claim-token fence.
+  const rpc = permanent
+    ? "fail_telefun_scoring_permanently"
+    : "fail_telefun_scoring";
+  const { data, error } = await adminClient.rpc(rpc, {
     p_session_id: sessionId,
     p_error: errorMsg,
     p_claim_token_hash: claimTokenHash ?? null,
@@ -291,12 +297,23 @@ export async function enqueueScoring(sessionId: string): Promise<boolean> {
   return data !== false;
 }
 
+/**
+ * Persist a fenced scoring failure. Permanent errors (per
+ * `classifyScoringError`, which also honors typed scoring errors passed as
+ * `cause`) are marked so the worker queue never retries them.
+ */
 export async function failScoringJob(
   sessionId: string,
   errorMsg: string,
   claimTokenHash?: string | null,
+  cause: unknown = errorMsg,
 ): Promise<boolean> {
-  return ensureFailed(sessionId, errorMsg, claimTokenHash);
+  return ensureFailed(
+    sessionId,
+    errorMsg,
+    claimTokenHash,
+    classifyScoringError(cause) === "permanent",
+  );
 }
 
 export async function completeScoringAssessment(
@@ -517,7 +534,12 @@ export async function processScoringJob(
           error: "Scoring aborted",
         };
       }
-      await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
+      await ensureFailed(
+        job.sessionId,
+        errorMsg,
+        claimTokenHash,
+        errorType === "permanent",
+      );
       return {
         success: false,
         status: "failed",
@@ -608,7 +630,7 @@ export async function processScoringJob(
           error: "Scoring aborted",
         };
       }
-      await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
+      await ensureFailed(job.sessionId, errorMsg, claimTokenHash, true);
       return { success: false, status: "failed", error: errorMsg };
     }
 
@@ -644,9 +666,10 @@ export async function fetchPendingJobs(
   ).join(",");
   const retired = `or(telefun_transport.in.(openai-audio,openai-webrtc),telefun_model_id.in.(${historicalIds}),telefun_model_id.like.gpt-realtime-*)`;
   const active = `and(or(telefun_transport.is.null,telefun_transport.not.in.(openai-audio,openai-webrtc)),or(telefun_model_id.is.null,and(telefun_model_id.not.in.(${historicalIds}),telefun_model_id.not.like.gpt-realtime-*)))`;
-  // Filter exhausted failures BEFORE LIMIT: fail RPC clears the retry date, and
-  // null is otherwise due. Explicit manual scoring does not use this queue filter.
-  const retryBudget = `or(scoring_status.neq.failed,scoring_attempt_count.is.null,scoring_attempt_count.lt.${MAX_SCORING_ATTEMPTS})`;
+  // Filter exhausted and permanent failures BEFORE LIMIT: fail RPC clears the
+  // retry date, and null is otherwise due. Explicit manual scoring does not use
+  // this queue filter. The permanent marker is only ever true on failed rows.
+  const retryBudget = `or(scoring_status.neq.failed,scoring_attempt_count.is.null,scoring_attempt_count.lt.${MAX_SCORING_ATTEMPTS}),scoring_failed_permanently.is.false`;
   // Failed captures and terminal retired failures must not consume the page.
   // Preserve historical terminal rows' intentional capture-readiness bypass.
   const eligible = `or(and(${retired},status.in.(completed,failed),or(scoring_status.neq.failed,scoring_next_attempt_at.not.is.null)),and(${active},${retryBudget},or(recording_status.is.null,recording_status.neq.failed),recording_error.is.null))`;

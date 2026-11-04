@@ -583,6 +583,7 @@ export async function scoreRecording(
         id,
         diagnostic,
         activeClaimTokenHash,
+        error,
       );
       if (!failurePersisted) {
         return c.json(

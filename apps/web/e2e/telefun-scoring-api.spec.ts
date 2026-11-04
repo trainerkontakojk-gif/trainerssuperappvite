@@ -475,6 +475,7 @@ for (const invalid of [
     error:
       "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).",
     // The reason is the user's to act on: a new call, not a retry.
+    permanent: true,
     response: {
       status: 422,
       code: "AGENT_SPEECH_TOO_SHORT",
@@ -486,9 +487,10 @@ for (const invalid of [
   name: string;
   text: string;
   error: string;
+  permanent?: boolean;
   response?: { status: number; code: string; message: string };
 }[]) {
-  test(`transcription failure: ${invalid.name} stops assessment and retains retry state`, async () => {
+  test(`transcription failure: ${invalid.name} stops assessment and ${invalid.permanent ? "leaves" : "retains"} the retry queue`, async () => {
     transcriptionText = invalid.text;
     const id = await createSession();
     const response = await score(id);
@@ -510,16 +512,39 @@ for (const invalid of [
     expect(stored.scoring_last_error).toBe(invalid.error);
     // Manual failures have a null retry date: production treats null as due.
     // Prove actual queue eligibility rather than requiring worker-only backoff.
+    // A permanent failure must leave the queue: retrying it repeats a paid
+    // transcription that cannot succeed.
     const service =
       await import("../../api/src/services/telefun-scoring-service");
     const queued = await fetchOwnedTelefunQueueJobs(
       env,
       agent.userId,
       [id],
-      [id],
+      invalid.permanent ? [] : [id],
       service.fetchPendingJobs,
     );
-    expect(queued.map((job) => job.sessionId)).toEqual([id]);
+    expect(queued.map((job) => job.sessionId)).toEqual(
+      invalid.permanent ? [] : [id],
+    );
+    if (invalid.permanent) {
+      // An explicit user retry still runs, and a later transient failure
+      // re-enters the queue: the permanent marker does not outlive its claim.
+      transcriptionText = "{rusak";
+      const retried = await score(id);
+      expect(retried.status).toBe(500);
+      expect(providerCalls.map((call) => call.kind)).toEqual([
+        "transcription",
+        "transcription",
+      ]);
+      const requeued = await fetchOwnedTelefunQueueJobs(
+        env,
+        agent.userId,
+        [id],
+        [id],
+        service.fetchPendingJobs,
+      );
+      expect(requeued.map((job) => job.sessionId)).toEqual([id]);
+    }
     if (invalid.name === "malformed JSON") {
       const worker =
         await import("../../api/src/workers/telefun-scoring-worker");
@@ -774,4 +799,41 @@ test("worker abort during transcription does not admit assessment or persist gue
   expect(result).toMatchObject({ processed: 1, rescheduled: 1, completed: 0 });
   expect(providerCalls.map((call) => call.kind)).toEqual(["transcription"]);
   expect((await readSession(id)).voice_assessment).toBeNull();
+});
+
+test("worker permanent failure leaves the retry queue after one paid transcription", async () => {
+  transcriptionText = JSON.stringify({
+    segments: [{ startSec: 0, endSec: 4, text: "eh halo" }],
+  });
+  const id = await createSession();
+  const service =
+    await import("../../api/src/services/telefun-scoring-service");
+  const worker = await import("../../api/src/workers/telefun-scoring-worker");
+  const ownedQueue = (expected: string[]) => (limit: number) =>
+    fetchOwnedTelefunQueueJobs(
+      env,
+      agent.userId,
+      [id],
+      expected,
+      service.fetchPendingJobs,
+      limit,
+    );
+  const first = await worker.processNextBatch(
+    { ...service, fetchPendingJobs: ownedQueue([id]) },
+    { batchSize: 1 },
+  );
+  expect(first).toMatchObject({ processed: 1, failed: 1, rescheduled: 0 });
+  const stored = await readSession(id);
+  expect(stored.scoring_status).toBe("failed");
+  expect(stored.scoring_last_error).toBe(
+    "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).",
+  );
+  // Attempt budget is not exhausted (1 of 3), so only the permanent marker
+  // keeps the row out of the queue.
+  const second = await worker.processNextBatch(
+    { ...service, fetchPendingJobs: ownedQueue([]) },
+    { batchSize: 1 },
+  );
+  expect(second).toMatchObject({ processed: 0, completed: 0 });
+  expect(providerCalls.map((call) => call.kind)).toEqual(["transcription"]);
 });

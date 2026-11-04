@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261104090000_telefun_scoring_permanent_failure.sql` | Minor data loss: drops the permanent-failure marker, so those failed rows become eligible for automatic retry again (bounded by the attempt budget); revert the API first |
 | New | `rollback_20261103100000_move_legacy_unguarded_definer_functions.sql` | No data loss: moves `consume_rate_limit` and `get_service_trend_dashboard` back to `public` with anon/authenticated EXECUTE, re-exposing them to the anon key; no repo code calls either |
 | New | `rollback_20261103090000_pin_function_search_path.sql` | No data loss: unpins `search_path` on `set_updated_at()` and the production-only QA/role helpers again (advisor lint 0011 returns); no code depends on the pinned path |
 | New | `rollback_20261029150511_trainer_activities.sql` | DATA LOSS: drops trainer activity rows; revert API and web first. After the SQL, delete the bucket through Storage API only if empty; non-empty buckets and objects remain. |
