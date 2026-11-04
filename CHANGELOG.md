@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-04
 
+- docs(tna): plan phases 3–6 (simulation practice targets, leader read access, program catalog UI, effectiveness dashboard) with decisions K17–K43 for Fajar
+
 - docs(telefun): note that too-short agent speech is now marked permanent and leaves the scoring queue
 - fix(telefun): mark permanent scoring failures so the worker queue stops re-claiming them (no repeat Gemini transcription for too-short speech)
 - fix(telefun): answer too-short agent speech with 422 AGENT_SPEECH_TOO_SHORT and show the reason in Telaah instead of a generic retry prompt

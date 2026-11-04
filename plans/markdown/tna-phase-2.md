@@ -205,7 +205,9 @@ RED pertama melalui Playwright real-backend membuktikan link tersimpan dan valid
 - **S13:** Kebutuhan mengubah `uq_tna_plans_open_need` atau CHECK status (bertentangan dengan K15 usulan).
 - **S14:** Muncul kebutuhan AI, notifikasi, akses leader, atau penugasan simulasi — itu fase lain.
 
-## 7. Peta fase berikutnya (belum direncanakan rinci)
+## 7. Peta fase berikutnya
+
+Rencana rinci (draf, keputusan menunggu Fajar): [Fase 3](tna-phase-3.md), [Fase 4](tna-phase-4.md), [Fase 5](tna-phase-5.md), [Fase 6](tna-phase-6.md).
 
 | Fase | Fokus                                                                                                                          | Prasyarat / catatan                                                                                |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
