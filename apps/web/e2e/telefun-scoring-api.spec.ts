@@ -474,16 +474,34 @@ for (const invalid of [
     }),
     error:
       "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).",
+    // The reason is the user's to act on: a new call, not a retry.
+    response: {
+      status: 422,
+      code: "AGENT_SPEECH_TOO_SHORT",
+      message:
+        "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).",
+    },
   },
-]) {
+] as {
+  name: string;
+  text: string;
+  error: string;
+  response?: { status: number; code: string; message: string };
+}[]) {
   test(`transcription failure: ${invalid.name} stops assessment and retains retry state`, async () => {
     transcriptionText = invalid.text;
     const id = await createSession();
     const response = await score(id);
-    expect(response.status).toBe(500);
-    expect((await response.json()).error.message).toBe(
-      "Gagal melakukan analisis suara.",
-    );
+    const expected = invalid.response ?? {
+      status: 500,
+      code: "ANALYSIS_ERROR",
+      message: "Gagal melakukan analisis suara.",
+    };
+    expect(response.status).toBe(expected.status);
+    expect((await response.json()).error).toMatchObject({
+      code: expected.code,
+      message: expected.message,
+    });
     expect(providerCalls.map((c) => c.kind)).toEqual(["transcription"]);
     const stored = await readSession(id);
     expect(stored.voice_assessment).toBeNull();

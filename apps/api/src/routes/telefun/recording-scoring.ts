@@ -34,6 +34,7 @@ import {
 } from "../../lib/telefun-feedback";
 import { TELEFUN_OPENAI_SCORING_DISABLED_REASON } from "../../lib/telefun-openai-assessment";
 import { isTelefunCaptureScoringReady } from "../../lib/telefun-capture-readiness";
+import { TELEFUN_AGENT_SHORT_SPEECH_ERROR } from "../../lib/telefun-scoring-errors";
 import type { TelefunRecordingVariables } from "./recordings";
 
 const SCORING_STATE_SELECT =
@@ -401,6 +402,19 @@ export async function scoreRecording(
             },
           },
           503,
+        );
+      }
+
+      if (result.error === TELEFUN_AGENT_SHORT_SPEECH_ERROR) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "AGENT_SPEECH_TOO_SHORT",
+              message: TELEFUN_AGENT_SHORT_SPEECH_ERROR,
+            },
+          },
+          422,
         );
       }
 

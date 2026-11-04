@@ -14,6 +14,8 @@ interface TelefunReviewStatusProps {
   /** Saat analisis manual dimulai di halaman ini; `null` bila tidak berjalan. */
   analyzeStartedAt: number | null;
   checking: boolean;
+  /** Alasan dari server yang tidak terselesaikan dengan analisis ulang. */
+  failureReason?: string | null;
   onAnalyze: () => void;
   onCheckStatus: () => void;
 }
@@ -28,6 +30,7 @@ export function TelefunReviewStatus({
   state,
   analyzeStartedAt,
   checking,
+  failureReason,
   onAnalyze,
   onCheckStatus,
 }: TelefunReviewStatusProps) {
@@ -58,6 +61,17 @@ export function TelefunReviewStatus({
         {!analyzing && (
           <CheckButton checking={checking} onClick={onCheckStatus} />
         )}
+      </div>
+    );
+  }
+
+  if (state === "failed" && failureReason) {
+    return (
+      <div role="alert" className="flex flex-col items-start gap-3">
+        <h3 className={sectionTitle}>Analisis belum berhasil</h3>
+        <p className={bodyText}>
+          {failureReason} Lakukan panggilan baru untuk mendapat penilaian.
+        </p>
       </div>
     );
   }

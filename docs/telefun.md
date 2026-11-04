@@ -299,7 +299,11 @@ secara durable sebelum claim.
 - WPM = jumlah token kata Unicode / jumlah durasi bicara segmen × 60, dibulatkan.
   Token berhubung/apostrof dihitung satu; `[tidak jelas]` dan tanda baca diabaikan.
   Jeda antarsegmen serta waktu bicara konsumen tidak masuk penyebut; durasi sesi
-  tidak dipakai. Total bicara <5 detik ditolak dengan pesan ramah, tanpa WPM palsu.
+  tidak dipakai. Total bicara <5 detik ditolak tanpa WPM palsu: `POST /telefun/score/:id`
+  membalas 422 `AGENT_SPEECH_TOO_SHORT` dengan alasan itu, dan panel Telaah
+  menampilkannya tanpa tombol analisis ulang. Antrean tetap memperlakukannya
+  seperti kegagalan lain (diambil ulang sampai batas percobaan), karena status
+  gagal belum menyimpan tanda permanen; alasan tidak bertahan setelah muat ulang.
   Segmen kosong/rusak/bertumpang tindih atau tidak berurutan juga ditolak.
 - Kata pengisi dihitung kode dengan batas kata dan pemanjangan bunyi (`eh`, `hm`,
   `em`, `anu`, `gitu`, `apa ya`, `eee`); contoh merupakan ejaan aktual unik,

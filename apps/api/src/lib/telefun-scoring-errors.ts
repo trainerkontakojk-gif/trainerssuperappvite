@@ -19,6 +19,10 @@ export class TransientScoringError extends Error {
 export const TELEFUN_AGENT_TRANSCRIPTION_ERROR =
   "Transkrip rekaman agen gagal dibuat.";
 
+/** Shown to the user as-is: the remedy is a new call, not another analysis. */
+export const TELEFUN_AGENT_SHORT_SPEECH_ERROR =
+  "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).";
+
 export function classifyScoringError(error: unknown): "transient" | "permanent" {
   if (error instanceof PermanentScoringError) return "permanent";
   if (error instanceof TransientScoringError) return "transient";

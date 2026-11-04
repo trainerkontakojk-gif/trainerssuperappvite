@@ -1301,6 +1301,43 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("rekaman agen terlalu pendek: alasan tampil dan analisis ulang tidak ditawarkan", async ({
+    page,
+  }) => {
+    const reason =
+      "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).";
+    const audit = await openTelaah(page, FAILED_ROW, [
+      {
+        method: "GET",
+        path: `/api/v1/telefun/history/${FAILED_ROW.id}`,
+        body: { success: true, data: FAILED_ROW },
+      },
+      {
+        method: "POST",
+        path: `/api/v1/telefun/score/${FAILED_ROW.id}`,
+        status: 422,
+        body: {
+          success: false,
+          error: { code: "AGENT_SPEECH_TOO_SHORT", message: reason },
+        },
+      },
+    ]);
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    await result
+      .getByRole("button", { name: "Analisis ulang" })
+      .click({ timeout: 20000 });
+    const failed = result.getByRole("alert");
+    await expect(failed).toContainText(reason);
+    await expect(failed).not.toContainText("bisa dijalankan ulang");
+    await expect(
+      result.getByRole("button", { name: "Analisis ulang" }),
+    ).toHaveCount(0);
+    await waitForMockedApi(audit, [
+      `POST /api/v1/telefun/score/${FAILED_ROW.id}`,
+    ]);
+    expectHermetic(audit);
+  });
+
   test("kategori bahasa: pengulangan punya dua bukti, offset satu baris, dan tanda tumpang tindih tetap bisa dibuka", async ({
     page,
   }) => {

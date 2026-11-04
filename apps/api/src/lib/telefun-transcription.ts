@@ -4,9 +4,10 @@ import type { VoiceQualityAssessment } from "@trainers/types";
 import { TELEFUN_ASSESSMENT_MODEL } from "./ai-models";
 import { parseJsonFromModelText } from "./ai-json";
 import { generateGeminiContent } from "./gemini";
-import { TELEFUN_AGENT_TRANSCRIPTION_ERROR as TRANSCRIPTION_ERROR } from "./telefun-scoring-errors";
-const SHORT_SPEECH_ERROR =
-  "Rekaman bicara agen terlalu pendek untuk dinilai (minimal 5 detik).";
+import {
+  TELEFUN_AGENT_SHORT_SPEECH_ERROR as SHORT_SPEECH_ERROR,
+  TELEFUN_AGENT_TRANSCRIPTION_ERROR as TRANSCRIPTION_ERROR,
+} from "./telefun-scoring-errors";
 
 const transcriptionSchema = z.object({
   segments: z

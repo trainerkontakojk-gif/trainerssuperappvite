@@ -20,7 +20,7 @@ import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { withQuoteMarks } from "../../../components/simulation/quoteMarks";
 import { Button } from "../../../components/ui/button";
 import { useApi } from "../../../hooks/useApi";
-import { telefunClient, unwrapResponse } from "../../../lib/api";
+import { ApiError, telefunClient, unwrapResponse } from "../../../lib/api";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import { notify } from "../../../lib/toast";
 import { useAuthStore } from "../../../store/authStore";
@@ -157,6 +157,9 @@ export function TelefunReviewStage({
   const [rerunStartedAt, setRerunStartedAt] = useState<number | null>(null);
   const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(null);
   const [rerunFailed, setRerunFailed] = useState(false);
+  const [analyzeFailureReason, setAnalyzeFailureReason] = useState<
+    string | null
+  >(null);
   // Dialog di atas lapisan `fixed z-[100]` harus dirender di dalamnya.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
   const [reviewVisible, setReviewVisible] = useState(true);
@@ -323,6 +326,7 @@ export function TelefunReviewStage({
 
   const analyze = async () => {
     setAnalyzeStartedAt(Date.now());
+    setAnalyzeFailureReason(null);
     try {
       const response = await unwrapResponse(
         await telefunClient.score[":id"].$post({
@@ -352,6 +356,12 @@ export function TelefunReviewStage({
       if (status === "pending" || status === "processing") {
         onRecordChange({ ...record, scoringStatus: status });
         onWatchScoring(record.id);
+      } else if (
+        error instanceof ApiError &&
+        error.code === "AGENT_SPEECH_TOO_SHORT"
+      ) {
+        onRecordChange({ ...record, scoringStatus: "failed" });
+        setAnalyzeFailureReason(error.message);
       } else {
         onRecordChange({ ...record, scoringStatus: "failed" });
         notify.error("Analisis belum berhasil. Coba lagi beberapa saat lagi.");
@@ -741,6 +751,7 @@ export function TelefunReviewStage({
                 state={state}
                 analyzeStartedAt={analyzeStartedAt}
                 checking={checking}
+                failureReason={analyzeFailureReason}
                 onAnalyze={() => void analyze()}
                 onCheckStatus={() => void checkStatus()}
               />
