@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-04
 
+- docs(plans): plan a separate Gemini transcription pass for Telefun agent audio, with code-computed WPM and filler counts
 - chore(deps): drop the stale ecc-universal allowBuilds placeholder that pnpm removed; the package is not in the lockfile
 - build(web): drop the unused shadcn devDependency (run the CLI with pnpm dlx) so the unpatched deepmerge advisory leaves the lockfile
 - build(web): bump shadcn to 4.23.0, which moves to zod 4 and removes the last zod 3 copy flagged by the zod memory-exhaustion advisory
