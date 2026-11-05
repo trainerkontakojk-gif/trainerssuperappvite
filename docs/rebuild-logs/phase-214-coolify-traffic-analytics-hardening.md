@@ -64,3 +64,11 @@ The VPS is a SumoPod (Tencent Cloud, ap-jakarta) instance with no provider secur
 - SSH: `/etc/ssh/sshd_config.d/01-hardening.conf` (read before `50-cloud-init.conf`) sets `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`; applied with `systemctl reload ssh`. Before the change, the log showed about 17,900 failed SSH logins in 7 days. Coolify still logs in as root with its key (`Accepted publickey for root from 10.0.1.8`), and the server shows Ready. External check: `ubuntu` key login works; password and keyboard-interactive logins for `ubuntu` and `root` return `Permission denied (publickey)`.
 - Rollback: `systemctl disable --now coolify-panel-firewall.service` and delete the two `DOCKER-USER` rules; remove `01-hardening.conf`, run `sshd -t`, then `systemctl reload ssh`.
 - Port 80 is unreachable from the internet (provider side), so plain-HTTP requests do not redirect; HTTPS is unaffected.
+
+## GitHub App webhook moved to HTTPS (2026-11-05)
+
+Blocking port 8000 also cut off Coolify auto-deploys: the GitHub App `coolify-trainerssuperapp-fajar` (owned by the `trainerkontakojk-gif` account that owns the repo) still pointed at `http://43.173.8.224:8000`. Every push after about 2026-10-30 failed with "failed to connect to host", so Web stayed on `6cde206` and API/Telefun on `a51fb44` while Vercel kept deploying. Watch Paths were not the cause.
+
+- Fix: the App's Homepage, Callback, Setup, and Webhook URLs now use `https://coolify.trainerssuperapp.my.id` (webhook `/webhooks/source/github/events`); the webhook secret is unchanged.
+- Check: redelivering the `aa281c32` push returned success, and Coolify started a Webhook deploy of Web only, as its Watch Paths expect.
+- If the panel domain or proxy changes again, update the App URLs too: GitHub → `trainerkontakojk-gif` → Settings → Developer settings → GitHub Apps → `coolify-trainerssuperapp-fajar` (sudo verification required), and check Advanced → Recent Deliveries.

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-05
 
+- docs(ops): record moving the Coolify GitHub App webhook to the HTTPS panel after the port 8000 block stopped auto-deploys
+
 - fix(sidak): open agent detail on the agent's latest audit service for the year instead of a carried-over SIDAK scope service, so transferred agents show their newest service and a carried service with no audits no longer lands on an empty state
 
 ## 2026-11-04
