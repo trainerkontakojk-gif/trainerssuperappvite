@@ -61,8 +61,8 @@ function isServiceType(value: string): value is ServiceType {
 
 export default function SidakAgentDetailPage() {
   const { id } = useParams({ from: "/sidak/agents/$id" });
-  // Tahun, layanan, dan rentang tren mengikuti cakupan bersama SIDAK, dan
-  // perubahan di sini ikut menulisnya kembali.
+  // Tahun dan rentang tren mengikuti cakupan bersama SIDAK. Layanan selalu
+  // dibuka di layanan terbaru agen; perubahan di sini ikut ditulis kembali.
   const { explicit: explicitScope, setScope } = useSidakScope();
   const [initialScope] = useState(() => ({
     year: explicitScope.tahun,
@@ -429,7 +429,11 @@ export default function SidakAgentDetailPage() {
                 {monthlySummaries.length === 0 ? (
                   <QaStatePanel
                     type="empty"
-                    title={`Belum ada audit ${serviceLabel} di ${selectedYear}`}
+                    title={
+                      selectedService
+                        ? `Belum ada audit ${serviceLabel} di ${selectedYear}`
+                        : `Belum ada audit di ${selectedYear}`
+                    }
                     description="Pilih tahun atau layanan lain, atau tambahkan audit lewat Input Audit."
                   />
                 ) : (

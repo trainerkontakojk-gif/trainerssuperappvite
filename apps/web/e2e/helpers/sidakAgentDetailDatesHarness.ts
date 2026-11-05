@@ -182,9 +182,10 @@ export type OpenAgentOptions = {
   >;
   /**
    * Ganti payload `AgentDetailData` default. Dipakai spec tata letak yang
-   * butuh beberapa bulan, tiket, dan akar masalah sekaligus.
+   * butuh beberapa bulan, tiket, dan akar masalah sekaligus. Menerima query
+   * request supaya payload bisa mengikuti `service_type` seperti API asli.
    */
-  detailPayload?: () => unknown;
+  detailPayload?: (search: URLSearchParams) => unknown;
   /** Ganti payload quickview default (ranking + forecast). */
   quickviewPayload?: unknown;
   /** Daftar agen yang dibalas endpoint folder agents. */
@@ -268,8 +269,16 @@ export async function openAgentDetail(
     `${APP_ORIGIN}/api/v1/sidak/agents/${AGENT_ID}?*`,
     async (route) => {
       audit.mockedApi.push("agent-detail");
-      (audit.detailQueries ??= []).push(new URL(route.request().url()).search);
-      await route.fulfill(toJson({ success: true, data: detailPayload() }));
+      const requestUrl = new URL(route.request().url());
+      (audit.detailQueries ??= []).push(requestUrl.search);
+      const search = requestUrl.searchParams;
+      // API asli selalu menggemakan tahun request sebagai `initialYear`;
+      // halaman memakainya untuk membuang data sisa request tahun lain.
+      const data = {
+        ...(detailPayload(search) as Record<string, unknown>),
+        initialYear: Number(search.get("year")),
+      };
+      await route.fulfill(toJson({ success: true, data }));
     },
   );
 

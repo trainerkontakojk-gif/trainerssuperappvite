@@ -419,9 +419,14 @@ test.describe("Detail agen mengikuti cakupan bersama", () => {
       .poll(() => audit.detailQueries?.[0] ?? "")
       .toContain("year=2025");
     const first = new URLSearchParams(audit.detailQueries![0]);
-    expect(first.get("service_type")).toBe("call");
+    // Layanan awal = layanan terbaru agen, bukan layanan dari alamat: request
+    // pertama tanpa filter layanan, lalu difilter ke layanan terbaru (call).
+    expect(first.get("service_type")).toBeNull();
     expect(first.get("startMonth")).toBe("3");
     expect(first.get("endMonth")).toBe("6");
+    await expect
+      .poll(() => audit.detailQueries?.at(-1) ?? "")
+      .toContain("service_type=call");
 
     await page.getByRole("tab", { name: "Tren" }).click();
     await expect(page).toHaveURL(/tab=trend/);

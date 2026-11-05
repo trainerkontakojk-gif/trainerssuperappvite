@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-05
+
+- fix(sidak): open agent detail on the agent's latest audit service for the year instead of a carried-over SIDAK scope service, so transferred agents show their newest service and a carried service with no audits no longer lands on an empty state
+
 ## 2026-11-04
 
 - feat(tna): show live and frozen simulation practice progress on the plan detail, reading history through one bounded service-role module shared with SIDAK

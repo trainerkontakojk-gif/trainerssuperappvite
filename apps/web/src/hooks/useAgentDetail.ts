@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useApi } from "./useApi";
 import { sidakClient, unwrapResponse } from "../lib/api";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
@@ -96,6 +96,11 @@ function computeTenure(bergabungDate: string | null): string {
 /** Cakupan awal dari cakupan bersama SIDAK (URL atau sesi). */
 export interface AgentDetailScope {
   year?: number;
+  /**
+   * Layanan yang terbawa dari cakupan bersama. Tidak dipakai untuk memilih
+   * layanan (yang dibuka selalu layanan terbaru agen), hanya menandai bahwa
+   * cakupan sudah ada sehingga layanan terpilih perlu ditulis kembali.
+   */
   service?: string;
   startMonth?: number;
   endMonth?: number;
@@ -115,8 +120,20 @@ export function useAgentDetail(
   const [selectedYear, setSelectedYear] = useState(
     initial.year ?? new Date().getFullYear(),
   );
-  const [selectedService, setSelectedService] = useState(
-    initial.service ?? "",
+  // Layanan tidak diambil dari cakupan bersama: cakupan itu bisa terbawa dari
+  // halaman atau agen lain. Kosong berarti "pakai layanan terbaru agen".
+  const [selectedService, setSelectedService] = useState("");
+  // Cakupan bersama hanya ditulis bila sudah ada (alamat/sesi) atau diubah di
+  // halaman ini, supaya membuka profil tanpa cakupan tidak menambah query.
+  const hasScopeRef = useRef(
+    Object.values(initial).some((value) => value !== undefined),
+  );
+  const reportScope = useCallback(
+    (patch: AgentDetailScope) => {
+      hasScopeRef.current = true;
+      onScopeChange?.(patch);
+    },
+    [onScopeChange],
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [trendStartMonth, setTrendStartMonth] = useState(
@@ -158,17 +175,17 @@ export function useAgentDetail(
   );
   const indicators = data?.indicators;
 
-  // Init selectedService to first available service once data loads
+  // Profil dibuka di layanan audit terbaru agen pada tahun terpilih (agen yang
+  // mutasi call → chat tampil di chat). Request tanpa `service_type` membalas
+  // ringkasan semua layanan, terbaru lebih dulu. Data tahun lain adalah sisa
+  // request sebelumnya, jadi ditunggu sampai data tahun ini tiba.
   useEffect(() => {
-    if (!data || !data.periodSummaries) return;
-    if (selectedService && data.initialService !== selectedService) return;
-    const svcs = [
-      ...new Set((data.periodSummaries ?? []).map((s) => s.serviceType)),
-    ];
-    if (svcs.length === 0) return;
-    if (selectedService && (svcs as string[]).includes(selectedService)) return;
-    setSelectedService(svcs[0]);
-  }, [data, selectedService]);
+    if (selectedService || !data || data.initialYear !== selectedYear) return;
+    const latest = data.periodSummaries?.[0]?.serviceType;
+    if (!latest) return;
+    setSelectedService(latest);
+    if (hasScopeRef.current) onScopeChange?.({ service: latest });
+  }, [data, selectedService, selectedYear, onScopeChange]);
 
   const monthlySummaries = useMemo(() => {
     if (!periodSummaries) return [];
@@ -701,24 +718,27 @@ export function useAgentDetail(
 
   const handleYearChange = useCallback(
     (year: number) => {
+      if (year === selectedYear) return;
       setSelectedYear(year);
+      // Layanan terbaru dihitung ulang untuk tahun baru.
+      setSelectedService("");
       setSelectedMonth(null);
       const isCurrent = year === new Date().getFullYear();
       const endMonth = isCurrent ? new Date().getMonth() + 1 : 12;
       setTrendStartMonth(1);
       setTrendEndMonth(endMonth);
-      onScopeChange?.({ year, startMonth: 1, endMonth });
+      reportScope({ year, startMonth: 1, endMonth });
     },
-    [onScopeChange],
+    [reportScope, selectedYear],
   );
 
   const handleServiceChange = useCallback(
     (svc: string) => {
       setSelectedService(svc);
       setSelectedMonth(null);
-      onScopeChange?.({ service: svc });
+      reportScope({ service: svc });
     },
-    [onScopeChange],
+    [reportScope],
   );
 
   const handleMonthSelect = useCallback((month: number) => {
@@ -729,9 +749,9 @@ export function useAgentDetail(
     (start: number, end: number) => {
       setTrendStartMonth(start);
       setTrendEndMonth(end);
-      onScopeChange?.({ startMonth: start, endMonth: end });
+      reportScope({ startMonth: start, endMonth: end });
     },
-    [onScopeChange],
+    [reportScope],
   );
 
   const handleAgentChange = useCallback((newAgentId: string) => {
