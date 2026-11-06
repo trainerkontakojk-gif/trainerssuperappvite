@@ -6,6 +6,8 @@ import type {
   TnaMetricsSnapshot,
   TnaNeed,
   TnaPlan,
+  TnaPlanPractice,
+  TnaPracticeModule,
   TnaProgram,
 } from "@trainers/types";
 import { STABLE_TREND_PCT } from "./thresholds";
@@ -85,6 +87,28 @@ export function buildTnaNarrative(args: {
   return `${args.preview ? "Pratinjau: " : ""}${opening} ${conclusion}${s.insufficientData ? " Catatan: data periode ini belum cukup untuk kesimpulan kuat." : ""}`;
 }
 
+const practiceModuleLabels: Record<TnaPracticeModule, string> = {
+  ketik: "KETIK",
+  pdkt: "PDKT",
+  telefun: "Telefun",
+};
+
+/** D18: a participant meets the practice target only when every module is met. */
+function practiceSentence(practice: TnaPlanPractice | null | undefined) {
+  if (!practice || practice.summary.length === 0) return "";
+  if (practice.state === "unavailable")
+    return " Progres latihan simulasi belum dapat dimuat.";
+  const met = practice.participants.filter((p) =>
+    practice.summary.every(
+      ({ module }) => p.modules[module]?.status === "memenuhi",
+    ),
+  ).length;
+  const targets = practice.summary
+    .map((t) => `${practiceModuleLabels[t.module]} ${t.min_sessions} sesi`)
+    .join(", ");
+  return ` ${met} dari ${practice.participants.length} peserta memenuhi target latihan simulasi (${targets}).`;
+}
+
 /** D13: frozen population baseline; cohort deltas come from the evaluation snapshot. */
 export function buildTnaEvaluationNarrative(args: {
   baseline: TnaBaselineSnapshot;
@@ -93,6 +117,8 @@ export function buildTnaEvaluationNarrative(args: {
   period: QAPeriod;
   participantCount: number;
   preview: boolean;
+  /** D18 (phase 3): live or frozen practice progress; null when no targets. */
+  practice?: TnaPlanPractice | null;
 }): string {
   const { baseline, evaluation, plan, period, participantCount } = args;
   const population = evaluation.population;
@@ -147,5 +173,6 @@ export function buildTnaEvaluationNarrative(args: {
   const caution = population.insufficientData
     ? " Catatan: data periode evaluasi belum cukup untuk kesimpulan kuat."
     : "";
-  return `${args.preview ? "Pratinjau: " : ""}${opening} ${cohorts}${caution} Perbandingan ini indikatif, bukan bukti sebab-akibat.`;
+  const practice = practiceSentence(args.practice);
+  return `${args.preview ? "Pratinjau: " : ""}${opening} ${cohorts}${caution}${practice} Perbandingan ini indikatif, bukan bukti sebab-akibat.`;
 }

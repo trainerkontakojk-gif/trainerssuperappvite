@@ -195,42 +195,6 @@ export async function getTnaPlanDetail(
   const evaluationSnapshot =
     evaluation?.snapshot ??
     (plan.status === "selesai" ? plan.evaluation_snapshot! : null);
-  let evaluationNarrative: string | null = null;
-  if (evaluationSnapshot) {
-    if (!plan.baseline_snapshot)
-      throw new Error("Evaluation narrative requires frozen baseline");
-    // Metadata only: completed plans never read QA rows or recompute metrics.
-    const { data: evaluationPeriod, error } = await supabase
-      .from("qa_periods")
-      .select("id, month, year")
-      .eq("id", evaluationSnapshot.evaluation_period_id)
-      .single();
-    if (error) throw error;
-    evaluationNarrative = buildTnaEvaluationNarrative({
-      baseline: plan.baseline_snapshot,
-      evaluation: evaluationSnapshot,
-      plan,
-      period: evaluationPeriod,
-      participantCount: participants.length,
-      preview: plan.status === "evaluasi",
-    });
-  }
-  const frozenParticipants =
-    plan.status === "selesai"
-      ? tnaParticipantEvaluationSchema.array().parse(
-          participants.map((p) => ({
-            participant_id: p.id,
-            peserta_id: p.peserta_id,
-            baseline_findings: p.baseline_findings,
-            baseline_sessions: p.baseline_sessions ?? null,
-            baseline_sessions_source:
-              p.baseline_sessions == null ? "unavailable" : "frozen",
-            eval_findings: p.eval_findings,
-            eval_sessions: p.eval_sessions,
-            audited_in_eval: p.audited_in_eval,
-          })),
-        )
-      : null;
   const practiceTargets = await loadTnaPracticeTargets(supabase, plan.id);
   let practice: TnaPlanDetail["practice"] = null;
   if (practiceTargets.length > 0) {
@@ -251,6 +215,43 @@ export async function getTnaPlanDetail(
       }
     }
   }
+  let evaluationNarrative: string | null = null;
+  if (evaluationSnapshot) {
+    if (!plan.baseline_snapshot)
+      throw new Error("Evaluation narrative requires frozen baseline");
+    // Metadata only: completed plans never read QA rows or recompute metrics.
+    const { data: evaluationPeriod, error } = await supabase
+      .from("qa_periods")
+      .select("id, month, year")
+      .eq("id", evaluationSnapshot.evaluation_period_id)
+      .single();
+    if (error) throw error;
+    evaluationNarrative = buildTnaEvaluationNarrative({
+      baseline: plan.baseline_snapshot,
+      evaluation: evaluationSnapshot,
+      plan,
+      period: evaluationPeriod,
+      participantCount: participants.length,
+      preview: plan.status === "evaluasi",
+      practice,
+    });
+  }
+  const frozenParticipants =
+    plan.status === "selesai"
+      ? tnaParticipantEvaluationSchema.array().parse(
+          participants.map((p) => ({
+            participant_id: p.id,
+            peserta_id: p.peserta_id,
+            baseline_findings: p.baseline_findings,
+            baseline_sessions: p.baseline_sessions ?? null,
+            baseline_sessions_source:
+              p.baseline_sessions == null ? "unavailable" : "frozen",
+            eval_findings: p.eval_findings,
+            eval_sessions: p.eval_sessions,
+            audited_in_eval: p.audited_in_eval,
+          })),
+        )
+      : null;
   return {
     plan,
     participants,

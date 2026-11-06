@@ -477,4 +477,191 @@ test("completed plan shows the frozen snapshot regardless of later history chang
     { module: "ketik", min_sessions: 2, met: 1, total: 2 },
     { module: "telefun", min_sessions: 1, met: 1, total: 2 },
   ]);
+  // Keep the shared live fixture unchanged for the following tests.
+  const extra = historyIds.telefun.pop()!;
+  sql(`DELETE FROM telefun_history WHERE id=${q(extra)};`);
+});
+
+// ── T3: HTTP write contract and narrative (D17, D18) ──────────────────────
+async function apiNeed() {
+  const need = await call<TnaNeed>("/needs", "POST", {
+    service_type: "chat",
+    period_id: baselinePeriod,
+    indicator_id: fixture.ids.metricsIndicators.alpha,
+    compare_count: 2,
+    validated_cluster_id: "kurang_menggali",
+    cause_note: "Trainer memvalidasi kebutuhan latihan simulasi.",
+    gap_type: "skill",
+    outcome: "training",
+  });
+  expect(need.status).toBe(201);
+  return need.data;
+}
+function planBody(needId: string, extra: Record<string, unknown> = {}) {
+  return {
+    need_id: needId,
+    program_id: programId,
+    title: "Pelatihan dengan latihan simulasi",
+    intervention_type: "kelas",
+    start_date: `${year}-02-01`,
+    end_date: `${year}-02-02`,
+    evaluation_due_date: today,
+    target_max_rate_per_100: 1,
+    target_max_spread_pct: 10,
+    participant_peserta_ids: [p0, p1],
+    ...extra,
+  };
+}
+
+test("POST and PATCH /plans accept, validate, replace, and lock practice targets", async () => {
+  const need = await apiNeed();
+  for (const practice_targets of [
+    [{ module: "sidak", min_sessions: 2 }],
+    [
+      { module: "ketik", min_sessions: 2 },
+      { module: "ketik", min_sessions: 3 },
+    ],
+    [{ module: "ketik", min_sessions: 0 }],
+    [{ module: "ketik", min_sessions: 21 }],
+    [{ module: "ketik", min_sessions: 2.5 }],
+    [{ module: "ketik", min_sessions: 2, extra: true }],
+  ]) {
+    const bad = await call(
+      "/plans",
+      "POST",
+      planBody(need.id, { practice_targets }),
+    );
+    expect(bad.status, JSON.stringify(practice_targets)).toBe(400);
+  }
+  const created = await call(
+    "/plans",
+    "POST",
+    planBody(need.id, {
+      practice_targets: [
+        { module: "telefun", min_sessions: 1 },
+        { module: "ketik", min_sessions: 2 },
+      ],
+    }),
+  );
+  expect(created.status, JSON.stringify(created.error)).toBe(201);
+  expect((await detail(created.data.id)).practice_targets).toEqual([
+    { module: "ketik", min_sessions: 2 },
+    { module: "telefun", min_sessions: 1 },
+  ]);
+
+  const replaced = await call(`/plans/${created.data.id}`, "PATCH", {
+    expected_updated_at: created.data.updated_at,
+    practice_targets: [{ module: "pdkt", min_sessions: 4 }],
+  });
+  expect(replaced.status, JSON.stringify(replaced.error)).toBe(200);
+  expect((await detail(created.data.id)).practice_targets).toEqual([
+    { module: "pdkt", min_sessions: 4 },
+  ]);
+  // Omitting the key keeps targets.
+  const renamed = await call(`/plans/${created.data.id}`, "PATCH", {
+    expected_updated_at: replaced.data.updated_at,
+    title: "Pelatihan latihan simulasi diganti",
+  });
+  expect(renamed.status).toBe(200);
+  expect((await detail(created.data.id)).practice_targets).toHaveLength(1);
+
+  const activated = await call(`/plans/${created.data.id}/activate`, "POST", {
+    expected_updated_at: renamed.data.updated_at,
+  });
+  expect(activated.status, JSON.stringify(activated.error)).toBe(200);
+  const locked = await call(`/plans/${created.data.id}`, "PATCH", {
+    expected_updated_at: activated.data.updated_at,
+    practice_targets: [],
+  });
+  expect(locked.status).toBe(409);
+  expect(locked.error?.code).toBe("TNA_PLAN_NOT_DRAFT");
+});
+
+test("POST /complete freezes server-computed practice and the narrative reports it", async () => {
+  const need = await apiNeed();
+  const created = await call(
+    "/plans",
+    "POST",
+    planBody(need.id, {
+      practice_targets: [
+        { module: "ketik", min_sessions: 2 },
+        { module: "telefun", min_sessions: 1 },
+      ],
+    }),
+  );
+  expect(created.status, JSON.stringify(created.error)).toBe(201);
+  const activated = await call(`/plans/${created.data.id}/activate`, "POST", {
+    expected_updated_at: created.data.updated_at,
+  });
+  expect(activated.status, JSON.stringify(activated.error)).toBe(200);
+  const started = await call(
+    `/plans/${created.data.id}/start-evaluation`,
+    "POST",
+    {
+      expected_updated_at: activated.data.updated_at,
+      evaluation_period_id: evaluationPeriod,
+    },
+  );
+  expect(started.status, JSON.stringify(started.error)).toBe(200);
+
+  const preview = await detail(created.data.id);
+  const sentence =
+    "1 dari 2 peserta memenuhi target latihan simulasi (KETIK 2 sesi, Telefun 1 sesi).";
+  expect(preview.evaluation_narrative).toContain(sentence);
+  expect(preview.evaluation_narrative).toMatch(
+    /latihan simulasi \(KETIK 2 sesi, Telefun 1 sesi\)\. Perbandingan ini indikatif/,
+  );
+
+  // Clients never send progress numbers.
+  const forged = await call(`/plans/${created.data.id}/complete`, "POST", {
+    expected_updated_at: started.data.updated_at,
+    conclusion_note: "Hasil evaluasi ditinjau bersama progres latihan.",
+    follow_up: "selesai_tuntas",
+    practice: { ketik: { sessions: 99, avg_score: 100, status: "memenuhi" } },
+  });
+  expect(forged.status).toBe(400);
+
+  const completed = await call(`/plans/${created.data.id}/complete`, "POST", {
+    expected_updated_at: started.data.updated_at,
+    conclusion_note: "Hasil evaluasi ditinjau bersama progres latihan.",
+    follow_up: "selesai_tuntas",
+  });
+  expect(completed.status, JSON.stringify(completed.error)).toBe(200);
+  const frozen = await detail(created.data.id);
+  expect(frozen.practice?.state).toBe("frozen");
+  expect(frozen.practice?.participants).toEqual(
+    expectedLive(frozen.participants),
+  );
+  expect(frozen.evaluation_narrative).toContain(sentence);
+  const stored = sql(
+    `SELECT count(*) FROM tna_plan_participants WHERE plan_id=${q(created.data.id)} AND practice_snapshot IS NOT NULL;`,
+  );
+  expect(stored).toBe("2");
+});
+
+test("plans without targets keep the phase 2 narrative and completion", async () => {
+  const need = await apiNeed();
+  const created = await call("/plans", "POST", planBody(need.id));
+  expect(created.status).toBe(201);
+  const activated = await call(`/plans/${created.data.id}/activate`, "POST", {
+    expected_updated_at: created.data.updated_at,
+  });
+  const started = await call(
+    `/plans/${created.data.id}/start-evaluation`,
+    "POST",
+    {
+      expected_updated_at: activated.data.updated_at,
+      evaluation_period_id: evaluationPeriod,
+    },
+  );
+  expect(started.status).toBe(200);
+  const preview = await detail(created.data.id);
+  expect(preview.evaluation_narrative).not.toContain("latihan simulasi");
+  const completed = await call(`/plans/${created.data.id}/complete`, "POST", {
+    expected_updated_at: started.data.updated_at,
+    conclusion_note: "Hasil evaluasi ditinjau tanpa target latihan.",
+    follow_up: "selesai_tuntas",
+  });
+  expect(completed.status, JSON.stringify(completed.error)).toBe(200);
+  expect((await detail(created.data.id)).practice).toBeNull();
 });

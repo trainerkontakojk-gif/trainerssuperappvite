@@ -19,6 +19,7 @@ import { logActivity } from "../activity-log-service";
 import { computeTnaBaseline, validateTnaParticipants } from "./baseline";
 import { tnaBusinessError, throwTnaRpcError, TnaServiceError } from "./errors";
 import { findTnaNeed, loadTnaPlan } from "./read-service";
+import { computeTnaPlanPractice, loadTnaPracticeTargets } from "./practice";
 import { getTnaParameterDetail } from "./detail";
 import { computeTnaEvaluation } from "./evaluation";
 
@@ -254,6 +255,17 @@ export async function completeTnaPlan(
   );
   if (evaluation.snapshot.population.auditStatus === "no_audit")
     throw tnaBusinessError("TNA_EVALUATION_NO_AUDIT");
+  // D17/P-1: practice progress is server-computed and frozen with the
+  // evaluation. A read failure stops completion (TnaPracticeUnavailableError
+  // -> 503) instead of freezing incomplete numbers.
+  const targets = await loadTnaPracticeTargets(args.supabase, plan.id);
+  const practice =
+    targets.length > 0
+      ? await computeTnaPlanPractice({ plan, participants, targets })
+      : null;
+  const practiceByParticipant = new Map(
+    practice?.participants.map((p) => [p.participant_id, p.modules]) ?? [],
+  );
   // Snapshot and participant values are server-owned. The RPC locks/rechecks
   // the revision and verdict, then persists all fields in one transaction.
   const { data, error } = await supabaseAdmin.rpc("tna_complete_plan", {
@@ -267,6 +279,9 @@ export async function completeTnaPlan(
         audited_in_eval,
         eval_findings,
         eval_sessions,
+        ...(practice
+          ? { practice: practiceByParticipant.get(participant_id) ?? {} }
+          : {}),
       }),
     ),
     p_verdict: evaluation.snapshot.verdict,

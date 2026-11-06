@@ -229,6 +229,65 @@ const participantIds = z
     (ids) => new Set(ids).size === ids.length,
     "Peserta tidak boleh duplikat",
   );
+// Phase 3 practice targets and progress (plans/markdown/tna-phase-3.md D15-D17).
+export const tnaPracticeModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
+export type TnaPracticeModule = z.infer<typeof tnaPracticeModuleSchema>;
+export const tnaPracticeStatusSchema = z.enum([
+  "belum_mulai",
+  "berjalan",
+  "memenuhi",
+]);
+export type TnaPracticeStatus = z.infer<typeof tnaPracticeStatusSchema>;
+export const tnaPracticeTargetSchema = z
+  .object({
+    module: tnaPracticeModuleSchema,
+    min_sessions: z.number().int().min(1).max(20),
+  })
+  .strict();
+export type TnaPracticeTarget = z.infer<typeof tnaPracticeTargetSchema>;
+export const tnaPracticeEntrySchema = z
+  .object({
+    sessions: count,
+    // Native module scale: KETIK/PDKT 0-100, Telefun 0-10 (Q-2).
+    avg_score: z.number().finite().nonnegative().nullable(),
+    status: tnaPracticeStatusSchema,
+  })
+  .strict();
+export type TnaPracticeEntry = z.infer<typeof tnaPracticeEntrySchema>;
+export const tnaPracticeModulesSchema = z
+  .object({
+    ketik: tnaPracticeEntrySchema.optional(),
+    pdkt: tnaPracticeEntrySchema.optional(),
+    telefun: tnaPracticeEntrySchema.optional(),
+  })
+  .strict();
+export type TnaPracticeModules = z.infer<typeof tnaPracticeModulesSchema>;
+export interface TnaParticipantPractice {
+  participant_id: string;
+  peserta_id: string | null;
+  modules: TnaPracticeModules;
+}
+export interface TnaPracticeSummary {
+  module: TnaPracticeModule;
+  min_sessions: number;
+  met: number;
+  total: number;
+}
+export interface TnaPlanPractice {
+  /** live: computed from current history; frozen: stored at completion;
+   * unavailable: history could not be read (retryable). */
+  state: "live" | "frozen" | "unavailable";
+  participants: TnaParticipantPractice[];
+  summary: TnaPracticeSummary[];
+}
+// Whole target set; at most one entry per module (D15). Omit on PATCH to keep.
+const practiceTargets = z
+  .array(tnaPracticeTargetSchema)
+  .max(3)
+  .refine(
+    (targets) => new Set(targets.map((t) => t.module)).size === targets.length,
+    "Modul latihan tidak boleh duplikat",
+  );
 const draftFields = z.object({
   title: z.string().trim().min(5).max(160),
   intervention_type: tnaInterventionTypeSchema,
@@ -243,6 +302,7 @@ export const createTnaPlanSchema = draftFields
     need_id: z.string().uuid(),
     program_id: z.string().uuid(),
     participant_peserta_ids: participantIds,
+    practice_targets: practiceTargets.optional(),
   })
   .strict()
   .refine(
@@ -257,6 +317,7 @@ export const updateTnaDraftPlanSchema = draftFields
   .extend({
     expected_updated_at: z.string().datetime({ offset: true }),
     participant_peserta_ids: participantIds.optional(),
+    practice_targets: practiceTargets.optional(),
   })
   .strict();
 export const tnaPlanTransitionSchema = z
@@ -334,57 +395,6 @@ export const tnaPlanSchema = draftFields.extend({
   created_at: z.string().datetime({ offset: true }),
   updated_at: z.string().datetime({ offset: true }),
 });
-// Phase 3 practice targets and progress (plans/markdown/tna-phase-3.md D15-D17).
-export const tnaPracticeModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
-export type TnaPracticeModule = z.infer<typeof tnaPracticeModuleSchema>;
-export const tnaPracticeStatusSchema = z.enum([
-  "belum_mulai",
-  "berjalan",
-  "memenuhi",
-]);
-export type TnaPracticeStatus = z.infer<typeof tnaPracticeStatusSchema>;
-export const tnaPracticeTargetSchema = z
-  .object({
-    module: tnaPracticeModuleSchema,
-    min_sessions: z.number().int().min(1).max(20),
-  })
-  .strict();
-export type TnaPracticeTarget = z.infer<typeof tnaPracticeTargetSchema>;
-export const tnaPracticeEntrySchema = z
-  .object({
-    sessions: count,
-    // Native module scale: KETIK/PDKT 0-100, Telefun 0-10 (Q-2).
-    avg_score: z.number().finite().nonnegative().nullable(),
-    status: tnaPracticeStatusSchema,
-  })
-  .strict();
-export type TnaPracticeEntry = z.infer<typeof tnaPracticeEntrySchema>;
-export const tnaPracticeModulesSchema = z
-  .object({
-    ketik: tnaPracticeEntrySchema.optional(),
-    pdkt: tnaPracticeEntrySchema.optional(),
-    telefun: tnaPracticeEntrySchema.optional(),
-  })
-  .strict();
-export type TnaPracticeModules = z.infer<typeof tnaPracticeModulesSchema>;
-export interface TnaParticipantPractice {
-  participant_id: string;
-  peserta_id: string | null;
-  modules: TnaPracticeModules;
-}
-export interface TnaPracticeSummary {
-  module: TnaPracticeModule;
-  min_sessions: number;
-  met: number;
-  total: number;
-}
-export interface TnaPlanPractice {
-  /** live: computed from current history; frozen: stored at completion;
-   * unavailable: history could not be read (retryable). */
-  state: "live" | "frozen" | "unavailable";
-  participants: TnaParticipantPractice[];
-  summary: TnaPracticeSummary[];
-}
 export const tnaPlanParticipantSchema = z.object({
   id: z.string().uuid(),
   plan_id: z.string().uuid(),

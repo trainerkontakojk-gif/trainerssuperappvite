@@ -45,6 +45,7 @@ import {
   listTnaPrograms,
 } from "../services/tna/read-service";
 import { TnaServiceError } from "../services/tna/errors";
+import { TnaPracticeUnavailableError } from "../services/tna/practice";
 import { TnaPeriodNotFoundError } from "../services/tna/metrics";
 import { efek } from "./efek";
 
@@ -78,6 +79,18 @@ function tnaFailure(c: Context<{ Variables: AuthVariables }>, error: unknown) {
         },
       },
       404,
+    );
+  if (error instanceof TnaPracticeUnavailableError)
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "TNA_PRACTICE_UNAVAILABLE",
+          message:
+            "Progres latihan simulasi belum bisa dimuat. Coba lagi sebelum menyelesaikan rencana.",
+        },
+      },
+      503,
     );
   if (error instanceof TnaNoFindingsError)
     return c.json(

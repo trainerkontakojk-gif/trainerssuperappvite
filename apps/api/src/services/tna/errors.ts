@@ -64,6 +64,21 @@ const rpcErrors: Record<
     message:
       "Rencana sebelumnya harus sudah selesai, memerlukan rencana lanjutan, dan memiliki layanan serta parameter yang sama.",
   },
+  TNA_INVALID_PRACTICE_TARGETS: {
+    status: 422,
+    message:
+      "Target latihan harus KETIK, PDKT, atau Telefun, masing-masing sekali, dengan 1–20 sesi.",
+  },
+  TNA_PRACTICE_TARGETS_IMMUTABLE: {
+    status: 409,
+    message:
+      "Target latihan sudah terkunci karena rencana sudah diaktifkan. Muat ulang untuk melihat status terbaru.",
+  },
+  TNA_PRACTICE_SNAPSHOT_INVALID: {
+    status: 409,
+    message:
+      "Progres latihan tidak sesuai target rencana. Muat ulang sebelum menyelesaikan.",
+  },
   TNA_PLAN_EXISTS: {
     status: 409,
     message: "Kebutuhan ini sudah memiliki rencana terbuka.",

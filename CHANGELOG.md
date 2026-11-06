@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-06
+
+- feat(tna): accept practice targets when creating or editing a draft plan, freeze server-computed practice progress at completion, and report it in the evaluation narrative
+
 ## 2026-11-05
 
 - docs(ops): record moving the Coolify GitHub App webhook to the HTTPS panel after the port 8000 block stopped auto-deploys
