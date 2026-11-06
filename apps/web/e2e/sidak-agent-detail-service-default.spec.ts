@@ -37,7 +37,10 @@ function servicePayload(serviceForMonth: (month: number) => string) {
     const base = richAgentDetailPayload() as Record<string, unknown>;
     const requested = search.get("service_type");
     const summaries = (base.periodSummaries as Row[])
-      .map((s) => ({ ...s, serviceType: serviceForMonth(s.month as number) }))
+      .map((s): Row => ({
+        ...s,
+        serviceType: serviceForMonth(s.month as number),
+      }))
       .filter((s) => !requested || s.serviceType === requested)
       // API mengurutkan ringkasan dari periode terbaru.
       .sort((a, b) => (b.month as number) - (a.month as number));

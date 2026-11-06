@@ -8,6 +8,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 - feat(tna): accept practice targets when creating or editing a draft plan, freeze server-computed practice progress at completion, and report it in the evaluation narrative
 
+- test(sidak): type the mapped period summaries as rows in the agent-detail service-default E2E spec so the E2E typecheck passes again
+
 ## 2026-11-05
 
 - docs(ops): record moving the Coolify GitHub App webhook to the HTTPS panel after the port 8000 block stopped auto-deploys
