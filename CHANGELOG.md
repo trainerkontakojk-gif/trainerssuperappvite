@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-06
 
+- feat(tna): add the practice targets section to the plan form and a practice progress section with live, frozen, and retryable states on the plan detail
 - feat(tna): accept practice targets when creating or editing a draft plan, freeze server-computed practice progress at completion, and report it in the evaluation narrative
 
 - test(sidak): type the mapped period summaries as rows in the agent-detail service-default E2E spec so the E2E typecheck passes again

@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   createTnaPlanSchema,
   type CreateTnaPlan,
+  type TnaPracticeModule,
+  type TnaPracticeTarget,
   type TnaProgram,
 } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
@@ -9,7 +11,33 @@ import type { SimulationSubjectOption } from "../../lib/api/rpc-client";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Field, State } from "./shared";
-import { selectClass, interventionLabels } from "./utils";
+import {
+  selectClass,
+  interventionLabels,
+  practiceModuleLabels,
+  practiceModules,
+  telefunPracticeNote,
+} from "./utils";
+
+type PracticeState = Record<
+  TnaPracticeModule,
+  { on: boolean; sessions: string }
+>;
+const DEFAULT_PRACTICE_SESSIONS = "3";
+function practiceState(targets: TnaPracticeTarget[]): PracticeState {
+  return Object.fromEntries(
+    practiceModules.map((module) => {
+      const target = targets.find((t) => t.module === module);
+      return [
+        module,
+        {
+          on: Boolean(target),
+          sessions: String(target?.min_sessions ?? DEFAULT_PRACTICE_SESSIONS),
+        },
+      ];
+    }),
+  ) as PracticeState;
+}
 
 export type ParticipantOption = { id: string; name: string };
 export function PlanForm({
@@ -33,6 +61,31 @@ export function PlanForm({
   const [options, setOptions] = useState(participants);
   const [search, setSearch] = useState("");
   const [invalid, setInvalid] = useState(false);
+  // D19: new plans start from the program's suggested modules until the
+  // trainer edits the practice targets; saved plans start from their targets.
+  const programTargets = (programId: string): TnaPracticeTarget[] => {
+    const suggested =
+      programs.find((p) => p.id === programId)?.suggested_modules ?? [];
+    return practiceModules
+      .filter((module) => suggested.includes(module))
+      .map((module) => ({ module, min_sessions: 3 }));
+  };
+  const [practice, setPractice] = useState<PracticeState>(() =>
+    practiceState(
+      initial.practice_targets ?? programTargets(initial.program_id),
+    ),
+  );
+  const [practiceTouched, setPracticeTouched] = useState(false);
+  const updatePractice = (
+    module: TnaPracticeModule,
+    change: Partial<PracticeState[TnaPracticeModule]>,
+  ) => {
+    setPracticeTouched(true);
+    setPractice((current) => ({
+      ...current,
+      [module]: { ...current[module], ...change },
+    }));
+  };
   const results = useApi<SimulationSubjectOption[]>(
     search.trim().length >= 2
       ? `/profiler/peserta/options?search=${encodeURIComponent(search.trim())}`
@@ -55,6 +108,12 @@ export function PlanForm({
           target_max_rate_per_100: Number(f.get("rate")),
           target_max_spread_pct: Number(f.get("spread")),
           participant_peserta_ids: selected,
+          practice_targets: practiceModules
+            .filter((module) => practice[module].on)
+            .map((module) => ({
+              module,
+              min_sessions: Number(practice[module].sessions),
+            })),
         });
         setInvalid(!parsed.success);
         if (parsed.success) onSave(parsed.data);
@@ -68,6 +127,10 @@ export function PlanForm({
               name="program"
               defaultValue={initial.program_id}
               className={selectClass}
+              onChange={(e) => {
+                if (!practiceTouched)
+                  setPractice(practiceState(programTargets(e.target.value)));
+              }}
             >
               <option value="" disabled>
                 Pilih program
@@ -158,6 +221,62 @@ export function PlanForm({
             />
           </Field>
         </div>
+        <fieldset className="space-y-3">
+          <legend className="mb-1 text-sm font-semibold">
+            Latihan simulasi
+          </legend>
+          <p className="max-w-[70ch] text-sm text-muted-foreground">
+            Opsional. Sesi yang sudah dinilai dihitung dari tanggal mulai sampai
+            tanggal evaluasi (WIB). Target dikunci saat aktivasi.
+          </p>
+          <div className="max-w-xl divide-y divide-border border-y border-border">
+            {practiceModules.map((module) => {
+              const label = practiceModuleLabels[module];
+              const entry = practice[module];
+              return (
+                <div
+                  key={module}
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1"
+                >
+                  <label className="flex min-h-[44px] items-center gap-3 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="size-5 accent-foreground"
+                      checked={entry.on}
+                      onChange={(e) =>
+                        updatePractice(module, { on: e.target.checked })
+                      }
+                    />
+                    {label}
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-muted-foreground">
+                    Sesi minimal
+                    <Input
+                      className="h-[44px] w-20 text-foreground tabular-nums"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={20}
+                      step={1}
+                      required={entry.on}
+                      disabled={!entry.on}
+                      aria-label={`Sesi minimal ${label}`}
+                      value={entry.sessions}
+                      onChange={(e) =>
+                        updatePractice(module, { sessions: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+          {practice.telefun.on && (
+            <p className="max-w-[70ch] text-sm text-muted-foreground">
+              {telefunPracticeNote}
+            </p>
+          )}
+        </fieldset>
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-semibold">
             Peserta ({selected.length}/200)
@@ -240,9 +359,9 @@ export function PlanForm({
       </fieldset>
       {invalid && (
         <p role="alert" className="text-sm text-destructive">
-          Periksa judul (minimal 5 karakter), program, target 0–100, dan 1–200
-          peserta unik. Tanggal selesai tidak boleh sebelum mulai; evaluasi
-          harus setelah selesai.
+          Periksa judul (minimal 5 karakter), program, target 0–100, sesi
+          latihan 1–20, dan 1–200 peserta unik. Tanggal selesai tidak boleh
+          sebelum mulai; evaluasi harus setelah selesai.
         </p>
       )}
       <Button

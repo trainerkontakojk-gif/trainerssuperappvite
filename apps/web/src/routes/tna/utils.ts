@@ -4,6 +4,9 @@ import type {
   TnaFollowUp,
   TnaMetricsSnapshot,
   TnaPlanStatus,
+  TnaPracticeModule,
+  TnaPracticeStatus,
+  TnaPracticeTarget,
   TnaVerdict,
 } from "@trainers/types";
 import { unwrapResponse } from "../../lib/api/unwrap-response";
@@ -144,3 +147,34 @@ export function parameterQuery(
     compare_count: String(compare),
   }).toString();
 }
+
+// Phase 3 practice labels (plans/markdown/tna-phase-3.md D19, Q-1, Q-2).
+export const practiceModules: TnaPracticeModule[] = [
+  "ketik",
+  "pdkt",
+  "telefun",
+];
+export const practiceModuleLabels: Record<TnaPracticeModule, string> = {
+  ketik: "KETIK",
+  pdkt: "PDKT",
+  telefun: "Telefun",
+};
+export const practiceStatusLabels: Record<TnaPracticeStatus, string> = {
+  belum_mulai: "Belum mulai",
+  berjalan: "Berjalan",
+  memenuhi: "Memenuhi",
+};
+/** Native score scale per module: Telefun 0-10, KETIK/PDKT 0-100 (Q-2). */
+export const practiceScoreScale: Record<TnaPracticeModule, number> = {
+  ketik: 100,
+  pdkt: 100,
+  telefun: 10,
+};
+export const practiceTargetsText = (targets: TnaPracticeTarget[]) =>
+  targets.length === 0
+    ? "Tanpa target latihan"
+    : targets
+        .map((t) => `${practiceModuleLabels[t.module]} ${t.min_sessions} sesi`)
+        .join(", ");
+export const telefunPracticeNote =
+  "Sesi Telefun dijalankan trainer atas nama peserta, karena agent belum bisa memulai Telefun sendiri.";

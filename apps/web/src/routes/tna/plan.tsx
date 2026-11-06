@@ -20,9 +20,11 @@ import {
   number,
   interventionLabels,
   planStatusLabels,
+  practiceTargetsText,
   useTnaMutation,
   tnaResponse,
 } from "./utils";
+import { PracticeProgress } from "./Practice";
 import { PlanForm } from "./PlanForm";
 import { Evaluation } from "./Evaluation";
 import { Textarea } from "../../components/ui/textarea";
@@ -82,6 +84,7 @@ function PlanContent({
     participant_peserta_ids: d.participants.flatMap((a) =>
       a.peserta_id ? [a.peserta_id] : [],
     ),
+    practice_targets: d.practice_targets ?? [],
   };
   return (
     <div className="space-y-8">
@@ -193,6 +196,10 @@ function PlanContent({
               <dt className="text-muted-foreground">Target sebaran maksimal</dt>
               <dd>{number(p.target_max_spread_pct)}%</dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">Target latihan simulasi</dt>
+              <dd>{practiceTargetsText(d.practice_targets ?? [])}</dd>
+            </div>
           </dl>
         )}
         <h3 className="font-semibold">
@@ -220,6 +227,14 @@ function PlanContent({
           {d.narrative}
         </p>
       </section>
+      {d.practice && (d.practice_targets?.length ?? 0) > 0 && (
+        <PracticeProgress
+          practice={d.practice}
+          targets={d.practice_targets!}
+          participants={d.participants}
+          retry={reload}
+        />
+      )}
       <Evaluation detail={d} mutation={mutation} reload={reload} />
       {p.cancel_reason && (
         <p className="max-w-[70ch] whitespace-pre-wrap text-sm">
