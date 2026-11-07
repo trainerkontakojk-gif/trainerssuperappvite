@@ -13,6 +13,8 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import type { NavItem, NavModel } from "./nav-config";
+import { useNavBadge } from "./nav-badges";
+import { NavBadgeMark } from "./NavBadgeMark";
 
 interface NavListProps {
   model: NavModel;
@@ -78,6 +80,7 @@ function NavItemContent({
   item: NavItem;
   descriptionId: string;
 }) {
+  const badge = useNavBadge(item.id);
   return (
     <>
       <item.icon className="nav-icon" aria-hidden="true" />
@@ -91,6 +94,7 @@ function NavItemContent({
           </span>
         )}
       </span>
+      <NavBadgeMark badge={badge} />
     </>
   );
 }

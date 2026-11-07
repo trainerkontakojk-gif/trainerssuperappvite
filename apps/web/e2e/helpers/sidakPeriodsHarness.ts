@@ -10,6 +10,7 @@
  * auth Supabase yang dimock, dan `/api` yang ada di tabel harness. Data sintetis.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import { expect, type Page, type Route } from "@playwright/test";
 import { installMockAuthSession } from "./mockAuth";
 import { E2E_SUPABASE_URL } from "./e2eTargets";
@@ -290,6 +291,8 @@ export async function openPeriods(
     }
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 
   await page.goto("/sidak/periods", { waitUntil: "domcontentloaded" });
 }

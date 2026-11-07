@@ -295,7 +295,9 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
           ? "Kebutuhan"
           : pathname === "/tna/katalog"
             ? "Katalog program"
-            : "Rencana";
+            : pathname === "/tna/hasil"
+              ? "Hasil rencana"
+              : "Rencana";
     return [{ label: "TNA", href: "/tna" }, { label }];
   }
 

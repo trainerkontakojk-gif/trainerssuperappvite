@@ -7,6 +7,7 @@ import { isPublicRoute } from "../lib/publicRoutes";
 import { useThemeMode } from "../hooks/useThemeMode";
 import { Sidebar, AppHeader, MobileTabBar, MobileDrawer } from "./layout/index";
 import { useRouteFocus } from "./layout/useRouteFocus";
+import { NavBadgeProvider, useNavBadges } from "./layout/nav-badges";
 
 function DashboardLayoutContent() {
   const profile = useAuthStore((s) => s.profile);
@@ -19,6 +20,11 @@ function DashboardLayoutContent() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   // Halaman publik mengatur judul sendiri, tanpa shell.
   useRouteFocus(pathname, contentRef, !isPublicRoute(pathname));
+  const navBadges = useNavBadges(
+    profile?.role,
+    pathname,
+    !isPublicRoute(pathname),
+  );
 
   useEffect(() => {
     // Close mobile drawer on route change
@@ -49,73 +55,75 @@ function DashboardLayoutContent() {
   };
 
   return (
-    <div className="flex h-screen bg-background text-foreground transition-colors duration-300">
-      <a
-        href="#konten-halaman"
-        className="skip-link"
-        onClick={(event) => {
-          event.preventDefault();
-          contentRef.current?.focus();
-        }}
-      >
-        Lewati ke konten
-      </a>
-
-      {/* Sidebar */}
-      <Sidebar
-        pathname={pathname}
-        profile={profile}
-        session={session}
-        theme={theme}
-        setTheme={setTheme}
-        handleLogout={handleLogout}
-      />
-
-      {/* Main Content Area */}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(44px+env(safe-area-inset-bottom,0px))] lg:pb-0">
-        {/* Sticky Glass Header */}
-        {!pathname.startsWith("/profiler") && (
-          <AppHeader onOpenMobileMenu={() => setMobileDrawerOpen(true)} />
-        )}
-
-        {/* Scrollable Workspace Content */}
-        <section
-          ref={contentRef}
-          id="konten-halaman"
-          role="region"
-          aria-label="Konten halaman"
-          tabIndex={0}
-          className={`min-h-0 min-w-0 flex-1 overscroll-contain ${pathname === "/profiler" || pathname === "/profiler/" ? "flex flex-col overflow-hidden" : "overflow-y-auto"}`}
+    <NavBadgeProvider value={navBadges}>
+      <div className="flex h-screen bg-background text-foreground transition-colors duration-300">
+        <a
+          href="#konten-halaman"
+          className="skip-link"
+          onClick={(event) => {
+            event.preventDefault();
+            contentRef.current?.focus();
+          }}
         >
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center h-full text-gray-400">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }
+          Lewati ke konten
+        </a>
+
+        {/* Sidebar */}
+        <Sidebar
+          pathname={pathname}
+          profile={profile}
+          session={session}
+          theme={theme}
+          setTheme={setTheme}
+          handleLogout={handleLogout}
+        />
+
+        {/* Main Content Area */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-[calc(44px+env(safe-area-inset-bottom,0px))] lg:pb-0">
+          {/* Sticky Glass Header */}
+          {!pathname.startsWith("/profiler") && (
+            <AppHeader onOpenMobileMenu={() => setMobileDrawerOpen(true)} />
+          )}
+
+          {/* Scrollable Workspace Content */}
+          <section
+            ref={contentRef}
+            id="konten-halaman"
+            role="region"
+            aria-label="Konten halaman"
+            tabIndex={0}
+            className={`min-h-0 min-w-0 flex-1 overscroll-contain ${pathname === "/profiler" || pathname === "/profiler/" ? "flex flex-col overflow-hidden" : "overflow-y-auto"}`}
           >
-            <Outlet />
-          </Suspense>
-        </section>
-      </main>
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </section>
+        </main>
 
-      {/* Bottom Tab Bar — Mobile Only */}
-      <MobileTabBar
-        profile={profile}
-        onOpenDrawer={() => setMobileDrawerOpen(true)}
-      />
+        {/* Bottom Tab Bar — Mobile Only */}
+        <MobileTabBar
+          profile={profile}
+          onOpenDrawer={() => setMobileDrawerOpen(true)}
+        />
 
-      {/* Mobile drawer bottom sheet */}
-      <MobileDrawer
-        isOpen={mobileDrawerOpen}
-        onClose={() => setMobileDrawerOpen(false)}
-        profile={profile}
-        session={session}
-        theme={theme}
-        setTheme={setTheme}
-        handleLogout={handleLogout}
-      />
-    </div>
+        {/* Mobile drawer bottom sheet */}
+        <MobileDrawer
+          isOpen={mobileDrawerOpen}
+          onClose={() => setMobileDrawerOpen(false)}
+          profile={profile}
+          session={session}
+          theme={theme}
+          setTheme={setTheme}
+          handleLogout={handleLogout}
+        />
+      </div>
+    </NavBadgeProvider>
   );
 }
 

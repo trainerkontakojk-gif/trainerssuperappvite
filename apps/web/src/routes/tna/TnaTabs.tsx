@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type { EfekReportSearch } from "../../router";
 
 /**
- * TNA views: the needs/plans analysis, EFEK (training effectiveness), and
- * the program catalog (phase 5).
+ * TNA views: the needs/plans analysis, completed plan results (phase 6),
+ * EFEK (training effectiveness), and the program catalog (phase 5).
  * `efekSearch` keeps the report filters (window, team, proper input mode)
  * when the EFEK tab leads back from a program detail.
  */
@@ -11,11 +11,12 @@ export function TnaTabs({
   current,
   efekSearch,
 }: {
-  current: "kebutuhan" | "efek" | "katalog";
+  current: "kebutuhan" | "hasil" | "efek" | "katalog";
   efekSearch?: EfekReportSearch;
 }) {
   const tabs = [
     { id: "kebutuhan", to: "/tna", label: "Kebutuhan & rencana" },
+    { id: "hasil", to: "/tna/hasil", label: "Hasil rencana" },
     { id: "efek", to: "/tna/efek", label: "EFEK" },
     { id: "katalog", to: "/tna/katalog", label: "Katalog program" },
   ] as const;

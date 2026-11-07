@@ -806,6 +806,30 @@ const tnaPlanRoute = createRoute({
   component: lazy(() => import("./routes/tna/plan")),
   beforeLoad: requireCapability("tna.read"),
 });
+export type TnaResultsSearch = {
+  group?: "gap_type" | "service";
+  from?: string;
+  to?: string;
+};
+const calendarDay = (value: unknown) =>
+  typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : undefined;
+const tnaResultsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/hasil",
+  component: lazy(() => import("./routes/tna/results")),
+  beforeLoad: requireCapability("tna.read"),
+  // Program is the default grouping and stays out of the URL.
+  validateSearch: (search: Record<string, unknown>): TnaResultsSearch => ({
+    group:
+      search.group === "gap_type" || search.group === "service"
+        ? search.group
+        : undefined,
+    from: calendarDay(search.from),
+    to: calendarDay(search.to),
+  }),
+});
 const tnaCatalogRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tna/katalog",
@@ -903,6 +927,7 @@ const routeTree = rootRoute.addChildren([
   tnaNeedRoute,
   tnaPlanRoute,
   tnaCatalogRoute,
+  tnaResultsRoute,
   indexRoute,
   kegiatanRoute,
   dashboardRoute,

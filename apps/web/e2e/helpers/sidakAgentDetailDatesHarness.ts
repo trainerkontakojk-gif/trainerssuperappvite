@@ -11,6 +11,7 @@
  * allowlist jaringan tetap fail-closed seperti harness lain.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import { type Page } from "@playwright/test";
 import { mockSupabaseAuth } from "./mockAuth";
 import { E2E_SUPABASE_URL } from "./e2eTargets";
@@ -457,4 +458,6 @@ async function installGuard(page: Page, audit: AgentAudit) {
     else audit.blockedExternal.push(origin);
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 }

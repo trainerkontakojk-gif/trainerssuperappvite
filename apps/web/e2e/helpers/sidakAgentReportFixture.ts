@@ -27,6 +27,7 @@
  *   4. `resolveArtifactDir()` menolak menulis artefak di dalam repo.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import {
   expect,
   type BrowserContext,
@@ -1455,6 +1456,8 @@ async function installNetworkGuard(page: Page, audit: NetworkAudit) {
 
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 }
 
 /**

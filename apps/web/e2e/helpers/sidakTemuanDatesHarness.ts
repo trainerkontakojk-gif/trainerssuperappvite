@@ -11,6 +11,7 @@
  * database mana pun.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import { expect, type Page, type Route } from "@playwright/test";
 import { mockSupabaseAuth } from "./mockAuth";
 import { E2E_SUPABASE_URL } from "./e2eTargets";
@@ -614,6 +615,8 @@ async function installGuard(page: Page, audit: Audit) {
 
     await route.fallback();
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 }
 
 export function expectIsolation(audit: Audit, opts: { minApi?: number } = {}) {

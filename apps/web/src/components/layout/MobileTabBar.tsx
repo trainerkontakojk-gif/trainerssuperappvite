@@ -1,6 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { buildNavModel } from "./nav-config";
+import { useNavBadgeMap } from "./nav-badges";
+import { NavBadgeMark } from "./NavBadgeMark";
 
 interface MobileTabBarProps {
   profile: { role?: string } | null;
@@ -14,6 +16,7 @@ export function MobileTabBar({
   const { pathname } = useLocation();
 
   const tabs = buildNavModel(profile?.role).mobileTabs;
+  const badges = useNavBadgeMap();
 
   return (
     <nav
@@ -32,10 +35,16 @@ export function MobileTabBar({
             <Link
               key={tab.id}
               to={tab.href as any}
-              className="flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-1 transition-colors"
+              className="relative flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-2 py-1 transition-colors"
               style={{ color: active ? "var(--fg)" : "var(--fg3)" }}
             >
-              <tab.icon className="h-[18px] w-[18px]" />
+              <span className="relative">
+                <tab.icon className="h-[18px] w-[18px]" />
+                <NavBadgeMark
+                  badge={badges[tab.id]}
+                  className="nav-badge absolute -right-3 -top-1.5 h-4 min-w-4 px-1 text-[10px]"
+                />
+              </span>
               <span className="text-xs font-semibold tracking-wider">
                 {tab.label}
               </span>

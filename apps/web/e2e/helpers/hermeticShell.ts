@@ -148,6 +148,28 @@ const UNLIMITED_PRACTICE_QUOTA = practiceQuotaMock();
  * (`useSidakDefaultTeam`). Bawaannya "Tim Call", sama dengan daftar tim pada
  * fixture dashboard, jadi tim bawaan halaman tetap sama.
  */
+/**
+ * TNA phase 6 K42/P-5: the shell asks for the due plan count on every page an
+ * admin or trainer opens. Default: zero (no badge). Specs that test the badge
+ * pass their own mock first.
+ */
+export const TNA_DUE_COUNT: ApiMock = {
+  method: "GET",
+  path: "/api/v1/tna/plans/due-count",
+  body: { success: true, data: { count: 0 } },
+};
+
+/**
+ * For harnesses with their own egress guard: answer the shell's due-count
+ * request with zero. Register it AFTER the guard's catch-all route, because
+ * Playwright tries the most recently registered route first.
+ */
+export async function mockTnaDueCount(page: Page, count = 0): Promise<void> {
+  await page.route("**/api/v1/tna/plans/due-count", (route) =>
+    route.fulfill(toJson({ success: true, data: { count } })),
+  );
+}
+
 const SIDAK_SCOPED_TEAMS: ApiMock = {
   method: "GET",
   path: "/api/v1/sidak/folders",
@@ -196,6 +218,7 @@ export async function openHermeticShell(
     ...(options.apiMocks ?? []),
     UNLIMITED_PRACTICE_QUOTA,
     SIDAK_SCOPED_TEAMS,
+    TNA_DUE_COUNT,
   ];
   const expectedAssetHosts = new Set([
     ...DEFAULT_EXPECTED_ASSET_HOSTS,

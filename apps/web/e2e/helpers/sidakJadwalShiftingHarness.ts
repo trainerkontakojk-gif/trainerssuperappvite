@@ -22,6 +22,7 @@
  *      ephemeral, jadi router asli bisa diuji tanpa WFM nyata.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import { expect, type Page, type Route } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { createServer, type Server, type ServerResponse } from "node:http";
@@ -453,6 +454,8 @@ export async function installNetworkGuard(page: Page, audit: NetworkAudit) {
 
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 }
 
 export function formatAudit(audit: NetworkAudit): string {

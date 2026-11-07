@@ -112,6 +112,11 @@
     --destructive-foreground: #fafafa;
     --success: #047857; /* status naik/membaik */
     --warning: #b45309; /* status perlu perhatian */
+    /* Verdict TNA (diverging: tercapai / sebagian / tidak). Divalidasi skill
+       dataviz terhadap --bg: CVD ΔE 8,6, normal ΔE 30,9. */
+    --verdict-good: #047857;
+    --verdict-mid: #a3a3a3;
+    --verdict-bad: #dc2626;
     --input: var(--border);
     --ring: var(--fg);
 
@@ -201,6 +206,10 @@
     --destructive-foreground: #fef2f2;
     --success: #34d399;
     --warning: #fbbf24;
+    /* Verdict TNA gelap: hijau digeser ke pita terang 0,48–0,67 (CVD ΔE 8,7). */
+    --verdict-good: #0f9f6e;
+    --verdict-mid: #525252;
+    --verdict-bad: #dc2626;
     --input: var(--border);
     --ring: var(--fg);
 
@@ -410,6 +419,32 @@
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
+  }
+  /* Jumlah fungsional (mis. rencana TNA jatuh tempo), bukan dekorasi. */
+  .nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--fg);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .app-sidebar[data-collapsed="true"] .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 10px;
   }
   .nav-sub {
     overflow: hidden;

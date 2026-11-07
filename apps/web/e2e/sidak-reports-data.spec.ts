@@ -1,3 +1,4 @@
+import { mockTnaDueCount } from "./helpers/hermeticShell";
 import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
 import { createServer } from "node:http";
 import { mkdirSync } from "node:fs";
@@ -863,6 +864,8 @@ async function installNetworkGuard(page: Page, audit: NetworkAudit) {
 
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 }
 
 /**

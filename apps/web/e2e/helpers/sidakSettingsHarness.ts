@@ -16,6 +16,7 @@
  * Seluruh data SINTETIS. Tidak ada Supabase/produksi yang disentuh.
  */
 
+import { mockTnaDueCount } from "./hermeticShell";
 import { expect, type Page, type Route } from "@playwright/test";
 import { installMockAuthSession } from "./mockAuth";
 import { E2E_SUPABASE_URL } from "./e2eTargets";
@@ -553,6 +554,8 @@ export async function openSettings(
     }
     await route.abort("blockedbyclient");
   });
+  // After the guard, so it runs first (TNA phase 6 P-5).
+  await mockTnaDueCount(page);
 
   await page.goto(opts.path ?? "/sidak/settings", {
     waitUntil: "domcontentloaded",
