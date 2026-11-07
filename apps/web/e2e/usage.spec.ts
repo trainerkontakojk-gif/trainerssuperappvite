@@ -1,3 +1,4 @@
+import { telefunMocks } from "./helpers/telefunFixtures";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import {
@@ -125,19 +126,9 @@ test.describe("Pemakaian AI KETIK (hermetic)", () => {
   }) => {
     const audit = await openHermeticShell(page, {
       path: "/telefun",
-      apiMocks: [
-        {
-          method: "GET",
-          path: "/api/v1/telefun/settings",
-          body: { success: true, data: {} },
-        },
-        {
-          method: "GET",
-          path: "/api/v1/telefun/sessions",
-          body: { success: true, data: [] },
-        },
-        USAGE_SUMMARY_MOCK,
-      ],
+      // Shared Telefun landing mocks (settings, month count, history), so the
+      // landing's own requests stay in step with the real page.
+      apiMocks: [...telefunMocks([]), USAGE_SUMMARY_MOCK],
     });
 
     await page

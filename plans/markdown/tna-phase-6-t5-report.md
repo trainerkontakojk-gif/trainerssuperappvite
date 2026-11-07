@@ -63,6 +63,20 @@ Ketujuh kegagalan tidak terkait Fase 6. Tidak ada yang menyebut `due-count`, hal
 | `static-security.spec.ts` (5 test: header CSP/`nosniff`, deep link `noindex`, 404 dotfile/aset/encoding) | Respons dev server lokal tidak membawa header keamanan dan 404 yang diharapkan              | Fase 6 tidak mengubah `vite.config.ts`, konfigurasi Vercel, `public/`, `playwright.config.ts`, atau spec ini (`git diff 91c2a120..HEAD` kosong untuk path itu) |
 | `usage.spec.ts:123` (popover di landing Telefun)                                                         | `GET /api/v1/telefun/sessions/month-count` tidak di-mock                                    | Endpoint dipakai web sejak `57e7d96f` (2026-10-17 18:53), sesudah perubahan terakhir spec ini `e9a8abea` (15:35 hari yang sama)                                |
 
+**Diperbaiki sesudahnya (2026-11-07, perubahan tes saja):**
+
+- **`authenticated-shell`:** `DASHBOARD_MOCKS` ditambah `home/agent-summary` (`{ linked: false, qa: null }`) dan `telefun/sessions` (`[]`), dengan bentuk yang sama seperti `home-agent.spec.ts`.
+- **`usage.spec.ts`:** landing Telefun memakai `telefunMocks([])` bersama (settings, `month-count`, riwayat), sehingga mock tidak tertinggal lagi dari permintaan halaman.
+- **`static-security`:** akar masalahnya, spec ini dibuat untuk server statis hasil build (`pnpm start` → `scripts/serve-static.mjs`, port 3105) lewat `playwright.static-security.config.ts`, seperti tercatat di log rilis fase 214. Namun `playwright.config.ts` bawaan hanya mengecualikan `*-api.spec.ts`, jadi spec ini ikut dijalankan terhadap dev server Vite yang memang tidak mengirim header itu. `testIgnore` bawaan kini juga mengecualikan `static-security.spec.ts`. Header dan konfigurasi produksi tidak diubah.
+
+Bukti:
+
+| Perintah                                                                                      | Hasil                                                                             |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm exec playwright test --config playwright.static-security.config.ts` (dari build `dist`) | **5 passed**                                                                      |
+| `pnpm exec playwright test authenticated-shell usage.spec --workers=1`                        | **17 passed**                                                                     |
+| `pnpm exec playwright test --list`                                                            | 991 test di 92 file; `static-security` tidak lagi terdaftar di konfigurasi bawaan |
+
 ## Status Fase 6
 
 Selesai: T0–T3 dan T5. T4 (email) memang di luar Fase 6 (K42). Tanpa migrasi; kode sudah di `main` (auto-deploy). Suite browser penuh sudah dijalankan (tanpa kegagalan baru). Belum diverifikasi: tampilan di produksi.

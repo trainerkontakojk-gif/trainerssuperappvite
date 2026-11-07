@@ -50,6 +50,18 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
     path: "/api/v1/pdkt/history",
     body: { success: true, data: [] },
   },
+  // Beranda agent juga memuat ringkasan QA dan riwayat Telefun (bentuk sama
+  // dengan `home-agent.spec.ts`): agent tanpa profil peserta tertaut.
+  {
+    method: "GET",
+    path: "/api/v1/home/agent-summary",
+    body: { success: true, data: { linked: false, qa: null } },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/telefun/sessions",
+    body: { success: true, data: [] },
+  },
 ];
 
 /**

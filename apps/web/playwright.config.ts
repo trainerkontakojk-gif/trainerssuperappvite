@@ -10,8 +10,11 @@ export default defineConfig({
   testDir: "./e2e",
   // API specs run under playwright.api.config.ts / playwright.access-api.config.ts,
   // one project per env. Sharing this single worker leaks one spec's API env
-  // stubs into the next.
-  testIgnore: "**/*-api.spec.ts",
+  // stubs into the next. static-security.spec.ts checks the built static server
+  // (`pnpm start`, serve-static.mjs) and has its own config,
+  // playwright.static-security.config.ts; the Vite dev server here never sends
+  // those headers.
+  testIgnore: ["**/*-api.spec.ts", "**/static-security.spec.ts"],
   timeout: 30000,
   expect: {
     timeout: 5000,

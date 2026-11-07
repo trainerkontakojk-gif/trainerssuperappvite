@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- test(e2e): fix the seven pre-existing browser failures by mocking the agent home and Telefun month-count calls and running static-security only under its own static-server config
+
 - docs(tna): record the full browser suite run after phase 6 with no new failures and seven pre-existing ones
 
 - docs(tna): close phase 6 with the T5 review report and results, export, and badge sections in modules and auth-rbac docs
