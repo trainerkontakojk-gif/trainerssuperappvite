@@ -490,6 +490,75 @@ export const tnaPlansQuerySchema = z.object({
   status: tnaPlanStatusSchema.optional(),
   due: z.enum(["0", "1"]).optional(),
 });
+/** Phase 6 K42/P-4: `GET /tna/plans/due-count` for the navigation badge. */
+export interface TnaDueCount {
+  count: number;
+}
+
+// Phase 6 effectiveness dashboard (plans/markdown/tna-phase-6.md D28-D29,
+// K39, P-1, P-2). Dates are Asia/Jakarta calendar days of `completed_at`.
+const calendarDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    // Invalid dates parse to NaN (toISOString would throw); rollovers such as
+    // 2026-02-30 parse but come back as another day.
+    const time = Date.parse(`${value}T00:00:00Z`);
+    return (
+      Number.isFinite(time) && new Date(time).toISOString().startsWith(value)
+    );
+  });
+export const tnaEffectivenessGroupBySchema = z.enum([
+  "program",
+  "gap_type",
+  "service",
+]);
+export type TnaEffectivenessGroupBy = z.infer<
+  typeof tnaEffectivenessGroupBySchema
+>;
+export const tnaEffectivenessQuerySchema = z
+  .object({
+    from: calendarDate.optional(),
+    to: calendarDate.optional(),
+    group_by: tnaEffectivenessGroupBySchema.default("program"),
+  })
+  .strict()
+  .refine((q) => !q.from || !q.to || q.from <= q.to, "from setelah to");
+export type TnaEffectivenessQuery = z.infer<typeof tnaEffectivenessQuerySchema>;
+export type TnaVerdictCounts = Record<TnaVerdict, number>;
+export interface TnaEffectivenessStats {
+  completed: number;
+  verdicts: TnaVerdictCounts;
+  /** Share of `tercapai` in percent; null without completed plans. */
+  fully_achieved_pct: number | null;
+  /** Median of baseline rate minus evaluation rate per 100 sessions. */
+  median_rate_drop: number | null;
+  /** Median days from activation to completion. */
+  median_duration_days: number | null;
+}
+export interface TnaEffectivenessGroup extends TnaEffectivenessStats {
+  /** Program code (frozen snapshot), need gap type, or service type. */
+  key: string;
+  /** Program name for program groups; the UI labels gap and service keys. */
+  label: string | null;
+  follow_ups: Record<TnaFollowUp, number>;
+  /** Fewer than 3 completed plans ("Data sedikit"). */
+  thin: boolean;
+  /** P-2: the plans behind the numbers, newest completion first. */
+  plans: Array<{
+    id: string;
+    title: string;
+    verdict: TnaVerdict;
+    completed_at: string;
+  }>;
+}
+export interface TnaEffectiveness {
+  group_by: TnaEffectivenessGroupBy;
+  from: string | null;
+  to: string | null;
+  summary: TnaEffectivenessStats;
+  groups: TnaEffectivenessGroup[];
+}
 export type TnaParticipantBaseline = {
   peserta_id: string | null;
   baseline_findings: number;

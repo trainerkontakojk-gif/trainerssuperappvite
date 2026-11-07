@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- feat(tna): add the effectiveness aggregate API over completed plans and the due plan count endpoint for the navigation badge
+
 - style(tna): realign the phase 6 decision table after recording approvals
 
 - docs(tna): approve phase 6 decisions K38-K43 and add the T0 discovery report

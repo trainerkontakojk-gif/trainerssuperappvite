@@ -18,6 +18,7 @@ import {
   updateTnaProgramSchema,
   setTnaProgramActiveSchema,
   tnaProgramsQuerySchema,
+  tnaEffectivenessQuerySchema,
 } from "@trainers/types";
 import type { AuthVariables } from "../middleware/auth";
 import { requireCapability } from "../middleware/role";
@@ -44,6 +45,7 @@ import {
 import {
   getTnaNeed,
   getTnaPlanDetail,
+  countDueTnaPlans,
   listTnaPlans,
   listTnaNeeds,
   listTnaPrograms,
@@ -57,6 +59,7 @@ import {
   updateTnaProgram,
 } from "../services/tna/catalog-service";
 import { TnaPracticeUnavailableError } from "../services/tna/practice";
+import { getTnaEffectiveness } from "../services/tna/effectiveness";
 import { TnaPeriodNotFoundError } from "../services/tna/metrics";
 import { efek } from "./efek";
 
@@ -264,6 +267,19 @@ const tna = new Hono<{ Variables: AuthVariables }>()
       return tnaFailure(c, error);
     }
   })
+  .get("/effectiveness", requireCapability("tna.read"), async (c) => {
+    const query = tnaEffectivenessQuerySchema.safeParse(c.req.query());
+    if (!query.success) return invalidInput(c);
+    try {
+      const data = await getTnaEffectiveness(
+        createUserClient(c.get("token")),
+        query.data,
+      );
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
   .get("/periods", requireCapability("tna.read"), async (c) => {
     try {
       const data = await listTnaPeriodOptions(createUserClient(c.get("token")));
@@ -445,6 +461,16 @@ const tna = new Hono<{ Variables: AuthVariables }>()
         parsed.data.status,
         parsed.data.due === "1",
       );
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
+  // Before `/plans/:id`, which would read "due-count" as an id.
+  .get("/plans/due-count", requireCapability("tna.read"), async (c) => {
+    if (Object.keys(c.req.query()).length) return invalidInput(c);
+    try {
+      const data = await countDueTnaPlans(createUserClient(c.get("token")));
       return c.json({ success: true as const, data });
     } catch (error) {
       return tnaFailure(c, error);

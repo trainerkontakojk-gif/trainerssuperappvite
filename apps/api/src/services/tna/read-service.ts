@@ -8,6 +8,7 @@ import {
   tnaPlanParticipantSchema,
   type TnaPlanDetail,
   type TnaPlanStatus,
+  type TnaDueCount,
   tnaParticipantEvaluationSchema,
 } from "@trainers/types";
 import { computeTnaBaseline } from "./baseline";
@@ -87,15 +88,32 @@ export async function getTnaNeed(
   return { need, plans: tnaPlanSchema.array().parse(plans) };
 }
 
+// Match the RPC's Asia/Jakarta calendar day, not the server's local timezone.
+const jakartaToday = () =>
+  new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+// One due rule for the list and the badge count, so both always agree.
+const dueFilter = (today: string) =>
+  `and(status.eq.aktif,evaluation_due_date.lte.${today}),status.eq.evaluasi`;
+
+/** Phase 6 K42/P-4: due plan count for the navigation badge, no rows. */
+export async function countDueTnaPlans(
+  supabase: SupabaseClient,
+): Promise<TnaDueCount> {
+  const { count, error } = await supabase
+    .from("tna_plans")
+    .select("id", { count: "exact", head: true })
+    .or(dueFilter(jakartaToday()));
+  if (error) throw error;
+  return { count: count ?? 0 };
+}
+
 export async function listTnaPlans(
   supabase: SupabaseClient,
   status?: TnaPlanStatus,
   due = false,
 ) {
-  // Match the RPC's Asia/Jakarta calendar day, not the server's local timezone.
-  const today = new Date(Date.now() + 7 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const today = jakartaToday();
   const rows = await fetchAllPages({
     build: ({ from, to }) => {
       let query = supabase
@@ -105,10 +123,7 @@ export async function listTnaPlans(
         .order("id")
         .range(from, to);
       if (status) query = query.eq("status", status);
-      if (due)
-        query = query.or(
-          `and(status.eq.aktif,evaluation_due_date.lte.${today}),status.eq.evaluasi`,
-        );
+      if (due) query = query.or(dueFilter(today));
       return query;
     },
   });
