@@ -47,7 +47,7 @@ Penerapan humanize (port mini perilaku Humanizer humanizr/humanizer ke TS) pada 
 | `docs/SIDAK_SCORING_GUARDRAILS.md` | `Tampilkan Data Keseluruhan` → `Tampilkan semua data`; `INPUT AUDIT` → `Input Audit` |
 | `docs/SIDAK_LOGIC_AND_SCORING.md` | `Refresh` → `Muat ulang` |
 | `docs/feature-agent-detail-export-csv-md-html.md` | `UNDUH LAPORAN` → `Unduh Laporan`; `INPUT AUDIT` → `Input Audit` |
-| `docs/superpowers/specs/2026-07-16-sidak-agent-report-html-variants-design.md` | Section names sinkron label live (`Ringkasan Skor Bulanan`, `Perkembangan Skor`, `Riwayat Temuan`) |
+| `docs/archive/superpowers/specs/2026-07-16-sidak-agent-report-html-variants-design.md` | Section names sinkron label live (`Ringkasan Skor Bulanan`, `Perkembangan Skor`, `Riwayat Temuan`) |
 
 ## Key Decisions
 

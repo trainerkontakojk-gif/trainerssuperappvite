@@ -29,7 +29,7 @@ apps/web/vite.config.d.ts
 .opencode/
 opencode.json
 .superpowers
-docs/superpowers/
+docs/archive/superpowers/
 # Legacy local plan archive. Canonical per-feature C/D plans live in plans/markdown/ (tracked).
 /plan/*
 !/plan/markdown/
