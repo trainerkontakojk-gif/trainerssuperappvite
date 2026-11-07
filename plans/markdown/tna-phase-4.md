@@ -1,6 +1,6 @@
 # TNA (Training Needs Analysis) — Fase 4: Akses Leader
 
-- **Status:** DRAF rev. 1 — keputusan K25–K31 menunggu Fajar. Belum ada kode, migrasi, atau test.
+- **Status:** **DIBATALKAN** 2026-11-07 — Fajar memutuskan leader tidak mendapat akses TNA sama sekali. Rencana ini disimpan sebagai arsip; jangan dikerjakan. Keputusan K25–K31 tidak berlaku.
 - **Tanggal rencana:** 2026-11-04.
 - **Baseline saat perencanaan:** `1b366ee9` (`main`). Mulai dari `main` terbaru di branch baru, mis. `feat/tna-phase-4`.
 - **Fondasi:** Fase 1 D8 (fondasi akses leader), Fase 2, dan idealnya Fase 3 ([`tna-phase-3.md`](tna-phase-3.md)) karena K30 bergantung pada tabel latihan. Fase 4 bisa jalan tanpa Fase 3 bila K30 = tidak.

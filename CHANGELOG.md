@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- docs(tna): cancel phase 4 because leaders get no TNA access, and approve phase 5 decisions K32-K37
+
 - docs(archive): move the legacy superpowers specs and plans to docs/archive/superpowers so the disabled workflow no longer looks active
 
 - ci(e2e): run the seven no-backend Playwright API projects (gate, rate-limit, consumer-email and language-evidence stubs, dev-database guard, subdomain robots, Gemini egress proxy) on every push and pull request
