@@ -506,7 +506,7 @@ Rollback: kembalikan deploy aplikasi terlebih dahulu, lalu jalankan `rollback_20
 
 ## TNA — Latihan simulasi (Fase 3)
 
-Sumber schema: `supabase/migrations/20261104120000_tna_phase3_practice.sql`, rollback `supabase/rollbacks/rollback_20261104120000_tna_phase3_practice.sql`. Diuji di Supabase lokal (replay bersih, rollback, regresi API/browser). **Belum diterapkan ke produksi**; apply butuh izin Fajar dengan prosedur satu file + `migration repair` seperti Fase 2, bukan `db push`. Kontrak: [rencana Fase 3](../plans/markdown/tna-phase-3.md).
+Sumber schema: `supabase/migrations/20261104120000_tna_phase3_practice.sql`, rollback `supabase/rollbacks/rollback_20261104120000_tna_phase3_practice.sql`. Diuji di Supabase lokal (replay bersih, rollback, regresi API/browser). **Diterapkan ke produksi `ruosnjmtywcrghjgqugz` pada 2026-11-07** dengan izin Fajar, lewat prosedur satu file + `migration repair` seperti Fase 2 (bukan `db push`); lihat [catatan apply](#apply-produksi-2026-11-07). Kontrak: [rencana Fase 3](../plans/markdown/tna-phase-3.md).
 
 | Objek                                       | Isi                                                                                                                                                                                                                         |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -518,6 +518,13 @@ Sumber schema: `supabase/migrations/20261104120000_tna_phase3_practice.sql`, rol
 - `tna_complete_plan` menerima kunci opsional kelima `practice` per peserta. `tna_internal.valid_practice_snapshot(jsonb,jsonb)` memeriksa kunci = modul target, `sessions = 0` ⇔ rata-rata NULL dan `belum_mulai`, rata-rata dalam skala modul (Telefun ≤ 10, lainnya ≤ 100), dan status konsisten dengan `min_sessions` → `TNA_PRACTICE_SNAPSHOT_INVALID`.
 - Signature semua RPC tidak berubah dan EXECUTE tidak dicabut (alasan crash di atas). Riwayat simulasi tidak disentuh SQL; hitungan dilakukan backend.
 - Rollback **fail-closed** (`TNA_PHASE3_ROLLBACK_DATA_PRESENT`) bila sudah ada target atau snapshot latihan; bila bersih, mengembalikan body fungsi Fase 1/2 lalu membuang objek Fase 3.
+
+#### Apply produksi 2026-11-07
+
+- Preflight read-only: `20261008120000`, `20261011130000`, `20261012150000` tercatat; belum ada tabel, kolom, atau helper Fase 3; 0 rencana dan 0 peserta TNA.
+- `supabase db query --linked -f supabase/migrations/20261104120000_tna_phase3_practice.sql` (02:12 UTC) lalu `supabase migration repair --linked --status applied 20261104120000` (exit 0).
+- Verifikasi read-only pasca-apply: versi tercatat; tabel `tna_plan_practice_targets` dengan RLS, policy `tna_practice_targets_read`, trigger `tna_practice_targets_guard`, `authenticated` hanya SELECT, `anon` tanpa hak; kolom `practice_snapshot jsonb`; tiga helper `tna_internal`; `tna_create_plan`/`tna_update_draft_plan`/`tna_complete_plan` memuat logika latihan dan tetap diawali `assert_service_role`; semua entry point `tna_*` tetap `SECURITY DEFINER` dengan EXECUTE `authenticated`. Data TNA tetap 0 baris.
+- RPC tidak dipanggil ke produksi. Kode Fase 3 sudah di `main` sejak 2026-11-04; karena belum ada rencana TNA, jeda kode → schema tidak berdampak.
 
 ## Storage
 

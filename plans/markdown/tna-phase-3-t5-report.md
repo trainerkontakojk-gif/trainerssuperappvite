@@ -57,3 +57,5 @@ Fase 3 **selesai lokal**. Belum diterapkan ke produksi. Langkah rilis yang butuh
 1. Preflight read-only produksi (Fase 2 lengkap, belum ada objek Fase 3).
 2. `supabase db query --linked -f supabase/migrations/20261104120000_tna_phase3_practice.sql`, lalu `supabase migration repair --linked --status applied 20261104120000`. **Bukan** `db push`.
 3. Deploy API + web segera sesudahnya (API lama tidak mengirim `practice_targets`, jadi jeda aman: rencana tanpa target).
+
+**Pembaruan 2026-11-07:** Fajar mengizinkan apply. Preflight bersih (0 rencana TNA), migrasi diterapkan 02:12 UTC, `migration repair` exit 0, verifikasi read-only lulus. Detail: [`docs/database.md`](../../docs/database.md#apply-produksi-2026-11-07).
