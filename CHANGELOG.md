@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- ci(e2e): run the seven no-backend Playwright API projects (gate, rate-limit, consumer-email and language-evidence stubs, dev-database guard, subdomain robots, Gemini egress proxy) on every push and pull request
+
 - docs(workflow): fix the focused E2E and typecheck commands agents use, mark the Supabase MCP as production, rename pr-ready to push-ready with push-to-main, let local bug fixes stay in Lane B, drop the Turborepo agent block, and block Git hook bypass
 
 - docs(tna): record the phase 3 practice migration 20261104120000 production apply with read-only preflight and verification

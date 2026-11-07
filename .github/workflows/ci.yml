@@ -43,6 +43,38 @@ jobs:
       - name: Dependency audit (prod)
         run: pnpm audit --prod
 
+  # E2E-first policy (AGENTS.md): run the API-only Playwright projects that
+  # need no backend. Each spec boots its own loopback stubs and sets its own
+  # env, so no Supabase stack, browser, or secret is involved. Real-backend
+  # projects read apps/api/.env.integration from
+  # scripts/integration/supabase-bootstrap.sh and stay local-only gates.
+  api-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Playwright API projects (no backend)
+        working-directory: apps/web
+        run: >-
+          pnpm exec playwright test --config=playwright.api.config.ts
+          --project gate-stub
+          --project rate-limit-stub
+          --project pdkt-consumer-email-stub
+          --project telefun-language-evidence-stub
+          --project dev-database-guard
+          --project subdomain-robots
+          --project gemini-egress-proxy
+          --reporter=line
+
   changelog:
     runs-on: ubuntu-latest
     steps:
