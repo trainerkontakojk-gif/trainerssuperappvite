@@ -1,6 +1,6 @@
 # SIDAK: parameter baru di versi aturan tidak bisa dicatat sebagai temuan
 
-- **Status:** DIIMPLEMENTASIKAN (lokal, belum di-commit) — Opsi A + B + A1 + A2 disetujui Fajar 2026-10-17 dengan master `is_active = false` dan kompensasi TypeScript (tanpa migrasi). Backfill (T6) menunggu hasil query produksi. Bukti di §Bukti verifikasi.
+- **Status:** DIIMPLEMENTASIKAN (lokal, belum di-commit) — Opsi A + B + A1 + A2 disetujui Fajar 2026-10-17 dengan master `is_active = false` dan kompensasi TypeScript (tanpa migrasi). Backfill (T6) tidak diperlukan: query produksi 2026-11-07 menemukan 0 snapshot unmapped. Bukti di §Bukti verifikasi.
 - **Tanggal:** 2026-10-17. Baseline: `ddda8a27` (`main`, bersih).
 - **Risk lane:** **Lane D** — kontrak API publik (`POST /sidak/rule-versions/:id/indicators`, `POST /sidak/temuan/batch`), kemungkinan migrasi/backfill data produksi, dan identitas parameter yang dipakai modul TNA.
 - **Asal:** `plans/markdown/tna-phase-1-t0-report.md` §S1; keputusan TNA K8 di `plans/markdown/tna-phase-1.md`.
@@ -89,7 +89,7 @@ Rekomendasi: jalankan query dulu; pilih 1 atau 3 sesuai hasil.
 
 ## Keputusan Fajar (2026-10-17)
 
-- K-a: **disetujui** A + B + A1 + A2. K-b: **`false`**. K-c: **kompensasi TypeScript**, tanpa migrasi. K-d: **menunggu** query produksi. K-e: tidak termasuk (tunda).
+- K-a: **disetujui** A + B + A1 + A2. K-b: **`false`**. K-c: **kompensasi TypeScript**, tanpa migrasi. K-d: **strategi 1, tidak backfill** — query produksi read-only 2026-11-07 menemukan 0 snapshot unmapped dan 0 mapping menggantung (`tna-phase-5-t4-report.md`). K-e: tidak termasuk (tunda).
 
 ### Pertanyaan semula
 
@@ -126,7 +126,7 @@ WHERE ri.legacy_indicator_id IS NOT NULL
 - [x] **T3 — GREEN backend:** Opsi A di `services/sidak/rule-versions.ts` (+ hapus master saat hapus draft), Opsi B di `temuan-service.ts` + `routes/sidak/temuan.ts`, A1 (`legacy_indicator_id` + `rule_indicator_id`, baca error query), A2. Tipe respons di `packages/types` bila ada.
 - [x] **T4 — GREEN web:** tampilkan error 422; tandai/disable parameter unmapped di dropdown dan baris import (selama data lama ada); ganti pesan buntu "gunakan parameter yang sudah dilink".
 - [x] **T5 — Regression:** `tna-parameter-key-api.spec.ts` (perbarui ekspektasi 422), spec TNA real-backend, spec SIDAK input/settings yang ada. Satu Playwright run pada satu waktu.
-- [ ] **T6 — Backfill (bila K-d memilih 3):** migrasi + `supabase/rollbacks/rollback_<name>.sql` via skill `supabase-migration`, replay lokal bersih. Tanpa push ke produksi tanpa izin.
+- [x] **T6 — TIDAK DIPERLUKAN** (2026-11-07: produksi 0 snapshot unmapped, `tna-phase-5-t4-report.md`). Semula: **Backfill (bila K-d memilih 3):** migrasi + `supabase/rollbacks/rollback_<name>.sql` via skill `supabase-migration`, replay lokal bersih. Tanpa push ke produksi tanpa izin.
 - [x] **T7 — Review & gate:** `thermo-nuclear`; `pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json`, web typecheck, lint, build; `git diff --check`; perbarui `docs/modules.md`/`docs/database.md` (identitas parameter) dan catatan K8 di `plans/markdown/tna-phase-1.md`; satu `graphify update .`.
 
 ## Catatan implementasi
