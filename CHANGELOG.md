@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- style(tna): realign the phase 6 decision table after recording approvals
+
 - docs(tna): approve phase 6 decisions K38-K43 and add the T0 discovery report
 
 - docs(tna): close phase 5 with the T6 review report and catalog sections in modules, database, and auth-rbac docs
