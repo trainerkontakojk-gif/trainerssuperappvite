@@ -537,6 +537,19 @@ Tidak ada kapabilitas baru: `practice_targets` di `POST/PATCH /plans` memakai `t
 
 Target latihan dibaca dengan JWT pengguna (RLS `is_admin_or_trainer()`). Penulisan target dan snapshot tetap lewat RPC service-role dengan guard pertama. Detail schema: [database TNA Fase 3](database.md#tna--latihan-simulasi-fase-3).
 
+## TNA — katalog program (Fase 5)
+
+Tidak ada kapabilitas baru (P-1). Admin dan trainer mengelola katalog (K32); leader dan agent tidak punya akses TNA sama sekali (Fase 4 dibatalkan).
+
+| Endpoint                                                         | Kapabilitas | Jalur data                                                  |
+| ---------------------------------------------------------------- | ----------- | ----------------------------------------------------------- |
+| `GET /v1/tna/programs`, `?include_inactive=1`, `/programs/coverage` | `tna.read`  | JWT pengguna, RLS `tna_programs_read` dan `tna_plans`.      |
+| `POST /v1/tna/programs`                                          | `tna.write` | `supabaseAdmin.rpc("tna_create_program")`                   |
+| `PATCH /v1/tna/programs/:id`                                     | `tna.write` | `supabaseAdmin.rpc("tna_update_program")`                   |
+| `POST /v1/tna/programs/:id/active`                               | `tna.write` | `supabaseAdmin.rpc("tna_set_program_active")`               |
+
+Leader/agent → 403, tanpa token → 401 (diuji di `tna-catalog-api.spec.ts`). Actor selalu dari autentikasi; `created_by`/`is_active` di body ditolak skema strict. Ketiga writer tetap EXECUTE untuk anon/authenticated dengan guard service-role pertama (`42501 TNA_FORBIDDEN`), dan inventaris `tna-access-api.spec.ts` mencakup ketiganya. Snapshot program diisi trigger database, bukan oleh klien. Detail schema: [database TNA Fase 5](database.md#tna--katalog-program-fase-5).
+
 ## Katalog dan scope terpadu (2026-10-06)
 
 `packages/types/src/access.ts` adalah katalog tunggal `ROLES`, `Role`, `CAPABILITIES`, `can()` dan metadata approval leader. Boundary menerima empat role canonical (trim/lowercase); alias `trainers`/`agents` dihapus setelah audit lokal dan remote bersih. Nilai tak dikenal mengembalikan `null` dan tidak mendapat capability. `qa` sebagai mode heatmap, jabatan peserta dan speaker transkrip tetap domain terpisah.
