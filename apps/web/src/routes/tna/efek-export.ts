@@ -12,20 +12,13 @@ import {
   sessionStatusLabel,
 } from "./efek-report-format";
 import { sessionDates } from "./utils";
+import { downloadHtml, esc, fileDate } from "./html-export";
 
 /**
  * EFEK phase 3: one self-contained, printable HTML file for a program report,
  * built in the browser from the report the page already loaded. Every value
  * from the database goes through `esc`, so names cannot inject markup.
  */
-
-const esc = (value: string | number) =>
-  String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 
 const DATE = new Intl.DateTimeFormat("id-ID", {
   day: "numeric",
@@ -179,19 +172,10 @@ export function downloadEfekProgramHtml(
   search: EfekReportSearch,
 ) {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  // Kept as before: inner runs collapse to "-", edges are not trimmed.
   const name = report.program.name.replace(/[^A-Za-z0-9-]+/g, "-");
-  const url = URL.createObjectURL(
-    new Blob([buildEfekProgramHtml(report, search, now)], {
-      type: "text/html;charset=utf-8",
-    }),
+  downloadHtml(
+    buildEfekProgramHtml(report, search, now),
+    `EFEK-${name}-${fileDate(now)}.html`,
   );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `EFEK-${name}-${date}.html`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

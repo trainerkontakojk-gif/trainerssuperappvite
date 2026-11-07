@@ -25,6 +25,7 @@ import {
   tnaResponse,
 } from "./utils";
 import { PracticeProgress } from "./Practice";
+import { canExportTnaPlan, downloadTnaPlanHtml } from "./plan-export";
 import { PlanForm } from "./PlanForm";
 import { Evaluation } from "./Evaluation";
 import { Textarea } from "../../components/ui/textarea";
@@ -88,17 +89,29 @@ function PlanContent({
   };
   return (
     <div className="space-y-8">
-      <div className="space-y-1 text-sm">
-        <p className="font-medium">Status: {planStatusLabels[p.status]}</p>
-        <p>
-          Program: {d.program.name}
-          {d.program.source === "snapshot" && (
-            <span className="text-muted-foreground">
-              {" "}
-              · dibekukan saat aktivasi
-            </span>
-          )}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1 text-sm">
+          <p className="font-medium">Status: {planStatusLabels[p.status]}</p>
+          <p>
+            Program: {d.program.name}
+            {d.program.source === "snapshot" && (
+              <span className="text-muted-foreground">
+                {" "}
+                · dibekukan saat aktivasi
+              </span>
+            )}
+          </p>
+        </div>
+        {canExportTnaPlan(d) && (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={() => downloadTnaPlanHtml(d)}
+          >
+            Ekspor ringkasan
+          </Button>
+        )}
       </div>
       <div ref={mutationPanel}>
         <MutationState

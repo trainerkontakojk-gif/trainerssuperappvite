@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- feat(tna): add a printable HTML summary export on active, evaluating, and completed plan detail
+
 - docs(agents): forbid new implicit state machines; lifecycle state uses one explicit status union with guarded transitions, and existing boolean-flag lifecycles are marked legacy
 
 - feat(tna): add the effectiveness aggregate API over completed plans and the due plan count endpoint for the navigation badge
