@@ -61,3 +61,5 @@ Kode T2 membaca kolom baru (`updated_at`, `created_by`, `updated_by`, `program_s
 ## Berikutnya
 
 T3: UI katalog (tab Katalog, form tambah/ubah, aktif/nonaktif dengan konfirmasi jumlah rencana, "Klaster tanpa program", baris "Program" di detail rencana).
+
+**Pembaruan 2026-11-07:** Fajar mengizinkan apply. Migrasi diterapkan 04:21 UTC, `migration repair` exit 0, verifikasi read-only lulus ([`docs/database.md`](../../docs/database.md#apply-produksi-2026-11-07-fase-5)); commit T2 lalu di-push.

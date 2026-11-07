@@ -526,6 +526,17 @@ Sumber schema: `supabase/migrations/20261104120000_tna_phase3_practice.sql`, rol
 - Verifikasi read-only pasca-apply: versi tercatat; tabel `tna_plan_practice_targets` dengan RLS, policy `tna_practice_targets_read`, trigger `tna_practice_targets_guard`, `authenticated` hanya SELECT, `anon` tanpa hak; kolom `practice_snapshot jsonb`; tiga helper `tna_internal`; `tna_create_plan`/`tna_update_draft_plan`/`tna_complete_plan` memuat logika latihan dan tetap diawali `assert_service_role`; semua entry point `tna_*` tetap `SECURITY DEFINER` dengan EXECUTE `authenticated`. Data TNA tetap 0 baris.
 - RPC tidak dipanggil ke produksi. Kode Fase 3 sudah di `main` sejak 2026-11-04; karena belum ada rencana TNA, jeda kode → schema tidak berdampak.
 
+## TNA — Katalog program (Fase 5)
+
+Sumber schema: `supabase/migrations/20261107120000_tna_phase5_catalog.sql`, rollback `supabase/rollbacks/rollback_20261107120000_tna_phase5_catalog.sql`. Kontrak: [rencana Fase 5](../plans/markdown/tna-phase-5.md); detail objek: [laporan T1](../plans/markdown/tna-phase-5-t1-report.md). Ringkasan: `tna_programs` mendapat `updated_at`/`created_by`/`updated_by` dan CHECK modul latihan; trigger `tna_program_guard` mengunci `code`; `tna_plans.program_snapshot` diisi trigger `tna_plan_program_snapshot` saat `draft → aktif` lalu immutable; writer `tna_create_program`, `tna_update_program`, `tna_set_program_active` memakai guard service-role pertama tanpa `REVOKE EXECUTE`. Rollback fail-closed (`TNA_PHASE5_ROLLBACK_DATA_PRESENT`) bila ada program yang dibuat/diubah lewat writer atau snapshot terisi.
+
+#### Apply produksi 2026-11-07 (Fase 5)
+
+- Preflight read-only: `20261104120000` tercatat; belum ada kolom atau fungsi Fase 5; 7 program dengan modul hanya `ketik`/`pdkt`/`telefun` (aman untuk CHECK); 0 rencana TNA.
+- `supabase db query --linked -f supabase/migrations/20261107120000_tna_phase5_catalog.sql` (04:21 UTC) lalu `supabase migration repair --linked --status applied 20261107120000`; keduanya exit 0.
+- Verifikasi read-only pasca-apply: versi tercatat; empat kolom baru; CHECK modul; trigger `tna_program_guard` dan `tna_plan_program_snapshot`; ketiga writer `SECURITY DEFINER`, memuat `assert_service_role`, EXECUTE `authenticated` tetap ada; helper `tna_internal` tanpa EXECUTE untuk `authenticated`; tujuh seed tetap aktif tanpa `created_by`/`updated_by`; 0 rencana.
+- RPC tidak dipanggil ke produksi. Kode T2 (yang membaca kolom baru) di-push sesudah apply ini.
+
 ## Storage
 
 Aplikasi menggunakan Supabase Storage bucket:
