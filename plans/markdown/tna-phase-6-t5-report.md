@@ -51,14 +51,18 @@ Catatan P3 (diterima, tidak diubah):
 | Graph               | `graphify update .`                                                                                                                                                      | exit 0, 19.162 node, 36.806 edge                                 |
 | Format / spasi      | `prettier --check docs/modules.md` dan laporan ini; `git diff --check`                                                                                                   | exit 0                                                           |
 
-**Tidak dijalankan:** suite browser penuh (996 test). Run T3 dihentikan atas permintaan Fajar. Fajar akan menjalankannya sekali sesudah T5:
+### Suite browser penuh (sesudah T5, atas permintaan Fajar)
 
-```bash
-pnpm exec playwright test --reporter=line --workers=1
-```
+`apps/web`: `pnpm exec playwright test --reporter=line --workers=1` → exit 1, **985 passed, 7 failed, 4 skipped** (1,2 jam, 996 test).
 
-Kegagalan yang sudah diketahui: `authenticated-shell.spec.ts:199` (agent), yang juga gagal di `main` sebelum Fase 6.
+Ketujuh kegagalan tidak terkait Fase 6. Tidak ada yang menyebut `due-count`, halaman TNA, atau badge.
+
+| Test                                                                                                     | Penyebab                                                                                    | Bukti pra-ada                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authenticated-shell.spec.ts:199` (agent, tab bar dan drawer)                                            | `GET /api/v1/home/agent-summary` dan `GET /api/v1/telefun/sessions?view=list` tidak di-mock | Gagal identik di `main` sebelum T3 (dijalankan dengan perubahan T3 di-stash)                                                                                   |
+| `static-security.spec.ts` (5 test: header CSP/`nosniff`, deep link `noindex`, 404 dotfile/aset/encoding) | Respons dev server lokal tidak membawa header keamanan dan 404 yang diharapkan              | Fase 6 tidak mengubah `vite.config.ts`, konfigurasi Vercel, `public/`, `playwright.config.ts`, atau spec ini (`git diff 91c2a120..HEAD` kosong untuk path itu) |
+| `usage.spec.ts:123` (popover di landing Telefun)                                                         | `GET /api/v1/telefun/sessions/month-count` tidak di-mock                                    | Endpoint dipakai web sejak `57e7d96f` (2026-10-17 18:53), sesudah perubahan terakhir spec ini `e9a8abea` (15:35 hari yang sama)                                |
 
 ## Status Fase 6
 
-Selesai: T0–T3 dan T5. T4 (email) memang di luar Fase 6 (K42). Tanpa migrasi; kode sudah di `main` (auto-deploy). Belum diverifikasi: tampilan di produksi, dan suite browser penuh.
+Selesai: T0–T3 dan T5. T4 (email) memang di luar Fase 6 (K42). Tanpa migrasi; kode sudah di `main` (auto-deploy). Suite browser penuh sudah dijalankan (tanpa kegagalan baru). Belum diverifikasi: tampilan di produksi.
