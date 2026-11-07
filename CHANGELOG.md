@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- docs(workflow): fix the focused E2E and typecheck commands agents use, mark the Supabase MCP as production, rename pr-ready to push-ready with push-to-main, let local bug fixes stay in Lane B, drop the Turborepo agent block, and block Git hook bypass
+
 - docs(tna): record the phase 3 practice migration 20261104120000 production apply with read-only preflight and verification
 
 - docs(tna): close phase 3 with the T5 review, share practice module labels between API and web, and document practice targets, the frozen snapshot, and the bounded service-role history read

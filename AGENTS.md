@@ -21,7 +21,7 @@ High-salience guardrails for every harness. Detailed policy belongs in [`docs/AG
 - For changed runtime behavior use focused Playwright E2E, written/run RED-first when applicable, against local or explicitly test-only disposable targets. Produce a verifiable, repeatable E2E artifact. Never substitute unit tests for E2E.
 - Ask Fajar before adding or running any non-E2E test; explain the exact contract E2E cannot prove and the smallest proposed alternative. For an approved isolated test, list all failure modes before coding.
 - Only after equivalent E2E coverage is verified, remove a superseded unit test and its stale suite-list entry; do not mass-delete unrelated tests. Existing unit-suite scripts/manifests are legacy inventory, not permission to run them. Never add unit tests to `scripts/test-core.json` or `scripts/test-fast.json`.
-- **Standing authorization (Fajar, this repo):** committing, pushing to this repo's own configured remote, merging, branching, and running local terminal/build/test commands are pre-authorized — do them without asking. Everything else still needs explicit authorization: production deploys (Vercel `--prod`/promote, Railway prod), remote Supabase mutations or `db push`/migrations against any non-local project, and any other change to a remote system. Never point E2E at production. Do not claim checks that did not run; report exact commands/evidence.
+- **Standing authorization (Fajar, this repo):** committing, pushing to this repo's own configured remote, merging, branching, and running local terminal/build/test commands are pre-authorized — do them without asking. `main` is the integration branch: once the lane's gates pass, commit and push straight to `main` without a PR, one commit per unrelated change; use a feature branch only when Fajar asks for one. Everything else still needs explicit authorization: production deploys (Vercel `--prod`/promote, Railway prod), remote Supabase mutations or `db push`/migrations against any non-local project, and any other change to a remote system. Never point E2E at production. Do not claim checks that did not run; report exact commands/evidence.
 - **Changelog:** every commit adds a `- type(scope): summary` entry under today's date in root `CHANGELOG.md`, in the same commit (Changelog gate in `docs/AGENT_WORKFLOW.md` §4; enforced by `.githooks/pre-commit` and CI).
 
 ## Skills and knowledge tools
@@ -35,14 +35,4 @@ Use installed skills only where the canonical workflow requires them. `trainers-
 - [`docs/README.md`](docs/README.md) — documentation index.
 - [`docs/architecture.md`](docs/architecture.md) — runtime/architecture contracts.
 - [`DESIGN.md`](DESIGN.md) → [`docs/design.md`](docs/design.md) — design pointer and canonical design reference.
-
-<!-- BEGIN:turborepo-agent-rules -->
-
-# This is NOT the Turborepo you know
-
-Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
-
-Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
-
-This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
-<!-- END:turborepo-agent-rules -->
+- Turborepo: before changing `turbo.json` or Turbo commands, read the docs bundled with the installed `turbo` package (`node_modules/turbo/docs/`); they match the installed version.

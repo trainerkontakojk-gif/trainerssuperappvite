@@ -65,7 +65,7 @@ Documentation, comments, or a simple ignored-file/config correction with **no ru
 One module, an established local pattern, and no public contract, security, schema, migration, authentication/RLS, or access-control change. Use an inline mini-spec with the goal, acceptance criteria, exact files, and focused verification. A persisted plan is optional unless requested.
 
 - Run focused Playwright E2E for runtime behavior when touched, plus affected-workspace lint/typecheck and self-review. If E2E is not feasible, stop and ask Fajar before any non-E2E test.
-- TDD remains mandatory for behavior or regression changes even when the edit is local. A bug fix or material runtime blast radius is at least Lane C; high-risk categories are Lane D.
+- TDD remains mandatory for behavior or regression changes even when the edit is local. A local bug fix (one module, an established pattern, and no public contract, schema, auth/RLS, permission, or AI-usage effect) may stay in Lane B with an inline mini-spec, but it still needs a RED-first focused E2E. A bug fix that crosses modules or has material runtime blast radius is at least Lane C; high-risk categories are Lane D.
 - A root build is not inherited automatically; run it only when an affected or release gate requires it.
 
 ### Lane C — standard behavior/cross-file
@@ -113,7 +113,7 @@ Planning size is proportional; spec-driven thinking and mandatory evidence for b
 
 Update canonical documentation when the task changes architecture, a public/API/schema contract, deployment or operations, or user-visible behavior that is not already documented. A regression fix that restores an existing documented contract does not need a new phase-history entry. Docs/config-only work can update only the affected index or canonical instruction file; it does not inherit product verification gates.
 
-Documentation-instruction-only work is limited to `docs/`, `AGENTS.md`, `GEMINI.md`, or an actually mirrored Wiki. Do not change product code, tests, package manifests, migrations, generated graphs, or secrets for docs-only work. Explicit user authorization for Pi-local harness files is a narrow harness-task scope, not authorization to change product configuration.
+Documentation-instruction-only work is limited to `docs/`, `AGENTS.md`, `GEMINI.md`, `CLAUDE.md`, `.claude/skills/`, or an actually mirrored Wiki. Do not change product code, tests, package manifests, migrations, generated graphs, or secrets for docs-only work. Explicit user authorization for Pi-local harness files is a narrow harness-task scope, not authorization to change product configuration.
 
 Keep summaries in their owning document. Do not copy a test matrix, route inventory, model registry, phase history, or detailed lane/tool policy into `AGENTS.md`, `GEMINI.md`, or `docs/README.md`.
 
@@ -176,7 +176,9 @@ Run only the gates applicable to the selected lane. Stop at the first new or une
 - Run the E2E RED-first when applicable. Before running it, verify the Playwright web server and every backend/database/provider target are local or explicitly test-only and disposable; the browser configs start only the web dev server with loopback Supabase/Telefun targets and never reuse a running server (`docs/e2e-testing.md`), but still check any other backend, database, or provider target a spec uses. Never use production credentials/data. If a safe E2E path cannot be established, stop and ask Fajar; do not fall back to a unit test.
 - When the E2E proves the same contract as an existing unit test, remove that superseded unit test and its entries from suite manifests in the same scoped change. Do not bulk-delete unrelated legacy tests.
 - Do not add or routinely run Vitest/unit suites (`test:affected`, `test:targeted`, `test:core`, `test:fast`, or `test:full`) as the default regression check. If a distinct invariant cannot be meaningfully, safely, and reliably proved end-to-end, ask Fajar before adding/running any non-E2E test; include the exact invariant, limitation, and smallest proposed alternative.
+- Focused run, from the repository root: `pnpm --dir apps/web exec playwright test <spec-file> -g "<test name>" --reporter=line --workers=1` (add `--config=playwright.api.config.ts --project <name>` for API-only specs). Never pass Playwright options through `pnpm … test:e2e -- …`: pnpm forwards the literal `--`, Playwright then reads `-g` as a file filter, and the whole suite runs.
 - Typecheck, lint, and build remain compile/quality checks, not substitutes for E2E behavior evidence. Root `pnpm typecheck` is Turbo typechecking and must finish without emitted files and exit 0.
+- Typecheck a workspace with its `typecheck` script (`pnpm --filter @trainers/web typecheck`), not a bare `tsc --noEmit`: the web script also checks `tsconfig.e2e.json`, which CI runs, so a changed spec under `apps/web/e2e/` is only covered this way.
 
 ### Test curation and budget
 
@@ -187,11 +189,14 @@ Before changing coverage, search the owning suite. Merge overlapping tests and r
 For applicable Lane C/D or release gates, after confirming the E2E target is safe, run:
 
 ```bash
-pnpm --filter @trainers/web test:e2e -- <focused-spec>
+pnpm --dir apps/web exec playwright test <spec-file> -g "<test name>" --reporter=line --workers=1
+pnpm typecheck
 pnpm lint
 pnpm build
 git diff --check
 ```
+
+CI (`.github/workflows/ci.yml`) reruns lint, typecheck, build, the dependency audit, the changelog and migration-replay checks, and the no-backend API projects of `playwright.api.config.ts` on every push to `main` and every pull request. Real-backend API projects and browser specs stay local-only gates.
 
 Expected evidence is the focused E2E result, applicable lint/build success, and a clean final diff check. Existing Vitest suite commands/manifests are legacy inventory, not default regression gates; do not expand them or run them for new work without Fajar's explicit approval. Docs/config-only work does not inherit product tests, root lint, or root build.
 

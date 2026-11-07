@@ -41,7 +41,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 Command meanings only; E2E policy, target-safety checks, tier exceptions, and verification gates live in [`docs/AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) §7.
 
 - **E2E harnesses and fixture rules** — [`e2e-testing.md`](e2e-testing.md): the two sanctioned patterns, the `mockAuth` UI-only contract, and the measurement/fixture traps.
-- **Runtime behavior** — focused Playwright E2E: `pnpm --filter @trainers/web test:e2e -- <focused-spec>`. Run only after verifying all targets are local/test-only and disposable.
+- **Runtime behavior** — focused Playwright E2E: `pnpm --dir apps/web exec playwright test <spec-file> -g "<test name>" --reporter=line --workers=1`. Run only after verifying all targets are local/test-only and disposable. Do not use `test:e2e -- …`; it drops the `-g` filter.
 - **TNA API-only gate** — `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --workers=1`: separate gate-stub and real-backend projects, no webServer. Real-backend targets must pass loopback guards. The browser configs start only the web dev server with loopback service targets (see [`e2e-testing.md`](e2e-testing.md#dev-server-and-service-targets)).
 - **Legacy unit-suite commands** — `pnpm test:affected`, `pnpm test:targeted`, `pnpm test:core`, `pnpm test:fast`, and `pnpm test:full` remain in the repository but are not default verification for new work. Do not add unit tests or run these suites without Fajar's explicit approval.
 - **`pnpm lint` / `pnpm typecheck` / `pnpm build` / `git diff --check`** — compile/quality gates when the selected lane requires them; they do not replace E2E behavior evidence.

@@ -11,7 +11,7 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 - `trainers-superapp-tdd`, `thermo-nuclear`, `ui-ux-pro-max`, `graphify`, `context7` — project skills in `.claude/skills/` (invoke with the Skill tool).
 - `impeccable` — user-level skill; Supabase — the connected Supabase MCP (conditional on task need).
 - Context7 MCP — registered in `.mcp.json`; Graphify — local `graphify` CLI via Bash.
-- `supabase-migration` and `pr-ready` — project skills that sequence the migration and pre-PR gates; they defer to `docs/AGENT_WORKFLOW.md`.
+- `supabase-migration` and `push-ready` — project skills that sequence the migration and pre-push gates; they defer to `docs/AGENT_WORKFLOW.md`.
 
 ## Claude Code hooks
 
@@ -21,6 +21,7 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 - `guard-remote.sh` lets `git push` to this repo's own remote run unattended (logged to `~/.claude/logs/git-push-audit.log`), and asks before remote Supabase CLI commands, Vercel deploys, and remote-mutating Supabase/Vercel MCP calls. It blocks MCP calls aimed at the production project ref.
 - `one-test-run.sh` refuses a second concurrent Playwright run.
 - `block-superpowers.sh` refuses `superpowers:*` skills.
+- `block-no-verify.sh` refuses Git commands that skip hooks (`--no-verify`, `git commit -n`, or a `core.hooksPath` override).
 - `format-changed.sh` runs Prettier on a touched `.ts`/`.tsx`/`.md` file only when that file is new or was already Prettier-clean, so legacy files are not reformatted wholesale.
 - `.githooks/pre-commit` (a Git hook, not a Claude hook) rejects commits that add no `CHANGELOG.md` entry; CI runs `scripts/check-changelog.mjs`.
 - `migration-rollback.sh` warns when a migration has no `supabase/rollbacks/rollback_<name>.sql`; CI enforces the same rule for new migrations.

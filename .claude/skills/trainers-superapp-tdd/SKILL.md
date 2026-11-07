@@ -33,20 +33,21 @@ Use these notes only after Fajar explicitly approves a non-E2E test exception. T
 
 Canonical tier definitions, gates, and lane exceptions live in `docs/AGENT_WORKFLOW.md` §7. Do not report durations unless measured in this session.
 
-- Focused E2E: `pnpm --filter @trainers/web test:e2e -- <focused-spec>` — first inspect `apps/web/playwright.config.ts` and the inherited env; every target must be local or test-only and disposable.
+- Focused E2E: `pnpm --dir apps/web exec playwright test <spec-file> -g "<test name>" --reporter=line --workers=1`, with output redirected to a scratchpad log rather than piped through `tail`. API-only specs add `--config=playwright.api.config.ts --project <name>`. First inspect the Playwright config and the inherited env; every target must be local or test-only and disposable.
+- Never use `pnpm --filter @trainers/web test:e2e -- …`: the literal `--` reaches Playwright, `-g` stops being an option, and the whole suite runs.
 - Existing Vitest scripts and suite manifests are legacy inventory. Do not run `test:affected`, `test:core`, `test:fast`, or `test:full` as default verification.
 
-Typecheck/build:
+Typecheck/build (use the workspace `typecheck` scripts, not bare `tsc --noEmit`):
 
 ```bash
-pnpm --dir apps/telefun exec tsc --noEmit -p tsconfig.json
-pnpm --dir apps/api exec tsc --noEmit -p tsconfig.json
-pnpm --filter @trainers/web exec tsc --noEmit
+pnpm --filter @trainers/telefun typecheck
+pnpm --filter @trainers/api typecheck
+pnpm --filter @trainers/web typecheck   # also checks tsconfig.e2e.json, as CI does
 pnpm --dir apps/telefun build
 pnpm --dir apps/api build
 ```
 
-When shared types or web UI change, include the web typecheck. Trust actual command output over stale editor diagnostics.
+When shared types, web UI, or any file under `apps/web/e2e/` changes, include the web typecheck. Trust actual command output over stale editor diagnostics.
 
 ## Final gate
 
