@@ -57,8 +57,69 @@ export const tnaProgramSchema = z.object({
   suggested_modules: z.array(z.enum(["ketik", "pdkt", "telefun"])),
   is_active: z.boolean(),
   created_at: z.string().datetime({ offset: true }),
+  // Phase 5 catalog revision and authorship (NULL for seeded programs).
+  updated_at: z.string().datetime({ offset: true }),
+  created_by: z.string().uuid().nullable(),
+  updated_by: z.string().uuid().nullable(),
 });
 export type TnaProgram = z.infer<typeof tnaProgramSchema>;
+
+// Phase 5 catalog (plans/markdown/tna-phase-5.md D25, K33, K35). Membership is
+// checked against the code registries here; the database checks shape.
+const uniqueArray = <T extends z.ZodTypeAny>(item: T, max: number) =>
+  z
+    .array(item)
+    .max(max)
+    .refine((items) => new Set(items).size === items.length, "Duplikat");
+const programFields = {
+  name: z.string().trim().min(3).max(120),
+  description: z.string().trim().min(10).max(1000),
+  gap_type: tnaGapTypeSchema,
+  trigger_clusters: uniqueArray(tnaClusterIdSchema, 20),
+  service_types: uniqueArray(serviceTypeSchema, 10),
+  suggested_modules: uniqueArray(z.enum(["ketik", "pdkt", "telefun"]), 3),
+};
+export const createTnaProgramSchema = z
+  .object({
+    code: z.string().regex(/^[a-z][a-z0-9-]{2,47}$/),
+    ...programFields,
+  })
+  .strict();
+export type CreateTnaProgram = z.infer<typeof createTnaProgramSchema>;
+export const updateTnaProgramSchema = z
+  .object(programFields)
+  .partial()
+  .extend({ expected_updated_at: z.string().datetime({ offset: true }) })
+  .strict()
+  .refine(
+    (input) => Object.keys(input).some((key) => key !== "expected_updated_at"),
+    "Tidak ada perubahan",
+  );
+export type UpdateTnaProgram = z.infer<typeof updateTnaProgramSchema>;
+export const setTnaProgramActiveSchema = z
+  .object({
+    active: z.boolean(),
+    expected_updated_at: z.string().datetime({ offset: true }),
+  })
+  .strict();
+export const tnaProgramsQuerySchema = z
+  .object({ include_inactive: z.literal("1").optional() })
+  .strict();
+/** Catalog row with the number of plans (any status) that use the program. */
+export type TnaCatalogProgram = TnaProgram & { plan_count: number };
+export interface TnaProgramCoverage {
+  /** P-2: clusters no active program triggers, excluding the catch-all `lainnya`. */
+  uncovered_clusters: z.infer<typeof tnaClusterIdSchema>[];
+}
+/** Program shown on a plan: the activation snapshot when frozen (K34). */
+export const tnaProgramSnapshotSchema = z
+  .object({
+    code: z.string(),
+    name: z.string(),
+    gap_type: tnaGapTypeSchema,
+  })
+  .strict();
+export type TnaProgramSnapshot = z.infer<typeof tnaProgramSnapshotSchema>;
 
 const count = z.number().int().nonnegative();
 const finiteRate = z.number().finite().nonnegative();
@@ -370,6 +431,8 @@ export interface TnaPlan extends z.infer<typeof draftFields> {
   evaluation_due?: boolean;
   activated_at: string | null;
   cancelled_at: string | null;
+  /** Phase 5: frozen at activation; NULL for drafts and earlier plans. */
+  program_snapshot?: TnaProgramSnapshot | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -404,6 +467,7 @@ export const tnaPlanSchema = draftFields.extend({
   cancel_reason: z.string().nullable(),
   activated_at: z.string().datetime({ offset: true }).nullable(),
   cancelled_at: z.string().datetime({ offset: true }).nullable(),
+  program_snapshot: tnaProgramSnapshotSchema.nullable(),
   created_by: z.string().uuid(),
   created_at: z.string().datetime({ offset: true }),
   updated_at: z.string().datetime({ offset: true }),
@@ -442,6 +506,8 @@ export const tnaParametersResponseSchema = z.object({
 export type TnaParametersResponse = z.infer<typeof tnaParametersResponseSchema>;
 export interface TnaPlanDetail {
   plan: TnaPlan;
+  /** P-3: activation snapshot when present, else the current catalog row. */
+  program: TnaProgramSnapshot & { source: "snapshot" | "catalog" };
   participants: TnaPlanParticipant[];
   preview: TnaBaselineSnapshot | null;
   participant_preview: TnaParticipantBaseline[] | null;

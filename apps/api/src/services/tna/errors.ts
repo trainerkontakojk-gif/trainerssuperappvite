@@ -101,6 +101,20 @@ const rpcErrors: Record<
     message:
       "Kebutuhan eskalasi non-training tidak dapat dibuatkan rencana pelatihan.",
   },
+  TNA_PROGRAM_CODE_EXISTS: {
+    status: 409,
+    message: "Kode program sudah dipakai. Pilih kode lain.",
+  },
+  TNA_PROGRAM_STALE: {
+    status: 409,
+    message: "Program sudah berubah, muat ulang sebelum menyimpan.",
+  },
+  TNA_PROGRAM_NOT_FOUND: { status: 404, message: "Program tidak ditemukan." },
+  TNA_INVALID_PROGRAM: {
+    status: 422,
+    message:
+      "Data program belum valid. Periksa kode, nama, deskripsi, klaster, layanan, dan modul latihan.",
+  },
   TNA_PROGRAM_INACTIVE: {
     status: 422,
     message: "Program tidak aktif atau tidak ditemukan. Pilih program lain.",

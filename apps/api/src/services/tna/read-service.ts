@@ -179,6 +179,17 @@ export async function getTnaPlanDetail(
       .single(),
   ]);
   if (programError || periodError) throw programError ?? periodError;
+  // K34/P-3: a plan shows the program as it was at activation; drafts and
+  // plans activated before phase 5 show the current catalog row.
+  const catalogProgram = tnaProgramSchema.parse(program);
+  const shownProgram: TnaPlanDetail["program"] = plan.program_snapshot
+    ? { ...plan.program_snapshot, source: "snapshot" }
+    : {
+        code: catalogProgram.code,
+        name: catalogProgram.name,
+        gap_type: catalogProgram.gap_type,
+        source: "catalog",
+      };
   const computed =
     plan.status === "draft"
       ? await computeTnaBaseline(supabase, need, participants)
@@ -266,11 +277,12 @@ export async function getTnaPlanDetail(
         : [],
     preview: computed?.snapshot ?? null,
     participant_preview: computed?.participantBaselines ?? null,
+    program: shownProgram,
     narrative: snapshot
       ? buildTnaNarrative({
           snapshot,
           need,
-          program: tnaProgramSchema.parse(program),
+          program: { ...catalogProgram, name: shownProgram.name },
           plan,
           period,
           preview: plan.status === "draft",

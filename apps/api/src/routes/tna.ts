@@ -14,6 +14,10 @@ import {
   tnaNeedsQuerySchema,
   tnaParametersQuerySchema,
   tnaParametersResponseSchema,
+  createTnaProgramSchema,
+  updateTnaProgramSchema,
+  setTnaProgramActiveSchema,
+  tnaProgramsQuerySchema,
 } from "@trainers/types";
 import type { AuthVariables } from "../middleware/auth";
 import { requireCapability } from "../middleware/role";
@@ -45,6 +49,13 @@ import {
   listTnaPrograms,
 } from "../services/tna/read-service";
 import { TnaServiceError } from "../services/tna/errors";
+import {
+  createTnaProgram,
+  getTnaProgramCoverage,
+  listTnaCatalogPrograms,
+  setTnaProgramActive,
+  updateTnaProgram,
+} from "../services/tna/catalog-service";
 import { TnaPracticeUnavailableError } from "../services/tna/practice";
 import { TnaPeriodNotFoundError } from "../services/tna/metrics";
 import { efek } from "./efek";
@@ -128,6 +139,21 @@ const invalidInput = (c: Context<{ Variables: AuthVariables }>) =>
     400,
   );
 
+// K35: a catalog form error is a business validation (422), so the UI can
+// show one message for code, text, clusters, services, and modules.
+const invalidProgram = (c: Context<{ Variables: AuthVariables }>) =>
+  c.json(
+    {
+      success: false as const,
+      error: {
+        code: "TNA_INVALID_PROGRAM",
+        message:
+          "Data program belum valid. Periksa kode, nama, deskripsi, klaster, layanan, dan modul latihan.",
+      },
+    },
+    422,
+  );
+
 const writeContext = (c: Context<{ Variables: AuthVariables }>) => ({
   supabase: createUserClient(c.get("token")),
   actorId: c.get("user").id,
@@ -153,8 +179,15 @@ const planInputFailure = (
 
 const tna = new Hono<{ Variables: AuthVariables }>()
   .get("/programs", requireCapability("tna.read"), async (c) => {
+    const query = tnaProgramsQuerySchema.safeParse(c.req.query());
+    if (!query.success) return invalidInput(c);
     try {
-      const data = await listTnaPrograms(createUserClient(c.get("token")));
+      const supabase = createUserClient(c.get("token"));
+      // Default stays the active list used by plan creation and suggestions;
+      // the catalog page asks for every program with its plan count.
+      const data = query.data.include_inactive
+        ? await listTnaCatalogPrograms(supabase)
+        : await listTnaPrograms(supabase);
       return c.json({ success: true as const, data });
     } catch {
       return c.json<ApiResponse<never>>(
@@ -167,6 +200,68 @@ const tna = new Hono<{ Variables: AuthVariables }>()
         },
         503,
       );
+    }
+  })
+  .get("/programs/coverage", requireCapability("tna.read"), async (c) => {
+    try {
+      const data = await getTnaProgramCoverage(
+        createUserClient(c.get("token")),
+      );
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
+  // P-1: catalog writes use tna.write (admin + trainer, K32).
+  .post("/programs", requireCapability("tna.write"), async (c) => {
+    const parsed = createTnaProgramSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) return invalidProgram(c);
+    try {
+      const data = await createTnaProgram({
+        ...writeContext(c),
+        input: parsed.data,
+      });
+      return c.json({ success: true as const, data }, 201);
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
+  .patch("/programs/:id", requireCapability("tna.write"), async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    if (!id.success) return invalidInput(c);
+    const parsed = updateTnaProgramSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!parsed.success) return invalidProgram(c);
+    try {
+      const data = await updateTnaProgram({
+        ...writeContext(c),
+        programId: id.data,
+        input: parsed.data,
+      });
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
+    }
+  })
+  .post("/programs/:id/active", requireCapability("tna.write"), async (c) => {
+    const id = z.string().uuid().safeParse(c.req.param("id"));
+    const parsed = setTnaProgramActiveSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
+    if (!id.success || !parsed.success) return invalidInput(c);
+    try {
+      const data = await setTnaProgramActive({
+        ...writeContext(c),
+        programId: id.data,
+        active: parsed.data.active,
+        expectedUpdatedAt: parsed.data.expected_updated_at,
+      });
+      return c.json({ success: true as const, data });
+    } catch (error) {
+      return tnaFailure(c, error);
     }
   })
   .get("/periods", requireCapability("tna.read"), async (c) => {

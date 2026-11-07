@@ -56,6 +56,9 @@ export const program: TnaProgram = {
   suggested_modules: [],
   is_active: true,
   created_at: timestamp,
+  updated_at: timestamp,
+  created_by: null,
+  updated_by: null,
 };
 export const detail: TnaParameterDetail = {
   metrics,
@@ -133,6 +136,12 @@ export function planDetail(status: TnaPlan["status"] = "draft"): TnaPlanDetail {
       ...plan,
       status,
       baseline_snapshot: status === "aktif" ? baseline : null,
+    },
+    program: {
+      code: program.code,
+      name: program.name,
+      gap_type: program.gap_type,
+      source: status === "draft" ? "catalog" : "snapshot",
     },
     participants: [
       {
