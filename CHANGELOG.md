@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- feat(tna): add the program catalog tab with in-place create and edit forms, deactivation confirmation, uncovered clusters, and the program row on plan detail
+
 - docs(tna): record the phase 5 catalog migration 20261107120000 production apply with read-only preflight and verification
 
 - feat(tna): add the program catalog API (list with plan counts, uncovered clusters, create, edit, activate or deactivate) and show the activation program snapshot on plan detail

@@ -806,6 +806,12 @@ const tnaPlanRoute = createRoute({
   component: lazy(() => import("./routes/tna/plan")),
   beforeLoad: requireCapability("tna.read"),
 });
+const tnaCatalogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tna/katalog",
+  component: lazy(() => import("./routes/tna/catalog")),
+  beforeLoad: requireCapability("tna.read"),
+});
 
 const programSearch = (search: Record<string, unknown>) =>
   typeof search.program === "string" &&
@@ -896,6 +902,7 @@ const routeTree = rootRoute.addChildren([
   tnaParameterRoute,
   tnaNeedRoute,
   tnaPlanRoute,
+  tnaCatalogRoute,
   indexRoute,
   kegiatanRoute,
   dashboardRoute,

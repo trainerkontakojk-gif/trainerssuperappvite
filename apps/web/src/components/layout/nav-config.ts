@@ -293,7 +293,9 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
         ? "Detail parameter"
         : pathname.startsWith("/tna/kebutuhan/")
           ? "Kebutuhan"
-          : "Rencana";
+          : pathname === "/tna/katalog"
+            ? "Katalog program"
+            : "Rencana";
     return [{ label: "TNA", href: "/tna" }, { label }];
   }
 

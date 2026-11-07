@@ -2,6 +2,7 @@ import { useState } from "react";
 import type {
   RootCauseClusterId,
   TnaFollowUp,
+  TnaGapType,
   TnaMetricsSnapshot,
   TnaPlanStatus,
   TnaPracticeModule,
@@ -18,12 +19,12 @@ import { unwrapResponse } from "../../lib/api/unwrap-response";
 
 class TnaConflictError extends Error {}
 // Keep typed RPC envelopes and the existing auth transport; classify actual HTTP 409.
+// Only call this where a 409 can only mean a stale revision.
 export async function tnaResponse<
   T extends Parameters<typeof unwrapResponse>[0],
->(request: Promise<T>) {
+>(request: Promise<T>, conflictMessage = "Rencana sudah berubah, muat ulang") {
   const response = await request;
-  if (response.status === 409)
-    throw new TnaConflictError("Rencana sudah berubah, muat ulang");
+  if (response.status === 409) throw new TnaConflictError(conflictMessage);
   return unwrapResponse(response);
 }
 export const planStatusLabels: Record<TnaPlanStatus, string> = {
@@ -47,6 +48,12 @@ export const interventionLabels = {
   kelas: "Kelas",
   kelompok_kecil: "Kelompok kecil",
   coaching_individu: "Coaching individu",
+};
+export const gapTypeLabels: Record<TnaGapType, string> = {
+  knowledge: "Pengetahuan",
+  skill: "Keterampilan",
+  proses: "Proses",
+  perilaku: "Perilaku",
 };
 export const clusterLabels: Record<RootCauseClusterId, string> = {
   salah_nama_perusahaan_produk: "Salah nama perusahaan atau produk",
@@ -128,7 +135,7 @@ export function useTnaMutation() {
       setConflict(stale);
       setError(
         stale
-          ? "Rencana sudah berubah, muat ulang"
+          ? e.message
           : e instanceof Error
             ? e.message
             : "Perubahan gagal disimpan. Coba lagi.",

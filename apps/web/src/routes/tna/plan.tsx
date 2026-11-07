@@ -88,9 +88,18 @@ function PlanContent({
   };
   return (
     <div className="space-y-8">
-      <p className="text-sm font-medium">
-        Status: {planStatusLabels[p.status]}
-      </p>
+      <div className="space-y-1 text-sm">
+        <p className="font-medium">Status: {planStatusLabels[p.status]}</p>
+        <p>
+          Program: {d.program.name}
+          {d.program.source === "snapshot" && (
+            <span className="text-muted-foreground">
+              {" "}
+              · dibekukan saat aktivasi
+            </span>
+          )}
+        </p>
+      </div>
       <div ref={mutationPanel}>
         <MutationState
           mutation={mutation}
