@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| New | `rollback_20261107120000_tna_phase5_catalog.sql` | Fails closed if any program was created or changed through the catalog writers or any plan has a program snapshot; drops the phase 5 writers, triggers, and columns (no function body to restore); revert the API first |
 | New | `rollback_20261104120000_tna_phase3_practice.sql` | Fails closed if any practice target or practice snapshot exists (would be lost); restores Phase 1 plan writers and Phase 2 completion writer/participant guard; revert the API first |
 | New | `rollback_20261104090000_telefun_scoring_permanent_failure.sql` | Minor data loss: drops the permanent-failure marker, so those failed rows become eligible for automatic retry again (bounded by the attempt budget); revert the API first |
 | New | `rollback_20261103100000_move_legacy_unguarded_definer_functions.sql` | No data loss: moves `consume_rate_limit` and `get_service_trend_dashboard` back to `public` with anon/authenticated EXECUTE, re-exposing them to the anon key; no repo code calls either |

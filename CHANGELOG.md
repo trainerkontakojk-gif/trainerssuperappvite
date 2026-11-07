@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- feat(tna): add phase 5 program catalog writers and a frozen program snapshot on activation (migration 20261107120000 with paired rollback and real-backend E2E)
+
 - docs(tna): add phase 5 T0 discovery report on program catalog consumers, seed, and schema
 
 - docs(tna): cancel phase 4 because leaders get no TNA access, and approve phase 5 decisions K32-K37

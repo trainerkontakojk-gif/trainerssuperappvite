@@ -27,6 +27,10 @@ const MUTATION_FUNCTIONS = [
   "tna_update_evaluation_period(uuid,uuid,timestamptz,uuid)",
   "tna_complete_plan(uuid,uuid,timestamptz,jsonb,jsonb,text,text,text)",
   "tna_cancel_plan(uuid,uuid,timestamptz,text)",
+  // Phase 5 catalog writers (plans/markdown/tna-phase-5.md D24).
+  "tna_create_program(uuid,jsonb)",
+  "tna_update_program(uuid,uuid,timestamptz,jsonb)",
+  "tna_set_program_active(uuid,uuid,timestamptz,boolean)",
 ];
 const users: Record<string, Awaited<ReturnType<typeof createUserWithJwt>>> = {};
 const admin = createAdmin(fixture.env);
@@ -163,7 +167,7 @@ test("mutation RPCs stay callable by client roles and helpers stay private", asy
       ).toBe("t");
     }
   }
-  // Only the five guarded entry points may live in the exposed schema.
+  // Only the guarded entry points listed above may live in the exposed schema.
   expect(
     runSql(
       fixture.env,
