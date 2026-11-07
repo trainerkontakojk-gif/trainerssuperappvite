@@ -524,6 +524,19 @@ Tidak ada kapabilitas baru. `POST /plans/:id/start-evaluation`, `PATCH /plans/:i
 
 Jalur tulis tetap tunggal: route → `write-service.ts` → `supabaseAdmin.rpc()` untuk `tna_start_plan_evaluation`, `tna_update_evaluation_period`, `tna_complete_plan`, `tna_cancel_plan` (overload empat argumen), dan `tna_create_need`. Keempat fungsi public baru/overload tetap EXECUTE untuk anon/authenticated dengan guard service-role pertama (`42501 TNA_FORBIDDEN`). Backend menghitung snapshot evaluasi, verdict, dan nilai peserta dengan JWT pengguna; body klien hanya membawa periode, kesimpulan, tindak lanjut, alasan, dan revision. Pembatalan rencana `aktif`/`evaluasi` wajib alasan, ditegakkan di skema API, RPC, dan trigger. Detail schema: [database TNA Fase 2](database.md#tna--evaluasi-pasca-training-fase-2).
 
+## TNA — latihan simulasi (Fase 3)
+
+Tidak ada kapabilitas baru: `practice_targets` di `POST/PATCH /plans` memakai `tna.write`, progres di `GET /plans/:id` memakai `tna.read`. Leader/agent tetap 403; agent belum punya tampilan progres (K22).
+
+**Batas service-role K21.** RLS riwayat simulasi (`ketik_history`, `pdkt_history`, `telefun_history`) hanya untuk pemilik, sehingga JWT trainer tidak bisa menghitung sesi peserta. `services/tna/practice.ts` adalah satu-satunya jalur TNA yang membaca riwayat itu dengan `createAdminClient()`, dengan batas berikut:
+
+- dipanggil hanya dari route yang sudah lolos `tna.read`/`tna.write`, untuk roster rencana yang sudah dibaca dengan JWT pengguna;
+- hanya memilih `id`, `user_id`, kolom subjek, kolom waktu, skor, dan status review; tidak membaca transkrip, teks skenario, atau data konsumen;
+- `profiler_peserta` dibaca hanya `id, akun_id` untuk peserta roster (cabang `self`);
+- respons hanya berisi jumlah sesi, rata-rata, dan status per peserta.
+
+Target latihan dibaca dengan JWT pengguna (RLS `is_admin_or_trainer()`). Penulisan target dan snapshot tetap lewat RPC service-role dengan guard pertama. Detail schema: [database TNA Fase 3](database.md#tna--latihan-simulasi-fase-3).
+
 ## Katalog dan scope terpadu (2026-10-06)
 
 `packages/types/src/access.ts` adalah katalog tunggal `ROLES`, `Role`, `CAPABILITIES`, `can()` dan metadata approval leader. Boundary menerima empat role canonical (trim/lowercase); alias `trainers`/`agents` dihapus setelah audit lokal dan remote bersih. Nilai tak dikenal mengembalikan `null` dan tidak mendapat capability. `qa` sebagai mode heatmap, jabatan peserta dan speaker transkrip tetap domain terpisah.

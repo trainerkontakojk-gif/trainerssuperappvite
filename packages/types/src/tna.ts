@@ -245,6 +245,19 @@ export const tnaPracticeTargetSchema = z
   })
   .strict();
 export type TnaPracticeTarget = z.infer<typeof tnaPracticeTargetSchema>;
+/** Display labels shared by the API narrative and the web UI. */
+export const TNA_PRACTICE_MODULE_LABELS: Record<TnaPracticeModule, string> = {
+  ketik: "KETIK",
+  pdkt: "PDKT",
+  telefun: "Telefun",
+};
+/** "KETIK 2 sesi, Telefun 1 sesi"; empty string when there are no targets. */
+export const formatTnaPracticeTargets = (targets: TnaPracticeTarget[]) =>
+  targets
+    .map(
+      (t) => `${TNA_PRACTICE_MODULE_LABELS[t.module]} ${t.min_sessions} sesi`,
+    )
+    .join(", ");
 export const tnaPracticeEntrySchema = z
   .object({
     sessions: count,

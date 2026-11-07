@@ -9,6 +9,11 @@ import type {
   TnaPracticeTarget,
   TnaVerdict,
 } from "@trainers/types";
+import {
+  formatTnaPracticeTargets,
+  TNA_PRACTICE_MODULE_LABELS,
+  tnaPracticeModuleSchema,
+} from "@trainers/types";
 import { unwrapResponse } from "../../lib/api/unwrap-response";
 
 class TnaConflictError extends Error {}
@@ -149,16 +154,9 @@ export function parameterQuery(
 }
 
 // Phase 3 practice labels (plans/markdown/tna-phase-3.md D19, Q-1, Q-2).
-export const practiceModules: TnaPracticeModule[] = [
-  "ketik",
-  "pdkt",
-  "telefun",
-];
-export const practiceModuleLabels: Record<TnaPracticeModule, string> = {
-  ketik: "KETIK",
-  pdkt: "PDKT",
-  telefun: "Telefun",
-};
+export const practiceModules: TnaPracticeModule[] =
+  tnaPracticeModuleSchema.options;
+export const practiceModuleLabels = TNA_PRACTICE_MODULE_LABELS;
 export const practiceStatusLabels: Record<TnaPracticeStatus, string> = {
   belum_mulai: "Belum mulai",
   berjalan: "Berjalan",
@@ -171,10 +169,6 @@ export const practiceScoreScale: Record<TnaPracticeModule, number> = {
   telefun: 10,
 };
 export const practiceTargetsText = (targets: TnaPracticeTarget[]) =>
-  targets.length === 0
-    ? "Tanpa target latihan"
-    : targets
-        .map((t) => `${practiceModuleLabels[t.module]} ${t.min_sessions} sesi`)
-        .join(", ");
+  formatTnaPracticeTargets(targets) || "Tanpa target latihan";
 export const telefunPracticeNote =
   "Sesi Telefun dijalankan trainer atas nama peserta, karena agent belum bisa memulai Telefun sendiri.";

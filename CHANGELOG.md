@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-07
+
+- docs(tna): close phase 3 with the T5 review, share practice module labels between API and web, and document practice targets, the frozen snapshot, and the bounded service-role history read
+
 ## 2026-11-06
 
 - feat(tna): add the practice targets section to the plan form and a practice progress section with live, frozen, and retryable states on the plan detail

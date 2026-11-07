@@ -305,6 +305,16 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - **Narasi evaluasi** (`buildTnaEvaluationNarrative`) deterministik, tanpa AI: arah tingkat ("turun/naik dari … menjadi …" atau "tetap di …"), sebaran, verdict, perubahan kohort dengan kata turun/naik/tetap, catatan data belum cukup, awalan `Pratinjau:` selama `evaluasi`, dan penutup indikatif. Narasi Fase 1 tidak berubah.
 - Schema, guard, dan prosedur rilis/rollback: [database](database.md#tna--evaluasi-pasca-training-fase-2); kapabilitas: [auth/RBAC](auth-rbac.md#tna--evaluasi-fase-2). Kontrak: [rencana Fase 2](../plans/markdown/tna-phase-2.md).
 
+### Fase 3 — target latihan simulasi
+
+- **Target:** form rencana punya bagian **Latihan simulasi**: satu target per modul (KETIK, PDKT, Telefun) dengan sesi minimal 1–20, sama untuk semua peserta. Default rencana baru = `suggested_modules` program, 3 sesi, sampai trainer mengubahnya. Target opsional, ikut `POST/PATCH /plans` sebagai `practice_targets`, dan terkunci saat aktivasi (`TNA_PRACTICE_TARGETS_IMMUTABLE`, 409).
+- **Jendela hitung:** `start_date` 00:00 WIB sampai akhir `evaluation_due_date` WIB. Yang dihitung hanya sesi berstatus review `completed` yang punya skor, baik sesi atas nama peserta (`simulation_subject_type = participant`) maupun sesi akun peserta sendiri (`self`, lewat `profiler_peserta.akun_id`).
+- **Progres:** `GET /plans/:id` menambah `practice_targets` dan `practice` (`state`: `live` untuk `aktif`/`evaluasi`, `frozen` untuk `selesai`, `unavailable` bila riwayat simulasi gagal dibaca; `null` tanpa target). Per peserta: jumlah sesi, rata-rata skor pada skala asli (Telefun 0–10, lainnya 0–100), status Belum mulai/Berjalan/Memenuhi. Progres live bisa turun bila riwayat KETIK/PDKT dihapus.
+- **Penyelesaian:** `POST /plans/:id/complete` menghitung progres di server dan membekukannya ke `practice_snapshot` peserta. Bila riwayat gagal dibaca, penyelesaian ditolak 503 `TNA_PRACTICE_UNAVAILABLE` alih-alih membekukan angka tidak lengkap.
+- **Narasi evaluasi** menambah kalimat "x dari N peserta memenuhi target latihan simulasi (…)" (peserta harus memenuhi semua modul). Skor latihan informatif saja, tidak memengaruhi verdict.
+- **UI:** bagian **Progres latihan simulasi** di detail rencana (ringkasan per modul, baris per peserta, keadaan gagal + **Coba lagi**), catatan bahwa sesi Telefun dijalankan trainer atas nama peserta. Belum ada tampilan untuk agent.
+- Schema dan rollback: [database](database.md#tna--latihan-simulasi-fase-3); batas service-role: [auth/RBAC](auth-rbac.md#tna--latihan-simulasi-fase-3). Kontrak: [rencana Fase 3](../plans/markdown/tna-phase-3.md).
+
 ## 10. EFEK — pengecualian agent dari analisis
 
 - Di `/tna/efek/program/$code`, **Pengecualian analisis** menerima agent dan alasan wajib (1–200 karakter setelah trim), maksimal 10 agent unik. Pengecualian berlaku untuk semua keikutsertaan agent dalam program pada filter yang dipilih, bukan menghapus daftar peserta atau mengubah skor SIDAK.

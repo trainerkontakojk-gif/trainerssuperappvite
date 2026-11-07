@@ -504,6 +504,21 @@ Rollback: kembalikan deploy aplikasi terlebih dahulu, lalu jalankan `rollback_20
 - Verifikasi read-only pasca-apply: 13 kolom baru, 3 constraint, indeks `idx_tna_plans_status_evaluation_due`, fungsi `tna_start_plan_evaluation/4`, `tna_update_evaluation_period/4`, `tna_complete_plan/8`, `tna_cancel_plan/4`, helper `valid_eval_period` dan `validate_evaluation_snapshot`; EXECUTE public tetap dengan guard; `tna_create_need` memuat validasi K15 dan tetap `SECURITY DEFINER`. Riwayat remote memuat `20261011130000` dan `20261012150000`. Data TNA tetap 0 baris.
 - Tidak ada penulisan data selain DDL migrasi dan riwayat; RPC tidak dipanggil ke produksi. Karena belum ada rencana, jeda migrasi → deploy tidak berdampak pada pembatalan.
 
+## TNA — Latihan simulasi (Fase 3)
+
+Sumber schema: `supabase/migrations/20261104120000_tna_phase3_practice.sql`, rollback `supabase/rollbacks/rollback_20261104120000_tna_phase3_practice.sql`. Diuji di Supabase lokal (replay bersih, rollback, regresi API/browser). **Belum diterapkan ke produksi**; apply butuh izin Fajar dengan prosedur satu file + `migration repair` seperti Fase 2, bukan `db push`. Kontrak: [rencana Fase 3](../plans/markdown/tna-phase-3.md).
+
+| Objek                                       | Isi                                                                                                                                                                                                                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tna_plan_practice_targets`                 | PK `(plan_id, module)`, FK plan CASCADE, `module` ∈ `ketik`/`pdkt`/`telefun`, `min_sessions` 1–20. RLS SELECT `is_admin_or_trainer()`; client role hanya SELECT, tanpa DML.                                               |
+| `tna_plan_participants.practice_snapshot`   | `jsonb` per modul `{sessions, avg_score, status}`; NULL sampai rencana `selesai`, ditulis sekali saat completion, lalu immutable (`TNA_PRACTICE_SNAPSHOT_IMMUTABLE`).                                                     |
+
+- Trigger `tna_internal.guard_practice_target()` hanya mengizinkan perubahan target saat parent `draft`; cascade tanpa parent lolos. Selain itu `TNA_PRACTICE_TARGETS_IMMUTABLE`.
+- `tna_internal.replace_practice_targets(uuid,jsonb)` memvalidasi array (kunci persis, integer 1–20, modul unik, maksimal 3) → `TNA_INVALID_PRACTICE_TARGETS`. Dipanggil `tna_create_plan` dan `tna_update_draft_plan` bila `p_plan` memuat `practice_targets`.
+- `tna_complete_plan` menerima kunci opsional kelima `practice` per peserta. `tna_internal.valid_practice_snapshot(jsonb,jsonb)` memeriksa kunci = modul target, `sessions = 0` ⇔ rata-rata NULL dan `belum_mulai`, rata-rata dalam skala modul (Telefun ≤ 10, lainnya ≤ 100), dan status konsisten dengan `min_sessions` → `TNA_PRACTICE_SNAPSHOT_INVALID`.
+- Signature semua RPC tidak berubah dan EXECUTE tidak dicabut (alasan crash di atas). Riwayat simulasi tidak disentuh SQL; hitungan dilakukan backend.
+- Rollback **fail-closed** (`TNA_PHASE3_ROLLBACK_DATA_PRESENT`) bila sudah ada target atau snapshot latihan; bila bersih, mengembalikan body fungsi Fase 1/2 lalu membuang objek Fase 3.
+
 ## Storage
 
 Aplikasi menggunakan Supabase Storage bucket:
