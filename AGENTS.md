@@ -15,6 +15,7 @@ High-salience guardrails for every harness. Detailed policy belongs in [`docs/AG
 - Supabase: use the user JWT by default so RLS applies. Service-role/admin access is backend-only for approved jobs. Never expose secrets or query sensitive data directly from the frontend.
 - Every AI call uses backend `logAiUsage()` with `UsageContext` and `userId`; if pricing is unavailable, record tokens at cost zero. Resolve models via `apps/api/src/lib/ai-models.ts`; return human-friendly errors, not raw database errors.
 - Keep one primary path and at most one bounded fallback, only for an explicit user-recoverable failure; never convert failure into plausible success.
+- **No new implicit state machines.** When adding or changing lifecycle state (calls, sessions, jobs, reviews, multi-step async UI), model it as one explicit status union with its transitions in one place: a `useReducer` on the client; a single transition function plus a `WHERE status = <expected>` guard on every status UPDATE on the server. Existing boolean-flag lifecycles (e.g. `PhoneInterface.tsx`) and scattered status writes are legacy: do not copy them, do not refactor them unless the task touches that lifecycle, and report any you find.
 
 ## Test and workflow guardrails
 
