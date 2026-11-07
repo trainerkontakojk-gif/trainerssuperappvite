@@ -282,7 +282,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - Entri TNA tersedia bagi admin/trainer di rail desktop dan drawer mobile, tanpa submenu atau tab mobile baru. Breadcrumb mengikuti halaman; leader/agent tidak melihat entri dan route guard menolak akses.
 - Tingkat adalah temuan **per 100 sesi sampel**, bukan persentase tiket. Phantom-only tetap merupakan audit; tanpa audit menghasilkan tingkat/sebaran `null`, bukan nol. `scope=all` menampilkan parameter dengan baris audit termasuk nol temuan; bila periode tanpa audit, parameter berasal dari pembanding dan ditandai banner no-audit. “Data belum cukup” tidak ditampilkan untuk daftar kosong.
 - State memuat/kosong/gagal + **Coba lagi** eksplisit; konflik 409 mengunci aksi hingga **Muat ulang**. Klaster berlabel **Dugaan otomatis**, bukan diagnosis tervalidasi. Tidak memakai AI, evaluasi Fase 2, atau akses leader (pengelolaan katalog ditambahkan di Fase 5).
-- Akses API `/api/v1/tna/*` hanya admin/trainer melalui `tna.read` dan `tna.write`; leader/agent mendapat 403.
+- Akses API `/api/v1/tna/*` hanya admin/trainer melalui `tna.read` dan `tna.write`; leader/agent mendapat 403. Fase 4 (akses leader) dibatalkan 2026-11-07.
 - Endpoint tersedia: `GET /programs` (katalog aktif), `GET /parameters`, `GET /parameters/detail`, `POST /needs`, `GET /needs`, dan `GET /needs/:id`. Daftar kebutuhan menerima filter `service_type`, `period_id`, dan `outcome`; detail mengembalikan `{ need, plans }`.
 - Drill-down mengembalikan `{ metrics, affected_agents, clusters, sample_tickets, suggested_programs }`. Metrik memakai mesin TNA dan tiga bucket SIDAK; klaster memakai `deriveAgentRootCauses` tanpa registry baru, maksimal 5 klaster, 3 bukti per klaster, dan 10 contoh tiket.
 - Create need menghitung ulang `validation_snapshot` dan `suggested_cluster_id` dari QA saat request. Angka, snapshot, dan identitas actor dari body diabaikan. Kebutuhan boleh dibuat untuk parameter bukan kandidat selama temuan > 0; nol temuan (termasuk tidak ada audit) ditolak dengan 422 `TNA_NO_FINDINGS`.
@@ -324,6 +324,26 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - **Endpoint:** `GET /programs` tetap daftar aktif; `GET /programs?include_inactive=1` mengembalikan semua program + `plan_count`; `GET /programs/coverage` → `{ uncovered_clusters }`; `POST /programs` (201), `PATCH /programs/:id` (wajib `expected_updated_at`, tanpa `code`), `POST /programs/:id/active` (`{ active, expected_updated_at }`). Body tidak valid → 422 `TNA_INVALID_PROGRAM`; kode ganda dan revisi basi → 409; program tidak ada → 404. Detail rencana menambah `program: { code, name, gap_type, source }`. Setiap tulis mencatat `logActivity` (`module: tna`).
 - Data lama SIDAK: query read-only produksi 2026-11-07 menemukan 0 parameter tanpa master, jadi tidak ada backfill ([laporan T4](../plans/markdown/tna-phase-5-t4-report.md)).
 - Schema dan rollback: [database](database.md#tna--katalog-program-fase-5); akses: [auth/RBAC](auth-rbac.md#tna--katalog-program-fase-5). Kontrak: [rencana Fase 5](../plans/markdown/tna-phase-5.md).
+
+### Fase 6 — hasil rencana, ekspor, dan pengingat
+
+- **Tab Hasil rencana** (`/tna/hasil`): rangkuman rencana `selesai` dari angka beku (baseline saat aktivasi, evaluasi saat selesai); SIDAK tidak dihitung ulang.
+  - **Filter:** kelompokkan menurut program (bawaan), jenis gap, atau layanan; rentang tanggal selesai (hari kalender WIB). Disimpan di URL `?group=&from=&to=`.
+  - **Ringkasan:** jumlah selesai, persentase tercapai penuh, median perubahan tingkat ("Turun/Naik X per 100 sesi"), median durasi aktivasi–selesai.
+  - **Per kelompok:** bar verdict (hijau/abu/merah) yang selalu disertai teks jumlah; keterangan "Data sedikit" bila kurang dari 3 rencana; tindak lanjut; dan "Lihat n rencana" yang menaut ke detail tiap rencana.
+  - **Sumber kelompok:** program memakai nama saat aktivasi (snapshot Fase 5); jenis gap memakai gap yang divalidasi trainer di kebutuhan.
+  - Halaman hanya untuk rencana TNA dan menaut ke EFEK untuk efek kelas simulasi. Selama belum ada rencana selesai, tampil "Belum ada rencana selesai…".
+- **Ekspor ringkasan:** tombol di detail rencana `aktif`, `evaluasi`, dan `selesai`. Tombol mengunduh satu file HTML siap cetak (`TNA-{judul}-{tanggal}.html`) yang dibuat di browser dari detail rencana yang sudah dimuat. Isinya:
+  - rencana dan target, baseline beku, Ringkasan TNA, peserta, dan progres latihan;
+  - Ringkasan evaluasi begitu evaluasi dimulai;
+  - verdict, kesimpulan, dan tindak lanjut hanya saat `selesai`.
+- **Badge jatuh tempo:** angka rencana yang perlu dievaluasi pada entri TNA di sidebar, rail, drawer, dan tab ponsel; pembaca layar mendengar "n rencana perlu dievaluasi".
+  - Dimuat saat shell dibuka dan setiap pindah halaman di `/tna`, tanpa polling. Perubahan status dari dalam halaman yang sama baru terlihat di badge setelah pindah halaman.
+  - Hanya untuk peran dengan `tna.read`; tidak tampil bila 0 atau gagal dimuat.
+- **Endpoint:**
+  - `GET /tna/effectiveness?from&to&group_by=program|gap_type|service` → `{ group_by, from, to, summary, groups }`; query tidak valid atau `from > to` → 400.
+  - `GET /tna/plans/due-count` → `{ count }`, aturan jatuh tempo WIB yang sama dengan `GET /tna/plans?due=1`.
+- Tidak ada migrasi. Akses: [auth/RBAC](auth-rbac.md#tna--hasil-rencana-dan-pengingat-fase-6). Kontrak: [rencana Fase 6](../plans/markdown/tna-phase-6.md).
 
 ## 10. EFEK — pengecualian agent dari analisis
 

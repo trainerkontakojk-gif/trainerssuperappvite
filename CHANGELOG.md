@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-07
 
+- docs(tna): close phase 6 with the T5 review report and results, export, and badge sections in modules and auth-rbac docs
+
 - feat(tna): add the Hasil rencana dashboard tab and the due plan badge in navigation, with a shared due-count mock in browser test harnesses
 
 - feat(tna): add a printable HTML summary export on active, evaluating, and completed plan detail

@@ -550,6 +550,17 @@ Tidak ada kapabilitas baru (P-1). Admin dan trainer mengelola katalog (K32); lea
 
 Leader/agent → 403, tanpa token → 401 (diuji di `tna-catalog-api.spec.ts`). Actor selalu dari autentikasi; `created_by`/`is_active` di body ditolak skema strict. Ketiga writer tetap EXECUTE untuk anon/authenticated dengan guard service-role pertama (`42501 TNA_FORBIDDEN`), dan inventaris `tna-access-api.spec.ts` mencakup ketiganya. Snapshot program diisi trigger database, bukan oleh klien. Detail schema: [database TNA Fase 5](database.md#tna--katalog-program-fase-5).
 
+## TNA — hasil rencana dan pengingat (Fase 6)
+
+Tidak ada kapabilitas baru. Kedua endpoint hanya membaca dengan JWT pengguna (RLS `is_admin_or_trainer()` pada `tna_plans`, `tna_needs`, `tna_programs`), tanpa service-role.
+
+| Endpoint                          | Kapabilitas | Jalur data                                                                 |
+| --------------------------------- | ----------- | -------------------------------------------------------------------------- |
+| `GET /v1/tna/effectiveness`       | `tna.read`  | Rencana `selesai` + kebutuhan + program, kolom yang dipakai saja.          |
+| `GET /v1/tna/plans/due-count`     | `tna.read`  | Hitungan `head` rencana `aktif` jatuh tempo (WIB) dan `evaluasi`.          |
+
+Leader/agent → 403, tanpa token → 401 (diuji di `tna-effectiveness-api.spec.ts`). Shell hanya memanggil `due-count` untuk peran dengan `tna.read`, jadi leader dan agent tidak pernah mengirim request itu. Ekspor ringkasan dibuat di browser dari `GET /v1/tna/plans/:id` yang sudah dibatasi `tna.read`; tidak ada endpoint ekspor.
+
 ## Katalog dan scope terpadu (2026-10-06)
 
 `packages/types/src/access.ts` adalah katalog tunggal `ROLES`, `Role`, `CAPABILITIES`, `can()` dan metadata approval leader. Boundary menerima empat role canonical (trim/lowercase); alias `trainers`/`agents` dihapus setelah audit lokal dan remote bersih. Nilai tak dikenal mengembalikan `null` dan tidak mendapat capability. `qa` sebagai mode heatmap, jabatan peserta dan speaker transkrip tetap domain terpisah.
