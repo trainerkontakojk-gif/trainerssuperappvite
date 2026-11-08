@@ -53,7 +53,10 @@ const MOCKS: readonly ApiMock[] = [
   {
     method: "POST",
     path: "/api/v1/profiler/peserta/bulk",
-    body: { success: true, data: [] },
+    body: {
+      success: true,
+      data: [{ nama: "Andi Saputra" }, { nama: "Maya Putri" }],
+    },
   },
   {
     method: "POST",
@@ -241,6 +244,64 @@ test.describe("Profiler tahap 3: tambah, impor, dan tim di workspace", () => {
     console.log("[audit]", formatAudit(audit));
     expectHermetic(audit);
   });
+
+  for (const scenario of ["partial", "unknown"] as const) {
+    test(`impor: ${scenario === "partial" ? "jumlah sesuai hasil server" : "respons hilang tidak memicu penulisan ulang"}`, async ({
+      page,
+    }) => {
+      const writes = collectWrites(page);
+      const audit = await openHermeticShell(page, {
+        path: "/profiler?batch=Batch%20Pagi&view=impor",
+        waitForUrl: /\/profiler/,
+        apiMocks:
+          scenario === "partial"
+            ? [
+                {
+                  method: "POST",
+                  path: "/api/v1/profiler/peserta/bulk",
+                  body: { success: true, data: [{ nama: "Andi Saputra" }] },
+                },
+                ...MOCKS,
+              ]
+            : MOCKS,
+        beforeNavigate:
+          scenario === "unknown"
+            ? async (target) => {
+                await target.route("**/api/v1/profiler/peserta/bulk", (route) =>
+                  route.abort("connectionreset"),
+                );
+              }
+            : undefined,
+      });
+      await page.getByLabel("Pilih file").setInputFiles({
+        name: "peserta.csv",
+        mimeType: "text/csv",
+        buffer: csv([
+          IMPORT_HEADER,
+          ["Andi Saputra", "Tim Call", "CCA", "OJK-010", ""],
+          ["Maya Putri", "Tim Call", "CCA", "OJK-011", ""],
+        ]),
+      });
+      await page.getByRole("button", { name: "Simpan 2 peserta" }).click();
+      if (scenario === "partial") {
+        await expect(
+          page.getByText("1 peserta disimpan ke Batch Pagi.", { exact: false }),
+        ).toBeVisible();
+        await expect(page.getByText(/Maya Putri/).last()).toBeVisible();
+        await expect(
+          page.getByText(/Tidak disimpan oleh server/),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.getByText(/Hasil belum dapat dipastikan/).first(),
+        ).toBeVisible();
+        expect(writes.map((write) => write.path)).toEqual([
+          "/api/v1/profiler/peserta/bulk",
+        ]);
+      }
+      expectHermetic(audit);
+    });
+  }
 
   test("impor: kolom yang tidak cocok dengan template ditolak tanpa menyimpan", async ({
     page,

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useReducer, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Textarea } from "../../../components/ui/textarea";
@@ -41,6 +41,23 @@ function writeDraft(key: string, text: string) {
   }
 }
 
+type ReplyPhase = "editing" | "confirming" | "sending" | "failed" | "sent";
+type ReplyAction = "confirm" | "cancel" | "send" | "fail" | "sent";
+function replyReducer(phase: ReplyPhase, action: ReplyAction): ReplyPhase {
+  switch (action) {
+    case "confirm":
+      return phase === "sending" || phase === "sent" ? phase : "confirming";
+    case "cancel":
+      return phase === "confirming" ? "editing" : phase;
+    case "send":
+      return phase === "confirming" ? "sending" : phase;
+    case "fail":
+      return phase === "sending" ? "failed" : phase;
+    case "sent":
+      return phase === "sending" ? "sent" : phase;
+  }
+}
+
 /** Tahap Tanggapi: menulis balasan. Draf tersimpan per email di perangkat ini. */
 export function ReplyComposer({
   mailboxId,
@@ -52,11 +69,21 @@ export function ReplyComposer({
   const draftKey = `pdkt_draft_${mailboxId}`;
   const textareaId = useId();
   const [replyText, setReplyText] = useState(() => readDraft(draftKey));
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [phase, dispatch] = useReducer(replyReducer, "editing");
+  const confirmOpen = phase === "confirming";
+  const sendInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   // Ruang kerja PDKT adalah lapisan `fixed z-[100]`; dialog dirender di
   // dalamnya supaya tidak tertutup editor.
-  const [dialogContainer, setDialogContainer] =
-    useState<HTMLDivElement | null>(null);
+  const [dialogContainer, setDialogContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
   const latestTextRef = useRef(replyText);
   const sentRef = useRef(false);
 
@@ -75,28 +102,42 @@ export function ReplyComposer({
   );
 
   const words = replyText.trim() ? replyText.trim().split(/\s+/).length : 0;
-  const canSend = replyText.trim().length > 0 && !isLoading;
+  const sending = isLoading || phase === "sending";
+  const canSend = replyText.trim().length > 0 && !sending && phase !== "sent";
 
   const send = async () => {
-    setConfirmOpen(false);
-    sentRef.current = true;
-    const ok = await onSend(replyText);
-    if (ok === false) {
-      sentRef.current = false;
-      return;
-    }
+    if (sendInFlight.current || !canSend || phase !== "confirming") return;
+    const submittedText = replyText;
+    sendInFlight.current = true;
+    dispatch("send");
+    // A pending request is not an acknowledged send. Persist before awaiting.
+    writeDraft(draftKey, submittedText);
     try {
-      localStorage.removeItem(draftKey);
+      const ok = await onSend(submittedText);
+      if (ok === false) {
+        if (mounted.current) dispatch("fail");
+        return;
+      }
+      sentRef.current = true;
+      // A late success must not delete a different draft typed after reopening.
+      if (readDraft(draftKey) === submittedText) writeDraft(draftKey, "");
+      if (mounted.current) {
+        latestTextRef.current = "";
+        setReplyText("");
+        dispatch("sent");
+      }
     } catch {
-      // noop
+      // Rejection and a false result both preserve the draft for retry.
+      if (mounted.current) dispatch("fail");
+    } finally {
+      sendInFlight.current = false;
     }
-    setReplyText("");
   };
 
   return (
     <section
       aria-label="Tulis balasan"
-      aria-busy={isLoading}
+      aria-busy={sending}
       className="flex min-h-0 flex-1 flex-col bg-surface-elevated"
     >
       <dl className="flex shrink-0 flex-col gap-1.5 border-b border-border px-4 py-3 text-[12px] md:px-6">
@@ -123,7 +164,7 @@ export function ReplyComposer({
           id={textareaId}
           value={replyText}
           onChange={(event) => setReplyText(event.target.value)}
-          readOnly={isLoading}
+          readOnly={sending}
           className="min-h-64 flex-1 resize-none bg-background p-4 text-[15px] leading-[26px]"
           autoFocus
         />
@@ -136,11 +177,11 @@ export function ReplyComposer({
         </span>
         <Button
           type="button"
-          onClick={() => setConfirmOpen(true)}
+          onClick={() => dispatch("confirm")}
           disabled={!canSend}
           className="min-h-[44px] gap-2 px-5 text-[13px] font-semibold"
         >
-          {isLoading ? (
+          {sending ? (
             <>
               <Loader2
                 aria-hidden="true"
@@ -158,10 +199,15 @@ export function ReplyComposer({
       </div>
 
       <div ref={setDialogContainer} className="contents" />
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => dispatch(open ? "confirm" : "cancel")}
+      >
         <DialogContent
           container={dialogContainer}
-          showCloseButton={false} className="sm:max-w-md">
+          showCloseButton={false}
+          className="sm:max-w-md"
+        >
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">
               Kirim balasan sekarang?
@@ -175,7 +221,7 @@ export function ReplyComposer({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setConfirmOpen(false)}
+              onClick={() => dispatch("cancel")}
               className="min-h-[44px]"
             >
               Periksa lagi

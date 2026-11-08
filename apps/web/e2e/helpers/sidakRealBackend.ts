@@ -48,6 +48,40 @@ function assertLoopback(host: string, label: string): void {
 }
 
 export function readLoopbackEnv(): LoopbackEnv {
+  // Explicit disposable workdir takes precedence over the developer's existing
+  // integration database. Resolve local credentials internally; never log them.
+  const workdir = process.env.E2E_SUPABASE_WORKDIR;
+  if (workdir) {
+    const status: Record<string, unknown> = JSON.parse(
+      execFileSync("supabase", ["status", "--workdir", workdir, "-o", "json"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }),
+    );
+    const get = (key: string): string => {
+      const value = status[key];
+      if (typeof value !== "string" || !value)
+        throw new Error(`[e2e guard] Disposable target is missing ${key}`);
+      return value;
+    };
+    const env = {
+      apiUrl: get("API_URL"),
+      dbUrl: get("DB_URL"),
+      anonKey: get("ANON_KEY"),
+      serviceRoleKey: get("SERVICE_ROLE_KEY"),
+    };
+    let apiHost: string;
+    let dbHost: string;
+    try {
+      apiHost = new URL(env.apiUrl).hostname;
+      dbHost = new URL(env.dbUrl).hostname;
+    } catch {
+      throw new Error("[e2e guard] Invalid disposable database target URL");
+    }
+    assertLoopback(apiHost, "disposable API_URL");
+    assertLoopback(dbHost, "disposable DB_URL");
+    return env;
+  }
   if (!existsSync(INTEGRATION_ENV)) {
     throw new Error("apps/api/.env.integration tidak ada");
   }
@@ -56,10 +90,17 @@ export function readLoopbackEnv(): LoopbackEnv {
     raw.match(new RegExp(`^${key}=(.+)$`, "m"))?.[1]?.trim();
   const apiUrl = value("SUPABASE_URL");
   const dbUrl = value("SUPABASE_DB_URL");
-  if (!apiUrl || !dbUrl) throw new Error("apps/api/.env.integration tidak lengkap");
+  if (!apiUrl || !dbUrl)
+    throw new Error("apps/api/.env.integration tidak lengkap");
 
   assertLoopback(new URL(apiUrl).hostname, "SUPABASE_URL");
-  assertLoopback(dbUrl.replace(/^[a-z]+:\/\//i, "").replace(/^[^@/]*@/, "").split(/[/:]/)[0]!, "SUPABASE_DB_URL");
+  assertLoopback(
+    dbUrl
+      .replace(/^[a-z]+:\/\//i, "")
+      .replace(/^[^@/]*@/, "")
+      .split(/[/:]/)[0]!,
+    "SUPABASE_DB_URL",
+  );
 
   return {
     apiUrl,
@@ -89,7 +130,9 @@ export function sqlOne(env: LoopbackEnv, query: string): string {
     .map((l) => l.trim())
     .filter(Boolean);
   if (lines.length !== 1) {
-    throw new Error(`Diharapkan 1 baris, dapat ${lines.length}: ${query.slice(0, 100)}`);
+    throw new Error(
+      `Diharapkan 1 baris, dapat ${lines.length}: ${query.slice(0, 100)}`,
+    );
   }
   return lines[0]!;
 }
@@ -208,16 +251,13 @@ export async function createRealSidakApp(
   let core: unknown;
   let ruleVersions: unknown;
   try {
-    ({ sidakTemuan: temuan } = await import(
-      "../../../api/src/routes/sidak/temuan"
-    ));
-    ({ sidakHeatmap: heatmap } = await import(
-      "../../../api/src/routes/sidak/heatmap"
-    ));
+    ({ sidakTemuan: temuan } =
+      await import("../../../api/src/routes/sidak/temuan"));
+    ({ sidakHeatmap: heatmap } =
+      await import("../../../api/src/routes/sidak/heatmap"));
     ({ sidakCore: core } = await import("../../../api/src/routes/sidak/core"));
-    ({ sidakRuleVersions: ruleVersions } = await import(
-      "../../../api/src/routes/sidak/rule-versions"
-    ));
+    ({ sidakRuleVersions: ruleVersions } =
+      await import("../../../api/src/routes/sidak/rule-versions"));
   } finally {
     for (const [key, value] of saved) {
       if (value === undefined) delete process.env[key];

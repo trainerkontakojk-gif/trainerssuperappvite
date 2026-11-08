@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   EFEK_MAX_IMPORT_SESSIONS,
@@ -52,60 +52,153 @@ async function readSheets(file: File): Promise<Record<string, string[][]>> {
   return text.sheets;
 }
 
+type ImportState = {
+  phase: "empty" | "reading" | "matching" | "ready" | "importing" | "failed";
+  generation: number;
+  fileName: string;
+  readError: string | null;
+  rows: EfekImportRow[];
+  problems: EfekImportProblem[];
+  matches: Record<string, EfekNameMatch>;
+  chosen: Record<string, string>;
+};
+type ImportAction = { generation: number } & (
+  | { type: "file-start"; fileName: string }
+  | { type: "parsed"; rows: EfekImportRow[]; problems: EfekImportProblem[] }
+  | {
+      type: "matched";
+      matches: Record<string, EfekNameMatch>;
+      chosen: Record<string, string>;
+    }
+  | { type: "file-failed"; error: string }
+  | { type: "choose"; name: string; id: string }
+  | { type: "import-start" }
+  | { type: "import-finished" }
+);
+const emptyImport: ImportState = {
+  phase: "empty",
+  generation: 0,
+  fileName: "",
+  readError: null,
+  rows: [],
+  problems: [],
+  matches: {},
+  chosen: {},
+};
+
+function importReducer(state: ImportState, action: ImportAction): ImportState {
+  if (action.type === "file-start") {
+    return state.phase === "importing" || action.generation <= state.generation
+      ? state
+      : {
+          ...emptyImport,
+          phase: "reading",
+          generation: action.generation,
+          fileName: action.fileName,
+        };
+  }
+  if (action.generation !== state.generation) return state;
+  switch (action.type) {
+    case "parsed":
+      return {
+        ...state,
+        phase: action.rows.length ? "matching" : "ready",
+        rows: action.rows,
+        problems: action.problems,
+      };
+    case "matched":
+      return {
+        ...state,
+        phase: "ready",
+        matches: action.matches,
+        chosen: action.chosen,
+      };
+    case "file-failed":
+      return { ...state, phase: "failed", readError: action.error };
+    case "choose":
+      return state.phase !== "ready"
+        ? state
+        : { ...state, chosen: { ...state.chosen, [action.name]: action.id } };
+    case "import-start":
+      return state.phase !== "ready" ? state : { ...state, phase: "importing" };
+    case "import-finished":
+      return state.phase !== "importing" ? state : { ...state, phase: "ready" };
+  }
+}
+
 export default function EfekImportPage() {
   const navigate = useNavigate();
   const programs = useApi<EfekProgram[]>("/tna/efek/programs");
   const mutation = useTnaMutation();
-  const [fileName, setFileName] = useState("");
-  const [readError, setReadError] = useState<string | null>(null);
-  const [reading, setReading] = useState(false);
-  const [rows, setRows] = useState<EfekImportRow[]>([]);
-  const [problems, setProblems] = useState<EfekImportProblem[]>([]);
-  const [matches, setMatches] = useState<Record<string, EfekNameMatch>>({});
-  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const [state, dispatch] = useReducer(importReducer, emptyImport);
+  const { fileName, readError, rows, problems, matches, chosen } = state;
+  const reading = state.phase === "reading" || state.phase === "matching";
+  const importing = state.phase === "importing";
+  const generation = useRef(0);
+  const importInFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      generation.current++;
+    };
+  }, []);
 
   async function onFile(file: File | undefined) {
-    if (!file || !programs.data) return;
-    setReadError(null);
-    setRows([]);
-    setProblems([]);
-    setMatches({});
-    setChosen({});
-    setFileName(file.name);
+    if (!file || !programs.data || importInFlight.current) return;
+    const request = ++generation.current;
+    const current = () => mounted.current && generation.current === request;
+    dispatch({ type: "file-start", generation: request, fileName: file.name });
     if (file.size > MAX_FILE_BYTES) {
-      setReadError("File terlalu besar. Maksimal 5 MB.");
+      dispatch({
+        type: "file-failed",
+        generation: request,
+        error: "File terlalu besar. Maksimal 5 MB.",
+      });
       return;
     }
-    setReading(true);
     try {
       const parsed = parseEfekSheets(await readSheets(file), programs.data);
+      if (!current()) return;
       const names = [...new Set(parsed.rows.map((r) => r.name))];
       if (names.length > EFEK_MAX_MATCH_NAMES)
         throw new Error(
           `Maksimal ${EFEK_MAX_MATCH_NAMES} nama per impor. Pecah file menjadi beberapa bagian.`,
         );
-      setRows(parsed.rows);
-      setProblems(parsed.problems);
+      dispatch({
+        type: "parsed",
+        generation: request,
+        rows: parsed.rows,
+        problems: parsed.problems,
+      });
       if (names.length === 0) return;
       const result = await unwrapResponse(
         await rpcClient.v1.tna.efek.import.match.$post({ json: { names } }),
       );
+      if (!current()) return;
       const byName: Record<string, EfekNameMatch> = {};
       const picks: Record<string, string> = {};
       for (const item of result.items) {
         byName[item.name] = item;
         if (item.status === "cocok") picks[item.name] = item.candidates[0]!.id;
       }
-      setMatches(byName);
-      setChosen(picks);
+      dispatch({
+        type: "matched",
+        generation: request,
+        matches: byName,
+        chosen: picks,
+      });
     } catch (e) {
-      setReadError(
-        e instanceof Error && e.message
-          ? e.message
-          : "File tidak bisa dibaca. Pastikan formatnya .xlsx atau .csv.",
-      );
-    } finally {
-      setReading(false);
+      if (current())
+        dispatch({
+          type: "file-failed",
+          generation: request,
+          error:
+            e instanceof Error && e.message
+              ? e.message
+              : "File tidak bisa dibaca. Pastikan formatnya .xlsx atau .csv.",
+        });
     }
   }
 
@@ -150,6 +243,34 @@ export default function EfekImportPage() {
   const programName = (code: string) =>
     programs.data?.find((p) => p.code === code)?.name ?? code;
 
+  async function commitImport() {
+    if (
+      importInFlight.current ||
+      state.phase !== "ready" ||
+      mutation.busy ||
+      mutation.conflict ||
+      !sessions.length ||
+      tooBig
+    )
+      return;
+    importInFlight.current = true;
+    const request = state.generation;
+    dispatch({ type: "import-start", generation: request });
+    try {
+      await mutation.run(async () => {
+        await unwrapResponse(
+          await rpcClient.v1.tna.efek.import.$post({ json: { sessions } }),
+        );
+        if (mounted.current && generation.current === request)
+          await navigate({ to: "/tna/efek" });
+      }, "Peserta diimpor");
+    } finally {
+      importInFlight.current = false;
+      if (mounted.current && generation.current === request)
+        dispatch({ type: "import-finished", generation: request });
+    }
+  }
+
   return (
     <Surface
       title="Impor peserta pelatihan"
@@ -182,6 +303,7 @@ export default function EfekImportPage() {
                 type="file"
                 accept=".xlsx,.csv"
                 aria-label="File daftar peserta"
+                disabled={importing}
                 className="sr-only"
                 onChange={(e) => {
                   void onFile(e.target.files?.[0]);
@@ -282,12 +404,15 @@ export default function EfekImportPage() {
                         {match?.status === "pilih" && (
                           <select
                             aria-label={`Pilih peserta untuk ${row.name}`}
+                            disabled={importing}
                             className={selectClass}
                             value={chosen[row.name] ?? ""}
                             onChange={(e) =>
-                              setChosen({
-                                ...chosen,
-                                [row.name]: e.target.value,
+                              dispatch({
+                                type: "choose",
+                                generation: state.generation,
+                                name: row.name,
+                                id: e.target.value,
                               })
                             }
                           >
@@ -337,17 +462,14 @@ export default function EfekImportPage() {
           <MutationState mutation={mutation} reload={() => location.reload()} />
           <Button
             className="min-h-[44px]"
-            disabled={mutation.busy || sessions.length === 0 || tooBig}
-            onClick={() =>
-              mutation.run(async () => {
-                await unwrapResponse(
-                  await rpcClient.v1.tna.efek.import.$post({
-                    json: { sessions },
-                  }),
-                );
-                await navigate({ to: "/tna/efek" });
-              }, "Peserta diimpor")
+            disabled={
+              state.phase !== "ready" ||
+              mutation.busy ||
+              mutation.conflict ||
+              sessions.length === 0 ||
+              tooBig
             }
+            onClick={() => void commitImport()}
           >
             {mutation.busy
               ? "Mengimpor…"

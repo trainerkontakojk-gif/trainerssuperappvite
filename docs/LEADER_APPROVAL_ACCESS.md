@@ -74,6 +74,14 @@ Leader opens KTP/SIDAK page
 5. Reassign allows changing access groups for already-approved requests without revoking
 6. Manage access groups at `/dashboard/access-groups`
 
+### Transaksi perubahan persetujuan
+
+Endpoint approve/reject/revoke/reassign memakai satu RPC backend `transition_leader_access` (`20261108000000_leader_access_transitions.sql`). Fungsi mengunci request, memeriksa aktor admin/trainer aktif dan masa aktifnya, kemudian menerapkan transisi dengan expected status: approve/reject hanya dari `pending`, revoke/reassign hanya dari `approved`. Self-approve dan penggantian grup sendiri ditolak. Grup wajib aktif dan ditautkan dalam transaksi yang sama; kegagalan tidak memerlukan write kompensasi dan tidak menyisakan status/grup parsial.
+
+Konflik transisi menghasilkan HTTP 409; request tidak ditemukan 404; aktor/self-review terlarang 403; grup invalid 400; kesalahan database lain 500 dengan pesan umum. Capability endpoint tetap berlaku. RPC menolak anon/authenticated pada baris pertama melalui `app_internal.assert_service_role()` dan memakai `search_path` kosong. Ini tidak mengubah grant/RLS tabel untuk klien lain; jaminan transaksi berlaku pada jalur API/RPC ini.
+
+Terapkan migration sebelum merilis API baru. Rollback: kembalikan API dulu, baru drop fungsi dengan rollback berpasangan. Pengujian lokal tidak berarti migration sudah diterapkan di server remote.
+
 ### RLS Policies
 
 - `leader_access_requests`: Leader only sees and inserts own pending requests; Admin/trainer can manage all

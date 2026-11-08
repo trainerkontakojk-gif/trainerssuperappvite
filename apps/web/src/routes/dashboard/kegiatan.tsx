@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import type { FormEvent } from "react";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -102,19 +109,42 @@ function FormFieldError({ children }: { children?: string }) {
   ) : null;
 }
 
+type ActivityFormPhase = "closed" | "editing" | "saving" | "failed";
+type ActivityFormAction = "open" | "close" | "save" | "fail" | "settle";
+function activityFormReducer(
+  phase: ActivityFormPhase,
+  action: ActivityFormAction,
+): ActivityFormPhase {
+  switch (action) {
+    case "open":
+      return phase === "saving" ? phase : "editing";
+    case "close":
+      return "closed";
+    case "save":
+      return phase === "editing" || phase === "failed" ? "saving" : phase;
+    case "fail":
+      return phase === "saving" ? "failed" : phase;
+    case "settle":
+      return phase === "saving" ? "editing" : phase;
+  }
+}
+
 export default function DashboardKegiatan() {
   const [year, setYear] = useState(currentYear);
   const [allItems, setAllItems] = useState<TrainerActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formPhase, dispatchForm] = useReducer(activityFormReducer, "closed");
+  const formOpen = formPhase !== "closed";
+  const saving = formPhase === "saving";
+  const mutationInFlight = useRef(false);
   const [editing, setEditing] = useState<TrainerActivity | null>(null);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [saving, setSaving] = useState(false);
+
   const [deleteTarget, setDeleteTarget] = useState<TrainerActivity | null>(
     null,
   );
@@ -155,26 +185,28 @@ export default function DashboardKegiatan() {
   );
 
   const openCreateForm = () => {
+    if (mutationInFlight.current) return;
     setEditing(null);
     setForm(emptyForm());
     setFile(null);
     setPreviewUrl(null);
     setErrors({});
-    setFormOpen(true);
+    dispatchForm("open");
   };
 
   const openEditForm = (item: TrainerActivity) => {
+    if (mutationInFlight.current) return;
     setEditing(item);
     setForm(formFromActivity(item));
     setFile(null);
     setPreviewUrl(item.image_url);
     setErrors({});
-    setFormOpen(true);
+    dispatchForm("open");
   };
 
   const closeForm = (open: boolean) => {
-    if (saving) return;
-    setFormOpen(open);
+    if (mutationInFlight.current) return;
+    dispatchForm(open ? "open" : "close");
     if (!open) {
       setFile(null);
       setPreviewUrl(null);
@@ -189,6 +221,8 @@ export default function DashboardKegiatan() {
 
   const submitForm = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (mutationInFlight.current || !formOpen) return;
+    mutationInFlight.current = true;
     // Field rules live in the shared schema; only the file needs checks before
     // it is read into a data URL.
     const imageError =
@@ -201,7 +235,7 @@ export default function DashboardKegiatan() {
             : undefined;
 
     setErrors({});
-    setSaving(true);
+    dispatchForm("save");
     setPageError(null);
     try {
       const image = file && !imageError ? await toDataUrl(file) : undefined;
@@ -260,19 +294,23 @@ export default function DashboardKegiatan() {
         setNotice("Kegiatan berhasil ditambahkan.");
       }
       setYear(saved.year);
-      setFormOpen(false);
+      dispatchForm("close");
       setFile(null);
       setPreviewUrl(null);
     } catch {
+      dispatchForm("fail");
       setPageError(
         "Kegiatan belum dapat disimpan. Periksa data lalu coba lagi.",
       );
     } finally {
-      setSaving(false);
+      mutationInFlight.current = false;
+      dispatchForm("settle");
     }
   };
 
   const togglePublished = async (item: TrainerActivity) => {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setPendingAction(true);
     setPageError(null);
     try {
@@ -304,12 +342,14 @@ export default function DashboardKegiatan() {
     } catch {
       setPageError("Status kegiatan belum dapat diubah. Silakan coba lagi.");
     } finally {
+      mutationInFlight.current = false;
       setPendingAction(false);
     }
   };
 
   const deleteItem = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setPendingAction(true);
     setPageError(null);
     try {
@@ -326,6 +366,7 @@ export default function DashboardKegiatan() {
     } catch {
       setPageError("Kegiatan belum dapat dihapus. Silakan coba lagi.");
     } finally {
+      mutationInFlight.current = false;
       setPendingAction(false);
     }
   };
@@ -335,7 +376,11 @@ export default function DashboardKegiatan() {
       title="Kelola Kegiatan"
       description="Tambah, perbarui, dan atur kegiatan yang tampil di laman publik."
       actions={
-        <Button onClick={openCreateForm} className="min-h-11 gap-2">
+        <Button
+          onClick={openCreateForm}
+          disabled={saving || pendingAction}
+          className="min-h-11 gap-2"
+        >
           <Plus size={17} aria-hidden="true" />
           Tambah kegiatan
         </Button>
@@ -479,6 +524,7 @@ export default function DashboardKegiatan() {
                             variant="ghost"
                             size="sm"
                             className="min-h-11 px-2"
+                            disabled={saving || pendingAction}
                             onClick={() => openEditForm(item)}
                           >
                             <Pencil size={16} aria-hidden="true" />
@@ -520,177 +566,191 @@ export default function DashboardKegiatan() {
             onSubmit={submitForm}
             className="grid gap-4 px-5 pb-5 sm:px-6 sm:pb-6"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="activity-title">Judul</Label>
-                <Input
-                  id="activity-title"
-                  className="min-h-11"
-                  value={form.title}
-                  maxLength={120}
-                  required
-                  onChange={(event) => updateForm("title", event.target.value)}
-                  aria-invalid={Boolean(errors.title)}
-                />
-                <FormFieldError>{errors.title}</FormFieldError>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="activity-year">Tahun</Label>
-                <Input
-                  id="activity-year"
-                  className="min-h-11"
-                  type="number"
-                  min={2020}
-                  max={2100}
-                  value={form.year}
-                  required
-                  onChange={(event) => updateForm("year", event.target.value)}
-                  aria-invalid={Boolean(errors.year)}
-                />
-                <FormFieldError>{errors.year}</FormFieldError>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="activity-program">Program</Label>
-                <select
-                  id="activity-program"
-                  value={form.program}
-                  onChange={(event) =>
-                    updateForm(
-                      "program",
-                      event.target.value as TrainerActivityProgram,
-                    )
-                  }
-                  className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
-                >
-                  {TRAINER_ACTIVITY_PROGRAMS.map((program) => (
-                    <option key={program.value} value={program.value}>
-                      {program.label} — {program.fullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="activity-kind">Jenis kegiatan</Label>
-                <select
-                  id="activity-kind"
-                  value={form.kind}
-                  onChange={(event) =>
-                    updateForm(
-                      "kind",
-                      event.target.value as ActivityForm["kind"],
-                    )
-                  }
-                  className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
-                >
-                  <option value="poster">Poster</option>
-                  <option value="foto">Foto</option>
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="activity-date">
-                  Tanggal kegiatan (opsional)
-                </Label>
-                <Input
-                  id="activity-date"
-                  className="min-h-11"
-                  type="date"
-                  value={form.eventDate}
-                  onChange={(event) =>
-                    updateForm("eventDate", event.target.value)
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="activity-order">Urutan</Label>
-                <Input
-                  id="activity-order"
-                  className="min-h-11"
-                  type="number"
-                  value={form.sortOrder}
-                  onChange={(event) =>
-                    updateForm("sortOrder", event.target.value)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="activity-drive">Link Google Drive</Label>
-              <Input
-                id="activity-drive"
-                className="min-h-11"
-                type="url"
-                value={form.driveUrl}
-                required
-                placeholder="https://drive.google.com/..."
-                onChange={(event) => updateForm("driveUrl", event.target.value)}
-                aria-invalid={Boolean(errors.drive_url)}
-              />
-              <FormFieldError>{errors.drive_url}</FormFieldError>
-            </div>
-
-            <div className="grid gap-3">
-              <Label htmlFor="activity-image">Gambar</Label>
-              <Input
-                id="activity-image"
-                className="min-h-11"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => {
-                  const nextFile = event.target.files?.[0] ?? null;
-                  setFile(nextFile);
-                  setErrors((previous) => ({ ...previous, image: undefined }));
-                  setPreviewUrl(
-                    nextFile
-                      ? URL.createObjectURL(nextFile)
-                      : (editing?.image_url ?? null),
-                  );
-                }}
-                aria-invalid={Boolean(errors.image)}
-              />
-              <p className="text-xs text-muted-foreground">
-                PNG, JPEG, atau WebP. Ukuran maksimal 5 MB.
+            {formPhase === "failed" && pageError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {pageError}
               </p>
-              <FormFieldError>{errors.image}</FormFieldError>
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt={
-                    form.title
-                      ? `Pratinjau ${form.title}`
-                      : "Pratinjau gambar kegiatan"
+            ) : null}
+            <fieldset className="contents" disabled={saving}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-title">Judul</Label>
+                  <Input
+                    id="activity-title"
+                    className="min-h-11"
+                    value={form.title}
+                    maxLength={120}
+                    required
+                    onChange={(event) =>
+                      updateForm("title", event.target.value)
+                    }
+                    aria-invalid={Boolean(errors.title)}
+                  />
+                  <FormFieldError>{errors.title}</FormFieldError>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-year">Tahun</Label>
+                  <Input
+                    id="activity-year"
+                    className="min-h-11"
+                    type="number"
+                    min={2020}
+                    max={2100}
+                    value={form.year}
+                    required
+                    onChange={(event) => updateForm("year", event.target.value)}
+                    aria-invalid={Boolean(errors.year)}
+                  />
+                  <FormFieldError>{errors.year}</FormFieldError>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-program">Program</Label>
+                  <select
+                    id="activity-program"
+                    value={form.program}
+                    onChange={(event) =>
+                      updateForm(
+                        "program",
+                        event.target.value as TrainerActivityProgram,
+                      )
+                    }
+                    className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
+                  >
+                    {TRAINER_ACTIVITY_PROGRAMS.map((program) => (
+                      <option key={program.value} value={program.value}>
+                        {program.label} — {program.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-kind">Jenis kegiatan</Label>
+                  <select
+                    id="activity-kind"
+                    value={form.kind}
+                    onChange={(event) =>
+                      updateForm(
+                        "kind",
+                        event.target.value as ActivityForm["kind"],
+                      )
+                    }
+                    className="h-8 min-h-11 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30 [&_option]:bg-popover [&_option]:text-popover-foreground"
+                  >
+                    <option value="poster">Poster</option>
+                    <option value="foto">Foto</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-date">
+                    Tanggal kegiatan (opsional)
+                  </Label>
+                  <Input
+                    id="activity-date"
+                    className="min-h-11"
+                    type="date"
+                    value={form.eventDate}
+                    onChange={(event) =>
+                      updateForm("eventDate", event.target.value)
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="activity-order">Urutan</Label>
+                  <Input
+                    id="activity-order"
+                    className="min-h-11"
+                    type="number"
+                    value={form.sortOrder}
+                    onChange={(event) =>
+                      updateForm("sortOrder", event.target.value)
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="activity-drive">Link Google Drive</Label>
+                <Input
+                  id="activity-drive"
+                  className="min-h-11"
+                  type="url"
+                  value={form.driveUrl}
+                  required
+                  placeholder="https://drive.google.com/..."
+                  onChange={(event) =>
+                    updateForm("driveUrl", event.target.value)
                   }
-                  className="max-h-60 w-fit max-w-full rounded-md border border-border object-contain"
+                  aria-invalid={Boolean(errors.drive_url)}
                 />
-              ) : null}
-            </div>
+                <FormFieldError>{errors.drive_url}</FormFieldError>
+              </div>
 
-            <label className="flex min-h-11 items-center gap-3 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={form.isPublished}
-                onChange={(event) =>
-                  updateForm("isPublished", event.target.checked)
-                }
-                className="size-4 accent-foreground"
-              />
-              Terbitkan setelah disimpan
-            </label>
+              <div className="grid gap-3">
+                <Label htmlFor="activity-image">Gambar</Label>
+                <Input
+                  id="activity-image"
+                  className="min-h-11"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => {
+                    const nextFile = event.target.files?.[0] ?? null;
+                    setFile(nextFile);
+                    setErrors((previous) => ({
+                      ...previous,
+                      image: undefined,
+                    }));
+                    setPreviewUrl(
+                      nextFile
+                        ? URL.createObjectURL(nextFile)
+                        : (editing?.image_url ?? null),
+                    );
+                  }}
+                  aria-invalid={Boolean(errors.image)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  PNG, JPEG, atau WebP. Ukuran maksimal 5 MB.
+                </p>
+                <FormFieldError>{errors.image}</FormFieldError>
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt={
+                      form.title
+                        ? `Pratinjau ${form.title}`
+                        : "Pratinjau gambar kegiatan"
+                    }
+                    className="max-h-60 w-fit max-w-full rounded-md border border-border object-contain"
+                  />
+                ) : null}
+              </div>
 
-            <DialogFooter className="-mx-5 -mb-5 px-5 sm:-mx-6 sm:-mb-6 sm:px-6">
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-11"
-                disabled={saving}
-                onClick={() => closeForm(false)}
-              >
-                Batal
-              </Button>
-              <Button type="submit" className="min-h-11" disabled={saving}>
-                {saving ? "Menyimpan…" : "Simpan kegiatan"}
-              </Button>
-            </DialogFooter>
+              <label className="flex min-h-11 items-center gap-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.isPublished}
+                  onChange={(event) =>
+                    updateForm("isPublished", event.target.checked)
+                  }
+                  className="size-4 accent-foreground"
+                />
+                Terbitkan setelah disimpan
+              </label>
+
+              <DialogFooter className="-mx-5 -mb-5 px-5 sm:-mx-6 sm:-mb-6 sm:px-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={saving}
+                  onClick={() => closeForm(false)}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" className="min-h-11" disabled={saving}>
+                  {saving ? "Menyimpan…" : "Simpan kegiatan"}
+                </Button>
+              </DialogFooter>
+            </fieldset>
           </form>
         </DialogContent>
       </Dialog>

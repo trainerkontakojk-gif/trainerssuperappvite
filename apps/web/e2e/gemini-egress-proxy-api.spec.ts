@@ -170,6 +170,18 @@ for (const service of ["api", "telefun"] as const) {
         if (service === "telefun") {
           await telefunCall(url);
           expect((await fetch(`${url}/health`)).status).toBe(200);
+          if (mode === "unset") {
+            // Retired WebRTC starts never enter Auth/DB/provider lifecycle work.
+            const retired = await fetch(
+              `${url}/telefun/realtime/openai/webrtc/sessions/${SESSION}/call`,
+              {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: "{}",
+              },
+            );
+            expect(retired.status).toBe(404);
+          }
         } else {
           const response = await fetch(
             `${url}/api/v1/telefun/annotations/generate/${SESSION}`,

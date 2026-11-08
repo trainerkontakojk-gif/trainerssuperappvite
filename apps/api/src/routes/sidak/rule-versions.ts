@@ -235,11 +235,24 @@ sidakRuleVersions.post(
         type: "publish",
       });
       return c.json({ success: true, data: version });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if (error instanceof sidakService.RulePublishError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: error.code, message: error.message },
+          },
+          error.status,
+        );
+      }
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: error.message },
+          error: {
+            code: "INTERNAL_ERROR",
+            message:
+              "Gagal mempublikasikan versi aturan. Coba lagi beberapa saat lagi.",
+          },
         },
         500,
       );

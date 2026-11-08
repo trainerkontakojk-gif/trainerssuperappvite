@@ -254,9 +254,7 @@ export default function SidakInputPage() {
 
   const periodOptions = useMemo(
     () =>
-      [...(periods ?? [])].sort(
-        (a, b) => b.year - a.year || b.month - a.month,
-      ),
+      [...(periods ?? [])].sort((a, b) => b.year - a.year || b.month - a.month),
     [periods],
   );
 
@@ -491,13 +489,12 @@ export default function SidakInputPage() {
   const scoringMode = activeWeight?.scoring_mode ?? "weighted";
 
   const serviceRequired =
-    selectedAgent !== null && resolveInitialInputService(selectedAgent.tim) === "";
+    selectedAgent !== null &&
+    resolveInitialInputService(selectedAgent.tim) === "";
   const ready =
     selectedAgent !== null && selectedPeriod !== null && selectedService !== "";
   const showConfigWarning =
-    ready &&
-    !loadingConfig &&
-    (hasDraftVersion || !ruleVersionId);
+    ready && !loadingConfig && (hasDraftVersion || !ruleVersionId);
 
   const expandMotion = reduceMotion
     ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 } }
@@ -542,9 +539,7 @@ export default function SidakInputPage() {
         : !selectedPeriod
           ? "Pilih periode untuk melihat temuan."
           : "Pilih layanan audit untuk memuat temuan.";
-    return (
-      <p className="py-6 text-sm text-muted-foreground">{next}</p>
-    );
+    return <p className="py-6 text-sm text-muted-foreground">{next}</p>;
   };
 
   return (
@@ -666,12 +661,7 @@ export default function SidakInputPage() {
                         type="button"
                         variant="outline"
                         className="h-[44px] px-4"
-                        onClick={() => {
-                          importHook.setShowImport(!importHook.showImport);
-                          importHook.setImportTab("download");
-                          importHook.setImportRows([]);
-                          importHook.setImportFile(null);
-                        }}
+                        onClick={importHook.handleImportToggle}
                       >
                         <Upload aria-hidden="true" />
                         Impor Excel
@@ -692,10 +682,7 @@ export default function SidakInputPage() {
               {/* ADD FORM */}
               <AnimatePresence>
                 {formHook.showForm && (
-                  <motion.div
-                    {...expandMotion}
-                    className="overflow-hidden"
-                  >
+                  <motion.div {...expandMotion} className="overflow-hidden">
                     <SidakInputManualForm
                       entries={formHook.entries}
                       noTiket={formHook.noTiket}
@@ -729,10 +716,7 @@ export default function SidakInputPage() {
               {/* IMPORT PANEL */}
               <AnimatePresence>
                 {importHook.showImport && (
-                  <motion.div
-                    {...expandMotion}
-                    className="overflow-hidden"
-                  >
+                  <motion.div {...expandMotion} className="overflow-hidden">
                     <SidakInputImportPanel
                       show={importHook.showImport}
                       onClose={importHook.handleImportClose}
@@ -798,7 +782,9 @@ export default function SidakInputPage() {
                   onStartEdit={editHook.startEdit}
                   onCancelEdit={editHook.cancelEdit}
                   onSaveEdit={editHook.handleSaveEdit}
-                  onDelete={(item, label) => editHook.handleDelete(item.id, label)}
+                  onDelete={(item, label) =>
+                    editHook.handleDelete(item.id, label)
+                  }
                   setEditNilai={editHook.setEditNilai}
                   setEditKetidaksesuaian={editHook.setEditKetidaksesuaian}
                   setEditSebaiknya={editHook.setEditSebaiknya}
@@ -815,7 +801,9 @@ export default function SidakInputPage() {
         title={confirmer.request?.title ?? ""}
         description={confirmer.request?.description ?? ""}
         confirmLabel={confirmer.request?.confirmLabel ?? "Lanjutkan"}
-        confirmVariant={confirmer.request?.destructive ? "destructive" : "default"}
+        confirmVariant={
+          confirmer.request?.destructive ? "destructive" : "default"
+        }
         onConfirm={() => confirmer.resolve(true)}
         onCancel={() => confirmer.resolve(false)}
       />

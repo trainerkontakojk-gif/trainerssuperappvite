@@ -140,11 +140,14 @@ export function createTnaFixture(namespace: string) {
       // Product comparison selection spans all visible chat audits, not our
       // namespace. Keep all four fixture months before every existing audit,
       // within qa_periods' 2000..2100 CHECK and (month, year) unique constraint.
+      // Keep audit/training months in a completed calendar year even when the
+      // disposable database has no other audits; due dates use the live clock.
       // Count every chat row conservatively, including phantom/zero findings.
       const availableYear = runSql(
         env,
         `SELECT candidate.year FROM generate_series(2000, 2100) AS candidate(year)
-         WHERE candidate.year < coalesce((
+         WHERE candidate.year < extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')
+         AND candidate.year < coalesce((
            SELECT min(p.year) FROM qa_periods p
            JOIN qa_temuan t ON t.period_id = p.id WHERE t.service_type = 'chat'
          ), 2101)

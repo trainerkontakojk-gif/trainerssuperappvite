@@ -35,6 +35,21 @@ import { buildPdktEvaluationPrompt } from "./evaluation-prompt";
 
 export { buildPdktEvaluationPrompt } from "./evaluation-prompt";
 
+export const PDKT_EVALUATION_STALE_MS = 5 * 60 * 1000;
+
+export function pdktEvaluationRecovery(
+  status: string | null,
+  startedAt: string | null,
+  createdAt: string | null,
+  now = Date.now(),
+): "retry_available" | null {
+  if (status !== "pending" && status !== "processing") return null;
+  const started = Date.parse(startedAt ?? createdAt ?? "");
+  return Number.isFinite(started) && now - started > PDKT_EVALUATION_STALE_MS
+    ? "retry_available"
+    : null;
+}
+
 function calculateScoreFromBreakdown(
   breakdown: PdktEvaluationScoreBreakdown,
 ): number {
@@ -808,7 +823,9 @@ export async function processPdktEvaluation(
   }
 
   const nowIso = new Date().toISOString();
-  const staleThreshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const staleThreshold = new Date(
+    Date.now() - PDKT_EVALUATION_STALE_MS,
+  ).toISOString();
 
   const claim = adminClient
     .from("pdkt_history")

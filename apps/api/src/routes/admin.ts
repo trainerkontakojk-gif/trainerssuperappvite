@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import * as adminService from "../services/admin-service";
+import { LeaderAccessTransitionError } from "../services/leader-access-transitions";
 import * as adminUserService from "../services/admin-user-service";
 import * as practiceLimits from "../services/practice-limits-service";
 import * as accountControls from "../services/account-controls-service";
@@ -51,6 +52,26 @@ function actorOf(c: Context<{ Variables: Variables }>) {
   };
 }
 
+function leaderAccessFailure(c: Context, error: unknown) {
+  if (error instanceof LeaderAccessTransitionError) {
+    return c.json(
+      { success: false, error: { code: error.code, message: error.message } },
+      error.status,
+    );
+  }
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "SERVER_ERROR",
+        message:
+          "Perubahan akses belum tersimpan. Coba lagi beberapa saat lagi.",
+      },
+    },
+    500,
+  );
+}
+
 function adminUserFailure(c: Context, error: unknown) {
   if (error instanceof AdminUserError)
     return c.json(
@@ -86,25 +107,21 @@ admin.get("/users", requireCapability("admin.users"), async (c) => {
   }
 });
 
-admin.get(
-  "/users/:id",
-  requireCapability("admin.users"),
-  async (c) => {
-    try {
-      const detail = await adminUserService.getUserDetail(c.req.param("id"));
-      const data = {
-        ...detail,
-        practice_limits: await practiceLimits.getUserPracticeLimits(
-          detail.user.id,
-          detail.user.role,
-        ),
-      };
-      return c.json({ success: true, data });
-    } catch (error) {
-      return adminUserFailure(c, error);
-    }
-  },
-);
+admin.get("/users/:id", requireCapability("admin.users"), async (c) => {
+  try {
+    const detail = await adminUserService.getUserDetail(c.req.param("id"));
+    const data = {
+      ...detail,
+      practice_limits: await practiceLimits.getUserPracticeLimits(
+        detail.user.id,
+        detail.user.role,
+      ),
+    };
+    return c.json({ success: true, data });
+  } catch (error) {
+    return adminUserFailure(c, error);
+  }
+});
 
 admin.get(
   "/peserta-options",
@@ -641,14 +658,8 @@ admin.post(
     try {
       await adminService.approveLeaderRequest(id, body.accessGroupIds, user.id);
       return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
+    } catch (error: unknown) {
+      return leaderAccessFailure(c, error);
     }
   },
 );
@@ -664,14 +675,8 @@ admin.post(
     try {
       await adminService.rejectLeaderRequest(id, body.note, user.id);
       return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
+    } catch (error: unknown) {
+      return leaderAccessFailure(c, error);
     }
   },
 );
@@ -687,14 +692,8 @@ admin.post(
     try {
       await adminService.revokeLeaderRequest(id, body.note, user.id);
       return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
+    } catch (error: unknown) {
+      return leaderAccessFailure(c, error);
     }
   },
 );
@@ -714,14 +713,8 @@ admin.put(
         user.id,
       );
       return c.json({ success: true, data: null });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "BAD_REQUEST", message: error.message },
-        },
-        400,
-      );
+    } catch (error: unknown) {
+      return leaderAccessFailure(c, error);
     }
   },
 );

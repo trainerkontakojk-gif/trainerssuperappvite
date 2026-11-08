@@ -1,4 +1,10 @@
-import { useState, useCallback } from "react";
+import {
+  useReducer,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import {
   formatQAIndicatorName,
@@ -56,6 +62,52 @@ interface TemuanBatchPreview {
   };
 }
 
+type ImportPhase =
+  "closed" | "empty" | "generating" | "parsing" | "ready" | "saving" | "failed";
+type ImportState = {
+  phase: ImportPhase;
+  tab: "download" | "upload";
+  file: File | null;
+  rows: ImportRowType[];
+};
+type ImportAction =
+  | { type: "close" | "open" | "generate" | "settled" | "save" | "failed" }
+  | { type: "tab"; tab: ImportState["tab"] }
+  | { type: "parse"; file: File }
+  | { type: "parsed"; rows: ImportRowType[] };
+const emptyImport: ImportState = {
+  phase: "closed",
+  tab: "download",
+  file: null,
+  rows: [],
+};
+function importReducer(state: ImportState, action: ImportAction): ImportState {
+  switch (action.type) {
+    case "close":
+      return emptyImport;
+    case "open":
+      return { ...emptyImport, phase: "empty" };
+    case "tab":
+      return state.phase === "saving" ? state : { ...state, tab: action.tab };
+    case "parse":
+      return state.phase === "saving"
+        ? state
+        : { phase: "parsing", tab: "upload", file: action.file, rows: [] };
+    case "parsed":
+      return { ...state, phase: "ready", rows: action.rows };
+    case "generate":
+      return { ...state, phase: "generating" };
+    case "save":
+      return state.phase === "ready" || state.phase === "failed"
+        ? { ...state, phase: "saving" }
+        : state;
+    case "failed":
+      return { ...state, phase: "failed" };
+    case "settled":
+      return { ...state, phase: state.rows.length ? "ready" : "empty" };
+  }
+}
+
 export function useTemuanImport({
   selectedAgent,
   selectedPeriod,
@@ -68,24 +120,51 @@ export function useTemuanImport({
   setSuccessMsg,
   confirm,
 }: UseTemuanImportParams) {
-  const [showImport, setShowImport] = useState(false);
-  const [importTab, setImportTab] = useState<"download" | "upload">("download");
-  const [importRows, setImportRows] = useState<ImportRowType[]>([]);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [parsing, setParsing] = useState(false);
-  const [generatingTemplate, setGeneratingTemplate] = useState(false);
-
+  const [state, dispatch] = useReducer(importReducer, emptyImport);
+  const generation = useRef(0);
+  const saveInFlight = useRef(false);
+  const mounted = useRef(true);
+  const contextKey = JSON.stringify([
+    selectedAgent?.id,
+    selectedPeriod?.id,
+    selectedService,
+  ]);
+  const context = useRef(contextKey);
+  useLayoutEffect(() => {
+    context.current = contextKey;
+  }, [contextKey]);
+  const isCurrent = (request: number, scope: string) =>
+    mounted.current &&
+    generation.current === request &&
+    context.current === scope;
   const handleImportClose = useCallback(() => {
-    setShowImport(false);
-    setImportRows([]);
-    setImportFile(null);
+    generation.current++;
+    dispatch({ type: "close" });
   }, []);
+  useEffect(() => {
+    handleImportClose();
+  }, [contextKey, handleImportClose]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      generation.current++;
+    };
+  }, []);
+  const handleImportToggle = () => {
+    if (saveInFlight.current) return;
+    generation.current++;
+    dispatch({ type: state.phase === "closed" ? "open" : "close" });
+  };
+  const importRows = state.rows;
 
   const handleDownloadTemplate = async () => {
     if (activeIndicators.length === 0 || !selectedAgent || !selectedPeriod)
       return;
-    setGeneratingTemplate(true);
+    if (saveInFlight.current || state.phase === "generating") return;
+    const request = ++generation.current;
+    const scope = contextKey;
+    dispatch({ type: "generate" });
     try {
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
@@ -119,7 +198,11 @@ export function useTemuanImport({
         { key: "sbknya", header: "Sebaiknya", width: 42 },
         // Dua kolom baru ditaruh DI BELAKANG lima kolom lama supaya template
         // lama tetap terbaca dan tidak perlu diunduh ulang.
-        { key: "tglLayanan", header: "Tanggal Layanan (YYYY-MM-DD)", width: 24 },
+        {
+          key: "tglLayanan",
+          header: "Tanggal Layanan (YYYY-MM-DD)",
+          width: 24,
+        },
         { key: "tglSampel", header: "Tanggal Sampel (YYYY-MM-DD)", width: 24 },
       ];
       const headerRow = ws.getRow(1);
@@ -171,6 +254,7 @@ export function useTemuanImport({
       }
 
       const buffer = await wb.xlsx.writeBuffer();
+      if (!isCurrent(request, scope)) return;
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -181,29 +265,33 @@ export function useTemuanImport({
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setErrorMsg("Gagal membuat template Excel.");
+      if (isCurrent(request, scope))
+        setErrorMsg("Gagal membuat template Excel.");
     } finally {
-      setGeneratingTemplate(false);
+      if (isCurrent(request, scope)) dispatch({ type: "settled" });
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || activeIndicators.length === 0) return;
+    if (!file || activeIndicators.length === 0 || saveInFlight.current) return;
+    const request = ++generation.current;
+    const scope = contextKey;
+    dispatch({ type: "parse", file });
+    setErrorMsg(null);
     if (file.name.toLowerCase().endsWith(".xls")) {
+      dispatch({ type: "failed" });
       setErrorMsg(
         "Format .xls tidak didukung. Simpan ulang sebagai .xlsx lalu impor kembali.",
       );
       return;
     }
-    setImportFile(file);
-    setParsing(true);
     try {
-      const { readWorkbookRawValues, toDateOnlyUTC } = await import(
-        "../../../lib/excel-utils"
-      );
+      const { readWorkbookRawValues, toDateOnlyUTC } =
+        await import("../../../lib/excel-utils");
       const buffer = await file.arrayBuffer();
       const { names, sheets } = await readWorkbookRawValues(buffer);
+      if (!isCurrent(request, scope)) return;
       const sheetName = names.find((n) => n === "Input Temuan") ?? names[0];
       const rows = sheets[sheetName] ?? [];
 
@@ -213,7 +301,9 @@ export function useTemuanImport({
        * kolom `Sebaiknya` terbaca sebagai tanggal.
        */
       const headerRow = (rows[0] ?? []).map((c) =>
-        String(c ?? "").trim().toLowerCase(),
+        String(c ?? "")
+          .trim()
+          .toLowerCase(),
       );
       const colOf = (header: string) => headerRow.indexOf(header);
       const colTiket = colOf("no. tiket");
@@ -287,18 +377,13 @@ export function useTemuanImport({
 
         const matched = paramMap.get(paramName.toLowerCase());
         if (!paramName) error = "Parameter kosong";
-        else if (!matched)
-          error = `Parameter "${paramName}" tidak dikenali`;
+        else if (!matched) error = `Parameter "${paramName}" tidak dikenali`;
         else if (unlinkedIndicatorIds.has(matched.id))
           error = unlinkedIndicatorError(matched.name);
         else indicator_id = matched.id;
 
         const nilaiNum = Number(nilaiRaw);
-        if (
-          nilaiRaw === "" ||
-          nilaiRaw === null ||
-          nilaiRaw === undefined
-        ) {
+        if (nilaiRaw === "" || nilaiRaw === null || nilaiRaw === undefined) {
           nilai = 3;
         } else if (isNaN(nilaiNum) || ![0, 1, 2, 3].includes(nilaiNum)) {
           error = `Nilai "${nilaiRaw}" tidak valid (harus 0-3)`;
@@ -328,17 +413,26 @@ export function useTemuanImport({
         });
       }
 
-      setImportRows(result);
-      setImportTab("upload");
+      dispatch({ type: "parsed", rows: result });
     } catch {
-      setErrorMsg("Gagal membaca file Excel.");
-    } finally {
-      setParsing(false);
+      if (isCurrent(request, scope)) {
+        dispatch({ type: "failed" });
+        setErrorMsg("Gagal membaca file Excel.");
+      }
     }
   };
 
   const handleImportSave = async () => {
-    if (!selectedAgent || !selectedPeriod || importRows.length === 0) return;
+    if (
+      !selectedAgent ||
+      !selectedPeriod ||
+      importRows.length === 0 ||
+      saveInFlight.current ||
+      (state.phase !== "ready" && state.phase !== "failed")
+    )
+      return;
+    const request = generation.current;
+    const scope = contextKey;
     const invalid = importRows.filter((r) => r.error);
     if (invalid.length > 0) {
       setErrorMsg(
@@ -350,7 +444,8 @@ export function useTemuanImport({
       setErrorMsg("Terdapat baris dengan parameter tidak valid.");
       return;
     }
-    setImporting(true);
+    saveInFlight.current = true;
+    dispatch({ type: "save" });
     setErrorMsg(null);
     try {
       const valid = importRows.filter(
@@ -378,6 +473,7 @@ export function useTemuanImport({
           },
         }),
       )) as TemuanBatchPreview;
+      if (!isCurrent(request, scope)) return;
       if (preview.stats.invalid_count > 0) {
         setErrorMsg(
           `${preview.stats.invalid_count} parameter tidak valid di server. Periksa kembali data import.`,
@@ -390,7 +486,7 @@ export function useTemuanImport({
           description: `${preview.stats.skipped_count} baris sudah ada dan akan dilewati. ${preview.stats.valid_count} baris baru akan diimport.`,
           confirmLabel: "Import yang baru",
         });
-        if (!ok) return;
+        if (!ok || !isCurrent(request, scope)) return;
       }
       const created = (await unwrapResponse(
         await sidakClient.temuan.batch.$post({
@@ -402,6 +498,7 @@ export function useTemuanImport({
           },
         }),
       )) as { inserted: number; skipped: number; total: number };
+      if (!isCurrent(request, scope)) return;
       const updated = (await unwrapResponse(
         await sidakClient.temuan.$get({
           query: {
@@ -412,33 +509,33 @@ export function useTemuanImport({
           },
         }),
       )) as { items: QATemuan[]; total: number };
+      if (!isCurrent(request, scope)) return;
       setTemuan(updated.items ?? []);
-      setShowImport(false);
-      setImportRows([]);
+      handleImportClose();
       setSuccessMsg(`${created?.inserted ?? 0} temuan berhasil diimport!`);
-      setTimeout(() => setSuccessMsg(null), 4000);
+      const successGeneration = generation.current;
+      setTimeout(() => {
+        if (isCurrent(successGeneration, scope)) setSuccessMsg(null);
+      }, 4000);
     } catch (e: any) {
-      setErrorMsg(e.message || "Gagal mengimport temuan");
+      if (isCurrent(request, scope))
+        setErrorMsg(e.message || "Gagal mengimport temuan");
     } finally {
-      setImporting(false);
+      saveInFlight.current = false;
+      if (isCurrent(request, scope)) dispatch({ type: "settled" });
     }
   };
 
   return {
-    showImport,
-    setShowImport,
-    importTab,
-    setImportTab,
+    showImport: state.phase !== "closed",
+    importTab: state.tab,
+    setImportTab: (tab: ImportState["tab"]) => dispatch({ type: "tab", tab }),
     importRows,
-    setImportRows,
-    importFile,
-    setImportFile,
-    importing,
-    setImporting,
-    parsing,
-    setParsing,
-    generatingTemplate,
-    setGeneratingTemplate,
+    importFile: state.file,
+    importing: state.phase === "saving",
+    parsing: state.phase === "parsing",
+    generatingTemplate: state.phase === "generating",
+    handleImportToggle,
     handleDownloadTemplate,
     handleFileUpload,
     handleImportSave,

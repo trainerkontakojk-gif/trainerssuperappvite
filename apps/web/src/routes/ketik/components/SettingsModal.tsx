@@ -77,6 +77,7 @@ export function SettingsModal({
     hasUnsavedChanges,
     discardUnsavedChanges,
     isSaving,
+    saveError,
   } = useKetikSettingsDraft({
     settings,
     isOpen,
@@ -177,96 +178,102 @@ export function SettingsModal({
             </div>
           </DialogHeader>
 
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) => {
-              if (value) {
-                setActiveTab(value as typeof activeTab);
-              }
-            }}
-            orientation="vertical"
-            className="min-h-0 flex-1 flex-col md:flex-row"
-          >
-            <div className="flex shrink-0 flex-col border-b bg-muted/20 md:w-60 md:border-r md:border-b-0">
-              <TabsList
-                variant="line"
-                aria-label="Bagian pengaturan"
-                className="w-full shrink-0 justify-start overflow-x-auto rounded-none p-2 max-md:flex-row! md:overflow-x-visible md:overflow-y-auto md:p-3"
-              >
-                {tabs.map((tab) => (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className="min-h-[44px] shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
-                  >
-                    <span className="flex-1">{tab.label}</span>
-                    {tab.count !== undefined && (
-                      <span className="font-mono text-xs font-medium text-muted-foreground tabular-nums">
-                        {tab.count}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+          <fieldset disabled={isSaving} className="contents">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                if (value) {
+                  setActiveTab(value as typeof activeTab);
+                }
+              }}
+              orientation="vertical"
+              className="min-h-0 flex-1 flex-col md:flex-row"
+            >
+              <div className="flex shrink-0 flex-col border-b bg-muted/20 md:w-60 md:border-r md:border-b-0">
+                <TabsList
+                  variant="line"
+                  aria-label="Bagian pengaturan"
+                  className="w-full shrink-0 justify-start overflow-x-auto rounded-none p-2 max-md:flex-row! md:overflow-x-visible md:overflow-y-auto md:p-3"
+                >
+                  {tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="min-h-[44px] shrink-0 justify-start gap-2 px-3 py-2.5 text-left max-md:w-auto! max-md:after:hidden max-md:data-active:bg-background max-md:data-active:shadow-sm md:w-full"
+                    >
+                      <span className="flex-1">{tab.label}</span>
+                      {tab.count !== undefined && (
+                        <span className="font-mono text-xs font-medium text-muted-foreground tabular-nums">
+                          {tab.count}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
-              <TabsContent value="scenarios">
-                <KetikScenariosTab
-                  confirmContainer={dialogContainer}
-                  scenarios={localSettings.scenarios}
-                  scenarioForm={scenarioForm}
-                  setLocalSettings={setLocalSettings}
-                />
-              </TabsContent>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+                <TabsContent value="scenarios">
+                  <KetikScenariosTab
+                    confirmContainer={dialogContainer}
+                    scenarios={localSettings.scenarios}
+                    scenarioForm={scenarioForm}
+                    setLocalSettings={setLocalSettings}
+                  />
+                </TabsContent>
 
-              <TabsContent value="consumers">
-                <KetikConsumersTab
-                  confirmContainer={dialogContainer}
-                  consumerTypes={localSettings.consumerTypes}
-                  activeConsumerTypeId={localSettings.activeConsumerTypeId}
-                  consumerForm={consumerForm}
-                  setLocalSettings={setLocalSettings}
-                />
-              </TabsContent>
+                <TabsContent value="consumers">
+                  <KetikConsumersTab
+                    confirmContainer={dialogContainer}
+                    consumerTypes={localSettings.consumerTypes}
+                    activeConsumerTypeId={localSettings.activeConsumerTypeId}
+                    consumerForm={consumerForm}
+                    setLocalSettings={setLocalSettings}
+                  />
+                </TabsContent>
 
-              <TabsContent value="identity">
-                <KetikIdentityTab
-                  identitySettings={localSettings.identitySettings}
-                  handleIdentityChange={handleIdentityChange}
-                />
-              </TabsContent>
+                <TabsContent value="identity">
+                  <KetikIdentityTab
+                    identitySettings={localSettings.identitySettings}
+                    handleIdentityChange={handleIdentityChange}
+                  />
+                </TabsContent>
 
-              <TabsContent value="template">
-                <KetikTemplateTab
-                  confirmContainer={dialogContainer}
-                  globalTemplates={templateLayers.global}
-                  personalTemplates={templateLayers.personal}
-                  templateForm={templateForm}
-                  templateScope={templateScope}
-                  setTemplateScope={setTemplateScope}
-                  setLocalSettings={setLocalSettings}
-                  canManageTemplates={canManageTemplates}
-                />
-              </TabsContent>
+                <TabsContent value="template">
+                  <KetikTemplateTab
+                    confirmContainer={dialogContainer}
+                    globalTemplates={templateLayers.global}
+                    personalTemplates={templateLayers.personal}
+                    templateForm={templateForm}
+                    templateScope={templateScope}
+                    setTemplateScope={setTemplateScope}
+                    setLocalSettings={setLocalSettings}
+                    canManageTemplates={canManageTemplates}
+                  />
+                </TabsContent>
 
-              <TabsContent value="system">
-                <KetikSystemTab
-                  localSettings={localSettings}
-                  setLocalSettings={setLocalSettings}
-                  durationMode={durationMode}
-                  handlePresetClick={handlePresetClick}
-                  handleCustomClick={handleCustomClick}
-                  customInputValue={customInputValue}
-                  handleDurationInputChange={handleDurationInputChange}
-                  handleDurationBlur={handleDurationBlur}
-                  durationValidationError={durationValidationError}
-                  inputRef={inputRef}
-                />
-              </TabsContent>
-            </div>
-          </Tabs>
-
+                <TabsContent value="system">
+                  <KetikSystemTab
+                    localSettings={localSettings}
+                    setLocalSettings={setLocalSettings}
+                    durationMode={durationMode}
+                    handlePresetClick={handlePresetClick}
+                    handleCustomClick={handleCustomClick}
+                    customInputValue={customInputValue}
+                    handleDurationInputChange={handleDurationInputChange}
+                    handleDurationBlur={handleDurationBlur}
+                    durationValidationError={durationValidationError}
+                    inputRef={inputRef}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </fieldset>
+          {saveError && (
+            <p role="alert" className="px-5 py-3 text-sm text-destructive">
+              {saveError}
+            </p>
+          )}
           <Separator />
           <DialogFooter className="mx-0 mb-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none border-0 bg-muted/20 px-5 py-3 sm:justify-between sm:px-6">
             <Button

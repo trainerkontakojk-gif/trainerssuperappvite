@@ -290,122 +290,48 @@ export async function updateRuleVersion(
   return result;
 }
 
+export class RulePublishError extends Error {
+  constructor(
+    message: string,
+    readonly code: "NOT_FOUND" | "CONFLICT" | "VALIDATION_ERROR",
+    readonly status: 400 | 404 | 409,
+  ) {
+    super(message);
+  }
+}
+
 export async function publishRuleVersion(
   id: string,
   userId: string,
   change_reason?: string,
   effective_period_id?: string,
 ) {
-  const { data: existing } = await supabaseAdmin
-    .from("qa_service_rule_versions")
-    .select("status, service_type, effective_period_id, version_number")
-    .eq("id", id)
-    .single();
-
-  if (!existing) throw new Error("Versi aturan tidak ditemukan");
-  if (existing.status !== "draft")
-    throw new Error("Hanya versi draft yang bisa dipublikasikan");
-
-  if (existing.service_type === "slik") {
-    const { data: slikIndicators, error: slikIndicatorError } =
-      await supabaseAdmin
-        .from("qa_service_rule_indicators")
-        .select("category, bobot")
-        .eq("rule_version_id", id);
-
-    if (slikIndicatorError) {
-      throw new Error(
-        `Gagal memvalidasi bobot parameter SLIK: ${slikIndicatorError.message}`,
-      );
+  const { data: result, error } = await supabaseAdmin.rpc(
+    "publish_sidak_rule_version",
+    {
+      p_id: id,
+      p_user_id: userId,
+      p_change_reason: change_reason ?? null,
+      p_change_reason_is_set: change_reason !== undefined,
+      p_effective_period_id: effective_period_id ?? null,
+    },
+  );
+  if (error) {
+    if (error.code === "P0001") {
+      switch (error.message) {
+        case "Versi aturan tidak ditemukan":
+          throw new RulePublishError(error.message, "NOT_FOUND", 404);
+        case "Hanya versi draft yang bisa dipublikasikan":
+        case "Versi aturan berubah; muat ulang dan coba lagi":
+          throw new RulePublishError(error.message, "CONFLICT", 409);
+        case "Total bobot parameter SLIK pada kategori Critical dan Non Critical masing-masing harus 100%":
+          throw new RulePublishError(error.message, "VALIDATION_ERROR", 400);
+      }
     }
-
-    const totals = (slikIndicators ?? []).reduce(
-      (result, indicator) => {
-        if (indicator.category === "critical") {
-          result.critical += Number(indicator.bobot);
-        } else if (indicator.category === "non_critical") {
-          result.nonCritical += Number(indicator.bobot);
-        }
-        return result;
-      },
-      { critical: 0, nonCritical: 0 },
+    throw new Error(
+      "Gagal mempublikasikan versi aturan. Coba lagi beberapa saat lagi.",
     );
-
-    if (
-      Math.abs(totals.critical - 1) >= 0.001 ||
-      Math.abs(totals.nonCritical - 1) >= 0.001
-    ) {
-      throw new Error(
-        "Total bobot parameter SLIK pada kategori Critical dan Non Critical masing-masing harus 100%",
-      );
-    }
   }
-
-  const now = new Date().toISOString();
-  const targetPeriodId = effective_period_id || existing.effective_period_id;
-  let targetVersionNumber = existing.version_number;
-
-  if (
-    effective_period_id &&
-    effective_period_id !== existing.effective_period_id
-  ) {
-    const { data: versions } = await supabaseAdmin
-      .from("qa_service_rule_versions")
-      .select("version_number")
-      .eq("service_type", existing.service_type)
-      .eq("effective_period_id", effective_period_id)
-      .order("version_number", { ascending: false })
-      .limit(1);
-
-    targetVersionNumber = (versions?.[0]?.version_number ?? 0) + 1;
-  }
-
-  const { data: publishedVersions } = await supabaseAdmin
-    .from("qa_service_rule_versions")
-    .select("id")
-    .eq("service_type", existing.service_type)
-    .eq("effective_period_id", targetPeriodId)
-    .eq("status", "published")
-    .neq("id", id);
-
-  if (publishedVersions && publishedVersions.length > 0) {
-    const { error: supersedeError } = await supabaseAdmin
-      .from("qa_service_rule_versions")
-      .update({
-        status: "superseded",
-        superseded_by: userId,
-        superseded_at: now,
-        superseded_by_version_id: id,
-      })
-      .in(
-        "id",
-        publishedVersions.map((p) => p.id),
-      );
-
-    if (supersedeError)
-      throw new Error(
-        `Gagal menonaktifkan versi lama: ${supersedeError.message}`,
-      );
-  }
-
-  const updates: Record<string, any> = {
-    status: "published",
-    published_by: userId,
-    published_at: now,
-    effective_period_id: targetPeriodId,
-    version_number: targetVersionNumber,
-  };
-  if (change_reason !== undefined) updates.change_reason = change_reason;
-
-  const { data: result, error } = await supabaseAdmin
-    .from("qa_service_rule_versions")
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error)
-    throw new Error(`Gagal mempublikasikan versi aturan: ${error.message}`);
   return result;
 }
 
@@ -574,7 +500,8 @@ export async function addRuleVersionIndicator(
     .maybeSingle();
   if (versionError)
     throw new Error(`Gagal memuat versi aturan: ${versionError.message}`);
-  if (!version) throw new RuleIndicatorInputError("Versi aturan tidak ditemukan");
+  if (!version)
+    throw new RuleIndicatorInputError("Versi aturan tidak ditemukan");
   if (version.service_type !== data.service_type) {
     throw new RuleIndicatorInputError(
       "Layanan parameter tidak sesuai dengan versi aturan",
@@ -589,7 +516,9 @@ export async function addRuleVersionIndicator(
       .eq("id", data.legacy_indicator_id)
       .maybeSingle();
     if (linkedError)
-      throw new Error(`Gagal memeriksa parameter master: ${linkedError.message}`);
+      throw new Error(
+        `Gagal memeriksa parameter master: ${linkedError.message}`,
+      );
     if (!linked || linked.service_type !== version.service_type) {
       throw new RuleIndicatorInputError(
         "Parameter master yang ditautkan tidak ditemukan untuk layanan ini",
@@ -606,7 +535,9 @@ export async function addRuleVersionIndicator(
     .eq("rule_version_id", data.rule_version_id)
     .eq("legacy_indicator_id", master.id);
   if (duplicateError)
-    throw new Error(`Gagal memeriksa parameter versi: ${duplicateError.message}`);
+    throw new Error(
+      `Gagal memeriksa parameter versi: ${duplicateError.message}`,
+    );
   if ((duplicateCount ?? 0) > 0) {
     throw new RuleIndicatorInputError(
       `Parameter "${data.name}" sudah ada di versi aturan ini`,

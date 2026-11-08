@@ -6,10 +6,10 @@ harnesses in `apps/web/e2e/` and the traps already paid for.
 
 ## Two sanctioned patterns
 
-| Pattern                                        | Helper                                                                                                                               | Requires                                   |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| **Hermetic** — mock every `/api` the page uses | `helpers/hermeticShell.ts`, or a feature harness such as `helpers/sidakTemuanDatesHarness.ts` / `helpers/sidakAgentReportFixture.ts` | nothing                                    |
-| **Real backend** — real JWT, real Hono routers | `helpers/sidakRealBackend.ts`                                                                                                        | `apps/api/.env.integration`, loopback only |
+| Pattern                                        | Helper                                                                                                                               | Requires                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| **Hermetic** — mock every `/api` the page uses | `helpers/hermeticShell.ts`, or a feature harness such as `helpers/sidakTemuanDatesHarness.ts` / `helpers/sidakAgentReportFixture.ts` | nothing                                                                           |
+| **Real backend** — real JWT, real Hono routers | `helpers/sidakRealBackend.ts`                                                                                                        | `E2E_SUPABASE_WORKDIR` disposable atau `apps/api/.env.integration`, loopback only |
 
 ## Dev server and service targets
 
@@ -35,6 +35,14 @@ real-backend specs forward `/api` to the in-process Hono app.
 - The browser configs ignore `*-api.spec.ts`. API specs run under `playwright.api.config.ts` or
   `playwright.access-api.config.ts`, one project per env, because a shared worker leaks one spec's
   API env stubs into the next. A new API spec needs a project in one of those configs, or it never runs.
+
+Untuk target disposable milik tugas, set `E2E_SUPABASE_WORKDIR` ke workdir CLI yang
+identitas/label, port dan migration-nya sudah diperiksa. `readLoopbackEnv()` membaca
+`supabase status -o json` di memori dan memvalidasi URL API serta DB tetap loopback;
+flag ini mendahului `.env.integration` tanpa menimpa file itu. Jangan mencetak
+credential hasil status. Tanpa flag, helper tetap memakai `.env.integration`.
+Fixture TNA memilih tahun kalender yang sudah selesai dan mendahului audit chat
+existing, agar bulan audit dan tanggal jatuh tempo tetap konsisten pada DB kosong.
 
 ## Real-backend specs: never import `apps/api` statically
 

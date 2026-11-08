@@ -1,3 +1,4 @@
+import { transitionLeaderAccess } from "./leader-access-transitions";
 import { supabaseAdmin } from "../lib/supabase";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { logActivity } from "./activity-log-service";
@@ -526,64 +527,12 @@ export async function approveLeaderRequest(
   accessGroupIds: string[],
   reviewerId: string,
 ): Promise<void> {
-  const uniqueAccessGroupIds = [
-    ...new Set((accessGroupIds || []).filter(Boolean)),
-  ];
-  if (uniqueAccessGroupIds.length === 0) {
-    throw new Error("Pilih minimal satu access group");
-  }
-
-  // Get request details
-  const { data: request, error: reqError } = await supabaseAdmin
-    .from("leader_access_requests")
-    .select("id, status, leader_user_id")
-    .eq("id", requestId)
-    .eq("status", "pending")
-    .single();
-
-  if (reqError || !request) {
-    throw new Error("Request tidak ditemukan atau sudah diproses");
-  }
-
-  if (request.leader_user_id === reviewerId) {
-    throw new Error("Anda tidak dapat menyetujui request akses milik sendiri");
-  }
-
-  const { data: activeGroups, error: groupError } = await supabaseAdmin
-    .from("access_groups")
-    .select("id")
-    .in("id", uniqueAccessGroupIds)
-    .eq("is_active", true);
-
-  if (groupError) throw new Error("Gagal memvalidasi access group");
-  if ((activeGroups || []).length !== uniqueAccessGroupIds.length) {
-    throw new Error("Access group tidak valid atau sudah nonaktif");
-  }
-
-  const { error: updateError } = await supabaseAdmin
-    .from("leader_access_requests")
-    .update({ status: "approved", reviewed_by: reviewerId })
-    .eq("id", requestId);
-
-  if (updateError) throw new Error("Gagal menyetujui request");
-
-  const groupRows = uniqueAccessGroupIds.map((groupId) => ({
-    request_id: requestId,
-    access_group_id: groupId,
-  }));
-
-  const { error: linkError } = await supabaseAdmin
-    .from("leader_access_request_groups")
-    .insert(groupRows);
-
-  if (linkError) {
-    // Rollback request status
-    await supabaseAdmin
-      .from("leader_access_requests")
-      .update({ status: "pending", reviewed_by: null })
-      .eq("id", requestId);
-    throw new Error("Gagal menautkan access group");
-  }
+  await transitionLeaderAccess(
+    requestId,
+    reviewerId,
+    "approve",
+    accessGroupIds,
+  );
 }
 
 export async function rejectLeaderRequest(
@@ -591,17 +540,7 @@ export async function rejectLeaderRequest(
   note: string | undefined,
   reviewerId: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("leader_access_requests")
-    .update({
-      status: "rejected",
-      reviewed_by: reviewerId,
-      review_note: note || null,
-    })
-    .eq("id", requestId)
-    .eq("status", "pending");
-
-  if (error) throw new Error("Gagal menolak request");
+  await transitionLeaderAccess(requestId, reviewerId, "reject", null, note);
 }
 
 export async function revokeLeaderRequest(
@@ -609,17 +548,7 @@ export async function revokeLeaderRequest(
   note: string | undefined,
   reviewerId: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("leader_access_requests")
-    .update({
-      status: "revoked",
-      reviewed_by: reviewerId,
-      review_note: note || null,
-    })
-    .eq("id", requestId)
-    .eq("status", "approved");
-
-  if (error) throw new Error("Gagal mencabut akses");
+  await transitionLeaderAccess(requestId, reviewerId, "revoke", null, note);
 }
 
 export async function reassignLeaderRequestGroups(
@@ -627,104 +556,7 @@ export async function reassignLeaderRequestGroups(
   accessGroupIds: string[],
   reviewerId: string,
 ): Promise<void> {
-  const uniqueAccessGroupIds = [
-    ...new Set((accessGroupIds || []).filter(Boolean)),
-  ];
-  if (uniqueAccessGroupIds.length === 0) {
-    throw new Error("Pilih minimal satu access group");
-  }
-
-  const { data: request, error: reqError } = await supabaseAdmin
-    .from("leader_access_requests")
-    .select("id, status, leader_user_id")
-    .eq("id", requestId)
-    .eq("status", "approved")
-    .single();
-
-  if (reqError || !request) {
-    throw new Error("Akses tidak ditemukan atau tidak aktif");
-  }
-
-  if (request.leader_user_id === reviewerId) {
-    throw new Error("Anda tidak dapat mengubah akses milik sendiri");
-  }
-
-  const { data: activeGroups, error: groupError } = await supabaseAdmin
-    .from("access_groups")
-    .select("id")
-    .in("id", uniqueAccessGroupIds)
-    .eq("is_active", true);
-
-  if (groupError) throw new Error("Gagal memvalidasi access group");
-  if ((activeGroups || []).length !== uniqueAccessGroupIds.length) {
-    throw new Error("Access group tidak valid atau sudah nonaktif");
-  }
-
-  // Save existing links for rollback
-  const { data: oldLinks, error: fetchError } = await supabaseAdmin
-    .from("leader_access_request_groups")
-    .select("access_group_id")
-    .eq("request_id", requestId);
-
-  if (fetchError) throw new Error("Gagal membaca access group lama");
-
-  const oldGroupIds = (oldLinks || []).map((l: any) => l.access_group_id);
-
-  // Re-verify request is still approved before mutating groups
-  const { data: recheckReq, error: recheckError } = await supabaseAdmin
-    .from("leader_access_requests")
-    .select("id, status")
-    .eq("id", requestId)
-    .eq("status", "approved")
-    .single();
-
-  if (recheckError || !recheckReq) {
-    throw new Error(
-      "Akses sudah tidak aktif. Permintaan mungkin sudah dicabut.",
-    );
-  }
-
-  // Clear existing links
-  const { error: deleteError } = await supabaseAdmin
-    .from("leader_access_request_groups")
-    .delete()
-    .eq("request_id", requestId);
-
-  if (deleteError) throw new Error("Gagal menghapus access group lama");
-
-  // Insert new links
-  const groupRows = uniqueAccessGroupIds.map((groupId) => ({
-    request_id: requestId,
-    access_group_id: groupId,
-  }));
-
-  const { error: insertError } = await supabaseAdmin
-    .from("leader_access_request_groups")
-    .insert(groupRows);
-
-  if (insertError) {
-    // Rollback: restore old links
-    await supabaseAdmin.from("leader_access_request_groups").insert(
-      oldGroupIds.map((gid: string) => ({
-        request_id: requestId,
-        access_group_id: gid,
-      })),
-    );
-    throw new Error("Gagal menyimpan access group baru. Perubahan dibatalkan.");
-  }
-
-  const { error: auditError } = await supabaseAdmin
-    .from("leader_access_requests")
-    .update({ reviewed_by: reviewerId })
-    .eq("id", requestId)
-    .eq("status", "approved");
-
-  if (auditError) {
-    console.error(
-      "[AdminService] Warning: Failed to update reviewed_by audit field:",
-      auditError.message,
-    );
-  }
+  await transitionLeaderAccess(requestId, reviewerId, "groups", accessGroupIds);
 }
 
 // ── Activity Logs ────────────────────────────────────────────

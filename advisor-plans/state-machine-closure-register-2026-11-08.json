@@ -1,0 +1,1221 @@
+{
+  "scope": "Seluruh subbagian bernomor yang sudah dilaporkan, bukan pencarian temuan baru",
+  "head": "6a6d9ba0b8d6130c4951a2fd5948c297b38d2ed4",
+  "entries": [
+    {
+      "id": "1.1",
+      "title": "Memulai, menjalani, dan mengakhiri panggilan",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/telefun-call.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/telefun-audio-fidelity.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Guard start/end dan cleanup dipertahankan; E2E start ganda, gagal koneksi/terminal, end terkonfirmasi, cleanup retry dan unmount lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Guard start/end existing tetap ada. Batch 47 kasus terhenti sebelum kasus panggilan Telefun dijalankan.",
+        "next_action": "Uji start ganda, gagal koneksi/terminal, end ganda, cleanup gagal→retry, dan unmount.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "1.2",
+      "title": "Hasil rekaman dan antrean rekonsiliasi",
+      "status": "guarded_with_storage_limit",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/telefun-audio-fidelity.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/telefun/services/telefun-recording-reconciliation-queue.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Finalize gagal tersimpan lokal dan tidak memulai scoring. Antrean browser dibatasi 32 entri, TTL 7 hari dan 8 attempt; kehilangan storage tidak dijanjikan recovery durable.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Antrean rekonsiliasi browser bukan jaminan durable server; tidak dirombak.",
+        "next_action": "Buktikan finalize/retry/rekaman terlambat serta batas storage dan pemulihan browser.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "1.3",
+      "title": "Status scoring dan worker",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/telefun-scoring-queue-api.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Worker nyata menyelesaikan capture valid; token lama/capture gagal tidak dapat publish. Hanya subset queue/fencing yang dipilih, bukan seluruh suite scoring.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Claim/token scoring dan worker belum diverifikasi ulang pada database disposable di batch ini.",
+        "next_action": "Pilih E2E telefun-scoring-queue-api dan cek definisi RPC terkini/fencing.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "1.4",
+      "title": "WebRTC broker dan pembersihan",
+      "status": "reviewed_retired_legacy",
+      "evidence": [
+        {
+          "path": "apps/telefun/src/server.ts",
+          "kind": "source_contract"
+        },
+        {
+          "path": "apps/telefun/src/realtime-webrtc/http-broker.ts",
+          "kind": "source_contract"
+        },
+        {
+          "path": "apps/telefun/src/realtime-webrtc/call-manager.ts",
+          "kind": "source_contract"
+        },
+        {
+          "path": "apps/telefun/src/realtime-webrtc/orphan-cleanup.ts",
+          "kind": "source_contract"
+        },
+        {
+          "path": "apps/web/e2e/gemini-egress-proxy-api.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Runtime hanya mengekspos cleanup facade; POST start retired terbukti 404 melalui boot E2E. Owner-bound cleanup/orphan dibaca statis; retry/hangup/persistence/lease historis belum mendapat E2E langsung. Bukan bug start aktif atau klaim cleanup sudah teruji penuh.",
+      "next_action": "Batas evidence tetap berlaku; uji cleanup historis langsung jika lifecycle itu diubah.",
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Broker/orphan cleanup dibaca sebagian; belum ada hasil E2E penutupan.",
+        "next_action": "Bedakan jalur aktif/legacy, lalu verifikasi hangup/persist gagal, retry dan lease.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "2.1",
+      "title": "Chat aktif, antrean pesan, dan respons konsumen",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/ketik-server-chat.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/ketik-session-api.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Retry turn mempertahankan ID/pesan; antrean, expiry, append ketika respons pending dan dua pesan cepat lulus browser. Lifecycle legacy tidak dirombak.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Sejumlah kasus antrean chat masuk run besar yang terinterupsi; tidak ada rekap PASS final.",
+        "next_action": "Selesaikan ketik-server-chat: append/response retry, antrean, expiry dan close.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "2.2",
+      "title": "Telaah AI di frontend",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/ketik-review-worker-browser.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Failed rerun tetap menampilkan hasil sebelumnya setelah reload; late polling tidak mengganti hasil explicit refresh; enqueue lost response tidak menulis dua kali.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Kasus hasil siap dan hasil lama saat rerun gagal masuk run terinterupsi, bukan suite final yang lulus.",
+        "next_action": "Rerun kontrak useKetikReviewStatus; pastikan hasil lama tidak hilang saat rerun gagal.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "2.3",
+      "title": "Sesi server dan antrean review KETIK",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/ketik-review-worker-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/ketik-session-api.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Worker nyata, SIGKILL/restart, lost lease, competing claims, session expiry, finalization failure/retry dan stale settlement teruji pada disposable.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Antrean durable/lease existing tidak diubah; database batch ini belum dinyalakan.",
+        "next_action": "Verifikasi SQL terakhir dan E2E worker, reclaim, crash/restart serta stale settlement.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "2.4",
+      "title": "Riwayat dan replay",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/ketik-history-browser.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/ketik/history.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Deep-link/detail retry, pergantian akun dan replay detail lama setelah pilihan baru lulus. Generation guard existing dipertahankan.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Deep-link dan pergantian akun masuk run terinterupsi; guard replay tetap dipertahankan.",
+        "next_action": "Lengkapi pengujian pilihan replay baru, respons lama, kegagalan detail dan ganti akun.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "3.1",
+      "title": "Tahap pahami → tanggapi → telaah",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/pdkt-flow.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/pdkt/simulation.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Tahap pahami/tanggapi/telaah serta navigasi sesi diuji melalui workspace, riwayat dan replay. Kombinasi panel existing bukan bug yang terbukti dan tidak direfactor massal.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Peta panel/status PDKT belum mempunyai disposition akhir di batch ini.",
+        "next_action": "Cocokkan pilihan email, detail, panel dan navigasi dengan E2E relevan.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "3.2",
+      "title": "Pembuatan email, draft, dan replay",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/pdkt-flow.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/pdkt-resilience-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/pdkt/utils/replaySession.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Replay tanpa mailbox bertahan setelah refresh; source menjaga pembeda item sintetis dan permission hapus. Create/retry token nyata tidak membocorkan metadata privat.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Identitas request/draft dan item replay sintetis belum ditutup sebagai kontrak menyeluruh.",
+        "next_action": "Pertahankan pembeda replay vs mailbox; verifikasi create, draft, pilih email dan larangan hapus sintetis.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "3.3",
+      "title": "Evaluasi AI per email",
+      "status": "manual_recovery_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/pdkt-resilience-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/helpers/pdktCrashApi.mjs",
+          "kind": "fixture"
+        }
+      ],
+      "note": "API SIGKILL setelah claim, restart, stale claim, explicit retry dan satu provider call lulus. Recovery tetap manual; tidak ada worker PDKT otomatis/durable baru.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "verification_pending",
+        "note": "Retry manual/stale fencing sudah ada dari pekerjaan lama. Test crash proses nyata baru ditulis dan BELUM dijalankan.",
+        "next_action": "Jalankan kasus baru crash→restart→retry pada disposable; jangan menyebutnya worker otomatis/durable.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "3.4",
+      "title": "Mailbox dan penghapusan",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/pdkt-replier-attribution-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/pdkt-resilience.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Reply RPC/API retry mengembalikan history yang sama dan menjaga atribusi; bulk delete campuran mempertahankan item gagal serta melaporkan dua count. E2E atribusi tidak menilai mutu jawaban AI.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Idempotensi reply dan hasil parsial hapus/bulk belum direkonsiliasi akhir.",
+        "next_action": "Buktikan reply idempoten dan penghapusan parsial tanpa menghilangkan item gagal.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "4.1",
+      "title": "Publikasi versi aturan QA",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/sidak-publish-atomic-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "supabase/migrations/20261107181115_sidak_atomic_rule_publish.sql",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "RPC publish atomik: kegagalan, concurrency, double publish, SLIK validation, pindah periode, not-found dan denial JWT lulus 7 kasus.",
+      "next_action": "Izin migration remote diperlukan sebelum integrasi API.",
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Service sudah memakai RPC publish atomik dari pekerjaan terdahulu; tidak direrun pada DB di batch ini.",
+        "next_action": "Rerun sidak-publish-atomic-api pada disposable, termasuk gagal dan publish bersamaan.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "4.2",
+      "title": "Form temuan dan impor SIDAK",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/sidak-temuan-import-dates.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "RED stale XLSX parse direproduksi; reducer + generation/context ownership mencegah resurrection setelah close/reopen dan ganti periode. Preview/confirm usang tidak melanjutkan write; payload save tetap milik konteks asal.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Review read-only terlambat mengindikasikan stale parse setelah panel tutup/konteks berubah. Belum diverifikasi ulang parent dan belum direproduksi; tidak ditutup.",
+        "next_action": "Saat diminta melanjutkan: baca sumber aktual lalu Playwright RED untuk parse lama yang selesai sesudah konteks berubah; jangan menerapkan perbaikan sebelum reproduksi.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "4.3",
+      "title": "Scope filter dan pemuatan dashboard",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/sidak-scope.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Query/default/reset dan perpindahan cakupan Dashboard/Ranking/Heatmap teruji; source useSidakScope dipertahankan, bukan bug yang memerlukan state machine baru.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "URL/storage/default dan loading scope adalah konteks yang perlu dijaga, bukan otomatis bug.",
+        "next_action": "Cocokkan sumber useSidakScope dengan E2E scope/dashboard yang relevan.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "5.1",
+      "title": "Impor peserta",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/profiler-phase3-add-import-teams.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/profiler-import-api.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Import tidak blind retry setelah hasil write tak diketahui. Jumlah mengikuti hasil server; field opsional dan hasil parsial terbukti melalui browser dan API/DB nyata.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "No-blind-retry dan jumlah hasil server sudah diperbaiki sebelumnya; kasus terkait belum selesai di run besar ini.",
+        "next_action": "Rerun UI import partial/lost response serta profiler-import-api untuk persistensi DB.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "5.2",
+      "title": "Workspace dan akses",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/profiler-workspace.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/hooks/useProfilerAccess.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Workspace/deep link, back, folder/peserta dan read-only role teruji. Hak tulis tetap dari capability/backend; tidak memperluas scope data.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Workspace/read-only dan pergantian tahun/folder/peserta belum mempunyai disposition akhir.",
+        "next_action": "Verifikasi pergantian konteks dan guard akses tanpa menimpa pekerjaan lama.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "6.1",
+      "title": "Lifecycle rencana pelatihan",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/tna-plan-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/tna-evaluation-flow-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/tna-evaluation-flow.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Rencana/evaluasi mempertahankan revision, locking dan frozen snapshots; aktivasi, penyelesaian, pembatalan dan concurrency lulus API/DB. Practice progress bukan status plan.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Revisi/lock/snapshot plan existing tidak diubah. Progres practice bukan status plan.",
+        "next_action": "Selesaikan verifikasi aktivasi, evaluasi, selesai/batal dan snapshot terbekukan.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "6.2",
+      "title": "Loading, mutasi, dan konflik revisi",
+      "status": "guarded_existing",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/tna-flow.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/e2e/tna-evaluation-flow.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "409 mengunci mutasi sampai reload; pending, error/retry dan completion failure tampil jujur pada browser; API menolak stale/wrong status.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "legacy_review_pending",
+        "note": "Konflik revisi dan kunci mutasi existing dipertahankan, belum direrun secara fokus.",
+        "next_action": "Verifikasi 409 mengunci sampai reload serta loading/error/retry yang jujur.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "7.1",
+      "title": "Bootstrap login dan callback",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/auth-callback-failure.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Reject getSession callback menghasilkan pemulihan, bukan loading selamanya. Bukti ini khusus callback, bukan sertifikat seluruh bootstrap auth.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Callback reject sudah ditangani dari pekerjaan lama; kasus callback muncul di run terinterupsi.",
+        "next_action": "Rerun auth-callback-failure secara fokus; jangan menyamakan callback dengan seluruh bootstrap.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "7.2",
+      "title": "Permintaan dan persetujuan akses leader",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/leader-access-race.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/hooks/useAccessStatus.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Generation guard reader akses menolak respons terbalik dan mempertahankan loading milik request terbaru; E2E race lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Hook akses sudah memiliki reducer/generation guard; kasus race masuk run terinterupsi.",
+        "next_action": "Rerun leader-access-race untuk respons terbalik dan overlap loading.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "7.3",
+      "title": "Hook request bersama",
+      "status": "reference_guard",
+      "evidence": [
+        {
+          "path": "apps/web/src/hooks/useApi.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "useApi sudah memiliki generation/unmount fence. Pembanding existing, tidak direfactor dan bukan bug yang terbukti; disposition berdasarkan source.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "reference",
+        "note": "useApi memiliki generation/unmount guard; tidak diubah dan bukan bug yang terbukti.",
+        "next_action": "Dokumentasikan disposition sebagai pembanding, bukan refactor massal.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.1",
+      "title": "Persetujuan akses leader di backend",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/leader-access-atomic-api.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "supabase/migrations/20261108000000_leader_access_transitions.sql",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Transition leader atomik, expected-status guard, rollback, conflict, group replacement, approve/reject race, self-review dan denial RPC lulus 7 API/DB.",
+      "next_action": "Izin migration remote diperlukan sebelum integrasi API.",
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Paket leader sebelumnya lulus 7/7 API secara lokal; bukti historis, bukan hasil batch closure terbaru.",
+        "next_action": "Rerun approval/reject/revoke/groups, konflik dan self-review sebelum rollout.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.2",
+      "title": "Pendaftaran dan masuk melalui modal autentikasi",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/lifecycle-ui-recovery.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/components/AuthModal.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Login lama tidak menavigasi sesudah modal ditutup; signup yang sudah menciptakan akun tetap menyelesaikan provisioning profil tanpa navigasi terlambat.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Guard AuthModal login usang dan signup provisioning selesai lokal pada paket sebelumnya.",
+        "next_action": "Rerun dua kasus auth dan gate integrasi; jangan membatalkan provisioning akun yang sudah dibuat.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.3",
+      "title": "Draf balasan PDKT: simpan lokal → konfirmasi → kirim → buang draf",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/lifecycle-ui-recovery.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Draf tersimpan sebelum await, bertahan pending-unmount dan gagal/retry, dibuang hanya setelah ACK serta tidak menghapus draf berbeda yang dibuka ulang.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "ReplyComposer persist-before-await dan ACK ownership selesai lokal sebelumnya.",
+        "next_action": "Rerun pending-unmount, gagal/retry dan hapus draf hanya sesudah ACK.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.4",
+      "title": "Pengaturan simulasi: editor bersarang dan simpan pengaturan",
+      "status": "retry_contract_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/lifecycle-ui-recovery.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Save/error reducer dan retry Telefun settings lulus. Dugaan reset props saat editor terbuka belum direproduksi di route; tidak diklaim sebagai bug yang diperbaiki.",
+      "next_action": "Reproduksi di route sebelum menyatakan reset props sebagai bug.",
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Reducer retry settings Telefun telah ditangani. Dugaan props-refresh belum direproduksi.",
+        "next_action": "Pertahankan retry; pisahkan bug terbukti dari dugaan reset props.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.5",
+      "title": "Kelola Kegiatan: baca gambar → validasi → simpan → tampilkan hasil",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/lifecycle-ui-recovery.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/dashboard/kegiatan.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Form Kegiatan dan mutasi single-flight; field/close dibekukan saat save, failure mempertahankan draf dan retry berhasil melalui browser.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "previous_fix",
+        "note": "Form Kegiatan sudah mempunyai freeze/save/mutation guard dari paket lama.",
+        "next_action": "Rerun create/update/fail/close guard dan regresi Kegiatan.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "9.6",
+      "title": "Harga AI terjadwal — lifecycle yang ditentukan waktu",
+      "status": "by_design",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/monitoring-harga.spec.ts",
+          "kind": "e2e_spec"
+        }
+      ],
+      "note": "Harga menjadi efektif lewat effective_from pada waktu baca, bukan worker status. Jadwal dan pembatalan sebelum berlaku lulus browser; bukan audit finansial menyeluruh.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "by_design",
+        "note": "Harga berlaku karena effective_from dan waktu baca, bukan wajib worker/update status.",
+        "next_action": "Catat sebagai desain; jika area diubah, jaga batas WIB dan pembatalan harga mendatang.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "10.1",
+      "title": "Riwayat Monitoring: ganti filter → muat data → hapus → refresh",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/monitoring-riwayat.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/monitoring/components/HistoryTab.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Filter loading/ready/failed dan delete dipusatkan; late success/failure ditolak dan delete completion memakai filter terbaru setelah Back. Fokus/109 lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "implemented_partial",
+        "note": "Reducer load/delete, generation fence dan current-context refresh sudah ditulis. Dua kasus late response lulus pada run 8 kasus.",
+        "next_action": "Tes baru delete completion setelah browser Back belum selesai; isolasi kasus ini lalu rerun seluruh fokus.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "10.2",
+      "title": "Impor EFEK: baca file → cocokkan nama → tinjau → impor",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/efek-import-lifecycle.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/tna/efek-import.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "File terakhir memiliki parse/match/preview/payload. Import membekukan file/pilihan; failure menjaga preview dan retry eksplisit. Fokus/109 lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "implemented_partial",
+        "note": "Reducer file/matching/importing, generation guard dan freeze payload sudah ditulis; dua kasus fokus lulus.",
+        "next_action": "Review retry/import lock dan jalankan ulang suite fokus/integrasi yang bersih.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "10.3",
+      "title": "Pengaturan KETIK: template global tersimpan, pengaturan pribadi belum tentu",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/ketik-settings-save-lifecycle.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "ACK global/pribadi terpisah, pesan partial, retry/reopen tanpa global write ulang dan next write memakai revision baru. Empat kasus dan integrasi lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "implemented_partial",
+        "note": "ACK global/pribadi, partial error, retry tanpa write global ulang dan freeze form sudah ditulis; dua kasus fokus lulus.",
+        "next_action": "Review ACK/reopen/perubahan template baru dan konflik revision; lengkapi gate akhir.",
+        "closed_in_this_batch": false
+      }
+    },
+    {
+      "id": "10.4",
+      "title": "Catatan manual Telefun: draf → simpan → refresh → bersihkan input",
+      "status": "local_fix_verified",
+      "evidence": [
+        {
+          "path": "apps/web/e2e/telefun-annotation-lifecycle.spec.ts",
+          "kind": "e2e_spec"
+        },
+        {
+          "path": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
+          "kind": "source_contract"
+        }
+      ],
+      "note": "Catatan manual single-flight; editor dibekukan sampai ACK, failure mempertahankan draf dan sukses membersihkan input. Locator slider eksak; dua kasus/integrasi lulus.",
+      "next_action": null,
+      "closed_in_this_batch": true,
+      "historical_checkpoint": {
+        "status": "implemented_partial",
+        "note": "Reducer edit/saving/failed dan freeze form sudah ditulis; failure-preserves-draft lulus. Kasus sukses gagal di locator slider ambigu.",
+        "next_action": "Locator Waktu di rekaman sudah dikoreksi, tetapi belum ada rerun selesai yang membuktikan jalur sukses.",
+        "closed_in_this_batch": false
+      }
+    }
+  ],
+  "batch_status": "resumed_verification_in_progress",
+  "checkpoint": "2026-11-08T12:23:42+07:00",
+  "resume_only_on_new_user_request": false,
+  "final_report": "advisor-plans/laporan-akhir-state-machine-2026-11-08.md",
+  "late_readonly_review": {
+    "delegation_id": "deleg_ec5c4ce0",
+    "parent_verified": false,
+    "tests_run_by_reviewers": false,
+    "closure_decisions_applied": false,
+    "main_followup": "4.2 SIDAK import: validate and reproduce stale parse/context ownership before changing behavior"
+  },
+  "resume_evidence_directory": ".audit-run/state-machine-closure-20261108/resume",
+  "verified_runs": {
+    "ui.log": {
+      "exit": 0,
+      "passed": 16
+    },
+    "ketik-ack.log": {
+      "exit": 0,
+      "passed": 4
+    },
+    "sidak-green.log": {
+      "exit": 0,
+      "passed": 9
+    },
+    "pdkt-crash-green.log": {
+      "exit": 0,
+      "passed": 1
+    },
+    "api-regression-green.log": {
+      "exit": 0,
+      "passed": 28
+    },
+    "workers.log": {
+      "exit": 0,
+      "passed": 12
+    },
+    "tna-fixture-green.log": {
+      "exit": 0,
+      "passed": 22
+    },
+    "gaps-green.log": {
+      "exit": 0,
+      "passed": 4
+    }
+  },
+  "status": "local_inventory_disposition_complete_remote_release_pending",
+  "report": "advisor-plans/hasil-lanjutan-state-machine-2026-11-08.md",
+  "definitions": {
+    "closed_in_this_batch": "Seluruh 32 item memperoleh disposition lokal; bukan jaminan seluruh lifecycle/refactor/race telah diuji.",
+    "local_fix_verified": "Perubahan lokal dengan skenario E2E teruji.",
+    "guarded_existing": "Pengaman existing ditinjau dan E2E terpilih lulus; batas cakupan dicatat.",
+    "reviewed_retired_legacy": "Start retired teruji; cleanup historis hanya ditinjau statis, bukan runtime lengkap.",
+    "reference_guard": "Pembanding source existing, bukan temuan bug.",
+    "retry_contract_verified": "Retry teruji; dugaan props-refresh belum direproduksi."
+  },
+  "verification": {
+    "counts_overlap": true,
+    "real_database_selected_total": 66,
+    "boot_egress_selected_total": 12,
+    "browser_selection": [
+      "auth-callback-failure.spec.ts",
+      "leader-access-race.spec.ts",
+      "lifecycle-ui-recovery.spec.ts",
+      "monitoring-riwayat.spec.ts",
+      "efek-import-lifecycle.spec.ts",
+      "ketik-settings-save-lifecycle.spec.ts",
+      "telefun-annotation-lifecycle.spec.ts",
+      "sidak-temuan-import-dates.spec.ts",
+      "ketik-review-worker-browser.spec.ts",
+      "ketik-history-browser.spec.ts",
+      "pdkt-resilience.spec.ts",
+      "sidak-scope.spec.ts",
+      "profiler-phase3-add-import-teams.spec.ts:169",
+      "profiler-phase3-add-import-teams.spec.ts:249",
+      "telefun-call.spec.ts:272",
+      "telefun-call.spec.ts:402",
+      "telefun-call.spec.ts:690",
+      "telefun-call.spec.ts:711",
+      "telefun-audio-fidelity.spec.ts:2570",
+      "telefun-audio-fidelity.spec.ts:2620",
+      "telefun-audio-fidelity.spec.ts:3652",
+      "telefun-audio-fidelity.spec.ts:3846",
+      "telefun-audio-fidelity.spec.ts:3878",
+      "telefun-audio-fidelity.spec.ts:3934",
+      "telefun-audio-fidelity.spec.ts:4181",
+      "telefun-audio-fidelity.spec.ts:5086",
+      "ketik-server-chat.spec.ts:168",
+      "ketik-server-chat.spec.ts:236",
+      "ketik-server-chat.spec.ts:349",
+      "ketik-server-chat.spec.ts:872",
+      "ketik-server-chat.spec.ts:998",
+      "profiler-workspace.spec.ts:155",
+      "profiler-workspace.spec.ts:199",
+      "profiler-workspace.spec.ts:285",
+      "profiler-workspace.spec.ts:391",
+      "tna-flow.spec.ts:17",
+      "tna-flow.spec.ts:128",
+      "tna-flow.spec.ts:211",
+      "tna-flow.spec.ts:317",
+      "tna-evaluation-flow.spec.ts:11",
+      "tna-evaluation-flow.spec.ts:237",
+      "tna-evaluation-flow.spec.ts:297",
+      "tna-evaluation-flow.spec.ts:383",
+      "tna-evaluation-flow.spec.ts:407",
+      "pdkt-flow.spec.ts:1158",
+      "pdkt-flow.spec.ts:1253",
+      "pdkt-flow.spec.ts:1482",
+      "pdkt-flow.spec.ts:1509",
+      "pdkt-flow.spec.ts:3515",
+      "pdkt-flow.spec.ts:3888",
+      "pdkt-flow.spec.ts:3917",
+      "monitoring-harga.spec.ts:187",
+      "monitoring-harga.spec.ts:294"
+    ],
+    "worker_selection": [
+      "ketik-review-worker-api.spec.ts:439",
+      "ketik-review-worker-api.spec.ts:520",
+      "ketik-review-worker-api.spec.ts:755",
+      "ketik-review-worker-api.spec.ts:931",
+      "telefun-scoring-queue-api.spec.ts:547",
+      "telefun-scoring-queue-api.spec.ts:969",
+      "telefun-scoring-queue-api.spec.ts:1156",
+      "telefun-scoring-queue-api.spec.ts:1263",
+      "ketik-session-api.spec.ts:536",
+      "ketik-session-api.spec.ts:580",
+      "ketik-session-api.spec.ts:912",
+      "ketik-session-api.spec.ts:1160"
+    ],
+    "results": [
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/browser-final.log",
+        "passed": 109,
+        "exit_code": 0,
+        "sha256": "5049c2ad5c8152003b408f034faef1d99abeb3077922a87e43de71f115fb4f08"
+      },
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/post-review.log",
+        "passed": 20,
+        "exit_code": 0,
+        "sha256": "fa04e95314177eb5deb7c91129dc7440acbb74257e1eac9fa259e74671dc05fd"
+      },
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/api-regression-green.log",
+        "passed": 28,
+        "exit_code": 0,
+        "sha256": "1bd4f6272ab8edc0c923372c7d93ec8c5de91027f9733922c000a8ad7534cb93"
+      },
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/workers.log",
+        "passed": 12,
+        "exit_code": 0,
+        "sha256": "c283f833e7b9af5a4af588af78a28b09a23962f235bf416edae0a20a0c9ded75"
+      },
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/tna-fixture-green.log",
+        "passed": 22,
+        "exit_code": 0,
+        "sha256": "4b4c3f68b70ce0ba31e36341fe5c6681fc651c876e24a990175e38b10434fbcc"
+      },
+      {
+        "path": ".audit-run/state-machine-closure-20261108/resume/api-final.log",
+        "passed": 16,
+        "exit_code": 0,
+        "sha256": "9124647238a5bad554228c7656934f75e7eda0f28e2a23305f353ecd84c5bcf7"
+      }
+    ],
+    "post_review_note": "109 browser mendahului koreksi ref pada Monitoring/SIDAK; dua spec itu diulang 20/20. Koreksi terakhir menambahkan dispatch useReducer yang stabil ke dependency callback agar React Compiler menerima memoization.",
+    "safe_target": {
+      "project": "ram-lifecycle-20261108",
+      "api_port": 55541,
+      "db_port": 55542,
+      "migration_count": 118,
+      "latest_migration": "20261108000000",
+      "provider": "loopback fixture with fail-closed egress"
+    },
+    "repeat_commands": {
+      "browser": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "auth-callback-failure.spec.ts",
+        "leader-access-race.spec.ts",
+        "lifecycle-ui-recovery.spec.ts",
+        "monitoring-riwayat.spec.ts",
+        "efek-import-lifecycle.spec.ts",
+        "ketik-settings-save-lifecycle.spec.ts",
+        "telefun-annotation-lifecycle.spec.ts",
+        "sidak-temuan-import-dates.spec.ts",
+        "ketik-review-worker-browser.spec.ts",
+        "ketik-history-browser.spec.ts",
+        "pdkt-resilience.spec.ts",
+        "sidak-scope.spec.ts",
+        "profiler-phase3-add-import-teams.spec.ts:169",
+        "profiler-phase3-add-import-teams.spec.ts:249",
+        "telefun-call.spec.ts:272",
+        "telefun-call.spec.ts:402",
+        "telefun-call.spec.ts:690",
+        "telefun-call.spec.ts:711",
+        "telefun-audio-fidelity.spec.ts:2570",
+        "telefun-audio-fidelity.spec.ts:2620",
+        "telefun-audio-fidelity.spec.ts:3652",
+        "telefun-audio-fidelity.spec.ts:3846",
+        "telefun-audio-fidelity.spec.ts:3878",
+        "telefun-audio-fidelity.spec.ts:3934",
+        "telefun-audio-fidelity.spec.ts:4181",
+        "telefun-audio-fidelity.spec.ts:5086",
+        "ketik-server-chat.spec.ts:168",
+        "ketik-server-chat.spec.ts:236",
+        "ketik-server-chat.spec.ts:349",
+        "ketik-server-chat.spec.ts:872",
+        "ketik-server-chat.spec.ts:998",
+        "profiler-workspace.spec.ts:155",
+        "profiler-workspace.spec.ts:199",
+        "profiler-workspace.spec.ts:285",
+        "profiler-workspace.spec.ts:391",
+        "tna-flow.spec.ts:17",
+        "tna-flow.spec.ts:128",
+        "tna-flow.spec.ts:211",
+        "tna-flow.spec.ts:317",
+        "tna-evaluation-flow.spec.ts:11",
+        "tna-evaluation-flow.spec.ts:237",
+        "tna-evaluation-flow.spec.ts:297",
+        "tna-evaluation-flow.spec.ts:383",
+        "tna-evaluation-flow.spec.ts:407",
+        "pdkt-flow.spec.ts:1158",
+        "pdkt-flow.spec.ts:1253",
+        "pdkt-flow.spec.ts:1482",
+        "pdkt-flow.spec.ts:1509",
+        "pdkt-flow.spec.ts:3515",
+        "pdkt-flow.spec.ts:3888",
+        "pdkt-flow.spec.ts:3917",
+        "monitoring-harga.spec.ts:187",
+        "monitoring-harga.spec.ts:294",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ],
+      "api_regression": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "--config=playwright.api.config.ts",
+        "--project=leader-access-atomic-real-backend",
+        "--project=sidak-publish-atomic-real-backend",
+        "--project=profiler-import-real-backend",
+        "--project=pdkt-resilience-real-backend",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ],
+      "workers": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "ketik-review-worker-api.spec.ts:439",
+        "ketik-review-worker-api.spec.ts:520",
+        "ketik-review-worker-api.spec.ts:755",
+        "ketik-review-worker-api.spec.ts:931",
+        "telefun-scoring-queue-api.spec.ts:547",
+        "telefun-scoring-queue-api.spec.ts:969",
+        "telefun-scoring-queue-api.spec.ts:1156",
+        "telefun-scoring-queue-api.spec.ts:1263",
+        "ketik-session-api.spec.ts:536",
+        "ketik-session-api.spec.ts:580",
+        "ketik-session-api.spec.ts:912",
+        "ketik-session-api.spec.ts:1160",
+        "--config=playwright.api.config.ts",
+        "--project=ketik-review-worker-real-backend",
+        "--project=telefun-scoring-queue-real-backend",
+        "--project=ketik-session-real-backend",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ],
+      "plan_evaluation": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "tna-plan-api.spec.ts",
+        "tna-evaluation-flow-api.spec.ts",
+        "--config=playwright.api.config.ts",
+        "--project=tna-real-backend",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ],
+      "api_final": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "--config=playwright.api.config.ts",
+        "--project=pdkt-replier-attribution-real-backend",
+        "--project=gemini-egress-proxy",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ],
+      "post_review": [
+        "pnpm",
+        "--dir",
+        "apps/web",
+        "exec",
+        "playwright",
+        "test",
+        "monitoring-riwayat.spec.ts",
+        "sidak-temuan-import-dates.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+        "--max-failures=1"
+      ]
+    },
+    "repeat_preconditions": [
+      "Commands are argv arrays; invoke from repository root.",
+      "For API groups, set E2E_SUPABASE_WORKDIR to an identity/schema-verified local disposable workdir; unset GEMINI_PROXY_URL.",
+      "Browser uses the repository hermetic loopback-only webServer env; do not reuse any running server.",
+      "Counts refer to recorded runs; repeat selectors are not a claim that another run happened."
+    ],
+    "format_paths": [
+      "CHANGELOG.md",
+      "advisor-plans/hasil-lanjutan-state-machine-2026-11-08.md",
+      "advisor-plans/hasil-perbaikan-state-machine-tambahan.md",
+      "advisor-plans/laporan-akhir-state-machine-2026-11-08.md",
+      "advisor-plans/laporan-state-machine-implisit.md",
+      "advisor-plans/state-machine-closure-register-2026-11-08.json",
+      "advisor-plans/state-machine-lanjutan-2026-11-08.json",
+      "apps/api/src/routes/admin.ts",
+      "apps/api/src/routes/pdkt/history.ts",
+      "apps/api/src/routes/profiler.ts",
+      "apps/api/src/routes/sidak/rule-versions.ts",
+      "apps/api/src/services/admin-service.ts",
+      "apps/api/src/services/leader-access-transitions.ts",
+      "apps/api/src/services/pdkt/evaluation-service.ts",
+      "apps/api/src/services/sidak/rule-versions.ts",
+      "apps/web/e2e/auth-callback-failure.spec.ts",
+      "apps/web/e2e/efek-import-lifecycle.spec.ts",
+      "apps/web/e2e/gemini-egress-proxy-api.spec.ts",
+      "apps/web/e2e/helpers/denyEgress.mjs",
+      "apps/web/e2e/helpers/pdktCrashApi.mjs",
+      "apps/web/e2e/helpers/sidakRealBackend.ts",
+      "apps/web/e2e/helpers/tnaFixture.ts",
+      "apps/web/e2e/ketik-history-browser.spec.ts",
+      "apps/web/e2e/ketik-settings-save-lifecycle.spec.ts",
+      "apps/web/e2e/leader-access-atomic-api.spec.ts",
+      "apps/web/e2e/leader-access-race.spec.ts",
+      "apps/web/e2e/lifecycle-ui-recovery.spec.ts",
+      "apps/web/e2e/monitoring-riwayat.spec.ts",
+      "apps/web/e2e/pdkt-resilience-api.spec.ts",
+      "apps/web/e2e/pdkt-resilience.spec.ts",
+      "apps/web/e2e/profiler-import-api.spec.ts",
+      "apps/web/e2e/profiler-phase3-add-import-teams.spec.ts",
+      "apps/web/e2e/sidak-publish-atomic-api.spec.ts",
+      "apps/web/e2e/sidak-temuan-import-dates.spec.ts",
+      "apps/web/e2e/telefun-annotation-lifecycle.spec.ts",
+      "apps/web/playwright.api.config.ts",
+      "apps/web/src/components/AuthModal.tsx",
+      "apps/web/src/hooks/useAccessStatus.ts",
+      "apps/web/src/routes/auth-callback.tsx",
+      "apps/web/src/routes/dashboard/kegiatan.tsx",
+      "apps/web/src/routes/ketik/components/SettingsModal.tsx",
+      "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
+      "apps/web/src/routes/monitoring/components/HistoryTab.tsx",
+      "apps/web/src/routes/pdkt/components/MailboxSidebar.tsx",
+      "apps/web/src/routes/pdkt/components/PdktReviewStage.tsx",
+      "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
+      "apps/web/src/routes/pdkt/simulation.tsx",
+      "apps/web/src/routes/pdkt/utils/usePdktEvaluations.ts",
+      "apps/web/src/routes/profiler/components/import/ProfilerImportFlow.tsx",
+      "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
+      "apps/web/src/routes/sidak/input.tsx",
+      "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
+      "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
+      "apps/web/src/routes/tna/efek-import.tsx",
+      "docs/LEADER_APPROVAL_ACCESS.md",
+      "docs/architecture.md",
+      "docs/auth-rbac.md",
+      "docs/database.md",
+      "docs/e2e-testing.md",
+      "docs/modules.md",
+      "plans/markdown/state-machine-additional-fixes.md",
+      "plans/markdown/state-machine-backlog-closure.md",
+      "plans/markdown/state-machine-report-fixes.md",
+      "supabase/rollbacks/README.md"
+    ]
+  },
+  "remote_release": {
+    "status": "approval_required",
+    "rpc_preflight": "both_missing",
+    "mutations_performed": false,
+    "migrations": [
+      "supabase/migrations/20261107181115_sidak_atomic_rule_publish.sql",
+      "supabase/migrations/20261108000000_leader_access_transitions.sql"
+    ]
+  },
+  "quality_gates": [
+    {
+      "command": "NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck --concurrency=1",
+      "log": ".audit-run/state-machine-closure-20261108/resume/typecheck-complete.log",
+      "exit_code": 0,
+      "sha256": "b7f8c3ad1889b14738c390bf05029f087f6f3675701891751aa5715fe41e122f"
+    },
+    {
+      "command": "NODE_OPTIONS=--max-old-space-size=768 pnpm lint --concurrency=1",
+      "log": ".audit-run/state-machine-closure-20261108/resume/lint-complete.log",
+      "exit_code": 0,
+      "sha256": "f0842966912984697ad404ae0804a98aa1539bccf0cba595738dfc49bc80fc1e"
+    },
+    {
+      "command": "NODE_OPTIONS=--max-old-space-size=1024 pnpm build --concurrency=1",
+      "log": ".audit-run/state-machine-closure-20261108/resume/build-final.log",
+      "exit_code": 0,
+      "sha256": "0148a9b7f33574f72d84beeb95c5d27b3babce772fb8250e8bac52946376d0b5"
+    },
+    {
+      "command": "graphify update .",
+      "log": ".audit-run/state-machine-closure-20261108/resume/graphify-final.log",
+      "exit_code": 0,
+      "sha256": "2dced3c608f4154cafaaba1dca5fb86675347374db8409e94e8a5b39f33bf92a"
+    }
+  ],
+  "review": {
+    "verdict": "PASS_local_patch",
+    "independent_review": false,
+    "material_open_patch_findings": [],
+    "limits": [
+      "Legacy WebRTC cleanup is source-reviewed, not directly runtime-tested for all retry/lease scenarios.",
+      "Telefun props-refresh suspicion is not reproduced; only retry contract verified.",
+      "No whole-app/security/financial audit claim."
+    ]
+  },
+  "baseline_preservation": {
+    "initial_file_count": 103,
+    "missing_files": [],
+    "unrelated_cloudflare_handoff": "identical_sha256",
+    "reset_stash_clean_used": false
+  }
+}

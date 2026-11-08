@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useReducer, useRef } from "react";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import {
@@ -26,7 +26,6 @@ interface UseTelefunSettingsDraftProps {
   providerReadiness?: TelefunProviderReadinessState;
   webRtcCapability?: TelefunWebRtcCapability | null;
 }
-
 
 export function buildTelefunSettingsForSave(params: {
   localSettings: AppSettings;
@@ -75,6 +74,28 @@ export function buildTelefunSettingsForSave(params: {
   return settingsToSave;
 }
 
+type SettingsSaveState =
+  | { phase: "ready" }
+  | { phase: "saving" }
+  | { phase: "failed"; message: string };
+type SettingsSaveAction =
+  { type: "reset" | "start" | "settled" } | { type: "fail"; message: string };
+function settingsSaveReducer(
+  state: SettingsSaveState,
+  action: SettingsSaveAction,
+): SettingsSaveState {
+  switch (action.type) {
+    case "reset":
+      return { phase: "ready" };
+    case "start":
+      return { phase: "saving" };
+    case "fail":
+      return { phase: "failed", message: action.message };
+    case "settled":
+      return state.phase === "saving" ? { phase: "ready" } : state;
+  }
+}
+
 export function useTelefunSettingsDraft({
   settings,
   isOpen,
@@ -86,8 +107,13 @@ export function useTelefunSettingsDraft({
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
   >("scenarios");
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveState, dispatchSave] = useReducer(settingsSaveReducer, {
+    phase: "ready",
+  });
+  const isSaving = saveState.phase === "saving";
+  const saveError = saveState.phase === "failed" ? saveState.message : null;
+  const setSaveError = (message: string | null) =>
+    dispatchSave(message ? { type: "fail", message } : { type: "reset" });
   const saveInFlightRef = useRef(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
@@ -260,7 +286,7 @@ export function useTelefunSettingsDraft({
 
     saveInFlightRef.current = true;
     setSaveError(null);
-    setIsSaving(true);
+    dispatchSave({ type: "start" });
     try {
       await onSave(settingsToSave);
       if (scenarioDirty) scenarioForm.close();
@@ -271,7 +297,7 @@ export function useTelefunSettingsDraft({
       setSaveError("Pengaturan belum tersimpan. Coba Simpan lagi.");
     } finally {
       saveInFlightRef.current = false;
-      setIsSaving(false);
+      dispatchSave({ type: "settled" });
     }
   };
 

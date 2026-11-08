@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useReducer, useRef } from "react";
 import { Loader2, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "../../../components/ui/button";
@@ -174,6 +174,50 @@ function AnnotationItem({
   );
 }
 
+type AnnotationDraft = {
+  phase: "editing" | "saving" | "failed";
+  text: string;
+  category: ReplayAnnotationCategory;
+  moment: AnnotationMoment;
+  timestampMs: number;
+};
+type AnnotationAction =
+  | { type: "text"; value: string }
+  | { type: "category"; value: ReplayAnnotationCategory }
+  | { type: "moment"; value: AnnotationMoment }
+  | { type: "timestamp"; value: number }
+  | { type: "submit" }
+  | { type: "saved" }
+  | { type: "failed" };
+
+function annotationReducer(
+  state: AnnotationDraft,
+  action: AnnotationAction,
+): AnnotationDraft {
+  if (
+    state.phase === "saving" &&
+    action.type !== "saved" &&
+    action.type !== "failed"
+  )
+    return state;
+  switch (action.type) {
+    case "text":
+      return { ...state, phase: "editing", text: action.value };
+    case "category":
+      return { ...state, category: action.value };
+    case "moment":
+      return { ...state, moment: action.value };
+    case "timestamp":
+      return { ...state, timestampMs: action.value };
+    case "submit":
+      return { ...state, phase: "saving" };
+    case "saved":
+      return { ...state, phase: "editing", text: "", moment: "missed_empathy" };
+    case "failed":
+      return { ...state, phase: "failed" };
+  }
+}
+
 export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
   sessionId: _sessionId,
   annotations,
@@ -189,12 +233,16 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
   highlightedId = null,
   onPlayFrom,
 }) => {
-  const [text, setText] = useState("");
-  const [category, setCategory] =
-    useState<ReplayAnnotationCategory>("strength");
-  const [moment, setMoment] = useState<AnnotationMoment>("missed_empathy");
-  const [timestampMs, setTimestampMs] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draft, dispatch] = useReducer(annotationReducer, {
+    phase: "editing",
+    text: "",
+    category: "strength",
+    moment: "missed_empathy",
+    timestampMs: 0,
+  });
+  const { text, category, moment, timestampMs } = draft;
+  const isSubmitting = draft.phase === "saving";
+  const submitInFlight = useRef(false);
 
   const charCount = text.length;
   const charLimitReached = charCount > MAX_CHAR_COUNT;
@@ -210,8 +258,15 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
       : 5 * 60 * 1000;
 
   const handleSubmit = async () => {
-    if (!text.trim() || charLimitReached) return;
-    setIsSubmitting(true);
+    if (
+      submitInFlight.current ||
+      isSubmitting ||
+      !text.trim() ||
+      charLimitReached
+    )
+      return;
+    submitInFlight.current = true;
+    dispatch({ type: "submit" });
     try {
       await onAddAnnotation({
         timestampMs,
@@ -219,12 +274,12 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
         moment,
         text: text.trim(),
       });
-      setText("");
-      setMoment("missed_empathy");
+      dispatch({ type: "saved" });
     } catch (_error) {
       // Parent component already surfaces errors; keep the form open.
+      dispatch({ type: "failed" });
     } finally {
-      setIsSubmitting(false);
+      submitInFlight.current = false;
     }
   };
 
@@ -306,112 +361,123 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
       </section>
 
       <section className="flex flex-col gap-4 border-t border-border pt-5">
-        <h3 className={sectionTitle}>Tambah catatan</h3>
+        <fieldset disabled={isSubmitting} className="contents">
+          <h3 className={sectionTitle}>Tambah catatan</h3>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="flex justify-between">
-            <span className={fieldLabel}>Waktu di rekaman</span>
-            <span className="font-mono text-xs text-fg2 tabular-nums">
-              {formatTimestamp(timestampMs)}
+          <label className="flex flex-col gap-1.5">
+            <span className="flex justify-between">
+              <span className={fieldLabel}>Waktu di rekaman</span>
+              <span className="font-mono text-xs text-fg2 tabular-nums">
+                {formatTimestamp(timestampMs)}
+              </span>
             </span>
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={maxTimestampMs}
-            step={1000}
-            value={timestampMs}
-            onChange={(e) => setTimestampMs(Number(e.target.value))}
-            className="min-h-[44px] w-full accent-foreground"
-          />
-        </label>
+            <input
+              type="range"
+              min={0}
+              max={maxTimestampMs}
+              step={1000}
+              value={timestampMs}
+              onChange={(e) =>
+                dispatch({ type: "timestamp", value: Number(e.target.value) })
+              }
+              className="min-h-[44px] w-full accent-foreground"
+            />
+          </label>
 
-        <div className="flex flex-col gap-1.5">
-          <span id="annotation-category-label" className={fieldLabel}>
-            Jenis catatan
-          </span>
-          <div
-            role="radiogroup"
-            aria-labelledby="annotation-category-label"
-            className="flex flex-wrap gap-1.5"
-          >
-            {(
-              [
-                "strength",
-                "improvement_area",
-                "critical_moment",
-                "technique_used",
-              ] as const
-            ).map((item) => (
-              <Button
-                key={item}
-                type="button"
-                role="radio"
-                aria-checked={category === item}
-                variant={category === item ? "secondary" : "ghost"}
-                onClick={() => setCategory(item)}
-                className="min-h-[44px] gap-2 px-3 text-[13px] aria-checked:font-semibold"
-              >
-                <span
-                  aria-hidden="true"
-                  className={cn("size-2 rounded-full", CATEGORY_DOT[item])}
-                />
-                {CATEGORY_LABELS[item]}
-              </Button>
-            ))}
+          <div className="flex flex-col gap-1.5">
+            <span id="annotation-category-label" className={fieldLabel}>
+              Jenis catatan
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby="annotation-category-label"
+              className="flex flex-wrap gap-1.5"
+            >
+              {(
+                [
+                  "strength",
+                  "improvement_area",
+                  "critical_moment",
+                  "technique_used",
+                ] as const
+              ).map((item) => (
+                <Button
+                  key={item}
+                  type="button"
+                  role="radio"
+                  aria-checked={category === item}
+                  variant={category === item ? "secondary" : "ghost"}
+                  onClick={() => dispatch({ type: "category", value: item })}
+                  className="min-h-[44px] gap-2 px-3 text-[13px] aria-checked:font-semibold"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn("size-2 rounded-full", CATEGORY_DOT[item])}
+                  />
+                  {CATEGORY_LABELS[item]}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className={fieldLabel}>Momen</span>
-          <select
-            value={moment}
-            onChange={(e) => setMoment(e.target.value as AnnotationMoment)}
-            className="min-h-[44px] w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          <label className="flex flex-col gap-1.5">
+            <span className={fieldLabel}>Momen</span>
+            <select
+              value={moment}
+              onChange={(e) =>
+                dispatch({
+                  type: "moment",
+                  value: e.target.value as AnnotationMoment,
+                })
+              }
+              className="min-h-[44px] w-full rounded-lg border border-border bg-background px-3 text-[13px] text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {(
+                Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
+              ).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className={fieldLabel}>Catatan</span>
+            <textarea
+              value={text.slice(0, MAX_CHAR_COUNT)}
+              onChange={(e) =>
+                dispatch({ type: "text", value: e.target.value })
+              }
+              placeholder="Tulis catatan singkat untuk momen ini"
+              className="h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            <span
+              className={cn(
+                "text-xs tabular-nums",
+                charCount > MAX_CHAR_COUNT * 0.9
+                  ? "font-semibold text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              {charCount}/{MAX_CHAR_COUNT} karakter
+            </span>
+          </label>
+
+          <Button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={isSubmitting || !text.trim() || charLimitReached}
+            className="min-h-[44px] gap-2 self-start px-4 text-[13px] font-semibold"
           >
-            {(
-              Object.entries(MOMENT_LABELS) as [AnnotationMoment, string][]
-            ).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className={fieldLabel}>Catatan</span>
-          <textarea
-            value={text.slice(0, MAX_CHAR_COUNT)}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Tulis catatan singkat untuk momen ini"
-            className="h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <span
-            className={cn(
-              "text-xs tabular-nums",
-              charCount > MAX_CHAR_COUNT * 0.9
-                ? "font-semibold text-foreground"
-                : "text-muted-foreground",
+            {isSubmitting ? (
+              <Loader2 data-icon="inline-start" className="animate-spin" />
+            ) : (
+              <Plus data-icon="inline-start" />
             )}
-          >
-            {charCount}/{MAX_CHAR_COUNT} karakter
-          </span>
-        </label>
-
-        <Button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={isSubmitting || !text.trim() || charLimitReached}
-          className="min-h-[44px] gap-2 self-start px-4 text-[13px] font-semibold"
-        >
-          {isSubmitting ? (
-            <Loader2 data-icon="inline-start" className="animate-spin" />
-          ) : (
-            <Plus data-icon="inline-start" />
-          )}
-          Simpan catatan
-        </Button>
+            Simpan catatan
+          </Button>
+        </fieldset>
       </section>
     </div>
   );

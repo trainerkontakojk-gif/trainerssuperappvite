@@ -318,12 +318,12 @@ export default function PdktSimulation({
 
   const { evaluations, retryEvaluation, seedEvaluation, loadFullResult } =
     usePdktEvaluations({
-    visibleMailboxItems,
-    history,
-    refetch,
-    fetchHistory,
-    onEvaluationFinished: notifyReview,
-  });
+      visibleMailboxItems,
+      history,
+      refetch,
+      fetchHistory,
+      onEvaluationFinished: notifyReview,
+    });
 
   // Trigger parent-level usage delta computation on activity
   const notifyBefore = async () => {

@@ -17,6 +17,10 @@ export default defineConfig({
   outputDir: "./test-results/api",
   projects: [
     {
+      name: "leader-access-atomic-real-backend",
+      testMatch: "leader-access-atomic-api.spec.ts",
+    },
+    {
       name: "pdkt-replier-attribution-real-backend",
       testMatch: "pdkt-replier-attribution-api.spec.ts",
     },
@@ -111,6 +115,10 @@ export default defineConfig({
       testMatch: "user-peserta-link-api.spec.ts",
     },
     {
+      name: "profiler-import-real-backend",
+      testMatch: "profiler-import-api.spec.ts",
+    },
+    {
       name: "practice-quota-real-backend",
       testMatch: "practice-quota-api.spec.ts",
     },
@@ -126,6 +134,10 @@ export default defineConfig({
     {
       name: "sidak-unmapped-indicator-real-backend",
       testMatch: "sidak-unmapped-indicator-api.spec.ts",
+    },
+    {
+      name: "sidak-publish-atomic-real-backend",
+      testMatch: "sidak-publish-atomic-api.spec.ts",
     },
     {
       name: "sidak-heatmap-filter-real-backend",

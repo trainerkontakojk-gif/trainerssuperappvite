@@ -1,11 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useReducer, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
-import {
-  clearLogoutGuestLock,
-} from "../lib/authLocalState";
+import { clearLogoutGuestLock } from "../lib/authLocalState";
 import { signOutLocalSession } from "../lib/session-logout";
 import { accountExpiredMessage, isAccountExpired } from "@trainers/types";
 
@@ -36,6 +34,44 @@ const AUTH_COPY = {
   },
 } as const;
 
+type AuthOperation = "form" | "forgot" | "google";
+type AuthRequestState =
+  | { phase: "idle" }
+  | { phase: "pending"; operation: AuthOperation }
+  | { phase: "success"; message: string }
+  | { phase: "failed"; message: string };
+type AuthRequestAction =
+  | { type: "reset"; notice?: { type: "error" | "info"; text: string } }
+  | { type: "start"; operation: AuthOperation }
+  | { type: "success" | "error"; message: string }
+  | { type: "settled" | "clear" };
+function authRequestReducer(
+  state: AuthRequestState,
+  action: AuthRequestAction,
+): AuthRequestState {
+  switch (action.type) {
+    case "reset":
+      return action.notice
+        ? {
+            phase: action.notice.type === "error" ? "failed" : "success",
+            message: action.notice.text,
+          }
+        : { phase: "idle" };
+    case "start":
+      return { phase: "pending", operation: action.operation };
+    case "success":
+      return { phase: "success", message: action.message };
+    case "error":
+      return { phase: "failed", message: action.message };
+    case "settled":
+      return state.phase === "pending" ? { phase: "idle" } : state;
+    case "clear":
+      return state.phase === "success" || state.phase === "failed"
+        ? { phase: "idle" }
+        : state;
+  }
+}
+
 export default function AuthModal({
   isOpen,
   onClose,
@@ -45,217 +81,197 @@ export default function AuthModal({
   const [mode, setMode] = useState<"login" | "register" | "forgot">(
     initialMode,
   );
-  const [error, setError] = useState<string | null>(
-    initialNotice?.type === "error" ? initialNotice.text : null,
+  const [request, dispatch] = useReducer(
+    authRequestReducer,
+    initialNotice,
+    (notice) =>
+      authRequestReducer({ phase: "idle" }, { type: "reset", notice }),
   );
-  const [successMessage, setSuccessMessage] = useState<string | null>(
-    initialNotice?.type === "info" ? initialNotice.text : null,
-  );
-  const [loading, setLoading] = useState(false);
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const generation = useRef(0);
+  const mounted = useRef(false);
+  const inFlight = useRef(false);
+  const error = request.phase === "failed" ? request.message : null;
+  const successMessage = request.phase === "success" ? request.message : null;
+  const loading = request.phase === "pending" && request.operation === "form";
+  const forgotLoading =
+    request.phase === "pending" && request.operation === "forgot";
+  const googleLoading =
+    request.phase === "pending" && request.operation === "google";
+  const setError = (message: string | null) =>
+    dispatch(message ? { type: "error", message } : { type: "clear" });
+  const setSuccessMessage = (message: string | null) =>
+    dispatch(message ? { type: "success", message } : { type: "clear" });
 
   useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      generation.current++;
+      inFlight.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    generation.current++;
+    inFlight.current = false;
     if (isOpen) {
       setMode(initialMode);
-      setError(initialNotice?.type === "error" ? initialNotice.text : null);
-      setSuccessMessage(
-        initialNotice?.type === "info" ? initialNotice.text : null,
-      );
-      setLoading(false);
-      setForgotLoading(false);
-      setGoogleLoading(false);
+      dispatch({ type: "reset", notice: initialNotice });
     }
   }, [initialMode, isOpen, initialNotice]);
 
+  const current = (run: number) =>
+    mounted.current && run === generation.current;
+  const begin = (operation: AuthOperation) => {
+    if (inFlight.current) return null;
+    inFlight.current = true;
+    const run = ++generation.current;
+    dispatch({ type: "start", operation });
+    clearLogoutGuestLock();
+    return run;
+  };
+  const finish = (run: number) => {
+    if (!current(run)) return;
+    inFlight.current = false;
+    dispatch({ type: "settled" });
+  };
+
   const handleClose = () => {
-    setError(null);
-    setSuccessMessage(null);
-    setLoading(false);
-    setForgotLoading(false);
-    setGoogleLoading(false);
+    generation.current++;
+    inFlight.current = false;
+    dispatch({ type: "reset" });
     const url = new URL(window.location.href);
     url.searchParams.delete("auth");
     window.history.replaceState({}, "", url.pathname || "/");
     onClose();
   };
 
-  async function waitForActiveSession() {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+  async function waitForActiveSession(run: number) {
+    for (let attempt = 0; attempt < 10 && current(run); attempt++) {
       const {
         data: { user },
-        error,
+        error: sessionError,
       } = await supabase.auth.getUser();
-
-      if (user && !error) {
+      if (!current(run)) return null;
+      if (user && !sessionError) {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        return session;
+        return current(run) ? session : null;
       }
-
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
-
     return null;
   }
 
-  async function resolvePostLoginPath(userId: string) {
+  async function resolvePostLoginPath(userId: string, run: number) {
     const profile = await fetchAuthProfile(userId);
-
-    if (!profile) {
-      console.warn("[AuthModal] Failed to fetch profile after login");
-      return "/dashboard";
-    }
-
-    if (profile.is_deleted) {
-      await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
-      throw new Error(
-        "Akun Anda telah dinonaktifkan. Silakan hubungi administrator.",
-      );
-    }
-
-    if (profile.status === "pending") {
+    if (!current(run)) return null;
+    if (!profile) return "/dashboard";
+    if (profile.status === "pending" && !profile.is_deleted)
       return "/waiting-approval";
-    }
-
-    if (profile.status === "inactive") {
+    if (
+      profile.is_deleted ||
+      profile.status === "inactive" ||
+      isAccountExpired(profile.active_until)
+    ) {
       await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
       throw new Error(
-        "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.",
+        profile.is_deleted
+          ? "Akun Anda telah dinonaktifkan. Silakan hubungi administrator."
+          : profile.status === "inactive"
+            ? "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda."
+            : accountExpiredMessage(profile.active_until!),
       );
     }
-
-    if (isAccountExpired(profile.active_until)) {
-      await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
-      throw new Error(accountExpiredMessage(profile.active_until!));
-    }
-
     return "/dashboard";
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    clearLogoutGuestLock();
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
+    const run = begin("form");
+    if (run === null) return;
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
     try {
       if (mode === "login") {
         const { error: loginError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
+        if (!current(run)) return;
         if (loginError) {
           setError(loginError.message);
-          setLoading(false);
           return;
         }
-
-        const session = await waitForActiveSession();
-
+        const session = await waitForActiveSession(run);
+        if (!current(run)) return;
         if (!session?.user) {
           setError("Sesi login belum siap. Silakan coba sekali lagi.");
-          setLoading(false);
           return;
         }
-
-        const nextPath = await resolvePostLoginPath(session.user.id);
+        const nextPath = await resolvePostLoginPath(session.user.id, run);
+        if (!current(run) || !nextPath) return;
         localStorage.setItem("auth_token", session.access_token);
         window.location.assign(nextPath);
         return;
       }
-
       const role = formData.get("role") as string;
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
-
+      // Closing the modal cancels presentation, not provisioning for an account
+      // already created by Auth. Complete its profile before ignoring late UI.
+      const success =
+        "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.";
       if (signUpError) {
-        const isDuplicate =
+        if (!current(run)) return;
+        const duplicate =
           (signUpError as any).code === "user_already_exists" ||
-          signUpError.message?.toLowerCase().includes("already registered") ||
-          signUpError.message?.toLowerCase().includes("already exists") ||
-          signUpError.message?.toLowerCase().includes("user already");
-
-        if (isDuplicate) {
-          setSuccessMessage(
-            "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
+          /already registered|already exists|user already/i.test(
+            signUpError.message,
           );
-          setLoading(false);
-          return;
-        }
-        setError(signUpError.message);
-        setLoading(false);
+        if (duplicate) setSuccessMessage(success);
+        else setError(signUpError.message);
         return;
       }
-
       if (data.user) {
-        const { error: profileError } = await supabase.from("profiles").insert([
-          {
-            id: data.user.id,
-            email,
-            role,
-            status: "pending",
-          },
-        ]);
-
-        if (profileError) {
-          if (
-            profileError.code === "23505" ||
-            profileError.message?.toLowerCase().includes("duplicate")
-          ) {
-            setSuccessMessage(
-              "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
-            );
-            setLoading(false);
-            return;
-          }
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert([{ id: data.user.id, email, role, status: "pending" }]);
+        if (!current(run)) return;
+        if (
+          profileError &&
+          profileError.code !== "23505" &&
+          !/duplicate/i.test(profileError.message)
+        ) {
           setError(
             "Terjadi masalah jaringan saat mendaftar. Silakan coba lagi.",
           );
-          setLoading(false);
           return;
         }
       }
-
-      setSuccessMessage(
-        "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
-      );
-    } catch (err: any) {
-      console.error("[AuthModal] Submission error:", err);
-      if (err instanceof TypeError && err.message === "Failed to fetch") {
+      if (current(run)) setSuccessMessage(success);
+    } catch (err: unknown) {
+      if (current(run))
         setError(
-          "Gagal menghubungkan ke server. Periksa koneksi internet Anda atau hubungi admin jika masalah berlanjut.",
+          err instanceof TypeError && err.message === "Failed to fetch"
+            ? "Gagal menghubungkan ke server. Periksa koneksi internet Anda atau hubungi admin jika masalah berlanjut."
+            : err instanceof Error
+              ? err.message
+              : "Terjadi kesalahan sistem saat memproses permintaan Anda.",
         );
-      } else {
-        setError(
-          err.message ||
-            "Terjadi kesalahan sistem saat memproses permintaan Anda.",
-        );
-      }
     } finally {
-      setLoading(false);
+      finish(run);
     }
   }
 
   async function handleForgotPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    clearLogoutGuestLock();
-    setForgotLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-
+    const run = begin("forgot");
+    if (run === null) return;
+    const email = new FormData(e.currentTarget).get("email") as string;
     try {
       const { error: forgotError } = await supabase.auth.resetPasswordForEmail(
         email,
@@ -263,50 +279,41 @@ export default function AuthModal({
           redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/reset-password`,
         },
       );
-
-      if (forgotError) {
-        setError(forgotError.message);
-      } else {
+      if (!current(run)) return;
+      if (forgotError) setError(forgotError.message);
+      else
         setSuccessMessage(
           "Tautan untuk mengatur ulang kata sandi sudah dikirim ke email Anda.",
         );
-      }
-    } catch (err: any) {
-      console.error("[AuthModal] Forgot password error:", err);
-      if (err instanceof TypeError && err.message === "Failed to fetch") {
+    } catch {
+      if (current(run))
         setError(
-          "Gagal menghubungkan ke server. Silakan periksa koneksi internet Anda.",
+          "Gagal memproses permintaan pemulihan kata sandi. Silakan coba lagi.",
         );
-      } else {
-        setError(
-          err.message || "Gagal memproses permintaan pemulihan kata sandi.",
-        );
-      }
     } finally {
-      setForgotLoading(false);
+      finish(run);
     }
   }
 
   async function handleGoogleLogin() {
-    clearLogoutGuestLock();
-    setGoogleLoading(true);
-    setError(null);
-    setSuccessMessage(null);
+    const run = begin("google");
+    if (run === null) return;
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/callback`,
         },
       });
-      if (error) {
-        setError(error.message);
-        setGoogleLoading(false);
+      if (current(run) && oauthError) {
+        setError(oauthError.message);
+        finish(run);
       }
-    } catch (err: any) {
-      console.error("[AuthModal] Google OAuth error:", err);
-      setError("Gagal menginisialisasi login Google. Silakan coba lagi.");
-      setGoogleLoading(false);
+    } catch {
+      if (current(run)) {
+        setError("Gagal menginisialisasi login Google. Silakan coba lagi.");
+        finish(run);
+      }
     }
   }
 

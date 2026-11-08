@@ -42,7 +42,7 @@ interface Props {
   item: PdktMailboxDetailItem;
   status: MailboxReviewState["status"] | null;
   result: PdktEvaluationResult | null;
-  /** Memulai atau mengulang telaah (status `failed` atau `not_started`). */
+  /** Memulai atau mengulang telaah yang tersedia untuk dicoba lagi. */
   onRetry: () => void;
   onInbox: () => void;
   onDelete?: () => void;
@@ -752,6 +752,28 @@ function ReviewPending({ status, onRetry }: Pick<Props, "status" | "onRetry">) {
       </div>
     );
   }
+  if (status === "retry_available") {
+    return (
+      <div
+        className={cn(
+          card,
+          "flex flex-wrap items-center justify-between gap-3",
+        )}
+      >
+        <p role="status" className="text-sm text-foreground">
+          Telaah belum selesai. Anda dapat mencoba lagi.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onRetry}
+          className="min-h-[44px] text-xs"
+        >
+          <RotateCcw aria-hidden="true" /> Coba lagi
+        </Button>
+      </div>
+    );
+  }
   return (
     <div role="status" className={cn(card, "flex items-center gap-3")}>
       <Loader2
@@ -837,10 +859,7 @@ export function PdktReviewStage({
               {item.subject || PDKT_NO_SUBJECT}
             </span>
           </h2>
-          <PdktReviewPdfButton
-            item={item}
-            result={completed ? result : null}
-          />
+          <PdktReviewPdfButton item={item} result={completed ? result : null} />
         </div>
 
         {completed ? (

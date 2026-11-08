@@ -352,6 +352,67 @@ test("rejected re-review preserves the completed score and retry action", async 
   expectHermetic(audit);
 });
 
+test("stalled review offers an explicit retry without claiming it failed", async ({
+  page,
+}) => {
+  const pendingHistory = {
+    ...completed,
+    evaluation: null,
+    evaluation_status: "processing",
+  };
+  const audit = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1&email=resilience-mail&tahap=telaah",
+    apiMocks: [
+      {
+        method: "GET",
+        path: `/api/v1/pdkt/history/eval/${completed.id}`,
+        body: {
+          success: true,
+          data: {
+            evaluation_status: "processing",
+            evaluation: null,
+            evaluation_error: null,
+            recovery: "retry_available",
+          },
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/v1/pdkt/history/retry-eval",
+        body: { success: true, message: "Evaluation retrying." },
+      },
+      ...mocks(mail("replied", completed.id), [pendingHistory]),
+    ],
+  });
+  await expect(
+    page.getByText("Telaah belum selesai. Anda dapat mencoba lagi."),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("Telaah gagal", { exact: true })).toHaveCount(0);
+  expect(
+    audit.mockedApi.filter(
+      (request) => request === "POST /api/v1/pdkt/history/retry-eval",
+    ),
+  ).toHaveLength(0);
+  const pollingBeforeRetry = audit.mockedApi.filter((request) =>
+    request.startsWith("GET /api/v1/pdkt/history/eval/"),
+  ).length;
+  await page.getByRole("button", { name: "Coba lagi", exact: true }).click();
+  await waitForMockedApi(audit, ["POST /api/v1/pdkt/history/retry-eval"]);
+  await expect
+    .poll(
+      () =>
+        audit.mockedApi.filter((request) =>
+          request.startsWith("GET /api/v1/pdkt/history/eval/"),
+        ).length,
+      { timeout: 10000 },
+    )
+    .toBeGreaterThan(pollingBeforeRetry);
+  await expect(
+    page.getByRole("button", { name: "Coba lagi", exact: true }),
+  ).toHaveCount(0);
+  expectHermetic(audit);
+});
+
 test("deleted history is an honest terminal state rather than ongoing evaluation", async ({
   page,
 }, info) => {
@@ -451,4 +512,86 @@ test("the inbox shows today's remaining new emails and turns Email baru off when
     page.getByRole("menuitem", { name: "Pengaturan" }),
   ).toBeEnabled();
   expectHermetic(out);
+});
+
+test("partial mailbox deletion keeps the refused email and reports both counts", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  const allowed = { ...mail("open"), subject: "Boleh dihapus" };
+  const refused = {
+    ...mail("open"),
+    id: "refused-mail",
+    subject: "Tetap di kotak masuk",
+  };
+  let rows = [allowed, refused];
+  let writes = 0;
+  const audit = await openHermeticShell(page, {
+    path: "/pdkt?ruang=1",
+    apiMocks: mocks(null),
+    expectedThirdPartyHosts: ["ojk.go.id"],
+    beforeNavigate: async () => {
+      await page.route("**/api/v1/pdkt/mailbox**", async (route) => {
+        const req = route.request();
+        const path = new URL(req.url()).pathname;
+        if (req.method() === "POST" && path.endsWith("/batch-delete")) {
+          writes++;
+          expect(req.postDataJSON().ids.sort()).toEqual(
+            [allowed.id, refused.id].sort(),
+          );
+          rows = [refused];
+          await route.fulfill({
+            json: {
+              success: true,
+              data: {
+                successCount: 1,
+                failureCount: 1,
+                errors: ["fixture-permission-changed"],
+              },
+            },
+          });
+        } else if (req.method() === "GET" && path === "/api/v1/pdkt/mailbox") {
+          await route.fulfill({ json: { success: true, data: rows } });
+        } else if (
+          req.method() === "GET" &&
+          (path.endsWith("/" + refused.id) || path.endsWith("/" + allowed.id))
+        ) {
+          await route.fulfill({
+            json: {
+              success: true,
+              data: path.endsWith("/" + refused.id) ? refused : allowed,
+            },
+          });
+        } else {
+          await route.fallback();
+        }
+      });
+    },
+  });
+  const list = page.getByRole("complementary", { name: "Kotak masuk" });
+  await expect(page.getByRole("button", { name: "Menu lainnya" })).toBeVisible({
+    timeout: 20000,
+  });
+  await page.getByRole("button", { name: "Menu lainnya" }).click();
+  await page.getByRole("menuitem", { name: "Pilih beberapa" }).click();
+  await page
+    .getByRole("checkbox", { name: "Pilih Boleh dihapus", exact: true })
+    .check();
+  await page
+    .getByRole("checkbox", { name: "Pilih Tetap di kotak masuk", exact: true })
+    .check();
+  await page
+    .getByRole("button", { name: "Hapus 2 email", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Hapus 2 email?", exact: true })
+    .getByRole("button", { name: "Hapus email", exact: true })
+    .click();
+  await expect.poll(() => writes).toBe(1);
+  await expect(
+    page.getByText(/1 email dihapus\. 1 email tidak bisa dihapus/),
+  ).toBeVisible();
+  await expect(list.getByText(refused.subject, { exact: true })).toBeVisible();
+  await expect(list.getByText(allowed.subject, { exact: true })).toBeHidden();
+  expectHermetic(audit);
 });

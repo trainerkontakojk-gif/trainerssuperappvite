@@ -112,7 +112,9 @@ test.describe("Monitoring Riwayat (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/ai/monitoring/history"]);
 
-    await expect(browser.getByText("30 sesi", { exact: true })).toBeVisible({ timeout: 20000 });
+    await expect(browser.getByText("30 sesi", { exact: true })).toBeVisible({
+      timeout: 20000,
+    });
     for (const text of ["KETIK 12", "PDKT 10", "Telefun 8", "Gagal 1"]) {
       await expect(browser.getByText(text, { exact: true })).toBeVisible();
     }
@@ -305,4 +307,183 @@ test.describe("Monitoring Riwayat (hermetic)", () => {
     expect(width).toBeLessThanOrEqual(390);
     expectHermetic(audit);
   });
+});
+
+test.describe("Monitoring request ownership", () => {
+  test.setTimeout(90000);
+  test.beforeAll(() => assertLocalDevOnlyTarget());
+
+  test("delete completion refreshes the current filter after browser Back", async ({
+    page: browser,
+  }) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let deleteStarted = false;
+    const seen: string[] = [];
+    const audit = await openHermeticShell(browser, {
+      path: "/monitoring?q=baru",
+      apiMocks: mocks(page(ROWS)),
+      beforeNavigate: async () => {
+        await browser.route(
+          "**/api/v1/ai/monitoring/history**",
+          async (route) => {
+            if (route.request().method() === "DELETE") {
+              deleteStarted = true;
+              await gate;
+              return route.fulfill({ json: { success: true, data: null } });
+            }
+            if (route.request().method() !== "GET") return route.fallback();
+            const q =
+              new URL(route.request().url()).searchParams.get("q") ?? "";
+            seen.push(q);
+            await route.fulfill({
+              json: {
+                success: true,
+                data: page(
+                  [
+                    row({
+                      scenario_title:
+                        q === "baru" ? "Konteks terbaru" : "Konteks lama",
+                    }),
+                  ],
+                  { total: 1 },
+                ),
+              },
+            });
+          },
+        );
+      },
+    });
+    try {
+      const table = browser.getByRole("table", { name: "Riwayat sesi" });
+      await expect(
+        table.getByText("Konteks terbaru", { exact: true }),
+      ).toBeVisible({ timeout: 20000 });
+      await browser.getByLabel("Cari riwayat").fill("lama");
+      await expect(
+        table.getByText("Konteks lama", { exact: true }),
+      ).toBeVisible();
+      await browser
+        .getByRole("button", { name: "Aksi sesi Konteks lama", exact: true })
+        .click();
+      await browser.getByRole("menuitem", { name: "Hapus sesi…" }).click();
+      const dialog = browser.getByRole("alertdialog", {
+        name: "Hapus sesi ini?",
+      });
+      await dialog
+        .getByRole("button", { name: "Hapus sesi", exact: true })
+        .click();
+      await expect.poll(() => deleteStarted).toBe(true);
+      await browser.goBack();
+      await expect(browser).toHaveURL(/q=baru/);
+      await expect(
+        browser.locator("table").getByText("Konteks terbaru", { exact: true }),
+      ).toBeVisible();
+      const beforeCompletion = seen.length;
+      release();
+      await expect(dialog).toBeHidden();
+      await expect.poll(() => seen.length).toBeGreaterThan(beforeCompletion);
+      expect(seen.at(-1)).toBe("baru");
+      await expect(
+        table.getByText("Konteks terbaru", { exact: true }),
+      ).toBeVisible();
+      await expect(browser.getByLabel("Cari riwayat")).toHaveValue("baru");
+      expectHermetic(audit);
+    } finally {
+      release();
+    }
+  });
+
+  for (const outcome of ["success", "failure"] as const) {
+    test(`late ${outcome} cannot replace the current history filter`, async ({
+      page: browser,
+    }) => {
+      let releaseOld!: () => void;
+      const oldGate = new Promise<void>((resolve) => {
+        releaseOld = resolve;
+      });
+      let oldStarted = false;
+      const audit = await openHermeticShell(browser, {
+        path: "/monitoring",
+        apiMocks: mocks(page(ROWS)),
+        beforeNavigate: async () => {
+          await browser.route(
+            "**/api/v1/ai/monitoring/history**",
+            async (route) => {
+              if (route.request().method() !== "GET") return route.fallback();
+              const q = new URL(route.request().url()).searchParams.get("q");
+              if (q !== "lama" && q !== "baru") return route.fallback();
+              if (q === "lama") {
+                oldStarted = true;
+                await oldGate;
+              }
+              await route.fulfill({
+                status: q === "lama" && outcome === "failure" ? 500 : 200,
+                contentType: "application/json",
+                body: JSON.stringify(
+                  q === "lama" && outcome === "failure"
+                    ? {
+                        success: false,
+                        error: {
+                          code: "SERVER_ERROR",
+                          message: "Permintaan lama gagal",
+                        },
+                      }
+                    : {
+                        success: true,
+                        data: page(
+                          [
+                            row({
+                              scenario_title:
+                                q === "baru"
+                                  ? "Hasil filter terbaru"
+                                  : "Hasil filter usang",
+                            }),
+                          ],
+                          { total: 1 },
+                        ),
+                      },
+                ),
+              });
+            },
+          );
+        },
+      });
+      await expect(
+        browser.getByRole("table", { name: "Riwayat sesi" }),
+      ).toBeVisible({ timeout: 20000 });
+      await browser.getByLabel("Cari riwayat").fill("lama");
+      await expect.poll(() => oldStarted).toBe(true);
+      await browser.getByLabel("Cari riwayat").fill("baru");
+      await expect(
+        browser
+          .getByRole("table", { name: "Riwayat sesi" })
+          .getByText("Hasil filter terbaru", { exact: true }),
+      ).toBeVisible({ timeout: 20000 });
+      const oldResponse = browser.waitForResponse(
+        (response) => new URL(response.url()).searchParams.get("q") === "lama",
+      );
+      releaseOld();
+      await (await oldResponse).finished();
+      await browser.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      await expect(
+        browser
+          .getByRole("table", { name: "Riwayat sesi" })
+          .getByText("Hasil filter terbaru", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        browser.getByText("Hasil filter usang", { exact: true }),
+      ).toHaveCount(0);
+      await expect(browser.getByRole("alert")).toHaveCount(0);
+      await expect(browser.getByLabel("Cari riwayat")).toHaveValue("baru");
+      expectHermetic(audit);
+    });
+  }
 });

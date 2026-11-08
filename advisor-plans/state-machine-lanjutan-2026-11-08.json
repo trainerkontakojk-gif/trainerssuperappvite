@@ -1,0 +1,184 @@
+{
+  "repository": "trainerssuperappvite",
+  "head": "6a6d9ba0b8d6130c4951a2fd5948c297b38d2ed4",
+  "inspection_date": "2026-11-08",
+  "scope": "Pemeriksaan statis terarah atas celah inventaris setelah perbaikan tambahan; bukan audit seluruh aplikasi",
+  "source_edits": false,
+  "runtime_tests_run": false,
+  "whole_app_coverage": false,
+  "findings": [
+    {
+      "id": "monitoring-history-request-order",
+      "label": "Riwayat Monitoring: filter, request, hapus, dan refresh",
+      "classification": "lifecycle request implisit",
+      "status": "risiko statis; belum direproduksi",
+      "evidence": [
+        {
+          "path": "apps/web/src/routes/monitoring/components/HistoryTab.tsx",
+          "start": 127,
+          "end": 161
+        },
+        {
+          "path": "apps/web/src/routes/monitoring/components/HistoryTab.tsx",
+          "start": 179,
+          "end": 200
+        },
+        {
+          "path": "apps/web/src/routes/monitoring/MonitoringPage.tsx",
+          "start": 127,
+          "end": 134
+        },
+        {
+          "path": "apps/web/src/lib/api/rpc-client.ts",
+          "start": 443,
+          "end": 480
+        }
+      ]
+    },
+    {
+      "id": "efek-file-match-import",
+      "label": "Impor EFEK: membaca file, mencocokkan nama, meninjau, dan menyimpan",
+      "classification": "wizard async implisit; penyimpanan DB memakai RPC",
+      "status": "risiko statis; belum direproduksi",
+      "evidence": [
+        {
+          "path": "apps/web/src/routes/tna/efek-import.tsx",
+          "start": 59,
+          "end": 109
+        },
+        {
+          "path": "apps/web/src/routes/tna/efek-import.tsx",
+          "start": 181,
+          "end": 190
+        },
+        {
+          "path": "apps/web/src/routes/tna/efek-import.tsx",
+          "start": 337,
+          "end": 354
+        },
+        {
+          "path": "apps/api/src/routes/efek.ts",
+          "start": 145,
+          "end": 163
+        },
+        {
+          "path": "apps/api/src/services/efek/sessions.ts",
+          "start": 150,
+          "end": 161
+        },
+        {
+          "path": "apps/api/src/services/efek/sessions.ts",
+          "start": 203,
+          "end": 218
+        },
+        {
+          "path": "supabase/migrations/20261019160000_efek_training_sessions.sql",
+          "start": 64,
+          "end": 121
+        }
+      ]
+    },
+    {
+      "id": "ketik-global-personal-save",
+      "label": "Pengaturan KETIK: menyimpan template global lalu pengaturan pribadi",
+      "classification": "workflow gabungan dua resource dengan revision terpisah",
+      "status": "risiko pengalaman hasil parsial; bukan klaim pemisahan resource keliru",
+      "evidence": [
+        {
+          "path": "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
+          "start": 392,
+          "end": 438
+        },
+        {
+          "path": "apps/web/src/routes/ketik/ketikApi.ts",
+          "start": 144,
+          "end": 165
+        },
+        {
+          "path": "apps/api/src/routes/ketik.ts",
+          "start": 74,
+          "end": 152
+        },
+        {
+          "path": "apps/api/src/services/ketik/settings-history.ts",
+          "start": 201,
+          "end": 228
+        },
+        {
+          "path": "apps/api/src/services/ketik/global-templates.ts",
+          "start": 69,
+          "end": 140
+        },
+        {
+          "path": "docs/modules.md",
+          "start": 59,
+          "end": 62
+        }
+      ]
+    },
+    {
+      "id": "telefun-manual-annotation-draft",
+      "label": "Catatan manual Telefun: edit, simpan, refresh, dan bersihkan input",
+      "classification": "subalur draf async implisit; bukan lifecycle panggilan",
+      "status": "risiko edit baru selama simpan; kegagalan normal sudah menjaga teks",
+      "evidence": [
+        {
+          "path": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
+          "start": 192,
+          "end": 229
+        },
+        {
+          "path": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
+          "start": 382,
+          "end": 405
+        },
+        {
+          "path": "apps/web/src/routes/telefun/components/TelefunReviewStage.tsx",
+          "start": 403,
+          "end": 426
+        },
+        {
+          "path": "apps/web/src/routes/telefun/index.tsx",
+          "start": 762,
+          "end": 775
+        }
+      ]
+    }
+  ],
+  "considered_not_a_new_bug": [
+    {
+      "label": "Aksi massal pengguna",
+      "reason": "Hasil per akun dan keberhasilan parsial disengaja; backend melanjutkan akun lain dan UI mempertahankan hanya ID gagal untuk retry. Tidak dihitung sebagai bug transaksi batch.",
+      "evidence": [
+        {
+          "path": "apps/api/src/services/account-controls-service.ts",
+          "start": 51,
+          "end": 78
+        },
+        {
+          "path": "apps/web/src/routes/dashboard/components/users/BulkUserActions.tsx",
+          "start": 83,
+          "end": 104
+        },
+        {
+          "path": "apps/web/src/routes/dashboard/components/users/BulkApproveDialog.tsx",
+          "start": 69,
+          "end": 106
+        },
+        {
+          "path": "apps/web/src/routes/dashboard/users.tsx",
+          "start": 422,
+          "end": 430
+        }
+      ]
+    }
+  ],
+  "coverage_notes": [
+    "Evidence ranges were read directly; this ledger does not claim entire cited files were manually reviewed.",
+    "Candidate file listings and graph lookup were used for orientation, not as evidence of complete manual review.",
+    "Relevant E2E files were located but their full coverage and current passing status were not audited or executed in this pass.",
+    "EFEK save RPC definition was searched across current migration files; no later textual replacement was found. The active database was not inspected."
+  ],
+  "historical_snapshot": true,
+  "current_status_source": "advisor-plans/hasil-lanjutan-state-machine-2026-11-08.md"
+}

@@ -430,3 +430,60 @@ test("search waits for typing to pause before querying the server", async ({
   expect(searches()[0]).toContain("q=Latihan+204");
   expectHermetic(audit);
 });
+
+test("late replay detail cannot replace the newly selected session", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started = false;
+  const oldPath = `/api/v1/ketik/history/${history[0].id}`;
+  const audit = await openHermeticShell(page, {
+    path: "/ketik/history",
+    apiMocks: mocks(),
+    beforeNavigate: async () => {
+      await dynamicPages(page);
+      await page.route(`**${oldPath}`, async (route) => {
+        started = true;
+        await gate;
+        await route.fulfill({ json: { success: true, data: history[0] } });
+      });
+    },
+  });
+  try {
+    await page
+      .getByRole("button", { name: "Putar ulang Latihan 0", exact: true })
+      .click();
+    await expect.poll(() => started).toBe(true);
+    await page
+      .getByRole("button", { name: "Putar ulang Latihan 1", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByText("Transkrip sesi 1", { exact: true }),
+    ).toBeVisible();
+    const response = page.waitForResponse(
+      (res) => new URL(res.url()).pathname === oldPath,
+    );
+    release();
+    await (await response).finished();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await expect(
+      dialog.getByText("Transkrip sesi 1", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText("Transkrip sesi 0", { exact: true }),
+    ).toBeHidden();
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
+});

@@ -4,6 +4,16 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-08
+
+- fix(lifecycle): fence asynchronous workflows and verify recovery
+
+- fix(access): make leader approval and group reassignment transactional with expected-status guards and safe conflict errors
+- fix(auth): ignore late modal responses and navigation while still completing profile provisioning for an account already created
+- fix(pdkt): persist reply drafts before send and retain them until acknowledged success, with single-flight confirmation
+- fix(kegiatan): freeze saving drafts and serialize mutations so delayed writes cannot discard new edits
+- refactor(telefun): centralize settings save/error phases without changing draft retry behavior
+
 ## 2026-11-07
 
 - test(e2e): fix the seven pre-existing browser failures by mocking the agent home and Telefun month-count calls and running static-security only under its own static-server config

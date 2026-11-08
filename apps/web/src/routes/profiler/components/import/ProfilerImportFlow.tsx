@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import {
   CheckCircle,
   CircleAlert,
@@ -29,6 +29,38 @@ import {
 import { cn } from "cn";
 
 type Step = 1 | 2 | 3 | 4;
+type ImportPhase =
+  "start" | "upload" | "reading" | "review" | "saving" | "finished";
+type ImportAction =
+  | "template-ready"
+  | "read"
+  | "read-failed"
+  | "read-success"
+  | "save"
+  | "finish"
+  | "restart";
+
+function importPhaseReducer(
+  phase: ImportPhase,
+  action: ImportAction,
+): ImportPhase {
+  switch (action) {
+    case "template-ready":
+      return phase === "start" ? "upload" : phase;
+    case "read":
+      return phase === "start" || phase === "upload" ? "reading" : phase;
+    case "read-failed":
+      return phase === "reading" ? "upload" : phase;
+    case "read-success":
+      return phase === "reading" ? "review" : phase;
+    case "save":
+      return phase === "review" ? "saving" : phase;
+    case "finish":
+      return phase === "saving" ? "finished" : phase;
+    case "restart":
+      return phase === "review" || phase === "finished" ? "upload" : phase;
+  }
+}
 
 const STEPS: { step: Step; label: string }[] = [
   { step: 1, label: "Unduh template" },
@@ -145,9 +177,11 @@ async function readRows(file: File): Promise<string[][]> {
 /** "Kolom Nama kosong, jabatan "X" tidak dikenal": satu kalimat per baris. */
 const joinReasons = (problems: string[]) =>
   problems
-    .map((problem, index) =>
-      (index === 0 ? problem.charAt(0).toUpperCase() : problem.charAt(0).toLowerCase()) +
-      problem.slice(1),
+    .map(
+      (problem, index) =>
+        (index === 0
+          ? problem.charAt(0).toUpperCase()
+          : problem.charAt(0).toLowerCase()) + problem.slice(1),
     )
     .join(", ");
 
@@ -195,7 +229,12 @@ function reviewRows(
     }
 
     if (problems.length > 0) {
-      rows.push({ line, data, status: "invalid", reason: joinReasons(problems) });
+      rows.push({
+        line,
+        data,
+        status: "invalid",
+        reason: joinReasons(problems),
+      });
       return;
     }
 
@@ -238,16 +277,26 @@ export default function ProfilerImportFlow({
   onImported,
   onFinish,
 }: ProfilerImportFlowProps) {
-  const [step, setStep] = useState<Step>(1);
+  const [phase, transition] = useReducer(importPhaseReducer, "start");
+  const step: Step =
+    phase === "start"
+      ? 1
+      : phase === "upload" || phase === "reading"
+        ? 2
+        : phase === "review" || phase === "saving"
+          ? 3
+          : 4;
+  const busy = phase === "reading" || phase === "saving";
   const [timList, setTimList] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [savedCount, setSavedCount] = useState(0);
   const [failures, setFailures] = useState<SaveFailure[]>([]);
+  const [hasUnknownResult, setHasUnknownResult] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const operationRef = useRef<"read" | "save" | null>(null);
 
   useEffect(() => {
     profilerApi
@@ -259,7 +308,7 @@ export default function ProfilerImportFlow({
   const downloadTemplate = async () => {
     try {
       await generateProfilerTemplate(batchName, timList);
-      setStep((current) => (current === 1 ? 2 : current));
+      transition("template-ready");
     } catch (error) {
       console.error("Gagal membuat template:", error);
       notify.error("Gagal membuat template Excel");
@@ -267,6 +316,8 @@ export default function ProfilerImportFlow({
   };
 
   const handleFile = async (file: File) => {
+    if ((phase !== "start" && phase !== "upload") || operationRef.current)
+      return;
     setFileError(null);
     if (!/\.(xlsx|csv)$/i.test(file.name)) {
       setFileError(
@@ -274,7 +325,8 @@ export default function ProfilerImportFlow({
       );
       return;
     }
-    setBusy(true);
+    operationRef.current = "read";
+    transition("read");
     try {
       const table = await readRows(file);
       const existing = await profilerApi.getPesertaByBatch(batchName);
@@ -283,25 +335,25 @@ export default function ProfilerImportFlow({
       );
       const reviewed = reviewRows(table, batchName, existingNames);
       if (!reviewed) {
-        setStep(2);
+        transition("read-failed");
         setFileError(
           "Kolom di file tidak cocok dengan template. Unduh template lalu salin data ke sana.",
         );
         return;
       }
       if (reviewed.length === 0) {
-        setStep(2);
+        transition("read-failed");
         setFileError("File tidak berisi baris peserta.");
         return;
       }
       setFileName(file.name);
       setRows(reviewed);
-      setStep(3);
+      transition("read-success");
     } catch (error: any) {
-      setStep(2);
+      transition("read-failed");
       setFileError(`File tidak bisa dibaca. ${error?.message ?? ""}`.trim());
     } finally {
-      setBusy(false);
+      operationRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -313,9 +365,12 @@ export default function ProfilerImportFlow({
   const invalidCount = rows.filter((row) => row.status === "invalid").length;
 
   const save = async () => {
-    setBusy(true);
+    if (phase !== "review" || operationRef.current) return;
+    operationRef.current = "save";
+    transition("save");
     let saved = 0;
     const failed: SaveFailure[] = [];
+    let unknown = false;
     try {
       const {
         data: { user },
@@ -324,49 +379,59 @@ export default function ProfilerImportFlow({
       for (let index = 0; index < items.length; index += IMPORT_CHUNK_SIZE) {
         const chunk = items.slice(index, index + IMPORT_CHUNK_SIZE);
         try {
-          await profilerApi.bulkCreatePeserta(chunk);
-          saved += chunk.length;
-        } catch {
-          // Satu baris bermasalah menggagalkan satu potongan; simpan per baris
-          // supaya alasan gagalnya jelas.
+          const inserted = await profilerApi.bulkCreatePeserta(chunk);
+          const insertedNames = new Set(
+            inserted.map((item) => item.nama?.trim().toLowerCase()),
+          );
           for (const item of chunk) {
-            try {
-              await profilerApi.createPeserta(item);
+            if (insertedNames.has((item.nama ?? "").trim().toLowerCase())) {
               saved += 1;
-            } catch (rowError: any) {
+            } else {
               failed.push({
                 nama: item.nama || "Tanpa nama",
-                message: rowError?.message || "Gagal disimpan",
+                message: "Tidak disimpan oleh server; periksa daftar peserta.",
               });
             }
           }
+        } catch {
+          // Respons yang hilang tidak membuktikan transaksi gagal. Jangan tulis
+          // ulang: server mungkin sudah menyimpan seluruh potongan ini.
+          unknown = true;
+          for (const item of chunk) {
+            failed.push({
+              nama: item.nama || "Tanpa nama",
+              message:
+                "Hasil belum dapat dipastikan. Periksa daftar peserta sebelum mencoba lagi.",
+            });
+          }
+          break;
         }
       }
     } catch (error: any) {
       notify.error("Impor terhenti", error?.message);
-    } finally {
-      setBusy(false);
     }
-    const unsaved = ready.length - saved - failed.length;
-    if (unsaved > 0) {
+    for (const row of ready.slice(saved + failed.length)) {
       failed.push({
-        nama: `${unsaved} peserta lain`,
+        nama: row.data.nama || "Tanpa nama",
         message: "Belum disimpan karena impor terhenti",
       });
     }
     setSavedCount(saved);
     setFailures(failed);
-    setStep(4);
-    if (saved > 0) onImported(saved);
+    setHasUnknownResult(unknown);
+    transition("finish");
+    operationRef.current = null;
+    if (saved > 0 || unknown) onImported(saved);
   };
 
   const restart = () => {
     setRows([]);
     setFileName("");
     setFailures([]);
+    setHasUnknownResult(false);
     setSavedCount(0);
     setFileError(null);
-    setStep(2);
+    transition("restart");
   };
 
   const onDrop = (event: React.DragEvent) => {
@@ -661,8 +726,12 @@ export default function ProfilerImportFlow({
       {step === 4 ? (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-foreground">
-            {savedCount} peserta disimpan ke {batchName}.
-            {failures.length > 0 ? ` ${failures.length} gagal disimpan:` : ""}
+            {savedCount} peserta{" "}
+            {hasUnknownResult ? "dikonfirmasi tersimpan" : "disimpan"} ke{" "}
+            {batchName}.
+            {failures.length > 0
+              ? ` ${failures.length} peserta perlu diperiksa:`
+              : ""}
           </p>
           {failures.length > 0 ? (
             <ul className="flex flex-col border-t border-border text-sm">

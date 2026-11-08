@@ -15,10 +15,21 @@ export default function AuthCallbackPage() {
     let cancelled = false;
 
     const completeAuth = async () => {
+      let sessionResponse: Awaited<ReturnType<typeof supabase.auth.getSession>>;
+      try {
+        sessionResponse = await supabase.auth.getSession();
+      } catch {
+        if (!cancelled) {
+          setErrorMessage(
+            getAuthCallbackError(new Error("Session read failed"), null),
+          );
+        }
+        return;
+      }
       const {
         data: { session },
         error,
-      } = await supabase.auth.getSession();
+      } = sessionResponse;
 
       if (cancelled) return;
       const authError = getAuthCallbackError(error, session);

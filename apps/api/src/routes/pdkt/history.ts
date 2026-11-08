@@ -15,6 +15,7 @@ import {
   fetchPdktHistory,
   fetchPdktHistoryItem,
 } from "../../services/pdkt/history-service";
+import { pdktEvaluationRecovery } from "../../services/pdkt/evaluation-service";
 
 const history = new Hono<{ Variables: Variables }>();
 
@@ -91,7 +92,9 @@ history.get("/eval/:id", requireCapability("pdkt.history.read"), async (c) => {
     // First, try querying via userClient (respects RLS, works if they own the row)
     let { data, error } = await userClient
       .from("pdkt_history")
-      .select("evaluation_status, evaluation, evaluation_error")
+      .select(
+        "evaluation_status, evaluation, evaluation_error, evaluation_started_at, created_at",
+      )
       .eq("id", id)
       .single();
 
@@ -108,7 +111,9 @@ history.get("/eval/:id", requireCapability("pdkt.history.read"), async (c) => {
         const adminClient = createAdminClient();
         const { data: adminData, error: adminError } = await adminClient
           .from("pdkt_history")
-          .select("evaluation_status, evaluation, evaluation_error")
+          .select(
+            "evaluation_status, evaluation, evaluation_error, evaluation_started_at, created_at",
+          )
           .eq("id", id)
           .single();
 
@@ -132,7 +137,18 @@ history.get("/eval/:id", requireCapability("pdkt.history.read"), async (c) => {
       );
     }
 
-    return c.json({ success: true, data });
+    const { evaluation_started_at, created_at, ...visible } = data;
+    return c.json({
+      success: true,
+      data: {
+        ...visible,
+        recovery: pdktEvaluationRecovery(
+          data.evaluation_status,
+          evaluation_started_at,
+          created_at,
+        ),
+      },
+    });
   } catch (error: unknown) {
     return jsonServerError(c, error);
   }

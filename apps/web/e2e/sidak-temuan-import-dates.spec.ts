@@ -70,7 +70,10 @@ async function openImportPanel(page: import("@playwright/test").Page) {
 }
 
 /** Unggah workbook lewat input file milik panel import. */
-async function uploadXlsx(page: import("@playwright/test").Page, buffer: Buffer) {
+async function uploadXlsx(
+  page: import("@playwright/test").Page,
+  buffer: Buffer,
+) {
   await openImportPanel(page);
   await page.getByRole("button", { name: "Upload & Preview" }).click();
   await page.locator('input[type="file"]').first().setInputFiles({
@@ -94,7 +97,9 @@ test.beforeEach(() => {
 });
 
 test.describe("Import batch dengan kolom tanggal", () => {
-  test("template yang diunduh punya tujuh kolom dan tanggal kosong", async ({ page }) => {
+  test("template yang diunduh punya tujuh kolom dan tanggal kosong", async ({
+    page,
+  }) => {
     // Unduh + tulis ulang .xlsx di disk; lambat setelah spec lain berjalan.
     test.slow();
     const audit = await openPage(page);
@@ -114,8 +119,14 @@ test.describe("Import batch dengan kolom tanggal", () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(path!);
     const ws = wb.getWorksheet("Input Temuan")!;
-    const headers = (ws.getRow(1).values as unknown[]).slice(1).map((h) => String(h));
-    expect(headers).toEqual([...HEADERS_LEGACY, HEADER_TGL_LAYANAN, HEADER_TGL_SAMPEL]);
+    const headers = (ws.getRow(1).values as unknown[])
+      .slice(1)
+      .map((h) => String(h));
+    expect(headers).toEqual([
+      ...HEADERS_LEGACY,
+      HEADER_TGL_LAYANAN,
+      HEADER_TGL_SAMPEL,
+    ]);
 
     // Baris contoh tidak boleh sudah terisi tanggal.
     const sample = ws.getRow(2);
@@ -159,7 +170,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
    * "Parameter kosong", tombol import tersembunyi, dan alur kanonik
    * download → isi → upload gagal total.
    */
-  test("template yang diunduh bisa langsung diunggah kembali tanpa baris error", async ({ page }) => {
+  test("template yang diunduh bisa langsung diunggah kembali tanpa baris error", async ({
+    page,
+  }) => {
     test.slow();
     const audit = await openPage(page);
     await openImportPanel(page);
@@ -194,7 +207,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
     expectIsolation(audit);
   });
 
-  test("tujuh kolom: kedua tanggal terkirim identik ke preview dan simpan", async ({ page }) => {
+  test("tujuh kolom: kedua tanggal terkirim identik ke preview dan simpan", async ({
+    page,
+  }) => {
     const audit = await openPage(page);
     await uploadXlsx(
       page,
@@ -202,14 +217,25 @@ test.describe("Import batch dengan kolom tanggal", () => {
         headers: [...HEADERS_LEGACY, HEADER_TGL_LAYANAN, HEADER_TGL_SAMPEL],
         rows: [
           [...legacyRow(), "2026-01-05", "2026-01-09"],
-          [...legacyRow({ tiket: "TKT-IMP-2", param: FIXTURE.indicators[1]!.name }), "", ""],
+          [
+            ...legacyRow({
+              tiket: "TKT-IMP-2",
+              param: FIXTURE.indicators[1]!.name,
+            }),
+            "",
+            "",
+          ],
         ],
       }),
     );
 
     // Preview harus menampilkan tanggal sebelum disimpan.
-    await expect(page.getByText(/Tanggal layanan: 2026-01-05/).first()).toBeVisible();
-    await expect(page.getByText(/Tanggal sampel: 2026-01-09/).first()).toBeVisible();
+    await expect(
+      page.getByText(/Tanggal layanan: 2026-01-05/).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Tanggal sampel: 2026-01-09/).first(),
+    ).toBeVisible();
     await expect(page.getByText(/Belum diisi/).first()).toBeVisible();
 
     await page.getByRole("button", { name: /^Import \d+ Temuan$/ }).click();
@@ -228,7 +254,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
     expectIsolation(audit);
   });
 
-  test("template lima kolom lama tetap diterima dan tanggalnya null", async ({ page }) => {
+  test("template lima kolom lama tetap diterima dan tanggalnya null", async ({
+    page,
+  }) => {
     const audit = await openPage(page);
     await uploadXlsx(
       page,
@@ -236,7 +264,12 @@ test.describe("Import batch dengan kolom tanggal", () => {
         headers: HEADERS_LEGACY,
         rows: [
           [...legacyRow()],
-          [...legacyRow({ tiket: "TKT-LEGACY-2", param: FIXTURE.indicators[2]!.name })],
+          [
+            ...legacyRow({
+              tiket: "TKT-LEGACY-2",
+              param: FIXTURE.indicators[2]!.name,
+            }),
+          ],
         ],
       }),
     );
@@ -279,7 +312,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
     expectIsolation(audit);
   });
 
-  test("sel Excel bertanggal asli tidak bergeser satu hari", async ({ page }) => {
+  test("sel Excel bertanggal asli tidak bergeser satu hari", async ({
+    page,
+  }) => {
     const audit = await openPage(page);
     await uploadXlsx(
       page,
@@ -288,9 +323,21 @@ test.describe("Import batch dengan kolom tanggal", () => {
         // Objek Date, bukan teks. Default ExcelJS = tengah malam UTC; kalau
         // importer memakai getter lokal, hasilnya bisa mundur satu hari.
         rows: [
-          [...legacyRow(), new Date(Date.UTC(2026, 0, 5)), new Date(Date.UTC(2026, 0, 9))],
-          [...legacyRow({ tiket: "TKT-EDGE" }), new Date(Date.UTC(2026, 11, 31)), ""],
-          [...legacyRow({ tiket: "TKT-LEAP" }), new Date(Date.UTC(2024, 1, 29)), ""],
+          [
+            ...legacyRow(),
+            new Date(Date.UTC(2026, 0, 5)),
+            new Date(Date.UTC(2026, 0, 9)),
+          ],
+          [
+            ...legacyRow({ tiket: "TKT-EDGE" }),
+            new Date(Date.UTC(2026, 11, 31)),
+            "",
+          ],
+          [
+            ...legacyRow({ tiket: "TKT-LEAP" }),
+            new Date(Date.UTC(2024, 1, 29)),
+            "",
+          ],
         ],
       }),
     );
@@ -308,7 +355,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
     expectIsolation(audit);
   });
 
-  test("tanggal ambigu atau angka serial memblokir import dengan pesan jelas", async ({ page }) => {
+  test("tanggal ambigu atau angka serial memblokir import dengan pesan jelas", async ({
+    page,
+  }) => {
     const audit = await openPage(page);
     await uploadXlsx(
       page,
@@ -323,8 +372,12 @@ test.describe("Import batch dengan kolom tanggal", () => {
     );
 
     // Ketiganya harus ditolak; tidak ada import yang berjalan.
-    await expect(page.getByText(/tidak valid\. Gunakan YYYY-MM-DD/).first()).toBeVisible();
-    await expect(page.getByText(/format tanggal tidak bisa dipastikan/).first()).toBeVisible();
+    await expect(
+      page.getByText(/tidak valid\. Gunakan YYYY-MM-DD/).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/format tanggal tidak bisa dipastikan/).first(),
+    ).toBeVisible();
 
     // Tombol import tidak boleh tersedia selama masih ada error.
     await expect(
@@ -335,7 +388,9 @@ test.describe("Import batch dengan kolom tanggal", () => {
     expectIsolation(audit);
   });
 
-  test("beda tanggal per baris pada tiket yang sama tidak saling menimpa", async ({ page }) => {
+  test("beda tanggal per baris pada tiket yang sama tidak saling menimpa", async ({
+    page,
+  }) => {
     const audit = await openPage(page);
     // Tiket sama, parameter BERBEDA, tanggal BERBEDA. Import harus menyimpan
     // setiap tanggal pada barisnya masing-masing.
@@ -345,7 +400,14 @@ test.describe("Import batch dengan kolom tanggal", () => {
         headers: [...HEADERS_LEGACY, HEADER_TGL_LAYANAN, HEADER_TGL_SAMPEL],
         rows: [
           [...legacyRow({ tiket: "TKT-SAME" }), "2026-04-01", "2026-04-02"],
-          [...legacyRow({ tiket: "TKT-SAME", param: FIXTURE.indicators[1]!.name }), "2026-05-03", ""],
+          [
+            ...legacyRow({
+              tiket: "TKT-SAME",
+              param: FIXTURE.indicators[1]!.name,
+            }),
+            "2026-05-03",
+            "",
+          ],
         ],
       }),
     );
@@ -355,11 +417,132 @@ test.describe("Import batch dengan kolom tanggal", () => {
 
     const rows = allRows();
     const byIndicator = new Map(rows.map((r) => [r.indicator_id, r]));
-    expect(byIndicator.get(FIXTURE.indicators[0]!.id)!.tanggal_layanan).toBe("2026-04-01");
-    expect(byIndicator.get(FIXTURE.indicators[0]!.id)!.tanggal_sampel).toBe("2026-04-02");
-    expect(byIndicator.get(FIXTURE.indicators[1]!.id)!.tanggal_layanan).toBe("2026-05-03");
-    expect(byIndicator.get(FIXTURE.indicators[1]!.id)!.tanggal_sampel).toBeNull();
+    expect(byIndicator.get(FIXTURE.indicators[0]!.id)!.tanggal_layanan).toBe(
+      "2026-04-01",
+    );
+    expect(byIndicator.get(FIXTURE.indicators[0]!.id)!.tanggal_sampel).toBe(
+      "2026-04-02",
+    );
+    expect(byIndicator.get(FIXTURE.indicators[1]!.id)!.tanggal_layanan).toBe(
+      "2026-05-03",
+    );
+    expect(
+      byIndicator.get(FIXTURE.indicators[1]!.id)!.tanggal_sampel,
+    ).toBeNull();
 
     expectIsolation(audit);
   });
 });
+
+for (const change of ["panel close/reopen", "period switch"] as const) {
+  test(`SIDAK import ${change} cannot resurrect a completed stale parse`, async ({
+    page,
+  }) => {
+    test.setTimeout(90000);
+    const nextPeriod = {
+      ...FIXTURE.period,
+      id: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbc",
+      month: 2,
+    };
+    const audit = startAudit();
+    await openInputAudit(page, audit, {
+      periods: [FIXTURE.period, nextPeriod],
+    });
+    await selectPeriod(page);
+    // Hold only the real parser's completed result. XLSX decoding and row validation
+    // still run unchanged; the browser barrier makes the late completion repeatable.
+    await page.evaluate(() => {
+      const control = window as typeof window & {
+        sidakParseGate?: Promise<void>;
+        releaseSidakParse?: () => void;
+        sidakParseStarted?: boolean;
+        sidakParseReleased?: boolean;
+      };
+      control.sidakParseGate = new Promise<void>((resolve) => {
+        control.releaseSidakParse = resolve;
+      });
+    });
+    let instrumented = false;
+    await page.route("**/src/lib/excel-utils.ts*", async (route) => {
+      const response = await route.fetch();
+      const source = await response.text();
+      const marker = "async function readWorkbookRawValues(";
+      expect(source).toContain(marker);
+      instrumented = true;
+      const wrapped =
+        source.replace(
+          marker,
+          "async function readWorkbookRawValuesOriginal(",
+        ) +
+        `
+export async function readWorkbookRawValues(data) {
+  const result = await readWorkbookRawValuesOriginal(data);
+  window.sidakParseStarted = true;
+  await window.sidakParseGate;
+  window.sidakParseReleased = true;
+  return result;
+}
+`;
+      await route.fulfill({ response, body: wrapped });
+    });
+    try {
+      await uploadXlsx(
+        page,
+        await buildXlsx({
+          headers: HEADERS_LEGACY,
+          rows: [legacyRow({ tiket: "STALE-CONTEXT" })],
+        }),
+      );
+      await expect.poll(() => instrumented).toBe(true);
+      await page.waitForFunction(
+        () =>
+          (window as typeof window & { sidakParseStarted?: boolean })
+            .sidakParseStarted,
+      );
+      if (change === "period switch") {
+        await selectPeriod(page, nextPeriod);
+      } else {
+        await page
+          .getByRole("button", { name: "Impor Excel", exact: true })
+          .click();
+      }
+      await expect(
+        page.getByText("Import dari Excel", { exact: true }),
+      ).toBeHidden();
+      await openImportPanel(page);
+      await page.getByRole("button", { name: "Upload & Preview" }).click();
+      await page.evaluate(() =>
+        (
+          window as typeof window & { releaseSidakParse?: () => void }
+        ).releaseSidakParse?.(),
+      );
+      await page.waitForFunction(
+        () =>
+          (window as typeof window & { sidakParseReleased?: boolean })
+            .sidakParseReleased,
+      );
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      await expect(
+        page.getByText("STALE-CONTEXT", { exact: true }),
+      ).toBeHidden();
+      await expect(
+        page.getByRole("button", { name: /^Import \d+ Temuan$/ }),
+      ).toBeHidden();
+      expect(captured("batch")).toEqual([]);
+      expectIsolation(audit);
+    } finally {
+      await page
+        .evaluate(() =>
+          (
+            window as typeof window & { releaseSidakParse?: () => void }
+          ).releaseSidakParse?.(),
+        )
+        .catch(() => {});
+    }
+  });
+}

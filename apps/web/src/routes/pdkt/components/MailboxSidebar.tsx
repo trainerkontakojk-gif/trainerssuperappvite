@@ -29,6 +29,7 @@ export interface MailboxReviewState {
     | "not_started"
     | "pending"
     | "processing"
+    | "retry_available"
     | "completed"
     | "failed"
     | "unavailable";
@@ -98,6 +99,17 @@ function RowStatus({
           className="size-3 text-chart-orange"
         />
         Telaah gagal
+      </span>
+    );
+  }
+  if (review?.status === "retry_available") {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <TriangleAlert
+          aria-hidden="true"
+          className="size-3 text-chart-orange"
+        />
+        Telaah belum selesai
       </span>
     );
   }
