@@ -319,6 +319,8 @@ anon denial, dan Gemini/non-WebRTC aggregate boundary terverifikasi.
 - **`leader_access_request_groups`**: Join table: satu approved request bisa memiliki >1 access group.
 - **`transition_leader_access(uuid,uuid,text,uuid[],text)`**: RPC backend untuk approve/reject/revoke/reassign dalam satu transaksi; expected status dan row lock menjaga perubahan status/grup tetap konsisten. Guard service-role di awal fungsi; actor aktif, larangan self-approve/reassign, grup aktif, dan konflik ditolak. Migration `20261108000000_leader_access_transitions.sql` wajib diterapkan sebelum API baru. Tidak mengubah grant/RLS tabel untuk penulis lain.
 
+Migration `20261107181115_sidak_atomic_rule_publish.sql` dan `20261108000000_leader_access_transitions.sql` diterapkan ke produksi canonical pada **2026-11-08** dengan izin Fajar, masing-masing melalui `supabase db query --linked -f` lalu `migration repair --status applied` untuk versi yang sama. Katalog membuktikan body kedua RPC identik dengan file teruji lokal, guard service-role tidak berubah, `search_path` kosong, dan dua versi history tercatat. Verifikasi remote tidak memanggil RPC bisnis; empat warning advisor EXECUTE mengikuti pola guard internal wajib. Perintah, hash, dan batas bukti: [hasil lanjutan state machine](../advisor-plans/hasil-lanjutan-state-machine-2026-11-08.md#apply-remote-berizin--8-november-2026).
+
 ### 7. Monitoring AI Usage & Billing
 
 - **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Dipelihara secara terpisah; endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi.

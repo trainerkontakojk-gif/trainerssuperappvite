@@ -1,6 +1,6 @@
 # Peta state machine implisit — Trainers SuperApp
 
-> **Status terbaru — 8 November 2026: seluruh 32 butir telah memperoleh disposition lokal.** Lihat [hasil lanjutan dan batas bukti](hasil-lanjutan-state-machine-2026-11-08.md) serta [register](state-machine-closure-register-2026-11-08.json). Integrasi remote menunggu izin dua migration. Snapshot dan uraian risiko di bawah tetap historis; bukan daftar bug yang masih terbukti terbuka.
+> **Status terbaru — 8 November 2026: seluruh 32 butir telah memperoleh disposition lokal.** Lihat [hasil lanjutan dan batas bukti](hasil-lanjutan-state-machine-2026-11-08.md) serta [register](state-machine-closure-register-2026-11-08.json). Kedua migration remote sudah diterapkan dengan izin Fajar dan terverifikasi. Snapshot dan uraian risiko di bawah tetap historis; bukan daftar bug yang masih terbukti terbuka.
 
 **Untuk:** Fajar
 

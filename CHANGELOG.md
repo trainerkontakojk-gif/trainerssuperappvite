@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-08
 
+- docs(lifecycle): record verified remote migrations
+
 - fix(lifecycle): fence asynchronous workflows and verify recovery
 
 - fix(access): make leader approval and group reassignment transactional with expected-status guards and safe conflict errors

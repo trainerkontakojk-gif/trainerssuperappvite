@@ -1,10 +1,10 @@
 # Lanjutan penutupan state machine — 8 November 2026
 
-**Status: SELESAI LOKAL; integrasi remote menunggu izin dua migration.** Seluruh 32 butir mempunyai disposition pada [register portabel](state-machine-closure-register-2026-11-08.json). Ini menggantikan status pause pada checkpoint lama, bukan klaim seluruh aplikasi bebas state machine implisit.
+**Status: SELESAI LOKAL DAN MIGRATION REMOTE TERVERIFIKASI.** Kedua migration diterapkan setelah izin Fajar; integrasi `main` mengikuti schema-first. Seluruh 32 butir mempunyai disposition pada [register portabel](state-machine-closure-register-2026-11-08.json). Ini menggantikan status pause pada checkpoint lama, bukan klaim seluruh aplikasi bebas state machine implisit.
 
 ## Scope dan hasil yang sudah terverifikasi
 
-Lane D, rencana `plans/markdown/state-machine-backlog-closure.md`. Seluruh dirty tree awal dipertahankan; snapshot resume memiliki 103 file termasuk artefak lama. Tidak ada reset/stash/clean, unit/Vitest, paid-provider smoke, migration remote, atau deploy.
+Lane D, rencana `plans/markdown/state-machine-backlog-closure.md`. Seluruh dirty tree awal dipertahankan; snapshot resume memiliki 103 file termasuk artefak lama. Tidak ada reset/stash/clean, unit/Vitest, paid-provider smoke, atau deploy manual. Verifikasi lokal selesai sebelum meminta izin migration remote; tindak lanjut berizin dicatat di bagian apply di bawah. Perubahan laporan sesudah apply adalah Lane A; kode runtime dan SQL tidak berubah, sehingga gate produk tidak diulang.
 
 - Empat perbaikan closure lama (Monitoring, EFEK, pengaturan KETIK, catatan Telefun) lolos fokus 16/16. KETIK diperluas menjadi 4/4 untuk retry, hasil parsial, reopen, dan revision template berikutnya.
 - SIDAK 4.2 direproduksi RED: hasil decode XLSX lama muncul setelah panel ditutup/dibuka. Hook kini memiliki satu reducer fase panel/parse/save; generation/context/unmount fence membuang hasil usang, single-flight menjaga payload, preview/confirm lama tidak mengirim mutasi berikutnya, dan refresh lama tidak menimpa konteks baru. Regresi impor 9/9; tambahan close/reopen dan ganti periode lolos pada run gap 4/4.
@@ -61,13 +61,32 @@ PY
 
 Kelompok API hanya boleh diulang setelah identitas/schema disposable diverifikasi dan `E2E_SUPABASE_WORKDIR` dipasang; `GEMINI_PROXY_URL` dikosongkan. Jangan menggantinya dengan target produksi atau server yang kebetulan memakai port sama. Snapshot 103 file awal tidak kehilangan file; handoff Cloudflare yang tidak terkait tetap identik.
 
-Dua RPC baru (`20261107181115`, `20261108000000`) wajib tersedia sebelum API dirilis. Remote migration/deploy tetap memerlukan izin eksplisit sesuai AGENTS; belum dilakukan.
+Dua RPC baru (`20261107181115`, `20261108000000`) wajib tersedia sebelum API dirilis. Prasyarat schema-first kini terpenuhi setelah izin dan apply remote. Otorisasi migration tidak mencakup deploy produksi manual.
 
-## Preflight integrasi remote (read-only)
+## Preflight integrasi remote sebelum izin (read-only, historis)
 
 Proyek linked CLI cocok dengan host API `.env.local`. SELECT katalog melalui Supabase MCP membuktikan `publish_sidak_rule_version(uuid,uuid,text,boolean,uuid)` dan `transition_leader_access(uuid,uuid,text,uuid[],text)` **keduanya belum ada**. Bukti boolean di `resume/remote-rpc-preflight.json`; tidak membaca data pengguna dan tidak memutasi remote.
 
-Push API ini menunggu urutan migration schema-first. Commit/push repo memang pre-authorized, tetapi AGENTS secara eksplisit meminta izin untuk migration remote; tidak menerapkan SQL dan tidak memicu rilis API tanpa dua RPC tersebut. Persetujuan migration baru diminta setelah patch dan seluruh gate lokal konkret.
+Saat preflight, push API ditahan demi urutan migration schema-first. Commit/push repo memang pre-authorized, tetapi AGENTS secara eksplisit meminta izin untuk migration remote. Fajar kemudian menjawab **“boleh terapkan migrasi”**; hanya dua file yang disetujui diterapkan, dengan bukti berikut.
+
+## Apply remote berizin — 8 November 2026
+
+Target linked `ruosnjmtywcrghjgqugz` cocok dengan host `.env.local` root yang dibaca API. Sebelum apply, kedua RPC dan dua versi history belum ada, seluruh kolom wajib tersedia, dan guard service-role sudah sesuai. Byte kedua file cocok dengan commit perbaikan `ea3d5e03`.
+
+Tool MCP tidak menyediakan parameter versi migration. Untuk mempertahankan ID repo, apply memakai CLI per file dan repair history terarah seperti prosedur existing di `docs/database.md`; tidak menjalankan `db push` atau menerapkan migration lain.
+
+| Perintah aktual                                                                                  | Exit | Log di `resume/remote-apply/` |
+| ------------------------------------------------------------------------------------------------ | ---- | ----------------------------- |
+| `supabase db query --linked -f supabase/migrations/20261107181115_sidak_atomic_rule_publish.sql` | 0    | `sidak-apply.log`             |
+| `supabase migration repair --linked --status applied 20261107181115`                             | 0    | `sidak-history.log`           |
+| `supabase db query --linked -f supabase/migrations/20261108000000_leader_access_transitions.sql` | 0    | `leader-apply.log`            |
+| `supabase migration repair --linked --status applied 20261108000000`                             | 0    | `leader-history.log`          |
+
+SELECT katalog melalui Supabase MCP membuktikan kedua signature tersedia, `SECURITY DEFINER`, `search_path` kosong, dan EXECUTE sesuai kontrak repo. Hash body `publish_sidak_rule_version` = `8a8daf8c1ab37ba5831b4020ba0bdf30`; `transition_leader_access` = `eda67988eb5b63a75ec2bb04d0f639d8`. Keduanya identik dengan file teruji lokal. Definisi `app_internal.assert_service_role()` tidak berubah: claims hilang/malformed/non-service ditolak dengan SQLSTATE `42501`. Masing-masing versi history tercatat sekali dengan nama yang benar dan dua statement. Bukti lengkap: `verification.json` dan `manifest.json`.
+
+Snapshot security advisor meningkat dari 158 ke 162 finding: tepat empat warning baru, yaitu EXECUTE `anon` dan `authenticated` pada masing-masing RPC SECURITY DEFINER. Ini sesuai kontrak guard internal wajib pada `docs/architecture.md`, bukan bukti akses bisnis diizinkan. Jangan mengganti grant dengan REVOKE karena pola crash PostgreSQL yang terdokumentasi. Referensi advisor: [anon EXECUTE](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) dan [authenticated EXECUTE](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable). Warning existing tidak diubah; hasil/diff tersimpan di `security-advisors-before.json`, `security-advisors-after.json`, dan `advisors-diff.json`.
+
+Verifikasi remote hanya katalog/definisi/privilege/history; tidak memanggil RPC bisnis atau menjalankan E2E produksi. Bukti perilaku tetap 14 E2E API/DB lokal untuk kedua migration, ditambah regresi lain di atas. Tidak ada deploy manual maupun paid-provider smoke.
 
 ## Disposition seluruh 32 butir
 
@@ -118,6 +137,6 @@ Koreksi dependency stabil `dispatch` dan format akhir sesudah 20/20 tidak mengub
 
 ## Verdict review dan sisa rilis
 
-**Verdict: PASS untuk patch lokal dan skenario terpilih; integrasi remote menunggu izin.** Review source langsung memeriksa ownership async, request/claim fencing, partial ACK, atomic transaction, expected-status UPDATE, guard service-role, error publik dan egress fixture. Tidak ada temuan material P0/P1/P2 yang masih terbuka pada patch berubah; ini bukan security audit seluruh repo atau review independen baru. Batas runtime legacy 1.4 dan dugaan 9.4 tetap mengikuti disposition di atas.
+**Verdict: PASS untuk patch lokal dan skenario terpilih; katalog migration remote terverifikasi.** Review source langsung memeriksa ownership async, request/claim fencing, partial ACK, atomic transaction, expected-status UPDATE, guard service-role, error publik dan egress fixture. Tidak ada temuan material P0/P1/P2 yang masih terbuka pada patch berubah; empat warning EXECUTE diterangkan di bagian apply. Ini bukan security audit seluruh repo atau review independen baru. Batas runtime legacy 1.4 dan dugaan 9.4 tetap mengikuti disposition di atas.
 
-Commit lokal memakai `fix(lifecycle): fence asynchronous workflows and verify recovery`, dengan changelog dan hook aktif. Push belum dilakukan: dua RPC production belum tersedia. Urutan berikutnya memerlukan izin migration remote sesuai [AGENTS.md](../AGENTS.md): apply tepat dua file yang tercatat, verifikasi katalog/guard tanpa E2E produksi, lalu push `main`. Deploy produksi bukan bagian otorisasi commit/push.
+Commit perbaikan `ea3d5e03` memakai `fix(lifecycle): fence asynchronous workflows and verify recovery`, dengan changelog dan hook aktif. Izin migration dari Fajar telah ditindaklanjuti; kedua RPC siap sebelum push `main`. Follow-up dokumentasi mencatat bukti remote tanpa mengubah kode/SQL. Staged artifact baseline dan handoff Cloudflare yang tidak terkait dipertahankan di luar commit. Deploy produksi manual bukan bagian otorisasi commit/push.

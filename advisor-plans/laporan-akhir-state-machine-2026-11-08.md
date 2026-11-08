@@ -1,4 +1,4 @@
-> **Update resume 8 November 2026:** pekerjaan lokal dilanjutkan dan seluruh 32 butir mendapat disposition. Checkpoint stop di bawah tetap dipertahankan sebagai riwayat. Status terbaru: [hasil lanjutan](hasil-lanjutan-state-machine-2026-11-08.md) dan [register](state-machine-closure-register-2026-11-08.json), dengan evidence mentah di `.audit-run/state-machine-closure-20261108/resume/`. Push menunggu izin migration remote.
+> **Update resume 8 November 2026:** pekerjaan lokal dilanjutkan dan seluruh 32 butir mendapat disposition. Kedua migration remote sudah diterapkan dengan izin Fajar dan terverifikasi sebelum integrasi `main`. Checkpoint stop di bawah tetap dipertahankan sebagai riwayat. Status terbaru: [hasil lanjutan](hasil-lanjutan-state-machine-2026-11-08.md) dan [register](state-machine-closure-register-2026-11-08.json), dengan evidence mentah di `.audit-run/state-machine-closure-20261108/resume/`.
 
 # Laporan akhir sesi — penutupan backlog state machine
 

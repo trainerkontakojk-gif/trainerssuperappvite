@@ -313,7 +313,7 @@
         }
       ],
       "note": "RPC publish atomik: kegagalan, concurrency, double publish, SLIK validation, pindah periode, not-found dan denial JWT lulus 7 kasus.",
-      "next_action": "Izin migration remote diperlukan sebelum integrasi API.",
+      "next_action": null,
       "closed_in_this_batch": true,
       "historical_checkpoint": {
         "status": "previous_fix",
@@ -545,7 +545,7 @@
         }
       ],
       "note": "Transition leader atomik, expected-status guard, rollback, conflict, group replacement, approve/reject race, self-review dan denial RPC lulus 7 API/DB.",
-      "next_action": "Izin migration remote diperlukan sebelum integrasi API.",
+      "next_action": null,
       "closed_in_this_batch": true,
       "historical_checkpoint": {
         "status": "previous_fix",
@@ -813,7 +813,7 @@
       "passed": 4
     }
   },
-  "status": "local_inventory_disposition_complete_remote_release_pending",
+  "status": "inventory_reconciled_migrations_applied_verified",
   "report": "advisor-plans/hasil-lanjutan-state-machine-2026-11-08.md",
   "definitions": {
     "closed_in_this_batch": "Seluruh 32 item memperoleh disposition lokal; bukan jaminan seluruh lifecycle/refactor/race telah diuji.",
@@ -1168,12 +1168,91 @@
     ]
   },
   "remote_release": {
-    "status": "approval_required",
-    "rpc_preflight": "both_missing",
-    "mutations_performed": false,
+    "status": "migrations_applied_verified",
+    "rpc_preflight": "both_missing_before_authorization",
+    "mutations_performed": true,
     "migrations": [
       "supabase/migrations/20261107181115_sidak_atomic_rule_publish.sql",
       "supabase/migrations/20261108000000_leader_access_transitions.sql"
+    ],
+    "authorization": "Fajar: boleh terapkan migrasi",
+    "rpc_current": "both_present_matching_reviewed_files",
+    "code_commit": "ea3d5e03beabd4798d1674e33d6378fac5a26904",
+    "verification": {
+      "functions": [
+        {
+          "signature": "public.publish_sidak_rule_version(uuid,uuid,text,boolean,uuid)",
+          "exists": true,
+          "body_md5": "8a8daf8c1ab37ba5831b4020ba0bdf30",
+          "body_matches_reviewed_file": true,
+          "security_definer": true,
+          "config": ["search_path=\"\""],
+          "anon_execute": true,
+          "authenticated_execute": true,
+          "service_role_execute": true
+        },
+        {
+          "signature": "public.transition_leader_access(uuid,uuid,text,uuid[],text)",
+          "exists": true,
+          "body_md5": "eda67988eb5b63a75ec2bb04d0f639d8",
+          "body_matches_reviewed_file": true,
+          "security_definer": true,
+          "config": ["search_path=\"\""],
+          "anon_execute": true,
+          "authenticated_execute": true,
+          "service_role_execute": true
+        }
+      ],
+      "migration_history": [
+        {
+          "version": "20261107181115",
+          "name": "sidak_atomic_rule_publish",
+          "statement_count": 2
+        },
+        {
+          "version": "20261108000000",
+          "name": "leader_access_transitions",
+          "statement_count": 2
+        }
+      ],
+      "guard_definition": "CREATE OR REPLACE FUNCTION app_internal.assert_service_role()\n RETURNS void\n LANGUAGE plpgsql\n STABLE\n SET search_path TO ''\nAS $function$\nDECLARE v_role text;\nBEGIN\n  BEGIN\n    v_role := nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role';\n  EXCEPTION WHEN others THEN\n    v_role := NULL;  -- malformed claims are treated as \"not service_role\"\n  END;\n  IF v_role IS DISTINCT FROM 'service_role' THEN\n    RAISE EXCEPTION 'SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';\n  END IF;\nEND $function$\n"
+    },
+    "verification_scope": "Catalog/definition/privilege/history only; no production business RPC calls or E2E.",
+    "security_advisors": {
+      "before": 158,
+      "after": 162,
+      "new_warnings": 4,
+      "disposition": "Expected anon/authenticated EXECUTE on both SECURITY DEFINER RPCs; first service-role guard and empty search_path match the locally tested mandatory repository contract.",
+      "remediation_urls": [
+        "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+        "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+      ]
+    },
+    "commands": [
+      {
+        "command": "supabase db query --linked -f supabase/migrations/20261107181115_sidak_atomic_rule_publish.sql",
+        "exit_code": 0,
+        "log": ".audit-run/state-machine-closure-20261108/resume/remote-apply/sidak-apply.log",
+        "sha256": "b4a42591e4f141e6ad03d2f6344f5fd0424e357449f504549882391d324d9efe"
+      },
+      {
+        "command": "supabase migration repair --linked --status applied 20261107181115",
+        "exit_code": 0,
+        "log": ".audit-run/state-machine-closure-20261108/resume/remote-apply/sidak-history.log",
+        "sha256": "0a5418032b4407c07f6f95ba42144dd167f00c456c5327f2ff2bd4be0620acf2"
+      },
+      {
+        "command": "supabase db query --linked -f supabase/migrations/20261108000000_leader_access_transitions.sql",
+        "exit_code": 0,
+        "log": ".audit-run/state-machine-closure-20261108/resume/remote-apply/leader-apply.log",
+        "sha256": "b4eb2ba52ffdf109cd07c8547e927d3641c4de6c221aac59c54f6d8b605c4f66"
+      },
+      {
+        "command": "supabase migration repair --linked --status applied 20261108000000",
+        "exit_code": 0,
+        "log": ".audit-run/state-machine-closure-20261108/resume/remote-apply/leader-history.log",
+        "sha256": "0151b1ba27fc9c1b4828beb71ff5b716bab03517a8a2bb3d92bacf505aaad103"
+      }
     ]
   },
   "quality_gates": [
