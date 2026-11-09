@@ -319,6 +319,7 @@ test("real JWT browser chat persists exactly the displayed transcript through Ho
       await import("../../api/src/workers/ketik-review-worker-runtime");
     reviewWorker = createKetikReviewWorker({
       intervalMs: 250,
+      idleMaxMs: 30000,
       shutdownMs: 500,
       healthPort: 0,
     });

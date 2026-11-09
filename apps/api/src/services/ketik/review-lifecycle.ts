@@ -10,6 +10,7 @@ import { createAdminClient } from "../../lib/supabase";
 import { processKetikReviewJob } from "./review-processor";
 import { mapKetikReviewDetail } from "./settings-history";
 import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
+import { notifyKetikReviewQueued } from "./review-queue-signal";
 
 // Gemini can retry the developer-instruction incompatibility once, then OpenAI.
 export const KETIK_REVIEW_LEASE_SECONDS = Math.max(
@@ -46,6 +47,7 @@ export async function enqueueKetikReview(
     },
   );
   if (error) throw error;
+  notifyKetikReviewQueued();
   return data as KetikReviewAccepted;
 }
 export async function triggerKetikAIReview(sessionId: string, userId: string) {

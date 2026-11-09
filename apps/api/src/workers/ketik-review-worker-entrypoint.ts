@@ -57,6 +57,8 @@ export function main() {
     console.log(
       JSON.stringify({
         event: "ketik_review_worker.started",
+        intervalMs: config.intervalMs,
+        idleMaxMs: config.idleMaxMs,
         healthPort:
           address && typeof address !== "string" ? address.port : null,
       }),

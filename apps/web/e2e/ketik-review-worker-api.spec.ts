@@ -254,13 +254,14 @@ function spawnWorkerHost(overrides: Record<string, string>) {
     },
   );
 }
-async function startWorker() {
+async function startWorker(overrides: Record<string, string> = {}) {
   workerLog = "";
   worker = spawnWorkerHost({
     KETIK_REVIEW_WORKER_ENABLED: "true",
     KETIK_REVIEW_WORKER_INTERVAL_MS: "250",
     KETIK_REVIEW_WORKER_SHUTDOWN_MS: "500",
     KETIK_REVIEW_WORKER_HEALTH_PORT: "0",
+    ...overrides,
   });
   worker.stdout?.on("data", (data) => {
     workerLog += String(data);
@@ -870,6 +871,110 @@ test("polling is read-only for missing jobs, old queues, expired leases, and mis
   expect((await job(id)).status).toBe("queued");
 });
 
+test("idle claims back off on the real database", async () => {
+  const count = () =>
+    Number(
+      runSql(
+        env,
+        `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS (%' AND query LIKE '%claim_ketik_review%';`,
+      ),
+    );
+  const before = count();
+  await startWorker({ KETIK_REVIEW_WORKER_IDLE_MAX_MS: "2000" });
+  await new Promise((resolve) => setTimeout(resolve, 6000));
+  await stopWorker();
+  const calls = count() - before;
+  console.log(`idle claim count: ${calls}`);
+  expect(calls).toBeGreaterThan(0);
+  expect(calls).toBeLessThanOrEqual(10);
+});
+
+test("enqueue wakes the local worker and cross-process enqueue remains bounded", async () => {
+  test.setTimeout(40_000);
+  providerMode = "success";
+  const id = await seedSession();
+  const cap = embedded() ? 10_000 : 2_000;
+  await startWorker({ KETIK_REVIEW_WORKER_IDLE_MAX_MS: String(cap) });
+  await new Promise((resolve) => setTimeout(resolve, embedded() ? 9000 : 2500));
+  const startedAt = Date.now();
+  if (embedded()) {
+    const port = workerLog.match(
+      /Server running on http:\/\/localhost:(\d+)/,
+    )?.[1];
+    expect(port).toBeTruthy();
+    const response = await guarded(
+      `http://127.0.0.1:${port}/api/v1/ketik/review`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${trainer.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId: id }),
+      },
+    );
+    expect(response.status).toBe(202);
+  } else {
+    expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+      202,
+    );
+  }
+  await expect
+    .poll(async () => (await job(id))?.status, {
+      timeout: embedded() ? 2000 : cap + 3000,
+      intervals: [50],
+    })
+    .toBe("completed");
+  console.log(
+    `${embedded() ? "local wake" : "cross-process"} latency: ${Date.now() - startedAt} ms`,
+  );
+  expect(providerCalls).toBe(1);
+  expect((await job(id)).attempt_count).toBe(1);
+});
+
+test("local enqueue during a cycle runs another cycle without waiting", async () => {
+  test.skip(!embedded(), "The worker and enqueue must share the API process");
+  test.setTimeout(30_000);
+  const first = await seedSession();
+  const second = await seedSession();
+  expect((await request("/review", trainer, { sessionId: first })).status).toBe(
+    202,
+  );
+  await startWorker({
+    KETIK_REVIEW_WORKER_INTERVAL_MS: "5000",
+    KETIK_REVIEW_WORKER_IDLE_MAX_MS: "10000",
+  });
+  await expect.poll(() => providerCalls, { timeout: 10_000 }).toBe(1);
+  const port = workerLog.match(
+    /Server running on http:\/\/localhost:(\d+)/,
+  )?.[1];
+  expect(port).toBeTruthy();
+  const response = await guarded(
+    `http://127.0.0.1:${port}/api/v1/ketik/review`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${trainer.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sessionId: second }),
+    },
+  );
+  expect(response.status).toBe(202);
+  providerMode = "success";
+  const startedAt = Date.now();
+  releaseProvider();
+  await expect
+    .poll(async () => (await job(second))?.status, {
+      timeout: 2000,
+      intervals: [50],
+    })
+    .toBe("completed");
+  console.log(`mid-cycle wake latency: ${Date.now() - startedAt} ms`);
+  expect(providerCalls).toBe(2);
+  expect((await job(second)).attempt_count).toBe(1);
+});
+
 test("worker host refuses invalid activation and stays idle when disabled", async () => {
   // Disabled: the standalone entrypoint exits 1; the API keeps serving and claims nothing.
   const id = await seedSession();
@@ -879,6 +984,15 @@ test("worker host refuses invalid activation and stays idle when disabled", asyn
     {
       KETIK_REVIEW_WORKER_ENABLED: "true",
       KETIK_REVIEW_WORKER_INTERVAL_MS: "-1",
+    },
+    {
+      KETIK_REVIEW_WORKER_ENABLED: "true",
+      KETIK_REVIEW_WORKER_INTERVAL_MS: "1000",
+      KETIK_REVIEW_WORKER_IDLE_MAX_MS: "500",
+    },
+    {
+      KETIK_REVIEW_WORKER_ENABLED: "true",
+      KETIK_REVIEW_WORKER_IDLE_MAX_MS: "3000.5",
     },
   ];
   for (const overrides of cases) {

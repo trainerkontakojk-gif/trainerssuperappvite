@@ -6,9 +6,11 @@ import {
   releaseKetikReview,
   type KetikReviewClaim,
 } from "../services/ketik/review-lifecycle";
+import { subscribeKetikReviewQueued } from "../services/ketik/review-queue-signal";
 
 export interface KetikWorkerConfig {
   intervalMs: number;
+  idleMaxMs: number;
   shutdownMs: number;
   healthPort: number;
 }
@@ -25,10 +27,45 @@ export function parseKetikWorkerConfig(
       throw new Error(`INVALID_${key}`);
     return value;
   };
+  const intervalMs = number(
+    "KETIK_REVIEW_WORKER_INTERVAL_MS",
+    5000,
+    250,
+    60000,
+  );
+  const idleMaxMs = number(
+    "KETIK_REVIEW_WORKER_IDLE_MAX_MS",
+    Math.max(30000, intervalMs),
+    250,
+    300000,
+  );
+  if (idleMaxMs < intervalMs)
+    throw new Error("INVALID_KETIK_REVIEW_WORKER_IDLE_MAX_MS");
   return {
-    intervalMs: number("KETIK_REVIEW_WORKER_INTERVAL_MS", 5000, 250, 60000),
+    intervalMs,
+    idleMaxMs,
     shutdownMs: number("KETIK_REVIEW_WORKER_SHUTDOWN_MS", 10000, 250, 30000),
     healthPort: number("KETIK_REVIEW_WORKER_HEALTH_PORT", 3014, 0, 65535),
+  };
+}
+
+type PollState = { delayMs: number; wakePending: boolean };
+type PollEvent = "found-work" | "empty" | "error" | "wake" | "consume-wake";
+function transitionPoll(
+  state: PollState,
+  event: PollEvent,
+  config: KetikWorkerConfig,
+): PollState {
+  if (event === "wake")
+    return { delayMs: config.intervalMs, wakePending: true };
+  if (event === "consume-wake") return { ...state, wakePending: false };
+  if (state.wakePending) return state;
+  return {
+    delayMs:
+      event === "found-work"
+        ? config.intervalMs
+        : Math.min(state.delayMs * 2, config.idleMaxMs),
+    wakePending: false,
   };
 }
 
@@ -41,6 +78,11 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   let cycle: Promise<void> | null = null;
   let loopPromise: Promise<void> | null = null;
   let wake: (() => void) | null = null;
+  let unsubscribe: (() => void) | null = null;
+  let pollState: PollState = { delayMs: config.intervalMs, wakePending: false };
+  const transition = (event: PollEvent) => {
+    pollState = transitionPoll(pollState, event, config);
+  };
   let lastPollAt: number | null = null;
   let errorClass: string | null = null;
   let shutdownPromise: Promise<void> | null = null;
@@ -50,6 +92,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     const claim = await claimKetikReview(workerId);
     lastPollAt = Date.now();
     errorClass = null;
+    transition(claim ? "found-work" : "empty");
     if (!claim || claim.status !== "processing") return;
     active = claim;
     if (stopping) {
@@ -92,22 +135,28 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
           await cycle;
         } catch (error) {
           errorClass = error instanceof Error ? error.name : "DatabaseError";
+          transition("error");
           log("ketik_review_worker.cycle_failed");
         } finally {
           cycle = null;
         }
         if (stopping) break;
+        if (pollState.wakePending) {
+          transition("consume-wake");
+          continue;
+        }
         await new Promise<void>((resolve) => {
           const timer = setTimeout(() => {
             wake = null;
             resolve();
-          }, config.intervalMs);
+          }, pollState.delayMs);
           wake = () => {
             clearTimeout(timer);
             wake = null;
             resolve();
           };
         });
+        if (pollState.wakePending) transition("consume-wake");
       }
     } finally {
       loopAlive = false;
@@ -117,6 +166,8 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
       stopping = true;
+      unsubscribe?.();
+      unsubscribe = null;
       wake?.();
       if (!cycle) {
         await loopPromise;
@@ -161,6 +212,10 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     start() {
       if (started) throw new Error("WORKER_ALREADY_STARTED");
       started = true;
+      unsubscribe = subscribeKetikReviewQueued(() => {
+        transition("wake");
+        wake?.();
+      });
       loopPromise = loop();
     },
     shutdown,
@@ -173,7 +228,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         Date.now() - lastPollAt <
           (active !== null
             ? KETIK_REVIEW_LEASE_SECONDS * 1000
-            : Math.max(config.intervalMs * 3, 15000));
+            : Math.max(config.idleMaxMs * 3, 15000));
       return {
         healthy,
         loopAlive,
@@ -221,6 +276,7 @@ export function prepareEmbeddedKetikReviewWorker(
           event: "ketik_review_worker.started",
           embedded: true,
           intervalMs: config.intervalMs,
+          idleMaxMs: config.idleMaxMs,
         }),
       );
       return runtime;
