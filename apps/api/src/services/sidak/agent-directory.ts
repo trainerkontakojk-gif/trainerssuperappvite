@@ -21,6 +21,7 @@ import {
   resolveServiceTypeFromTeam,
 } from "../../lib/scoring";
 import {
+  getAllServiceWeights,
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
   mergeServiceWeights,
@@ -300,7 +301,7 @@ export async function getAgentDetail(
       .single(),
     getIndicators(serviceType),
     getPeriods(),
-    supabaseAdmin.from("qa_service_weights").select("*"),
+    getAllServiceWeights(),
   ]);
 
   if (peserta.error) throw new Error("Agent tidak ditemukan");

@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "../../lib/supabase";
-import { getPeriods } from "./period-indicator";
+import { getPeriods, invalidateIndicators } from "./period-indicator";
+import { invalidatePublishedRuleVersions } from "./rule-version-resolver";
+import { invalidateRuleIndicatorSnapshots } from "./period-scoring-context";
 
 export async function getRuleVersions(serviceType?: string) {
   let query = supabaseAdmin
@@ -131,7 +133,7 @@ export async function createRuleVersion(
     if (data.effective_period_id) {
       effectivePeriodId = data.effective_period_id;
     } else {
-      const periods = await getPeriods();
+      const periods = await getPeriods(true);
       if (periods.length === 0) {
         throw new Error(
           "Belum ada periode audit. Silakan buat periode terlebih dahulu.",
@@ -204,6 +206,7 @@ export async function createRuleVersion(
     .single();
 
   if (error) throw new Error(`Gagal membuat versi aturan: ${error.message}`);
+  invalidatePublishedRuleVersions();
 
   if (baseIndicators.length > 0) {
     const newInds = baseIndicators.map((ind) => ({
@@ -225,11 +228,13 @@ export async function createRuleVersion(
     const { error: copyErr } = await supabaseAdmin
       .from("qa_service_rule_indicators")
       .insert(newInds);
+    invalidateRuleIndicatorSnapshots();
     if (copyErr) {
       await supabaseAdmin
         .from("qa_service_rule_versions")
         .delete()
         .eq("id", result.id);
+      invalidatePublishedRuleVersions();
       throw new Error(`Gagal menduplikasi parameter: ${copyErr.message}`);
     }
   }
@@ -257,6 +262,8 @@ export async function deleteRuleVersionDraft(id: string): Promise<void> {
     .eq("status", "draft");
 
   if (error) throw new Error(`Gagal menghapus draft: ${error.message}`);
+  invalidatePublishedRuleVersions();
+  invalidateRuleIndicatorSnapshots();
 }
 
 export async function updateRuleVersion(
@@ -287,6 +294,7 @@ export async function updateRuleVersion(
     .single();
 
   if (error) throw new Error(`Gagal mengupdate versi aturan: ${error.message}`);
+  invalidatePublishedRuleVersions();
   return result;
 }
 
@@ -332,6 +340,8 @@ export async function publishRuleVersion(
       "Gagal mempublikasikan versi aturan. Coba lagi beberapa saat lagi.",
     );
   }
+  invalidatePublishedRuleVersions();
+  invalidateRuleIndicatorSnapshots();
   return result;
 }
 
@@ -394,6 +404,7 @@ export async function supersedeRuleVersion(
 
   if (error)
     throw new Error(`Gagal menonaktifkan versi aturan: ${error.message}`);
+  invalidatePublishedRuleVersions();
   return result;
 }
 
@@ -468,7 +479,10 @@ async function resolveMasterForNewIndicator(
     })
     .select("id")
     .single();
-  if (!error) return { id: data.id, created: true };
+  if (!error) {
+    invalidateIndicators();
+    return { id: data.id, created: true };
+  }
 
   // Request paralel dengan identitas sama: pakai master yang menang.
   if (error.code === "23505") {
@@ -554,6 +568,7 @@ export async function addRuleVersionIndicator(
     if (master.created) await deleteMasterIfUnreferenced(master.id);
     throw new Error(`Gagal menambah indikator: ${error.message}`);
   }
+  invalidateRuleIndicatorSnapshots();
   return result;
 }
 
@@ -588,6 +603,7 @@ async function deleteMasterIfUnreferenced(masterId: string): Promise<void> {
     .eq("id", masterId)
     .eq("is_active", false);
   if (error) console.error("Gagal menghapus master parameter:", error.message);
+  else invalidateIndicators();
 }
 
 export async function deleteRuleVersionIndicator(id: string) {
@@ -605,6 +621,7 @@ export async function deleteRuleVersionIndicator(id: string) {
     .eq("id", id);
 
   if (error) throw new Error(`Gagal menghapus indikator: ${error.message}`);
+  invalidateRuleIndicatorSnapshots();
   if (snapshot?.legacy_indicator_id)
     await deleteMasterIfUnreferenced(snapshot.legacy_indicator_id);
 }
@@ -629,5 +646,6 @@ export async function updateRuleVersionIndicator(
     .single();
 
   if (error) throw new Error(`Gagal memperbarui indikator: ${error.message}`);
+  invalidateRuleIndicatorSnapshots();
   return result;
 }

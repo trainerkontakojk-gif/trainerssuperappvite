@@ -18,7 +18,10 @@ installLoopbackFetchGuard();
 const admin = createAdmin(env);
 const suffix = randomUUID();
 const batch = `link-${suffix}`;
-const MAILPIT = "http://127.0.0.1:54324";
+// Keep disposable-stack mail assertions away from the repo-root stack.
+const MAILPIT = process.env.E2E_SUPABASE_WORKDIR
+  ? "http://127.0.0.1:55324"
+  : "http://127.0.0.1:54324";
 const users: Record<string, Awaited<ReturnType<typeof createUserWithJwt>>> = {};
 const peserta: Record<"rina" | "karina" | "other", string> = {
   rina: "",

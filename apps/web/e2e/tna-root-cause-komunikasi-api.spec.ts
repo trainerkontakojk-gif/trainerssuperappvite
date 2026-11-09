@@ -238,6 +238,17 @@ test.beforeAll(async () => {
     COMMIT;`,
   );
   app = (await import("../../api/src/app")).default as unknown as Hono;
+  // SQL fixtures bypass API invalidation and the worker may reuse warmed modules.
+  const reference =
+    await import("../../api/src/services/sidak/period-indicator");
+  reference.invalidatePeriods();
+  reference.invalidateIndicators();
+  (
+    await import("../../api/src/services/sidak/rule-version-resolver")
+  ).invalidatePublishedRuleVersions();
+  (
+    await import("../../api/src/services/sidak/period-scoring-context")
+  ).invalidateRuleIndicatorSnapshots();
 });
 
 test.afterAll(async () => {

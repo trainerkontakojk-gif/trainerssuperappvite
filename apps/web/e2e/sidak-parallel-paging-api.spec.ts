@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { resetSidakReferenceCache } from "./helpers/resetSidakReferenceCache";
 import type { Hono } from "hono";
 import { tnaApiRequest } from "./helpers/tnaApi";
 import {
@@ -246,6 +247,7 @@ test.beforeAll(async () => {
   expect(total).toBeGreaterThan(2000);
 
   app = (await import("../../api/src/app")).default as unknown as Hono;
+  await resetSidakReferenceCache();
 });
 
 test.afterAll(async () => {

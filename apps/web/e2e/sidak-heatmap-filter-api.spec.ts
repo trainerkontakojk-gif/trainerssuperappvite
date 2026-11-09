@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { resetSidakReferenceCache } from "./helpers/resetSidakReferenceCache";
 import type { Hono } from "hono";
 import { tnaApiRequest } from "./helpers/tnaApi";
 import {
@@ -135,6 +136,7 @@ test.beforeAll(async () => {
     `INSERT INTO leader_access_request_groups (request_id, access_group_id) VALUES (${q(requestId)}, ${q(groupId)});`,
   );
   app = (await import("../../api/src/app")).default as unknown as Hono;
+  await resetSidakReferenceCache();
 });
 
 test.afterAll(async () => {

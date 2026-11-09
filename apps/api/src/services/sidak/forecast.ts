@@ -2,6 +2,7 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import { getPeriods, getIndicators } from "./period-indicator";
+import { getAllServiceWeights } from "./period-scoring-context";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
   calculateQAScoreFromTemuan,
@@ -90,9 +91,7 @@ export async function generateSidakAgentForecast(
     buildPeriodLabel(year, context.request.endMonth ?? context.request.startMonth ?? new Date().getMonth() + 1);
 
   const indicators = await getIndicators(serviceType);
-  const weightsResult = await supabaseAdmin
-    .from("qa_service_weights")
-    .select("*");
+  const weightsResult = await getAllServiceWeights();
   if (weightsResult.error) {
     throw new Error(weightsResult.error.message);
   }

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { createTtlCache } from "../../lib/ttl-cache";
 
 export interface EffectiveRuleVersion {
   id: string;
@@ -24,7 +25,19 @@ export type PublishedRuleVersionRow = {
   qa_periods: PeriodRef | null;
 };
 
-export async function fetchPublishedRuleVersions(
+const versionsCache = createTtlCache<string, PublishedRuleVersionRow[]>();
+export const invalidatePublishedRuleVersions = () => versionsCache.invalidate();
+
+// write and validation paths must pass fresh = true
+export function fetchPublishedRuleVersions(
+  serviceType: string,
+  fresh = false,
+): Promise<PublishedRuleVersionRow[]> {
+  const load = () => loadPublishedRuleVersions(serviceType);
+  return fresh ? load() : versionsCache.get(serviceType, load);
+}
+
+async function loadPublishedRuleVersions(
   serviceType: string,
 ): Promise<PublishedRuleVersionRow[]> {
   const { data: versions, error: vErr } = await supabaseAdmin
@@ -87,9 +100,11 @@ export function pickEffectiveRuleVersion(
   };
 }
 
+// write and validation paths must pass fresh = true
 export async function resolveEffectiveRuleVersionForPeriod(
   serviceType: string,
   periodId: string,
+  fresh = false,
 ): Promise<EffectiveRuleVersion | null> {
   const { data: targetPeriod, error: pErr } = await supabaseAdmin
     .from("qa_periods")
@@ -100,7 +115,7 @@ export async function resolveEffectiveRuleVersionForPeriod(
   if (pErr) throw new Error(`Gagal memuat periode target: ${pErr.message}`);
   if (!targetPeriod) return null;
 
-  const versions = await fetchPublishedRuleVersions(serviceType);
+  const versions = await fetchPublishedRuleVersions(serviceType, fresh);
   if (versions.length === 0) return null;
 
   return pickEffectiveRuleVersion(targetPeriod, versions);

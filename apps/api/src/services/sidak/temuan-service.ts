@@ -12,6 +12,7 @@ import {
 } from "../../lib/scoring";
 import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import {
+  freshPeriodScoringLoaders,
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
 } from "./period-scoring-context";
@@ -111,6 +112,7 @@ export async function createPerfectScoreSession(
   const activeVersion = await resolveEffectiveRuleVersionForPeriod(
     service_type,
     period_id,
+    true,
   );
   let indicators: { id: string; rule_indicator_id: string | null }[];
   let rule_version_id: string | null = null;
@@ -206,7 +208,11 @@ export async function validateTemuanBatch(
   items: CreateTemuanBatch,
 ): Promise<PreviewResult> {
   const [activeVersion, validIndicators, existing] = await Promise.all([
-    resolveEffectiveRuleVersionForPeriod(items.service_type, items.period_id),
+    resolveEffectiveRuleVersionForPeriod(
+      items.service_type,
+      items.period_id,
+      true,
+    ),
 
     supabaseAdmin
       .from("qa_indicators")
@@ -460,7 +466,7 @@ export async function refreshDashboardSummary(
   serviceType?: string,
 ) {
   const [indicators, weights] = await Promise.all([
-    getIndicators(serviceType),
+    getIndicators(serviceType, true),
     supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
@@ -579,6 +585,7 @@ export async function refreshDashboardSummary(
         periodId,
         indicators,
         fallbackWeight,
+        freshPeriodScoringLoaders,
       );
       contextCache.set(comboKey, ctx);
     }

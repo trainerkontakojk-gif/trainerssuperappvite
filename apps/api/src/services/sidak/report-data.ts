@@ -3,6 +3,10 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
 import { getPeriods } from "./period-indicator";
+import {
+  getAllServiceWeights,
+  invalidateServiceWeights,
+} from "./period-scoring-context";
 
 export async function getDataReportRows(params: {
   serviceType?: string;
@@ -83,9 +87,7 @@ export async function getDataReportRows(params: {
 }
 
 export async function getServiceWeights(): Promise<any[]> {
-  const { data, error } = await supabaseAdmin
-    .from("qa_service_weights")
-    .select("*");
+  const { data, error } = await getAllServiceWeights();
   if (error)
     throw new Error(`Gagal mengambil service weight: ${error.message}`);
   return data ?? [];
@@ -106,5 +108,6 @@ export async function updateServiceWeight(
     .select()
     .single();
   if (error) throw new Error(`Gagal update service weight: ${error.message}`);
+  invalidateServiceWeights();
   return data;
 }

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-10
 
+- perf(sidak): cache SIDAK reference tables for 60 seconds with local invalidation on writes
+
 - perf(ketik): back off the idle review worker poll and wake it on local enqueue
 
 ## 2026-11-09

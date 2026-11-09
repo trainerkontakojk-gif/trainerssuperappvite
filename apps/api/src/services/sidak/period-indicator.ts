@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { createTtlCache } from "../../lib/ttl-cache";
 import type {
   QAPeriod,
   QAPeriodUsage,
@@ -9,7 +10,17 @@ import type {
 import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import { DEFAULT_SERVICE_WEIGHTS } from "../../lib/scoring";
 
-export async function getPeriods(): Promise<QAPeriod[]> {
+const periodsCache = createTtlCache<string, QAPeriod[]>();
+const indicatorsCache = createTtlCache<string, QAIndicator[]>();
+export const invalidatePeriods = () => periodsCache.invalidate();
+export const invalidateIndicators = () => indicatorsCache.invalidate();
+
+// write and validation paths must pass fresh = true
+export function getPeriods(fresh = false): Promise<QAPeriod[]> {
+  return fresh ? loadPeriods() : periodsCache.get("*", loadPeriods);
+}
+
+async function loadPeriods(): Promise<QAPeriod[]> {
   const { data, error } = await supabaseAdmin
     .from("qa_periods")
     .select("*")
@@ -30,6 +41,7 @@ export async function createPeriod(
     .select()
     .single();
   if (error) throw new Error(`Failed to create period: ${error.message}`);
+  invalidatePeriods();
   return { ...data, label };
 }
 
@@ -97,6 +109,7 @@ export async function deletePeriod(id: string): Promise<{ success: boolean }> {
     .delete()
     .eq("id", id);
   if (error) throw new Error(`Failed to delete period: ${error.message}`);
+  invalidatePeriods();
   return { success: true };
 }
 
@@ -131,9 +144,16 @@ export async function hasDraftRuleVersion(
   return (count ?? 0) > 0;
 }
 
-export async function getIndicators(
+// write and validation paths must pass fresh = true
+export function getIndicators(
   serviceType?: string,
+  fresh = false,
 ): Promise<QAIndicator[]> {
+  const load = () => loadIndicators(serviceType);
+  return fresh ? load() : indicatorsCache.get(serviceType ?? "*", load);
+}
+
+async function loadIndicators(serviceType?: string): Promise<QAIndicator[]> {
   let query = supabaseAdmin.from("qa_indicators").select("*");
   if (serviceType) query = query.eq("service_type", serviceType);
   const { data, error } = await query
@@ -161,6 +181,7 @@ export async function createIndicator(indicator: {
     .select()
     .single();
   if (error) throw new Error(`Failed to create indicator: ${error.message}`);
+  invalidateIndicators();
   return data;
 }
 

@@ -666,7 +666,7 @@ test("SIDAK agent quickview lists the agent's EFEK training for admin and traine
 });
 
 test.describe("proper input report mode", () => {
-  test.beforeAll(() => {
+  test.beforeAll(async () => {
     const name = "Proper Input: Efek " + tag;
     sql(
       "INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES ('" +
@@ -699,9 +699,16 @@ test.describe("proper input report mode", () => {
         tag +
         "-proper-service-only',0,'Input APPK tidak sesuai');",
     );
+    // This fixture writes reference rows directly, outside the API.
+    (
+      await import("../../api/src/services/sidak/period-indicator")
+    ).invalidateIndicators();
+    (
+      await import("../../api/src/services/sidak/period-scoring-context")
+    ).invalidateRuleIndicatorSnapshots();
   });
 
-  test.afterAll(() => {
+  test.afterAll(async () => {
     sql(
       "BEGIN; DELETE FROM qa_temuan WHERE indicator_id='" +
         properInputIndicator +
@@ -713,6 +720,12 @@ test.describe("proper input report mode", () => {
         properInputIndicator +
         "'; COMMIT;",
     );
+    (
+      await import("../../api/src/services/sidak/period-indicator")
+    ).invalidateIndicators();
+    (
+      await import("../../api/src/services/sidak/period-scoring-context")
+    ).invalidateRuleIndicatorSnapshots();
   });
 
   test("proper input counts as compliant by default and the toggle restores the SIDAK score", async () => {

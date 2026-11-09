@@ -25,6 +25,7 @@ let groupId: string;
 let requestId: string;
 let indicatorId: string;
 let parameter: string;
+let failIndicatorRead = false;
 const periods: string[] = [];
 const folders: string[] = [];
 const agents: string[] = [];
@@ -65,6 +66,21 @@ test.beforeAll(async () => {
     OPENAI_API_KEY: "e2e-only",
   });
   installLoopbackFetchGuard();
+  const guardedFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(
+      typeof input === "string" || input instanceof URL
+        ? input.toString()
+        : input.url,
+    );
+    if (failIndicatorRead && url.pathname === "/rest/v1/qa_indicators") {
+      return new Response(
+        JSON.stringify({ message: "fixture indicator failure" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return guardedFetch(input, init);
+  }) as typeof fetch;
   trainer = await createUserWithJwt(env, "trainer", `brief-${ns}`);
   leader = await createUserWithJwt(env, "leader", `brief-${ns}`);
   expect(runSql(env, `SELECT id FROM qa_periods WHERE year=${YEAR};`)).toBe("");
@@ -155,6 +171,211 @@ test.afterAll(async () => {
       expect(
         (await createAdmin(env).auth.admin.deleteUser(user.userId)).error,
       ).toBeNull();
+});
+
+test("repeated dashboard requests do not reread reference tables", async () => {
+  const tables = [
+    "qa_periods",
+    "qa_indicators",
+    "qa_service_weights",
+    "qa_service_rule_versions",
+    "qa_service_rule_indicators",
+  ];
+  const counts = () =>
+    tables.map((table) =>
+      Number(
+        runSql(
+          env,
+          `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS ( SELECT %' AND query LIKE '%"public"."${table}"%';`,
+        ),
+      ),
+    );
+  const version = sqlOne(
+    env,
+    `INSERT INTO qa_service_rule_versions(service_type,effective_period_id,status,version_number) VALUES ('call',${q(periods[0]!)},'published',1) RETURNING id;`,
+  );
+  runSql(
+    env,
+    `INSERT INTO qa_service_rule_indicators(rule_version_id,service_type,name,category,bobot,legacy_indicator_id) SELECT ${q(version)},service_type,name,category,bobot,id FROM qa_indicators WHERE id=${q(indicatorId)};`,
+  );
+  // Fixture writes bypass the API; explicitly clear the same process-local caches.
+  const { invalidatePublishedRuleVersions } =
+    await import("../../api/src/services/sidak/rule-version-resolver");
+  const { invalidateRuleIndicatorSnapshots } =
+    await import("../../api/src/services/sidak/period-scoring-context");
+  invalidatePublishedRuleVersions();
+  invalidateRuleIndicatorSnapshots();
+  try {
+    const before = counts();
+    const first = await dashboard({ startMonth: "1", endMonth: "2" });
+    const middle = counts();
+    const second = await dashboard({ startMonth: "1", endMonth: "2" });
+    const after = counts();
+    console.log(
+      "reference reads",
+      tables.map((table, i) => ({
+        table,
+        first: middle[i]! - before[i]!,
+        second: after[i]! - middle[i]!,
+      })),
+    );
+    expect(middle[4]! - before[4]!).toBeGreaterThan(0);
+    expect(second).toEqual(first);
+    expect(after.map((count, i) => count - middle[i]!)).toEqual(
+      tables.map(() => 0),
+    );
+  } finally {
+    runSql(env, `DELETE FROM qa_service_rule_versions WHERE id=${q(version)};`);
+    invalidatePublishedRuleVersions();
+    invalidateRuleIndicatorSnapshots();
+  }
+});
+
+test("publishing a rule invalidates the cached version and batch validation reads it fresh", async () => {
+  const version = sqlOne(
+    env,
+    `INSERT INTO qa_service_rule_versions(service_type,effective_period_id,status,version_number,created_by) VALUES ('call',${q(periods[0]!)},'draft',1,${q(trainer.userId)}) RETURNING id;`,
+  );
+  runSql(
+    env,
+    `INSERT INTO qa_service_rule_indicators(rule_version_id,service_type,name,category,bobot,legacy_indicator_id) SELECT ${q(version)},service_type,name,category,bobot,id FROM qa_indicators WHERE id=${q(indicatorId)};`,
+  );
+  const otherIndicator = randomUUID();
+  runSql(
+    env,
+    `INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES (${q(otherIndicator)},'call',${q(`unmapped-${ns}`)},'critical',1);`,
+  );
+  const request = (path: string, method = "GET", body?: unknown) =>
+    tnaApiRequest(app, `http://localhost/api/v1/sidak${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${trainer.token}`,
+        "Content-Type": "application/json",
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  const configPath = `/resolved-input-config?service_type=call&period_id=${periods[0]}`;
+  const { invalidatePublishedRuleVersions } =
+    await import("../../api/src/services/sidak/rule-version-resolver");
+  const { invalidateRuleIndicatorSnapshots } =
+    await import("../../api/src/services/sidak/period-scoring-context");
+  try {
+    const before = await request(configPath);
+    expect(before.status).toBe(200);
+    expect((await before.json()).data.ruleVersionId).not.toBe(version);
+    const published = await request(
+      `/rule-versions/${version}/publish`,
+      "POST",
+      {},
+    );
+    expect(published.status).toBe(200);
+    const batch = await request("/temuan/batch", "POST", {
+      peserta_id: agents[0],
+      period_id: periods[0],
+      service_type: "call",
+      no_tiket: `RULE-${ns}`,
+      items: [{ indicator_id: otherIndicator, nilai: 1 }],
+    });
+    const batchBody = await batch.json();
+    expect(batch.status).toBe(422);
+    expect(batchBody.error.code).toBe("INVALID_INDICATORS");
+    const after = await request(configPath);
+    expect(after.status).toBe(200);
+    expect((await after.json()).data.ruleVersionId).toBe(version);
+  } finally {
+    runSql(
+      env,
+      `DELETE FROM qa_service_rule_versions WHERE id=${q(version)}; DELETE FROM qa_indicators WHERE id=${q(otherIndicator)};`,
+    );
+    invalidatePublishedRuleVersions();
+    invalidateRuleIndicatorSnapshots();
+  }
+});
+
+test("failed reference reads are retried", async () => {
+  const { invalidateIndicators } =
+    await import("../../api/src/services/sidak/period-indicator");
+  invalidateIndicators();
+  const request = () =>
+    tnaApiRequest(
+      app,
+      "http://localhost/api/v1/sidak/indicators?service_type=call",
+      { headers: { Authorization: `Bearer ${trainer.token}` } },
+    );
+  try {
+    failIndicatorRead = true;
+    expect((await request()).status).toBe(500);
+  } finally {
+    failIndicatorRead = false;
+  }
+  const retry = await request();
+  expect(retry.status).toBe(200);
+  expect((await retry.json()).data.length).toBeGreaterThan(0);
+});
+
+test("API weight and period writes invalidate the next read", async () => {
+  const request = (path: string, method = "GET", body?: unknown) =>
+    tnaApiRequest(app, `http://localhost/api/v1/sidak${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${trainer.token}`,
+        "Content-Type": "application/json",
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  const beforeWeights = await request("/service-weights");
+  expect(beforeWeights.status).toBe(200);
+  const original = (await beforeWeights.json()).data.find(
+    (w: { service_type: string }) => w.service_type === "call",
+  );
+  expect(original).toBeTruthy();
+  const beforeDashboard = await dashboard();
+  const changed = {
+    critical_weight: 0.9,
+    non_critical_weight: 0.1,
+    scoring_mode: "weighted",
+  };
+  try {
+    expect(
+      (await request("/service-weights/call", "PUT", changed)).status,
+    ).toBe(200);
+    const afterWeights = await request("/service-weights");
+    expect(
+      (await afterWeights.json()).data.find(
+        (w: { service_type: string }) => w.service_type === "call",
+      ),
+    ).toMatchObject(changed);
+    const afterDashboard = await dashboard();
+    expect(afterDashboard.summary.avgAgentScore).not.toBe(
+      beforeDashboard.summary.avgAgentScore,
+    );
+  } finally {
+    expect(
+      (
+        await request("/service-weights/call", "PUT", {
+          critical_weight: Number(original.critical_weight),
+          non_critical_weight: Number(original.non_critical_weight),
+          scoring_mode: original.scoring_mode,
+        })
+      ).status,
+    ).toBe(200);
+  }
+  expect((await request("/periods")).status).toBe(200);
+  const created = await request("/periods", "POST", { month: 3, year: YEAR });
+  expect(created.status).toBe(201);
+  const id = (await created.json()).data.id;
+  try {
+    const listed = await request("/periods");
+    expect(
+      (await listed.json()).data.some((p: { id: string }) => p.id === id),
+    ).toBe(true);
+  } finally {
+    expect((await request(`/periods/${id}`, "DELETE")).status).toBe(200);
+  }
+  const listed = await request("/periods");
+  expect(
+    (await listed.json()).data.some((p: { id: string }) => p.id === id),
+  ).toBe(false);
 });
 
 test("latest focus +6, deterministic recommendation, sorted/capped agents and period-only counts", async () => {

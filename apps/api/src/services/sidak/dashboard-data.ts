@@ -47,6 +47,7 @@ import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds, isAgentExcluded } from "./agent-directory";
 import {
   createPeriodScoringLoaders,
+  getAllServiceWeights,
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
   type PeriodScoringContext,
@@ -178,7 +179,7 @@ export async function getDashboardData(params: {
     await Promise.all([
       getPeriods(),
       getIndicators(),
-      supabaseAdmin.from("qa_service_weights").select("*"),
+      getAllServiceWeights(),
       params.showArchived ? [] : getSoftDeletedPesertaIds(),
       params.folder_ids && params.folder_ids.length > 0
         ? resolveFolderFiltersByIds(params.folder_ids)

@@ -15,6 +15,7 @@ import { getScoreRows } from "../sidak/dashboard-aggregation";
 import { getIndicators, getPeriods } from "../sidak/period-indicator";
 import {
   createPeriodScoringLoaders,
+  getAllServiceWeights,
   loadPeriodScoringContext,
   mergeServiceWeights,
   normalizePeriodScoringRows,
@@ -112,14 +113,11 @@ export async function getAgentHomeSummary(
     .filter((g) => g[0]!.service_type === service)
     .slice(0, 6);
   const indicators = await getIndicators(service);
-  const weights = await supabaseAdmin
-    .from("qa_service_weights")
-    .select("*")
-    .eq("service_type", service);
+  const weights = await getAllServiceWeights();
   if (weights.error) throw weights.error;
   const weight = mergeServiceWeights(
     DEFAULT_SERVICE_WEIGHTS,
-    weights.data ?? [],
+    (weights.data ?? []).filter((row) => row.service_type === service),
   )[service];
   const loaders = createPeriodScoringLoaders(periods);
   const points: { periodLabel: string; score: number }[] = [];

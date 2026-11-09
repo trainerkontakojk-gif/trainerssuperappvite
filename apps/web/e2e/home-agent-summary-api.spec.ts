@@ -305,12 +305,19 @@ test("role gates, unauthenticated calls and IDOR/query attempts are rejected", a
 });
 
 test("database errors fail visibly without private diagnostics or plausible empty success", async () => {
+  const { invalidatePeriods } =
+    await import("../../api/src/services/sidak/period-indicator");
+  const { invalidateRuleIndicatorSnapshots } =
+    await import("../../api/src/services/sidak/period-scoring-context");
   for (const table of [
     "profiler_peserta",
     "qa_temuan",
     "qa_periods",
     "qa_service_rule_indicators",
   ]) {
+    // Test-only reset: exercise actual network failures rather than a warm cache.
+    invalidatePeriods();
+    invalidateRuleIndicatorSnapshots();
     failingTable = table;
     try {
       const result = await call(self.token);

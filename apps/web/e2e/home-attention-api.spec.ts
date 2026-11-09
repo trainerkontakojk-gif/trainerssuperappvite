@@ -389,6 +389,10 @@ test("leader tanpa persetujuan: tidak ada item", async () => {
 });
 
 test("satu sumber gagal: 200, partial true, item lain tetap", async () => {
+  // Test-only reset so the fault reaches PostgREST instead of a warm cache.
+  const { invalidatePeriods } =
+    await import("../../api/src/services/sidak/period-indicator");
+  invalidatePeriods();
   failQaPeriods = true;
   try {
     const data = await attention(trainer.token);

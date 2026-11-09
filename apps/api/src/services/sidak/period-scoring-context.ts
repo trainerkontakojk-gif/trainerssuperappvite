@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { createTtlCache } from "../../lib/ttl-cache";
+
 import {
   fetchPublishedRuleVersions,
   pickEffectiveRuleVersion,
@@ -13,6 +15,17 @@ import type {
   ServiceType,
   ServiceWeight,
 } from "@trainers/types";
+
+async function loadServiceWeights() {
+  return await supabaseAdmin.from("qa_service_weights").select("*");
+}
+const weightsCache = createTtlCache<
+  string,
+  Awaited<ReturnType<typeof loadServiceWeights>>
+>((result) => !result.error);
+export const invalidateServiceWeights = () => weightsCache.invalidate();
+export const getAllServiceWeights = () =>
+  weightsCache.get("*", loadServiceWeights);
 
 export type PeriodScoringRow = {
   indicator_id: string;
@@ -58,7 +71,20 @@ export type PeriodScoringLoaders = {
   loadSnapshot: (versionId: string) => Promise<RuleIndicatorSnapshotRow[]>;
 };
 
-async function fetchRuleIndicatorSnapshot(
+const snapshotsCache = createTtlCache<string, RuleIndicatorSnapshotRow[]>();
+export const invalidateRuleIndicatorSnapshots = () =>
+  snapshotsCache.invalidate();
+
+// write and validation paths must pass fresh = true
+function fetchRuleIndicatorSnapshot(
+  versionId: string,
+  fresh = false,
+): Promise<RuleIndicatorSnapshotRow[]> {
+  const load = () => loadRuleIndicatorSnapshot(versionId);
+  return fresh ? load() : snapshotsCache.get(versionId, load);
+}
+
+async function loadRuleIndicatorSnapshot(
   versionId: string,
 ): Promise<RuleIndicatorSnapshotRow[]> {
   const { data, error } = await supabaseAdmin
@@ -74,6 +100,12 @@ async function fetchRuleIndicatorSnapshot(
 const directLoaders: PeriodScoringLoaders = {
   resolveVersion: resolveEffectiveRuleVersionForPeriod,
   loadSnapshot: fetchRuleIndicatorSnapshot,
+};
+
+export const freshPeriodScoringLoaders: PeriodScoringLoaders = {
+  resolveVersion: (serviceType, periodId) =>
+    resolveEffectiveRuleVersionForPeriod(serviceType, periodId, true),
+  loadSnapshot: (versionId) => fetchRuleIndicatorSnapshot(versionId, true),
 };
 
 function memoize<T>(load: (key: string) => Promise<T>) {
