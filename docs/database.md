@@ -559,7 +559,14 @@ Advisor produksi 2026-11-09 (lint `0001_unindexed_foreign_keys`) menandai sepulu
 
 - **Kontrak**: setiap FK di tabel `public.tna_*` punya indeks yang kolom depannya sama dengan kolom FK (aturan advisor; indeks parsial seperti `uq_tna_plans_open_need` ikut dihitung). E2E `apps/web/e2e/tna-fk-index-api.spec.ts` (project `tna-fk-index-real-backend`, hanya Supabase lokal) gagal bila ada FK TNA tanpa indeks, termasuk dari fase berikutnya.
 - Tanpa perubahan data, grant, atau RLS. Rollback membuang kesepuluh indeks tanpa kehilangan data.
-- Apply produksi menunggu persetujuan Fajar. Plan: `plans/markdown/tna-fk-indexes.md`.
+- Plan: `plans/markdown/tna-fk-indexes.md`.
+
+#### Apply produksi 2026-11-09
+
+- Disetujui Fajar. Preflight read-only: versi terakhir `20261108000000`, `20261109090000` belum tercatat, belum ada satu pun dari sepuluh indeks target; 7 program, 0 kebutuhan/rencana/peserta.
+- `supabase db query --linked -f supabase/migrations/20261109090000_tna_fk_indexes.sql` (01:33 UTC) lalu `supabase migration repair --linked --status applied 20261109090000`.
+- Verifikasi read-only pasca-apply: versi tercatat; sepuluh indeks `indisvalid` dan `indisready`; query aturan E2E di produksi mengembalikan `[]` (tidak ada FK TNA tanpa indeks); 7 program tetap.
+- Advisor performance sesudahnya: `unindexed_foreign_keys` 45 → 35 (kesepuluh temuan TNA hilang). Sepuluh indeks baru muncul sebagai `unused_index` (INFO) karena tabelnya hampir kosong dan indeks belum pernah dibaca; ini diharapkan dan bukan alasan untuk menghapusnya.
 
 ## Storage
 

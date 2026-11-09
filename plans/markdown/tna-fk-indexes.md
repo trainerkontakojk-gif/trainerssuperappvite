@@ -57,4 +57,5 @@ decision.
 - [x] GREEN after a clean local replay
 - [x] Rollback round-trip: spec RED again after the rollback (ten keys), GREEN after re-apply; a second apply only emits NOTICEs
 - [x] Changelog, review, commit and push to `main`
-- [ ] Production apply (Fajar)
+- [x] Production apply (approved by Fajar, 2026-11-09 01:33 UTC; readback and
+      advisor recorded in `docs/database.md`)
