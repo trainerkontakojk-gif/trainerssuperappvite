@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-09
 
+- chore(git): ignore the local .handoff/ session notes
+
 - docs(db): record the production apply of the TNA foreign key indexes
 
 - perf(db): index the ten TNA foreign keys flagged by advisor lint 0001 and add a catalog E2E guard

@@ -77,3 +77,5 @@ tsconfig.tsbuildinfo
 supabase/.branches/
 .claude/launch.json
 .impeccable/
+# Session handoff notes from the context-handoff plugin (per machine, per session)
+.handoff/
