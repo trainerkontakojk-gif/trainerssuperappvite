@@ -147,8 +147,9 @@ Detail batas integrasi ada di [`docs/architecture.md`](architecture.md#sidak--ja
 | `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`          | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
 | `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS`      | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
 | `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE`      | retired/no-op                   | No active OpenAI WebRTC start/write path                                                                                      |
-| `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` | `30000`                         | Bounded historical encrypted-reference cleanup retry interval                                                                  |
 | `ALLOWED_ORIGINS`                                  | exact HTTPS allowlist           | Exact origin list for production and historical cleanup DELETE; wildcard/HTTP are rejected                                     |
+
+`TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` is obsolete since 2026-11-10 and can be deleted from Railway/Coolify.
 
 Aturan secret/config:
 

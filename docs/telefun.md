@@ -423,9 +423,8 @@ construct SDP, open a sideband, send media, score audio, or emit new usage.
 
 - A missing or invalid cleanup key/reference/call ID leaves the attempt
   retryable and returns the established safe `503` finalization response.
-- A no-attempt terminalization may complete locally. An orphan with no encrypted
-  reference is terminalized locally only when a server-side lookup proves that
-  no provider call was bound; otherwise it remains retryable.
+- A no-attempt terminalization may complete locally. The historical orphan sweep
+  was removed on 2026-11-10; owner-bound cleanup remains available.
 - Successful durable cleanup is `204`; lifecycle conflict is `409`; foreign,
   absent, or nonhistorical rows are hidden as `404`.
 
@@ -493,7 +492,6 @@ run remote cleanup, migrate data, or deploy as evidence for this change.
 pnpm --filter @trainers/telefun exec vitest run \
   src/realtime-webrtc/call-manager.test.ts \
   src/realtime-webrtc/http-broker.test.ts \
-  src/realtime-webrtc/orphan-cleanup.test.ts \
   src/realtime-webrtc/contracts.test.ts
 
 pnpm --filter @trainers/api exec vitest run \

@@ -20,16 +20,6 @@ export type AttemptOutcome =
   | "orphaned";
 export type UsageStatus = "pending" | "persisted" | "incomplete" | "failed";
 
-export interface TelefunWebRtcOrphanCandidate {
-  leaseId: string;
-  attemptId: string;
-  sessionId: string;
-  userId: string;
-  provider: "openai-webrtc";
-  providerCallReference: string | null;
-  sidebandConnected: boolean;
-}
-
 export interface WebRtcAttemptClaim {
   claimed: boolean;
   attemptId: string;
@@ -169,15 +159,6 @@ export interface TelefunWebRtcDb {
     resetAt: string;
     reason: string;
   }>;
-  claimOrphans?(limit: number): Promise<TelefunWebRtcOrphanCandidate[]>;
-  completeOrphan?(input: {
-    leaseId: string;
-    attemptId: string;
-    outcome: "orphaned";
-    providerClosed: boolean;
-    sidebandClosed: boolean;
-    errorCode?: string;
-  }): Promise<void>;
   recordMetric?(input: {
     name:
       | "cost_reconciliation"
@@ -724,61 +705,6 @@ export function createTelefunWebRtcDb(
         resetAt: readRequiredString(row, "reset_at", 64),
         reason: readReason(row),
       };
-    },
-
-    async claimOrphans(limit) {
-      let data: unknown;
-      let error: unknown;
-      try {
-        ({ data, error } = await client.rpc("claim_telefun_realtime_orphans", {
-          p_limit: Math.max(1, Math.min(100, Math.floor(limit))),
-        }));
-      } catch {
-        throw new WebRtcDurabilityError("claim_orphans");
-      }
-      if (error || !Array.isArray(data)) {
-        throw new WebRtcDurabilityError("claim_orphans");
-      }
-      return data.map((value) => {
-        if (!isDurableRow(value))
-          throw new WebRtcDurabilityError("invalid_orphan");
-        const provider = readRequiredString(value, "provider", 32);
-        if (provider !== "openai-webrtc")
-          throw new WebRtcDurabilityError("invalid_provider");
-        const providerCallReference = readOptionalString(
-          value,
-          "provider_call_reference",
-          16_384,
-        );
-        return {
-          leaseId: readRequiredString(value, "lease_id"),
-          attemptId: readRequiredString(value, "attempt_id"),
-          sessionId: readRequiredString(value, "session_id"),
-          userId: readRequiredString(value, "user_id"),
-          provider,
-          providerCallReference,
-          sidebandConnected: readBoolean(value, "sideband_connected"),
-        };
-      });
-    },
-
-    async completeOrphan(input) {
-      const row = await callDurableRpc(
-        client,
-        "complete_orphan",
-        "complete_telefun_realtime_orphan",
-        {
-          p_lease_id: input.leaseId,
-          p_attempt_id: input.attemptId,
-          p_outcome: "orphaned",
-          p_provider_closed: input.providerClosed,
-          p_sideband_closed: input.sidebandClosed,
-          p_error_code: input.errorCode ?? null,
-        },
-      );
-      if (!readBoolean(row, "applied")) {
-        throw new WebRtcDurabilityError("complete_orphan");
-      }
     },
 
     async recordMetric(input) {

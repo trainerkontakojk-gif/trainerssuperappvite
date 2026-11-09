@@ -53,12 +53,8 @@ import {
 } from "./realtime-webrtc/http-broker.js";
 import { createWebRtcCleanupManager } from "./realtime-webrtc/call-manager.js";
 import { createOpenAiCallCleanupClient } from "./realtime-webrtc/openai-calls-client.js";
-import { createOrphanCleanupWorker } from "./realtime-webrtc/orphan-cleanup.js";
 import { decryptProviderCallReference } from "./realtime-webrtc/provider-reference.js";
-import {
-  createWebRtcMetricRecorder,
-  redactProviderDiagnostic,
-} from "./realtime-webrtc/observability.js";
+import { redactProviderDiagnostic } from "./realtime-webrtc/observability.js";
 import { createShutdownCoordinator } from "./shutdown-coordinator.js";
 
 process.on("uncaughtException", () =>
@@ -72,9 +68,6 @@ process.on("unhandledRejection", () =>
 );
 
 const openAIWebRtcDb = createTelefunWebRtcDb();
-const webRtcMetricRecorder = createWebRtcMetricRecorder(async (metric) => {
-  await openAIWebRtcDb.recordMetric?.(metric);
-});
 const WEBRTC_SHUTDOWN_TIMEOUT_MS = 30_000;
 const openAiCleanupClient = createOpenAiCallCleanupClient({
   apiKey: env.OPENAI_API_KEY ?? "",
@@ -98,41 +91,6 @@ const openAIWebRtcManager = createWebRtcCleanupManager({
   providerHangupTimeoutMs: env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS,
   shutdownTimeoutMs: WEBRTC_SHUTDOWN_TIMEOUT_MS,
 });
-
-const orphanCleanupWorker = createOrphanCleanupWorker({
-  store: {
-    claim: (limit) =>
-      openAIWebRtcDb.claimOrphans?.(limit) ?? Promise.resolve([]),
-    getProviderBinding: async (candidate) => {
-      const attempt = await openAIWebRtcDb.getAttempt(
-        candidate.sessionId,
-        candidate.userId,
-      );
-      if (!attempt) return "unknown";
-      return attempt.providerCallIdHash ? "bound" : "unbound";
-    },
-    complete: (input) => openAIWebRtcDb.completeOrphan!(input),
-  },
-  closeProvider: async (encryptedReference) => {
-    const callId = decryptHistoricalProviderCallReference(encryptedReference);
-    if (!callId) return false;
-    return openAiCleanupClient.closeCall(callId);
-  },
-  // Historical orphan cleanup has no process-local sideband to touch.
-  closeSideband: async () => true,
-  onOrphan: ({ candidate, completed }) =>
-    webRtcMetricRecorder.record({
-      name: "orphan",
-      userId: candidate.userId,
-      sessionId: candidate.sessionId,
-      attemptId: candidate.attemptId,
-      metadata: { cleanup: completed ? "completed" : "retryable" },
-    }),
-  intervalMs: env.TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS,
-});
-// Without a key, cleanup attempts remain retryable and the cleanup client
-// refuses to fetch; do not convert unavailable hangup authority into success.
-orphanCleanupWorker.start();
 
 const openAIWebRtcHandler = createOpenAIWebRtcHttpHandler({
   allowedOrigins: env.ALLOWED_ORIGINS,
@@ -568,7 +526,6 @@ const gracefulShutdown = createShutdownCoordinator({
   timeoutMs: WEBRTC_SHUTDOWN_TIMEOUT_MS,
   stopAccepting: () => {
     console.log("[Telefun] Stopping new HTTP/WebSocket work");
-    orphanCleanupWorker.stop();
     wss.close(() => {
       console.log("[Telefun] WebSocket server closed");
     });

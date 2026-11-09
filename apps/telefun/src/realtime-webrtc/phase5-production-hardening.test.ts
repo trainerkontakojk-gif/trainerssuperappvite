@@ -15,7 +15,6 @@ import {
 } from "./distributed-lease.js";
 import { createWebRtcCallManager } from "./call-manager.js";
 import type { TelefunWebRtcDb } from "../db.js";
-import { createOrphanCleanupWorker } from "./orphan-cleanup.js";
 import {
   createWebRtcMetricRecorder,
   redactProviderDiagnostic,
@@ -301,90 +300,6 @@ describe("Phase 5 distributed WebRTC hardening", () => {
     }
   });
 
-  it("closes provider references after a restart and records orphaned outcome", async () => {
-    const complete = vi.fn(async () => undefined);
-    const closeProvider = vi.fn(
-      async (callId: string) => callId === "rtc_restart",
-    );
-    const onOrphan = vi.fn();
-    const worker = createOrphanCleanupWorker({
-      store: {
-        claim: vi.fn(async () => [
-          {
-            leaseId: "lease-restart",
-            attemptId: ATTEMPT_ID,
-            sessionId: SESSION_ID,
-            userId: "user-1",
-            provider: "openai-webrtc" as const,
-            providerCallReference: "rtc_restart",
-            sidebandConnected: true,
-          },
-        ]),
-        complete,
-      },
-      closeProvider,
-      closeSideband: vi.fn(async () => true),
-      onOrphan,
-      limit: 10,
-    });
-
-    await expect(worker.runOnce()).resolves.toEqual({
-      claimed: 1,
-      completed: 1,
-      failed: 0,
-    });
-    expect(closeProvider).toHaveBeenCalledWith("rtc_restart");
-    expect(complete).toHaveBeenCalledWith(
-      expect.objectContaining({
-        leaseId: "lease-restart",
-        attemptId: ATTEMPT_ID,
-        outcome: "orphaned",
-        providerClosed: true,
-        sidebandClosed: true,
-      }),
-    );
-    expect(onOrphan).toHaveBeenCalledWith({
-      candidate: expect.objectContaining({ leaseId: "lease-restart" }),
-      completed: true,
-    });
-  });
-
-  it("keeps an orphan cleanup failure retryable instead of hiding provider close failure", async () => {
-    const complete = vi.fn(async () => undefined);
-    const worker = createOrphanCleanupWorker({
-      store: {
-        claim: vi.fn(async () => [
-          {
-            leaseId: "lease-retry",
-            attemptId: ATTEMPT_ID,
-            sessionId: SESSION_ID,
-            userId: "user-1",
-            provider: "openai-webrtc" as const,
-            providerCallReference: "rtc_retry",
-            sidebandConnected: true,
-          },
-        ]),
-        complete,
-      },
-      closeProvider: vi.fn(async () => false),
-      closeSideband: vi.fn(async () => true),
-      limit: 10,
-    });
-
-    await expect(worker.runOnce()).resolves.toEqual({
-      claimed: 1,
-      completed: 0,
-      failed: 1,
-    });
-    expect(complete).toHaveBeenCalledWith(
-      expect.objectContaining({
-        outcome: "orphaned",
-        providerClosed: false,
-        sidebandClosed: true,
-      }),
-    );
-  });
-
   it("redacts provider diagnostics and bounds metric metadata", () => {
     expect(
       redactProviderDiagnostic(new Error("Bearer sk-secret provider SDP")),
@@ -479,9 +394,6 @@ describe("Phase 5 distributed WebRTC hardening", () => {
           error: null,
         };
       }
-      if (functionName === "claim_telefun_realtime_orphans") {
-        return { data: [], error: null };
-      }
       if (functionName === "record_telefun_realtime_metric") {
         return { data: { recorded: true, reason: "recorded" }, error: null };
       }
@@ -510,7 +422,6 @@ describe("Phase 5 distributed WebRTC hardening", () => {
         requestLimit: 10,
       }),
     ).resolves.toMatchObject({ allowed: true, remaining: 3 });
-    await expect(db.claimOrphans?.(10)).resolves.toEqual([]);
     await expect(
       db.recordMetric?.({
         name: "session_cap",
@@ -521,7 +432,6 @@ describe("Phase 5 distributed WebRTC hardening", () => {
     expect(rpc.mock.calls.map(([name]) => name)).toEqual([
       "claim_telefun_realtime_lease",
       "consume_telefun_realtime_rate_limit",
-      "claim_telefun_realtime_orphans",
       "record_telefun_realtime_metric",
     ]);
   });

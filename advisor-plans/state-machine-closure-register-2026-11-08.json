@@ -88,15 +88,11 @@
           "kind": "source_contract"
         },
         {
-          "path": "apps/telefun/src/realtime-webrtc/orphan-cleanup.ts",
-          "kind": "source_contract"
-        },
-        {
           "path": "apps/web/e2e/gemini-egress-proxy-api.spec.ts",
           "kind": "e2e_spec"
         }
       ],
-      "note": "Runtime hanya mengekspos cleanup facade; POST start retired terbukti 404 melalui boot E2E. Owner-bound cleanup/orphan dibaca statis; retry/hangup/persistence/lease historis belum mendapat E2E langsung. Bukan bug start aktif atau klaim cleanup sudah teruji penuh.",
+      "note": "Runtime hanya mengekspos cleanup facade; POST start retired terbukti 404 melalui boot E2E. Owner-bound cleanup/orphan dibaca statis; retry/hangup/persistence/lease historis belum mendapat E2E langsung. Bukan bug start aktif atau klaim cleanup sudah teruji penuh. orphan sweep removed 2026-11-10",
       "next_action": "Batas evidence tetap berlaku; uji cleanup historis langsung jika lifecycle itu diubah.",
       "closed_in_this_batch": true,
       "historical_checkpoint": {

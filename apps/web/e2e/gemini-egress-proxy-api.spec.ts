@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
 import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
+import { readLoopbackEnv, runSql } from "./helpers/sidakRealBackend";
 import {
   bootLocalService,
   type LocalService,
@@ -146,6 +147,40 @@ async function telefunCall(url: string) {
     ws.terminate();
   }
 }
+
+test("idle Telefun does not claim retired WebRTC orphans", async () => {
+  if (!process.env.E2E_SUPABASE_WORKDIR)
+    throw new Error("Disposable Supabase workdir required");
+  const env = readLoopbackEnv();
+  if (
+    new URL(env.apiUrl).port !== "55321" ||
+    new URL(env.dbUrl).port !== "55322"
+  )
+    throw new Error("Unexpected disposable Supabase ports");
+  const count = () =>
+    Number(
+      runSql(
+        env,
+        `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS (%' AND query LIKE '%claim_telefun_realtime_orphans%';`,
+      ),
+    );
+  const before = count();
+  const app = bootLocalService("telefun", env.apiUrl, {
+    SUPABASE_ANON_KEY: env.anonKey,
+    SUPABASE_SERVICE_ROLE_KEY: env.serviceRoleKey,
+    TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS: "1000",
+  });
+  try {
+    const url = await app.url();
+    expect((await fetch(`${url}/health`)).status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+  } finally {
+    await app.close();
+  }
+  const calls = count() - before;
+  console.log(`idle orphan claim count: ${calls}`);
+  expect(calls).toBe(0);
+});
 
 for (const service of ["api", "telefun"] as const) {
   for (const mode of ["proxy", "empty", "unset"] as const) {

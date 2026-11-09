@@ -84,12 +84,6 @@ export const telefunEnvSchema = z
       .min(1)
       .max(10_000)
       .default(10),
-    TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS: z.coerce
-      .number()
-      .int()
-      .min(1_000)
-      .max(300_000)
-      .default(30_000),
     TELEFUN_INTERNAL_TOKEN: optionalSecret,
     ALLOWED_ORIGINS: z.string().default("*"),
     NODE_ENV: z

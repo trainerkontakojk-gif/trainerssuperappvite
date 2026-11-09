@@ -85,7 +85,7 @@ not requeued.
 - `telefun_realtime_leases` menjadi authority quota/concurrency lintas replica. Claim, renew, release, expiry cleanup, dan provider/user cap dijalankan melalui RPC atomic; binding in-memory hanya cache untuk routing provider. Kehilangan lease memicu provider hangup/finalisasi `network_lost`, lalu release bertoken tetap dicoba agar row terminal tidak menunggu orphan sweep.
 - Renewal coordinator mengklasifikasikan kehilangan authority secara bounded sebagai `local_expiry`, `rpc_error`, `invalid_response`, closed RPC reason, atau `renewal_rejected`; raw exception/reason tidak diteruskan. Migration `20260811044655` mengualifikasi `lease.expires_at`, mengambil row lock, dan memisahkan `lease_not_found`/`owner_mismatch`/`inactive`/`expired`/`invalid_ttl`. Database production canonical sudah memuat dan memverifikasi function repair ini; candidate aplikasi dengan reason taxonomy baru masih memerlukan staging deploy.
 - `telefun_realtime_rate_limits` memakai scope user/session/provider dan window atomic di database. Kegagalan RPC limiter bersifat fail-closed untuk jalur WebRTC.
-- Orphan cleanup worker meng-claim lease stale setelah restart, menutup provider reference dan sideband secara bounded, lalu menulis outcome `orphaned`. Outcome lifecycle yang didukung adalah `completed`, `failed`, `network_lost`, dan `orphaned`.
+- Worker orphan cleanup historis telah dihapus pada 2026-11-10. Outcome lifecycle historis adalah `completed`, `failed`, `network_lost`, dan `orphaned`.
 - Recovery browser/network tidak melakukan silent recreate. Recreate yang disetujui harus menghasilkan attempt/session boundary baru dan `discontinuity` yang dapat direkonsiliasi; kegagalan network dikirim sebagai `network_lost`.
 - Provider call ID disimpan sebagai encrypted opaque reference server-side. Browser hanya menerima session/attempt boundary dan pesan aman; OpenAI key, provider secret, sideband URL, canonical config, SDP diagnostics, dan raw provider error tidak pernah diteruskan ke browser/log.
 - Metric names dibatasi untuk cost reconciliation, sideband disconnect, duplicate write, missing usage, orphan, dan session cap. UUID user diubah menjadi SHA-256 `user_id_hash` sebelum persistence; missing/unpriceable usage tetap audit state, bukan biaya sintetis.
@@ -341,7 +341,6 @@ Penempatan env dan gate rilis ada di [`.env.example`](../.env.example) serta [`d
 - `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`, `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS` (historical cleanup-data compatibility only; never admission)
 - `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`, `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS` (retired/no-op; no active provider session exists)
 - `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` (retired/no-op; never an admission limit)
-- `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` (bounded historical encrypted-reference cleanup retry interval)
 - `ALLOWED_ORIGINS` (exact HTTPS allowlist in production; applies to historical DELETE cleanup)
 
 ### MCP / Tools:
