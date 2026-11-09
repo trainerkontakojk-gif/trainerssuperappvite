@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-09
 
+- docs(db): record the production apply of the qa_temuan countability flag
+
 - perf(sidak): add a generated countability flag with Unicode trim parity
 
 - docs(kegiatan): record the production apply of the Knowledge Sharing and New Hire programs
