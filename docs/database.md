@@ -553,6 +553,14 @@ Sumber schema: `supabase/migrations/20261107120000_tna_phase5_catalog.sql`, roll
 - Verifikasi read-only pasca-apply: versi tercatat; empat kolom baru; CHECK modul; trigger `tna_program_guard` dan `tna_plan_program_snapshot`; ketiga writer `SECURITY DEFINER`, memuat `assert_service_role`, EXECUTE `authenticated` tetap ada; helper `tna_internal` tanpa EXECUTE untuk `authenticated`; tujuh seed tetap aktif tanpa `created_by`/`updated_by`; 0 rencana.
 - RPC tidak dipanggil ke produksi. Kode T2 (yang membaca kolom baru) di-push sesudah apply ini.
 
+## TNA — Indeks foreign key (2026-11-09)
+
+Advisor produksi 2026-11-09 (lint `0001_unindexed_foreign_keys`) menandai sepuluh FK TNA tanpa indeks penutup. Migration `20261109090000_tna_fk_indexes.sql` menambah satu indeks kolom tunggal untuk masing-masing: `tna_programs(created_by)`, `tna_programs(updated_by)`, `tna_needs(created_by)`, `tna_needs(indicator_id)`, `tna_needs(period_id)`, `tna_needs(previous_plan_id)`, `tna_plans(created_by)`, `tna_plans(evaluation_period_id)`, `tna_plans(program_id)`, dan `tna_plan_participants(peserta_id)` (nama `idx_<tabel>_<kolom>`). `idx_tna_needs_service_period` tidak menutup `period_id` karena kolom depannya `service_type`.
+
+- **Kontrak**: setiap FK di tabel `public.tna_*` punya indeks yang kolom depannya sama dengan kolom FK (aturan advisor; indeks parsial seperti `uq_tna_plans_open_need` ikut dihitung). E2E `apps/web/e2e/tna-fk-index-api.spec.ts` (project `tna-fk-index-real-backend`, hanya Supabase lokal) gagal bila ada FK TNA tanpa indeks, termasuk dari fase berikutnya.
+- Tanpa perubahan data, grant, atau RLS. Rollback membuang kesepuluh indeks tanpa kehilangan data.
+- Apply produksi menunggu persetujuan Fajar. Plan: `plans/markdown/tna-fk-indexes.md`.
+
 ## Storage
 
 Aplikasi menggunakan Supabase Storage bucket:

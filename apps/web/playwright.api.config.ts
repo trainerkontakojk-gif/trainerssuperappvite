@@ -164,6 +164,10 @@ export default defineConfig({
       testMatch: "function-move-legacy-definer-api.spec.ts",
     },
     {
+      name: "tna-fk-index-real-backend",
+      testMatch: "tna-fk-index-api.spec.ts",
+    },
+    {
       name: "sidak-temuan-tahun-trigger-real-backend",
       testMatch: "sidak-temuan-tahun-trigger-api.spec.ts",
     },
