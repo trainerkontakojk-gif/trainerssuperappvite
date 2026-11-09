@@ -40,3 +40,12 @@ Lane D (schema CHECK constraint + shared API contract). Requested by Fajar on 20
    Knowledge Sharing/New Hire activity fails the DB check and the API returns 503 "Data kegiatan
    belum dapat diproses. Silakan coba lagi." (verified locally by the rollback round-trip); the
    five existing programs are unaffected. Apply the migration before or right after the API deploy.
+
+## Production apply 2026-11-09
+
+- Approved by Fajar. Read-only preflight on `ruosnjmtywcrghjgqugz`: last version `20261109090000`,
+  `20261109120000` not recorded, five-program check in place, 4 rows (sobat 3, ketik 1).
+- `supabase db query --linked -f supabase/migrations/20261109120000_trainer_activities_more_programs.sql`
+  (07:29 UTC), then `supabase migration repair --linked --status applied 20261109120000`.
+- Read-only readback: version recorded; `trainer_activities_program_check` lists all seven programs
+  and is validated; rows unchanged (sobat 3, ketik 1).
