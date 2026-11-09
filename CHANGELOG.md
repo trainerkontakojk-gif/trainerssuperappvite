@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-09
 
+- perf(sidak): add a generated countability flag with Unicode trim parity
+
 - docs(kegiatan): record the production apply of the Knowledge Sharing and New Hire programs
 
 - feat(kegiatan): add the Knowledge Sharing and New Hire programs

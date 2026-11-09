@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 import type { Hono } from "hono";
 import { tnaApiRequest } from "./helpers/tnaApi";
 import {
@@ -255,6 +256,113 @@ test("staf yang dikecualikan SIDAK tidak muncul di tabel agen", async () => {
 
   expect(data.topAgents.map((a) => a.agentId)).toEqual([created.pesertaId]);
   expect(data.topAgents[0]!.defects).toBe(8);
+});
+
+test("is_countable paritas JS dan penulisan temuan melalui RLS", async () => {
+  const { isCountableFinding } =
+    await import("../../api/src/services/sidak/shared-constants");
+  const admin = createAdmin(env);
+  const indicatorId = sqlOne(
+    env,
+    "SELECT id FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order, name LIMIT 1;",
+  );
+  // Self-contained synthetic fixture; the WP0 baseline, when present, is checked too.
+  runSql(
+    env,
+    `INSERT INTO qa_temuan (peserta_id, period_id, indicator_id, service_type, no_tiket, nilai, ketidaksesuaian, sebaiknya, tahun)
+    SELECT ${quoted(created.pesertaId!)}, ${quoted(created.periodIds[1])}, ${quoted(indicatorId)}, 'call',
+      'PARITY-${ns}-' || g, CASE WHEN g % 4 = 0 THEN 2 ELSE 3 END,
+      CASE WHEN g % 500 = 0 THEN chr(160) || chr(65279) || chr(8232) ELSE repeat('K', 125) END,
+      CASE WHEN g % 500 = 0 THEN chr(8233) || chr(12288) ELSE repeat('S', 125) END, ${YEAR}
+    FROM generate_series(1, 8500) g;`,
+  );
+  let checked = 0;
+  let unicodeOnly = 0;
+  let mismatches = 0;
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await admin
+      .from("qa_temuan")
+      .select("nilai, ketidaksesuaian, sebaiknya, is_countable")
+      .order("id")
+      .range(offset, offset + 999);
+    expect(error).toBeNull();
+    for (const row of data ?? []) {
+      checked++;
+      if (row.ketidaksesuaian === "\u00a0\ufeff\u2028") unicodeOnly++;
+      if (row.is_countable !== isCountableFinding(row)) mismatches++;
+    }
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  expect(checked).toBeGreaterThanOrEqual(8500);
+  expect(unicodeOnly).toBeGreaterThanOrEqual(17);
+  expect(mismatches).toBe(0);
+
+  const whitespace =
+    "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+  const cases: Array<[number | null, string | null]> = [
+    [null, null],
+    [null, whitespace],
+    [null, `${whitespace}x`],
+    [2, null],
+    [null, "\u0085"],
+    [null, "\u180e"],
+    [null, "\u200b"],
+  ];
+  for (const char of whitespace) cases.push([null, char]);
+  for (const [nilai, note] of cases) {
+    const noteSql = note === null ? "NULL" : quoted(note);
+    for (const field of ["ketidaksesuaian", "sebaiknya"] as const) {
+      const args =
+        field === "ketidaksesuaian" ? `${noteSql}, NULL` : `NULL, ${noteSql}`;
+      const sqlValue = sqlOne(
+        env,
+        `SELECT app_internal.qa_is_countable(${nilai ?? "NULL"}, ${args});`,
+      );
+      expect(sqlValue === "t").toBe(
+        isCountableFinding({ nilai, [field]: note }),
+      );
+    }
+  }
+
+  expect(
+    sqlOne(
+      env,
+      `SELECT has_function_privilege('anon', 'app_internal.qa_is_countable(integer,text,text)', 'EXECUTE');`,
+    ),
+  ).toBe("f");
+  const authenticated = createClient(env.apiUrl, env.anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${trainer.token}` } },
+  });
+  for (const [role, client] of [
+    ["service", admin],
+    ["authenticated", authenticated],
+  ] as const) {
+    const { data: inserted, error: insertError } = await client
+      .from("qa_temuan")
+      .insert({
+        peserta_id: created.pesertaId!,
+        period_id: created.periodIds[1],
+        indicator_id: indicatorId,
+        service_type: "call",
+        tahun: YEAR,
+        no_tiket: `E2E-${ns}-${role}`,
+        nilai: 3,
+        ketidaksesuaian: whitespace,
+      })
+      .select("id, is_countable")
+      .single();
+    expect(insertError).toBeNull();
+    expect(inserted?.is_countable).toBe(false);
+    const { data: updated, error: updateError } = await client
+      .from("qa_temuan")
+      .update({ ketidaksesuaian: `${whitespace}x` })
+      .eq("id", inserted!.id)
+      .select("is_countable")
+      .single();
+    expect(updateError).toBeNull();
+    expect(updated?.is_countable).toBe(true);
+  }
 });
 
 test("index tahun untuk baca dashboard per halaman ada", () => {
