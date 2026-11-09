@@ -19,6 +19,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a1",
         service_type: "call",
         nilai: 3,
+        is_countable: false,
         is_phantom_padding: true,
       },
       {
@@ -26,6 +27,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a2",
         service_type: "call",
         nilai: 3,
+        is_countable: false,
         is_phantom_padding: true,
       },
       {
@@ -33,6 +35,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a1",
         service_type: "call",
         nilai: 3,
+        is_countable: false,
         is_phantom_padding: true,
       },
       {
@@ -40,6 +43,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a2",
         service_type: "call",
         nilai: 0,
+        is_countable: true,
         indicator_id: "critical-1",
       },
       {
@@ -47,6 +51,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a3",
         service_type: "call",
         nilai: 3,
+        is_countable: false,
         is_phantom_padding: true,
       },
       {
@@ -54,6 +59,7 @@ describe("buildDashboardTrends", () => {
         peserta_id: "a4",
         service_type: "call",
         nilai: 3,
+        is_countable: false,
         is_phantom_padding: true,
       },
     ] as any[];

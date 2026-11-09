@@ -81,6 +81,7 @@ describe("hasCritical Parity Validation", () => {
     mockTemuan = [
       {
         id: "t-1",
+        is_countable: true,
         peserta_id: "agent-1",
         indicator_id: "ind-1", // non_critical
         nilai: 0,
@@ -113,6 +114,7 @@ describe("hasCritical Parity Validation", () => {
     mockTemuan = [
       {
         id: "t-2",
+        is_countable: true,
         peserta_id: "agent-2",
         indicator_id: "ind-2", // critical
         nilai: 1,
@@ -130,6 +132,7 @@ describe("hasCritical Parity Validation", () => {
       },
       {
         id: "t-3",
+        is_countable: true,
         peserta_id: "agent-3",
         indicator_id: "ind-2", // critical
         nilai: 2,
@@ -163,6 +166,7 @@ describe("hasCritical Parity Validation", () => {
     mockTemuan = [
       {
         id: "t-4",
+        is_countable: true,
         peserta_id: "agent-4",
         indicator_id: "ind-2", // critical
         nilai: 0,
@@ -194,6 +198,7 @@ describe("hasCritical Parity Validation", () => {
     mockTemuan = [
       {
         id: "t-5",
+        is_countable: true,
         peserta_id: "agent-5",
         indicator_id: "ind-2", // critical
         nilai: 0,

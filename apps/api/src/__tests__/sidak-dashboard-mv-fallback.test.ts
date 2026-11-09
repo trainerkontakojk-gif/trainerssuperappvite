@@ -83,6 +83,7 @@ describe("Dashboard Materialized View Fallback", () => {
         no_tiket: "ticket-1",
         indicator_id: "ind-1",
         nilai: 2,
+        is_countable: true,
         ketidaksesuaian: "Greeting tidak lengkap",
         sebaiknya: null,
         is_phantom_padding: false,

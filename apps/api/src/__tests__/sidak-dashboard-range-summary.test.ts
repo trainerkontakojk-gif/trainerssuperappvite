@@ -85,13 +85,13 @@ describe("Dashboard Range Summary Calculation", () => {
 
     mockTemuanRows = [
       // April (period-1)
-      { period_id: "period-1", peserta_id: "a1", service_type: "call", nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a1", nama: "Agent 1", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
-      { period_id: "period-1", peserta_id: "a2", service_type: "call", nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a2", nama: "Agent 2", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-1", peserta_id: "a1", service_type: "call", is_countable: false, nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a1", nama: "Agent 1", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-1", peserta_id: "a2", service_type: "call", is_countable: false, nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a2", nama: "Agent 2", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
       // May (period-2)
-      { period_id: "period-2", peserta_id: "a1", service_type: "call", nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a1", nama: "Agent 1", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
-      { period_id: "period-2", peserta_id: "a2", service_type: "call", nilai: 0, indicator_id: "ind-2", tahun: 2026, profiler_peserta: { id: "a2", nama: "Agent 2", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
-      { period_id: "period-2", peserta_id: "a3", service_type: "call", nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a3", nama: "Agent 3", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
-      { period_id: "period-2", peserta_id: "a4", service_type: "call", nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a4", nama: "Agent 4", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-2", peserta_id: "a1", service_type: "call", is_countable: false, nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a1", nama: "Agent 1", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-2", peserta_id: "a2", service_type: "call", is_countable: true, nilai: 0, indicator_id: "ind-2", tahun: 2026, profiler_peserta: { id: "a2", nama: "Agent 2", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-2", peserta_id: "a3", service_type: "call", is_countable: false, nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a3", nama: "Agent 3", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
+      { period_id: "period-2", peserta_id: "a4", service_type: "call", is_countable: false, nilai: 3, is_phantom_padding: true, tahun: 2026, profiler_peserta: { id: "a4", nama: "Agent 4", batch_name: "Folder A", tim: "A", jabatan: "Agent" } },
     ];
 
     const result = await sidakService.getDashboardData({

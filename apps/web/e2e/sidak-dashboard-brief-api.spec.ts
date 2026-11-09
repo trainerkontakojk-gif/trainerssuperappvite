@@ -158,7 +158,23 @@ test.afterAll(async () => {
 });
 
 test("latest focus +6, deterministic recommendation, sorted/capped agents and period-only counts", async () => {
+  const calls = (condition: string) =>
+    Number(
+      runSql(
+        env,
+        `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS ( SELECT %' AND query LIKE '%"public"."qa_temuan"%' AND (${condition});`,
+      ),
+    );
+  const bulk = `query LIKE '%"public"."qa_temuan"."is_countable"%' AND query NOT LIKE '%"public"."qa_temuan"."ketidaksesuaian"%' AND query NOT LIKE '%"public"."qa_temuan"."sebaiknya"%'`;
+  const textById = `query LIKE '%"public"."qa_temuan"."ketidaksesuaian"%' AND query LIKE '%"public"."qa_temuan"."id" = ANY (%'`;
+  const bulkWithNotes = `query LIKE '%"public"."qa_temuan"."peserta_id"%' AND (query LIKE '%"public"."qa_temuan"."ketidaksesuaian"%' OR query LIKE '%"public"."qa_temuan"."sebaiknya"%')`;
+  const bulkBefore = calls(bulk);
+  const notesBefore = calls(bulkWithNotes);
+  const textBefore = calls(textById);
   const result = await dashboard({ startMonth: "1", endMonth: "2" });
+  expect(calls(bulk) - bulkBefore).toBeGreaterThan(0);
+  expect(calls(bulkWithNotes) - notesBefore).toBe(0);
+  expect(calls(textById) - textBefore).toBeGreaterThan(0);
   expect(result.insights).toBeTruthy();
   const insight = result.insights;
   expect(insight.what.tone).toBe("bad");
@@ -189,6 +205,32 @@ test("latest focus +6, deterministic recommendation, sorted/capped agents and pe
   expect(insight.soWhat.text).toContain(
     `Kenaikan terbesar datang dari ${parameter} (+6 temuan, parameter kritikal).`,
   );
+});
+
+test("focus root cause reads more than 100 findings in chunks", async () => {
+  const note = `informasi tidak akurat chunk-${ns}`;
+  runSql(
+    env,
+    `INSERT INTO qa_temuan (peserta_id, period_id, indicator_id, service_type, no_tiket, is_phantom_padding, nilai, ketidaksesuaian, tahun)
+    SELECT ${q(agents[0]!)}, ${q(periods[1]!)}, ${q(indicatorId)}, 'call', ${q(`CHUNK-${ns}-`)} || n, false, 0, ${q(note)}, ${YEAR} FROM generate_series(1,100) n;`,
+  );
+  const textCalls = () =>
+    Number(
+      runSql(
+        env,
+        `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS ( SELECT %' AND query LIKE '%"public"."qa_temuan"%' AND query LIKE '%"public"."qa_temuan"."ketidaksesuaian"%' AND query LIKE '%"public"."qa_temuan"."id" = ANY (%';`,
+      ),
+    );
+  try {
+    const before = textCalls();
+    const result = await dashboard({ startMonth: "1", endMonth: "2" });
+    expect(textCalls() - before).toBeGreaterThanOrEqual(2);
+    expect(result.insights.focusParameter.recommendation).toBe(
+      "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
+    );
+  } finally {
+    runSql(env, `DELETE FROM qa_temuan WHERE ketidaksesuaian=${q(note)};`);
+  }
 });
 
 test("leader receives only approved agents even with a broad/foreign folder request", async () => {

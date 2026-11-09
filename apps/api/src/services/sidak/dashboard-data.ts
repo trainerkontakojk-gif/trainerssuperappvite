@@ -13,7 +13,10 @@ import {
 } from "./dashboard-types";
 import { groupTemuanByAgent, getScoreRows } from "./dashboard-aggregation";
 import { buildDashboardTrends } from "./dashboard-trends";
-import { buildDashboardInsights } from "./dashboard-insights";
+import {
+  buildDashboardInsights,
+  getDashboardParameterChanges,
+} from "./dashboard-insights";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
@@ -32,7 +35,6 @@ import { formatQAIndicatorName } from "@trainers/types";
 import {
   countFindingTickets,
   emptyDashboardResponse,
-  isCountableFinding,
   SIDAK_COMPLIANCE_TARGET,
 } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
@@ -55,7 +57,7 @@ const PAGINATION_STEP = 1000;
 // Only the columns the dashboard reads. Peserta are read once and attached in
 // memory: embedding them in every temuan row made the read ~40% slower.
 const DASHBOARD_TEMUAN_COLUMNS =
-  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya";
+  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, is_countable";
 
 type DashboardPeserta = NonNullable<DashboardTemuanRow["profiler_peserta"]>;
 
@@ -341,7 +343,7 @@ export async function getDashboardData(params: {
       agentScoreSum += score.finalScore;
       agentPeriodsCount++;
 
-      const findingRows = periodRows.filter((r) => isCountableFinding(r));
+      const findingRows = periodRows.filter((r) => r.is_countable);
       agentFindings += findingRows.length;
       countableFindingRows.push(...findingRows);
 
@@ -406,7 +408,7 @@ export async function getDashboardData(params: {
     year: params.year ?? new Date().getFullYear(),
     startMonth: params.startMonth,
     endMonth: params.endMonth,
-    isCountableFinding,
+    isCountableFinding: (row) => row.is_countable,
     calculateScore: (scoreRows, serviceType, periodId) => {
       const context = getScoringContext(serviceType, periodId);
       return calculateQAScoreFromTemuan(
@@ -542,12 +544,34 @@ export async function getDashboardData(params: {
     findings.push(row);
     parameterRows.set(name, findings);
   }
+  const { focus } = getDashboardParameterChanges({
+    periodMetrics: trends.periodMetrics,
+    paramTrend: trends.paramTrend,
+  });
+  const focusRows = focus ? (parameterRows.get(focus.name) ?? []) : [];
+  const focusRowsWithNotes: DashboardTemuanRow[] = [];
+  for (let start = 0; start < focusRows.length; start += 100) {
+    const chunk = focusRows.slice(start, start + 100);
+    const ids = chunk.map((row) => row.id!);
+    const { data, error } = await supabaseAdmin
+      .from("qa_temuan")
+      .select("id, ketidaksesuaian, sebaiknya")
+      .in("id", ids);
+    if (error) throw error;
+    const notesById = new Map((data ?? []).map((row) => [row.id, row]));
+    for (const row of chunk) {
+      const notes = notesById.get(row.id!);
+      if (notes) focusRowsWithNotes.push({ ...row, ...notes });
+    }
+  }
   const insights = buildDashboardInsights({
     periodMetrics: trends.periodMetrics,
     paramTrend: trends.paramTrend,
     paretoData: paretoArray,
     parameterAgents,
-    parameterRows,
+    parameterRows: focus
+      ? new Map([[focus.name, focusRowsWithNotes]])
+      : new Map(),
     indicators,
     periodById: new Map(periods.map((period) => [period.id, period])),
     hasFindings: totalFindings > 0,

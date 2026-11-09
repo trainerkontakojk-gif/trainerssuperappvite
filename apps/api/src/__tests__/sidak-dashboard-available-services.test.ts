@@ -78,6 +78,7 @@ describe("getDashboardData availableServices regression", () => {
     mockTemuan = [
       {
         id: "sf-1",
+        is_countable: false,
         peserta_id: "sf-a-1",
         indicator_id: "ind-1",
         nilai: 3,
@@ -95,6 +96,7 @@ describe("getDashboardData availableServices regression", () => {
       },
       {
         id: "sf-2",
+        is_countable: false,
         peserta_id: "sf-a-2",
         indicator_id: "ind-1",
         nilai: 3,
@@ -112,6 +114,7 @@ describe("getDashboardData availableServices regression", () => {
       },
       {
         id: "sf-3",
+        is_countable: false,
         peserta_id: "sf-a-3",
         indicator_id: "ind-1",
         nilai: 3,
@@ -143,6 +146,7 @@ describe("getDashboardData availableServices regression", () => {
     mockTemuan = [
       {
         id: "sf-4",
+        is_countable: false,
         peserta_id: "sf-a-4",
         indicator_id: "ind-1",
         nilai: 3,
@@ -160,6 +164,7 @@ describe("getDashboardData availableServices regression", () => {
       },
       {
         id: "sf-5",
+        is_countable: false,
         peserta_id: "sf-a-5",
         indicator_id: "ind-1",
         nilai: 3,
@@ -177,6 +182,7 @@ describe("getDashboardData availableServices regression", () => {
       },
       {
         id: "sf-6",
+        is_countable: false,
         peserta_id: "sf-a-6",
         indicator_id: "ind-1",
         nilai: 3,
@@ -228,6 +234,7 @@ describe("getDashboardData availableServices regression", () => {
     mockTemuan = [
       {
         id: "sf-8",
+        is_countable: false,
         peserta_id: "sf-a-8",
         indicator_id: "ind-1",
         nilai: 3,

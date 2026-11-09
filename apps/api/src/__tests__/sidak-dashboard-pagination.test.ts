@@ -165,6 +165,7 @@ import * as sidakService from "../services/sidak-service";
 function generateTemuanRows(count: number) {
   return Array.from({ length: count }, (_, i) => ({
     id: `temuan-${i + 1}`,
+    is_countable: true,
     period_id: "period-1",
     peserta_id: `agent-${(i % 50) + 1}`,
     service_type: "call",
@@ -219,6 +220,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
       ...generateTemuanRows(30),
       ...Array.from({ length: 20 }, (_, i) => ({
         id: `chat-${i + 1}`,
+        is_countable: true,
         period_id: "period-1",
         peserta_id: `chat-agent-${i + 1}`,
         service_type: "chat",
@@ -252,6 +254,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
     mockTemuanRows = [
       ...Array.from({ length: 15 }, (_, i) => ({
         id: `call-folder-a-${i + 1}`,
+        is_countable: true,
         period_id: "period-1",
         peserta_id: `call-folder-a-agent-${i + 1}`,
         service_type: "call",
@@ -269,6 +272,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
       })),
       ...Array.from({ length: 15 }, (_, i) => ({
         id: `chat-folder-b-${i + 1}`,
+        is_countable: true,
         period_id: "period-1",
         peserta_id: `chat-folder-b-agent-${i + 1}`,
         service_type: "chat",
@@ -333,6 +337,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
     mockTemuanRows = [
       {
         id: "temuan-qa",
+        is_countable: true,
         period_id: "period-1",
         peserta_id: "agent-qa",
         service_type: "call",
@@ -350,6 +355,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
       },
       {
         id: "temuan-valid",
+        is_countable: true,
         period_id: "period-1",
         peserta_id: "agent-valid",
         service_type: "call",

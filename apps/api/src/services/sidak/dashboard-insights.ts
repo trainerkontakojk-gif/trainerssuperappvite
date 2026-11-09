@@ -33,6 +33,29 @@ const fmt = formatInsightNumber;
 /** Kenaikan absolut minimal agar sebuah parameter menjadi fokus. */
 const FOCUS_MIN_INCREASE = 5;
 
+export function getDashboardParameterChanges(
+  input: Pick<Input, "paramTrend" | "periodMetrics">,
+) {
+  const previous = input.periodMetrics.at(-2);
+  const parameterChanges = input.paramTrend.datasets
+    .filter((ds) => !ds.isTotal)
+    .map((ds) => {
+      const last = ds.data.at(-1) ?? 0;
+      const prev = ds.data.at(-2);
+      return {
+        name: ds.label,
+        latestCount: last,
+        change: previous && prev !== undefined ? last - prev : null,
+      };
+    });
+  const focus = parameterChanges
+    .filter((p) => p.change !== null && p.change >= FOCUS_MIN_INCREASE)
+    .sort(
+      (a, b) => b.change! - a.change! || a.name.localeCompare(b.name, "id"),
+    )[0];
+  return { parameterChanges, focus };
+}
+
 /** Pure, deterministic summary. All inputs must already have the caller's SIDAK scope. */
 export function buildDashboardInsights(input: Input): DashboardInsights | null {
   const latest = input.periodMetrics.at(-1);
@@ -65,22 +88,7 @@ export function buildDashboardInsights(input: Input): DashboardInsights | null {
     perAuditedLatest: perLatest === null ? null : roundTo(perLatest, 1),
     perAuditedPrevious: perPrevious === null ? null : roundTo(perPrevious, 1),
   };
-  const parameterChanges = input.paramTrend.datasets
-    .filter((ds) => !ds.isTotal)
-    .map((ds) => {
-      const last = ds.data.at(-1) ?? 0;
-      const prev = ds.data.at(-2);
-      return {
-        name: ds.label,
-        latestCount: last,
-        change: previous && prev !== undefined ? last - prev : null,
-      };
-    });
-  const focus = parameterChanges
-    .filter((p) => p.change !== null && p.change >= FOCUS_MIN_INCREASE)
-    .sort(
-      (a, b) => b.change! - a.change! || a.name.localeCompare(b.name, "id"),
-    )[0];
+  const { parameterChanges, focus } = getDashboardParameterChanges(input);
   let focusParameter: DashboardInsights["focusParameter"] = null;
   if (focus) {
     const temuan = (input.parameterRows.get(focus.name) ?? []).flatMap(

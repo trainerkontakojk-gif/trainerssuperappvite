@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-09
 
+- perf(sidak): fetch dashboard note text only for the focus parameter
+
 - perf(sidak): count heatmap, trend, forecast, comparison, and EFEK findings from is_countable
 
 - docs(db): record the production apply of the qa_temuan countability flag
