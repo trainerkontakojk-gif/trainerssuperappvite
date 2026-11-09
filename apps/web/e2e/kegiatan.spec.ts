@@ -171,6 +171,56 @@ test.describe("Kegiatan Trainers", () => {
     expectHermetic(audit);
   });
 
+  test("program Knowledge Sharing dan New Hire tampil setelah CERIWIS dan bisa difilter", async ({
+    page,
+  }) => {
+    const knowledgeSharing = {
+      ...PUBLIC_ITEM,
+      id: "kegiatan-2026-knowledge-sharing",
+      program: "knowledge_sharing",
+      title: "Sharing Session Produk Baru",
+    } as const;
+    const newHire = {
+      ...PUBLIC_ITEM,
+      id: "kegiatan-2026-new-hire",
+      program: "new_hire",
+      title: "Orientasi Agen Batch 12",
+    } as const;
+    const audit = await openPublic(page, "/kegiatan?tahun=2026", [
+      publicResponse(2026, [newHire, knowledgeSharing, PUBLIC_ITEM]),
+    ]);
+
+    const programButtons = page
+      .locator(".kegiatan-program-list")
+      .getByRole("button");
+    await expect(programButtons).toHaveText([
+      "Semua",
+      "SOBAT",
+      "KETIK",
+      "Telefun",
+      "PDKT",
+      "CERIWIS",
+      "Knowledge Sharing",
+      "New Hire",
+    ]);
+    await expect(page.locator(".kegiatan-group h2")).toHaveText([
+      "SOBAT",
+      "Knowledge Sharing",
+      "New Hire",
+    ]);
+
+    await page.getByRole("button", { name: "New Hire" }).click();
+    await expect(page).toHaveURL(/tahun=2026.*program=new_hire/);
+    await expect(page.getByText("Orientasi Agen Batch 12")).toBeVisible();
+    await expect(page.getByText("Sharing Session Produk Baru")).toHaveCount(0);
+
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "New Hire" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expectHermetic(audit);
+  });
+
   test("kartu membuka Google Drive di tab baru dengan rel noopener", async ({
     page,
   }) => {
@@ -301,6 +351,22 @@ test.describe("Kegiatan Trainers", () => {
     await page.getByRole("button", { name: "Tambah kegiatan" }).click();
     await page.getByLabel("Judul").fill("Kelas Layanan 2026");
     await page.getByRole("spinbutton", { name: "Tahun" }).fill("2026");
+    expect(
+      await page
+        .getByLabel("Program")
+        .locator("option")
+        .evaluateAll((options) =>
+          options.map((option) => (option as HTMLOptionElement).value),
+        ),
+    ).toEqual([
+      "sobat",
+      "ketik",
+      "telefun",
+      "pdkt",
+      "ceriwis",
+      "knowledge_sharing",
+      "new_hire",
+    ]);
     await page.getByLabel("Program").selectOption("sobat");
     await page.getByLabel("Jenis kegiatan").selectOption("poster");
     await page.getByLabel("Link Google Drive").fill(created.drive_url);

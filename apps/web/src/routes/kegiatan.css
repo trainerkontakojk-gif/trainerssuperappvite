@@ -95,7 +95,10 @@
 .kegiatan-shell .kegiatan-program-button[data-program="ketik"]::before,
 .kegiatan-shell .kegiatan-program-button[data-program="telefun"]::before,
 .kegiatan-shell .kegiatan-program-button[data-program="pdkt"]::before,
-.kegiatan-shell .kegiatan-program-button[data-program="ceriwis"]::before {
+.kegiatan-shell .kegiatan-program-button[data-program="ceriwis"]::before,
+.kegiatan-shell
+  .kegiatan-program-button[data-program="knowledge_sharing"]::before,
+.kegiatan-shell .kegiatan-program-button[data-program="new_hire"]::before {
   width: 8px;
   height: 8px;
   margin-right: 8px;
@@ -122,6 +125,15 @@
 
 .kegiatan-shell .kegiatan-program-button[data-program="ceriwis"] {
   --program-color: var(--module-ceriwis);
+}
+
+/* Not shown elsewhere on this page, so the module tokens stay distinct here. */
+.kegiatan-shell .kegiatan-program-button[data-program="knowledge_sharing"] {
+  --program-color: var(--module-profiler);
+}
+
+.kegiatan-shell .kegiatan-program-button[data-program="new_hire"] {
+  --program-color: var(--module-tna);
 }
 
 .kegiatan-shell .kegiatan-drive-note {
@@ -200,6 +212,15 @@
 
 .kegiatan-shell .kegiatan-program-dot[data-program="ceriwis"] {
   --program-color: var(--module-ceriwis);
+}
+
+/* Not shown elsewhere on this page, so the module tokens stay distinct here. */
+.kegiatan-shell .kegiatan-program-dot[data-program="knowledge_sharing"] {
+  --program-color: var(--module-profiler);
+}
+
+.kegiatan-shell .kegiatan-program-dot[data-program="new_hire"] {
+  --program-color: var(--module-tna);
 }
 
 .kegiatan-shell .kegiatan-program-full-name,

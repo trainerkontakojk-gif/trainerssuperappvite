@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { crc32, deflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 import type { Hono } from "hono";
+import type { TrainerActivityProgram } from "@trainers/types";
 import {
   createAdmin,
   createUserWithJwt,
@@ -51,7 +52,7 @@ function readLocalSupabaseEnv(): LoopbackEnv {
 type Identity = Awaited<ReturnType<typeof createUserWithJwt>>;
 type ActivityInput = {
   year: number;
-  program: "sobat" | "ketik" | "telefun" | "pdkt" | "ceriwis";
+  program: TrainerActivityProgram;
   kind: "poster" | "foto";
   title: string;
   event_date: string | null;
@@ -299,6 +300,48 @@ test("API publik hanya mengembalikan item terbit, urut, dan daftar tahunnya", as
     year: 2030,
     items: [],
   });
+});
+
+test("program Knowledge Sharing dan New Hire bisa dibuat dan tampil di API publik setelah CERIWIS", async () => {
+  const identity = users.trainer!;
+  const year = 2024;
+  const items = [
+    input("program-new-hire", { year, program: "new_hire" }),
+    input("program-knowledge-sharing", { year, program: "knowledge_sharing" }),
+    input("program-ceriwis", { year, program: "ceriwis" }),
+  ];
+  const ids: string[] = [];
+  for (const item of items) {
+    const response = await api("/api/v1/kegiatan", {
+      method: "POST",
+      token: identity.token,
+      body: item,
+    });
+    expect(response.status).toBe(201);
+    const json = await response.json();
+    expect(json.data.program).toBe(item.program);
+    ids.push(json.data.id);
+    trackImageUrl(json.data.image_url);
+  }
+
+  const publicYear = await api(`/api/public/kegiatan?tahun=${year}`);
+  expect(publicYear.status).toBe(200);
+  const rows = (await publicYear.json()).data.items.filter(
+    (row: { title: string }) => row.title.startsWith(namespace),
+  );
+  expect(rows.map((row: { program: string }) => row.program)).toEqual([
+    "ceriwis",
+    "knowledge_sharing",
+    "new_hire",
+  ]);
+
+  for (const id of ids) {
+    const removed = await api(`/api/v1/kegiatan/${id}`, {
+      method: "DELETE",
+      token: identity.token,
+    });
+    expect(removed.status).toBe(200);
+  }
 });
 
 test("link selain Google Drive dan gambar di luar PNG/JPEG/WebP 5 MB ditolak dengan pesan manusiawi", async () => {

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-09
 
+- feat(kegiatan): add the Knowledge Sharing and New Hire programs
+
 - chore(git): ignore the local .handoff/ session notes
 
 - docs(db): record the production apply of the TNA foreign key indexes

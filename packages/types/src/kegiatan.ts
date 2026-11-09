@@ -29,6 +29,16 @@ export const TRAINER_ACTIVITY_PROGRAMS = [
     label: "CERIWIS",
     fullName: "Customer Experience Improvement With Smile",
   },
+  {
+    value: "knowledge_sharing",
+    label: "Knowledge Sharing",
+    fullName: "Sesi Berbagi Pengetahuan",
+  },
+  {
+    value: "new_hire",
+    label: "New Hire",
+    fullName: "Pelatihan Karyawan Baru",
+  },
 ] as const;
 
 export type TrainerActivityProgram =
