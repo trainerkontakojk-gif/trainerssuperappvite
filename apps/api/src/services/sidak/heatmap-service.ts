@@ -2,9 +2,8 @@ import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 /**
  * Agregasi heatmap ketidaksesuaian SIDAK.
  *
- * Aturan yang harus selalu benar dan karena itu tidak diserahkan ke SQL:
- *   - Hanya baris COUNTABLE yang dihitung, memakai `isCountableFinding()` —
- *     helper yang sama dengan dipakai SIDAK di tempat lain, supaya heatmap
+ * Aturan agregasi yang harus selalu benar:
+ *   - Hanya baris dengan `is_countable` yang dihitung, supaya heatmap
  *     tidak menghitung sesi yang memang complies.
  *   - Satuan `parameter` menghitung satu baris = satu temuan. Satuan `tiket`
  *     menghitung distinct `no_tiket` per hari; baris tanpa nomor tiket tetap
@@ -27,17 +26,12 @@ import {
   type SidakHeatmapTicketRef,
 } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
-import {
-  countFindingTickets,
-  hasTicketNumber,
-  isCountableFinding,
-} from "./shared-constants";
+import { countFindingTickets, hasTicketNumber } from "./shared-constants";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SidakHeatmapMode, ServiceType } from "@trainers/types";
 
 /** Kolom yang benar-benar dibutuhkan agregasi — jangan `select("*")`. */
-const SELECT_COLUMNS =
-  "id, service_type, nilai, ketidaksesuaian, sebaiknya, no_tiket";
+const SELECT_COLUMNS = "id, service_type, nilai, is_countable, no_tiket";
 
 /**
  * Batas akses app-side untuk leader. `null` berarti tanpa batas (admin/trainer).
@@ -52,8 +46,7 @@ type TemuanRow = {
   id: string;
   service_type: string;
   nilai: number | null;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
+  is_countable: boolean;
   no_tiket: string | null;
   tanggal: string | null;
   /** Hanya diambil untuk heatmap satu agen. */
@@ -78,18 +71,13 @@ export function buildYearDays(year: number): string[] {
 
 type CountableRow = {
   nilai: number | null;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
+  is_countable: boolean;
   no_tiket?: string | null;
   tanggal?: string | null;
 };
 
 function isCountable(row: CountableRow): boolean {
-  return isCountableFinding({
-    nilai: row.nilai,
-    ketidaksesuaian: row.ketidaksesuaian,
-    sebaiknya: row.sebaiknya,
-  });
+  return row.is_countable;
 }
 
 /** Terapkan batas agent + layanan secara konsisten ke setiap query. */
@@ -183,7 +171,7 @@ async function fetchMissingDateRows(args: {
     build: ({ from, to }) => {
       let query = supabase
         .from("qa_temuan")
-        .select("id, nilai, ketidaksesuaian, sebaiknya, no_tiket")
+        .select("id, nilai, is_countable, no_tiket")
         .eq("is_phantom_padding", false)
         .is(column, null)
         .order("id", { ascending: true })

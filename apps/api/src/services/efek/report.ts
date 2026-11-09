@@ -28,7 +28,6 @@ import {
   normalizePeriodScoringRows,
   type PeriodScoringContext,
 } from "../sidak/period-scoring-context";
-import { isCountableFinding } from "../sidak/shared-constants";
 import { TnaServiceError } from "../tna/errors";
 import { isProperInputIndicator } from "./proper-input";
 import { listEfekPrograms } from "./sessions";
@@ -86,8 +85,7 @@ interface TemuanRow {
   no_tiket: string | null;
   created_at: string;
   is_phantom_padding: boolean | null;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
+  is_countable: boolean;
   profiler_peserta: {
     tim: string | null;
     batch_name: string | null;
@@ -218,7 +216,7 @@ async function loadScores(
           const rawId = row.rule_indicator_id || row.indicator_id;
           const scoreId = context.scoreIdByAnyId.get(rawId) ?? rawId;
           return (
-            isCountableFinding(row) &&
+            row.is_countable &&
             (includeProperInput || !properInputIds.has(scoreId))
           );
         }).length,
@@ -251,7 +249,7 @@ async function loadTemuan(
     let query = supabase
       .from("qa_temuan")
       .select(
-        "id, peserta_id, period_id, indicator_id, rule_indicator_id, nilai, no_tiket, created_at, is_phantom_padding, ketidaksesuaian, sebaiknya, profiler_peserta!inner(tim, batch_name, jabatan)",
+        "id, peserta_id, period_id, indicator_id, rule_indicator_id, nilai, no_tiket, created_at, is_phantom_padding, is_countable, profiler_peserta!inner(tim, batch_name, jabatan)",
       )
       .eq("service_type", service)
       .in("period_id", periodIds)

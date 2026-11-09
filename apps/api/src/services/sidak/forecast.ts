@@ -8,7 +8,6 @@ import {
   DEFAULT_SERVICE_WEIGHTS,
   isServiceType,
 } from "../../lib/scoring";
-import { isCountableFinding } from "./shared-constants";
 import { resolveFolderFiltersByIds } from "./access-scope";
 import type {
   ServiceType,
@@ -26,8 +25,7 @@ type ForecastRow = {
   service_type: string | null;
   no_tiket: string | null;
   is_phantom_padding: boolean | null;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
+  is_countable: boolean;
   profiler_peserta: {
     id: string;
     nama: string | null;
@@ -112,7 +110,7 @@ export async function generateSidakAgentForecast(
       let query: any = supabaseAdmin
         .from("qa_temuan")
         .select(
-          "peserta_id, period_id, indicator_id, nilai, service_type, no_tiket, is_phantom_padding, ketidaksesuaian, sebaiknya, profiler_peserta!inner(id, nama, tim, batch_name, jabatan, foto_url)",
+          "peserta_id, period_id, indicator_id, nilai, service_type, no_tiket, is_phantom_padding, is_countable, profiler_peserta!inner(id, nama, tim, batch_name, jabatan, foto_url)",
         )
         .eq("tahun", year)
         .eq("service_type", serviceType)
@@ -166,7 +164,7 @@ export async function generateSidakAgentForecast(
       if (periodRows.length === 0) continue;
 
       // Findings count — dihitung SEBELUM score check, independen!
-      const findingRows = periodRows.filter((row) => isCountableFinding(row));
+      const findingRows = periodRows.filter((row) => row.is_countable);
       findingsTrendValues.push(findingRows.length);
 
       const scoreRows = getScoreRows(periodRows as any);

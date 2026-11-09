@@ -4,7 +4,6 @@ import {
   fetchAllPages,
   PARALLEL_PAGE_CONCURRENCY,
 } from "../../lib/supabase-pagination";
-import { isCountableFinding } from "./shared-constants";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { formatQAIndicatorName, type QAPeriod } from "@trainers/types";
 
@@ -34,7 +33,7 @@ export async function fetchPaginatedTrendData(
       let query = supabaseAdmin
         .from("qa_temuan")
         .select(
-          "nilai, ketidaksesuaian, sebaiknya, period_id, service_type, peserta_id, no_tiket, indicator_id, tahun",
+          "nilai, is_countable, period_id, service_type, peserta_id, no_tiket, indicator_id, tahun",
         )
         .in("period_id", pIds)
         .eq("is_phantom_padding", false)
@@ -62,7 +61,7 @@ export async function calculateTopParameters(temuan: any[]) {
   > = {};
 
   for (const finding of temuan) {
-    if (!isCountableFinding(finding)) continue;
+    if (!finding.is_countable) continue;
     const service = finding.service_type || "unknown";
     const id = finding.indicator_id;
     if (!id) continue;
@@ -122,7 +121,7 @@ function buildTrendResult(
   > = {};
 
   const totalAuditedAgentsSet = new Set(temuan.map((t) => t.peserta_id));
-  const totalDefectsCount = temuan.filter(isCountableFinding).length;
+  const totalDefectsCount = temuan.filter((row) => row.is_countable).length;
 
   temuan.forEach((t) => {
     const sType = t.service_type || "unknown";
@@ -131,18 +130,18 @@ function buildTrendResult(
     const periodIdx = sortedPeriods.findIndex((p) => p.id === t.period_id);
     if (periodIdx === -1) return;
 
-    if (isCountableFinding(t)) {
+    if (t.is_countable) {
       totalData[periodIdx]++;
     }
     if (!serviceData[sType]) serviceData[sType] = labels.map(() => 0);
-    if (isCountableFinding(t)) {
+    if (t.is_countable) {
       serviceData[sType][periodIdx]++;
     }
 
     if (!serviceSummary[sType]) {
       serviceSummary[sType] = { totalDefects: 0, auditedAgents: 0 };
     }
-    if (isCountableFinding(t)) {
+    if (t.is_countable) {
       serviceSummary[sType].totalDefects++;
     }
   });
@@ -166,12 +165,12 @@ function buildTrendResult(
     > = {};
 
     const pAgents = new Set(pTemuan.map((t) => t.peserta_id));
-    const pDefects = pTemuan.filter(isCountableFinding).length;
+    const pDefects = pTemuan.filter((row) => row.is_countable).length;
 
     activeServicesSet.forEach((svc) => {
       const sTemuan = pTemuan.filter((t) => t.service_type === svc);
       svcStats[svc] = {
-        totalDefects: sTemuan.filter(isCountableFinding).length,
+        totalDefects: sTemuan.filter((row) => row.is_countable).length,
         auditedAgents: new Set(sTemuan.map((t) => t.peserta_id)).size,
       };
     });

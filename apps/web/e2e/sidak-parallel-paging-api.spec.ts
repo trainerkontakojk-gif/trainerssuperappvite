@@ -316,6 +316,49 @@ test("tren dashboard: halaman paralel dan total temuan sama dengan oracle", asyn
   expect(inFlight.max).toBeGreaterThan(1);
   expect(data.totalSummary.totalDefects).toBe(countableOracle());
   expect(data.totalSummary.auditedAgents).toBe(AGENTS + 1);
+  const temuanUrls = requestLog
+    .filter((r) => r.url.includes("/rest/v1/qa_temuan"))
+    .map((r) => new URL(r.url).searchParams.get("select") ?? "");
+  expect(temuanUrls.length).toBeGreaterThan(0);
+  for (const columns of temuanUrls) {
+    expect(columns).toContain("is_countable");
+    expect(columns).not.toContain("ketidaksesuaian");
+    expect(columns).not.toContain("sebaiknya");
+  }
+  const forecastData = await call("/sidak/forecast/agents", {
+    method: "POST",
+    body: { year: YEAR, serviceType: "chat", startMonth: 1, endMonth: 2 },
+  });
+  expect(forecastData.summary.totalEligible).toBe(AGENTS + 1);
+  expect(forecastData.watchlistAgents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        agentId: created.tailPesertaId,
+        latestFindingsCount: Number(
+          runSql(
+            env,
+            `SELECT count(*) FROM qa_temuan WHERE peserta_id=${quoted(created.tailPesertaId!)} AND period_id=${quoted(created.periodIds[1]!)} AND nilai < 3;`,
+          ),
+        ),
+      }),
+    ]),
+  );
+  expect(
+    requestLog.filter((r) => r.url.includes("/rest/v1/qa_temuan")).length,
+  ).toBeGreaterThan(0);
+  for (const entry of requestLog.filter((r) =>
+    r.url.includes("/rest/v1/qa_temuan"),
+  )) {
+    expect(new URL(entry.url).searchParams.get("select")).toContain(
+      "is_countable",
+    );
+    expect(new URL(entry.url).searchParams.get("select")).not.toContain(
+      "ketidaksesuaian",
+    );
+    expect(new URL(entry.url).searchParams.get("select")).not.toContain(
+      "sebaiknya",
+    );
+  }
 });
 
 test("Beranda perlu tindakan: halaman paralel, tidak partial", async () => {

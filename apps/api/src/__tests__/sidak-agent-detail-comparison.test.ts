@@ -82,6 +82,7 @@ function temuanRow(
     service_type: "call" as ServiceType,
     no_tiket: `T-${id}`,
     nilai,
+    is_countable: nilai < 3 || Boolean(note?.trim()),
     tahun: 2026,
     is_phantom_padding: false,
     ketidaksesuaian: note ?? null,

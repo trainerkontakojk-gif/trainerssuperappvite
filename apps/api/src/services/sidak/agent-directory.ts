@@ -579,7 +579,7 @@ interface BuildComparisonArgs {
  *  - agent:   rows belonging to the viewed agent
  *  - team:    audited agents sharing the viewed agent's batch_name (fallback tim)
  *  - service: all accessible audited agents for the selected service/range
- * Only "countable" findings (per isCountableFinding) are tallied.
+ * Only findings marked is_countable are tallied.
  */
 async function buildAgentComparisonTable({
   agentId,
@@ -617,7 +617,7 @@ async function buildAgentComparisonTable({
       let q = supabaseAdmin
         .from("qa_temuan")
         .select(
-          "id, peserta_id, indicator_id, nilai, no_tiket, sebaiknya, ketidaksesuaian, is_phantom_padding, service_type, period_id, tahun, profiler_peserta!inner(id, batch_name, tim)",
+          "id, peserta_id, indicator_id, nilai, no_tiket, is_countable, is_phantom_padding, service_type, period_id, tahun, profiler_peserta!inner(id, batch_name, tim)",
         )
         .eq("tahun", year)
         .in("period_id", periodIdsInRange)
@@ -673,7 +673,7 @@ async function buildAgentComparisonTable({
   const tallies = new Map<string, AgentTally>();
 
   for (const row of temuanRows) {
-    if (!isCountableFinding(row)) continue;
+    if (!row.is_countable) continue;
     const pid = row.peserta_id;
     if (!tallies.has(pid)) {
       tallies.set(pid, { total: 0, byIndicator: new Map() });

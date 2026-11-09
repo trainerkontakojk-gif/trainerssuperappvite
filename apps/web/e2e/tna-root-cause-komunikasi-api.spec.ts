@@ -177,7 +177,17 @@ async function agentClusters(agent: keyof typeof agents) {
     users.admin.token,
   );
   expect(response.status).toBe(200);
-  return (await response.json()).data.rootCauses;
+  const data = (await response.json()).data;
+  expect(data.comparisonTable.rows[0]).toMatchObject({
+    key: "total",
+    agentCount: Number(
+      runSql(
+        fixture.env,
+        `SELECT count(*) FROM qa_temuan WHERE peserta_id=${quoted(agents[agent])} AND tahun=${year} AND service_type='call' AND (nilai < 3 OR length(btrim(coalesce(ketidaksesuaian, ''))) > 0 OR length(btrim(coalesce(sebaiknya, ''))) > 0);`,
+      ),
+    ),
+  });
+  return data.rootCauses;
 }
 
 async function parameterClusters(indicator: IndicatorKey) {

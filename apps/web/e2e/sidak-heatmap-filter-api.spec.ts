@@ -168,7 +168,20 @@ test.afterAll(async () => {
 });
 
 test("folder filter, month boundaries, and all-period missing dates", async () => {
+  const selectedCalls = (columns: string) =>
+    Number(
+      runSql(
+        env,
+        `SELECT coalesce(sum(calls),0) FROM pg_stat_statements WHERE query LIKE 'WITH pgrst_source AS ( SELECT %' AND query LIKE '%"public"."qa_temuan"%' AND (${columns});`,
+      ),
+    );
+  const countable = `query LIKE '%"public"."qa_temuan"."is_countable"%'`;
+  const notes = `query LIKE '%"public"."qa_temuan"."ketidaksesuaian"%' OR query LIKE '%"public"."qa_temuan"."sebaiknya"%'`;
+  const beforeCountable = selectedCalls(countable);
+  const beforeNotes = selectedCalls(notes);
   const year = await data({ folder_ids: folders[0]! });
+  expect(selectedCalls(countable) - beforeCountable).toBe(2);
+  expect(selectedCalls(notes) - beforeNotes).toBe(0);
   expect(year.totalFindings).toBe(2);
   expect(year.missingDateFindingsAllPeriods).toBe(1);
   const feb = await data({
