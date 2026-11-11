@@ -39,7 +39,7 @@ Acceptance:
 - Web:
   - `lib/app-config.ts`: new modules `sidak-saya` and `ktp-saya`, plus a `getHomePath(role)` helper.
   - The helper is used by `AuthModal.resolvePostLoginPath` and by the auth-callback destination.
-  - `nav-config.ts`: agent mobile tabs become `sidak-saya, ketik, pdkt, ktp-saya`, with colors and breadcrumbs.
+  - `nav-config.ts`: agent mobile tabs become `sidak-saya, dashboard, ketik, ktp-saya`, with colors and breadcrumbs.
   - New routes `/sidak/saya` (`routes/sidak/saya.tsx`) and `/profiler/saya` (`routes/profiler/saya.tsx`), each guarded by its own capability.
   - KTP saya reuses `ProfileFields` from `ProfilerParticipantDetail.tsx`, which is now exported.
 
@@ -51,3 +51,41 @@ Acceptance:
 - [x] Update `e2e/helpers/accessMatrix.ts` for the new capabilities.
 - [x] Gates: `thermo-nuclear`, `impeccable`, then root typecheck, lint and build, and `git diff --check`.
 - [x] Docs: `docs/modules.md` and `docs/auth-rbac.md`. Add a CHANGELOG entry.
+
+## Revision 2 (2026-11-11): full agent detail instead of SIDAK saya
+
+Fajar clarified that the agent view should be the staff page `/sidak/agents/$id` for the agent's own participant, not a summary page. KTP saya also gets a Slide view.
+
+### Requirement
+
+- After login (and via the SIDAK nav item) an agent lands on `/sidak/agents/<own pesertaId>`. `/sidak/saya` stays only as a stable redirect URL: it resolves the own ID from `GET /profiler/me`, and shows the "hubungi admin atau trainer" state when the account is unlinked. The summary page, `GET /sidak/me`, its service and its type are removed.
+- The agent sees these tabs: Ringkasan (including Bahan coaching), Tren, Temuan (full, with tickets and QA notes, read-only), Heatmap and Simulasi. The sidebar also shows rank/forecast and Unduh laporan. Ganti agen, Input Audit, edit/delete temuan and EFEK training stay hidden.
+- Agent access to any other participant ID returns 403 (API), and the web redirects such a request to the agent's own page. Staff behaviour is unchanged.
+- KTP saya has a Profil / Slide switch. Slide reuses `SlideCanvas` and `ParticipantSlide`, with PNG/PDF save.
+
+### Design
+
+- New capability `sidak.agent.read` (admin, trainer, leader, agent). It gates only the per-agent read endpoints the detail page uses:
+  - `GET /sidak/agents/:id`
+  - `GET /sidak/agents/:id/quickview`
+  - `GET /sidak/heatmap` (an agent must pass their own `agent_id`)
+  - `GET /sidak/agents/:id/simulations` and `GET /sidak/agents/:id/simulations/:module/:historyId`
+- Per-participant scope is still enforced in each handler.
+- Self-scope fixes:
+  - `getAccessibleSidakFilters` returns `agentIds: [pesertaId]` for self.
+  - `resolveSidakSimulationAccess` gets an agent self branch (no Telefun recording playback).
+  - Quickview and detail pass `accessibleAgentIds: null` for self after the in-scope check, so ranks and cohort averages compare against the real team. Only position, total and averages leave the server; no peer identities.
+- `sidak.self.read` stays agent-only. It is used only by the web for the `/sidak/saya` redirect route and the detail route guard.
+- The "Unduh laporan" action is client-side from the loaded data, so no report capability is needed.
+
+### Tasklist
+
+- [x] RED: rewrite `agent-self-api.spec.ts` for the detail endpoints, and `agent-self-browser.spec.ts` for the landing, the detail page as agent and KTP Slide.
+- [x] GREEN: types/capability, API gates and scope fixes, removal of `/sidak/me`, web route/redirect/guards, detail tweaks for agent, KTP Slide.
+- [x] Access matrix, docs, CHANGELOG. Gates: thermo-nuclear, impeccable, root typecheck/lint/build.
+
+### Review notes (thermo-nuclear, 2026-11-11)
+
+- No cross-participant leak found. Open for Fajar to decide (documented in `docs/auth-rbac.md`):
+  - P2: simulation history/detail include the session actor's email/name/role. A session a staff member ran for this participant shows that staff identity to the agent.
+  - P3: the team comparison row (average + agent count) lets an agent in a two-agent team infer the peer's total.

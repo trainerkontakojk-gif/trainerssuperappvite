@@ -1,8 +1,4 @@
-import type {
-  ServiceType,
-  SidakAgentForecastQuickview,
-  SidakAgentRankQuickview,
-} from "./sidak";
+import type { ServiceType } from "./sidak";
 
 /** Only self QA aggregates; no profile, tickets, notes or peer data. */
 export interface AgentHomeSummary {
@@ -18,23 +14,6 @@ export interface AgentHomeSummary {
     trend: { periodLabel: string; score: number }[];
     topParameters: { name: string; count: number }[];
     recommendation: string | null;
-  };
-}
-
-/**
- * `GET /api/v1/sidak/me` ("SIDAK saya"). Same privacy rules as
- * `AgentHomeSummary`: self aggregates only; ranks carry no peer identity.
- */
-export interface AgentSidakSelf {
-  linked: boolean;
-  qa: AgentHomeSummary["qa"];
-  standing: null | {
-    /** Year and service of the latest audited period. */
-    year: number;
-    serviceType: ServiceType;
-    combinedTeam: SidakAgentRankQuickview | null;
-    leaderTeam: SidakAgentRankQuickview | null;
-    forecast: SidakAgentForecastQuickview | null;
   };
 }
 

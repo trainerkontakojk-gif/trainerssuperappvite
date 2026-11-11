@@ -10,6 +10,7 @@ import { DashboardLayout } from "./components/Layout";
 import {
   can,
   isAccountExpired,
+  type AgentKtpSelf,
   LEADER_APPROVAL_MODULE,
   TRAINER_ACTIVITY_PROGRAMS,
   VALID_SERVICE_TYPES,
@@ -22,6 +23,7 @@ import { fetchAuthProfile } from "./lib/fetchAuthProfile";
 import { signOutLocalSession } from "./lib/session-logout";
 import { fetchApi } from "./hooks/useApi";
 import { getHomePath } from "./lib/app-config";
+import { validateKtpSayaSearch } from "./routes/profiler/saya-search";
 import {
   validateSidakScopeSearch,
   type SidakScopeSearch,
@@ -215,6 +217,7 @@ const profilerSayaRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/saya",
   component: KtpSaya,
+  validateSearch: validateKtpSayaSearch,
   beforeLoad: requireCapability("profiler.self.read"),
 });
 
@@ -439,7 +442,7 @@ const sidakAgentDetailRoute = createRoute({
   path: "/sidak/agents/$id",
   component: SidakAgentDetail,
   validateSearch: validateAgentDetailSearch,
-  beforeLoad: requireCapability("sidak.view"),
+  beforeLoad: ({ params }) => guardAgentDetail(params.id),
 });
 
 const sidakReportsRoute = createRoute({
@@ -735,6 +738,31 @@ export function requireCapability(capability: Capability) {
       throw redirect({ to: "/unauthorized" });
     }
   };
+}
+
+/**
+ * Staff need `sidak.view`. An agent (`sidak.self.read`) may open only their
+ * own linked participant; any other ID goes to their own page, and an
+ * unlinked account or failed lookup to `/sidak/saya` (which explains it).
+ * The API enforces the same scope; this guard keeps the URL honest.
+ */
+async function guardAgentDetail(id: string) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw redirect({ to: "/" });
+  const profile = await fetchAuthProfile(session.user.id);
+  if (!can(profile?.role, "sidak.self.read"))
+    return requireCapability("sidak.view")();
+  await requireCapability("sidak.self.read")();
+  const own = await fetchApi<AgentKtpSelf>("/profiler/me").catch(() => null);
+  if (!own?.linked) throw redirect({ to: "/sidak/saya", replace: true });
+  if (own.peserta.id !== id)
+    throw redirect({
+      to: "/sidak/agents/$id",
+      params: { id: own.peserta.id },
+      replace: true,
+    });
 }
 
 // Legacy Compatibility Redirect Routes

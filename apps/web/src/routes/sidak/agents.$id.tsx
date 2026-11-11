@@ -239,6 +239,9 @@ export default function SidakAgentDetailPage() {
     );
   }
 
+  // Agents open only their own detail (route guard); staff tools stay hidden.
+  const isStaff = role === "trainer" || role === "admin" || role === "leader";
+
   if (!data) {
     return (
       <div className="mx-auto flex min-h-full max-w-7xl items-center justify-center px-4 py-16 text-center sm:px-6 lg:px-8">
@@ -258,26 +261,27 @@ export default function SidakAgentDetailPage() {
               profilnya.
             </EmptyDescription>
           </EmptyHeader>
-          <Button
-            render={<Link to="/sidak/agents" />}
-            nativeButton={false}
-            variant="outline"
-            size="lg"
-            className="min-h-11"
-          >
-            <ArrowLeft
-              data-icon="inline-start"
-              className="size-4"
-              aria-hidden="true"
-            />
-            Kembali ke daftar agen
-          </Button>
+          {isStaff ? (
+            <Button
+              render={<Link to="/sidak/agents" />}
+              nativeButton={false}
+              variant="outline"
+              size="lg"
+              className="min-h-11"
+            >
+              <ArrowLeft
+                data-icon="inline-start"
+                className="size-4"
+                aria-hidden="true"
+              />
+              Kembali ke daftar agen
+            </Button>
+          ) : null}
         </Empty>
       </div>
     );
   }
 
-  const isStaff = role === "trainer" || role === "admin" || role === "leader";
   const activeLabel =
     latestPeriod && selectedMonth
       ? (monthsFull[selectedMonth - 1]?.slice(0, 3) ?? "") + " " + selectedYear
@@ -311,17 +315,19 @@ export default function SidakAgentDetailPage() {
       <div className="mx-auto grid min-w-0 max-w-7xl items-start gap-8 px-4 py-5 sm:px-6 sm:py-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-10 lg:px-8">
         <AgentProfileSidebar
           backAction={
-            <Button
-              render={<Link to="/sidak/agents" />}
-              nativeButton={false}
-              variant="outline"
-              size="icon-lg"
-              aria-label="Kembali ke daftar agen"
-              title="Kembali ke daftar agen"
-              className="size-10 shrink-0 text-muted-foreground"
-            >
-              <ArrowLeft className="size-4" aria-hidden="true" />
-            </Button>
+            isStaff ? (
+              <Button
+                render={<Link to="/sidak/agents" />}
+                nativeButton={false}
+                variant="outline"
+                size="icon-lg"
+                aria-label="Kembali ke daftar agen"
+                title="Kembali ke daftar agen"
+                className="size-10 shrink-0 text-muted-foreground"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+              </Button>
+            ) : null
           }
           nama={data.peserta.nama}
           tim={data.peserta.tim}
@@ -434,7 +440,11 @@ export default function SidakAgentDetailPage() {
                         ? `Belum ada audit ${serviceLabel} di ${selectedYear}`
                         : `Belum ada audit di ${selectedYear}`
                     }
-                    description="Pilih tahun atau layanan lain, atau tambahkan audit lewat Input Audit."
+                    description={
+                      isStaff
+                        ? "Pilih tahun atau layanan lain, atau tambahkan audit lewat Input Audit."
+                        : "Pilih tahun atau layanan lain."
+                    }
                   />
                 ) : (
                   <>

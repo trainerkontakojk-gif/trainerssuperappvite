@@ -6,59 +6,32 @@ import {
   type ApiMock,
 } from "./helpers/hermeticShell";
 import { buildMockAuth } from "./helpers/mockAuth";
+import {
+  AGENT_ID,
+  openAgentDetail,
+  type AgentAudit,
+} from "./helpers/sidakAgentDetailDatesHarness";
+import {
+  richAgentDetailPayload,
+  richQuickviewPayload,
+} from "./helpers/sidakAgentDetailLayoutFixture";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 
 /**
- * Agent self views — hermetic (plan `plans/markdown/agent-self-sidak-ktp.md`).
+ * Agent self views — hermetic (plan `plans/markdown/agent-self-sidak-ktp.md`,
+ * revision 2).
  *
- * Contract: after password login an agent lands on `/sidak/saya` (staff keep
- * `/dashboard`); SIDAK saya shows only the self aggregate from
- * `GET /sidak/me`; KTP saya shows the own row from `GET /profiler/me`
- * read-only; unlinked accounts get the "hubungi admin/trainer" state. The
- * fail-closed guard proves no staff SIDAK/KTP endpoint is requested.
+ * Contract: after password login an agent lands on the staff agent detail
+ * page for their own participant (`/sidak/saya` resolves the ID from
+ * `GET /profiler/me`); staff keep `/dashboard`. As agent the page is
+ * read-only: no agent switcher, no Input Audit, no edit; report download
+ * stays. Another participant ID redirects to the own page. KTP saya shows the
+ * own row read-only with a Slide view. Unlinked accounts get the
+ * "hubungi admin atau trainer" state.
  */
 
 const ok = (data: unknown) => ({ body: { success: true, data } });
-
-const SIDAK_ME = {
-  linked: true,
-  qa: {
-    serviceType: "chat",
-    periodLabel: "Okt 2026",
-    score: 91.5,
-    target: 95,
-    gapToTarget: 3.5,
-    previousLabel: "Sep 2026",
-    delta: 2.5,
-    trend: [
-      { periodLabel: "Sep 2026", score: 89 },
-      { periodLabel: "Okt 2026", score: 91.5 },
-    ],
-    topParameters: [{ name: "Akurasi informasi", count: 3 }],
-    recommendation: "Pakai checklist verifikasi sebelum menutup tiket.",
-  },
-  standing: {
-    year: 2026,
-    serviceType: "chat",
-    combinedTeam: {
-      rank: 4,
-      total: 18,
-      scopeId: "f1",
-      scopeLabel: "Tim Chat Gabungan",
-      basis: "least_findings_ytd",
-    },
-    leaderTeam: null,
-    forecast: {
-      status: "improving",
-      label: "Membaik",
-      supportingText: "Temuan cenderung turun dalam 3 bulan terakhir.",
-      findingsSlope: -0.4,
-      sourcePointCount: 6,
-      confidence: "medium",
-      horizonMonths: 3,
-    },
-  },
-};
+const OWN_NAME = "Rahmawati Kusumaningrum";
 
 const KTP_ME = {
   linked: true,
@@ -75,21 +48,6 @@ const KTP_ME = {
     nama_bank: "Bank Uji",
   },
 };
-
-function selfMocks(linked = true): ApiMock[] {
-  return [
-    {
-      method: "GET",
-      path: "/api/v1/sidak/me",
-      ...ok(linked ? SIDAK_ME : { linked: false, qa: null, standing: null }),
-    },
-    {
-      method: "GET",
-      path: "/api/v1/profiler/me",
-      ...ok(linked ? KTP_ME : { linked: false, peserta: null }),
-    },
-  ];
-}
 
 /** Mocks the Supabase password grant, user and profile for a real login. */
 async function mockLogin(page: Page, role: "agent" | "trainer") {
@@ -130,6 +88,10 @@ async function login(page: Page) {
   await dialog.getByRole("button", { name: /Masuk sekarang/ }).click();
 }
 
+function newAudit(): AgentAudit {
+  return { mockedApi: [], blockedApi: [], blockedExternal: [] };
+}
+
 test.describe("Agent self views", () => {
   test.beforeAll(async () => {
     await assertLocalDevOnlyTarget();
@@ -139,38 +101,25 @@ test.describe("Agent self views", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
-  test("agent password login lands on SIDAK saya with only self data", async ({
+  test("agent password login lands on their own SIDAK agent detail", async ({
     page,
   }) => {
+    const apiMocks: ApiMock[] = [
+      { method: "GET", path: "/api/v1/profiler/me", ...ok(KTP_ME) },
+    ];
     const audit = await openHermeticShell(page, {
       path: "/",
       auth: false,
-      apiMocks: selfMocks(),
+      apiMocks,
       beforeNavigate: (p) => mockLogin(p, "agent"),
     });
     await login(page);
-    await expect(page).toHaveURL(/\/sidak\/saya$/, { timeout: 20000 });
-    const main = page.getByRole("region", { name: "Konten halaman" });
-    await expect(
-      main.getByRole("heading", { level: 1, name: "SIDAK saya" }),
-    ).toBeVisible({ timeout: 20000 });
-    await expect(
-      main.getByText("91,5", { exact: false }).first(),
-    ).toBeVisible();
-    await expect(main.getByText("Okt 2026").first()).toBeVisible();
-    await expect(main.getByText(/4\s*dari\s*18/)).toBeVisible();
-    await expect(main.getByText("Membaik")).toBeVisible();
-    await expect(main.getByText("Akurasi informasi")).toBeVisible();
-    // Staff SIDAK tools are absent.
-    await expect(page.getByRole("link", { name: /Input temuan/ })).toHaveCount(
-      0,
-    );
-    await expect(page.locator('a[href="/sidak/saya"]').first()).toBeVisible();
-    await expect(
-      page.locator('a[href="/profiler/saya"]').first(),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/sidak\/agents\/p-self(\?|$)/, {
+      timeout: 20000,
+    });
     console.log("[audit]", formatAudit(audit));
-    expectHermetic(audit);
+    expect(audit.mockedApi).toContain("GET /api/v1/profiler/me");
+    expect(audit.blockedExternal).toEqual([]);
   });
 
   test("staff password login still lands on Beranda", async ({ page }) => {
@@ -195,11 +144,65 @@ test.describe("Agent self views", () => {
     expect(audit.blockedExternal).toEqual([]);
   });
 
-  test("KTP saya shows the agent's own row read-only", async ({ page }) => {
+  test("agent sees their own detail read-only, with findings and report download", async ({
+    page,
+  }) => {
+    const audit = newAudit();
+    await openAgentDetail(page, audit, {
+      role: "agent",
+      ownPesertaId: AGENT_ID,
+      detailPayload: () => richAgentDetailPayload(),
+      quickviewPayload: richQuickviewPayload(),
+    });
+    await expect(
+      page.getByRole("heading", { level: 1, name: OWN_NAME }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.getByRole("button", { name: /Unduh Laporan/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Temuan" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Simulasi" })).toBeVisible();
+    // Staff-only tools are absent for an agent.
+    await expect(page.getByText("Ganti agen")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Input Audit/ })).toHaveCount(
+      0,
+    );
+    await expect(page.locator('a[href="/sidak/agents"]')).toHaveCount(0);
+    await page.getByRole("tab", { name: "Temuan" }).click();
+    await expect(page.getByRole("button", { name: /^Edit|Hapus/ })).toHaveCount(
+      0,
+    );
+    expect(audit.mockedApi).not.toContain("agent-directory");
+    expect(audit.blockedApi).toEqual([]);
+    expect(audit.blockedExternal).toEqual([]);
+  });
+
+  test("agent opening another participant is sent to their own detail", async ({
+    page,
+  }) => {
+    const audit = newAudit();
+    await openAgentDetail(page, audit, {
+      role: "agent",
+      ownPesertaId: AGENT_ID,
+      path: "/sidak/agents/11111111-1111-4111-8111-111111111111",
+      detailPayload: () => richAgentDetailPayload(),
+      quickviewPayload: richQuickviewPayload(),
+    });
+    await expect(page).toHaveURL(new RegExp(`/sidak/agents/${AGENT_ID}`), {
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole("heading", { level: 1, name: OWN_NAME }),
+    ).toBeVisible({ timeout: 20000 });
+  });
+
+  test("KTP saya shows the own row read-only and as a slide", async ({
+    page,
+  }) => {
     const audit = await openHermeticShell(page, {
       path: "/profiler/saya",
       auth: { role: "agent" },
-      apiMocks: selfMocks(),
+      apiMocks: [{ method: "GET", path: "/api/v1/profiler/me", ...ok(KTP_ME) }],
     });
     const main = page.getByRole("region", { name: "Konten halaman" });
     await expect(
@@ -207,21 +210,38 @@ test.describe("Agent self views", () => {
     ).toBeVisible({ timeout: 20000 });
     await expect(main.getByText("3174000000000001")).toBeVisible();
     await expect(main.getByText("Jl. Mawar 1, Jakarta")).toBeVisible();
-    await expect(main.getByText("Bank Uji")).toBeVisible();
     await expect(
       main.getByRole("button", { name: /Edit|Pindah folder/ }),
     ).toHaveCount(0);
+
+    await main.getByRole("tab", { name: "Slide" }).click();
+    await expect(page).toHaveURL(/view=slide/);
+    await expect(
+      main.getByRole("region", { name: "Slide Sari Agen" }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("button", { name: /Simpan Gambar/ }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("button", { name: /Simpan PDF/ }),
+    ).toBeVisible();
     expectHermetic(audit);
   });
 
-  test("unlinked agent sees the contact-trainer state on both pages", async ({
+  test("unlinked agent sees the contact-trainer state for SIDAK and KTP", async ({
     page,
   }) => {
     for (const path of ["/sidak/saya", "/profiler/saya"]) {
       const audit = await openHermeticShell(page, {
         path,
         auth: { role: "agent" },
-        apiMocks: selfMocks(false),
+        apiMocks: [
+          {
+            method: "GET",
+            path: "/api/v1/profiler/me",
+            ...ok({ linked: false, peserta: null }),
+          },
+        ],
       });
       const main = page.getByRole("region", { name: "Konten halaman" });
       await expect(
@@ -236,11 +256,11 @@ test.describe("Agent self views", () => {
   test("agent cannot open the staff SIDAK or KTP workspace", async ({
     page,
   }) => {
-    for (const path of ["/sidak/dashboard", "/profiler"]) {
+    for (const path of ["/sidak/dashboard", "/sidak/agents", "/profiler"]) {
       await openHermeticShell(page, {
         path,
         auth: { role: "agent" },
-        apiMocks: selfMocks(),
+        apiMocks: [],
         waitForUrl: /\/unauthorized/,
       });
       await expect(page, path).toHaveURL(/\/unauthorized/);

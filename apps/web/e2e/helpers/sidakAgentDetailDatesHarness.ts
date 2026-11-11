@@ -38,6 +38,8 @@ const MOCKED_API: RegExp[] = [
   /^\/api\/v1\/sidak\/agents\/[^/]+\/quickview$/,
   /^\/api\/v1\/sidak\/temuan\/[^/]+$/,
   /^\/api\/v1\/sidak\/heatmap$/,
+  // Agent self view: own participant ID for `/sidak/saya` and the guard.
+  /^\/api\/v1\/profiler\/me$/,
 ];
 
 export type AgentAudit = {
@@ -201,6 +203,13 @@ export type OpenAgentOptions = {
   directoryAgents?: unknown[];
   /** Query halaman, mis. cakupan bersama `?layanan=chat&tahun=2025`. */
   query?: string;
+  /**
+   * Agent self view: ID peserta milik akun di `GET /profiler/me`; `null` =
+   * akun belum tertaut. Tanpa opsi ini endpoint tidak dimock.
+   */
+  ownPesertaId?: string | null;
+  /** Path yang dibuka; bawaan detail `AGENT_ID`. */
+  path?: string;
 };
 
 export async function openAgentDetail(
@@ -222,7 +231,32 @@ export async function openAgentDetail(
     quickviewGate,
     directoryAgents = [],
     query = "",
+    ownPesertaId,
+    path = `/sidak/agents/${AGENT_ID}`,
   } = opts;
+
+  if (ownPesertaId !== undefined)
+    await page.route(`${APP_ORIGIN}/api/v1/profiler/me`, async (route) => {
+      audit.mockedApi.push("profiler-me");
+      await route.fulfill(
+        toJson({
+          success: true,
+          data: ownPesertaId
+            ? {
+                linked: true,
+                peserta: {
+                  id: ownPesertaId,
+                  nama: "Rahmawati Kusumaningrum",
+                  batch_name: "Batch Januari 2025",
+                  nomor_urut: 1,
+                  tim: "Call",
+                  jabatan: "Agent",
+                },
+              }
+            : { linked: false, peserta: null },
+        }),
+      );
+    });
 
   await mockSupabaseAuth(page, { role });
 
@@ -405,7 +439,7 @@ export async function openAgentDetail(
   // `domcontentloaded`, bukan default `load`: halaman punya koneksi
   // HMR yang membuat event `load` tidak pernah sampai, sehingga setiap
   // aksi Playwright ikut menggantung menunggu navigasi.
-  await page.goto(`/sidak/agents/${AGENT_ID}${query}`, {
+  await page.goto(`${path}${query}`, {
     waitUntil: "domcontentloaded",
   });
 }

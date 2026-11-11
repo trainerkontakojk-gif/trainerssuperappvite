@@ -137,6 +137,8 @@ export interface NavItem {
   description?: string;
   href: string;
   icon: LucideIcon;
+  /** Prefix path untuk status aktif bila berbeda dari `href`. */
+  activePrefix?: string;
   /** Token warna modul (`var(--module-*)`); kosong untuk Beranda/Administrasi. */
   moduleColor?: string;
   /** Sub-halaman yang lolos capability peran (SIDAK). */
@@ -215,6 +217,7 @@ export function buildNavModel(role: string | null | undefined): NavModel {
     label: module.navLabel ?? module.shortTitle,
     description: module.navDescription,
     href: module.href,
+    activePrefix: module.activePrefix,
     icon: module.icon,
     moduleColor: MODULE_COLORS[module.id],
     children:
@@ -267,7 +270,10 @@ export interface BreadcrumbSegment {
   href?: string; // undefined = current page (no link)
 }
 
-export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
+export function buildBreadcrumb(
+  pathname: string,
+  role?: string | null,
+): BreadcrumbSegment[] {
   const crumbs: BreadcrumbSegment[] = [];
 
   // Root
@@ -305,7 +311,13 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     return [{ label: "TNA", href: "/tna" }, { label }];
   }
 
-  if (pathname === "/sidak/saya") return [{ label: "SIDAK saya" }];
+  // An agent's SIDAK is only their own detail; staff list links do not apply.
+  if (
+    pathname === "/sidak/saya" ||
+    (isCapabilityAllowed(role, "sidak.self.read") &&
+      pathname.startsWith("/sidak/agents/"))
+  )
+    return [{ label: "SIDAK saya" }];
   if (pathname === "/profiler/saya") return [{ label: "KTP saya" }];
 
   // Module root detection

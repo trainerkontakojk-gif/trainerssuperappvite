@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Tooltip } from "@base-ui/react/tooltip";
 import { ChevronDown } from "lucide-react";
 import {
@@ -111,10 +111,15 @@ function NavLinkItem({
   onClick: (event: MouseEvent) => void;
 }) {
   const descriptionId = domId(idPrefix, "desc", item.id);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const prefixActive =
+    Boolean(item.activePrefix) &&
+    pathname.startsWith(`${item.activePrefix}/`);
   const link = (
     <Link
       to={item.href as any}
       activeOptions={{ exact: item.id === "dashboard" }}
+      data-current={prefixActive || undefined}
       className="nav-item"
       style={{ "--mc": item.moduleColor } as CSSProperties}
       aria-describedby={item.description ? descriptionId : undefined}

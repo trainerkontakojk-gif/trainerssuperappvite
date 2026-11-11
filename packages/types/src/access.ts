@@ -64,13 +64,19 @@ export const CAPABILITIES = {
   "sidak.config.manage": ["admin", "trainer"],
   "sidak.config.read": ["admin", "trainer", "leader"],
   "sidak.dashboard.read": ["admin", "trainer", "leader", "agent"],
+  /**
+   * Per-agent read endpoints of the agent detail page (detail, quickview,
+   * heatmap, simulations). Row scope is enforced per handler: an agent only
+   * reaches their own linked participant.
+   */
+  "sidak.agent.read": ["admin", "trainer", "leader", "agent"],
   "sidak.forecast.generate": ["admin", "trainer", "leader"],
   "sidak.landing": ["admin", "trainer", "leader"],
   "sidak.read": ["admin", "trainer", "leader"],
   "sidak.reports.generate": ["admin", "trainer", "leader"],
   "sidak.reports.view": ["admin", "trainer"],
   "sidak.schedule.read": ["admin", "trainer"],
-  /** Own QA aggregate and standing only (`GET /sidak/me`). */
+  /** Agent self view in the web app (`/sidak/saya` → own agent detail). */
   "sidak.self.read": ["agent"],
   "sidak.summary.refresh": ["admin", "trainer"],
   "sidak.view": ["admin", "trainer", "leader"],

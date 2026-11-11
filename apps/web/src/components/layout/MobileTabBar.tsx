@@ -29,7 +29,7 @@ export function MobileTabBar({
           const active =
             tab.id === "dashboard"
               ? pathname === tab.href
-              : pathname.startsWith(tab.href);
+              : pathname.startsWith(tab.activePrefix ?? tab.href);
 
           return (
             <Link

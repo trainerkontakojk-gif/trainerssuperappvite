@@ -6,9 +6,8 @@ import { ScopeUnavailableError } from "../../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { can, serviceTypeSchema } from "@trainers/types";
-import { getActor, requireCapability } from "../../middleware/role";
-import { getAgentSidakSelf } from "../../services/sidak/agent-self";
+import { can, normalizeRole, serviceTypeSchema } from "@trainers/types";
+import { requireCapability } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { listEfekTrainingForAgent } from "../../services/efek/training";
 import {
@@ -33,38 +32,10 @@ async function resolveSidakFilterScope(
   return sidakService.getAccessibleSidakFilters(user.id, profile?.role ?? "");
 }
 
-// ── SIDAK saya (agent self view) ───────────────────────
-// No client ID or filter: the participant is the caller's linked row.
-sidakDashboard.get("/me", requireCapability("sidak.self.read"), async (c) => {
-  if (Object.keys(c.req.query()).length)
-    return c.json(
-      {
-        success: false as const,
-        error: {
-          code: "INVALID_INPUT",
-          message: "SIDAK saya tidak menerima filter tambahan.",
-        },
-      },
-      400,
-    );
-  try {
-    return c.json({
-      success: true as const,
-      data: await getAgentSidakSelf(getActor(c)),
-    });
-  } catch {
-    return c.json(
-      {
-        success: false as const,
-        error: {
-          code: "SIDAK_SELF_UNAVAILABLE",
-          message: "Data SIDAK Anda belum dapat dimuat. Silakan coba lagi.",
-        },
-      },
-      503,
-    );
-  }
-});
+/** Agents are scoped to their own linked participant by `getAccessibleAgentIds`. */
+function isSelfAgent(role: string | undefined): boolean {
+  return normalizeRole(role) === "agent";
+}
 
 // ── Agents ─────────────────────────────────────────────
 sidakDashboard.get("/agents", requireCapability("sidak.read"), async (c) => {
@@ -89,7 +60,7 @@ sidakDashboard.get("/agents", requireCapability("sidak.read"), async (c) => {
 
 sidakDashboard.get(
   "/agents/:id/quickview",
-  requireCapability("sidak.read"),
+  requireCapability("sidak.agent.read"),
   async (c) => {
     const parsed = agentQuickviewQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
@@ -125,13 +96,16 @@ sidakDashboard.get(
       );
     }
 
-    const filterScope = await resolveSidakFilterScope(c);
+    // An agent reached this point only for their own ID. Rank against the
+    // real team (only position/total/folder label leave the server).
+    const self = isSelfAgent(profile?.role);
+    const filterScope = self ? null : await resolveSidakFilterScope(c);
     try {
       const data = await sidakService.getSidakAgentQuickview({
         agentId,
         year: parsed.data.year,
         requestedServiceType: parsed.data.service_type,
-        accessibleAgentIds,
+        accessibleAgentIds: self ? null : accessibleAgentIds,
         filterScope,
       });
       // EFEK training is a TNA view: admin/trainer only, and never blocks SIDAK.
@@ -161,7 +135,7 @@ sidakDashboard.get(
 
 sidakDashboard.get(
   "/agents/:id",
-  requireCapability("sidak.read"),
+  requireCapability("sidak.agent.read"),
   async (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
@@ -201,7 +175,9 @@ sidakDashboard.get(
         startMonth,
         endMonth,
         filterScope?.allowedServices ?? undefined,
-        accessibleIds,
+        // Agent (own ID only, checked above): compare with the real team
+        // cohorts; the comparison rows carry averages, never identities.
+        isSelfAgent(profile?.role) ? null : accessibleIds,
       );
       return c.json({ success: true, data: detail });
     } catch (e: any) {

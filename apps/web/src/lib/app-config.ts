@@ -25,6 +25,8 @@ export interface AppModuleConfig {
   navLabel?: string;
   /** Fungsi singkat di bawah label navigasi. */
   navDescription?: string;
+  /** Prefix path yang menandai modul aktif bila berbeda dari `href`. */
+  activePrefix?: string;
   /** Grup navigasi shell; lihat `buildNavModel` di `nav-config.ts`. */
   group?: "beranda" | "latihan" | "kualitas" | "data";
 }
@@ -117,8 +119,10 @@ export const APP_MODULES: AppModuleConfig[] = [
     title: "SIDAK saya",
     shortTitle: "SIDAK",
     expandedTitle: "Sistem Informasi Data Analisis Kualitas",
-    description: "Skor, tren, dan posisi QA Anda sendiri.",
+    description: "Detail QA Anda sendiri: skor, tren, temuan, dan simulasi.",
     href: "/sidak/saya",
+    // `/sidak/saya` opens `/sidak/agents/<own id>`; keep the item active there.
+    activePrefix: "/sidak",
     icon: BarChart3,
     accentClassName: "text-rose-600",
     accentSoftClassName: "bg-rose-100",

@@ -67,7 +67,7 @@ function dataError(error: unknown, fallback: string) {
 
 sidakSimulations.get(
   "/agents/:id/simulations",
-  requireCapability("sidak.read"),
+  requireCapability("sidak.agent.read"),
   async (c) => {
     const agentId = c.req.param("id");
     const parsedAgentId = agentIdSchema.safeParse(agentId);
@@ -140,7 +140,7 @@ sidakSimulations.get(
 
 sidakSimulations.get(
   "/agents/:id/simulations/:module/:historyId",
-  requireCapability("sidak.read"),
+  requireCapability("sidak.agent.read"),
   async (c) => {
     const parsedAgentId = agentIdSchema.safeParse(c.req.param("id"));
     const parsedModule = simulationModuleSchema.safeParse(

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { PanelLeftOpen, ChevronRight } from "lucide-react";
 import { buildBreadcrumb } from "./nav-config";
+import { useAuthStore } from "../../store/authStore";
 
 interface AppHeaderProps {
   onOpenMobileMenu: () => void;
@@ -8,7 +9,8 @@ interface AppHeaderProps {
 
 export function AppHeader({ onOpenMobileMenu }: AppHeaderProps) {
   const { pathname } = useLocation();
-  const crumbs = buildBreadcrumb(pathname);
+  const role = useAuthStore((s) => s.profile?.role);
+  const crumbs = buildBreadcrumb(pathname, role);
 
   return (
     <header

@@ -1,6 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, type RefObject } from "react";
 import { buildBreadcrumb } from "./nav-config";
+import { useAuthStore } from "../../store/authStore";
 
 const APP_TITLE = "Trainers SuperApp";
 /** Batas tunggu `h1` yang baru muncul setelah data halaman dimuat. */
@@ -20,17 +21,18 @@ export function useRouteFocus(
 ) {
   const router = useRouter();
   const enabledRef = useRef(enabled);
+  const role = useAuthStore((s) => s.profile?.role);
 
   useEffect(() => {
     enabledRef.current = enabled;
     if (!enabled) return;
-    const crumbs = buildBreadcrumb(pathname);
+    const crumbs = buildBreadcrumb(pathname, role);
     const pageLabel = crumbs[crumbs.length - 1]?.label;
     document.title =
       pageLabel && pageLabel !== APP_TITLE
         ? `${pageLabel} · ${APP_TITLE}`
         : APP_TITLE;
-  }, [pathname, enabled]);
+  }, [pathname, enabled, role]);
 
   useEffect(() => {
     let cancelPending = () => {};

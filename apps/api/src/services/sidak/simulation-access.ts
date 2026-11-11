@@ -95,6 +95,30 @@ export async function resolveSidakSimulationAccess(params: {
     };
   }
 
+  // Agent: only their own linked participant's simulations, read-only.
+  if (normalizeRole(role) === "agent") {
+    let scope;
+    try {
+      scope = await getAccessibleSidakFilters(params.userId, role);
+    } catch {
+      throw failClosedScopeError();
+    }
+    if (
+      !scope ||
+      !isPesertaInScope(pesertaScopeFromIds(scope.agentIds), params.agentId)
+    )
+      throw new SidakSimulationAccessError(
+        "Anda tidak memiliki akses ke data agent ini.",
+        { status: 403, code: "FORBIDDEN" },
+      );
+    return {
+      agentId: params.agentId,
+      role,
+      modules: ALL_SIMULATION_MODULES,
+      canPlayTelefunRecording: false,
+    };
+  }
+
   if (role !== "leader") {
     throw new SidakSimulationAccessError(
       "Anda tidak memiliki akses ke riwayat simulasi SIDAK.",

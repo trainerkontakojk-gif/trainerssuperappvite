@@ -195,6 +195,14 @@ export async function getAccessibleSidakFilters(
     };
   }
 
+  if (scope.kind === "self")
+    return {
+      agentIds: [scope.pesertaId],
+      allowedFolders: [],
+      allowedServices: [],
+      serviceTypeLocked: false,
+    };
+
   return {
     agentIds: [],
     allowedFolders: [],

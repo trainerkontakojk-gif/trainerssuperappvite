@@ -13,8 +13,11 @@ import {
 /**
  * Agent self views (plan `plans/markdown/agent-self-sidak-ktp.md`).
  * Real JWT/Hono/PostgREST on the local Supabase stack; no business mocks.
- * `GET /v1/sidak/me` and `GET /v1/profiler/me` are agent-only, take no client
- * input, and never leak another participant's row, ticket or note.
+ * Revision 2: an agent reads the staff per-agent SIDAK endpoints
+ * (`sidak.agent.read`) for their own participant only, with full own findings;
+ * every other participant is 403 and nothing of a peer leaks. `GET
+ * /v1/profiler/me` is agent-only and takes no client input. `/v1/sidak/me` is
+ * gone.
  */
 test.describe.configure({ mode: "serial" });
 const env = readLoopbackEnv();
@@ -37,12 +40,11 @@ let administrator: Identity;
 let app: Hono;
 let period = "";
 const sql = (query: string) => runSql(env, query);
-const PRIVATE = [
+const OTHER = [
   `OTHER_PRIVATE_NAME_${ns}`,
   `OTHER_KTP_${ns}`,
   `OTHER_TICKET_${ns}`,
-  `SELF_TICKET_${ns}`,
-  `SELF_NOTE_${ns}`,
+  `OTHER_NOTE_${ns}`,
 ];
 
 async function call(path: string, token?: string) {
@@ -87,7 +89,7 @@ test.beforeAll(async () => {
   sql(`INSERT INTO qa_indicators(id,service_type,name,category,bobot) VALUES ('${indicator}','chat','Akurasi ${ns}','non_critical',1);
     INSERT INTO qa_temuan(peserta_id,period_id,indicator_id,service_type,no_tiket,nilai,ketidaksesuaian,is_phantom_padding) VALUES
     ('${person}','${period}','${indicator}','chat','SELF_TICKET_${ns}',0,'SELF_NOTE_${ns}',false),
-    ('${other}','${period}','${indicator}','chat','OTHER_TICKET_${ns}',0,'other note',false);`);
+    ('${other}','${period}','${indicator}','chat','OTHER_TICKET_${ns}',0,'OTHER_NOTE_${ns}',false);`);
   app = (await import("../../api/src/app")).default as unknown as Hono;
 });
 
@@ -99,7 +101,7 @@ test.afterAll(async () => {
     expect((await admin.auth.admin.deleteUser(user.userId)).error).toBeNull();
 });
 
-test("linked agent reads only their own SIDAK aggregate and standing", async () => {
+test("linked agent opens their own SIDAK agent detail with full findings", async () => {
   // Ranks read the dashboard summary; build it like a trainer would.
   const refresh = await tnaApiRequest(
     app,
@@ -114,38 +116,74 @@ test("linked agent reads only their own SIDAK aggregate and standing", async () 
     },
   );
   expect(refresh.status).toBe(200);
-  const { status, body, text } = await call("/v1/sidak/me", self.token);
-  expect(status).toBe(200);
-  expect(Object.keys(body.data).sort()).toEqual(["linked", "qa", "standing"]);
-  expect(body.data.linked).toBe(true);
-  expect(body.data.qa).toMatchObject({
-    serviceType: "chat",
-    periodLabel: "Mei 2016",
-  });
-  expect(body.data.standing).toMatchObject({ year: 2016, serviceType: "chat" });
-  expect(Object.keys(body.data.standing).sort()).toEqual([
-    "combinedTeam",
-    "forecast",
-    "leaderTeam",
-    "serviceType",
-    "year",
-  ]);
+  const detail = await call(
+    `/v1/sidak/agents/${person}?year=2016&service_type=chat`,
+    self.token,
+  );
+  expect(detail.status, detail.text).toBe(200);
+  expect(detail.body.data.peserta.id).toBe(person);
+  // Own findings are complete: ticket and QA note.
+  expect(detail.text).toContain(`SELF_TICKET_${ns}`);
+  expect(detail.text).toContain(`SELF_NOTE_${ns}`);
+  for (const secret of OTHER) expect(detail.text).not.toContain(secret);
+  expect(detail.text).not.toContain(other);
+
+  const quickview = await call(
+    `/v1/sidak/agents/${person}/quickview?year=2016&service_type=chat`,
+    self.token,
+  );
+  expect(quickview.status, quickview.text).toBe(200);
   // Whole-team comparison ran (self + peer), but only the position leaves.
-  const team = body.data.standing.combinedTeam;
+  const team = quickview.body.data.combinedTeam;
   expect(team).not.toBeNull();
   expect(typeof team.rank).toBe("number");
   expect(team.total).toBeGreaterThanOrEqual(2);
-  for (const rank of [team, body.data.standing.leaderTeam])
-    if (rank)
-      expect(Object.keys(rank).sort()).toEqual([
-        "basis",
-        "rank",
-        "scopeId",
-        "scopeLabel",
-        "total",
-      ]);
-  for (const secret of PRIVATE) expect(text).not.toContain(secret);
-  expect(text).not.toContain(other);
+  expect(Object.keys(team).sort()).toEqual([
+    "basis",
+    "rank",
+    "scopeId",
+    "scopeLabel",
+    "total",
+  ]);
+  expect(quickview.body.data.efekTraining).toBeUndefined();
+  for (const secret of OTHER) expect(quickview.text).not.toContain(secret);
+  expect(quickview.text).not.toContain(other);
+
+  const heatmap = await call(
+    `/v1/sidak/heatmap?mode=agent&year=2016&agent_id=${person}`,
+    self.token,
+  );
+  expect(heatmap.status, heatmap.text).toBe(200);
+  for (const secret of OTHER) expect(heatmap.text).not.toContain(secret);
+
+  const simulations = await call(
+    `/v1/sidak/agents/${person}/simulations?module=all`,
+    self.token,
+  );
+  expect(simulations.status, simulations.text).toBe(200);
+});
+
+test("agent gets 403 for every other participant on the detail endpoints", async () => {
+  for (const path of [
+    `/v1/sidak/agents/${other}?year=2016&service_type=chat`,
+    `/v1/sidak/agents/${other}/quickview?year=2016&service_type=chat`,
+    `/v1/sidak/heatmap?mode=agent&year=2016&agent_id=${other}`,
+    `/v1/sidak/heatmap?mode=agent&year=2016`,
+    `/v1/sidak/agents/${other}/simulations?module=all`,
+  ]) {
+    const response = await call(path, self.token);
+    expect(response.status, path).toBe(403);
+    for (const secret of OTHER) expect(response.text).not.toContain(secret);
+  }
+  // An unlinked agent has no own participant at all.
+  expect(
+    (
+      await call(
+        `/v1/sidak/agents/${person}?year=2016&service_type=chat`,
+        unlinked.token,
+      )
+    ).status,
+  ).toBe(403);
 });
 
 test("linked agent reads their own full KTP row and nobody else's", async () => {
@@ -166,43 +204,33 @@ test("linked agent reads their own full KTP row and nobody else's", async () => 
     .single();
   expect(row.error).toBeNull();
   expect(body.data.peserta).toEqual(row.data);
-  for (const secret of PRIVATE) expect(text).not.toContain(secret);
+  for (const secret of OTHER) expect(text).not.toContain(secret);
   expect(text).not.toContain(other);
 });
 
-test("unlinked agent gets an explicit unlinked result, not someone else's data", async () => {
-  const sidak = await call("/v1/sidak/me", unlinked.token);
-  expect(sidak.status).toBe(200);
-  expect(sidak.body.data).toEqual({ linked: false, qa: null, standing: null });
+test("unlinked agent gets an explicit unlinked KTP result, not someone else's data", async () => {
   const ktp = await call("/v1/profiler/me", unlinked.token);
   expect(ktp.status).toBe(200);
   expect(ktp.body.data).toEqual({ linked: false, peserta: null });
 });
 
-test("self endpoints reject client input, staff roles and anonymous callers", async () => {
-  for (const path of ["/v1/sidak/me", "/v1/profiler/me"]) {
-    const filtered = await call(`${path}?id=${other}`, self.token);
-    expect(filtered.status, path).toBe(400);
-    expect(filtered.text).not.toContain(`OTHER_KTP_${ns}`);
-    for (const staff of [trainer, leader, administrator]) {
-      const denied = await call(path, staff.token);
-      expect(denied.status, `${path} staff`).toBe(403);
-    }
-    expect((await call(path)).status, `${path} anon`).toBe(401);
-  }
+test("KTP self endpoint rejects client input, staff roles and anonymous callers", async () => {
+  const path = "/v1/profiler/me";
+  const filtered = await call(`${path}?id=${other}`, self.token);
+  expect(filtered.status).toBe(400);
+  expect(filtered.text).not.toContain(`OTHER_KTP_${ns}`);
+  for (const staff of [trainer, leader, administrator])
+    expect((await call(path, staff.token)).status).toBe(403);
+  expect((await call(path)).status).toBe(401);
 });
 
-test("agent still cannot open the staff KTP list or another participant", async () => {
-  expect((await call("/v1/profiler/peserta", self.token)).status).toBe(403);
-  expect((await call(`/v1/profiler/peserta/${other}`, self.token)).status).toBe(
-    403,
-  );
-  expect(
-    (
-      await call(
-        `/v1/sidak/agents/${other}/quickview?year=2016&service_type=chat`,
-        self.token,
-      )
-    ).status,
-  ).toBe(403);
+test("agent still cannot open staff SIDAK or KTP lists, and SIDAK saya API is gone", async () => {
+  for (const path of [
+    "/v1/profiler/peserta",
+    `/v1/profiler/peserta/${other}`,
+    "/v1/sidak/agents?year=2016",
+    "/v1/sidak/dashboard/trend?year=2016",
+  ])
+    expect((await call(path, self.token)).status, path).toBe(403);
+  expect((await call("/v1/sidak/me", self.token)).status).toBe(404);
 });

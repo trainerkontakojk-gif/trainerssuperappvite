@@ -9,7 +9,7 @@ import {
 } from "../../services/sidak/access-scope";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSidakHeatmap } from "../../services/sidak/heatmap-service";
-import { sidakHeatmapQuerySchema } from "@trainers/types";
+import { normalizeRole, sidakHeatmapQuerySchema } from "@trainers/types";
 
 type Variables = { user: User; profile: any; token: string };
 
@@ -30,7 +30,8 @@ const sidakHeatmap = new Hono<{ Variables: Variables }>();
  *
  * Kegagalan query selalu menjadi error, bukan heatmap kosong.
  */
-sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
+const agentRead = requireCapability("sidak.agent.read");
+sidakHeatmap.get("/heatmap", agentRead, async (c) => {
   const parsed = sidakHeatmapQuerySchema.safeParse({
     mode: c.req.query("mode"),
     year: c.req.query("year"),
@@ -92,8 +93,14 @@ sidakHeatmap.get("/heatmap", requireCapability("sidak.read"), async (c) => {
       profile?.role ?? "",
     );
 
-    // Leader tidak boleh meminta agent di luar scope-nya.
-    if (agent_id && filterScope && !filterScope.agentIds.includes(agent_id)) {
+    // Leader tidak boleh meminta agent di luar scope-nya; agent hanya boleh
+    // heatmap per-agent untuk dirinya sendiri (detail agen), bukan agregat.
+    const agentWithoutOwnId =
+      normalizeRole(profile?.role) === "agent" && !agent_id;
+    if (
+      agentWithoutOwnId ||
+      (agent_id && filterScope && !filterScope.agentIds.includes(agent_id))
+    ) {
       return c.json(
         {
           success: false,

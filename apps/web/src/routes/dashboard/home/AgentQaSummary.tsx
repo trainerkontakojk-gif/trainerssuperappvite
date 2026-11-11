@@ -16,8 +16,7 @@ type State =
   | { status: "ready"; data: AgentHomeSummary };
 type Qa = NonNullable<AgentHomeSummary["qa"]>;
 
-/** Self QA panel; also used by SIDAK saya (`routes/sidak/saya.tsx`). */
-export function QaResult({ qa }: { qa: Qa }) {
+function QaResult({ qa }: { qa: Qa }) {
   const sentence =
     qa.gapToTarget === null
       ? `Skor QA ${qa.periodLabel} ${NUMBER.format(qa.score)}, sudah mencapai target ${qa.target}.`
