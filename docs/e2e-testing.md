@@ -139,7 +139,6 @@ pnpm --dir apps/web exec playwright test pdkt-flow.spec.ts pdkt-resilience.spec.
 ## KETIK — riwayat penuh (paket D)
 
 - `ketik-history-api.spec.ts` / project `ketik-history-real-backend`: JWT/Hono/DB loopback asli; 65 sesi, timestamp sama (microseconds), batas bulan WIB, owner lain, pagination stabil, filter/search literal, summary, cursor/limit invalid, detail owner, kegagalan DB aman dan RPC anon/authenticated ditolak. Fixture tambahan 2.001 sesi membuktikan count tidak terpotong oleh cap PostgREST. EXPLAIN sebelum/sesudah indeks memakai fixture yang sama; attachment payload membandingkan bentuk respons HTTP lama (50 sesi dengan transkrip) dan baru (20 ringkasan). Rollback/reapply hanya di DB loopback, mempertahankan jumlah/skor.
-- `home-agent.spec.ts`: fixture page KETIK tanpa messages membuktikan integrasi Beranda dengan kontrak pagination, riwayat gabungan KETIK/PDKT, state kosong dan kegagalan sebagian.
 - `ketik-history-browser.spec.ts`: hermetic dengan 205 sesi; deep-link lama dan detail retry, pagination server, race search, replay/focus, CSV seluruh halaman dan hasil filter, kegagalan ekspor tanpa file parsial, screenshot 390/1280px. Bukan bukti backend nyata; suite API membuktikan batas backend dan regresi JWT browser sesi menguji integrasi transport nyata.
 
 ```bash

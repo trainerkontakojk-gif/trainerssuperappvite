@@ -253,6 +253,53 @@ test.describe("Agent self views", () => {
     }
   });
 
+  test("agent opening Beranda is sent to their own SIDAK detail", async ({
+    page,
+  }) => {
+    await openHermeticShell(page, {
+      path: "/dashboard",
+      auth: { role: "agent" },
+      apiMocks: [{ method: "GET", path: "/api/v1/profiler/me", ...ok(KTP_ME) }],
+      waitForUrl: /\/sidak\/agents\/p-self(\?|$)/,
+    });
+    await expect(page).toHaveURL(/\/sidak\/agents\/p-self(\?|$)/);
+  });
+
+  test("agent nav holds only SIDAK, KTP, KETIK, Telefun and PDKT", async ({
+    page,
+  }) => {
+    const agentHrefs = [
+      "/sidak/saya",
+      "/profiler/saya",
+      "/ketik",
+      "/telefun",
+      "/pdkt",
+    ];
+    const audit = await openHermeticShell(page, {
+      path: "/profiler/saya",
+      auth: { role: "agent" },
+      apiMocks: [{ method: "GET", path: "/api/v1/profiler/me", ...ok(KTP_ME) }],
+    });
+    const sidebar = page.locator(".app-sidebar-nav");
+    await expect(sidebar.locator("a").first()).toBeVisible({ timeout: 20000 });
+    const sidebarHrefs = await sidebar
+      .locator("a")
+      .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+    expect(sidebarHrefs.sort()).toEqual([...agentHrefs].sort());
+    await expect(page.locator('a[href="/dashboard"]')).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const tabBar = page.locator("nav.fixed").getByRole("link");
+    await expect(tabBar.first()).toBeVisible();
+    expect(
+      await tabBar.evaluateAll((links) =>
+        links.map((a) => a.getAttribute("href")),
+      ),
+    ).toEqual(agentHrefs);
+    await expect(page.locator('a[href="/dashboard"]')).toHaveCount(0);
+    expectHermetic(audit);
+  });
+
   test("agent cannot open the staff SIDAK or KTP workspace", async ({
     page,
   }) => {

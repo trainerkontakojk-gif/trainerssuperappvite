@@ -43,6 +43,8 @@ export const APP_MODULES: AppModuleConfig[] = [
     description:
       "Pusat kendali untuk memantau performa, aktivitas, dan prioritas kerja harian.",
     href: "/dashboard",
+    // Staff only: agents land on SIDAK saya instead (see getHomePath).
+    capability: "sidak.read",
     icon: LayoutDashboard,
     accentClassName: "text-indigo-600",
     accentSoftClassName: "bg-indigo-100",

@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Home, ShieldAlert, ArrowLeft } from "lucide-react";
+import { getHomePath } from "../lib/app-config";
+import { useAuthStore } from "../store/authStore";
 
 export default function UnauthorizedPage() {
+  const home = getHomePath(useAuthStore((s) => s.profile?.role));
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md text-center space-y-6">
@@ -29,11 +32,11 @@ export default function UnauthorizedPage() {
             Kembali
           </button>
           <Link
-            to="/dashboard"
+            to={home}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:opacity-90 transition-all"
           >
             <Home className="w-4 h-4" />
-            Dashboard
+            {home === "/dashboard" ? "Dashboard" : "SIDAK saya"}
           </Link>
         </div>
       </div>

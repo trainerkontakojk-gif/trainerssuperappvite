@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { getHomePath } from "../../lib/app-config";
 import { buildNavModel } from "./nav-config";
 import { NavList } from "./NavList";
 import { UserMenu } from "./UserMenu";
@@ -56,7 +57,7 @@ export function Sidebar({
   return (
     <aside className="app-sidebar hidden lg:flex" data-collapsed={collapsed}>
       <div className="app-sidebar-top">
-        <Link to="/dashboard" className="app-sidebar-wordmark">
+        <Link to={getHomePath(profile?.role)} className="app-sidebar-wordmark">
           Trainers <span>SuperApp</span>
         </Link>
         <button

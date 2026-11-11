@@ -39,28 +39,11 @@ const DASHBOARD_MOCKS: readonly ApiMock[] = [
     path: "/api/v1/home/attention",
     body: { success: true, data: { items: [], partial: false } },
   },
-  // Beranda agent memuat riwayat latihan, bukan data SIDAK.
+  // Agent tidak punya Beranda; shell agent dibuka di KTP saya.
   {
     method: "GET",
-    path: "/api/v1/ketik/history",
-    body: { success: true, data: [] },
-  },
-  {
-    method: "GET",
-    path: "/api/v1/pdkt/history",
-    body: { success: true, data: [] },
-  },
-  // Beranda agent juga memuat ringkasan QA dan riwayat Telefun (bentuk sama
-  // dengan `home-agent.spec.ts`): agent tanpa profil peserta tertaut.
-  {
-    method: "GET",
-    path: "/api/v1/home/agent-summary",
-    body: { success: true, data: { linked: false, qa: null } },
-  },
-  {
-    method: "GET",
-    path: "/api/v1/telefun/sessions",
-    body: { success: true, data: [] },
+    path: "/api/v1/profiler/me",
+    body: { success: true, data: { linked: false, peserta: null } },
   },
 ];
 
@@ -123,7 +106,8 @@ test.describe("Shell terautentikasi (hermetic)", () => {
  * memuat himpunan modul yang sama untuk tiap peran, sesuai `access.ts`:
  * TELEFUN untuk semua peran (mulai panggilan dibatasi jatah harian); TNA hanya
  * admin/trainer. Agent mendapat SIDAK dan KTP versi diri sendiri
- * (`/sidak/saya`, `/profiler/saya`), bukan workspace staff.
+ * (`/sidak/saya`, `/profiler/saya`), bukan workspace staff, dan tanpa
+ * Beranda: `/dashboard` mengalihkan agent ke SIDAK saya.
  */
 const ALL_MODULE_LABELS = [
   "Beranda",
@@ -152,8 +136,8 @@ const NAV_MATRIX: Record<
     tabs: ["Beranda", "SIDAK", "KTP", "KETIK"],
   },
   agent: {
-    modules: ["Beranda", "KETIK", "PDKT", "TELEFUN", "SIDAK", "KTP"],
-    tabs: ["SIDAK", "Beranda", "KETIK", "KTP"],
+    modules: ["KETIK", "PDKT", "TELEFUN", "SIDAK", "KTP"],
+    tabs: ["SIDAK", "KTP", "KETIK", "TELEFUN", "PDKT"],
   },
 };
 
@@ -190,6 +174,7 @@ async function expectModuleSet(
 }
 
 for (const [role, { modules, tabs }] of Object.entries(NAV_MATRIX)) {
+  const path = role === "agent" ? "/profiler/saya" : "/dashboard";
   test.describe(`${role}: navigasi mengikuti matriks akses`, () => {
     test.beforeAll(async () => {
       await assertLocalDevOnlyTarget();
@@ -198,7 +183,7 @@ for (const [role, { modules, tabs }] of Object.entries(NAV_MATRIX)) {
     test("sidebar desktop memuat modul peran", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
       const audit = await openHermeticShell(page, {
-        path: "/dashboard",
+        path,
         auth: { role },
         apiMocks: DASHBOARD_MOCKS,
       });
@@ -214,7 +199,7 @@ for (const [role, { modules, tabs }] of Object.entries(NAV_MATRIX)) {
     }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       const audit = await openHermeticShell(page, {
-        path: "/dashboard",
+        path,
         auth: { role },
         apiMocks: DASHBOARD_MOCKS,
       });

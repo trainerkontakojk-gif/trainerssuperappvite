@@ -132,7 +132,7 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
   component: DashboardPage,
-  beforeLoad: requireAuth(),
+  beforeLoad: guardStaffHome(),
 });
 
 const dashboardUsersRoute = createRoute({
@@ -706,6 +706,19 @@ function requireAuth() {
     if (!session) {
       throw redirect({ to: "/" });
     }
+  };
+}
+
+/** Beranda is staff-only; an agent's home is their own SIDAK page. */
+function guardStaffHome() {
+  return async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/" });
+    const profile = await fetchAuthProfile(session.user.id);
+    const home = getHomePath(profile?.role);
+    if (home !== "/dashboard") throw redirect({ to: home, replace: true });
   };
 }
 

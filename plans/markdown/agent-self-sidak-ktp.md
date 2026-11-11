@@ -89,3 +89,23 @@ Fajar clarified that the agent view should be the staff page `/sidak/agents/$id`
 - No cross-participant leak found. Open for Fajar to decide (documented in `docs/auth-rbac.md`):
   - P2: simulation history/detail include the session actor's email/name/role. A session a staff member ran for this participant shows that staff identity to the agent.
   - P3: the team comparison row (average + agent count) lets an agent in a two-agent team infer the peer's total.
+
+## Revision 3 (2026-11-11): no Beranda for agents
+
+Fajar: after login an agent should see only their SIDAK QA data; `/dashboard` is not needed. Agents need only SIDAK, KTP, KETIK, Telefun and PDKT. PDKT stays always visible (there is no PDKT assignment concept yet; decided in chat).
+
+### Requirement
+
+- `/dashboard` redirects an agent to `getHomePath(role)` (`/sidak/saya` → own detail). Staff keep Beranda.
+- Agent nav (sidebar, drawer, mobile tabs) holds exactly SIDAK saya, KTP saya, KETIK, Telefun, PDKT; no link to `/dashboard` anywhere in the shell (sidebar wordmark and the 403 page button use `getHomePath`).
+
+### Design
+
+- Web only, no API or capability change. `dashboardRoute` gets `guardStaffHome()`; the `dashboard` module is gated on `sidak.read` (the same staff test `dashboard.tsx` already used). Agent mobile tabs: `sidak-saya, ktp-saya, ketik, telefun, pdkt`.
+- `AgentHome`, `AgentQaSummary` and `e2e/home-agent.spec.ts` are removed (page unreachable). `GET /v1/home/agent-summary` and its real-backend spec are left in place: removing them is an API change that deploys to Railway; it is now unused by the web and can go in a follow-up.
+
+### Tasklist
+
+- [x] RED: `agent-self-browser.spec.ts` — agent `/dashboard` redirects to own detail; agent nav hrefs exactly the five modules, no `/dashboard` link (both failed before the change).
+- [x] GREEN: router guard, module capability, mobile tabs, wordmark, 403 button; `authenticated-shell.spec.ts` agent nav matrix updated.
+- [x] Docs: `docs/modules.md`, `docs/e2e-testing.md`.
