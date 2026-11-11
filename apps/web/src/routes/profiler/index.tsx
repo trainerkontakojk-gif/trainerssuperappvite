@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { profilerApi } from "../../lib/profilerService";
 import type {
@@ -46,7 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function ProfilerLanding() {
-  const { isReadOnly } = useProfilerAccess();
+  const { isReadOnly, role } = useProfilerAccess();
   const navigate = useNavigate();
   // Batch aktif hidup di URL (`?batch=`) supaya tahan refresh, back, dan bisa dibagikan.
   const queryParams = useQueryParams();
@@ -149,6 +149,27 @@ export default function ProfilerLanding() {
     }
     if (activeFolder.year_id) setSelectedYearId(activeFolder.year_id);
   }, [loaded, selectedBatch, activeFolder, selectBatch]);
+
+  // Leader hanya menerima folder berizin (plus induknya) dan hitungan peserta
+  // yang boleh dilihat. Bila tepat satu folder berisi peserta berizin, buka
+  // langsung saat halaman pertama dimuat; tombol "Ringkasan tahun" tetap bisa
+  // dipakai sesudahnya tanpa dialihkan lagi.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    if (role !== "leader" || selectedBatch || showTeams) return;
+    const granted = folders.filter((f) => (counts[f.name] ?? 0) > 0);
+    if (granted.length === 1) selectBatch(granted[0].name, { replace: true });
+  }, [
+    loaded,
+    role,
+    selectedBatch,
+    showTeams,
+    folders,
+    counts,
+    selectBatch,
+  ]);
 
   useEffect(() => {
     if (!activeFolder || pesertaMap[activeFolder.name]) return;

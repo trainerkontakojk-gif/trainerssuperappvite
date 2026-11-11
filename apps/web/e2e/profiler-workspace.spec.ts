@@ -304,6 +304,83 @@ test.describe("Workspace Profiler (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("leader dengan satu folder berizin langsung masuk folder itu", async ({
+    page,
+  }) => {
+    // Backend hanya mengembalikan folder berizin (beserta induknya) dan
+    // hitungan peserta yang boleh dilihat leader.
+    const singleFolderMocks: readonly ApiMock[] = [
+      ...LEADER_APPROVED_MOCKS.map((mock) =>
+        mock.path === "/api/v1/profiler/counts"
+          ? { ...mock, body: { success: true, data: { "Batch Pagi": 2 } } }
+          : mock,
+      ),
+    ];
+    const audit = await openHermeticShell(page, {
+      path: "/profiler",
+      waitForUrl: /\/profiler/,
+      apiMocks: singleFolderMocks,
+      auth: { role: "leader" },
+    });
+
+    await expect(page).toHaveURL(/[?&]batch=Batch(%20|\+)Pagi/, {
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Batch Pagi" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Batch Pagi" }).getByText("Rina Kartika").first(),
+    ).toBeVisible();
+
+    // Kembali ke ringkasan tetap bisa dan tidak dialihkan lagi.
+    await page
+      .getByRole("complementary", { name: "Panel folder" })
+      .getByRole("button", { name: "Ringkasan tahun" })
+      .click();
+    await expect(page).not.toHaveURL(/batch=/);
+    await expect(
+      page.getByRole("region", { name: /Folder tahun 2026/ }),
+    ).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(page).not.toHaveURL(/batch=/);
+
+    console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
+  test("leader dengan lebih dari satu folder berizin tetap memilih folder", async ({
+    page,
+  }) => {
+    const multiFolderMocks: readonly ApiMock[] = [
+      ...LEADER_APPROVED_MOCKS.map((mock) =>
+        mock.path === "/api/v1/profiler/counts"
+          ? {
+              ...mock,
+              body: { success: true, data: { "Batch Pagi": 2, "Tim Email": 1 } },
+            }
+          : mock,
+      ),
+    ];
+    const audit = await openHermeticShell(page, {
+      path: "/profiler",
+      waitForUrl: /\/profiler/,
+      apiMocks: multiFolderMocks,
+      auth: { role: "leader" },
+    });
+
+    const overview = page.getByRole("region", { name: /Folder tahun 2026/ });
+    await expect(overview).toBeVisible({ timeout: 20000 });
+    await page.waitForTimeout(500);
+    await expect(page).not.toHaveURL(/batch=/);
+    await expect(
+      overview.getByRole("button", { name: /^Tim Email/ }),
+    ).toBeVisible();
+
+    console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
   test("tab Statistik, Slide, Ekspor dirender di workspace tanpa memuat ulang peserta", async ({
     page,
   }) => {
