@@ -48,8 +48,8 @@ const COMPLIANT_NILAI = 3;
 
 /**
  * Bahan coaching untuk bulan terpilih di detail agen: skor dan statusnya,
- * parameter yang paling sering muncul, pola akar masalah, dan tiga tiket
- * pengurang terbesar. Semua dari data detail agen yang sudah dimuat.
+ * parameter yang paling sering muncul, pola akar masalah, dan hingga lima
+ * tiket pengurang terbesar. Semua dari data detail agen yang sudah dimuat.
  */
 export default function AgentCoachingBrief({
   monthTitle,
@@ -92,7 +92,7 @@ export default function AgentCoachingBrief({
   }, [findings, month, year]);
 
   const cause = causes[0] ?? null;
-  const topTickets = tickets.slice(0, 3);
+  const topTickets = tickets.slice(0, 5);
 
   const copySummary = async () => {
     const lines = [

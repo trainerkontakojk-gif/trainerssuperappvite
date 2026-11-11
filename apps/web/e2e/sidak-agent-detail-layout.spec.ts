@@ -293,6 +293,99 @@ test.describe("Tata letak detail agent", () => {
     await expect(brief).toContainText("Memenuhi target");
   });
 
+  test("Bahan coaching menampilkan hingga lima tiket dan mengganti pengurang terkecil", async ({
+    page,
+  }, testInfo) => {
+    const payload = richAgentDetailPayload();
+    const june = payload.periodSummaries.find((period) => period.month === 6)!;
+    const addTicket = (ticket: string, indicator: number, nilai: number) => {
+      payload.temuan.push({
+        id: `temuan-${ticket}`,
+        peserta_id: payload.peserta.id,
+        period_id: june.id,
+        indicator_id: payload.indicators[indicator]!.id,
+        service_type: "call",
+        no_tiket: ticket,
+        nilai,
+        ketidaksesuaian: "Temuan sintetis untuk urutan tiket coaching.",
+        sebaiknya: "Ikuti standar layanan.",
+        is_phantom_padding: false,
+      });
+    };
+    // Empat tiket harus terlihat, bukan hanya tiga terbesar.
+    addTicket("TKT-FOURTH", 0, 2);
+    const audit: AgentAudit = {
+      mockedApi: [],
+      blockedApi: [],
+      blockedExternal: [],
+    };
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await openAgentDetail(page, audit, {
+      detailPayload: () => payload,
+      quickviewPayload: richQuickviewPayload(),
+    });
+    const brief = page.getByRole("region", { name: "Bahan coaching" });
+    const tickets = brief.getByRole("button", { name: /TKT-/ });
+    await expect(tickets).toHaveText([
+      /TKT-2026-06-118/,
+      /TKT-2026-06-142/,
+      /TKT-2026-06-177/,
+      /TKT-FOURTH/,
+    ], { timeout: 20000 });
+
+    // Tiket kelima lebih berat: masuk sesuai pengurang, bukan urutan input.
+    addTicket("TKT-FIFTH", 1, 0);
+    await sidebar(page).getByRole("button", { name: "Muat ulang profil agen" }).click();
+    await expect(tickets).toHaveText([
+      /TKT-2026-06-118/,
+      /TKT-FIFTH/,
+      /TKT-2026-06-142/,
+      /TKT-2026-06-177/,
+      /TKT-FOURTH/,
+    ]);
+
+    // Tiket keenam menggantikan TKT-FOURTH yang pengurangnya paling kecil.
+    addTicket("TKT-SIXTH", 0, 0);
+    await sidebar(page).getByRole("button", { name: "Muat ulang profil agen" }).click();
+    await expect(tickets).toHaveText([
+      /TKT-2026-06-118/,
+      /TKT-FIFTH/,
+      /TKT-2026-06-142/,
+      /TKT-SIXTH/,
+      /TKT-2026-06-177/,
+    ]);
+    await expect(brief.getByRole("button", { name: /TKT-FOURTH/ })).toHaveCount(0);
+
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await brief.getByRole("button", { name: "Salin ringkasan" }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toContain("TKT-SIXTH");
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toContain("TKT-2026-06-177");
+    expect(copied).not.toContain("TKT-FOURTH");
+
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect(tickets).toHaveCount(5);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth))
+        .toBeLessThanOrEqual(width);
+      for (const ticket of await tickets.all()) {
+        expect(await ticket.evaluate((el) => (el as HTMLElement).offsetHeight))
+          .toBeGreaterThanOrEqual(44);
+      }
+      await brief.screenshot({ path: testInfo.outputPath(`coaching-five-${width}.png`) });
+    }
+    await tickets.filter({ hasText: "TKT-SIXTH" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("tabpanel", { name: "Temuan" })
+        .getByRole("region", { name: "Tiket TKT-SIXTH", exact: true }),
+    ).toBeFocused();
+    expect(audit.mockedApi).toContain("agent-detail");
+    expect(audit.blockedApi).toEqual([]);
+    expect(audit.blockedExternal).toEqual([]);
+  });
+
   test("klik tiket pengurang membuka tab Temuan pada grup tiket itu", async ({
     page,
   }) => {

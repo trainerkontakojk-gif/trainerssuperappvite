@@ -401,6 +401,8 @@ Halaman `/sidak/agents/:id` menampilkan quickview pada panel **Ringkasan**, di b
 
 Presentation halaman memakai tab `summary`, `trend`, `temuan`, dan `simulations`. Ringkasan menjadi tab awal; hanya panel aktif yang terlihat, sementara panel yang sudah dibuka tetap mounted untuk mempertahankan state lokal. Tahun dan layanan audit berlaku untuk tiga tab audit, rentang bulan hanya tersedia pada Tren, dan filter history Simulasi tetap independen. Response detail memisahkan `temuan` riil dari `phantomSessions` agar clean session tetap muncul sebagai histori tanpa menjadi temuan yang bisa diedit atau dihapus.
 
+Kartu **Bahan coaching** menampilkan hingga lima tiket pengurang skor sesi terbesar untuk bulan terpilih, diurutkan dari pengurang terbesar ke terkecil. Semua tiket pengurang tampil bila jumlahnya kurang dari lima; ketika ada lebih dari lima, tiket dengan pengurang lebih besar menggantikan yang lebih kecil. Ringkasan yang disalin memakai daftar yang sama. Batas tampilan ini tidak mengubah rumus skor QA atau padding sesi bernilai 100.
+
 Header profil memakai avatar shadcn/ui berukuran 96px pada mobile dan 112px mulai breakpoint `sm`. Kontrol dan surface pada detail agen menggunakan primitive shadcn/ui dengan token tema aplikasi, target sentuh minimum 44px, label aksesibel, serta nama panjang yang dapat membungkus.
 
 MonthRail memberi ikon peringatan kecil pada setiap skor bulanan di bawah target 95 persen, dengan legenda target yang tetap terlihat sehingga status tidak bergantung pada warna progress bar. Detail dari Riwayat Simulasi memakai modal dengan lebar responsif dan area isi yang menggulir di dalam batas tinggi viewport.
