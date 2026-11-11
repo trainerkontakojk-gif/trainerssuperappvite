@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-11
 
+- feat(agent): land agents on SIDAK saya after login and show their own KTP profile, both self-only and read-only
 - feat(home): show the nearest participant birthday in the staff home attention list, renamed to Perlu perhatian
 
 ## 2026-11-10

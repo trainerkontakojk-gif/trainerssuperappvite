@@ -21,6 +21,7 @@ import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
 import { signOutLocalSession } from "./lib/session-logout";
 import { fetchApi } from "./hooks/useApi";
+import { getHomePath } from "./lib/app-config";
 import {
   validateSidakScopeSearch,
   type SidakScopeSearch,
@@ -59,6 +60,7 @@ const SidakJadwalShifting = lazy(
 );
 const SidakAgents = lazy(() => import("./routes/sidak/agents"));
 const SidakAgentDetail = lazy(() => import("./routes/sidak/agents.$id"));
+const SidakSaya = lazy(() => import("./routes/sidak/saya"));
 const SidakReportsData = lazy(() => import("./routes/sidak/reports-data"));
 const KetikLanding = lazy(() => import("./routes/ketik/index"));
 const KetikHistory = lazy(() => import("./routes/ketik/history"));
@@ -82,6 +84,7 @@ const UnauthorizedPage = lazy(() => import("./routes/unauthorized"));
 const WaitingApprovalPage = lazy(() => import("./routes/waiting-approval"));
 const ResetPasswordPage = lazy(() => import("./routes/reset-password"));
 const ProfilerLanding = lazy(() => import("./routes/profiler/index"));
+const KtpSaya = lazy(() => import("./routes/profiler/saya"));
 
 const rootRoute = createRootRoute({
   component: DashboardLayout,
@@ -205,6 +208,14 @@ const profilerRoute = createRoute({
   path: "/profiler",
   component: ProfilerLanding,
   beforeLoad: requireCapability("profiler.landing"),
+});
+
+/** Agent self view: own participant row, read-only. */
+const profilerSayaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profiler/saya",
+  component: KtpSaya,
+  beforeLoad: requireCapability("profiler.self.read"),
 });
 
 /** Daftar peserta kini satu: tab Peserta di workspace, mode Tabel. */
@@ -413,6 +424,14 @@ const sidakAgentsRoute = createRoute({
   // Cakupan bersama SIDAK + `status` (mis. `?status=below` dari Beranda).
   validateSearch: validateSidakAgentsSearch,
   beforeLoad: requireCapability("sidak.view"),
+});
+
+/** Agent self view; staff use `/sidak/agents/$id`. */
+const sidakSayaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sidak/saya",
+  component: SidakSaya,
+  beforeLoad: requireCapability("sidak.self.read"),
 });
 
 const sidakAgentDetailRoute = createRoute({
@@ -634,7 +653,7 @@ export function guardWaitingApproval() {
     }
     if (isAccountExpired(profile?.active_until)) await endExpiredSession();
     if (profile?.status === "active") {
-      throw redirect({ to: "/dashboard" });
+      throw redirect({ to: getHomePath(profile.role) });
     }
   };
 }
@@ -939,6 +958,7 @@ const routeTree = rootRoute.addChildren([
   dashboardActivitiesRoute,
   dashboardKegiatanRoute,
   profilerRoute,
+  profilerSayaRoute,
   profilerTableRoute,
   profilerSlidesRoute,
   profilerAnalyticsRoute,
@@ -957,6 +977,7 @@ const routeTree = rootRoute.addChildren([
   sidakJadwalShiftingRoute,
   sidakAgentsRoute,
   sidakAgentDetailRoute,
+  sidakSayaRoute,
   sidakReportsRoute,
   sidakReportsDataRoute,
   sidakReportsAiRoute,

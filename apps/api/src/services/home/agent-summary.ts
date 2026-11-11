@@ -1,4 +1,8 @@
-import { formatQAIndicatorName, type AgentHomeSummary } from "@trainers/types";
+import {
+  formatQAIndicatorName,
+  type AgentHomeSummary,
+  type ServiceType,
+} from "@trainers/types";
 import type { Actor } from "../../middleware/role";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
@@ -52,10 +56,31 @@ const MONTHS = [
 export async function getAgentHomeSummary(
   actor: Actor,
 ): Promise<AgentHomeSummary> {
+  return (await buildAgentSelfQa(actor)).summary;
+}
+
+/** Latest audited period of the self summary; `null` when nothing scored. */
+export interface AgentSelfQaLatest {
+  pesertaId: string;
+  year: number;
+  serviceType: ServiceType;
+}
+
+/**
+ * The self summary plus the server-resolved context it was computed for, so
+ * other self views (SIDAK saya) never take an agent ID from the client.
+ */
+export async function buildAgentSelfQa(
+  actor: Actor,
+): Promise<{ summary: AgentHomeSummary; latest: AgentSelfQaLatest | null }> {
   if (actor.role !== "agent") throw new Error("Self summary requires agent");
+  const unscored = (linked: boolean) => ({
+    summary: { linked, qa: null },
+    latest: null,
+  });
   const scope = await resolveDataScope(actor, "sidak");
   if (scope.kind === "none" && scope.reason === "unlinked")
-    return { linked: false, qa: null };
+    return unscored(false);
   if (scope.kind !== "self") throw new Error("Self scope required");
   const profile = await supabaseAdmin
     .from("profiler_peserta")
@@ -64,7 +89,7 @@ export async function getAgentHomeSummary(
     .eq("akun_id", actor.id)
     .maybeSingle();
   if (profile.error) throw profile.error;
-  if (!profile.data) return { linked: false, qa: null };
+  if (!profile.data) return unscored(false);
   const rows = await fetchAllPages<Row>({
     build: ({ from, to }) =>
       supabaseAdmin
@@ -76,7 +101,7 @@ export async function getAgentHomeSummary(
         .order("id")
         .range(from, to),
   });
-  if (!rows.length) return { linked: true, qa: null };
+  if (!rows.length) return unscored(true);
   const periods = await getPeriods();
   const periodById = new Map(periods.map((p) => [p.id, p]));
   const buckets = new Map<string, Row[]>();
@@ -102,7 +127,7 @@ export async function getAgentHomeSummary(
     );
   });
   const latest = audited[0];
-  if (!latest) return { linked: true, qa: null };
+  if (!latest) return unscored(true);
   const latestId = latest[0]!.period_id;
   const preferred = resolveServiceTypeFromTeam(profile.data.tim ?? "");
   const service =
@@ -173,7 +198,7 @@ export async function getAgentHomeSummary(
   }
   const current = points[0]!;
   const previous = points[1];
-  return {
+  const summary: AgentHomeSummary = {
     linked: true,
     qa: {
       serviceType: service,
@@ -189,6 +214,14 @@ export async function getAgentHomeSummary(
       trend: points.reverse(),
       topParameters,
       recommendation,
+    },
+  };
+  return {
+    summary,
+    latest: {
+      pesertaId: scope.pesertaId,
+      year: periodById.get(latestId)!.year,
+      serviceType: service,
     },
   };
 }

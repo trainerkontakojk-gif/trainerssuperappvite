@@ -2,9 +2,14 @@ import { supabaseAdmin } from "../lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { normalizeRole, wibToday } from "@trainers/types";
-import { resolveDataScope, scopePesertaIds } from "./access/scope";
+import {
+  getLinkedPesertaId,
+  resolveDataScope,
+  scopePesertaIds,
+} from "./access/scope";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
 import type {
+  AgentKtpSelf,
   ProfilerPeserta,
   ProfilerUpcomingBirthday,
 } from "@trainers/types";
@@ -162,6 +167,22 @@ export async function searchPesertaOptions(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as ProfilerPesertaOption[];
+}
+
+/** The participant row linked to this account (1:1 `akun_id`), all fields. */
+export async function getOwnPeserta(userId: string): Promise<AgentKtpSelf> {
+  const pesertaId = await getLinkedPesertaId(userId);
+  if (!pesertaId) return { linked: false, peserta: null };
+  const { data, error } = await supabaseAdmin
+    .from("profiler_peserta")
+    .select("*")
+    .eq("id", pesertaId)
+    .eq("akun_id", userId)
+    .maybeSingle();
+  if (error) throw new Error("Profil peserta tidak dapat dimuat");
+  return data
+    ? { linked: true, peserta: data }
+    : { linked: false, peserta: null };
 }
 
 export async function getPesertaById(

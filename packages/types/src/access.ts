@@ -57,6 +57,8 @@ export const CAPABILITIES = {
   "practice.limits.manage": ["admin", "trainer"],
   "profiler.landing": ["admin", "trainer", "leader"],
   "profiler.read": ["admin", "trainer", "leader"],
+  /** Own linked participant row only (`GET /profiler/me`). */
+  "profiler.self.read": ["agent"],
   "profiler.view": ["admin", "trainer", "leader"],
   "profiler.write": ["admin", "trainer"],
   "sidak.config.manage": ["admin", "trainer"],
@@ -68,6 +70,8 @@ export const CAPABILITIES = {
   "sidak.reports.generate": ["admin", "trainer", "leader"],
   "sidak.reports.view": ["admin", "trainer"],
   "sidak.schedule.read": ["admin", "trainer"],
+  /** Own QA aggregate and standing only (`GET /sidak/me`). */
+  "sidak.self.read": ["agent"],
   "sidak.summary.refresh": ["admin", "trainer"],
   "sidak.view": ["admin", "trainer", "leader"],
   "sidak.write": ["admin", "trainer"],

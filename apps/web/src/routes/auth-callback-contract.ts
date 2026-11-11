@@ -1,9 +1,13 @@
 import type { UserProfile } from "@trainers/types";
+import { getHomePath } from "../lib/app-config";
 
 export function getAuthCallbackDestination(
-  profile: Pick<UserProfile, "status"> | null,
-): "/dashboard" | "/waiting-approval" {
-  return profile?.status === "active" ? "/dashboard" : "/waiting-approval";
+  profile:
+    (Pick<UserProfile, "status"> & Partial<Pick<UserProfile, "role">>) | null,
+): "/sidak/saya" | "/dashboard" | "/waiting-approval" {
+  return profile?.status === "active"
+    ? getHomePath(profile.role)
+    : "/waiting-approval";
 }
 
 export function getAuthCallbackError(

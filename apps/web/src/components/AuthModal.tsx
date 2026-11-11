@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
+import { getHomePath } from "../lib/app-config";
 import { clearLogoutGuestLock } from "../lib/authLocalState";
 import { signOutLocalSession } from "../lib/session-logout";
 import { accountExpiredMessage, isAccountExpired } from "@trainers/types";
@@ -183,7 +184,7 @@ export default function AuthModal({
             : accountExpiredMessage(profile.active_until!),
       );
     }
-    return "/dashboard";
+    return getHomePath(profile.role);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {

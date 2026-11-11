@@ -208,6 +208,10 @@ export default defineConfig({
       testMatch: "home-agent-summary-api.spec.ts",
     },
     {
+      name: "agent-self-real-backend",
+      testMatch: "agent-self-api.spec.ts",
+    },
+    {
       name: "telefun-schema-real-backend",
       testMatch: "telefun-schema-contract-api.spec.ts",
     },

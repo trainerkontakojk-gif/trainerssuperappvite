@@ -7,7 +7,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import { can, serviceTypeSchema } from "@trainers/types";
-import { requireCapability } from "../../middleware/role";
+import { getActor, requireCapability } from "../../middleware/role";
+import { getAgentSidakSelf } from "../../services/sidak/agent-self";
 import * as sidakService from "../../services/sidak-service";
 import { listEfekTrainingForAgent } from "../../services/efek/training";
 import {
@@ -31,6 +32,39 @@ async function resolveSidakFilterScope(
   const profile = c.get("profile");
   return sidakService.getAccessibleSidakFilters(user.id, profile?.role ?? "");
 }
+
+// ── SIDAK saya (agent self view) ───────────────────────
+// No client ID or filter: the participant is the caller's linked row.
+sidakDashboard.get("/me", requireCapability("sidak.self.read"), async (c) => {
+  if (Object.keys(c.req.query()).length)
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "INVALID_INPUT",
+          message: "SIDAK saya tidak menerima filter tambahan.",
+        },
+      },
+      400,
+    );
+  try {
+    return c.json({
+      success: true as const,
+      data: await getAgentSidakSelf(getActor(c)),
+    });
+  } catch {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "SIDAK_SELF_UNAVAILABLE",
+          message: "Data SIDAK Anda belum dapat dimuat. Silakan coba lagi.",
+        },
+      },
+      503,
+    );
+  }
+});
 
 // ── Agents ─────────────────────────────────────────────
 sidakDashboard.get("/agents", requireCapability("sidak.read"), async (c) => {

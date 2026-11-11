@@ -2,7 +2,7 @@ import { ScopeUnavailableError } from "../services/access/scope";
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { requireCapability } from "../middleware/role";
+import { getActor, requireCapability } from "../middleware/role";
 import * as profilerService from "../services/profiler-service";
 import { logActivity } from "../services/activity-log-service";
 import { getPesertaAccount } from "../services/admin-user-service";
@@ -17,6 +17,39 @@ async function resolveKtpScope(c: any): Promise<string[] | null> {
   const profile = c.get("profile");
   return profilerService.getAccessiblePesertaIds(user.id, profile?.role ?? "");
 }
+
+// ── KTP saya (agent self view) ───────────────────────────
+// No client ID or filter: only the row linked to the caller's account.
+profiler.get("/me", requireCapability("profiler.self.read"), async (c) => {
+  if (Object.keys(c.req.query()).length)
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "INVALID_INPUT",
+          message: "KTP saya tidak menerima filter tambahan.",
+        },
+      },
+      400,
+    );
+  try {
+    return c.json({
+      success: true as const,
+      data: await profilerService.getOwnPeserta(getActor(c).id),
+    });
+  } catch {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "KTP_SELF_UNAVAILABLE",
+          message: "Data KTP Anda belum dapat dimuat. Silakan coba lagi.",
+        },
+      },
+      503,
+    );
+  }
+});
 
 // ── Years ────────────────────────────────────────────────
 profiler.get("/years", requireCapability("profiler.read"), async (c) => {

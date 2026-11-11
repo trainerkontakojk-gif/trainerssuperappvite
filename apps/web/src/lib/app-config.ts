@@ -109,6 +109,38 @@ export const APP_MODULES: AppModuleConfig[] = [
     capability: "profiler.landing",
   },
   {
+    // Agent self view of SIDAK; staff get `qa-analyzer` below.
+    id: "sidak-saya",
+    navLabel: "SIDAK",
+    navDescription: "Hasil QA saya",
+    group: "kualitas",
+    title: "SIDAK saya",
+    shortTitle: "SIDAK",
+    expandedTitle: "Sistem Informasi Data Analisis Kualitas",
+    description: "Skor, tren, dan posisi QA Anda sendiri.",
+    href: "/sidak/saya",
+    icon: BarChart3,
+    accentClassName: "text-rose-600",
+    accentSoftClassName: "bg-rose-100",
+    capability: "sidak.self.read",
+  },
+  {
+    // Agent self view of KTP; staff get `profiler` above.
+    id: "ktp-saya",
+    navLabel: "KTP",
+    navDescription: "Profil saya",
+    group: "data",
+    title: "KTP saya",
+    shortTitle: "KTP",
+    expandedTitle: "Kotak Tool Profil",
+    description: "Data profil peserta milik Anda, hanya-baca.",
+    href: "/profiler/saya",
+    icon: Users,
+    accentClassName: "text-amber-600",
+    accentSoftClassName: "bg-amber-100",
+    capability: "profiler.self.read",
+  },
+  {
     id: "qa-analyzer",
     navLabel: "SIDAK",
     navDescription: "Analitik kualitas QA",
@@ -144,6 +176,15 @@ export const APP_MODULES: AppModuleConfig[] = [
 export function normalizeRoleLabel(raw?: string | null) {
   const role = normalizeRole(raw);
   return role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
+}
+
+/** First page after sign-in: agents open SIDAK saya, everyone else Beranda. */
+export function getHomePath(
+  role: string | undefined | null,
+): "/sidak/saya" | "/dashboard" {
+  return isCapabilityAllowed(role, "sidak.self.read")
+    ? "/sidak/saya"
+    : "/dashboard";
 }
 
 export function isCapabilityAllowed(

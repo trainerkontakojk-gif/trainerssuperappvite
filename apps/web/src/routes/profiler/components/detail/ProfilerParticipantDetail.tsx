@@ -7,7 +7,6 @@ import type {
 } from "@trainers/types";
 import {
   can,
-  labelJabatan,
   normalizeRole,
   type LinkedAccountSummary,
 } from "@trainers/types";
@@ -33,12 +32,8 @@ import {
   normalizeStatus,
   roleLabel,
 } from "../../../dashboard/users-format";
-import { getDaysUntilBirthday } from "../../utils/birthday";
-import {
-  formatTanggal,
-  hitungMasaDinas,
-  hitungUsia,
-} from "../../utils/profilerFormatters";
+import { formatTanggal } from "../../utils/profilerFormatters";
+import { summaryLine } from "../../utils/profilerSummary";
 import { MoveFolderModal } from "../table/MoveFolderModal";
 import { ProfilerParticipantEditor } from "./ProfilerParticipantEditor";
 
@@ -293,21 +288,6 @@ export default function ProfilerParticipantDetail({
   );
 }
 
-function summaryLine(p: ProfilerPeserta) {
-  const parts = [
-    p.jabatan ? labelJabatan[p.jabatan] || p.jabatan : null,
-    p.tim,
-    p.bergabung_date ? `Masa dinas ${hitungMasaDinas(p.bergabung_date)}` : null,
-    p.tgl_lahir ? `${hitungUsia(p.tgl_lahir)} tahun` : null,
-  ];
-  if (p.tgl_lahir) {
-    const days = getDaysUntilBirthday(p.tgl_lahir);
-    if (days === 0) parts.push("ulang tahun hari ini");
-    else if (days <= 7) parts.push(`ulang tahun ${days} hari lagi`);
-  }
-  return parts.filter(Boolean).join(" · ");
-}
-
 type FieldRow = [label: string, value: ReactNode];
 
 /** The app account linked to this participant (set on the user page). */
@@ -356,7 +336,8 @@ function LinkedAccount({ participant }: { participant: ProfilerPeserta }) {
   );
 }
 
-function ProfileFields({
+/** Read-only field groups; also used by KTP saya (`routes/profiler/saya.tsx`). */
+export function ProfileFields({
   p,
   account,
 }: {

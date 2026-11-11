@@ -169,9 +169,11 @@ const MODULE_ORDER = [
   "ketik",
   "pdkt",
   "telefun",
+  "sidak-saya",
   "qa-analyzer",
   "tna",
   "profiler",
+  "ktp-saya",
 ];
 
 const MODULE_COLORS: Record<string, string> = {
@@ -179,6 +181,8 @@ const MODULE_COLORS: Record<string, string> = {
   pdkt: "var(--module-pdkt)",
   telefun: "var(--module-telefun)",
   "qa-analyzer": "var(--module-sidak)",
+  "sidak-saya": "var(--module-sidak)",
+  "ktp-saya": "var(--module-profiler)",
   tna: "var(--module-tna)",
   profiler: "var(--module-profiler)",
 };
@@ -191,7 +195,7 @@ const MOBILE_TAB_IDS: Record<Role, readonly string[]> = {
   admin: ["dashboard", "qa-analyzer", "tna", "ketik"],
   trainer: ["dashboard", "qa-analyzer", "tna", "ketik"],
   leader: ["dashboard", "qa-analyzer", "profiler", "ketik"],
-  agent: ["dashboard", "ketik", "pdkt", "telefun"],
+  agent: ["sidak-saya", "dashboard", "ketik", "ktp-saya"],
 };
 
 /**
@@ -300,6 +304,9 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
               : "Rencana";
     return [{ label: "TNA", href: "/tna" }, { label }];
   }
+
+  if (pathname === "/sidak/saya") return [{ label: "SIDAK saya" }];
+  if (pathname === "/profiler/saya") return [{ label: "KTP saya" }];
 
   // Module root detection
   if (pathname.startsWith("/sidak")) {

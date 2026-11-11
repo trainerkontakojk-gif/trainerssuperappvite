@@ -60,6 +60,10 @@ export interface ProfilerPeserta {
   updated_at?: string;
 }
 
+/** `GET /api/v1/profiler/me` ("KTP saya"): the caller's own row, read-only. */
+export type AgentKtpSelf =
+  { linked: true; peserta: ProfilerPeserta } | { linked: false; peserta: null };
+
 export interface ProfilerTim {
   id: string;
   nama: string;

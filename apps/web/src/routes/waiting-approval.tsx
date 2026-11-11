@@ -4,6 +4,7 @@ import { Clock, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
 import { signOutLocalSession } from "../lib/session-logout";
+import { getHomePath } from "../lib/app-config";
 import {
   shouldPollWaitingApproval,
   WAITING_APPROVAL_POLL_INTERVAL_MS,
@@ -12,6 +13,7 @@ import {
 type WaitingApprovalProfile = {
   status?: string | null;
   is_deleted?: boolean | null;
+  role?: string | null;
 };
 
 export default function WaitingApprovalPage() {
@@ -36,7 +38,7 @@ export default function WaitingApprovalPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("status, is_deleted")
+        .select("status, is_deleted, role")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -45,7 +47,7 @@ export default function WaitingApprovalPage() {
       const resolvedProfile: WaitingApprovalProfile = isMissingColumn
         ? ((await supabase
             .from("profiles")
-            .select("status")
+            .select("status, role")
             .eq("id", user.id)
             .maybeSingle()
           ).data as WaitingApprovalProfile | null) ?? { status: null, is_deleted: false }
@@ -59,7 +61,7 @@ export default function WaitingApprovalPage() {
       }
 
       if (profileStatus === "active") {
-        navigate({ to: "/dashboard" });
+        navigate({ to: getHomePath(resolvedProfile.role) });
       } else if (profileStatus === "inactive") {
         await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
       }

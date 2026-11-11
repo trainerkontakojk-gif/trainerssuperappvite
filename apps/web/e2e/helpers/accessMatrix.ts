@@ -3,6 +3,7 @@ const MANAGERS = ["admin", "trainer"] as const;
 const LEADERS = ["admin", "trainer", "leader"] as const;
 const ALL = ["admin", "trainer", "leader", "agent"] as const;
 const ADMIN = ["admin"] as const;
+const AGENT = ["agent"] as const;
 const rows = [
   ["GET", "/v1/admin/users", "admin.users", MANAGERS],
   ["PUT", "/v1/admin/users/:id/status", "admin.users", MANAGERS],
@@ -134,6 +135,7 @@ const rows = [
   ["POST", "/v1/pdkt/generate-template", "pdkt.templates.generate", LEADERS],
   ["POST", "/v1/pdkt/session/init", "pdkt.use", ALL],
   ["POST", "/v1/pdkt/session/create", "pdkt.use", ALL],
+  ["GET", "/v1/profiler/me", "profiler.self.read", AGENT],
   ["GET", "/v1/profiler/years", "profiler.read", LEADERS],
   ["POST", "/v1/profiler/years", "profiler.write", MANAGERS],
   ["DELETE", "/v1/profiler/years/:id", "profiler.write", MANAGERS],
@@ -189,6 +191,7 @@ const rows = [
   ["GET", "/v1/sidak/agents/:id/quickview", "sidak.read", LEADERS],
   ["GET", "/v1/sidak/agents/:id", "sidak.read", LEADERS],
   ["GET", "/v1/sidak/dashboard", "sidak.dashboard.read", ALL],
+  ["GET", "/v1/sidak/me", "sidak.self.read", AGENT],
   [
     "POST",
     "/v1/sidak/dashboard/refresh-summary",
