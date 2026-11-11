@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-11
 
+- docs(agents): record the leader single-folder Profiler learnings in the auto-updated session block
 - feat(profiler): open a leader's only permitted KTP folder directly instead of the folder picker; leaders with several folders still choose
 - refactor(home): remove the unused agent-summary endpoint, its service, type and real-backend spec
 - feat(agent): drop Beranda for agents so /dashboard redirects to their own SIDAK and the nav holds only SIDAK, KTP, KETIK, Telefun and PDKT

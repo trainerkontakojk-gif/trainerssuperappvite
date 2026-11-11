@@ -37,3 +37,18 @@ Use installed skills only where the canonical workflow requires them. `trainers-
 - [`docs/architecture.md`](docs/architecture.md) — runtime/architecture contracts.
 - [`DESIGN.md`](DESIGN.md) → [`docs/design.md`](docs/design.md) — design pointer and canonical design reference.
 - Turborepo: before changing `turbo.json` or Turbo commands, read the docs bundled with the installed `turbo` package (`node_modules/turbo/docs/`); they match the installed version.
+
+<!-- handoff:learnings:begin -->
+## Session Learnings (auto-updated by handoff)
+
+### Implicit Rules
+- Profiler E2E: pnpm --dir apps/web exec playwright test e2e/profiler-workspace.spec.ts --reporter=line --workers=1 (hermetic mocks in e2e/helpers/profilerMocks.ts)
+- Leader KTP route = /profiler behind LeaderAccessGate module ktp
+
+### Key Decisions
+- Decision: permitted folder = folder with scoped peserta count > 0 — Reason: backend getFolders for leader also returns parent folders; scoped counts exclude parents
+- Decision: auto-open once per mount via useRef — Reason: 'Ringkasan tahun' must still return to overview without re-redirect
+- Decision: skip auto-open when ?batch= or ?tim=1 present — Reason: respect explicit URL state
+- Decision: frontend-only, Lane B — Reason: no backend/permission/contract change; scope already enforced by resolveKtpScope
+
+<!-- handoff:learnings:end -->
