@@ -109,3 +109,10 @@ Fajar: after login an agent should see only their SIDAK QA data; `/dashboard` is
 - [x] RED: `agent-self-browser.spec.ts` — agent `/dashboard` redirects to own detail; agent nav hrefs exactly the five modules, no `/dashboard` link (both failed before the change).
 - [x] GREEN: router guard, module capability, mobile tabs, wordmark, 403 button; `authenticated-shell.spec.ts` agent nav matrix updated.
 - [x] Docs: `docs/modules.md`, `docs/e2e-testing.md`.
+
+## Revision 4 (2026-11-11): remove the unused agent-summary API
+
+Fajar asked to delete `GET /v1/home/agent-summary` now that the web no longer calls it.
+
+- Removed the route in `apps/api/src/routes/home.ts`, `services/home/agent-summary.ts`, the `AgentHomeSummary` type, `home-agent-summary-api.spec.ts` and its Playwright project. `sidak.dashboard.read` stays (still used by SIDAK dashboard routes).
+- [x] RED/GREEN: `agent-self-api.spec.ts` asserts the endpoint returns 404 for an agent (was 200).

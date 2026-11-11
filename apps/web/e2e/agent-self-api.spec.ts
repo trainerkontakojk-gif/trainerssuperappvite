@@ -224,7 +224,7 @@ test("KTP self endpoint rejects client input, staff roles and anonymous callers"
   expect((await call(path)).status).toBe(401);
 });
 
-test("agent still cannot open staff SIDAK or KTP lists, and SIDAK saya API is gone", async () => {
+test("agent still cannot open staff SIDAK or KTP lists, and the retired self APIs are gone", async () => {
   for (const path of [
     "/v1/profiler/peserta",
     `/v1/profiler/peserta/${other}`,
@@ -232,5 +232,6 @@ test("agent still cannot open staff SIDAK or KTP lists, and SIDAK saya API is go
     "/v1/sidak/dashboard/trend?year=2016",
   ])
     expect((await call(path, self.token)).status, path).toBe(403);
-  expect((await call("/v1/sidak/me", self.token)).status).toBe(404);
+  for (const path of ["/v1/sidak/me", "/v1/home/agent-summary"])
+    expect((await call(path, self.token)).status, path).toBe(404);
 });

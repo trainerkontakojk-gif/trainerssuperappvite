@@ -204,10 +204,6 @@ export default defineConfig({
       testMatch: "sidak-parallel-paging-api.spec.ts",
     },
     {
-      name: "home-agent-summary-real-backend",
-      testMatch: "home-agent-summary-api.spec.ts",
-    },
-    {
       name: "agent-self-real-backend",
       testMatch: "agent-self-api.spec.ts",
     },

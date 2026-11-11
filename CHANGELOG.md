@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-11
 
+- refactor(home): remove the unused agent-summary endpoint, its service, type and real-backend spec
 - feat(agent): drop Beranda for agents so /dashboard redirects to their own SIDAK and the nav holds only SIDAK, KTP, KETIK, Telefun and PDKT
 
 - feat(agent): open the agent's own read-only SIDAK agent detail after login instead of the summary page, and add a slide view to KTP saya
