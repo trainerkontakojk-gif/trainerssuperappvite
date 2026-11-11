@@ -11,7 +11,7 @@ import { findTextBelowFloor } from "./helpers/typographyFloor";
  * Beranda agent — hermetic.
  *
  * Kontrak (rencana `plans/markdown/shell-beranda-redesign.md`, hasil D):
- * aksi utama "Lanjutkan KETIK"; tanpa panel tren dan "Perlu tindakan";
+ * aksi utama "Lanjutkan KETIK"; tanpa panel tren dan "Perlu perhatian";
  * Fase 4 menambah QA pribadi, kuota dan riwayat Telefun. Endpoint SIDAK/admin
  * dan home/attention tetap terlarang; hanya home/agent-summary yang dibuka.
  * Guard fail-closed membuktikan tidak ada permintaan di luar allowlist.
@@ -155,7 +155,7 @@ test.describe("Beranda agent", () => {
     ).toHaveAttribute("href", "/telefun");
     await expect(practice.getByRole("link")).toHaveCount(3);
 
-    for (const absent of ["Tren temuan QA", "Perlu tindakan"]) {
+    for (const absent of ["Tren temuan QA", "Perlu perhatian"]) {
       await expect(main.getByRole("heading", { name: absent })).toHaveCount(0);
     }
     await expect(history(page).getByRole("row")).toHaveCount(4);

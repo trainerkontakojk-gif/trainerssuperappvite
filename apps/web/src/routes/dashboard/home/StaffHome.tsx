@@ -13,7 +13,7 @@ import { TrendCard } from "./TrendCard";
 import { useDashboardTrend } from "./useDashboardTrend";
 
 /**
- * Beranda admin/trainer/leader: Perlu tindakan → Tren temuan + Temuan per
+ * Beranda admin/trainer/leader: Perlu perhatian → Tren temuan + Temuan per
  * layanan → Aktivitas terakhir + Pintasan. Tiap section memuat datanya
  * sendiri, jadi kegagalan satu section tidak mengosongkan section lain.
  */

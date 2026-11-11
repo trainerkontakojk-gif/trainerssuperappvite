@@ -8,6 +8,7 @@ import type { Actor } from "../../middleware/role";
 import { getCurrentWibMonth } from "../../lib/timezone";
 import { getPendingLeaderRequests } from "../admin-service";
 import * as sidakService from "../sidak-service";
+import { getUpcomingBirthdays } from "../profiler-service";
 
 type Source = {
   kind: HomeAttentionKind;
@@ -15,7 +16,7 @@ type Source = {
 };
 
 /**
- * Item "Perlu tindakan" di Beranda. Setiap sumber memakai ulang fungsi dan
+ * Item "Perlu perhatian" di Beranda. Setiap sumber memakai ulang fungsi dan
  * scope yang sama dengan halaman asalnya, hanya dijalankan bila capability
  * peran mengizinkan, dan tidak saling menggagalkan.
  */
@@ -91,6 +92,31 @@ export async function getHomeAttention(
           count: exists ? 0 : 1,
           scope: "all",
           period: current,
+        };
+      },
+    });
+  }
+
+  if (can(actor.role, "participants.readAll")) {
+    sources.push({
+      kind: "upcoming_birthday",
+      // Fungsi yang sama dengan `GET /profiler/peserta/upcoming-birthdays`;
+      // `participants.readAll` berarti tanpa batas peserta (scope `all`).
+      load: async () => {
+        const [nearest] = await getUpcomingBirthdays(1, null);
+        if (!nearest) return null;
+        return {
+          kind: "upcoming_birthday",
+          count: 1,
+          scope: "all",
+          birthday: {
+            pesertaId: nearest.id,
+            nama: nearest.nama,
+            tglLahir: nearest.tgl_lahir,
+            batchName: nearest.batch_name,
+            daysUntil: nearest.daysUntil,
+            age: nearest.age,
+          },
         };
       },
     });

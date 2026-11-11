@@ -18,7 +18,7 @@ export interface AgentHomeSummary {
 }
 
 /**
- * Kontrak `GET /api/v1/home/attention` ("Perlu tindakan" di Beranda).
+ * Kontrak `GET /api/v1/home/attention` ("Perlu perhatian" di Beranda).
  *
  * Backend hanya mengirim item yang diizinkan capability pengguna dan yang
  * hitungannya > 0. Label dan CTA ditentukan UI dari `kind`.
@@ -30,6 +30,11 @@ export const HOME_ATTENTION_KINDS = [
   "agents_below_target",
   /** Periode QA bulan berjalan belum dibuat (`sidak.config.manage`). */
   "qa_period_missing",
+  /**
+   * Satu peserta dengan ulang tahun terdekat (`participants.readAll`). Selalu
+   * dikirim bila ada peserta bertanggal lahir; bukan tindakan, hanya pengingat.
+   */
+  "upcoming_birthday",
 ] as const;
 
 export type HomeAttentionKind = (typeof HOME_ATTENTION_KINDS)[number];
@@ -40,6 +45,20 @@ export interface HomeAttentionWorstAgent {
   nama: string;
   /** Rata-rata skor periode audit terakhir agen itu, 0–100. */
   score: number;
+}
+
+/** Peserta Profiler yang ulang tahunnya paling dekat (hari ini dalam WIB). */
+export interface HomeAttentionBirthday {
+  pesertaId: string;
+  nama: string;
+  /** Tanggal lahir `YYYY-MM-DD`. */
+  tglLahir: string;
+  /** Folder Profiler tempat peserta berada. */
+  batchName: string;
+  /** 0 = hari ini. */
+  daysUntil: number;
+  /** Usia yang dicapai pada ulang tahun itu. */
+  age: number;
 }
 
 export interface HomeAttentionItem {
@@ -55,6 +74,8 @@ export interface HomeAttentionItem {
    * dibatasi scope pemanggil.
    */
   worstAgents?: HomeAttentionWorstAgent[];
+  /** Hanya pada `upcoming_birthday`. */
+  birthday?: HomeAttentionBirthday;
 }
 
 export interface HomeAttentionResponse {

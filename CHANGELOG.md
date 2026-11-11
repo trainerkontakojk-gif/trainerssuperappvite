@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-11
+
+- feat(home): show the nearest participant birthday in the staff home attention list, renamed to Perlu perhatian
+
 ## 2026-11-10
 
 - perf(telefun): remove the retired OpenAI WebRTC orphan sweep

@@ -11,10 +11,11 @@ import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
  * Beranda staff (admin/trainer/leader) — hermetic.
  *
  * Kontrak (rencana `plans/markdown/shell-beranda-redesign.md`, hasil D):
- * urutan Header → Perlu tindakan → Tren temuan → Aktivitas
+ * urutan Header → Perlu perhatian → Tren temuan → Aktivitas
  * (hanya baca) + Pintasan; tanpa Workspace Terpadu, Opsi Manajerial, atau
- * tombol hapus log; "Perlu tindakan" dari `GET /home/attention` dengan state
- * kosong, error + coba lagi, dan sebagian; aksi dan pintasan sesuai peran.
+ * tombol hapus log; "Perlu perhatian" dari `GET /home/attention` dengan state
+ * kosong, error + coba lagi, dan sebagian, plus pengingat ulang tahun terdekat
+ * yang tidak dihitung sebagai hal menunggu; aksi dan pintasan sesuai peran.
  */
 
 // Jam browser dipatok ke Oktober 2026 supaya YTD = Jan–Okt 2026. Waktunya
@@ -225,7 +226,7 @@ function content(page: Page) {
 }
 
 function attentionSection(page: Page) {
-  return page.getByRole("region", { name: "Perlu tindakan" });
+  return page.getByRole("region", { name: "Perlu perhatian" });
 }
 
 function trendCard(page: Page) {
@@ -275,7 +276,7 @@ test.describe("Beranda staff", () => {
       .getByRole("heading", { level: 2 })
       .allTextContents();
     const expected = [
-      "Perlu tindakan",
+      "Perlu perhatian",
       "Tren temuan QA",
       "Temuan per layanan",
       "Aktivitas terakhir",
@@ -329,6 +330,56 @@ test.describe("Beranda staff", () => {
     await expect(
       rows.nth(2).getByRole("link", { name: /Buat periode/ }),
     ).toHaveAttribute("href", "/sidak/periods");
+    expectHermetic(audit);
+  });
+
+  const birthday = (daysUntil: number, tglLahir: string) => ({
+    kind: "upcoming_birthday",
+    count: 1,
+    scope: "all",
+    birthday: {
+      pesertaId: "p-1",
+      nama: "Budi Santoso",
+      tglLahir,
+      batchName: "Batch-12",
+      daysUntil,
+      age: 25,
+    },
+  });
+
+  test("perlu perhatian: ulang tahun terdekat dan tujuan folder", async ({
+    page,
+  }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([...ATTENTION_ITEMS, birthday(3, "2001-10-08")])),
+    });
+    const section = attentionSection(page);
+    const rows = section.getByRole("listitem");
+    await expect(rows).toHaveCount(4, { timeout: 20000 });
+    const row = rows.nth(3);
+    await expect(row).toContainText("Ulang tahun Budi Santoso ke-25");
+    await expect(row).toContainText("Profiler");
+    await expect(row).toContainText("8 Okt · 3 hari lagi · Batch-12");
+    await expect(
+      row.getByRole("link", { name: /Buka folder/ }),
+    ).toHaveAttribute("href", "/profiler?batch=Batch-12");
+    // Pengingat, bukan tindakan: tidak ikut dihitung di subjudul.
+    await expect(section.getByText("3 hal menunggu Anda")).toBeVisible();
+    expectHermetic(audit);
+  });
+
+  test("perlu perhatian: ulang tahun hari ini saja", async ({ page }) => {
+    const audit = await openHermeticShell(page, {
+      path: "/dashboard",
+      apiMocks: mocks(ok([birthday(0, "2001-10-05")])),
+    });
+    const section = attentionSection(page);
+    await expect(section.getByRole("listitem")).toHaveCount(1, {
+      timeout: 20000,
+    });
+    await expect(section).toContainText("5 Okt · Hari ini · Batch-12");
+    await expect(section.getByText(/hal menunggu Anda/)).toHaveCount(0);
     expectHermetic(audit);
   });
 

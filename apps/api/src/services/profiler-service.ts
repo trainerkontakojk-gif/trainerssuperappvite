@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "../lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllPages } from "../lib/supabase-pagination";
-import { normalizeRole } from "@trainers/types";
+import { normalizeRole, wibToday } from "@trainers/types";
 import { resolveDataScope, scopePesertaIds } from "./access/scope";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
 import type {
@@ -88,24 +88,28 @@ export async function getUpcomingBirthdays(
     },
   });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // "Hari ini" dalam WIB, dan tanggal lahir dibaca sebagai teks: jam server
+  // (UTC di produksi) tidak boleh menggeser hitungan hari.
+  const [ty, tm, td] = wibToday().split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const todayMs = Date.UTC(ty, tm - 1, td);
 
   const enriched = rows
     .filter((r) => r.tgl_lahir)
     .map((r) => {
-      const dob = new Date(r.tgl_lahir!);
-      const next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-      if (next < today) next.setFullYear(today.getFullYear() + 1);
-      const daysUntil = Math.round(
-        (next.getTime() - today.getTime()) / 86400000,
-      );
-      const nextYear =
-        today.getMonth() > dob.getMonth() ||
-        (today.getMonth() === dob.getMonth() && today.getDate() > dob.getDate())
-          ? today.getFullYear() + 1
-          : today.getFullYear();
-      const age = nextYear - dob.getFullYear();
+      const [by, bm, bd] = r.tgl_lahir!.slice(0, 10).split("-").map(Number) as [
+        number,
+        number,
+        number,
+      ];
+      // 29 Feb di tahun bukan kabisat jatuh ke 1 Mar (overflow Date.UTC).
+      let next = Date.UTC(ty, bm - 1, bd);
+      if (next < todayMs) next = Date.UTC(ty + 1, bm - 1, bd);
+      const daysUntil = Math.round((next - todayMs) / 86400000);
+      const age = new Date(next).getUTCFullYear() - by;
       return {
         id: r.id,
         nama: r.nama || "Unknown",

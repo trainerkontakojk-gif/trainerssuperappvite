@@ -673,7 +673,7 @@
     }
   }
 
-  /* Daftar berbaris: Perlu tindakan, Aktivitas, Pintasan, Latihan agent. */
+  /* Daftar berbaris: Perlu perhatian, Aktivitas, Pintasan, Latihan agent. */
   .home-attention,
   .home-rows {
     border: 1px solid var(--border);

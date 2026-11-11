@@ -25,6 +25,11 @@ import {
  * `agents_below_target`: maksimal tiga agen berisiko dengan skor terendah
  * (seri diurutkan nama), hanya dari direktori yang sudah dibatasi scope.
  *
+ * `upcoming_birthday` (admin/trainer saja, capability `participants.readAll`)
+ * memuat satu peserta dengan ulang tahun terdekat — sama dengan baris pertama
+ * `GET /profiler/peserta/upcoming-birthdays?limit=1`; leader dan agent tidak
+ * pernah menerimanya. "Hari ini" dihitung dalam WIB.
+ *
  * Fixture memakai nama unik per run dan dibersihkan di `afterAll`. Kegagalan
  * sumber disuntikkan di batas jaringan Supabase (fetch ke `qa_periods`), bukan
  * dengan mengubah kode produk.
@@ -85,6 +90,7 @@ type AttentionItem = {
   scope: string;
   period?: unknown;
   worstAgents?: { agentId: string; nama: string; score: number }[];
+  birthday?: unknown;
 };
 
 async function attention(token: string) {
@@ -219,6 +225,15 @@ test.beforeAll(async () => {
     );
   }
 
+  // Peserta pertama berulang tahun ke-30 hari ini (WIB), jadi ulang tahun
+  // terdekat pasti jatuh hari ini.
+  runSql(
+    env,
+    `UPDATE profiler_peserta
+       SET tgl_lahir = ((now() AT TIME ZONE 'Asia/Jakarta')::date - interval '30 years')::date
+     WHERE id=${quoted(created.pesertaIds[0]!)};`,
+  );
+
   // Leader hanya punya scope SIDAK atas empat agen pertama (rantai produksi:
   // request approved → request_groups → access_group_items).
   created.groupId = sqlOne(
@@ -350,6 +365,43 @@ test("trainer: item mengikuti sumber aslinya", async () => {
   );
   // Item berhitungan 0 tidak pernah dikirim.
   for (const item of data.items) expect(item.count).toBeGreaterThan(0);
+});
+
+test("trainer: ulang tahun terdekat sama dengan daftar Profiler", async () => {
+  const data = await attention(trainer.token);
+  const response = await get(
+    "/profiler/peserta/upcoming-birthdays?limit=1",
+    trainer.token,
+  );
+  expect(response.status).toBe(200);
+  const [nearest] = (await response.json()).data as {
+    id: string;
+    nama: string;
+    tgl_lahir: string;
+    batch_name: string;
+    daysUntil: number;
+    age: number;
+  }[];
+  // Fixture berulang tahun hari ini, jadi yang terdekat juga hari ini.
+  expect(nearest?.daysUntil).toBe(0);
+  expect(
+    data.items.filter((item) => item.kind === "upcoming_birthday"),
+  ).toEqual([
+    {
+      kind: "upcoming_birthday",
+      count: 1,
+      scope: "all",
+      birthday: {
+        pesertaId: nearest!.id,
+        nama: nearest!.nama,
+        tglLahir: nearest!.tgl_lahir,
+        batchName: nearest!.batch_name,
+        daysUntil: 0,
+        age: nearest!.age,
+      },
+    },
+  ]);
+  if (nearest!.id === created.pesertaIds[0]) expect(nearest!.age).toBe(30);
 });
 
 test("leader: hanya agen di scope timnya, tanpa item admin/konfigurasi", async () => {

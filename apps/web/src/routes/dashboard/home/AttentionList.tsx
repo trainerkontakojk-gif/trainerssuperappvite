@@ -1,5 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import type { HomeAttentionItem, HomeAttentionKind } from "@trainers/types";
+import {
+  formatWibDay,
+  type HomeAttentionItem,
+  type HomeAttentionKind,
+} from "@trainers/types";
+import { Cake } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { homeClient, unwrapResponse } from "../../../lib/api";
 import QaStatePanel from "../../../components/ui/QaStatePanel";
@@ -28,6 +33,15 @@ type Copy = {
   /** Query tambahan pada tautan CTA (mis. filter status daftar agen). */
   search?: Record<string, string>;
 };
+
+/** Pengingat, bukan tindakan: tanpa angka dan tidak ikut "hal menunggu". */
+const REMINDER_KINDS = new Set<HomeAttentionKind>(["upcoming_birthday"]);
+
+function daysUntilLabel(days: number): string {
+  if (days === 0) return "Hari ini";
+  if (days === 1) return "Besok";
+  return `${days} hari lagi`;
+}
 
 /**
  * Baris kedua item "agen di bawah target": tiga agen terjauh beserta sisanya.
@@ -73,6 +87,22 @@ const COPY: Record<HomeAttentionKind, (item: HomeAttentionItem) => Copy> = {
     cta: "Buat periode",
     href: "/sidak/periods",
   }),
+  upcoming_birthday: (item) => {
+    const b = item.birthday;
+    return {
+      title: b
+        ? `Ulang tahun ${b.nama} ke-${b.age}`
+        : "Ulang tahun peserta terdekat",
+      meta: b
+        ? `${formatWibDay(b.tglLahir.slice(0, 10), false)} · ${daysUntilLabel(b.daysUntil)} · ${b.batchName}`
+        : "",
+      module: "Profiler",
+      moduleColor: "var(--module-profiler)",
+      cta: "Buka folder",
+      href: "/profiler",
+      search: b ? { batch: b.batchName } : undefined,
+    };
+  },
 };
 
 type State =
@@ -80,7 +110,7 @@ type State =
   | { status: "error" }
   | { status: "ready"; items: HomeAttentionItem[]; partial: boolean };
 
-/** "Perlu tindakan": item dari `GET /home/attention`, sesuai capability. */
+/** "Perlu perhatian": item dari `GET /home/attention`, sesuai capability. */
 export function AttentionList() {
   const [state, setState] = useState<State>({ status: "loading" });
 
@@ -98,6 +128,11 @@ export function AttentionList() {
     void load();
   }, [load]);
 
+  const waiting =
+    state.status === "ready"
+      ? state.items.filter((item) => !REMINDER_KINDS.has(item.kind)).length
+      : 0;
+
   const retry = (
     <Button
       type="button"
@@ -113,12 +148,10 @@ export function AttentionList() {
     <section aria-labelledby="home-attention-title" className="home-section">
       <div className="home-section-head">
         <h2 id="home-attention-title" className="home-section-title">
-          Perlu tindakan
+          Perlu perhatian
         </h2>
-        {state.status === "ready" && state.items.length > 0 && (
-          <p className="home-section-sub">
-            {state.items.length} hal menunggu Anda
-          </p>
+        {waiting > 0 && (
+          <p className="home-section-sub">{waiting} hal menunggu Anda</p>
         )}
       </div>
 
@@ -173,7 +206,17 @@ export function AttentionList() {
               const worst = worstAgentsLine(item);
               return (
                 <li key={item.kind} className="home-attention-row">
-                  <span className="home-attention-count">{item.count}</span>
+                  <span className="home-attention-count">
+                    {REMINDER_KINDS.has(item.kind) ? (
+                      <Cake
+                        className="h-6 w-6"
+                        style={{ color: copy.moduleColor }}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      item.count
+                    )}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-fg">
                       {copy.title}
