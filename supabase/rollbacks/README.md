@@ -203,3 +203,8 @@ done
 - `rollback_20261018090000_monitoring_sessions.sql` drops the Monitoring
   session view, its paging function and the `profiler_peserta.trainer_id`
   index. No data loss; the API falls back to reading every session.
+- `rollback_20261113100000_efek_tna_plan_link.sql` restores the original
+  `efek_save_sessions`, then drops `efek_sessions.tna_plan_id` and its index.
+  Data loss: every EFEK session ↔ TNA plan link is removed; sessions and plans
+  themselves are kept. Roll back the API/web first, since they select
+  `tna_plans(...)` through that column.

@@ -26,6 +26,7 @@ import {
   TnaPracticeUnavailableError,
   unavailableTnaPlanPractice,
 } from "./practice";
+import { loadTnaPlanEfek } from "./plan-efek";
 
 export async function listTnaPrograms(supabase: SupabaseClient) {
   const { data, error } = await supabase
@@ -278,8 +279,14 @@ export async function getTnaPlanDetail(
           })),
         )
       : null;
+  const efek = await loadTnaPlanEfek(
+    supabase,
+    plan.id,
+    participants.flatMap((p) => (p.peserta_id ? [p.peserta_id] : [])),
+  );
   return {
     plan,
+    service_type: need.service_type,
     participants,
     practice_targets: practiceTargets,
     practice,
@@ -293,6 +300,7 @@ export async function getTnaPlanDetail(
     preview: computed?.snapshot ?? null,
     participant_preview: computed?.participantBaselines ?? null,
     program: shownProgram,
+    efek,
     narrative: snapshot
       ? buildTnaNarrative({
           snapshot,

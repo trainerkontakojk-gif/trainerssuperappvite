@@ -6,6 +6,8 @@ import {
   efekProgramCodeSchema,
   efekReportQuerySchema,
   efekSessionInputSchema,
+  serviceTypeSchema,
+  tanggalSchema,
 } from "@trainers/types";
 import type { AuthVariables } from "../middleware/auth";
 import { requireCapability } from "../middleware/role";
@@ -16,6 +18,7 @@ import {
   deleteEfekSession,
   getEfekSession,
   importEfekSessions,
+  listEfekPlanOptions,
   listEfekPrograms,
   listEfekSessions,
   matchEfekNames,
@@ -60,6 +63,10 @@ const invalidInput = (c: EfekContext) =>
     },
     400,
   );
+
+const planOptionsQuerySchema = z
+  .object({ service_type: serviceTypeSchema, start_date: tanggalSchema })
+  .strict();
 
 const writeContext = (c: EfekContext) => ({
   actorId: c.get("user").id,
@@ -117,6 +124,20 @@ export const efek = new Hono<{ Variables: AuthVariables }>()
     try {
       const id = await createEfekSession(writeContext(c), parsed.data);
       return c.json({ success: true as const, data: { id } }, 201);
+    } catch (error) {
+      return efekFailure(c, error);
+    }
+  })
+  .get("/plan-options", requireCapability("tna.read"), async (c) => {
+    const parsed = planOptionsQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) return invalidInput(c);
+    try {
+      const data = await listEfekPlanOptions(
+        readClient(c),
+        parsed.data.service_type,
+        parsed.data.start_date,
+      );
+      return c.json({ success: true as const, data });
     } catch (error) {
       return efekFailure(c, error);
     }

@@ -46,6 +46,8 @@ Lane C/D persisted plans live in [`plans/markdown/`](markdown/) and are tracked 
 
 ## Module behavior plans
 
+- [EFEK ↔ TNA — tautan sesi kelas ke rencana TNA](markdown/efek-tna-plan-link.md) — Lane D; DONE di `main` (2026-11-13): migrasi + rollback, API/tipe/UI; edit tanpa `tna_plan_id` mempertahankan tautan. API `tna-real-backend` 122/122, browser `tna-efek-plan-link` + `tna-efek` 24/24, root typecheck/lint/build lulus. Migrasi remote belum dijalankan (butuh izin Fajar).
+
 - [KETIK — Integritas, Ketahanan, dan Riwayat](markdown/ketik-integrity-resilience.md) — A/C/B.1/B.2/D/E DONE lokal. E: durable review worker, atomic rerun, izin/legacy UI; API 13/13, UI 4/4. Typecheck/lint lulus; build lulus pada source snapshot identik (ancestor ignore file di luar repo macet). Checkpoint A–D `63785527`; E ditutup melalui commit lokal atas instruksi user, tanpa push/deploy/remote migration. Evidence dan batas verifikasi tercatat di plan.
 
 - [PDKT Navigation Flow](markdown/pdkt-navigation-flow.md) — Lane C; IMPLEMENTED lokal: PDKT 50/50, root typecheck/lint/build lulus; suite default tertahan assertion copy Monitoring yang stale. Tanpa commit, push, atau PR.

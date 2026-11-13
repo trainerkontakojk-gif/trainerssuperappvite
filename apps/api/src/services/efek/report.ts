@@ -12,7 +12,9 @@ import type {
   EfekReportQuery,
   EfekSessionSummary,
   ServiceType,
+  TnaPlanStatus,
 } from "@trainers/types";
+import { efekReportQuerySchema } from "@trainers/types";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
@@ -70,6 +72,11 @@ interface SessionRow {
   service_type: ServiceType;
   start_date: string;
   end_date: string;
+  tna_plans: {
+    id: string;
+    title: string;
+    status: TnaPlanStatus;
+  } | null;
   efek_participants: {
     peserta_id: string;
     profiler_peserta: { nama: string; tim: string | null } | null;
@@ -110,18 +117,23 @@ type Result = Omit<EfekParticipantResult, "months"> & {
   months: Point[];
 };
 
-async function loadSessions(supabase: SupabaseClient, program?: string) {
+async function loadSessions(
+  supabase: SupabaseClient,
+  program?: string,
+  onlySessionIds?: string[],
+) {
   return fetchAllPages<SessionRow>({
     build: ({ from, to }) => {
       let query = supabase
         .from("efek_sessions")
         .select(
-          "id, program_code, title, service_type, start_date, end_date, efek_participants(peserta_id, profiler_peserta(nama, tim))",
+          "id, program_code, title, service_type, start_date, end_date, tna_plans(id, title, status), efek_participants(peserta_id, profiler_peserta(nama, tim))",
         )
         .order("start_date", { ascending: false })
         .order("id")
         .range(from, to);
       if (program) query = query.eq("program_code", program);
+      if (onlySessionIds) query = query.in("id", onlySessionIds);
       return query as unknown as PromiseLike<{
         data: SessionRow[] | null;
         error: { message: string } | null;
@@ -278,13 +290,14 @@ async function build(
   supabase: SupabaseClient,
   query: EfekReportQuery,
   program?: string,
+  onlySessionIds?: string[],
 ): Promise<Built> {
   const { window } = query;
   const exclusions = new Map(
     (query.exclusions ?? []).map((r) => [r.peserta_id, r.reason]),
   );
   const current = currentEfekMonth();
-  const allSessions = await loadSessions(supabase, program);
+  const allSessions = await loadSessions(supabase, program, onlySessionIds);
   const sessions = allSessions
     .filter(
       (s) =>
@@ -545,6 +558,7 @@ function sessionSummaries(built: Built): EfekSessionSummary[] {
             : "terukur",
       months_after_closed: closed,
       first_after: toMonth(end + 1),
+      tna_plan: s.tna_plans,
     };
   });
 }
@@ -684,4 +698,23 @@ export async function getEfekProgramReport(
       )
       .map(publicResult),
   };
+}
+
+/**
+ * Status and mean Δ for a bounded set of sessions in one build, so a TNA plan
+ * with several linked sessions does not repeat the whole report per session.
+ * Default window and proper-input mode match the EFEK report.
+ */
+export async function getEfekSessionSummaries(
+  supabase: SupabaseClient,
+  sessionIds: string[],
+): Promise<Map<string, EfekSessionSummary>> {
+  if (!sessionIds.length) return new Map();
+  const built = await build(
+    supabase,
+    efekReportQuerySchema.parse({}),
+    undefined,
+    sessionIds,
+  );
+  return new Map(sessionSummaries(built).map((s) => [s.id, s]));
 }

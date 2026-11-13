@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { serviceTypeSchema, tanggalSchema, type ServiceType } from "./sidak";
+import type { TnaPlanStatus } from "./tna";
 
 /** EFEK (Evaluasi Efektivitas dan Kinerja): training sessions and participants. */
 export const efekProgramCodeSchema = z
@@ -18,16 +19,22 @@ const pesertaIds = z
     message: "Peserta tidak boleh ganda",
   });
 
+const baseSessionFields = {
+  program_code: efekProgramCodeSchema,
+  title: z.string().trim().min(3).max(160),
+  service_type: serviceTypeSchema,
+  start_date: tanggalSchema,
+  end_date: tanggalSchema,
+  peserta_ids: pesertaIds,
+};
 const sessionFields = z
   .object({
-    program_code: efekProgramCodeSchema,
-    title: z.string().trim().min(3).max(160),
-    service_type: serviceTypeSchema,
-    start_date: tanggalSchema,
-    end_date: tanggalSchema,
-    peserta_ids: pesertaIds,
+    ...baseSessionFields,
+    tna_plan_id: z.string().uuid().nullable().optional(),
   })
   .strict();
+// Imports merge into existing sessions, so they never choose a link.
+const importSessionFields = z.object(baseSessionFields).strict();
 
 const validDates = (s: { start_date: string; end_date: string }) =>
   s.end_date >= s.start_date &&
@@ -46,7 +53,7 @@ export type EfekSessionInput = z.infer<typeof efekSessionInputSchema>;
 export const efekImportInputSchema = z
   .object({
     sessions: z
-      .array(efekSessionInputSchema)
+      .array(importSessionFields.refine(validDates, datesIssue))
       .min(1)
       .max(EFEK_MAX_IMPORT_SESSIONS),
   })
@@ -79,6 +86,19 @@ export interface EfekSession {
   end_date: string;
   participant_count: number;
   updated_at: string;
+  /** The TNA plan this session measures, when linked. */
+  tna_plan: { id: string; title: string; status: TnaPlanStatus } | null;
+}
+
+/** Linkable plan for the EFEK session form (statuses aktif/evaluasi/selesai). */
+export interface EfekPlanOption {
+  id: string;
+  title: string;
+  status: TnaPlanStatus;
+  start_date: string;
+  end_date: string;
+  service_type: ServiceType;
+  participant_ids: string[];
 }
 
 export interface EfekParticipant {
@@ -235,6 +255,8 @@ export interface EfekSessionSummary {
   status: EfekSessionStatus;
   months_after_closed: number;
   first_after: EfekMonth;
+  /** Linked TNA plan, when the session was created or edited with one. */
+  tna_plan: { id: string; title: string; status: TnaPlanStatus } | null;
 }
 
 export interface EfekChartPoint {

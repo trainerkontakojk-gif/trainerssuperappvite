@@ -211,7 +211,9 @@ export default function TnaResults() {
         >
           EFEK
         </Link>
-        . Perbandingan bersifat indikatif, bukan bukti sebab-akibat.
+        . Sesi kelas yang tertaut ke sebuah rencana tampil di detail rencana,
+        tanpa digabung ke angka verdict. Perbandingan bersifat indikatif, bukan
+        bukti sebab-akibat.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-3">

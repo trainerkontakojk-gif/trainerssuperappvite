@@ -45,6 +45,7 @@ const sessions: EfekSession[] = [
     end_date: "2026-05-16",
     participant_count: 2,
     updated_at: "2026-10-19T10:00:00.000Z",
+    tna_plan: null,
   },
   {
     id: "9a4b3c2d-1e5f-4a6b-9c7d-8e9f0a1b2c3d",
@@ -55,6 +56,7 @@ const sessions: EfekSession[] = [
     end_date: "2026-07-14",
     participant_count: 4,
     updated_at: "2026-10-19T10:00:00.000Z",
+    tna_plan: null,
   },
 ];
 const summary = (

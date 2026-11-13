@@ -5,7 +5,7 @@ import QaStatePanel from "../../components/ui/QaStatePanel";
 import { SERVICE_LABELS } from "../../lib/scoring";
 import { Surface, Field, State } from "./shared";
 import { TnaTabs } from "./TnaTabs";
-import { selectClass, sessionDates } from "./utils";
+import { planStatusLabels, selectClass, sessionDates } from "./utils";
 import { ProgramStats, ReportFilters } from "./efek-report-ui";
 import {
   deltaClass,
@@ -201,6 +201,13 @@ export default function EfekIndex() {
                           >
                             {s.title}
                           </Link>
+                          {s.tna_plan && (
+                            <span className="block text-xs text-muted-foreground">
+                              Rencana: {s.tna_plan.title}
+                              {s.tna_plan.status === "dibatalkan" &&
+                                ` · ${planStatusLabels.dibatalkan}`}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-1">
                           <Link

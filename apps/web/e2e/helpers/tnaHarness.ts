@@ -137,6 +137,8 @@ export function planDetail(status: TnaPlan["status"] = "draft"): TnaPlanDetail {
       status,
       baseline_snapshot: status === "aktif" ? baseline : null,
     },
+    service_type: "call",
+    efek: { state: "ok", sessions: [] },
     program: {
       code: program.code,
       name: program.name,
@@ -222,6 +224,23 @@ export const defaults: ApiMock[] = [
     method: "POST",
     path: `/api/v1/tna/plans/${ids.plan}/cancel`,
     body: ok({ ...plan, status: "dibatalkan" }),
+  },
+  {
+    method: "GET",
+    path: "/api/v1/tna/efek/programs",
+    body: ok([
+      {
+        code: "ketik",
+        name: "KETIK",
+        default_service_type: "chat",
+        sort_order: 1,
+      },
+    ]),
+  },
+  {
+    method: "GET",
+    path: /^\/api\/v1\/tna\/efek\/plan-options\?/,
+    body: ok([]),
   },
   {
     method: "GET",

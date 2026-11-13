@@ -575,6 +575,17 @@ Advisor produksi 2026-11-09 (lint `0001_unindexed_foreign_keys`) menandai sepulu
 - Verifikasi read-only pasca-apply: versi tercatat; sepuluh indeks `indisvalid` dan `indisready`; query aturan E2E di produksi mengembalikan `[]` (tidak ada FK TNA tanpa indeks); 7 program tetap.
 - Advisor performance sesudahnya: `unindexed_foreign_keys` 45 → 35 (kesepuluh temuan TNA hilang). Sepuluh indeks baru muncul sebagai `unused_index` (INFO) karena tabelnya hampir kosong dan indeks belum pernah dibaca; ini diharapkan dan bukan alasan untuk menghapusnya.
 
+## EFEK — tautan sesi ke rencana TNA
+
+Migration `20261113100000_efek_tna_plan_link.sql` menambah relasi opsional dari sesi pelatihan EFEK ke rencana TNA (plan `plans/markdown/efek-tna-plan-link.md`).
+
+- **Kolom:** `public.efek_sessions.tna_plan_id uuid NULL REFERENCES public.tna_plans(id) ON DELETE SET NULL`. Satu sesi menaut ke paling banyak satu rencana; satu rencana dapat memiliki banyak sesi. Indeks parsial `idx_efek_sessions_tna_plan` hanya mencakup baris bertaut dan menutup FK tersebut.
+- **RLS dan grant tidak berubah.** `efek_sessions` tetap hanya-baca untuk admin/trainer; `tna_plans` sudah terbaca oleh peran yang sama. Semua tulis tetap lewat `public.efek_save_sessions` dengan signature, ACL, `search_path`, dan guard yang sama.
+- **Validasi RPC:** `tna_plan_id` opsional. Bila diisi pada `create`, atau berubah pada `replace`, rencana harus ada, berstatus `aktif`/`evaluasi`/`selesai`, `tna_needs.service_type` sama dengan `service_type` sesi, dan `start_date` sesi berada di antara `start_date`/`end_date` rencana. Pelanggaran → `EFEK_PLAN_INVALID`. Pada `replace`, tautan yang tidak berubah tetap diterima meskipun rencana sudah `dibatalkan` (hanya nilai baru yang divalidasi). Pada `replace`, key `tna_plan_id` yang tidak dikirim mempertahankan tautan tersimpan; hanya `null` eksplisit yang melepasnya. Mode `merge` (impor) tidak pernah menyentuh `tna_plan_id`; sesi baru hasil impor tidak bertaut. Payload impor dengan `tna_plan_id` ditolak skema strict (400).
+- **Baca:** detail rencana memakai JWT pengguna (RLS) untuk membaca sesi tertaut dan menghitung status/Δ lewat service laporan EFEK dalam satu build; kegagalan baca hanya membuat bagian `efek` menjadi `unavailable`.
+- **Rollback:** `supabase/rollbacks/rollback_20261113100000_efek_tna_plan_link.sql` mengembalikan definisi `efek_save_sessions` dari `20261019160000_efek_training_sessions.sql`, lalu membuang indeks dan kolom. Replay lokal diuji dengan `supabase db reset`, rollback, dan migrasi ulang.
+- **Verifikasi:** `apps/web/e2e/tna-efek-plan-link-api.spec.ts` mencakup create/update/lepas tautan, penolakan 422, impor `merge`, `plan-options`, izin `tna.read`, dan detail rencana `efek`.
+
 ## Storage
 
 Aplikasi menggunakan Supabase Storage bucket:

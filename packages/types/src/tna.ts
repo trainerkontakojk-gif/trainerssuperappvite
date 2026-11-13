@@ -5,7 +5,9 @@ import {
   serviceTypeSchema,
   tanggalSchema,
   type RootCauseResult,
+  type ServiceType,
 } from "./sidak";
+import type { EfekSessionStatus } from "./efek";
 
 export const tnaGapTypeSchema = z.enum([
   "knowledge",
@@ -575,6 +577,8 @@ export const tnaParametersResponseSchema = z.object({
 export type TnaParametersResponse = z.infer<typeof tnaParametersResponseSchema>;
 export interface TnaPlanDetail {
   plan: TnaPlan;
+  /** Service measured by the need; prefills a linked EFEK session. */
+  service_type: ServiceType;
   /** P-3: activation snapshot when present, else the current catalog row. */
   program: TnaProgramSnapshot & { source: "snapshot" | "catalog" };
   participants: TnaPlanParticipant[];
@@ -587,6 +591,26 @@ export interface TnaPlanDetail {
   evaluation_period_options?: TnaEvaluationPeriodOption[];
   practice_targets?: TnaPracticeTarget[];
   practice?: TnaPlanPractice | null;
+  /** Informational only: never feeds the TNA verdict. */
+  efek: TnaPlanEfek;
+}
+
+/** Linked EFEK sessions shown on a plan. `unavailable` keeps the plan readable. */
+export type TnaPlanEfek =
+  | { state: "ok"; sessions: TnaPlanEfekSession[] }
+  | { state: "unavailable" };
+
+export interface TnaPlanEfekSession {
+  id: string;
+  program_code: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  participant_count: number;
+  /** Participants also listed on the plan roster. */
+  roster_overlap: number;
+  status: EfekSessionStatus;
+  mean_delta: number | null;
 }
 
 export interface TnaParameterDetail {

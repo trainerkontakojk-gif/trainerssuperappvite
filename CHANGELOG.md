@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-13
+
+- feat(tna): link EFEK training sessions to a TNA plan, prefill sessions from a plan, and show linked sessions on plan detail without changing the verdict
+
 ## 2026-11-11
 
 - fix(sidak): show up to five largest score-deducting tickets in the agent coaching brief and copied summary

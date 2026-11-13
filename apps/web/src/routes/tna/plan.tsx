@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import type {
   CreateTnaPlan,
   TnaPlanDetail,
+  TnaPlanEfekSession,
   UpdateTnaDraftPlan,
 } from "@trainers/types";
+import { can } from "@trainers/types";
+import { useAuthStore } from "../../store/authStore";
 import { useApi } from "../../hooks/useApi";
 import { rpcClient } from "../../lib/api/rpc-client";
 import { Button } from "../../components/ui/button";
+import QaStatePanel from "../../components/ui/QaStatePanel";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +25,11 @@ import {
   interventionLabels,
   planStatusLabels,
   practiceTargetsText,
+  sessionDates,
   useTnaMutation,
   tnaResponse,
 } from "./utils";
+import { deltaClass, fmtDelta } from "./efek-report-format";
 import { PracticeProgress } from "./Practice";
 import { canExportTnaPlan, downloadTnaPlanHtml } from "./plan-export";
 import { PlanForm } from "./PlanForm";
@@ -69,6 +75,8 @@ function PlanContent({
   }, [mutation.error]);
   const [confirm, setConfirm] = useState<"activate" | "cancel" | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const role = useAuthStore((state) => state.profile?.role);
+  const canWriteEfek = can(role, "tna.write");
   const p = d.plan;
   const draft = p.status === "draft";
   const baseline = draft ? d.preview : p.baseline_snapshot;
@@ -257,6 +265,16 @@ function PlanContent({
           retry={reload}
         />
       )}
+      {(p.status === "aktif" ||
+        p.status === "evaluasi" ||
+        p.status === "selesai") && (
+        <LinkedEfekSessions
+          detail={d}
+          planActive={p.status === "aktif"}
+          canWrite={canWriteEfek}
+          retry={reload}
+        />
+      )}
       <Evaluation detail={d} mutation={mutation} reload={reload} />
       {p.cancel_reason && (
         <p className="max-w-[70ch] whitespace-pre-wrap text-sm">
@@ -375,5 +393,94 @@ function PlanContent({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const efekStatusLabels: Record<TnaPlanEfekSession["status"], string> = {
+  terukur: "Terukur",
+  sebagian: "Sebagian",
+  menunggu: "Menunggu",
+};
+
+/** Informational only; the TNA verdict never reads these numbers. */
+function LinkedEfekSessions({
+  detail: d,
+  planActive,
+  canWrite,
+  retry,
+}: {
+  detail: TnaPlanDetail;
+  planActive: boolean;
+  canWrite: boolean;
+  retry: () => unknown;
+}) {
+  const createLink = planActive && canWrite && (
+    <Link
+      to="/tna/efek/sesi/baru"
+      search={{ plan: d.plan.id }}
+      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-foreground bg-foreground px-4 text-sm font-medium text-background"
+    >
+      Catat sesi pelatihan
+    </Link>
+  );
+  return (
+    <section className="space-y-3" aria-label="Sesi kelas EFEK">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-heading text-xl font-bold">Sesi kelas (EFEK)</h2>
+        {createLink}
+      </div>
+      {d.efek.state === "unavailable" ? (
+        <QaStatePanel
+          type="error"
+          title="Data sesi kelas belum bisa dimuat."
+          description="Rencana tetap dapat dibaca. Coba lagi untuk memuat sesi kelas."
+          action={
+            <Button variant="outline" onClick={() => retry()}>
+              Coba lagi
+            </Button>
+          }
+        />
+      ) : d.efek.sessions.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Belum ada sesi kelas tertaut.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {d.efek.sessions.map((s) => (
+            <li
+              key={s.id}
+              className="flex flex-col gap-1 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+            >
+              <div className="min-w-0 space-y-1">
+                <Link
+                  to="/tna/efek/program/$code"
+                  params={{ code: s.program_code }}
+                  search={{ session: s.id }}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {s.title}
+                </Link>
+                <p className="text-sm text-muted-foreground">
+                  {s.program_code.toUpperCase()} · {sessionDates(s)} ·{" "}
+                  {s.roster_overlap} dari {d.participants.length} peserta rencana
+                  ikut sesi ini
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-4 text-sm">
+                <span>{efekStatusLabels[s.status]}</span>
+                <span
+                  className={`font-semibold tabular-nums ${deltaClass(s.mean_delta)}`}
+                >
+                  Δ {fmtDelta(s.mean_delta)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-sm text-muted-foreground">
+        Δ EFEK informatif, tidak memengaruhi verdict.
+      </p>
+    </section>
   );
 }

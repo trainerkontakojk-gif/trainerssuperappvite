@@ -9,23 +9,26 @@ import {
   VALID_SERVICE_TYPES,
   efekSessionInputSchema,
   EFEK_MAX_PARTICIPANTS,
+  type EfekPlanOption,
   type EfekProgram,
   type EfekSessionDetail,
   type ServiceType,
+  type TnaPlanDetail,
 } from "@trainers/types";
 import { useApi } from "../../hooks/useApi";
+import type { EfekSessionSearch } from "../../router";
 import {
   rpcClient,
   type SimulationSubjectOption,
 } from "../../lib/api/rpc-client";
-import { unwrapResponse } from "../../lib/api/unwrap-response";
+import { ApiError, unwrapResponse } from "../../lib/api/unwrap-response";
 import QaStatePanel from "../../components/ui/QaStatePanel";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { SERVICE_LABELS } from "../../lib/scoring";
 import { Surface, Field, State, MutationState } from "./shared";
 import { TnaTabs } from "./TnaTabs";
-import { selectClass, useTnaMutation } from "./utils";
+import { planStatusLabels, selectClass, useTnaMutation } from "./utils";
 
 type Person = { id: string; nama: string; tim: string | null };
 
@@ -33,12 +36,14 @@ type Person = { id: string; nama: string; tim: string | null };
 export default function EfekSessionPage() {
   const params = useParams({ strict: false }) as { id?: string };
   const id = params.id;
-  const search = useSearch({ strict: false }) as { program?: string };
+  const search = useSearch({ strict: false }) as EfekSessionSearch;
   const programs = useApi<EfekProgram[]>("/tna/efek/programs");
   const existing = useApi<EfekSessionDetail>(
     id ? `/tna/efek/sessions/${id}` : null,
   );
-  const ready = programs.data && (!id || existing.data);
+  const planId = !id && search.plan ? search.plan : null;
+  const plan = useApi<TnaPlanDetail>(planId ? `/tna/plans/${planId}` : null);
+  const ready = programs.data && (!id || existing.data) && (!planId || plan.data);
   return (
     <Surface
       title={id ? "Ubah sesi pelatihan" : "Sesi pelatihan baru"}
@@ -52,18 +57,20 @@ export default function EfekSessionPage() {
         Kembali ke EFEK
       </Link>
       <State
-        loading={programs.loading || existing.loading}
-        error={programs.error || existing.error}
+        loading={programs.loading || existing.loading || plan.loading}
+        error={programs.error || existing.error || plan.error}
         retry={() => {
           programs.refetch();
           existing.refetch();
+          plan.refetch();
         }}
       />
       {ready && (
         <SessionForm
-          key={existing.data?.updated_at ?? "new"}
+          key={existing.data?.updated_at ?? `new/${planId ?? ""}`}
           programs={programs.data!}
           existing={existing.data}
+          initialPlan={plan.data}
           initialProgram={search.program}
         />
       )}
@@ -74,10 +81,12 @@ export default function EfekSessionPage() {
 function SessionForm({
   programs,
   existing,
+  initialPlan,
   initialProgram,
 }: {
   programs: EfekProgram[];
   existing: EfekSessionDetail | null;
+  initialPlan: TnaPlanDetail | null;
   initialProgram?: string;
 }) {
   const navigate = useNavigate();
@@ -91,21 +100,60 @@ function SessionForm({
     programs.find((p) => p.code === code)?.default_service_type ?? "call";
   const [program, setProgram] = useState(firstProgram);
   const [service, setService] = useState<ServiceType>(
-    existing?.service_type ?? defaultService(firstProgram),
+    existing?.service_type ??
+      initialPlan?.service_type ??
+      defaultService(firstProgram),
   );
-  const [title, setTitle] = useState(existing?.title ?? "");
-  const [start, setStart] = useState(existing?.start_date ?? "");
-  const [end, setEnd] = useState(existing?.end_date ?? "");
+  const [tnaPlanId, setTnaPlanId] = useState(
+    existing?.tna_plan?.id ?? initialPlan?.plan.id ?? "",
+  );
+  const [planError, setPlanError] = useState<string | null>(null);
+  // Keep the prefilled plan visible until the option list arrives.
+  const selectedPlan =
+    existing?.tna_plan ??
+    (initialPlan
+      ? {
+          id: initialPlan.plan.id,
+          title: initialPlan.plan.title,
+          status: initialPlan.plan.status,
+        }
+      : null);
+  const [title, setTitle] = useState(
+    existing?.title ?? initialPlan?.plan.title ?? "",
+  );
+  const [start, setStart] = useState(
+    existing?.start_date ?? initialPlan?.plan.start_date ?? "",
+  );
+  const [end, setEnd] = useState(
+    existing?.end_date ?? initialPlan?.plan.end_date ?? "",
+  );
   const [people, setPeople] = useState<Person[]>(
     existing?.participants.map((p) => ({
       id: p.peserta_id,
       nama: p.nama,
       tim: p.tim,
-    })) ?? [],
+    })) ??
+      initialPlan?.participants.flatMap((p) =>
+        p.peserta_id
+          ? [
+              {
+                id: p.peserta_id,
+                nama: p.peserta_name_snapshot,
+                tim: p.team_snapshot,
+              },
+            ]
+          : [],
+      ) ??
+      [],
   );
   const [query, setQuery] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const planOptions = useApi<EfekPlanOption[]>(
+    service && start
+      ? `/tna/efek/plan-options?service_type=${encodeURIComponent(service)}&start_date=${encodeURIComponent(start)}`
+      : null,
+  );
   const results = useApi<SimulationSubjectOption[]>(
     query.trim().length >= 2
       ? `/profiler/peserta/options?search=${encodeURIComponent(query.trim())}`
@@ -123,23 +171,42 @@ function SessionForm({
       start_date: start,
       end_date: end || start,
       peserta_ids: people.map((p) => p.id),
+      // Omitted when unlinked so the create payload stays unchanged; an
+      // explicit null detaches a previously linked session.
+      tna_plan_id: tnaPlanId
+        ? tnaPlanId
+        : existing?.tna_plan
+          ? null
+          : undefined,
     });
     setInvalid(!parsed.success);
     if (!parsed.success) return;
     mutation.run(
       async () => {
-        if (existing)
-          await unwrapResponse(
-            await rpcClient.v1.tna.efek.sessions[":id"].$put(
-              { param: { id: existing.id } },
-              { init: { body: JSON.stringify(parsed.data) } },
-            ),
-          );
-        else
-          await unwrapResponse(
-            await rpcClient.v1.tna.efek.sessions.$post({ json: parsed.data }),
-          );
-        await navigate({ to: "/tna/efek", search: { program } });
+        setPlanError(null);
+        try {
+          if (existing)
+            await unwrapResponse(
+              await rpcClient.v1.tna.efek.sessions[":id"].$put(
+                { param: { id: existing.id } },
+                { init: { body: JSON.stringify(parsed.data) } },
+              ),
+            );
+          else
+            await unwrapResponse(
+              await rpcClient.v1.tna.efek.sessions.$post({ json: parsed.data }),
+            );
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "EFEK_PLAN_INVALID")
+            setPlanError(error.message);
+          throw error;
+        }
+        if (!existing && initialPlan)
+          await navigate({
+            to: "/tna/rencana/$id",
+            params: { id: initialPlan.plan.id },
+          });
+        else await navigate({ to: "/tna/efek", search: { program } });
       },
       existing ? "Sesi tersimpan" : "Sesi dibuat",
     );
@@ -183,6 +250,38 @@ function SessionForm({
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Rencana TNA (opsional)">
+            <select
+              className={selectClass}
+              value={tnaPlanId}
+              onChange={(e) => {
+                setTnaPlanId(e.target.value);
+                setPlanError(null);
+              }}
+            >
+              <option value="">Tanpa rencana</option>
+              {selectedPlan?.id === tnaPlanId &&
+                !planOptions.data?.some((o) => o.id === tnaPlanId) && (
+                  <option value={tnaPlanId}>
+                    {selectedPlan.title} · {planStatusLabels[selectedPlan.status]}
+                  </option>
+                )}
+              {planOptions.data?.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.title} · {planStatusLabels[o.status]}
+                </option>
+              ))}
+            </select>
+            <p className="text-sm font-normal text-muted-foreground">
+              Hanya rencana aktif, evaluasi, atau selesai dengan layanan dan
+              tanggal sesi yang cocok.
+            </p>
+            {planError && (
+              <p role="alert" className="text-sm text-destructive">
+                {planError}
+              </p>
+            )}
           </Field>
           <Field label="Nama sesi">
             <Input

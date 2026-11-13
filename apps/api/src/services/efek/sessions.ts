@@ -6,12 +6,15 @@ import {
   type EfekImportInput,
   type EfekMatchInput,
   type EfekNameMatch,
+  type EfekPlanOption,
   type EfekProgram,
   type EfekPesertaOption,
   type EfekSession,
   type EfekSessionDetail,
   type EfekSessionInput,
+  type ServiceType,
 } from "@trainers/types";
+import type { TnaPlanStatus } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { logActivity } from "../activity-log-service";
@@ -44,6 +47,11 @@ const rpcErrors: Record<
     status: 422,
     message: "Program pelatihan tidak dikenal atau sudah tidak aktif.",
   },
+  EFEK_PLAN_INVALID: {
+    status: 422,
+    message:
+      "Rencana TNA tidak cocok: periksa status, layanan, dan tanggal sesi.",
+  },
   EFEK_INVALID_PARTICIPANTS: {
     status: 422,
     message: "Peserta harus 1–300 orang yang terdaftar di Profiler.",
@@ -74,14 +82,24 @@ export async function listEfekPrograms(
   return data as EfekProgram[];
 }
 
-type SessionRow = Omit<EfekSession, "participant_count"> & {
+type SessionRow = Omit<EfekSession, "participant_count" | "tna_plan"> & {
   efek_participants: { count: number }[];
+  tna_plans: {
+    id: string;
+    title: string;
+    status: TnaPlanStatus;
+  } | null;
 };
 const SESSION_COLUMNS =
-  "id, program_code, title, service_type, start_date, end_date, updated_at, efek_participants(count)";
-const toSession = ({ efek_participants, ...row }: SessionRow): EfekSession => ({
+  "id, program_code, title, service_type, start_date, end_date, updated_at, tna_plans(id, title, status), efek_participants(count)";
+const toSession = ({
+  efek_participants,
+  tna_plans,
+  ...row
+}: SessionRow): EfekSession => ({
   ...row,
   participant_count: efek_participants[0]?.count ?? 0,
+  tna_plan: tna_plans,
 });
 
 export async function listEfekSessions(
@@ -171,13 +189,20 @@ async function log(ctx: EfekWriteContext, action: string, type: string) {
   });
 }
 
+const withPlan = (title: string, tnaPlanId?: string | null) =>
+  tnaPlanId ? `${title} (rencana TNA ${tnaPlanId})` : title;
+
 export async function createEfekSession(
   ctx: EfekWriteContext,
   input: EfekSessionInput,
 ) {
   const parsed = efekSessionInputSchema.parse(input);
   const [id] = await saveSessions(ctx, [parsed], "create");
-  await log(ctx, `Membuat sesi EFEK: ${parsed.title}`, "add");
+  await log(
+    ctx,
+    `Membuat sesi EFEK: ${withPlan(parsed.title, parsed.tna_plan_id)}`,
+    "add",
+  );
   return id!;
 }
 
@@ -188,7 +213,67 @@ export async function updateEfekSession(
 ) {
   const parsed = efekSessionInputSchema.parse(input);
   await saveSessions(ctx, [{ ...parsed, id }], "replace");
-  await log(ctx, `Mengubah sesi EFEK: ${parsed.title}`, "update");
+  await log(
+    ctx,
+    `Mengubah sesi EFEK: ${withPlan(parsed.title, parsed.tna_plan_id)}`,
+    "update",
+  );
+}
+
+/** Plans a session may link to: live statuses, same service, date inside the plan. */
+export async function listEfekPlanOptions(
+  supabase: SupabaseClient,
+  serviceType: ServiceType,
+  startDate: string,
+): Promise<EfekPlanOption[]> {
+  const { data: plans, error: plansError } = await supabase
+    .from("tna_plans")
+    .select("id, title, status, start_date, end_date, tna_needs!tna_plans_need_id_fkey!inner(service_type)")
+    .in("status", ["aktif", "evaluasi", "selesai"])
+    .eq("tna_needs.service_type", serviceType)
+    .lte("start_date", startDate)
+    .gte("end_date", startDate)
+    .order("start_date", { ascending: false })
+    .order("id")
+    .limit(50);
+  if (plansError) throw plansError;
+  if (!plans?.length) return [];
+  const planIds = plans.map((plan) => plan.id as string);
+  // Paginate: PostgREST caps a response, and 50 plans can hold more rows.
+  const roster = await fetchAllPages<{
+    plan_id: string;
+    peserta_id: string | null;
+  }>({
+    build: ({ from, to }) =>
+      supabase
+        .from("tna_plan_participants")
+        .select("plan_id, peserta_id")
+        .in("plan_id", planIds)
+        .not("peserta_id", "is", null)
+        .order("plan_id")
+        .order("peserta_id")
+        .range(from, to) as unknown as PromiseLike<{
+        data: { plan_id: string; peserta_id: string | null }[] | null;
+        error: { message: string } | null;
+      }>,
+  });
+  const byPlan = new Map<string, string[]>();
+  for (const row of roster) {
+    if (!row.peserta_id) continue;
+    byPlan.set(row.plan_id, [
+      ...(byPlan.get(row.plan_id) ?? []),
+      row.peserta_id,
+    ]);
+  }
+  return plans.map((plan) => ({
+    id: plan.id as string,
+    title: plan.title as string,
+    status: plan.status as TnaPlanStatus,
+    start_date: plan.start_date as string,
+    end_date: plan.end_date as string,
+    service_type: serviceType,
+    participant_ids: byPlan.get(plan.id as string) ?? [],
+  }));
 }
 
 export async function deleteEfekSession(ctx: EfekWriteContext, id: string) {

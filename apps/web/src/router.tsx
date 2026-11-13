@@ -902,6 +902,22 @@ const programSearch = (search: Record<string, unknown>) =>
   /^[a-z][a-z0-9_-]{1,31}$/.test(search.program)
     ? { program: search.program }
     : {};
+export interface EfekSessionSearch {
+  program?: string;
+  /** Prefill a new session from this TNA plan. */
+  plan?: string;
+}
+const efekSessionSearch = (
+  search: Record<string, unknown>,
+): EfekSessionSearch => ({
+  ...programSearch(search),
+  ...(typeof search.plan === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    search.plan,
+  )
+    ? { plan: search.plan }
+    : {}),
+});
 export interface EfekReportSearch {
   /** JSON filter, kept verbatim so the backend can reject invalid input. */
   exclusions?: string;
@@ -959,14 +975,14 @@ const efekNewSessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tna/efek/sesi/baru",
   component: lazy(() => import("./routes/tna/efek-session")),
-  validateSearch: (search: Record<string, unknown>): { program?: string } =>
-    programSearch(search),
+  validateSearch: efekSessionSearch,
   beforeLoad: requireCapability("tna.write"),
 });
 const efekSessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tna/efek/sesi/$id",
   component: lazy(() => import("./routes/tna/efek-session")),
+  validateSearch: efekSessionSearch,
   beforeLoad: requireCapability("tna.write"),
 });
 const efekImportRoute = createRoute({
