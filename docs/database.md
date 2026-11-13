@@ -702,3 +702,11 @@ loses any stored NIK/email values. Deployment/replay is a separate local gate.
 - Sesi terputus setelah pemanggilan awal `supabase migration repair --linked --status applied 20261020170000`; hasil/exit code pemanggilan itu tidak terekam. Saat dilanjutkan, `supabase migration list --linked` (exit 0) masih menunjukkan versi belum applied, lalu perintah repair yang sama dijalankan sekali dan selesai exit 0 (`Repaired migration history: [20261020170000] => applied`). SQL migrasi tidak diulang.
 - Verifikasi hanya-baca: dua `supabase db query --linked` (masing-masing exit 0) memastikan kedua kolom bertipe `text`, nullable (`YES`); `pg_get_functiondef` kedua RPC memuat `consumer_nik` dan `consumer_email`, keduanya SECURITY INVOKER (`prosecdef = false`); `has_function_privilege(..., 'EXECUTE')` untuk masing-masing RPC: `anon = false`, `authenticated = false`, `service_role = true`.
 - `supabase migration list --linked` pasca-verifikasi (exit 0) menampilkan `20261020170000` pada kolom Local dan Remote. Tidak ada pemanggilan RPC, pembacaan row pengguna, rollback, migrasi lain, atau penulisan data pengguna.
+
+### AI Model Policy per Task (2026-11-13)
+
+Migration `20261113160000_ai_model_policy.sql` menambahkan tabel `ai_model_policy` dan `ai_model_policy_audit`, serta atomic RPC setter `public.ai_model_policy_set(p_task text, p_model_id text, p_actor uuid)`.
+- RLS aktif tanpa policy, REVOKE ALL dari PUBLIC, anon, dan authenticated; GRANT ALL / EXECUTE hanya kepada `service_role`.
+- Tabel kosong secara default: perilaku fallback otomatis kembali ke konstanta kode bawaan (`codeDefault`) sehingga aman diaplikasikan tanpa risiko downtime.
+- Audit mencatat `task`, `old_model_id`, `new_model_id`, `changed_by`, dan `changed_at`.
+- Rollback: `supabase/rollbacks/rollback_20261113160000_ai_model_policy.sql` menghapus RPC dan kedua tabel. Replay rollback telah diverifikasi pada Supabase lokal disposable.

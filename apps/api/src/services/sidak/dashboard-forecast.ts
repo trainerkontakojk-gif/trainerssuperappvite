@@ -8,6 +8,7 @@ import type {
   SidakForecastLookupResult,
 } from "@trainers/types";
 import { SIDAK_FORECAST_MODEL } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { generateGeminiContent } from "../../lib/gemini";
 import { roundTo } from "../../lib/math-utils";
 import { getDashboardData } from "./dashboard-data";
@@ -311,8 +312,9 @@ async function generateBatchInsight(
   userId: string,
 ): Promise<SidakBatchForecastSnapshot["insight"]> {
   const parameterSummary = buildParameterSummary(parameters);
+  const { modelId } = await resolveTaskModel("sidak_forecast");
   const response = await generateGeminiContent({
-    model: SIDAK_FORECAST_MODEL,
+    model: modelId || SIDAK_FORECAST_MODEL,
     userId,
     usageContext: {
       module: "qa-analyzer",

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-13
 
+- feat(monitoring): add dynamic AI model policy per task and Monitoring Model tab with audit log
 - docs(agents): record the Supabase egress probe and agent directory cache learnings in the auto-updated session block
 - perf(sidak): cache the scored agent directory for 60 seconds so Home and the Agents page stop rescanning a year of temuan, with scope applied per request and local invalidation on temuan and peserta writes
 - docs(database): record the production apply of the EFEK ↔ TNA plan link migration

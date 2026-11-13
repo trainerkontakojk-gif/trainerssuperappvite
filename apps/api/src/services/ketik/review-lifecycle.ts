@@ -10,9 +10,25 @@ import { createAdminClient } from "../../lib/supabase";
 import { processKetikReviewJob } from "./review-processor";
 import { mapKetikReviewDetail } from "./settings-history";
 import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { notifyKetikReviewQueued } from "./review-queue-signal";
 
 // Gemini can retry the developer-instruction incompatibility once, then OpenAI.
+export async function calculateKetikReviewLeaseSeconds(): Promise<number> {
+  const [primary, fallback] = await Promise.all([
+    resolveTaskModel("ketik_review"),
+    resolveTaskModel("ketik_review_fallback"),
+  ]);
+  return Math.max(
+    600,
+    Math.ceil(
+      ((resolveModelProvider(primary.modelId).timeoutMs ?? 180_000) * 2 +
+        (resolveModelProvider(fallback.modelId).timeoutMs ?? 120_000)) /
+        1000,
+    ) + 120,
+  );
+}
+
 export const KETIK_REVIEW_LEASE_SECONDS = Math.max(
   600,
   Math.ceil(

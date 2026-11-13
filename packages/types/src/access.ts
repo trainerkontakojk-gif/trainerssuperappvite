@@ -36,6 +36,8 @@ export const CAPABILITIES = {
   "monitoring.billing.read": ["admin", "trainer"],
   "monitoring.billing.write": ["admin", "trainer"],
   "monitoring.history.delete": ["admin", "trainer"],
+  "monitoring.models.read": ["admin", "trainer"],
+  "monitoring.models.write": ["admin", "trainer"],
   "monitoring.pricing.read": ["admin", "trainer"],
   "monitoring.pricing.write": ["admin", "trainer"],
   "monitoring.read": ["admin", "trainer", "leader"],

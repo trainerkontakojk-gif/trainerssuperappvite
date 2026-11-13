@@ -4,6 +4,7 @@ import {
   AiModelInfo,
   AIProvider,
   AI_MODELS,
+  AI_TASK_DEFINITIONS,
   DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
   KETIK_PDKT_MODELS,
@@ -29,17 +30,20 @@ export {
 };
 
 // Central policy for KETIK coaching: one primary and one bounded fallback.
+// Code defaults mirror AI_TASK_DEFINITIONS from @trainers/types.
 export const KETIK_REVIEW_MODELS = {
-  primary: "gemini-3.8-flash",
-  fallback: "gpt-5.4-mini",
+  primary: AI_TASK_DEFINITIONS.ketik_review.codeDefault,
+  fallback: AI_TASK_DEFINITIONS.ketik_review_fallback.codeDefault,
 } as const;
 
 // Telefun voice scoring, content review, coaching summary, and annotation
 // assistance all run on one Gemini model.
-export const TELEFUN_ASSESSMENT_MODEL = "gemini-3.8-flash";
+export const TELEFUN_ASSESSMENT_MODEL =
+  AI_TASK_DEFINITIONS.telefun_assessment.codeDefault;
 
 // SIDAK dashboard forecast narration ("Perbarui Prediksi").
-export const SIDAK_FORECAST_MODEL = "gemini-3.8-flash";
+export const SIDAK_FORECAST_MODEL =
+  AI_TASK_DEFINITIONS.sidak_forecast.codeDefault;
 
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (model) => model.provider === "gemini",

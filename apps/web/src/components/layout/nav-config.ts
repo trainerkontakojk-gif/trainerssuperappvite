@@ -408,10 +408,21 @@ export function buildBreadcrumb(
   if (pathname === "/monitoring") {
     return [{ label: "Monitoring" }];
   }
-  if (pathname === "/monitoring/biaya" || pathname === "/monitoring/harga") {
+  if (
+    pathname === "/monitoring/biaya" ||
+    pathname === "/monitoring/harga" ||
+    pathname === "/monitoring/model"
+  ) {
     return [
       { label: "Monitoring", href: "/monitoring" },
-      { label: pathname === "/monitoring/biaya" ? "Biaya AI" : "Harga & kurs" },
+      {
+        label:
+          pathname === "/monitoring/biaya"
+            ? "Biaya AI"
+            : pathname === "/monitoring/model"
+              ? "Model"
+              : "Harga & kurs",
+      },
     ];
   }
   if (pathname.startsWith("/monitoring/biaya/")) {

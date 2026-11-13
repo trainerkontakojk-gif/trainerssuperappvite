@@ -11,6 +11,7 @@ import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
 import { generateGeminiContent } from "../../lib/gemini";
 import { TELEFUN_ASSESSMENT_MODEL } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 
 type Variables = { user: User; profile: any };
 
@@ -435,8 +436,9 @@ Jenis momen (moment):
 
 Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 karakter.`;
 
+      const { modelId } = await resolveTaskModel("telefun_assessment");
       const result = await generateGeminiContent({
-        model: TELEFUN_ASSESSMENT_MODEL,
+        model: modelId || TELEFUN_ASSESSMENT_MODEL,
         systemInstruction:
           "Anda adalah pelatih komunikasi profesional. Analisis rekaman telepon dan berikan catatan objektif dalam format JSON. Gunakan Bahasa Indonesia.",
         contents: [

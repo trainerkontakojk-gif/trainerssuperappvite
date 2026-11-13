@@ -3,6 +3,8 @@ import type { ClientResponse } from "hono/client";
 import type { AppType, HealthRouteType } from "@trainers/api";
 import type {
   AccessGroupItemRow,
+  AiModelPolicyAuditEntry,
+  AiModelPolicyItem,
   BulkUserResponse,
   PesertaSuggestion,
   AccessGroupRow,
@@ -346,6 +348,21 @@ type AiClient = {
   };
   "monitoring/pricing/schedule/:id": {
     $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
+  };
+  "monitoring/models": {
+    $get(): Promise<RpcResponse<{ items: AiModelPolicyItem[] }>>;
+  };
+  "monitoring/models/:task": {
+    $put(args: {
+      param: { task: string };
+      json: { modelId: string };
+    }): Promise<RpcResponse<null>>;
+    $delete(args: {
+      param: { task: string };
+    }): Promise<RpcResponse<null>>;
+  };
+  "monitoring/models/audit": {
+    $get(): Promise<RpcResponse<{ items: AiModelPolicyAuditEntry[] }>>;
   };
   "monitoring/billing": {
     $get(): Promise<RpcResponse<{ usd_to_idr_rate: number }>>;

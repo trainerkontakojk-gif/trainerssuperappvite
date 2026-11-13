@@ -592,6 +592,22 @@ const monitoringPricingRoute = createRoute({
   component: () => <MonitoringPage section="pricing" />,
 });
 
+const monitoringModelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/monitoring/model",
+  beforeLoad: async () => {
+    await requireCapability("monitoring.read")();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const profile = session ? await fetchAuthProfile(session.user.id) : null;
+    if (!profile || !can(profile.role, "monitoring.models.read")) {
+      throw redirect({ to: "/monitoring", replace: true });
+    }
+  },
+  component: () => <MonitoringPage section="models" />,
+});
+
 const telefunRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun",
@@ -1051,6 +1067,7 @@ const routeTree = rootRoute.addChildren([
   monitoringUsageRoute,
   monitoringUsageUserRoute,
   monitoringPricingRoute,
+  monitoringModelsRoute,
   monitoringSessionRoute,
   accountRoute,
   authCallbackRoute,

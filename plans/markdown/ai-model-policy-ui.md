@@ -1,0 +1,184 @@
+# Pengaturan model AI per tugas (Monitoring → Model)
+
+Lane D: tabel baru, RLS/grant, kontrak API baru, perubahan perilaku pemanggil AI, dan UI. Status: **DRAFT, menunggu review Fajar** (dibuat 2026-11-13).
+Ikuti `AGENTS.md` dan `docs/AGENT_WORKFLOW.md`. Muat `trainers-superapp-tdd` dan `supabase-migration` sebelum mengedit.
+
+## Masalah
+
+Model AI untuk tugas sistem ditulis langsung di kode (`apps/api/src/lib/ai-models.ts:32-42`):
+
+| Konstanta                     | Nilai sekarang                      | Pemanggil                                                                                                                              |
+| ----------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `KETIK_REVIEW_MODELS`         | `gemini-3.8-flash` → `gpt-5.4-mini` | `services/ketik/review-processor.ts:41,79`, `services/ketik/review-lifecycle.ts:19-21`                                                 |
+| `TELEFUN_ASSESSMENT_MODEL`    | `gemini-3.8-flash`                  | `lib/telefun-transcription.ts:86`, `lib/telefun-analysis.ts:347,451`, `routes/telefun/annotations.ts:439`                              |
+| `SIDAK_FORECAST_MODEL`        | `gemini-3.8-flash`                  | `services/sidak/dashboard-forecast.ts:315`                                                                                             |
+| `DEFAULT_AI_MODEL_ID` (types) | `gemini-3.8-flash`                  | `lib/gemini.ts:66`, `services/pdkt/session-service.ts:126,303`, `services/pdkt/evaluation-service.ts:594`, `normalizeModelId` fallback |
+
+Akibatnya, mengganti model (misalnya ke Gemini 4 Hydrogen pada 2027-01-01, saat harga 3.8 Flash naik ke harga Hydrogen) harus lewat perubahan kode dan deploy.
+
+Catatan: KETIK dan PDKT **sudah** punya pilihan model per settings (`selectedModel`, `KetikSystemTab.tsx:204`, `KETIK_PDKT_MODEL_IDS`). Celah yang ada adalah model untuk tugas sistem dan model default saat `selectedModel` kosong.
+
+## Requirement
+
+1. Admin/trainer bisa memilih model untuk setiap **tugas AI** dari UI, tanpa deploy:
+   - `ketik_review` (primary)
+   - `ketik_review_fallback`
+   - `telefun_assessment` (scoring suara, content review, coaching summary, annotation assist, transkripsi)
+   - `sidak_forecast`
+   - `default_text` (dipakai saat `selectedModel` KETIK/PDKT kosong, dan sebagai fallback `normalizeModelId`)
+2. Pilihan hanya dari model yang **terdaftar di registry kode** dan **memenuhi kapabilitas tugas**. Tidak ada input model ID bebas.
+3. Backend menolak model yang belum punya harga efektif (`ai_pricing_settings`/`ai_pricing_schedule`), supaya `logAiUsage` tidak diam-diam mencatat biaya nol.
+4. Bila baris tugas tidak ada atau DB gagal dibaca, perilakunya sama persis dengan hari ini: konstanta kode menjadi fallback. Tidak ada error ke pengguna.
+5. Setiap perubahan tercatat: siapa, kapan, nilai lama → nilai baru.
+6. Perubahan berlaku untuk panggilan AI **baru**. Sesi atau review yang sedang berjalan tetap memakai model yang sudah di-resolve di awal (lihat D4).
+7. `ai_usage_logs.model_id` tetap mencatat model yang benar-benar dipakai. Monitoring Biaya tidak berubah.
+
+## Keputusan default (konfirmasi ke Fajar sebelum T1 bila ragu)
+
+| #   | Pertanyaan                                                | Default di rencana ini                                                                                                                                                                                             |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | Siapa yang boleh mengubah?                                | **Admin + trainer**, sama dengan `monitoring.pricing.write` (`packages/types/src/access.ts:40`). Capability baru: `monitoring.models.read` / `monitoring.models.write`, supaya bisa dipersempit ke admin nanti.    |
+| D2  | Penjadwalan ("berlaku mulai 2027-01-01")?                 | **Tidak di tahap ini.** Ganti manual di hari H. Penjadwalan bisa ditambah kemudian mengikuti pola `ai_pricing_schedule`.                                                                                           |
+| D3  | Pilihan per-trainer untuk tugas penilaian?                | **Tidak.** Satu nilai global per tugas, supaya skor KETIK dan Telefun tetap bisa dibandingkan antar-trainer.                                                                                                       |
+| D4  | Sesi berjalan saat model diganti?                         | Model di-resolve **sekali per unit kerja**: satu review KETIK, satu analisis Telefun, satu forecast. Tidak ada pergantian model di tengah unit.                                                                    |
+| D5  | Mengubah `KETIK_PDKT_MODEL_IDS` (daftar pilihan trainer)? | **Tidak di tahap ini.** Daftar itu tetap di kode. `default_text` hanya mengatur fallback saat `selectedModel` kosong.                                                                                              |
+| D6  | Kapabilitas audio untuk `telefun_assessment`              | Tambah flag `supportsAudioInput` di `AiModelInfo.capabilities`. Hanya model yang sudah terbukti lewat E2E/smoke yang diberi flag ini. Gemini 4 Hydrogen **tidak** diberi flag sampai input audionya terverifikasi. |
+
+## Desain
+
+### Tugas dan kebutuhan kapabilitas — `packages/types/src/ai-model-policy.ts` (baru)
+
+```ts
+export const AI_TASKS = [
+  "ketik_review",
+  "ketik_review_fallback",
+  "telefun_assessment",
+  "sidak_forecast",
+  "default_text",
+] as const;
+export type AiTask = (typeof AI_TASKS)[number];
+
+export const AI_TASK_DEFINITIONS: Record<
+  AiTask,
+  {
+    label: string; // Bahasa Indonesia untuk UI
+    description: string;
+    codeDefault: string; // = konstanta lama, fallback (R4)
+    requires: {
+      supportsText?: true;
+      supportsImage?: true;
+      supportsAudioInput?: true;
+    };
+    providers?: AIProvider[]; // mis. ketik_review_fallback harus beda provider dari primary (lihat validasi)
+  }
+>;
+
+export function eligibleModelsForTask(task: AiTask): AiModelInfo[];
+```
+
+- `codeDefault` menggantikan konstanta di `apps/api/src/lib/ai-models.ts`. Konstanta lama tetap di-export, diturunkan dari `AI_TASK_DEFINITIONS`, supaya tidak ada nilai ganda.
+- `capabilities.supportsAudioInput` ditambahkan ke `AiModelInfo`. Model yang sekarang dipakai Telefun (`gemini-3.8-flash`) diberi `true`.
+
+### Skema — `supabase/migrations/<ts>_ai_model_policy.sql` + `supabase/rollbacks/rollback_<ts>_ai_model_policy.sql`
+
+```sql
+CREATE TABLE public.ai_model_policy (
+  task text PRIMARY KEY,
+  model_id text NOT NULL,
+  updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE public.ai_model_policy_audit (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task text NOT NULL,
+  old_model_id text,
+  new_model_id text NOT NULL,
+  changed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  changed_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+- Sama dengan `ai_pricing_schedule`: RLS on tanpa policy, `REVOKE ALL ... FROM PUBLIC, anon, authenticated`, `GRANT ALL ... TO service_role`. Tabel hanya untuk backend.
+- **Tidak** ada CHECK pada `task` atau `model_id`. Validasi ada di backend karena registry hidup di kode, dan model yang dihapus dari registry tidak boleh membuat baris lama gagal dibaca (lihat resolver).
+- **Tidak ada seed row.** Tabel kosong = perilaku sekarang (R4). Ini membuat apply ke prod tidak berisiko.
+- Perubahan dan audit ditulis dalam satu RPC `public.ai_model_policy_set(p_task text, p_model_id text, p_actor uuid)` (`SECURITY INVOKER`, EXECUTE hanya untuk `service_role`), agar upsert dan audit atomik.
+- Rollback: drop fungsi, drop kedua tabel. Verifikasi dengan `supabase db reset` lokal.
+
+### Backend
+
+`apps/api/src/lib/ai-model-policy.ts` (baru):
+
+```ts
+export async function resolveTaskModel(
+  task: AiTask,
+): Promise<{ modelId: string; source: "policy" | "code" }>;
+export function invalidateAiModelPolicyCache(): void;
+```
+
+- Membaca seluruh tabel (paling banyak 5 baris) dengan admin client, di-cache 60 detik memakai `createTtlCache` (`apps/api/src/lib/ttl-cache.ts`). Cache di-invalidate lokal setelah tulis. Railway hanya menjalankan satu instance; instance lain (Coolify) mengikuti dalam 60 detik.
+- Validasi saat **baca**: bila `model_id` tidak lagi ada di registry, tidak memenuhi `requires`, atau DB gagal dibaca → pakai `codeDefault` dan `console.warn` sekali per siklus cache. Ini satu-satunya fallback dan sifatnya terbatas (aturan "one primary path, one bounded fallback").
+- Pemanggil di tabel Masalah diganti `await resolveTaskModel(...)`. Untuk unit kerja panjang (KETIK review, analisis Telefun), resolve sekali di awal lalu teruskan nilainya (D4). `review-lifecycle.ts:19-21` menghitung timeout dari kedua model hasil resolve.
+- `DEFAULT_AI_MODEL_ID` di `normalizeModelId`/`gemini.ts:66` tetap sinkron (konstanta kode). Pemanggil PDKT (`session-service.ts:126,303`, `evaluation-service.ts:594`) memakai `config.selectedModel || await resolveTaskModel("default_text")`. `normalizeModelId` sendiri **tidak** dibuat async, karena dipakai di banyak jalur sinkron dan di web.
+
+Route di `apps/api/src/routes/ai.ts`, di sebelah `/monitoring/pricing`:
+
+- `GET /monitoring/models` (`monitoring.models.read`) → per tugas: `{ task, label, description, modelId, source, codeDefault, eligible: [{ id, name, provider, hasPricing }] , updatedBy, updatedAt }`.
+- `PUT /monitoring/models/:task` (`monitoring.models.write`), body `{ modelId }` (zod). Tolak dengan pesan Bahasa Indonesia, tanpa error DB mentah:
+  - `400 TASK_UNKNOWN`: tugas tidak dikenal
+  - `400 MODEL_NOT_ELIGIBLE`: model tidak terdaftar atau kapabilitasnya tidak cocok
+  - `400 MODEL_NO_PRICING`: belum ada harga efektif untuk model ini
+  - `400 FALLBACK_SAME_AS_PRIMARY`: `ketik_review_fallback` sama dengan `ketik_review` yang efektif
+- `DELETE /monitoring/models/:task` (`monitoring.models.write`) → hapus baris, kembali ke `codeDefault`. Dicatat di audit dengan `new_model_id = codeDefault`.
+- `GET /monitoring/models/audit?limit=20`: riwayat perubahan terbaru.
+- Tipe respons di `packages/types`. Frontend memakai typed Hono RPC (`hc<AppType>`) / `fetchApi` yang sudah ada.
+
+Tidak ada lifecycle/state baru (aturan "no new implicit state machines" tidak terpicu). Ini hanya nilai konfigurasi.
+
+### UI — tab baru "Model" di `apps/web/src/routes/monitoring/MonitoringPage.tsx`
+
+- Pola sama dengan `PricingTab.tsx`/`PricingRow.tsx`/`PricingEditDialog.tsx`: satu baris per tugas berisi nama tugas, deskripsi singkat, model aktif, dan badge "Bawaan sistem" atau "Diatur oleh <nama>, <tanggal>".
+- Tombol ubah membuka dialog pilihan model eligible. Model tanpa harga ditampilkan nonaktif dengan tautan "Atur harga dulu" ke tab Harga.
+- Tombol "Kembalikan ke bawaan" muncul bila `source = "policy"`.
+- Konfirmasi sebelum simpan menyebut dampaknya, misalnya "Berlaku untuk review KETIK baru. Review yang sedang berjalan tidak berubah."
+- Daftar riwayat perubahan ringkas di bawah tabel.
+- Tab hanya tampil bila `can(role, "monitoring.models.read")`. Tombol hanya aktif bila `monitoring.models.write`.
+- Ini perubahan kecil yang mengikuti pola tab yang ada, bukan redesign, jadi `ui-ux-pro-max` tidak wajib. Tetap jalankan `impeccable` audit pada tab baru sebelum gate akhir.
+
+### Dokumen
+
+- `docs/architecture.md` (bagian AI models): kebijakan model per tugas dan aturan fallback.
+- `docs/database.md`: dua tabel baru, RPC, dan catatan apply prod nanti.
+
+## E2E (RED dulu, target lokal saja)
+
+Spec baru `apps/web/e2e/monitoring-models-api.spec.ts` (API) dan `apps/web/e2e/monitoring-models.spec.ts` (UI):
+
+1. Tabel kosong → `GET` mengembalikan `source: "code"` dan `codeDefault` untuk semua tugas.
+2. `PUT` model eligible yang punya harga → tersimpan, audit bertambah satu baris, `GET` mengembalikan `source: "policy"`.
+3. `PUT` ditolak: model tanpa harga (`MODEL_NO_PRICING`), model tanpa `supportsAudioInput` untuk `telefun_assessment` (`MODEL_NOT_ELIGIBLE`), fallback sama dengan primary, tugas tidak dikenal.
+4. Role tanpa capability (agent/leader) → 403 untuk `PUT`/`DELETE`/`GET`.
+5. **Efek nyata:** set `sidak_forecast` ke model lain, picu forecast dengan provider stub lokal yang sudah dipakai spec yang ada, lalu verifikasi `ai_usage_logs.model_id` = model baru. Ulangi untuk `ketik_review`.
+6. Baris berisi model yang tidak ada di registry (disisipkan langsung lewat service role) → panggilan AI memakai `codeDefault`, tidak error.
+7. `DELETE` → kembali ke `codeDefault`, audit tercatat.
+8. UI: trainer melihat tab Model, mengganti model `sidak_forecast`, melihat badge "Diatur oleh …", lalu mengembalikan ke bawaan.
+
+Spec yang sekarang meng-hardcode `gemini-3.8-flash` (±20 file di `apps/web/e2e/`) **tidak** diubah, karena tabel kosong mempertahankan perilaku lama.
+
+## Tasklist
+
+- [ ] T0 Konfirmasi D1–D6 dengan Fajar.
+- [ ] T1 Types: `ai-model-policy.ts`, `supportsAudioInput`, turunkan konstanta lama dari `AI_TASK_DEFINITIONS`. `pnpm --filter @trainers/web typecheck` + api typecheck.
+- [ ] T2 Migration + rollback + RPC (`supabase-migration`). `supabase db reset` lokal bersih, replay rollback.
+- [ ] T3 E2E API RED (skenario 1–7), jalankan dan pastikan gagal karena route belum ada.
+- [ ] T4 Backend: resolver + cache + route + capability baru di `access.ts`. GREEN skenario 1–4, 6, 7.
+- [ ] T5 Ganti pemanggil (KETIK review/lifecycle, Telefun ×4, SIDAK forecast, PDKT default). GREEN skenario 5. Jalankan ulang spec KETIK/Telefun/PDKT/SIDAK yang ada dan terdampak satu per satu (`--workers=1`).
+- [ ] T6 UI tab Model + E2E UI (skenario 8) RED → GREEN. `impeccable` audit.
+- [ ] T7 Docs (`architecture.md`, `database.md`), `CHANGELOG.md`.
+- [ ] T8 `thermo-nuclear` review, lalu root `typecheck`, lint, build, dan spec terfokus. Commit + push ke `main`.
+- [ ] T9 **Butuh izin Fajar:** apply migration ke prod `ruosnjmtywcrghjgqugz`. Aman karena tabel kosong = perilaku lama. Catat di `docs/database.md`.
+
+## Tindak lanjut (di luar rencana ini)
+
+- Daftarkan `gemini-4-hydrogen` di registry + migration harga ($1.50/$7.50, cek dulu ai.google.dev). Uji input audio Telefun sebelum memberi `supportsAudioInput`.
+- 2027-01-01: ganti `ketik_review`, `sidak_forecast`, `default_text` (dan `telefun_assessment` bila audio lolos) ke Hydrogen lewat tab Model.
+- Opsional: penjadwalan perubahan model (D2).

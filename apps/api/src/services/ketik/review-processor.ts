@@ -1,6 +1,7 @@
 import { detectKetikSessionAnomalies } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
+import { resolveModelProvider } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenAIContent } from "../../lib/openai";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
@@ -35,58 +36,95 @@ async function generateKetikReviewAiResponse(options: {
     action: "coaching_review",
   };
 
-  // Try Gemini first
+  const [primaryPolicy, fallbackPolicy] = await Promise.all([
+    resolveTaskModel("ketik_review"),
+    resolveTaskModel("ketik_review_fallback"),
+  ]);
+
+  const primaryModel = resolveModelProvider(primaryPolicy.modelId);
+  const fallbackModel = resolveModelProvider(fallbackPolicy.modelId);
+
+  // Try primary model (Gemini or OpenAI based on registry)
   try {
-    const geminiResp = await generateGeminiContent({
-      model: resolveModelProvider(KETIK_REVIEW_MODELS.primary).modelId,
-      systemInstruction: options.systemInstruction,
-      contents: options.contents as any,
-      responseMimeType: "application/json",
-      responseSchema: (options.hasVerification
-        ? {
-            ...KETIK_REVIEW_RESPONSE_SCHEMA,
-            properties: {
-              ...KETIK_REVIEW_RESPONSE_SCHEMA.properties,
-              verification: KETIK_VERIFICATION_RESPONSE_SCHEMA,
-            },
-            required: [
-              ...KETIK_REVIEW_RESPONSE_SCHEMA.required,
-              "verification",
-            ],
-          }
-        : KETIK_REVIEW_RESPONSE_SCHEMA) as any,
-      usageContext,
-      userId: options.userId,
-      sanitizeOutput: false,
-    });
-    if (geminiResp.success && geminiResp.text) {
-      return geminiResp;
+    let primaryResp: { success: boolean; text?: string; error?: string };
+    const schema = (options.hasVerification
+      ? {
+          ...KETIK_REVIEW_RESPONSE_SCHEMA,
+          properties: {
+            ...KETIK_REVIEW_RESPONSE_SCHEMA.properties,
+            verification: KETIK_VERIFICATION_RESPONSE_SCHEMA,
+          },
+          required: [
+            ...KETIK_REVIEW_RESPONSE_SCHEMA.required,
+            "verification",
+          ],
+        }
+      : KETIK_REVIEW_RESPONSE_SCHEMA) as any;
+
+    if (primaryModel.provider === "gemini") {
+      primaryResp = await generateGeminiContent({
+        model: primaryModel.modelId,
+        systemInstruction: options.systemInstruction,
+        contents: options.contents as any,
+        responseMimeType: "application/json",
+        responseSchema: schema,
+        usageContext,
+        userId: options.userId,
+        sanitizeOutput: false,
+      });
+    } else {
+      primaryResp = await generateOpenAIContent({
+        model: primaryModel.modelId,
+        systemInstruction: options.systemInstruction,
+        contents: options.contents,
+        responseMimeType: "application/json",
+        usageContext,
+        userId: options.userId,
+        sanitizeOutput: false,
+      });
+    }
+
+    if (primaryResp.success && primaryResp.text) {
+      return primaryResp;
     }
     console.warn(
-      "[KETIK Review] Gemini failed, falling back to direct OpenAI:",
-      geminiResp.error,
+      `[KETIK Review] Primary model (${primaryModel.modelId}) failed, falling back to (${fallbackModel.modelId}):`,
+      primaryResp.error,
     );
   } catch (err) {
     console.warn(
-      "[KETIK Review] Gemini exception, falling back to direct OpenAI:",
+      `[KETIK Review] Primary model (${primaryModel.modelId}) exception, falling back to (${fallbackModel.modelId}):`,
       err,
     );
   }
 
-  // Fallback to direct OpenAI Responses API
+  // Fallback model
   try {
-    const orResp = await generateOpenAIContent({
-      model: resolveModelProvider(KETIK_REVIEW_MODELS.fallback).modelId,
-      systemInstruction: options.systemInstruction,
-      contents: options.contents,
-      responseMimeType: "application/json",
-      usageContext,
-      userId: options.userId,
-      sanitizeOutput: false,
-    });
-    return orResp;
+    let fallbackResp: { success: boolean; text?: string; error?: string };
+    if (fallbackModel.provider === "openai") {
+      fallbackResp = await generateOpenAIContent({
+        model: fallbackModel.modelId,
+        systemInstruction: options.systemInstruction,
+        contents: options.contents,
+        responseMimeType: "application/json",
+        usageContext,
+        userId: options.userId,
+        sanitizeOutput: false,
+      });
+    } else {
+      fallbackResp = await generateGeminiContent({
+        model: fallbackModel.modelId,
+        systemInstruction: options.systemInstruction,
+        contents: options.contents as any,
+        responseMimeType: "application/json",
+        usageContext,
+        userId: options.userId,
+        sanitizeOutput: false,
+      });
+    }
+    return fallbackResp;
   } catch (err) {
-    console.error("[KETIK Review] OpenAI fallback also failed:", err);
+    console.error("[KETIK Review] Fallback also failed:", err);
     return {
       success: false,
       error: "AI tidak tersedia dari provider manapun.",

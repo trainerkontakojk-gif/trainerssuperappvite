@@ -34,6 +34,13 @@ import {
   PricingError,
   savePricing,
 } from "../services/ai-pricing-service";
+import {
+  AiModelPolicyError,
+  deleteTaskModelPolicy,
+  listTaskModelPolicies,
+  listTaskModelPolicyAudit,
+  setTaskModelPolicy,
+} from "../lib/ai-model-policy";
 
 type Variables = { user: User; profile: any };
 
@@ -602,6 +609,93 @@ ai.delete(
       return c.json({ success: true, data: null });
     } catch (error) {
       return pricingErrorResponse(c, "monitoring/pricing/schedule DELETE", error);
+    }
+  },
+);
+
+// ── Model Policy per Task ─────────────────────────────
+function modelPolicyErrorResponse(
+  c: Context,
+  scope: string,
+  error: unknown,
+) {
+  if (error instanceof AiModelPolicyError) {
+    return c.json(
+      {
+        success: false as const,
+        error: { code: error.code, message: error.message },
+      },
+      error.status,
+    );
+  }
+  return dbErrorResponse(c, scope, error);
+}
+
+ai.get(
+  "/monitoring/models",
+  requireCapability("monitoring.models.read"),
+  async (c) => {
+    try {
+      const items = await listTaskModelPolicies(createAdminClient());
+      return c.json({ success: true, data: { items } });
+    } catch (error) {
+      return modelPolicyErrorResponse(c, "monitoring/models GET", error);
+    }
+  },
+);
+
+ai.get(
+  "/monitoring/models/audit",
+  requireCapability("monitoring.models.read"),
+  async (c) => {
+    try {
+      const items = await listTaskModelPolicyAudit(createAdminClient());
+      return c.json({ success: true, data: { items } });
+    } catch (error) {
+      return modelPolicyErrorResponse(c, "monitoring/models/audit GET", error);
+    }
+  },
+);
+
+const modelPolicyPutSchema = z.object({
+  modelId: z.string().min(1),
+});
+
+ai.put(
+  "/monitoring/models/:task",
+  requireCapability("monitoring.models.write"),
+  zValidator("json", modelPolicyPutSchema),
+  async (c) => {
+    const task = c.req.param("task");
+    const body = c.req.valid("json");
+    const user = c.get("user");
+
+    try {
+      await setTaskModelPolicy(
+        createAdminClient(),
+        task,
+        body.modelId,
+        user.id,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return modelPolicyErrorResponse(c, "monitoring/models PUT", error);
+    }
+  },
+);
+
+ai.delete(
+  "/monitoring/models/:task",
+  requireCapability("monitoring.models.write"),
+  async (c) => {
+    const task = c.req.param("task");
+    const user = c.get("user");
+
+    try {
+      await deleteTaskModelPolicy(createAdminClient(), task, user.id);
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return modelPolicyErrorResponse(c, "monitoring/models DELETE", error);
     }
   },
 );

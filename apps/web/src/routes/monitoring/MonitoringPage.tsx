@@ -16,13 +16,15 @@ import { mapError } from "./utils/formatting";
 import { HistoryTab } from "./components/HistoryTab";
 import { BiayaTab } from "./components/BiayaTab";
 import { PricingTab, type PricingEntry } from "./components/PricingTab";
+import { ModelTab } from "./components/ModelTab";
 
-export type MonitoringSection = "history" | "usage" | "pricing";
+export type MonitoringSection = "history" | "usage" | "pricing" | "models";
 
 const SECTION_PATHS = {
   history: "/monitoring",
   usage: "/monitoring/biaya",
   pricing: "/monitoring/harga",
+  models: "/monitoring/model",
 } as const satisfies Record<MonitoringSection, string>;
 
 export default function MonitoringPage({
@@ -35,6 +37,7 @@ export default function MonitoringPage({
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role?.toLowerCase() || "";
   const canEditPricing = can(normalizeRole(role), "monitoring.pricing.write");
+  const canReadModels = can(normalizeRole(role), "monitoring.models.read");
 
   const [pricing, setPricing] = useState<PricingEntry[]>([]);
   const [billingRate, setBillingRate] = useState(15000);
@@ -106,6 +109,15 @@ export default function MonitoringPage({
               Harga &amp; kurs
             </TabsTrigger>
           )}
+          {canReadModels && (
+            <TabsTrigger
+              value="models"
+              id="monitoring-tab-models"
+              className="min-h-12 flex-none px-5 text-sm font-semibold text-muted-foreground data-active:text-foreground data-active:after:bg-primary"
+            >
+              Model
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {error && (
@@ -152,6 +164,20 @@ export default function MonitoringPage({
               billingRate={billingRate}
               onBillingRateChange={setBillingRate}
               onRefresh={fetchPricing}
+            />
+          </TabsContent>
+        )}
+        {canReadModels && (
+          <TabsContent
+            value="models"
+            id="monitoring-panel-models"
+            aria-labelledby="monitoring-tab-models"
+            tabIndex={0}
+          >
+            <ModelTab
+              onNavigateToPricing={() => {
+                navigate({ to: SECTION_PATHS.pricing });
+              }}
             />
           </TabsContent>
         )}

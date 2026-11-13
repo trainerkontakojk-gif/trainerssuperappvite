@@ -420,6 +420,17 @@ Di Supabase Postgres 17.6.1.x, memanggil fungsi yang EXECUTE-nya di-revoke dari 
 - Sejak migrasi atribusi pembalas PDKT (`20261023090000`), wrapper Group B `submit_pdkt_mailbox_reply` dan `submit_pdkt_mailbox_reply_with_outcome` mendelegasikan ke `submit_pdkt_mailbox_reply_with_subject`; anon tetap ditolak dengan pesan `Unauthorized`, tetapi kode errornya `42501` (HTTP 401), bukan `P0001`.
 - Rollback `supabase/rollbacks/rollback_20261008150000_*.sql` dan `rollback_20261008150001_*.sql` mengembalikan eksposur crash; hanya dipakai dengan persetujuan Fajar.
 
+## AI Model Policy per Task & Fallback
+
+Kebijakan penentuan model AI untuk tugas sistem (`ketik_review`, `ketik_review_fallback`, `telefun_assessment`, `sidak_forecast`, `default_text`) diatur secara terpusat:
+- **Registry & Capabilities**: Didikte oleh `packages/types/src/ai-model-policy.ts` dan `ai-models.ts`. Setiap tugas memiliki persyaratan kapabilitas (`requires.supportsAudioInput`, dsb.).
+- **Penyimpanan Kebijakan**: Tabel `ai_model_policy` (backend-only, RLS enabled, no public access) dan audit log `ai_model_policy_audit`.
+- **Primary & Fallback**:
+  - Primary path: Resolver `resolveTaskModel(task)` membaca kebijakan dari database dengan local cache 60s (`createTtlCache`).
+  - Bounded fallback: Jika database kosong, gagal dibaca, atau model yang tersimpan tidak lagi eligible, sistem otomatis menggunakan konstanta kode bawaan (`codeDefault`) tanpa melempar error ke pengguna.
+  - Untuk proses berdurasi panjang (mis. KETIK review atau Telefun scoring), model di-resolve tepat satu kali di awal proses kerja (tidak berganti di tengah jalan).
+- **Manajemen UI**: Admin dan Trainer dapat mengatur model per tugas secara dinamis melalui tab **Monitoring → Model** (`/monitoring/model`) tanpa deploy ulang kode. Model yang belum memiliki pricing aktif dicegah untuk dipilih agar menghindari logging biaya nol.
+
 ## Performance Guardrails (FCP/LCP)
 
 - Code splitting & lazy loading sudah diterapkan — semua 37 route di `router.tsx` menggunakan `React.lazy()`.

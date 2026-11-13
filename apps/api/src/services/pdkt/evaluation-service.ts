@@ -19,6 +19,7 @@ import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { callAI, isTransientAiError } from "./shared-utils";
 import {
@@ -591,7 +592,8 @@ export async function evaluateAgentResponse(
   errorCode?: PdktEvaluationErrorCode;
   error?: string;
 }> {
-  const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
+  const defaultTextModel = (await resolveTaskModel("default_text")).modelId;
+  const modelId = config.selectedModel || defaultTextModel || DEFAULT_AI_MODEL_ID;
 
   const inboundEmails = emails.filter((email) => !email.isAgent);
   const agentReplies = emails.filter((email) => email.isAgent);

@@ -192,6 +192,10 @@ export default defineConfig({
       testMatch: "monitoring-pricing-schedule-api.spec.ts",
     },
     {
+      name: "monitoring-models-real-backend",
+      testMatch: "monitoring-models-api.spec.ts",
+    },
+    {
       name: "monitoring-riwayat-real-backend",
       testMatch: "monitoring-riwayat-api.spec.ts",
     },

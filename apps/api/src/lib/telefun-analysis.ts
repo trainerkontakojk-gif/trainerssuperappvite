@@ -1,6 +1,7 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
 import { TELEFUN_ASSESSMENT_MODEL } from "./ai-models";
+import { resolveTaskModel } from "./ai-model-policy";
 import { isTelefunCaptureScoringReady } from "./telefun-capture-readiness";
 import {
   parseTelefunTranscript,
@@ -343,8 +344,9 @@ export async function analyzeVoiceQuality(
   // Keep this check immediately adjacent to the provider boundary. Once the
   // provider request has started, its logging/cost contract is unchanged.
   if (signal?.aborted) return { success: false, error: "Scoring aborted" };
+  const { modelId } = await resolveTaskModel("telefun_assessment");
   const response = await generateGeminiContent({
-    model: TELEFUN_ASSESSMENT_MODEL,
+    model: modelId || TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:
       "Anda adalah pelatih vokal senior dan analis wicara profesional dengan 15 tahun pengalaman melatih agent contact center OJK 157 dan telemarketing. Tugas Anda adalah memberikan penilaian yang MENDALAM, DETAIL, dan KONSTRUKTIF — bukan ringkasan singkat. Setiap penilaian harus spesifik, mengutip perilaku aktual dari rekaman, menjelaskan dampaknya ke konsumen, dan memberikan langkah perbaikan yang actionable. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia yang natural, profesional, dan kritis-membangun (50% apresiasi, 50% kritik). Jangan pernah memberikan jawaban generik, singkat, atau asal-asalan.",
     contents: [
@@ -447,8 +449,9 @@ export async function generateCoachingSummary(
     SEMUA TEKS WAJIB DALAM BAHASA INDONESIA, detail, dan tidak generik.
   `;
 
+  const { modelId } = await resolveTaskModel("telefun_assessment");
   const response = await generateGeminiContent({
-    model: TELEFUN_ASSESSMENT_MODEL,
+    model: modelId || TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:
       "Anda adalah pelatih customer service senior dan mentor QA OJK 157 dengan pengalaman coaching agent. Berikan rekomendasi yang TAJAM, SPESIFIK, dan MEMBANGUN — setiap saran harus actionable, merujuk ke indikator penilaian Telefun yang sudah ditentukan, dan dapat langsung dipraktikkan agen. Hindari saran generik atau singkat. Semua balasan WAJIB Bahasa Indonesia.",
     contents: [{ role: "user", parts: [{ text: prompt }] }],

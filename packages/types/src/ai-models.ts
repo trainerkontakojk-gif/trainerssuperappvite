@@ -3,6 +3,7 @@ import { isGeminiLiveVoiceName } from "./telefun-voices";
 export interface AiModelCapabilities {
   supportsText: boolean;
   supportsImage: boolean;
+  supportsAudioInput?: boolean;
   imageGenerationMode?: "native" | "none";
   /** Google bills generated-image output tokens at their own rate (USD per 1M). */
   imageOutputPriceUsdPerMillion?: number;
@@ -383,7 +384,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
     description: "Model Gemini cepat untuk percakapan dan analisis.",
     provider: "gemini",
     timeoutMs: 180_000,
-    capabilities: { supportsText: true, supportsImage: true },
+    capabilities: { supportsText: true, supportsImage: true, supportsAudioInput: true },
   },
   {
     id: "gemini-3.5-flash-lite",

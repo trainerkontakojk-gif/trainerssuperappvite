@@ -2,6 +2,7 @@ import { ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import type { VoiceQualityAssessment } from "@trainers/types";
 import { TELEFUN_ASSESSMENT_MODEL } from "./ai-models";
+import { resolveTaskModel } from "./ai-model-policy";
 import { parseJsonFromModelText } from "./ai-json";
 import { generateGeminiContent } from "./gemini";
 import {
@@ -82,8 +83,9 @@ export async function transcribeTelefunAgentAudio(params: {
   // Keep the admission check immediately before the provider boundary.
   if (params.signal?.aborted)
     return { success: false, error: "Scoring aborted" };
+  const { modelId } = await resolveTaskModel("telefun_assessment");
   const response = await generateGeminiContent({
-    model: TELEFUN_ASSESSMENT_MODEL,
+    model: modelId || TELEFUN_ASSESSMENT_MODEL,
     thinkingLevel: ThinkingLevel.LOW,
     sanitizeOutput: false,
     systemInstruction:

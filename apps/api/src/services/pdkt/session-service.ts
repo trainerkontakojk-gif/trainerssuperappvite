@@ -14,6 +14,7 @@ import {
 import { UsageContext } from "../../lib/ai-usage";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { resolvePdktTemplateBody } from "../pdkt-template-resolver";
 import { generatePdktScenarioImages } from "./image-generation";
 import {
@@ -123,7 +124,8 @@ export async function generateScenarioEmailTemplate(
     };
   }
 
-  const model = config.selectedModel || DEFAULT_AI_MODEL_ID;
+  const defaultTextModel = (await resolveTaskModel("default_text")).modelId;
+  const model = config.selectedModel || defaultTextModel || DEFAULT_AI_MODEL_ID;
   const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
 
   const executeGeneration = async (revisionRequirements: string[] = []) => {
@@ -300,7 +302,8 @@ export async function initializeEmailSession(
   // AI Generation Flow
   const customAttachments: string[] = scenario.attachmentImages || [];
   const hasCustomImages = customAttachments.length > 0;
-  const model = config.selectedModel || DEFAULT_AI_MODEL_ID;
+  const defaultTextModel = (await resolveTaskModel("default_text")).modelId;
+  const model = config.selectedModel || defaultTextModel || DEFAULT_AI_MODEL_ID;
   const policy = buildPdktEmailGenerationPolicy(
     configWithRecipientContext,
     scenario,
