@@ -586,6 +586,14 @@ Migration `20261113100000_efek_tna_plan_link.sql` menambah relasi opsional dari 
 - **Rollback:** `supabase/rollbacks/rollback_20261113100000_efek_tna_plan_link.sql` mengembalikan definisi `efek_save_sessions` dari `20261019160000_efek_training_sessions.sql`, lalu membuang indeks dan kolom. Replay lokal diuji dengan `supabase db reset`, rollback, dan migrasi ulang.
 - **Verifikasi:** `apps/web/e2e/tna-efek-plan-link-api.spec.ts` mencakup create/update/lepas tautan, penolakan 422, impor `merge`, `plan-options`, izin `tna.read`, dan detail rencana `efek`.
 
+#### Apply produksi 2026-11-13
+
+Diterapkan ke produksi `ruosnjmtywcrghjgqugz` dengan izin Fajar, satu file + `migration repair` (bukan `db push`).
+
+- Pra-cek hanya-baca: kolom `tna_plan_id` belum ada, `tna_plans` ada, dan `md5(prosrc)` `efek_save_sessions` produksi (`9f9604655f94bdbc363100edafb439ff`) identik dengan definisi asli `20261019160000` yang dipulihkan rollback.
+- `supabase db query --linked -f supabase/migrations/20261113100000_efek_tna_plan_link.sql` (04:51:18 UTC), lalu `supabase migration repair --linked --status applied 20261113100000` (exit 0).
+- Verifikasi katalog: kolom dan indeks `idx_efek_sessions_tna_plan` ada; `md5(prosrc)` = `6d666453c21052d15ec026d2bde76ea9` (sama dengan file teruji lokal); `SECURITY DEFINER`, `search_path=public, tna_internal`, EXECUTE `authenticated` tetap; 20 sesi lama utuh dengan 0 tautan; versi tercatat di history. RPC bisnis tidak dipanggil di produksi.
+
 ## Storage
 
 Aplikasi menggunakan Supabase Storage bucket:

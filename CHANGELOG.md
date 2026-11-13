@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-13
 
+- docs(database): record the production apply of the EFEK ↔ TNA plan link migration
 - feat(tna): link EFEK training sessions to a TNA plan, prefill sessions from a plan, and show linked sessions on plan detail without changing the verdict
 
 ## 2026-11-11

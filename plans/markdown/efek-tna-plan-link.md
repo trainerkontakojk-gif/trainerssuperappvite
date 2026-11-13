@@ -1,6 +1,6 @@
 # EFEK ↔ TNA — tautan sesi kelas ke rencana TNA
 
-Lane D (schema + RPC change, API contract, UI). Status: **DONE di `main`** (2026-11-13); migrasi remote/produksi belum dijalankan (butuh izin Fajar).
+Lane D (schema + RPC change, API contract, UI). Status: **DONE di `main`** (2026-11-13); migrasi diterapkan ke produksi 2026-11-13 04:51 UTC (catatan di `docs/database.md`).
 Dibuat 2026-11-13 untuk dikerjakan agent lain. Ikuti `AGENTS.md` dan `docs/AGENT_WORKFLOW.md`;
 muat `trainers-superapp-tdd` dan `supabase-migration` sebelum mengedit.
 
