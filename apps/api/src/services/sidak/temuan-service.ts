@@ -4,6 +4,7 @@ import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import { isCountableFinding } from "./shared-constants";
 import { getIndicators } from "./period-indicator";
+import { invalidateAgentDirectorySummary } from "./agent-directory";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
   calculateQAScoreFromTemuan,
@@ -201,6 +202,7 @@ export async function createPerfectScoreSession(
     throw new Error(`Gagal membuat sesi tanpa temuan: ${error.message}`);
   }
 
+  invalidateAgentDirectorySummary();
   return data ?? [];
 }
 
@@ -422,6 +424,7 @@ export async function createTemuanBatch(
     }
     throw new Error(`Gagal menyimpan temuan: ${error.message}`);
   }
+  invalidateAgentDirectorySummary();
 
   if (userId) {
     await supabaseAdmin.from("activity_logs").insert({
@@ -705,10 +708,12 @@ export async function updateTemuan(id: string, updates: UpdateTemuan) {
   // akan pernah sampai ke lapisan ini. Menebak dari `error.message` hanya
   // menambah jalur yang tidak bisa diuji dan bisa menimpa pesan lain.
   if (error) throw new Error(`Gagal update temuan: ${error.message}`);
+  invalidateAgentDirectorySummary();
   return data;
 }
 
 export async function deleteTemuan(id: string) {
   const { error } = await supabaseAdmin.from("qa_temuan").delete().eq("id", id);
   if (error) throw new Error(`Gagal hapus temuan: ${error.message}`);
+  invalidateAgentDirectorySummary();
 }

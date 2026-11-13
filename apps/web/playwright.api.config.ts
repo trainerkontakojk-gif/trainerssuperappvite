@@ -148,6 +148,10 @@ export default defineConfig({
       testMatch: "sidak-dashboard-brief-api.spec.ts",
     },
     {
+      name: "sidak-agent-directory-cache-real-backend",
+      testMatch: "sidak-agent-directory-cache-api.spec.ts",
+    },
+    {
       name: "sidak-dashboard-kpi-real-backend",
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },

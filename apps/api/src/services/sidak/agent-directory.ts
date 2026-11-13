@@ -5,6 +5,7 @@ import {
   PARALLEL_PAGE_CONCURRENCY,
 } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
+import { createTtlCache } from "../../lib/ttl-cache";
 import {
   EXCLUDED_FOLDERS,
   EXCLUDED_JABATAN,
@@ -108,12 +109,54 @@ export async function getAgents(params: {
   return data;
 }
 
+/**
+ * Unscoped directory per year and service set: every peserta, excluded ones
+ * included. Each entry is scored on its own temuan only, so filtering by
+ * access scope and exclusion after the cache gives the same result as
+ * filtering before scoring. Access scope itself is never cached.
+ */
+const directoryCache = createTtlCache<string, AgentDirectoryEntry[]>();
+
+/** Call after any write to `qa_temuan` or `profiler_peserta`. */
+export function invalidateAgentDirectorySummary(): void {
+  directoryCache.invalidate();
+}
+
 export async function getAgentDirectorySummary(
   year: number = new Date().getFullYear(),
   agentIds?: string[],
   includeExcluded?: boolean,
   allowedServiceTypes?: ServiceType[],
 ): Promise<{ agents: AgentDirectoryEntry[]; batches: string[] }> {
+  const services =
+    allowedServiceTypes && allowedServiceTypes.length > 0
+      ? [...allowedServiceTypes].sort()
+      : undefined;
+  const all = await directoryCache.get(
+    `${year}|${services?.join(",") ?? "*"}`,
+    () => buildAgentDirectory(year, services),
+  );
+
+  let agents = all;
+  if (agentIds) {
+    const idSet = new Set(agentIds);
+    agents = agents.filter((agent) => idSet.has(agent.id));
+  }
+  if (!includeExcluded) {
+    agents = agents.filter(
+      (agent) => !isAgentExcluded(agent.tim, agent.batch_name, agent.jabatan),
+    );
+  }
+  const batches = [
+    ...new Set(agents.map((agent) => agent.batch_name).filter(Boolean)),
+  ] as string[];
+  return { agents, batches };
+}
+
+async function buildAgentDirectory(
+  year: number,
+  allowedServiceTypes?: ServiceType[],
+): Promise<AgentDirectoryEntry[]> {
   const svcsToLoad =
     allowedServiceTypes && allowedServiceTypes.length > 0
       ? allowedServiceTypes
@@ -154,23 +197,6 @@ export async function getAgentDirectorySummary(
     Promise.all(svcsToLoad.map((st) => getIndicators(st))),
   ]);
 
-  let filteredAgents = agents;
-
-  if (agentIds) {
-    const idSet = new Set(agentIds);
-    filteredAgents = filteredAgents.filter((a: any) => idSet.has(a.id));
-  }
-
-  if (!includeExcluded) {
-    filteredAgents = filteredAgents.filter(
-      (a: any) => !isAgentExcluded(a.tim, a.batch_name, a.jabatan),
-    );
-  }
-
-  const batches = [
-    ...new Set(filteredAgents.map((a: any) => a.batch_name).filter(Boolean)),
-  ] as string[];
-
   const periodsMap = new Map(periods.map((p) => [p.id, p]));
 
   const temuanByAgent = new Map<string, any[]>();
@@ -183,7 +209,7 @@ export async function getAgentDirectorySummary(
     svcsToLoad.map((st, index) => [st, indicatorLists[index]!]),
   );
 
-  const entries: AgentDirectoryEntry[] = filteredAgents.map((a: any) => ({
+  const entries: AgentDirectoryEntry[] = agents.map((a: any) => ({
     id: a.id,
     nama: a.nama,
     tim: a.tim ?? "",
@@ -281,7 +307,7 @@ export async function getAgentDirectorySummary(
     }
   }
 
-  return { agents: entries, batches };
+  return entries;
 }
 
 export async function getAgentDetail(
