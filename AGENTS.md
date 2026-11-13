@@ -42,13 +42,17 @@ Use installed skills only where the canonical workflow requires them. `trainers-
 ## Session Learnings (auto-updated by handoff)
 
 ### Implicit Rules
-- Profiler E2E: pnpm --dir apps/web exec playwright test e2e/profiler-workspace.spec.ts --reporter=line --workers=1 (hermetic mocks in e2e/helpers/profilerMocks.ts)
-- Leader KTP route = /profiler behind LeaderAccessGate module ktp
+- Per-owner probe SQL in plan Lampiran B; run via Supabase MCP query_logs on prod ruosnjmtywcrghjgqugz; aggregates only, never copy raw query strings
+- Railway project 4cfeccd5-2cc3-46ec-9b2c-b45ff3649c07, API service d9660c65-12e0-4e18-8b4d-09d5b236679e, production env 561fb9cb-7cac-4680-a620-4746066e7726; Railway auto-deploys API on push to main
+- Coolify API deploy is manual by Fajar; no tool access
+- getDashboardData callers: sidak dashboard route, sidak-ranking-service (3 sites), agent-quickview, dashboard-forecast
+- Fajar's weekly Claude quota may be tight; implementation can be delegated to Pi (openai-codex/gpt-6.1-terra high) with Claude review
+- Reply in Indonesian; code/commits English
 
 ### Key Decisions
-- Decision: permitted folder = folder with scoped peserta count > 0 — Reason: backend getFolders for leader also returns parent folders; scoped counts exclude parents
-- Decision: auto-open once per mount via useRef — Reason: 'Ringkasan tahun' must still return to overview without re-redirect
-- Decision: skip auto-open when ?batch= or ?tim=1 present — Reason: respect explicit URL state
-- Decision: frontend-only, Lane B — Reason: no backend/permission/contract change; scope already enforced by resolveKtpScope
+- Decision: old offset-based probe unreliable — Reason: dashboard uses keyset paging (id=gt.), so continuation pages belonged to directory+trends
+- Decision: cache unscoped scored directory per year + sorted service set, scope/exclusion applied per request — Reason: per-agent scoring independent; access scope never cached
+- Decision: next step = extend same cache pattern to getDashboardData + fetchPaginatedTrendData by caching raw unscoped qa_temuan rows per year+service, filtering scope/folder/month per request, reusing invalidation hooks — Reason: Lane C, no migration, scoring engine untouched, much cheaper than WP4 RPC
+- Decision: WP4 RPC deferred until measurement shows target missed — Reason: dashboard-data.ts:446 says old SQL/MV formulas are not scoring-equivalent; RPC should only group rows, scoring stays in TypeScript; Lane D cost ~2-3x
 
 <!-- handoff:learnings:end -->
