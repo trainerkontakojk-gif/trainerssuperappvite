@@ -1,0 +1,129 @@
+{
+  "result": "partial_failure",
+  "environment": "real Google Gemini; real local Hono/JWT/Supabase; synthetic WebM storage fixture",
+  "model": "gemini-4-hydrogen",
+  "syntheticAudio": {
+    "durationSeconds": 22.015,
+    "codec": "opus",
+    "sampleRateHz": 48000,
+    "channels": 1,
+    "sizeBytes": 74051,
+    "sha256": "c22c8b82a035feb4f1bd5d5fd280acc8c06ff7217fc55cbf4b48d44944454452"
+  },
+  "smokeOverrides": {
+    "thinkingLevel": "LOW",
+    "maxOutputTokens": 8192,
+    "maxProviderCalls": 4
+  },
+  "calls": [
+    {
+      "kind": "transcription",
+      "status": 200,
+      "modelVersion": "gemini-4-hydrogen",
+      "usage": {
+        "promptTokenCount": 1272,
+        "candidatesTokenCount": 220,
+        "totalTokenCount": 2045,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 605
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 667
+          }
+        ],
+        "candidatesTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 220
+          }
+        ],
+        "thoughtsTokenCount": 553,
+        "serviceTier": "standard"
+      },
+      "durationMs": 7422
+    },
+    {
+      "kind": "assessment",
+      "status": 200,
+      "modelVersion": "gemini-4-hydrogen",
+      "usage": {
+        "promptTokenCount": 3426,
+        "candidatesTokenCount": 884,
+        "totalTokenCount": 4310,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 2759
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 667
+          }
+        ],
+        "candidatesTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 884
+          }
+        ],
+        "serviceTier": "standard"
+      },
+      "durationMs": 8528
+    },
+    {
+      "kind": "coaching",
+      "status": 200,
+      "modelVersion": "gemini-4-hydrogen",
+      "usage": {
+        "promptTokenCount": 3360,
+        "candidatesTokenCount": 236,
+        "totalTokenCount": 3596,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 3360
+          }
+        ],
+        "candidatesTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 236
+          }
+        ],
+        "serviceTier": "standard"
+      },
+      "durationMs": 3432
+    },
+    {
+      "kind": "annotations",
+      "status": 400,
+      "durationMs": 3547
+    }
+  ],
+  "passedBeforeFailure": [
+    "local policy save with test-only candidate audio flag",
+    "score route HTTP 200",
+    "coaching recommendations persisted nonempty"
+  ],
+  "failure": {
+    "route": "POST /telefun/annotations/generate/:id",
+    "localStatus": 500,
+    "localCode": "NO_ANNOTATIONS",
+    "upstreamStatus": 400,
+    "upstreamCode": "INVALID_ARGUMENT",
+    "upstreamMessage": "Request contains an invalid argument."
+  },
+  "estimatedUsdFromReportedTokens": 0.0262845,
+  "notVerified": [
+    "transcript keyword assertion occurs after failing annotation step and was not reached",
+    "annotation generation/persistence",
+    "production provider defaults and latency",
+    "production UI/model policy switch",
+    "two-way transcript content review (fixture session had no two-way message history)"
+  ],
+  "productionAudioEligibilityEnabled": false,
+  "estimatedCostNote": "Standard-price estimate from provider-reported tokens, not an invoice or confirmed charge; failed annotation response reported no usage."
+}

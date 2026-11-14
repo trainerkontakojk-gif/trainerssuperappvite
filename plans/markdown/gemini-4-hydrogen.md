@@ -86,3 +86,8 @@ linked push applied exactly `20261114130615_add_gemini_4_hydrogen_pricing.sql` (
 Postflight verified input 1.50 / output 7.50 / cached input 0.075, correct history, unchanged complete Flash price/schedule and policy fingerprints,
 zero configured task policies, and continued ACTIVE_HEALTHY status. Final dry-run exited 0: Remote database is up to date.
 No model choice was switched and no production AI/UI flow was run. Full record: `docs/database.md`.
+
+
+### Telefun audio follow-up
+
+Fajar subsequently requested real audio testing. The bounded four-request live smoke passed transcription/assessment/coaching but failed annotation with HTTP 400 INVALID_ARGUMENT; the local annotation endpoint returned 500 NO_ANNOTATIONS. Audio eligibility remains disabled. See [diagnostic and evidence](telefun-hydrogen-audio.md). This does not change Hydrogen text availability or the applied pricing migration.
