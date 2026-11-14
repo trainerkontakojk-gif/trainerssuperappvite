@@ -45,20 +45,24 @@ export function ModelEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Ubah Model: {policy.label}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             {policy.description}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto py-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Pilih Model yang Tersedia
           </p>
 
-          <div role="radiogroup" aria-label="Pilih model AI" className="space-y-2.5">
+          <div
+            role="radiogroup"
+            aria-label="Pilih model AI"
+            className="space-y-2.5"
+          >
             {policy.eligible.map((model) => {
               const hasPricing = model.hasPricing;
               const isSelected = currentSelected === model.id;
@@ -125,12 +129,13 @@ export function ModelEditDialog({
           </div>
 
           <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
-            <strong>Catatan:</strong> Perubahan berlaku untuk pemanggilan AI baru.
-            Unit kerja atau proses yang sedang berjalan tidak akan terpengaruh.
+            <strong>Catatan:</strong> Perubahan berlaku untuk pemanggilan AI
+            baru. Unit kerja atau proses yang sedang berjalan tidak akan
+            terpengaruh.
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="shrink-0 gap-2 sm:gap-0">
           <Button
             type="button"
             variant="ghost"

@@ -181,7 +181,7 @@ Status implementasi awal dan follow-up (2026-11-14); bukti sesi ini ada di bawah
 
 ## Tindak lanjut (di luar rencana ini)
 
-- Daftarkan `gemini-4-hydrogen` di registry + migration harga ($1.50/$7.50, cek dulu ai.google.dev). Uji input audio Telefun sebelum memberi `supportsAudioInput`.
+- Hydrogen ditambahkan melalui follow-up `gemini-4-hydrogen.md`, tanpa menghapus 3.8 Flash atau mengubah default. Migration harga `20261114130615_add_gemini_4_hydrogen_pricing.sql` disiapkan lokal; prod menunggu izin baru. Uji audio Telefun tetap diperlukan sebelum `supportsAudioInput`.
 - 2027-01-01: ganti `ketik_review`, `sidak_forecast`, `default_text` (dan `telefun_assessment` bila audio lolos) ke Hydrogen lewat tab Model.
 - Opsional: penjadwalan perubahan model (D2).
 

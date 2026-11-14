@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-14
 
+- feat(ai): add Gemini 4 Hydrogen alongside Gemini 3.8 Flash
+
 - docs(database): record verified production apply of AI model policy migrations
 - fix(monitoring): enforce model policy contracts and verify selected models end to end
 

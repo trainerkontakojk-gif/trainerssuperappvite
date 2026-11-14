@@ -30,7 +30,7 @@ export interface AiModelInfo {
   capabilities?: AiModelCapabilities;
   availableModules?: readonly AiModelModule[];
   realtime?: AiModelRealtimeMetadata;
-  /** False for reasoning models whose vendor API rejects the temperature parameter. */
+  /** False when the vendor API rejects or does not honor temperature. */
   supportsTemperature?: boolean;
 }
 
@@ -379,6 +379,16 @@ export function normalizePersistedTelefunSettings<T>(
 
 export const TEXT_MODELS: AiModelInfo[] = [
   {
+    id: "gemini-4-hydrogen",
+    name: "Gemini 4 Hydrogen",
+    description:
+      "Model Gemini 4 untuk percakapan, penalaran, dan analisis multimodal.",
+    provider: "gemini",
+    timeoutMs: 180_000,
+    capabilities: { supportsText: true, supportsImage: true },
+    supportsTemperature: false,
+  },
+  {
     id: "gemini-3.8-flash",
     name: "Gemini 3.8 Flash",
     description: "Model Gemini cepat untuk percakapan dan analisis.",
@@ -460,8 +470,9 @@ export const TEXT_MODELS: AiModelInfo[] = [
   GEMINI_31_FLASH_LIVE_MODEL,
 ];
 
-/** The only models KETIK and PDKT users may pick (newest Gemini Flash and Flash-Lite). */
+/** Explicit KETIK/PDKT choices; adding Hydrogen retains Flash and Flash-Lite. */
 export const KETIK_PDKT_MODEL_IDS = [
+  "gemini-4-hydrogen",
   "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
 ] as const;

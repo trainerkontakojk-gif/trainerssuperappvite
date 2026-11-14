@@ -257,7 +257,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 ## AI Integration Pattern
 
 - Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openai.ts`).
-- Pemilihan model mengikuti canonical mapping. Telefun realtime registry aktif hanya berisi dua Gemini Live model; historical GPT realtime metadata is separate read-only compatibility and never derived from env or used for admission. Direct text IDs (`gpt-5.6-luna`, `gpt-5.4-mini`) remain supported. KETIK and PDKT users can only pick `KETIK_PDKT_MODEL_IDS` (`gemini-3.8-flash`, `gemini-3.5-flash-lite`); `coerceKetikPdktModelId` in `packages/types` maps any other saved or requested choice to Flash-Lite when it was a Flash-Lite model and to `gemini-3.8-flash` otherwise. Sessions created before the change keep the model stored in their snapshot.
+- Pemilihan model mengikuti canonical mapping. Telefun realtime registry aktif hanya berisi dua Gemini Live model; historical GPT realtime metadata is separate read-only compatibility and never derived from env or used for admission. Direct text IDs (`gpt-5.6-luna`, `gpt-5.4-mini`) remain supported. KETIK and PDKT users can only pick `KETIK_PDKT_MODEL_IDS` (`gemini-4-hydrogen`, `gemini-3.8-flash`, `gemini-3.5-flash-lite`); `coerceKetikPdktModelId` in `packages/types` maps any other saved or requested choice to Flash-Lite when it was a Flash-Lite model and to `gemini-3.8-flash` otherwise. Sessions created before the change keep the model stored in their snapshot.
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
 - `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
 - `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup. Provider aktif hanya `gemini` dan `openai`.
@@ -436,6 +436,8 @@ matching their Gemini provider implementation. Pricing eligibility uses the same
 lookup as usage billing; a future schedule alone is insufficient. Reset and its audit record are atomic.
 Telefun scoring carries one resolved model through transcription, assessment and follow-up coaching.
 KETIK review claims derive their lease from resolved primary/fallback timeouts.
+
+Gemini 4 Hydrogen (`gemini-4-hydrogen`) is an additional text/image choice; Gemini 3.8 Flash remains registered and is still every existing Gemini code default. Hydrogen does not receive `supportsAudioInput` in this app until dedicated Telefun audio verification succeeds. Standard pricing is USD 1.50 input / 7.50 output (including thinking) / 0.075 implicit cached input per million tokens, seeded by `20261114130615_add_gemini_4_hydrogen_pricing.sql`; applying that migration to production requires separate approval. Missing Hydrogen pricing logs tokens at zero cost and prevents policy selection (`MODEL_NO_PRICING`). GenerateContent cachedContentTokenCount is a subset of promptTokenCount; the cached subset is priced through the existing cached-input bucket while remaining prompt tokens stay unspecified, so input is counted once. Existing legacy fallback rates for other models are unchanged. The Monitoring model picker bounds its height to the viewport and scrolls the options while retaining visible header/footer actions.
 
 ## Performance Guardrails (FCP/LCP)
 

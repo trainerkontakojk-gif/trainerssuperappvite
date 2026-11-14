@@ -111,6 +111,9 @@ export async function logAiUsage(options: {
     // Audit 2026-08-21: Google/ai.google.dev + OpenAI 2026-07-30 cut.
     // Standard (Paid Tier, Global) unless noted. Gemini Live keeps its own realtime rates.
     const pricingByModel: Record<string, { input: number; output: number }> = {
+      // New models retain token evidence at zero cost without DB pricing
+      // (AGENTS.md); do not estimate Hydrogen at legacy Flash rates.
+      "gemini-4-hydrogen": { input: 0, output: 0 },
       "gemini-3.8-flash": { input: 0.75, output: 3.75 },
       "gemini-3.5-flash": { input: 1.5, output: 9.0 },
       "gemini-3.5-flash-lite": { input: 0.30, output: 2.50 },

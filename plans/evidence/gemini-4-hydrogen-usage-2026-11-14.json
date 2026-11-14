@@ -1,0 +1,35 @@
+{
+  "environment": "local Supabase and loopback provider stub",
+  "requestedModels": [
+    "/v1beta/models/gemini-4-hydrogen:generateContent",
+    "/v1beta/models/gemini-4-hydrogen:generateContent"
+  ],
+  "logs": [
+    {
+      "action": "generate-trend-forecast",
+      "model_id": "gemini-4-hydrogen",
+      "input_price_usd_per_million": 1.5,
+      "output_price_usd_per_million": 7.5,
+      "cached_input_text_price_usd_per_million": 0.075,
+      "input_tokens": 10000,
+      "input_text_tokens": 8000,
+      "cached_input_text_tokens": 8000,
+      "input_unspecified_tokens": 2000,
+      "output_tokens": 1000,
+      "estimated_cost_usd": 0.0111
+    },
+    {
+      "action": "coaching_review",
+      "model_id": "gemini-4-hydrogen",
+      "input_price_usd_per_million": 1.5,
+      "output_price_usd_per_million": 7.5,
+      "cached_input_text_price_usd_per_million": 0.075,
+      "input_tokens": 10000,
+      "input_text_tokens": 8000,
+      "cached_input_text_tokens": 8000,
+      "input_unspecified_tokens": 2000,
+      "output_tokens": 1000,
+      "estimated_cost_usd": 0.0111
+    }
+  ]
+}

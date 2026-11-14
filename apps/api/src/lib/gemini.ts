@@ -171,6 +171,13 @@ export async function generateGeminiContent(options: {
           typeof usage.promptTokenCount === "number"
             ? usage.promptTokenCount
             : 0;
+        // Cached input is already included in promptTokenCount. Put only that
+        // subset in the cached input bucket; keep the rest unspecified so the
+        // canonical calculator neither loses nor double-charges prompt tokens.
+        const cachedInputTokens =
+          typeof usage.cachedContentTokenCount === "number"
+            ? Math.max(0, Math.min(inputTokens, usage.cachedContentTokenCount))
+            : 0;
         // Google bills thinking tokens as output; candidatesTokenCount excludes them.
         const outputTokens =
           (typeof usage.candidatesTokenCount === "number"
@@ -208,6 +215,12 @@ export async function generateGeminiContent(options: {
               inputTokens,
               outputTokens,
               totalTokens,
+              ...(cachedInputTokens > 0
+                ? {
+                    inputTextTokens: cachedInputTokens,
+                    cachedInputTextTokens: cachedInputTokens,
+                  }
+                : {}),
               ...(outputImageTokens > 0 ? { outputImageTokens } : {}),
             },
           });

@@ -729,3 +729,10 @@ Both policy migrations were applied to production on 2026-11-14 after Fajar's ex
 - MD5 body RPC prod cocok dengan source migration: setter `2624433952a25c364d51fbe4c7a3ede7`, reset `2b599fabe3a4f14d34ee25ffb3bf6195`.
 - Policy dan audit masing-masing 0 baris saat verifikasi: apply tidak mengganti pilihan model. Tidak ada pemanggilan AI, perubahan konfigurasi model, production E2E, atau deploy aplikasi manual.
 - Dry-run sesudah apply (exit 0): `Remote database is up to date.` Verifikasi ini membuktikan schema/history/ACL; alur UI prod tidak dijalankan.
+
+
+### Gemini 4 Hydrogen pricing (2026-11-14; production pending)
+
+`20261114130615_add_gemini_4_hydrogen_pricing.sql` inserts only `gemini-4-hydrogen` in `ai_pricing_settings`: USD 1.50 input / 7.50 output (including thinking) / 0.075 implicit cached input per million tokens (Standard paid tier, [official source](https://aistudio.google.com/docs/pricing#gemini-4-hydrogen)). `ON CONFLICT DO NOTHING` preserves existing custom pricing. No Flash pricing/schedules, policy choices, or historical usage are changed.
+
+Local apply, custom-price preservation, and rollback/forward replay were verified. Production application is pending explicit authorization for this new migration. Rollback removes only the unchanged default Hydrogen price row, preserves all Flash rows and usage logs, and rejects removal while a task policy references Hydrogen. Revert Hydrogen selections/API first; preserve pre-existing Hydrogen prices rather than running this rollback.

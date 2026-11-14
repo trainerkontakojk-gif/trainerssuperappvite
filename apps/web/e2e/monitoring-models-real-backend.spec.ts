@@ -46,60 +46,85 @@ test.afterAll(async () => {
     (await createAdmin(env).auth.admin.deleteUser(trainer.userId)).error,
   ).toBeNull();
 });
-test("trainer saves and resets a policy through the real backend", async ({
-  page,
-}) => {
-  await openHermeticShell(page, {
-    path: "/monitoring/model",
-    beforeNavigate: async (page) => {
-      await page.route("**/api/v1/ai/monitoring/models**", async (route) => {
-        const req = route.request();
-        const url = new URL(req.url());
-        const response = await tnaApiRequest(
-          app,
-          `http://localhost${url.pathname}${url.search}`,
-          {
-            method: req.method(),
-            headers: {
-              Authorization: `Bearer ${trainer.token}`,
-              "Content-Type": "application/json",
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+]) {
+  test(`trainer chooses Hydrogen alongside Flash and resets through the real backend (${viewport.width})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    runSql(
+      env,
+      "DELETE FROM ai_model_policy; DELETE FROM ai_model_policy_audit;",
+    );
+    (
+      await import("../../api/src/lib/ai-model-policy")
+    ).invalidateAiModelPolicyCache();
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await openHermeticShell(page, {
+      path: "/monitoring/model",
+      beforeNavigate: async (page) => {
+        await page.route("**/api/v1/ai/monitoring/models**", async (route) => {
+          const req = route.request();
+          const url = new URL(req.url());
+          const response = await tnaApiRequest(
+            app,
+            `http://localhost${url.pathname}${url.search}`,
+            {
+              method: req.method(),
+              headers: {
+                Authorization: `Bearer ${trainer.token}`,
+                "Content-Type": "application/json",
+              },
+              ...(req.postData() ? { body: req.postData()! } : {}),
             },
-            ...(req.postData() ? { body: req.postData()! } : {}),
-          },
-        );
-        await route.fulfill({
-          status: response.status,
-          contentType: "application/json",
-          body: await response.text(),
+          );
+          await route.fulfill({
+            status: response.status,
+            contentType: "application/json",
+            body: await response.text(),
+          });
         });
-      });
-    },
+      },
+    });
+    const row = page.locator("tr", { hasText: "Prediksi Dashboard SIDAK" });
+    await row.getByRole("button", { name: "Ubah" }).click();
+    await expect(
+      page.locator("label", { hasText: "Gemini 3.8 Flash" }),
+    ).toBeVisible();
+    await page.locator("label", { hasText: "Gemini 4 Hydrogen" }).click();
+    await expect(
+      page.getByRole("button", { name: "Simpan Perubahan" }),
+    ).toBeInViewport();
+    await page.screenshot({
+      path: `/tmp/hydrogen-model-dialog-${viewport.width}.png`,
+    });
+    await page.getByRole("button", { name: "Simpan Perubahan" }).click();
+    await expect(row.getByText("Kustom (Database)")).toBeVisible();
+    expect(
+      runSql(
+        env,
+        "SELECT model_id FROM ai_model_policy WHERE task='sidak_forecast'",
+      ),
+    ).toBe("gemini-4-hydrogen");
+    await expect(page.getByText("E2E trainer", { exact: true })).toBeVisible();
+    await row.getByRole("button", { name: "Bawaan" }).click();
+    await page.getByRole("button", { name: "Kembalikan", exact: true }).click();
+    await expect(row.getByText("Bawaan Sistem")).toBeVisible();
+    expect(
+      runSql(
+        env,
+        "SELECT count(*) FROM ai_model_policy WHERE task='sidak_forecast'",
+      ),
+    ).toBe("0");
+    expect(
+      runSql(
+        env,
+        `SELECT count(*) FROM ai_model_policy_audit WHERE changed_by='${trainer.userId}'`,
+      ),
+    ).toBe("2");
+    expect(pageErrors).toEqual([]);
   });
-  const row = page.locator("tr", { hasText: "Prediksi Dashboard SIDAK" });
-  await row.getByRole("button", { name: "Ubah" }).click();
-  await page.locator("label", { hasText: "Gemini 3.5 Flash Lite" }).click();
-  await page.getByRole("button", { name: "Simpan Perubahan" }).click();
-  await expect(row.getByText("Kustom (Database)")).toBeVisible();
-  expect(
-    runSql(
-      env,
-      "SELECT model_id FROM ai_model_policy WHERE task='sidak_forecast'",
-    ),
-  ).toBe("gemini-3.5-flash-lite");
-  await expect(page.getByText("E2E trainer", { exact: true })).toBeVisible();
-  await row.getByRole("button", { name: "Bawaan" }).click();
-  await page.getByRole("button", { name: "Kembalikan", exact: true }).click();
-  await expect(row.getByText("Bawaan Sistem")).toBeVisible();
-  expect(
-    runSql(
-      env,
-      "SELECT count(*) FROM ai_model_policy WHERE task='sidak_forecast'",
-    ),
-  ).toBe("0");
-  expect(
-    runSql(
-      env,
-      `SELECT count(*) FROM ai_model_policy_audit WHERE changed_by='${trainer.userId}'`,
-    ),
-  ).toBe("2");
-});
+}
