@@ -28,7 +28,6 @@ Lane D: AI provider/usage and eligibility. User explicitly requested audio testi
 
 Proof boundaries: local provider fixtures prove routing/state/persistence, not audio comprehension; live smoke proves acceptance and basic content/JSON compatibility for the supplied synthetic clip under LOW thinking, not broad human scoring accuracy or production latency.
 
-
 ## Actual live result — 2026-11-14
 
 Command (exit 1):
@@ -64,7 +63,6 @@ ffmpeg -i /tmp/agent.aiff -c:a libopus -ar 48000 -ac 1 -b:a 24k /tmp/agent.webm
 
 The committed diagnostic is opt-in only and intentionally remains a readiness gate that can fail; its default skip is not GREEN proof of live compatibility. Candidate capability changes are confined to the Playwright worker and restored on cleanup. Full provider-key material is never printed; only existing configured credentials are read in explicit live mode. Storage fixture is synthetic bytes, while provider requests and local Hono/JWT/database are real.
 
-
 ## Harness verification
 
 - After isolating the live-only diagnostic, `pnpm typecheck`, `pnpm lint`, `pnpm build` all exited 0. An initial Buffer/BodyInit typing mismatch in the diagnostic was corrected by copying synthetic bytes into Uint8Array; no runtime product code changed.
@@ -75,3 +73,9 @@ The committed diagnostic is opt-in only and intentionally remains a readiness ga
 - `graphify update .`: exit 0; 19879 nodes, 37956 edges, 1265 communities; local graph updated and oversized HTML view skipped automatically.
 - Final `git diff --check`: exit 0. Only the opt-in diagnostic/configuration, evidence and documentation are integrated. Existing 15 scoring regressions are unchanged; three pre-existing untracked plans remain untouched.
 - Testing request is complete with a partial-failure result. The conditional capability-enable step is intentionally incomplete because live annotations failed; it requires a separate corrective change and bounded live confirmation, not a claim of readiness.
+
+## Follow-up annotation repair — 2026-11-14
+
+The authorized [annotation fix and recheck](telefun-hydrogen-annotations-fix.md) now passes with exactly one additional Hydrogen call: HTTP 200, 3 persisted annotations, 2 coaching recommendations and verified model usage. See [new live evidence](../evidence/telefun-hydrogen-annotations-fix-2026-11-14.json). This is an annotation-only recheck; the original result above remains historical evidence.
+
+Current official structured-output docs clarify the earlier schema hypothesis: maxLength is ignored, while array/numeric bounds expand constrained decoding grammar and can cause INVALID_ARGUMENT when too complex. The fix removes those provider bounds, preserves bounds in backend validation, and handles provider/invalid response failures before writes. No single original field was named by the upstream error. Production audio eligibility/defaults remain unchanged.

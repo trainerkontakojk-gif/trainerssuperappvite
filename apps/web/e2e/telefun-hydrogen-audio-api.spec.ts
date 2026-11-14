@@ -16,6 +16,11 @@ import { tnaApiRequest } from "./helpers/tnaApi";
 // four requests with synthetic WebM only. A failure is readiness evidence;
 // this test does not enable production registry eligibility.
 const LIVE_HYDROGEN = process.env.E2E_HYDROGEN_LIVE_SMOKE === "1";
+const MAX_LIVE_CALLS = Number(process.env.E2E_HYDROGEN_MAX_CALLS ?? 4);
+if (MAX_LIVE_CALLS !== 1 && MAX_LIVE_CALLS !== 4)
+  throw new Error(
+    "Hydrogen smoke budget must be 1 (annotations) or 4 (full flow)",
+  );
 test.skip(
   !LIVE_HYDROGEN,
   "Live provider diagnostic requires explicit opt-in and synthetic audio",
@@ -156,7 +161,7 @@ test.beforeAll(async () => {
           !url.pathname.endsWith("/models/gemini-4-hydrogen:generateContent")
         )
           throw new Error("Live smoke permits only Hydrogen GenerateContent");
-        if (++liveProviderCalls > 4)
+        if (++liveProviderCalls > MAX_LIVE_CALLS)
           throw new Error("Live smoke provider-call budget exhausted");
         payload.generationConfig = {
           ...payload.generationConfig,
@@ -242,6 +247,10 @@ test.afterAll(async () => {
   expect((await db.auth.admin.deleteUser(agent.userId)).error).toBeNull();
 });
 test("Hydrogen policy supports transcription, scoring, coaching and replay annotations", async () => {
+  test.skip(
+    MAX_LIVE_CALLS !== 4,
+    "Full audio diagnostic requires a four-call budget",
+  );
   test.setTimeout(LIVE_HYDROGEN ? 300000 : 60000);
   requestedModelUrls.length = 0;
   let observedAssessment: unknown;
@@ -368,6 +377,122 @@ test("Hydrogen policy supports transcription, scoring, coaching and replay annot
         }),
         contentType: "application/json",
       });
+    runSql(
+      env,
+      `DELETE FROM ai_model_policy WHERE task='telefun_assessment' AND updated_by='${agent.userId}'; DELETE FROM ai_model_policy_audit WHERE changed_by='${agent.userId}';`,
+    );
+    (
+      await import("../../api/src/lib/ai-model-policy")
+    ).invalidateAiModelPolicyCache();
+  }
+});
+
+test("Hydrogen replay annotations succeed with one provider request", async () => {
+  test.skip(
+    MAX_LIVE_CALLS !== 1,
+    "Annotation-only diagnostic requires a one-call budget",
+  );
+  test.setTimeout(120000);
+  try {
+    const policy = await tnaApiRequest(
+      app,
+      "http://localhost/api/v1/ai/monitoring/models/telefun_assessment",
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${agent.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ modelId: "gemini-4-hydrogen" }),
+      },
+    );
+    expect(policy.status, await policy.clone().text()).toBe(200);
+    const id = await createSession();
+    const response = await tnaApiRequest(
+      app,
+      `http://localhost/api/v1/telefun/annotations/generate/${id}`,
+      { method: "POST", headers: { Authorization: `Bearer ${agent.token}` } },
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    const data = (await response.json()).data;
+    expect(data.annotations.length).toBeGreaterThan(0);
+    expect(data.annotations.length).toBeLessThanOrEqual(30);
+    expect(data.recommendations.length).toBeLessThanOrEqual(5);
+    expect(
+      data.annotations.every(
+        (row: { text: string; timestamp_ms: number }) =>
+          row.text.length <= 500 &&
+          Number.isInteger(row.timestamp_ms) &&
+          row.timestamp_ms >= 0,
+      ),
+    ).toBe(true);
+    expect(
+      data.recommendations.every(
+        (row: { priority: number }) =>
+          Number.isInteger(row.priority) &&
+          row.priority >= 1 &&
+          row.priority <= 5,
+      ),
+    ).toBe(true);
+    expect(providerCalls).toEqual([{ kind: "annotations" }]);
+    expect(liveProviderCalls).toBe(1);
+    expect(liveProviderEvidence).toEqual([
+      expect.objectContaining({
+        kind: "annotations",
+        status: 200,
+        modelVersion: "gemini-4-hydrogen",
+      }),
+    ]);
+    const db = createAdmin(env);
+    const persisted = await db
+      .from("telefun_replay_annotations")
+      .select("id,text")
+      .eq("session_id", id);
+    expect(persisted.error).toBeNull();
+    expect(persisted.data?.length).toBe(data.annotations.length);
+    const coaching = await db
+      .from("telefun_coaching_summary")
+      .select("recommendations,ai_annotation_count")
+      .eq("session_id", id)
+      .single();
+    expect(coaching.error).toBeNull();
+    expect(coaching.data?.recommendations).toEqual(data.recommendations);
+    expect(coaching.data?.ai_annotation_count).toBe(data.annotations.length);
+    const logs = await usageLogs();
+    expect(logs).toEqual([
+      expect.objectContaining({
+        action: "replay-annotation-generation",
+        model_id: "gemini-4-hydrogen",
+      }),
+    ]);
+    expect(logs[0].input_tokens).toBeGreaterThan(0);
+    expect(logs[0].output_tokens).toBeGreaterThan(0);
+    await test.info().attach("hydrogen-annotation-persistence", {
+      body: JSON.stringify({
+        annotationCount: data.annotations.length,
+        recommendationCount: data.recommendations.length,
+        annotations: data.annotations.map(
+          ({
+            timestamp_ms,
+            category,
+            moment,
+            text,
+          }: {
+            timestamp_ms: number;
+            category: string;
+            moment: string;
+            text: string;
+          }) => ({ timestamp_ms, category, moment, text }),
+        ),
+        usage: logs,
+      }),
+      contentType: "application/json",
+    });
+  } finally {
+    await test.info().attach("hydrogen-annotation-provider-attempts", {
+      body: JSON.stringify({ provider: liveProviderEvidence }),
+      contentType: "application/json",
+    });
     runSql(
       env,
       `DELETE FROM ai_model_policy WHERE task='telefun_assessment' AND updated_by='${agent.userId}'; DELETE FROM ai_model_policy_audit WHERE changed_by='${agent.userId}';`,

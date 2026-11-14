@@ -1,0 +1,75 @@
+{
+  "result": "passed",
+  "startedAt": "2026-11-14T14:32:38.108Z",
+  "durationMs": 15521.801,
+  "scope": "annotation-only recheck; real Hydrogen, local Hono/JWT/Postgres; synthetic WebM storage fixture",
+  "model": "gemini-4-hydrogen",
+  "providerCallBudget": 1,
+  "actualProviderCalls": 1,
+  "geminiTtsCalls": 0,
+  "syntheticAudio": {
+    "pathForReproduction": "/tmp/telefun-hydrogen-audio/agent.webm",
+    "sha256": "c22c8b82a035feb4f1bd5d5fd280acc8c06ff7217fc55cbf4b48d44944454452",
+    "durationSeconds": 22.015,
+    "source": "macOS say Damayanti, encoded to WebM/Opus locally"
+  },
+  "smokeOverrides": {
+    "maxOutputTokens": 8192,
+    "thinkingLevel": "LOW"
+  },
+  "provider": [
+    {
+      "kind": "annotations",
+      "status": 200,
+      "modelVersion": "gemini-4-hydrogen",
+      "usage": {
+        "promptTokenCount": 1477,
+        "candidatesTokenCount": 228,
+        "totalTokenCount": 2304,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 810
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 667
+          }
+        ],
+        "candidatesTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 228
+          }
+        ],
+        "thoughtsTokenCount": 599,
+        "serviceTier": "standard"
+      },
+      "durationMs": 8071
+    }
+  ],
+  "persistence": {
+    "annotationCount": 3,
+    "recommendationCount": 2,
+    "usage": [
+      {
+        "action": "replay-annotation-generation",
+        "model_id": "gemini-4-hydrogen",
+        "input_tokens": 1477,
+        "output_tokens": 827
+      }
+    ],
+    "annotationRowsVerified": true,
+    "coachingSummaryVerified": true
+  },
+  "estimatedStandardUsdFromReportedTokens": 0.008418,
+  "costNote": "Standard-price estimate from reported tokens, not an invoice or confirmed provider charge.",
+  "productionAudioEligibilityEnabled": false,
+  "notVerified": [
+    "Full four-stage workflow was not rerun in this recheck.",
+    "No broad human grading quality, default thinking behavior or production latency claim.",
+    "No production database, policy or manual deployment was changed."
+  ],
+  "command": "E2E_HYDROGEN_LIVE_SMOKE=1 E2E_HYDROGEN_MAX_CALLS=1 E2E_HYDROGEN_AUDIO_FILE=/tmp/telefun-hydrogen-audio/agent.webm pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project telefun-hydrogen-audio-real-backend -g 'Hydrogen replay annotations succeed' --reporter=json --workers=1",
+  "exitCode": 0
+}

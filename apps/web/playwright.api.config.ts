@@ -58,6 +58,10 @@ export default defineConfig({
       testMatch: "telefun-language-evidence-api.spec.ts",
     },
     {
+      name: "telefun-annotations-real-backend",
+      testMatch: "telefun-annotations-api.spec.ts",
+    },
+    {
       name: "telefun-hydrogen-audio-real-backend",
       testMatch: "telefun-hydrogen-audio-api.spec.ts",
     },

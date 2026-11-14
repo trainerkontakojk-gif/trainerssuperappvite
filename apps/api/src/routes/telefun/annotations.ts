@@ -15,6 +15,20 @@ import { resolveTaskModel } from "../../lib/ai-model-policy";
 
 type Variables = { user: User; profile: any };
 
+const ANNOTATION_CATEGORIES = [
+  "strength",
+  "improvement_area",
+  "critical_moment",
+  "technique_used",
+] as const;
+const ANNOTATION_MOMENTS = [
+  "missed_empathy",
+  "good_de_escalation",
+  "long_pause",
+  "interruption",
+  "technique_usage",
+] as const;
+
 export function createReplayAnnotationChecksum(
   annotations: Array<{
     timestamp_ms: number;
@@ -114,12 +128,7 @@ telefunAnnotations.post(
     "json",
     z.object({
       timestamp_ms: z.number().int(),
-      category: z.enum([
-        "strength",
-        "improvement_area",
-        "critical_moment",
-        "technique_used",
-      ]),
+      category: z.enum(ANNOTATION_CATEGORIES),
       moment: z.string(),
       text: z.string().max(500),
       is_manual: z.boolean().default(true),
@@ -285,37 +294,25 @@ export const REPLAY_ANNOTATION_SCHEMA = {
         type: "object",
         properties: {
           timestamp_ms: {
-            type: "number",
-            description: "Waktu dalam milidetik pada rekaman",
+            type: "integer",
+            description: "Waktu dalam milidetik pada rekaman, minimal 0",
           },
           category: {
             type: "string",
-            enum: [
-              "strength",
-              "improvement_area",
-              "critical_moment",
-              "technique_used",
-            ],
+            enum: ANNOTATION_CATEGORIES,
           },
           moment: {
             type: "string",
-            enum: [
-              "missed_empathy",
-              "good_de_escalation",
-              "long_pause",
-              "interruption",
-              "technique_usage",
-            ],
+            enum: ANNOTATION_MOMENTS,
           },
           text: {
             type: "string",
             description: "Deskripsi maksimal 500 karakter",
-            maxLength: 500,
           },
         },
         required: ["timestamp_ms", "category", "moment", "text"],
       },
-      maxItems: 30,
+      description: "Maksimal 30 anotasi",
     },
     recommendations: {
       type: "array",
@@ -323,15 +320,41 @@ export const REPLAY_ANNOTATION_SCHEMA = {
         type: "object",
         properties: {
           text: { type: "string" },
-          priority: { type: "number", minimum: 1, maximum: 5 },
+          priority: { type: "integer", description: "Prioritas 1 sampai 5" },
         },
         required: ["text", "priority"],
       },
-      maxItems: 5,
+      description: "Maksimal 5 rekomendasi coaching",
     },
   },
   required: ["annotations", "recommendations"],
 };
+
+// Keep bounds in backend validation: numeric/array bounds expand Gemini's
+// constrained-output grammar and can make this request fail with INVALID_ARGUMENT.
+const replayAnnotationResultSchema = z.object({
+  annotations: z
+    .array(
+      z.object({
+        timestamp_ms: z.number().int().nonnegative(),
+        category: z.enum(ANNOTATION_CATEGORIES),
+        moment: z.enum(ANNOTATION_MOMENTS),
+        text: z
+          .string()
+          .min(1)
+          .transform((text) => text.slice(0, 500)),
+      }),
+    )
+    .transform((annotations) => annotations.slice(0, 30)),
+  recommendations: z
+    .array(
+      z.object({
+        text: z.string().min(1),
+        priority: z.number().int().min(1).max(5),
+      }),
+    )
+    .transform((recommendations) => recommendations.slice(0, 5)),
+});
 
 // Analisis AI penuh atas rekaman tanpa batas harian: hanya trainer/admin.
 telefunAnnotations.post(
@@ -434,7 +457,8 @@ Jenis momen (moment):
 - interruption: Interupsi
 - technique_usage: Penggunaan teknik spesifik
 
-Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 karakter.`;
+Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 karakter.
+Gunakan timestamp_ms berupa bilangan bulat minimal 0 dan priority berupa bilangan bulat 1 sampai 5.`;
 
       const { modelId } = await resolveTaskModel("telefun_assessment");
       const result = await generateGeminiContent({
@@ -464,17 +488,37 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
         userId: user.id,
       });
 
-      const resultText = result.text || "";
-      let parsed: { annotations?: any[]; recommendations?: any[] } = {};
-      try {
-        parsed = JSON.parse(resultText);
-      } catch {
-        const match = resultText.match(/\{[\s\S]*\}/);
-        if (match) parsed = JSON.parse(match[0]);
+      if (!result.success) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "GENERATION_ERROR",
+              message: "Gagal menghasilkan anotasi AI. Silakan coba lagi.",
+            },
+          },
+          500,
+        );
       }
 
-      const annotations = (parsed.annotations || []).slice(0, 30);
-      const recommendations = (parsed.recommendations || []).slice(0, 5);
+      let parsed: z.infer<typeof replayAnnotationResultSchema>;
+      try {
+        const resultText = result.text || "";
+        const jsonText = resultText.match(/\{[\s\S]*\}/)?.[0] ?? resultText;
+        parsed = replayAnnotationResultSchema.parse(JSON.parse(jsonText));
+      } catch {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "GENERATION_ERROR",
+              message: "Hasil anotasi AI tidak valid. Silakan coba lagi.",
+            },
+          },
+          500,
+        );
+      }
+      const { annotations, recommendations } = parsed;
 
       if (annotations.length === 0) {
         return c.json(
@@ -497,7 +541,7 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
         .eq("is_manual", false);
 
       // 5. Insert new AI annotations
-      const annotationRows = annotations.map((a: any) => ({
+      const annotationRows = annotations.map((a) => ({
         session_id: sessionId,
         user_id: session.user_id,
         timestamp_ms: a.timestamp_ms,
@@ -522,7 +566,7 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
         "upsert_telefun_coaching_summary",
         {
           p_session_id: sessionId,
-          p_recommendations: recommendations.map((r: any) => ({
+          p_recommendations: recommendations.map((r) => ({
             text: r.text,
             priority: r.priority,
           })),
