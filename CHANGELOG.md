@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-14
 
+- docs(database): record verified production apply of AI model policy migrations
 - fix(monitoring): enforce model policy contracts and verify selected models end to end
 
 ## 2026-11-13

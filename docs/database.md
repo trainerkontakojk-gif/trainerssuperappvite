@@ -718,4 +718,14 @@ Migration `20261113160000_ai_model_policy.sql` menambahkan tabel `ai_model_polic
 `ai_model_policy_reset(p_task text, p_default_model_id text, p_actor uuid)`.
 Reset and audit share one transaction; setter/reset serialize per task so old audit values remain accurate.
 No anon/authenticated EXECUTE. Rollback removes reset and restores the original setter without deleting rows.
-Both policy migrations await explicit production approval; local verification does not prove production application.
+Both policy migrations were applied to production on 2026-11-14 after Fajar's explicit approval; verification is recorded below.
+
+#### Diterapkan ke produksi 2026-11-14
+
+- Target terverifikasi: `ruosnjmtywcrghjgqugz`, status `ACTIVE_HEALTHY` sebelum dan sesudah apply. Sebelum apply, kedua tabel/RPC belum ada dan kedua versi belum tercatat.
+- `supabase db push --linked --dry-run` (exit 0) mencantumkan tepat `20261113160000_ai_model_policy.sql` dan `20261114121440_ai_model_policy_atomic_reset.sql`.
+- `supabase db push --linked --yes` (exit 0) menerapkan keduanya berurutan dan mencatat versi repository yang sama. Tidak ada migration lain yang diterapkan atau history repair.
+- Verifikasi katalog via Supabase MCP: kedua tabel memiliki kolom sesuai migration, RLS aktif tanpa policy; `anon`/`authenticated` tidak memiliki SELECT/INSERT/UPDATE/DELETE, `service_role` memiliki semuanya. Kedua RPC mengembalikan void, SECURITY INVOKER, `search_path` kosong, dan EXECUTE hanya untuk `service_role`.
+- MD5 body RPC prod cocok dengan source migration: setter `2624433952a25c364d51fbe4c7a3ede7`, reset `2b599fabe3a4f14d34ee25ffb3bf6195`.
+- Policy dan audit masing-masing 0 baris saat verifikasi: apply tidak mengganti pilihan model. Tidak ada pemanggilan AI, perubahan konfigurasi model, production E2E, atau deploy aplikasi manual.
+- Dry-run sesudah apply (exit 0): `Remote database is up to date.` Verifikasi ini membuktikan schema/history/ACL; alur UI prod tidak dijalankan.

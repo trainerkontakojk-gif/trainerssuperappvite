@@ -1,6 +1,6 @@
 # Pengaturan model AI per tugas (Monitoring → Model)
 
-Lane D: tabel baru, RLS/grant, kontrak API baru, perubahan perilaku pemanggil AI, dan UI. Status: **IMPLEMENTED b66ac4c4; follow-up fixes implemented and verified (2026-11-14); production migrations pending approval** (dibuat 2026-11-13).
+Lane D: tabel baru, RLS/grant, kontrak API baru, perubahan perilaku pemanggil AI, dan UI. Status: **IMPLEMENTED b66ac4c4; follow-up fixes implemented and verified (2026-11-14); production migrations applied and verified (2026-11-14)** (dibuat 2026-11-13).
 Ikuti `AGENTS.md` dan `docs/AGENT_WORKFLOW.md`. Muat `trainers-superapp-tdd` dan `supabase-migration` sebelum mengedit.
 
 ## Masalah
@@ -147,7 +147,7 @@ Tidak ada lifecycle/state baru (aturan "no new implicit state machines" tidak te
 ### Dokumen
 
 - `docs/architecture.md` (bagian AI models): kebijakan model per tugas dan aturan fallback.
-- `docs/database.md`: dua tabel baru, RPC, dan catatan apply prod nanti.
+- `docs/database.md`: dua tabel baru, RPC, dan bukti apply prod 2026-11-14.
 
 ## E2E (RED dulu, target lokal saja)
 
@@ -177,7 +177,7 @@ Status implementasi awal dan follow-up (2026-11-14); bukti sesi ini ada di bawah
 - [x] T6 UI sudah ada; hermetic browser dan alur browser→backend nyata lulus. Tidak ada perubahan layout pada follow-up.
 - [x] T7 Docs architecture/database, rollback index, changelog diperbarui.
 - [x] T8 Review, root typecheck/lint/build, E2E dan diff check lulus; satu follow-up commit ke main.
-- [ ] T9 **Butuh izin Fajar:** apply `20261113160000_ai_model_policy` lalu `20261114121440_ai_model_policy_atomic_reset` ke prod. Tidak ada DDL remote pada sesi ini.
+- [x] T9 Dengan izin eksplisit Fajar, `20261113160000_ai_model_policy` lalu `20261114121440_ai_model_policy_atomic_reset` sudah diterapkan dan diverifikasi di prod 2026-11-14. Bukti: `docs/database.md`.
 
 ## Tindak lanjut (di luar rencana ini)
 
@@ -188,7 +188,7 @@ Status implementasi awal dan follow-up (2026-11-14); bukti sesi ini ada di bawah
 
 ## Requirement — follow-up 2026-11-14
 
-Authorized scope: fix review findings 1–8, verify locally, commit/push main. No production migration authorization.
+Original implementation scope: fix review findings 1–8, verify locally, commit/push main. Production migration was subsequently authorized by Fajar with "apply migration"; completion is recorded below.
 Preserve unrelated untracked plans. Gemini-only eligibility for SIDAK/Telefun; audit full_name; atomic reset;
 effective scheduled pricing; actual SIDAK/KETIK provider-model and usage evidence; policy-derived KETIK lease;
 one Telefun model per scoring unit; rollback index and honest plan status.
@@ -209,9 +209,9 @@ Context7 confirms explicit EXECUTE revocation is required; Supabase changelog ha
 - [x] Verify actual model on local provider requests and ai_usage_logs for SIDAK/KETIK (11/11 policy API checks passed before final snapshot regression expansion).
 - [x] Run affected Telefun/KETIK regressions and thermo-nuclear review (51 passed, 1 pre-existing embedded-host skip).
 - [x] Complete Lane D typecheck/lint/build and final diff check; integrate as one follow-up commit on main.
-- [ ] Production: Fajar approval required for both policy migrations; no remote DDL executed.
+- [x] Production: both named migrations applied after Fajar approval; schema/history/RLS/grants/RPC bodies verified.
 
-T0–T8 now distinguish existing implementation from verification performed in this session. T9 remains pending.
+T0–T8 distinguish implementation from local verification. T9 is complete; production schema verification is recorded in `docs/database.md`.
 
 
 Review findings repaired during follow-up: worker deadline/health still used the fixed KETIK lease;
@@ -236,7 +236,7 @@ authenticated=false, service_role=true for reset EXECUTE. Historical migration i
 
 - Final `pnpm typecheck`, `pnpm lint`, `pnpm build`: exit 0 each. Lint warnings remain in unrelated existing files; none in the changed paths.
 - Final focused selected-model scenario after the claim-snapshot assertion was added: exit 0, 1 passed (8.8s). This rerun proves the latest spec, beyond the earlier 51-pass regression batch.
-- `git diff --check`: exit 0. No unit/non-E2E suites were run. No production deploy command, remote DDL, or paid provider call was executed.
+- Implementation-session `git diff --check`: exit 0. No unit/non-E2E suites were run. At that point no production deploy command, remote DDL, or paid provider call had been executed; subsequent authorized schema application is recorded below.
 
 - Additional baseline replay on original HEAD product code (only owned paths temporarily restored, all follow-up bytes restored in finally): focused Telefun model freeze and KETIK configured lease both failed as expected (exit 1, 2 failed). Telefun's second eligible audio model is a temporary local-provider registry fixture, restored after the test; production audio capability flags are unchanged.
 - Latest focused GREEN: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project monitoring-models-real-backend --project telefun-scoring-real-backend -g 'one scoring unit|configured fallback timeout|selected SIDAK and KETIK models' --reporter=line --workers=1` — exit 0, 3 passed.
@@ -246,3 +246,14 @@ authenticated=false, service_role=true for reset EXECUTE. Historical migration i
 - `graphify update .` completed: 19,810 nodes, 37,877 edges, 1,268 communities. HTML visualization skipped automatically because graph exceeds 5,000 nodes; graph.json/GRAPH_REPORT.md were updated in ignored local cache.
 - Final JSON-reporter replay of the selected-model scenario: exit 0, 1 passed. Stable extracted evidence: [provider paths and actual usage model IDs](../evidence/ai-model-policy-selected-models-2026-11-14.json). It contains only local-stub model paths and action/model IDs, no JWTs or user data.
 - Documentation/code drift repaired: R3 scheduled-pricing support, R5 atomic reset audit, D4 frozen work-unit models, policy-derived lease, missing rollback index, and stale DRAFT status. `profiles.full_name` is the schema source of truth; `nama_lengkap` was the erroneous audit reader.
+
+
+## Production completion — 2026-11-14
+
+Fajar explicitly authorized "apply migration" after local verification and push of `01795762`.
+Preflight confirmed the healthy intended project and absent policy schema/history. Linked dry-run listed only the two authorized migrations.
+`supabase db push --linked --yes` exited 0 and applied both in order, preserving their repository version IDs.
+Postflight verified exact migration history, column types, RLS/no policies, backend-only table and function permissions,
+SECURITY INVOKER/empty search path, matching RPC source MD5s, and zero policy/audit rows. Project remained ACTIVE_HEALTHY.
+Final linked dry-run exited 0: Remote database is up to date. No production AI/UI flow was exercised and no model choice was changed.
+See `docs/database.md` for the complete apply/verification record. All T0–T9 work is complete.
