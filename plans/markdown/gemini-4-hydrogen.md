@@ -8,7 +8,7 @@ Lane D: AI selection and billing. User requests an additional model, retaining G
 - Expose it in appropriate system-task options; leave Telefun audio capability disabled until dedicated audio verification (existing D6 contract).
 - Seed standard paid pricing of USD 1.50 input / 7.50 output / 0.075 implicit cached input per million tokens without overwriting custom prices, changing 3.8 pricing/schedules, switching policies, or recalculating old logs.
 - If Hydrogen pricing is absent, log tokens at zero cost as required by AGENTS.md; policy writes remain blocked by MODEL_NO_PRICING.
-- Prepare and verify migration/rollback locally. Production mutation needs separate explicit approval for this new migration; the earlier approval covered two policy migrations only.
+- Prepare and verify migration/rollback locally. Production mutation required separate explicit approval for this new migration; Fajar subsequently authorized it with "apply" and it is now complete.
 
 ## Design
 
@@ -36,7 +36,7 @@ Agent Reach Exa backend was unavailable (Unknown MCP server 'exa'); official pag
 - [x] GREEN real-backend model selection/provider/usage and browser choices.
 - [x] Thermo-nuclear self-review; root typecheck/lint/build, diff check; update docs/changelog.
 - [x] Integrate one feature commit on main; report exact checks and production pricing status.
-- [ ] Production pricing apply: separate explicit approval required.
+- [x] Production pricing applied after explicit approval; three rates, migration history, unchanged Flash/policies and project health verified.
 
 Unrelated untracked plans are preserved. No paid/provider calls or production E2E.
 
@@ -60,7 +60,7 @@ Unrelated untracked plans are preserved. No paid/provider calls or production E2
 
 ### Pricing screenshot clarification
 
-The user supplied the official Standard pricing screenshot and asked whether prices matched. Input/output matched the initial draft, but implicit cached input 0.075 was missing; this was corrected before commit/apply. The user question does not authorize production mutation.
+The user supplied the official Standard pricing screenshot and asked whether prices matched. Input/output matched the initial draft, but implicit cached input 0.075 was missing; this was corrected before commit/apply. That pricing question did not authorize production mutation; the subsequent explicit "apply" did.
 
 - Cache RED: provider fixture reports 10000 input, including 8000 cached, and 500 visible output + 500 thinking tokens. Before correction the cached rate snapshot was 1.50 rather than 0.075 (exit 1).
 - Migration now seeds cached_input_text_price_usd_per_million=0.075 along with input/output, leaving all other modality rates null so regular base-price edits still apply. Local draft row was safely reseeded (not applied prod history); rollback recognizes the default cache rate and preserves customized 0.05 cache pricing.
@@ -75,4 +75,14 @@ The user supplied the official Standard pricing screenshot and asked whether pri
 - `graphify update .` — exit 0; 19823 nodes / 37892 edges / 1261 communities. Local graph updated; oversized HTML view skipped automatically.
 - `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project monitoring-models-real-backend -g 'selected SIDAK and KETIK models.*gemini-4-hydrogen' --reporter=json --workers=1` — exit 0, 1 passed. Actual extracted local evidence: [Hydrogen provider paths, rates and cached/thinking usage](../evidence/gemini-4-hydrogen-usage-2026-11-14.json).
 - Focused API gate: 15 passed after cached pricing correction; browser gate: 3 passed desktop/mobile + existing hermetic flow. Browser validation preceded the backend-only cached-token correction; no UI code changed afterward.
-- `git diff --check`: exit 0. Source review confirms Gemini 3.8 Flash registry/capabilities/defaults and its current/future pricing remain intact. Production application of `20261114130615_add_gemini_4_hydrogen_pricing.sql` is still pending separate explicit approval under AGENTS.md.
+- `git diff --check`: exit 0. Source review confirms Gemini 3.8 Flash registry/capabilities/defaults and its current/future pricing remain intact. Production application of `20261114130615_add_gemini_4_hydrogen_pricing.sql` was subsequently authorized under AGENTS.md and verified as complete (see below).
+
+
+## Production completion — 2026-11-14
+
+Following push of `637291a0`, Fajar explicitly authorized the prepared pricing migration with "apply".
+The healthy intended project had neither the Hydrogen price nor migration version. Linked dry-run listed only this file;
+linked push applied exactly `20261114130615_add_gemini_4_hydrogen_pricing.sql` (exit 0).
+Postflight verified input 1.50 / output 7.50 / cached input 0.075, correct history, unchanged complete Flash price/schedule and policy fingerprints,
+zero configured task policies, and continued ACTIVE_HEALTHY status. Final dry-run exited 0: Remote database is up to date.
+No model choice was switched and no production AI/UI flow was run. Full record: `docs/database.md`.

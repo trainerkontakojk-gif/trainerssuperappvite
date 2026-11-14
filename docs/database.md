@@ -731,8 +731,18 @@ Both policy migrations were applied to production on 2026-11-14 after Fajar's ex
 - Dry-run sesudah apply (exit 0): `Remote database is up to date.` Verifikasi ini membuktikan schema/history/ACL; alur UI prod tidak dijalankan.
 
 
-### Gemini 4 Hydrogen pricing (2026-11-14; production pending)
+### Gemini 4 Hydrogen pricing (applied to production 2026-11-14)
 
 `20261114130615_add_gemini_4_hydrogen_pricing.sql` inserts only `gemini-4-hydrogen` in `ai_pricing_settings`: USD 1.50 input / 7.50 output (including thinking) / 0.075 implicit cached input per million tokens (Standard paid tier, [official source](https://aistudio.google.com/docs/pricing#gemini-4-hydrogen)). `ON CONFLICT DO NOTHING` preserves existing custom pricing. No Flash pricing/schedules, policy choices, or historical usage are changed.
 
-Local apply, custom-price preservation, and rollback/forward replay were verified. Production application is pending explicit authorization for this new migration. Rollback removes only the unchanged default Hydrogen price row, preserves all Flash rows and usage logs, and rejects removal while a task policy references Hydrogen. Revert Hydrogen selections/API first; preserve pre-existing Hydrogen prices rather than running this rollback.
+Local apply, custom-price preservation, and rollback/forward replay were verified. Production application was explicitly authorized and completed on 2026-11-14; evidence is recorded below. Rollback removes only the unchanged default Hydrogen price row, preserves all Flash rows and usage logs, and rejects removal while a task policy references Hydrogen. Revert Hydrogen selections/API first; preserve pre-existing Hydrogen prices rather than running this rollback.
+
+
+#### Hydrogen production verification — 2026-11-14
+
+- Authorized migration only: `20261114130615_add_gemini_4_hydrogen_pricing.sql`; source SHA-256 `2908f9505a44fbc6ce46dc0cac2928e523832472cbfd3c7f6c6eab2fde908afb`.
+- Intended project `ruosnjmtywcrghjgqugz` was `ACTIVE_HEALTHY` before and after apply. Hydrogen pricing and this migration version were absent before apply.
+- `supabase db push --linked --dry-run` (exit 0) listed exactly the authorized file. `supabase db push --linked --yes` (exit 0) applied it and recorded version `20261114130615` / name `add_gemini_4_hydrogen_pricing`.
+- Supabase MCP postflight read confirmed USD per 1M tokens: input **1.50**, output including thinking **7.50**, implicit cached input **0.075**.
+- Before/after catalog-data fingerprints matched for the entire 3.8 Flash pricing row (`5a66108e2ab5c1f9047e3ad3102fbcbf`), all its scheduled prices (`c5683558c7c24f1e53f2854bae0b0fb1`), and task policies (`d751713988987e9331980363e24189ce`, 0 rows). No model choice/default was switched.
+- Final linked dry-run (exit 0): `Remote database is up to date.` No production AI request, UI E2E, historical-usage backfill, or manual app deployment was run.

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-14
 
+- docs(database): record production Hydrogen pricing migration
+
 - feat(ai): add Gemini 4 Hydrogen alongside Gemini 3.8 Flash
 
 - docs(database): record verified production apply of AI model policy migrations
