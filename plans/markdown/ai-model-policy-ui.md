@@ -1,6 +1,6 @@
 # Pengaturan model AI per tugas (Monitoring → Model)
 
-Lane D: tabel baru, RLS/grant, kontrak API baru, perubahan perilaku pemanggil AI, dan UI. Status: **DRAFT, menunggu review Fajar** (dibuat 2026-11-13).
+Lane D: tabel baru, RLS/grant, kontrak API baru, perubahan perilaku pemanggil AI, dan UI. Status: **IMPLEMENTED b66ac4c4; follow-up fixes implemented and verified (2026-11-14); production migrations pending approval** (dibuat 2026-11-13).
 Ikuti `AGENTS.md` dan `docs/AGENT_WORKFLOW.md`. Muat `trainers-superapp-tdd` dan `supabase-migration` sebelum mengedit.
 
 ## Masalah
@@ -166,19 +166,83 @@ Spec yang sekarang meng-hardcode `gemini-3.8-flash` (±20 file di `apps/web/e2e/
 
 ## Tasklist
 
-- [ ] T0 Konfirmasi D1–D6 dengan Fajar.
-- [ ] T1 Types: `ai-model-policy.ts`, `supportsAudioInput`, turunkan konstanta lama dari `AI_TASK_DEFINITIONS`. `pnpm --filter @trainers/web typecheck` + api typecheck.
-- [ ] T2 Migration + rollback + RPC (`supabase-migration`). `supabase db reset` lokal bersih, replay rollback.
-- [ ] T3 E2E API RED (skenario 1–7), jalankan dan pastikan gagal karena route belum ada.
-- [ ] T4 Backend: resolver + cache + route + capability baru di `access.ts`. GREEN skenario 1–4, 6, 7.
-- [ ] T5 Ganti pemanggil (KETIK review/lifecycle, Telefun ×4, SIDAK forecast, PDKT default). GREEN skenario 5. Jalankan ulang spec KETIK/Telefun/PDKT/SIDAK yang ada dan terdampak satu per satu (`--workers=1`).
-- [ ] T6 UI tab Model + E2E UI (skenario 8) RED → GREEN. `impeccable` audit.
-- [ ] T7 Docs (`architecture.md`, `database.md`), `CHANGELOG.md`.
-- [ ] T8 `thermo-nuclear` review, lalu root `typecheck`, lint, build, dan spec terfokus. Commit + push ke `main`.
-- [ ] T9 **Butuh izin Fajar:** apply migration ke prod `ruosnjmtywcrghjgqugz`. Aman karena tabel kosong = perilaku lama. Catat di `docs/database.md`.
+Status implementasi awal dan follow-up (2026-11-14); bukti sesi ini ada di bawah.
+
+- [x] T0 Scope D1–D6 diteruskan oleh permintaan perbaikan Fajar.
+- [x] T1 Types/registry dan capability sudah diimplementasikan; root typecheck lulus.
+- [x] T2 Migration + rollback tersedia. Forward/rollback SQL follow-up diverifikasi lokal; clean full db reset tidak dijalankan pada sesi ini.
+- [x] T3 Regresi API RED-first follow-up: empat kegagalan yang diharapkan teramati. RED sebelum route awal dibuat tidak diverifikasi ulang.
+- [x] T4 Backend resolver/cache/route + capability: API GREEN.
+- [x] T5 Pemanggil SIDAK/KETIK/Telefun diperbaiki; provider-model dan usage log lokal diverifikasi; regresi KETIK/Telefun lulus.
+- [x] T6 UI sudah ada; hermetic browser dan alur browser→backend nyata lulus. Tidak ada perubahan layout pada follow-up.
+- [x] T7 Docs architecture/database, rollback index, changelog diperbarui.
+- [x] T8 Review, root typecheck/lint/build, E2E dan diff check lulus; satu follow-up commit ke main.
+- [ ] T9 **Butuh izin Fajar:** apply `20261113160000_ai_model_policy` lalu `20261114121440_ai_model_policy_atomic_reset` ke prod. Tidak ada DDL remote pada sesi ini.
 
 ## Tindak lanjut (di luar rencana ini)
 
 - Daftarkan `gemini-4-hydrogen` di registry + migration harga ($1.50/$7.50, cek dulu ai.google.dev). Uji input audio Telefun sebelum memberi `supportsAudioInput`.
 - 2027-01-01: ganti `ketik_review`, `sidak_forecast`, `default_text` (dan `telefun_assessment` bila audio lolos) ke Hydrogen lewat tab Model.
 - Opsional: penjadwalan perubahan model (D2).
+
+
+## Requirement — follow-up 2026-11-14
+
+Authorized scope: fix review findings 1–8, verify locally, commit/push main. No production migration authorization.
+Preserve unrelated untracked plans. Gemini-only eligibility for SIDAK/Telefun; audit full_name; atomic reset;
+effective scheduled pricing; actual SIDAK/KETIK provider-model and usage evidence; policy-derived KETIK lease;
+one Telefun model per scoring unit; rollback index and honest plan status.
+
+## Design — follow-up
+
+Reuse readEffectivePricing for both listing and saving. Add a forward migration (never rewrite applied history)
+with a backend-only SECURITY INVOKER reset RPC. Serialize setter/reset per task with transaction advisory locks.
+Pass the resolved Telefun model from scoring orchestration through transcription, assessment and coaching.
+Graphify exact resolveTaskModel query returned no matching nodes; use live rg callers/schema instead.
+Context7 confirms explicit EXECUTE revocation is required; Supabase changelog has no relevant change to this existing RPC API.
+
+## Tasklist — follow-up
+
+- [x] Inspect contract/schema/loopback stack and preserve unrelated work.
+- [x] RED: audit names, Gemini provider eligibility, reset failure atomicity, due schedule pricing.
+- [x] Implement findings 1–4, 6–7 and add forward/rollback SQL.
+- [x] Verify actual model on local provider requests and ai_usage_logs for SIDAK/KETIK (11/11 policy API checks passed before final snapshot regression expansion).
+- [x] Run affected Telefun/KETIK regressions and thermo-nuclear review (51 passed, 1 pre-existing embedded-host skip).
+- [x] Complete Lane D typecheck/lint/build and final diff check; integrate as one follow-up commit on main.
+- [ ] Production: Fajar approval required for both policy migrations; no remote DDL executed.
+
+T0–T8 now distinguish existing implementation from verification performed in this session. T9 remains pending.
+
+
+Review findings repaired during follow-up: worker deadline/health still used the fixed KETIK lease;
+claims now carry the model pair plus lease to processing/deadline/health. The real provider-path regression
+also changes the primary policy after claim admission, proving the captured model remains in use.
+Legacy optional claim fields retain compatibility with existing direct test fixtures; production claims always populate them.
+No new lifecycle status or scattered status update was introduced.
+Local SQL rollback + forward replay in one transaction succeeded; ACL probe returned anon=false,
+authenticated=false, service_role=true for reset EXECUTE. Historical migration is unchanged.
+
+
+### Follow-up evidence
+
+- RED (exit 1): `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project monitoring-models-real-backend --reporter=line --workers=1` — 4 expected regressions failed; 5 passed.
+- GREEN (exit 0): same policy project — 11 passed, including actual SIDAK/KETIK provider requests and ai_usage_logs.
+- Final API regression (exit 0): `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project monitoring-models-real-backend --project telefun-scoring-real-backend --project ketik-review-worker-real-backend --reporter=line --workers=1` — 51 passed, 1 skipped. Includes policy change after KETIK claim and during Telefun transcription.
+- Browser (exit 0): `pnpm --dir apps/web exec playwright test monitoring-models-real-backend.spec.ts monitoring-models.spec.ts --reporter=line --workers=1` — 2 passed. New spec forwards all model requests through real Hono/JWT/local Supabase; shell auth alone remains a browser fixture. Existing spec remains hermetic.
+- Provider transport is stubbed locally, no paid/provider traffic. Usage logging and DB writes are real local product code. Playwright attaches selected-model-evidence (provider model paths and usage rows).
+- Thermo-nuclear self-review: reused canonical pricing lookup; atomic DB operation; frozen models/lease carried by claim; no new lifecycle state. Existing direct fixture compatibility remains via optional claim metadata. No unresolved scoped finding.
+- No meaningful UI/layout change in this follow-up; UI design/polish skills not applicable.
+- Local prerequisites verified: trainerssuperappvite container label, loopback 54321/54322, populated public schema, initial policy migration present. OrbStack was started because it was stopped; no production target substituted.
+
+- Final `pnpm typecheck`, `pnpm lint`, `pnpm build`: exit 0 each. Lint warnings remain in unrelated existing files; none in the changed paths.
+- Final focused selected-model scenario after the claim-snapshot assertion was added: exit 0, 1 passed (8.8s). This rerun proves the latest spec, beyond the earlier 51-pass regression batch.
+- `git diff --check`: exit 0. No unit/non-E2E suites were run. No production deploy command, remote DDL, or paid provider call was executed.
+
+- Additional baseline replay on original HEAD product code (only owned paths temporarily restored, all follow-up bytes restored in finally): focused Telefun model freeze and KETIK configured lease both failed as expected (exit 1, 2 failed). Telefun's second eligible audio model is a temporary local-provider registry fixture, restored after the test; production audio capability flags are unchanged.
+- Latest focused GREEN: `pnpm --dir apps/web exec playwright test --config=playwright.api.config.ts --project monitoring-models-real-backend --project telefun-scoring-real-backend -g 'one scoring unit|configured fallback timeout|selected SIDAK and KETIK models' --reporter=line --workers=1` — exit 0, 3 passed.
+- After the fixture correction, `pnpm --filter @trainers/web typecheck` — exit 0; production code/build inputs did not change after the passing root build.
+
+- Latest spec lint: `pnpm --filter @trainers/web exec eslint e2e/telefun-scoring-api.spec.ts` — exit 0.
+- `graphify update .` completed: 19,810 nodes, 37,877 edges, 1,268 communities. HTML visualization skipped automatically because graph exceeds 5,000 nodes; graph.json/GRAPH_REPORT.md were updated in ignored local cache.
+- Final JSON-reporter replay of the selected-model scenario: exit 0, 1 passed. Stable extracted evidence: [provider paths and actual usage model IDs](../evidence/ai-model-policy-selected-models-2026-11-14.json). It contains only local-stub model paths and action/model IDs, no JWTs or user data.
+- Documentation/code drift repaired: R3 scheduled-pricing support, R5 atomic reset audit, D4 frozen work-unit models, policy-derived lease, missing rollback index, and stale DRAFT status. `profiles.full_name` is the schema source of truth; `nama_lengkap` was the erroneous audit reader.

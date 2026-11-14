@@ -431,6 +431,12 @@ Kebijakan penentuan model AI untuk tugas sistem (`ketik_review`, `ketik_review_f
   - Untuk proses berdurasi panjang (mis. KETIK review atau Telefun scoring), model di-resolve tepat satu kali di awal proses kerja (tidak berganti di tengah jalan).
 - **Manajemen UI**: Admin dan Trainer dapat mengatur model per tugas secara dinamis melalui tab **Monitoring → Model** (`/monitoring/model`) tanpa deploy ulang kode. Model yang belum memiliki pricing aktif dicegah untuk dipilih agar menghindari logging biaya nol.
 
+AI model policy constraints: SIDAK forecast and Telefun assessment accept Gemini models only,
+matching their Gemini provider implementation. Pricing eligibility uses the same effective current/due-schedule
+lookup as usage billing; a future schedule alone is insufficient. Reset and its audit record are atomic.
+Telefun scoring carries one resolved model through transcription, assessment and follow-up coaching.
+KETIK review claims derive their lease from resolved primary/fallback timeouts.
+
 ## Performance Guardrails (FCP/LCP)
 
 - Code splitting & lazy loading sudah diterapkan — semua 37 route di `router.tsx` menggunakan `React.lazy()`.

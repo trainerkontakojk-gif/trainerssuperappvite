@@ -10,20 +10,22 @@ import { createAdminClient } from "../../lib/supabase";
 import { processKetikReviewJob } from "./review-processor";
 import { mapKetikReviewDetail } from "./settings-history";
 import { KETIK_REVIEW_MODELS, resolveModelProvider } from "../../lib/ai-models";
-import { resolveTaskModel } from "../../lib/ai-model-policy";
+import {
+  resolveKetikReviewModels,
+  type KetikReviewModels,
+} from "../../lib/ai-model-policy";
 import { notifyKetikReviewQueued } from "./review-queue-signal";
 
 // Gemini can retry the developer-instruction incompatibility once, then OpenAI.
-export async function calculateKetikReviewLeaseSeconds(): Promise<number> {
-  const [primary, fallback] = await Promise.all([
-    resolveTaskModel("ketik_review"),
-    resolveTaskModel("ketik_review_fallback"),
-  ]);
+export async function calculateKetikReviewLeaseSeconds(
+  models?: KetikReviewModels,
+): Promise<number> {
+  const selected = models ?? (await resolveKetikReviewModels());
   return Math.max(
     600,
     Math.ceil(
-      ((resolveModelProvider(primary.modelId).timeoutMs ?? 180_000) * 2 +
-        (resolveModelProvider(fallback.modelId).timeoutMs ?? 120_000)) /
+      ((resolveModelProvider(selected.primary).timeoutMs ?? 180_000) * 2 +
+        (resolveModelProvider(selected.fallback).timeoutMs ?? 120_000)) /
         1000,
     ) + 120,
   );
@@ -44,6 +46,8 @@ export interface KetikReviewClaim {
   sessionId: string;
   token: string;
   attempt: number;
+  leaseSeconds?: number;
+  models?: KetikReviewModels;
 }
 export type KetikClaimOutcome =
   KetikReviewClaim | { status: "failed"; sessionId: string } | null;
@@ -73,13 +77,18 @@ export async function claimKetikReview(
   workerId: string,
   sessionId?: string,
 ): Promise<KetikClaimOutcome> {
+  const models = await resolveKetikReviewModels();
+  const leaseSeconds = await calculateKetikReviewLeaseSeconds(models);
   const { data, error } = await createAdminClient().rpc("claim_ketik_review", {
     p_worker: workerId,
-    p_lease_seconds: KETIK_REVIEW_LEASE_SECONDS,
+    p_lease_seconds: leaseSeconds,
     p_session: sessionId ?? null,
   });
   if (error) throw error;
-  return data as KetikClaimOutcome;
+  const claim = data as KetikClaimOutcome;
+  return claim?.status === "processing"
+    ? { ...claim, leaseSeconds, models }
+    : claim;
 }
 export async function releaseKetikReview(
   claim: KetikReviewClaim,
@@ -94,7 +103,11 @@ export async function releaseKetikReview(
 }
 export async function processClaimedKetikReview(claim: KetikReviewClaim) {
   try {
-    return await processKetikReviewJob(claim.sessionId, claim.token);
+    return await processKetikReviewJob(
+      claim.sessionId,
+      claim.token,
+      claim.models,
+    );
   } catch (error) {
     console.error("[KETIK] Review attempt failed", {
       errorClass: error instanceof Error ? error.name : "Unknown",

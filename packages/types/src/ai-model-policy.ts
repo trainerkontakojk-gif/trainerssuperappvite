@@ -51,9 +51,11 @@ export const AI_TASK_DEFINITIONS: Record<AiTask, AiTaskDefinition> = {
       "Scoring audio, content review, coaching summary, dan anotasi Telefun.",
     codeDefault: "gemini-3.8-flash",
     requires: { supportsText: true, supportsAudioInput: true },
+    providers: ["gemini"],
   },
   sidak_forecast: {
     task: "sidak_forecast",
+    providers: ["gemini"],
     label: "Prediksi Dashboard SIDAK",
     description: "Narasi ringkasan forecast dan insight performa SIDAK.",
     codeDefault: "gemini-3.8-flash",
@@ -70,7 +72,9 @@ export const AI_TASK_DEFINITIONS: Record<AiTask, AiTaskDefinition> = {
 };
 
 export function isAiTask(task: unknown): task is AiTask {
-  return typeof task === "string" && (AI_TASKS as readonly string[]).includes(task);
+  return (
+    typeof task === "string" && (AI_TASKS as readonly string[]).includes(task)
+  );
 }
 
 export function eligibleModelsForTask(task: AiTask): AiModelInfo[] {
@@ -83,7 +87,8 @@ export function eligibleModelsForTask(task: AiTask): AiModelInfo[] {
 
     if (def.requires.supportsText && !caps.supportsText) return false;
     if (def.requires.supportsImage && !caps.supportsImage) return false;
-    if (def.requires.supportsAudioInput && !caps.supportsAudioInput) return false;
+    if (def.requires.supportsAudioInput && !caps.supportsAudioInput)
+      return false;
 
     if (def.providers && !def.providers.includes(model.provider)) return false;
 

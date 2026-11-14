@@ -1,0 +1,16 @@
+{
+  "requestedModels": [
+    "/v1beta/models/gemini-3.5-flash-lite:generateContent",
+    "/v1beta/models/gemini-3.5-flash-lite:generateContent"
+  ],
+  "logs": [
+    {
+      "action": "generate-trend-forecast",
+      "model_id": "gemini-3.5-flash-lite"
+    },
+    {
+      "action": "coaching_review",
+      "model_id": "gemini-3.5-flash-lite"
+    }
+  ]
+}

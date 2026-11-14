@@ -112,7 +112,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         new Promise<"deadline">((resolve) => {
           deadline = setTimeout(
             () => resolve("deadline"),
-            (KETIK_REVIEW_LEASE_SECONDS - 30) * 1000,
+            ((claim.leaseSeconds ?? KETIK_REVIEW_LEASE_SECONDS) - 30) * 1000,
           );
         }),
       ]);
@@ -227,7 +227,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         lastPollAt !== null &&
         Date.now() - lastPollAt <
           (active !== null
-            ? KETIK_REVIEW_LEASE_SECONDS * 1000
+            ? (active.leaseSeconds ?? KETIK_REVIEW_LEASE_SECONDS) * 1000
             : Math.max(config.idleMaxMs * 3, 15000));
       return {
         healthy,

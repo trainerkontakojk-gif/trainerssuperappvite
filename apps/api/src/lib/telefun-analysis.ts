@@ -78,12 +78,18 @@ export async function analyzeVoiceQuality(
   userId: string,
   signal?: AbortSignal,
   /** `fresh`: abaikan hasil tersimpan (Telaah ulang). */
-  options: { fresh?: boolean; claimTokenHash?: string | null } = {},
+  options: {
+    fresh?: boolean;
+    claimTokenHash?: string | null;
+    modelId?: string;
+  } = {},
 ): Promise<{
   success: boolean;
   assessment?: VoiceQualityAssessment;
   error?: string;
 }> {
+  const modelId =
+    options.modelId ?? (await resolveTaskModel("telefun_assessment")).modelId;
   const adminClient = createAdminClient();
 
   // 1. Fetch paths, session_metrics, and the two-way transcript
@@ -258,6 +264,7 @@ export async function analyzeVoiceQuality(
   // claim through the existing retry path, never fall back to guessed metrics.
   const transcription = await transcribeTelefunAgentAudio({
     base64Audio,
+    modelId,
     scenarioTitle: row.scenario_title ?? "",
     userId,
     signal,
@@ -344,7 +351,6 @@ export async function analyzeVoiceQuality(
   // Keep this check immediately adjacent to the provider boundary. Once the
   // provider request has started, its logging/cost contract is unchanged.
   if (signal?.aborted) return { success: false, error: "Scoring aborted" };
-  const { modelId } = await resolveTaskModel("telefun_assessment");
   const response = await generateGeminiContent({
     model: modelId || TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:
@@ -411,11 +417,14 @@ export async function analyzeVoiceQuality(
 export async function generateCoachingSummary(
   sessionId: string,
   userId: string,
+  selectedModelId?: string,
 ): Promise<{
   success: boolean;
   summary?: any;
   error?: string;
 }> {
+  const modelId =
+    selectedModelId ?? (await resolveTaskModel("telefun_assessment")).modelId;
   const adminClient = createAdminClient();
 
   // 1. Fetch session and existing assessment/messages
@@ -449,7 +458,6 @@ export async function generateCoachingSummary(
     SEMUA TEKS WAJIB DALAM BAHASA INDONESIA, detail, dan tidak generik.
   `;
 
-  const { modelId } = await resolveTaskModel("telefun_assessment");
   const response = await generateGeminiContent({
     model: modelId || TELEFUN_ASSESSMENT_MODEL,
     systemInstruction:

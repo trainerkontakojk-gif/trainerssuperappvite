@@ -6,6 +6,7 @@ import {
   AiModelPolicyItem,
   AiModelPolicyAuditEntry,
 } from "@trainers/types";
+import { readEffectivePricing } from "./ai-pricing-lookup";
 import { createAdminClient } from "./supabase";
 import { createTtlCache } from "./ttl-cache";
 
@@ -25,7 +26,6 @@ interface AuditRow {
   new_model_id: string;
   changed_by: string | null;
   changed_at: string;
-  profiles?: { nama_lengkap: string | null } | null;
 }
 
 export class AiModelPolicyError extends Error {
@@ -45,13 +45,18 @@ export function invalidateAiModelPolicyCache(): void {
   policyCache.invalidate();
 }
 
-async function loadPolicies(admin: AdminClient): Promise<Map<string, PolicyRow>> {
+async function loadPolicies(
+  admin: AdminClient,
+): Promise<Map<string, PolicyRow>> {
   try {
     const { data, error } = await admin
       .from("ai_model_policy")
       .select("task, model_id, updated_by, updated_at");
     if (error) {
-      console.warn("[ai-model-policy] Failed to load policies from DB:", error.message);
+      console.warn(
+        "[ai-model-policy] Failed to load policies from DB:",
+        error.message,
+      );
       return new Map();
     }
     const map = new Map<string, PolicyRow>();
@@ -60,7 +65,10 @@ async function loadPolicies(admin: AdminClient): Promise<Map<string, PolicyRow>>
     }
     return map;
   } catch (err) {
-    console.warn("[ai-model-policy] Unexpected error reading ai_model_policy:", err);
+    console.warn(
+      "[ai-model-policy] Unexpected error reading ai_model_policy:",
+      err,
+    );
     return new Map();
   }
 }
@@ -80,7 +88,9 @@ export async function resolveTaskModel(
 
   try {
     const admin = createAdminClient();
-    const policies = await policyCache.get("policy_map", () => loadPolicies(admin));
+    const policies = await policyCache.get("policy_map", () =>
+      loadPolicies(admin),
+    );
     const row = policies.get(task);
 
     if (row && row.model_id) {
@@ -95,7 +105,10 @@ export async function resolveTaskModel(
       );
     }
   } catch (err) {
-    console.warn(`[ai-model-policy] Error resolving task model for "${task}":`, err);
+    console.warn(
+      `[ai-model-policy] Error resolving task model for "${task}":`,
+      err,
+    );
   }
 
   return { modelId: def.codeDefault, source: "code" };
@@ -107,15 +120,24 @@ export async function resolveTaskModel(
 export async function listTaskModelPolicies(
   admin: AdminClient,
 ): Promise<AiModelPolicyItem[]> {
-  const policies = await policyCache.get("policy_map", () => loadPolicies(admin));
-
-  // Check active pricing for models
-  const { data: pricingRows } = await admin
-    .from("ai_pricing_settings")
-    .select("model_id");
-  const modelsWithPricing = new Set((pricingRows ?? []).map((r: { model_id: string }) => r.model_id));
+  const policies = await policyCache.get("policy_map", () =>
+    loadPolicies(admin),
+  );
 
   const tasks = Object.keys(AI_TASK_DEFINITIONS) as AiTask[];
+  const modelIds = [
+    ...new Set(
+      tasks.flatMap((task) => eligibleModelsForTask(task).map((m) => m.id)),
+    ),
+  ];
+  const at = new Date();
+  const pricedModels = await Promise.all(
+    modelIds.map(async (id) =>
+      (await readEffectivePricing(admin, id, at)) ? id : null,
+    ),
+  );
+  const modelsWithPricing = new Set(pricedModels.filter((id) => id !== null));
+
   const result: AiModelPolicyItem[] = [];
 
   for (const task of tasks) {
@@ -145,7 +167,9 @@ export async function listTaskModelPolicies(
       codeDefault: def.codeDefault,
       eligible,
       updatedBy: row?.updated_by ?? null,
-      updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : null,
+      updatedAt: row?.updated_at
+        ? new Date(row.updated_at).toISOString()
+        : null,
     });
   }
 
@@ -162,7 +186,11 @@ export async function setTaskModelPolicy(
   actorUserId: string,
 ): Promise<void> {
   if (!isAiTask(task)) {
-    throw new AiModelPolicyError(400, "TASK_UNKNOWN", `Tugas "${task}" tidak dikenal.`);
+    throw new AiModelPolicyError(
+      400,
+      "TASK_UNKNOWN",
+      `Tugas "${task}" tidak dikenal.`,
+    );
   }
 
   const def = AI_TASK_DEFINITIONS[task];
@@ -177,12 +205,7 @@ export async function setTaskModelPolicy(
     );
   }
 
-  // Check pricing
-  const { data: pricing } = await admin
-    .from("ai_pricing_settings")
-    .select("model_id")
-    .eq("model_id", modelId)
-    .maybeSingle();
+  const pricing = await readEffectivePricing(admin, modelId);
 
   if (!pricing) {
     throw new AiModelPolicyError(
@@ -240,38 +263,28 @@ export async function deleteTaskModelPolicy(
   actorUserId: string,
 ): Promise<void> {
   if (!isAiTask(task)) {
-    throw new AiModelPolicyError(400, "TASK_UNKNOWN", `Tugas "${task}" tidak dikenal.`);
+    throw new AiModelPolicyError(
+      400,
+      "TASK_UNKNOWN",
+      `Tugas "${task}" tidak dikenal.`,
+    );
   }
 
   const def = AI_TASK_DEFINITIONS[task];
 
-  // Atomic delete & audit log
-  const { data: existing } = await admin
-    .from("ai_model_policy")
-    .select("model_id")
-    .eq("task", task)
-    .maybeSingle();
-
-  const oldModelId = existing?.model_id ?? null;
-
-  const { error: delError } = await admin
-    .from("ai_model_policy")
-    .delete()
-    .eq("task", task);
-
-  if (delError) {
-    console.error("[ai-model-policy] Delete policy error:", delError);
-    throw new AiModelPolicyError(500, "DB_ERROR", "Gagal menghapus pengaturan model AI.");
-  }
-
-  // Insert audit row noting revert to code default
-  await admin.from("ai_model_policy_audit").insert({
-    task,
-    old_model_id: oldModelId,
-    new_model_id: def.codeDefault,
-    changed_by: actorUserId,
-    changed_at: new Date().toISOString(),
+  const { error } = await admin.rpc("ai_model_policy_reset", {
+    p_task: task,
+    p_default_model_id: def.codeDefault,
+    p_actor: actorUserId,
   });
+  if (error) {
+    console.error("[ai-model-policy] Reset policy error:", error);
+    throw new AiModelPolicyError(
+      500,
+      "DB_ERROR",
+      "Gagal mengembalikan pengaturan model AI.",
+    );
+  }
 
   invalidateAiModelPolicyCache();
 }
@@ -296,17 +309,25 @@ export async function listTaskModelPolicyAudit(
 
   const rows = (data ?? []) as AuditRow[];
   const userIds = Array.from(
-    new Set(rows.map((r) => r.changed_by).filter((id): id is string => Boolean(id))),
+    new Set(
+      rows.map((r) => r.changed_by).filter((id): id is string => Boolean(id)),
+    ),
   );
 
   let nameMap = new Map<string, string>();
   if (userIds.length > 0) {
-    const { data: profiles } = await admin
+    const { data: profiles, error: profileError } = await admin
       .from("profiles")
-      .select("id, nama_lengkap")
+      .select("id, full_name")
       .in("id", userIds);
+    if (profileError) {
+      console.error(
+        "[ai-model-policy] Audit profile lookup failed:",
+        profileError.message,
+      );
+    }
     if (profiles) {
-      nameMap = new Map(profiles.map((p) => [p.id, p.nama_lengkap ?? ""]));
+      nameMap = new Map(profiles.map((p) => [p.id, p.full_name ?? ""]));
     }
   }
 
@@ -316,7 +337,21 @@ export async function listTaskModelPolicyAudit(
     oldModelId: row.old_model_id,
     newModelId: row.new_model_id,
     changedBy: row.changed_by,
-    changedByName: row.changed_by ? nameMap.get(row.changed_by) ?? null : null,
+    changedByName: row.changed_by
+      ? (nameMap.get(row.changed_by) ?? null)
+      : null,
     changedAt: new Date(row.changed_at).toISOString(),
   }));
+}
+
+export interface KetikReviewModels {
+  primary: string;
+  fallback: string;
+}
+export async function resolveKetikReviewModels(): Promise<KetikReviewModels> {
+  const [primary, fallback] = await Promise.all([
+    resolveTaskModel("ketik_review"),
+    resolveTaskModel("ketik_review_fallback"),
+  ]);
+  return { primary: primary.modelId, fallback: fallback.modelId };
 }

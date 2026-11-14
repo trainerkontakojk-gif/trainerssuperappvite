@@ -73,6 +73,7 @@ export type TelefunSpeechMetrics = ReturnType<
 
 export async function transcribeTelefunAgentAudio(params: {
   base64Audio: string;
+  modelId?: string;
   scenarioTitle: string;
   userId: string;
   signal?: AbortSignal;
@@ -83,7 +84,8 @@ export async function transcribeTelefunAgentAudio(params: {
   // Keep the admission check immediately before the provider boundary.
   if (params.signal?.aborted)
     return { success: false, error: "Scoring aborted" };
-  const { modelId } = await resolveTaskModel("telefun_assessment");
+  const modelId =
+    params.modelId ?? (await resolveTaskModel("telefun_assessment")).modelId;
   const response = await generateGeminiContent({
     model: modelId || TELEFUN_ASSESSMENT_MODEL,
     thinkingLevel: ThinkingLevel.LOW,

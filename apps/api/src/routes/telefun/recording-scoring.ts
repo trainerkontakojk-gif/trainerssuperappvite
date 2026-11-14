@@ -1,3 +1,4 @@
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 /**
  * POST /score/:id — owner-checked voice-quality scoring for one Telefun
  * session: returns a cached assessment when one exists, claims the scoring
@@ -344,7 +345,9 @@ export async function scoreRecording(
     }
 
     // === Claim succeeded — proceed with analysis ===
+    const { modelId } = await resolveTaskModel("telefun_assessment");
     const result = await analyzeVoiceQuality(id, user.id, undefined, {
+      modelId,
       claimTokenHash: manualClaim.claimTokenHash,
     });
     if (!result.success || !result.assessment) {
@@ -533,7 +536,7 @@ export async function scoreRecording(
 
     // A second AI call; the score must not wait for it. Telaah reads the
     // summary on its own when the notes tab opens.
-    void generateCoachingSummary(id, user.id).catch(() => null);
+    void generateCoachingSummary(id, user.id, modelId).catch(() => null);
 
     return c.json({
       success: true,

@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-14
+
+- fix(monitoring): enforce model policy contracts and verify selected models end to end
+
 ## 2026-11-13
 
 - feat(monitoring): add dynamic AI model policy per task and Monitoring Model tab with audit log

@@ -1,3 +1,4 @@
+import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
 import { isRetiredTelefunOpenAiRealtimeSelection } from "@trainers/types";
@@ -184,7 +185,9 @@ telefunRerun.post(
     console.log(`[Telefun Rerun] session=${id} action=claimed`);
 
     try {
+      const { modelId } = await resolveTaskModel("telefun_assessment");
       const result = await analyzeVoiceQuality(id, user.id, undefined, {
+        modelId,
         fresh: true,
         claimTokenHash,
       });
@@ -196,7 +199,7 @@ telefunRerun.post(
         // Hasil baru sudah tersimpan. Ringkasan coaching adalah panggilan AI
         // kedua (batas 3 menit); dijalankan setelah respons supaya pengguna
         // tidak ikut menunggunya.
-        void generateCoachingSummary(id, user.id).catch(() => null);
+        void generateCoachingSummary(id, user.id, modelId).catch(() => null);
         return c.json({
           success: true,
           data: {

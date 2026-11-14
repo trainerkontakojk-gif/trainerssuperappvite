@@ -6,6 +6,7 @@ import {
   createUserWithJwt,
   installLoopbackFetchGuard,
   readLoopbackEnv,
+  runSql,
 } from "./helpers/sidakRealBackend";
 import { tnaApiRequest } from "./helpers/tnaApi";
 import { fetchOwnedTelefunQueueJobs } from "./helpers/telefunScoringQueueHarness";
@@ -31,6 +32,8 @@ let releaseCoaching: (() => void) | undefined;
 let holdCoaching = false;
 let coachingWrites = 0;
 let providerScores = { rate: 9.9, fillers: 9.9 };
+let changePolicyAfterTranscription = false;
+const requestedModelUrls: string[] = [];
 let abortAfterTranscription: AbortController | undefined;
 const TRANSCRIPT_SEGMENTS = [
   {
@@ -154,6 +157,7 @@ test.beforeAll(async () => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (url.hostname === "generativelanguage.googleapis.com") {
+      requestedModelUrls.push(url.pathname);
       const payload = await request.json();
       const parts = payload.contents[0].parts;
       const prompt = parts.find((p: { text?: string }) => p.text)?.text ?? "";
@@ -164,6 +168,15 @@ test.beforeAll(async () => {
           : "coaching";
       providerCalls.push({ kind, prompt, payload });
       if (kind === "transcription") {
+        if (changePolicyAfterTranscription) {
+          runSql(
+            env,
+            "INSERT INTO ai_model_policy(task,model_id) VALUES ('telefun_assessment','gemini-3.5-flash-lite') ON CONFLICT(task) DO UPDATE SET model_id=EXCLUDED.model_id;",
+          );
+          (
+            await import("../../api/src/lib/ai-model-policy")
+          ).invalidateAiModelPolicyCache();
+        }
         abortAfterTranscription?.abort();
         return providerResponse(
           transcriptionText ?? JSON.stringify({ segments }),
@@ -836,4 +849,34 @@ test("worker permanent failure leaves the retry queue after one paid transcripti
   );
   expect(second).toMatchObject({ processed: 0, completed: 0 });
   expect(providerCalls.map((call) => call.kind)).toEqual(["transcription"]);
+});
+
+test("one scoring unit keeps its resolved model after policy changes during transcription", async () => {
+  // Only one production model currently supports audio. Temporarily add audio
+  // capability to the second model in this local provider fixture so a policy
+  // change is genuinely eligible; restore the registry after this test.
+  const { AI_MODELS } = await import("@trainers/types");
+  const alternate = AI_MODELS.find(
+    (model) => model.id === "gemini-3.5-flash-lite",
+  )!;
+  const originalAudioCapability = alternate.capabilities!.supportsAudioInput;
+  alternate.capabilities!.supportsAudioInput = true;
+  changePolicyAfterTranscription = true;
+  requestedModelUrls.length = 0;
+  try {
+    const id = await createSession();
+    expect((await score(id)).status).toBe(200);
+    await expect.poll(() => coachingWrites).toBe(1);
+    expect(requestedModelUrls).toHaveLength(3);
+    expect(
+      requestedModelUrls.every((url) => url.includes("gemini-3.8-flash")),
+    ).toBe(true);
+  } finally {
+    changePolicyAfterTranscription = false;
+    alternate.capabilities!.supportsAudioInput = originalAudioCapability;
+    runSql(env, "DELETE FROM ai_model_policy WHERE task='telefun_assessment';");
+    (
+      await import("../../api/src/lib/ai-model-policy")
+    ).invalidateAiModelPolicyCache();
+  }
 });

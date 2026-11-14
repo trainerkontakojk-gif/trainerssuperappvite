@@ -710,3 +710,12 @@ Migration `20261113160000_ai_model_policy.sql` menambahkan tabel `ai_model_polic
 - Tabel kosong secara default: perilaku fallback otomatis kembali ke konstanta kode bawaan (`codeDefault`) sehingga aman diaplikasikan tanpa risiko downtime.
 - Audit mencatat `task`, `old_model_id`, `new_model_id`, `changed_by`, dan `changed_at`.
 - Rollback: `supabase/rollbacks/rollback_20261113160000_ai_model_policy.sql` menghapus RPC dan kedua tabel. Replay rollback telah diverifikasi pada Supabase lokal disposable.
+
+
+### AI model policy atomic reset follow-up (2026-11-14)
+
+`20261114121440_ai_model_policy_atomic_reset.sql` adds backend-only SECURITY INVOKER
+`ai_model_policy_reset(p_task text, p_default_model_id text, p_actor uuid)`.
+Reset and audit share one transaction; setter/reset serialize per task so old audit values remain accurate.
+No anon/authenticated EXECUTE. Rollback removes reset and restores the original setter without deleting rows.
+Both policy migrations await explicit production approval; local verification does not prove production application.
