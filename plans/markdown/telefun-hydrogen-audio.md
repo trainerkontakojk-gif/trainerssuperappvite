@@ -23,7 +23,7 @@ Lane D: AI provider/usage and eligibility. User explicitly requested audio testi
 - [x] Add focused RED E2E for Hydrogen scoring/coaching/annotations (400 MODEL_NOT_ELIGIBLE before candidate test-only flag).
 - [x] Generate valid local synthetic Indonesian WebM/Opus audio (22.015s, mono Opus 48 kHz).
 - [x] Run four real provider requests: transcription, assessment, coaching returned 200; annotation returned 400 INVALID_ARGUMENT and product route returned 500 NO_ANNOTATIONS. Audio keyword assertion was not reached in this first run.
-- [ ] BLOCKED by failed annotation request: supportsAudioInput stays unchanged; no production option is enabled. Do not mark all flows verified.
+- [x] Original annotation blocker resolved in the annotation repair; registry audio eligibility enabled in the subsequent [authorized activation](telefun-hydrogen-enable.md). Original run evidence below remains unchanged.
 - [x] Review and verify the diagnostic harness; document evidence and integrate on main. No product/runtime code or migration changes.
 
 Proof boundaries: local provider fixtures prove routing/state/persistence, not audio comprehension; live smoke proves acceptance and basic content/JSON compatibility for the supplied synthetic clip under LOW thinking, not broad human scoring accuracy or production latency.

@@ -108,13 +108,13 @@ telefunAnnotations.get("/annotations/:id", async (c) => {
 
     if (error) throw error;
     return c.json({ success: true, data: data ?? [] });
-  } catch (error: any) {
+  } catch {
     return c.json(
       {
         success: false,
         error: {
           code: "DATABASE_ERROR",
-          message: error?.message || "Database error.",
+          message: "Gagal memuat anotasi. Silakan coba lagi.",
         },
       },
       500,
@@ -192,13 +192,13 @@ telefunAnnotations.post(
 
       if (error) throw error;
       return c.json({ success: true, data });
-    } catch (error: any) {
+    } catch {
       return c.json(
         {
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: "Gagal menyimpan anotasi. Silakan coba lagi.",
           },
         },
         500,
@@ -269,13 +269,13 @@ telefunAnnotations.delete("/annotations/:annotationId", async (c) => {
 
     if (deleteError) throw deleteError;
     return c.json({ success: true, message: "Anotasi berhasil dihapus." });
-  } catch (error: any) {
+  } catch {
     return c.json(
       {
         success: false,
         error: {
           code: "DATABASE_ERROR",
-          message: error?.message || "Database error.",
+          message: "Gagal menghapus anotasi. Silakan coba lagi.",
         },
       },
       500,
@@ -595,7 +595,7 @@ Gunakan timestamp_ms berupa bilangan bulat minimal 0 dan priority berupa bilanga
           success: false,
           error: {
             code: "GENERATION_ERROR",
-            message: error?.message || "Gagal menghasilkan anotasi.",
+            message: "Gagal menghasilkan anotasi. Silakan coba lagi.",
           },
         },
         500,

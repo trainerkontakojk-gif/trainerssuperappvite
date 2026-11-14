@@ -20,7 +20,7 @@ let providerText: string;
 let requestPayload: any;
 let requestPath: string;
 let providerCalls = 0;
-let restoreAudioCapability: (() => void) | undefined;
+let databaseFailure = false;
 const annotation = {
   timestamp_ms: 1000,
   category: "strength",
@@ -74,6 +74,22 @@ test.beforeAll(async () => {
   globalThis.fetch = async (input, init) => {
     const req = new Request(input, init);
     const url = new URL(req.url);
+    if (
+      databaseFailure &&
+      req.method === "GET" &&
+      [
+        "/rest/v1/telefun_history",
+        "/rest/v1/telefun_replay_annotations",
+      ].includes(url.pathname)
+    )
+      return Response.json(
+        {
+          code: "XX000",
+          message: "private_database_table_detail",
+          details: "sensitive_query_detail",
+        },
+        { status: 500 },
+      );
     if (url.hostname === "generativelanguage.googleapis.com") {
       requestPayload = await req.json();
       requestPath = url.pathname;
@@ -131,18 +147,10 @@ test.beforeAll(async () => {
     env,
     `INSERT INTO ai_model_policy(task,model_id,updated_by) VALUES ('telefun_assessment','gemini-4-hydrogen','${actor.userId}');`,
   );
-  const { AI_MODELS } = await import("@trainers/types");
-  const caps = AI_MODELS.find(
-    (model) => model.id === "gemini-4-hydrogen",
-  )!.capabilities!;
-  const original = caps.supportsAudioInput;
-  caps.supportsAudioInput = true;
-  restoreAudioCapability = () => {
-    caps.supportsAudioInput = original;
-  };
   app = (await import("../../api/src/app")).default as unknown as Hono;
 });
 test.beforeEach(async () => {
+  databaseFailure = false;
   providerStatus = 200;
   providerText = JSON.stringify(result());
   providerCalls = 0;
@@ -208,7 +216,6 @@ test.afterEach(async () => {
   ).toBeNull();
 });
 test.afterAll(async () => {
-  restoreAudioCapability?.();
   if (!actor) return;
   runSql(
     env,
@@ -324,5 +331,52 @@ for (const invalid of [
     );
     expect(await rows()).toEqual(before);
     expect(await summary()).toEqual(previousSummary);
+  });
+}
+
+for (const operation of ["list", "create", "delete", "generate"] as const) {
+  test(`${operation} database failure returns a friendly annotation error`, async () => {
+    const before = await rows();
+    const id = before.find((row) => row.is_manual)!.id;
+    databaseFailure = true;
+    let response: Response;
+    try {
+      if (operation === "generate") response = await generate();
+      else {
+        const target = operation === "delete" ? id : sessionId;
+        response = await tnaApiRequest(
+          app,
+          `http://localhost/api/v1/telefun/annotations/${target}`,
+          {
+            method:
+              operation === "list"
+                ? "GET"
+                : operation === "create"
+                  ? "POST"
+                  : "DELETE",
+            headers: {
+              Authorization: `Bearer ${actor.token}`,
+              "Content-Type": "application/json",
+            },
+            ...(operation === "create"
+              ? { body: JSON.stringify({ ...annotation, is_manual: true }) }
+              : {}),
+          },
+        );
+      }
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body.error.code).toBe(
+        operation === "generate" ? "GENERATION_ERROR" : "DATABASE_ERROR",
+      );
+      expect(body.error.message).toMatch(/Gagal/);
+      expect(JSON.stringify(body)).not.toMatch(
+        /private_database_table_detail|sensitive_query_detail|XX000/,
+      );
+      expect(providerCalls).toBe(0);
+    } finally {
+      databaseFailure = false;
+    }
+    expect(await rows()).toEqual(before);
   });
 }

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- feat(telefun): enable Hydrogen assessment and hide database errors
+
 - fix(telefun): simplify annotation schema and verify Hydrogen replay annotations
 
 ## 2026-11-14

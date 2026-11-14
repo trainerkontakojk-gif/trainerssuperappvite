@@ -714,7 +714,7 @@ test("Hydrogen is additive in model catalogs and system-task policy options", as
       item.eligible.some(
         (model: { id: string }) => model.id === "gemini-4-hydrogen",
       ),
-    ).toBe(item.task !== "telefun_assessment");
+    ).toBe(true);
   }
 });
 
@@ -869,5 +869,69 @@ test("Hydrogen with missing pricing logs real tokens at zero cost and cannot be 
       expect(
         (await db.from("ai_pricing_settings").insert(pricing.data)).error,
       ).toBeNull();
+  }
+});
+
+test("Telefun policy can select verified Hydrogen while retaining Flash default", async () => {
+  const db = createAdmin(env);
+  const previous = await db
+    .from("ai_pricing_settings")
+    .select("*")
+    .eq("model_id", "gemini-4-hydrogen")
+    .maybeSingle();
+  expect(previous.error).toBeNull();
+  try {
+    expect(
+      (
+        await db.from("ai_pricing_settings").upsert(
+          {
+            model_id: "gemini-4-hydrogen",
+            input_price_usd_per_million: 1.5,
+            output_price_usd_per_million: 7.5,
+            cached_input_text_price_usd_per_million: 0.075,
+          },
+          { onConflict: "model_id" },
+        )
+      ).error,
+    ).toBeNull();
+    const response = await call(
+      "PUT",
+      "/monitoring/models/telefun_assessment",
+      { modelId: "gemini-4-hydrogen" },
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    const list = await call("GET", "/monitoring/models").then((r) => r.json());
+    const item = list.data.items.find(
+      (row: { task: string }) => row.task === "telefun_assessment",
+    );
+    expect(item).toMatchObject({
+      modelId: "gemini-4-hydrogen",
+      source: "policy",
+      codeDefault: "gemini-3.8-flash",
+    });
+    expect(item.eligible.map((model: { id: string }) => model.id)).toEqual(
+      expect.arrayContaining(["gemini-4-hydrogen", "gemini-3.8-flash"]),
+    );
+  } finally {
+    runSql(
+      env,
+      `DELETE FROM ai_model_policy WHERE task='telefun_assessment' AND updated_by='${trainer.userId}';`,
+    );
+    if (previous.data)
+      expect(
+        (await db.from("ai_pricing_settings").upsert(previous.data)).error,
+      ).toBeNull();
+    else
+      expect(
+        (
+          await db
+            .from("ai_pricing_settings")
+            .delete()
+            .eq("model_id", "gemini-4-hydrogen")
+        ).error,
+      ).toBeNull();
+    (
+      await import("../../api/src/lib/ai-model-policy")
+    ).invalidateAiModelPolicyCache();
   }
 });

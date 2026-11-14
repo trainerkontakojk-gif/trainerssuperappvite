@@ -34,7 +34,6 @@ const liveProviderEvidence: Array<{
 }> = [];
 let liveProviderCalls = 0;
 let liveAudio: Buffer | undefined;
-let restoreAudioCapability: (() => void) | undefined;
 function readSmokeKey(): string {
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "e2e-only")
     return process.env.GEMINI_API_KEY;
@@ -220,20 +219,8 @@ test.beforeAll(async () => {
     existingPolicy.data,
     "Local Telefun policy must be empty before isolated smoke",
   ).toBeNull();
-  if (LIVE_HYDROGEN) {
-    const { AI_MODELS } = await import("@trainers/types");
-    const caps = AI_MODELS.find(
-      (model) => model.id === "gemini-4-hydrogen",
-    )!.capabilities!;
-    const original = caps.supportsAudioInput;
-    caps.supportsAudioInput = true;
-    restoreAudioCapability = () => {
-      caps.supportsAudioInput = original;
-    };
-  }
 });
 test.afterAll(async () => {
-  restoreAudioCapability?.();
   if (guardedFetch) globalThis.fetch = guardedFetch;
   if (!agent) return;
   const db = createAdmin(env);

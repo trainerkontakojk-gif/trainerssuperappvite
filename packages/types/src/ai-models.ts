@@ -36,11 +36,7 @@ export interface AiModelInfo {
 
 export type AIProvider = "gemini" | "openai";
 export type AiModelModule =
-  | "ketik"
-  | "pdkt"
-  | "qa-analyzer"
-  | "telefun"
-  | "default";
+  "ketik" | "pdkt" | "qa-analyzer" | "telefun" | "default";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.8-flash";
 export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
@@ -326,9 +322,7 @@ function normalizeGeminiVoice(value: unknown): string {
   return isGeminiLiveVoiceName(value) ? value : "";
 }
 
-function normalizeIdentityVoice(
-  value: unknown,
-): unknown {
+function normalizeIdentityVoice(value: unknown): unknown {
   if (!isSettingsRecord(value) || value.voiceName === undefined) return value;
   return { ...value, voiceName: normalizeGeminiVoice(value.voiceName) };
 }
@@ -368,7 +362,9 @@ export function normalizePersistedTelefunSettings<T>(
     normalized.voiceName = normalizeGeminiVoice(settings.voiceName);
   }
   if (settings.identitySettings !== undefined) {
-    normalized.identitySettings = normalizeIdentityVoice(settings.identitySettings);
+    normalized.identitySettings = normalizeIdentityVoice(
+      settings.identitySettings,
+    );
   }
   if (settings.identity !== undefined) {
     normalized.identity = normalizeIdentityVoice(settings.identity);
@@ -385,7 +381,11 @@ export const TEXT_MODELS: AiModelInfo[] = [
       "Model Gemini 4 untuk percakapan, penalaran, dan analisis multimodal.",
     provider: "gemini",
     timeoutMs: 180_000,
-    capabilities: { supportsText: true, supportsImage: true },
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      supportsAudioInput: true,
+    },
     supportsTemperature: false,
   },
   {
@@ -394,7 +394,11 @@ export const TEXT_MODELS: AiModelInfo[] = [
     description: "Model Gemini cepat untuk percakapan dan analisis.",
     provider: "gemini",
     timeoutMs: 180_000,
-    capabilities: { supportsText: true, supportsImage: true, supportsAudioInput: true },
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      supportsAudioInput: true,
+    },
   },
   {
     id: "gemini-3.5-flash-lite",

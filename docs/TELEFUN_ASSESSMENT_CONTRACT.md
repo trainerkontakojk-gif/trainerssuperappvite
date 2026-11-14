@@ -4,6 +4,21 @@ Dokumen ini menjelaskan batas kepercayaan data penilaian suara Telefun. Tujuanny
 agar hasil AI, cache database, API, dan tampilan selalu memakai arti data yang
 sama.
 
+## Model penilai dan error anotasi
+
+Model penilai dipilih melalui Monitoring → Model untuk tugas `telefun_assessment`.
+Gemini 4 Hydrogen dan Gemini 3.8 Flash mendukung input audio; bawaan kode tetap
+Gemini 3.8 Flash. Pilihan ini tidak mengubah model konsumen Gemini Live.
+[Bukti audio Hydrogen](../plans/markdown/telefun-hydrogen-annotations-fix.md)
+memakai audio sintetis; bukti tersebut bukan evaluasi menyeluruh akurasi penilaian.
+
+Endpoint anotasi baca/tambah/hapus mengembalikan `DATABASE_ERROR` dengan pesan
+Indonesia yang tetap ketika operasi database gagal. Generate mengembalikan
+`GENERATION_ERROR`; detail mentah database/provider tidak diteruskan ke pengguna.
+Status kegagalan tetap HTTP 500. Validasi hasil AI berjalan sebelum penggantian
+anotasi lama; penggantian anotasi dan penyimpanan summary masih merupakan operasi
+terpisah, sehingga kontrak ini tidak menjanjikan transaksi atomik.
+
 ## Skala Nilai
 
 - `overallScore` dan seluruh skor aspek memakai skala **`0..10`**.
@@ -90,13 +105,13 @@ tetap dimiliki sistem.
 Setiap metrik memiliki target tetap (hard-coded di
 `packages/types/src/telefun-communication-profile.ts`):
 
-| Metrik           | Target (displayScore / radar) | targetDirection       |
-| ---------------- | ----------------------------- | --------------------- |
-| Speaking Rate    | 70                            | `match_target`        |
-| Intonation       | 80                            | `match_target`        |
-| Articulation     | 90                            | `match_target`        |
-| Tone             | 85                            | `match_target`        |
-| Fillers          | count ≤ 3 (radar guide: 20)   | `lower_raw_is_better` |
+| Metrik        | Target (displayScore / radar) | targetDirection       |
+| ------------- | ----------------------------- | --------------------- |
+| Speaking Rate | 70                            | `match_target`        |
+| Intonation    | 80                            | `match_target`        |
+| Articulation  | 90                            | `match_target`        |
+| Tone          | 85                            | `match_target`        |
+| Fillers       | count ≤ 3 (radar guide: 20)   | `lower_raw_is_better` |
 
 - **Non-Fillers** — `targetDirection = "match_target"`: skor radar mendekati
   target = semakin baik. Deviasi absolut terhadap target yang dinilai.
@@ -136,12 +151,12 @@ kepadatan — bukan skor kualitas:
 burden = min(100, round(count / 15 * 100))
 ```
 
-| Count | Burden | Visual                        |
-| ----- | ------ | ----------------------------- |
-| 0     | 0      | Paling dalam (terbaik)        |
-| 3     | 20     | Target QA (guide line hijau)  |
-| 5     | 33     | Batas needs_improvement       |
-| 15+   | 100    | Paling luar (terburuk)        |
+| Count | Burden | Visual                       |
+| ----- | ------ | ---------------------------- |
+| 0     | 0      | Paling dalam (terbaik)       |
+| 3     | 20     | Target QA (guide line hijau) |
+| 5     | 33     | Batas needs_improvement      |
+| 15+   | 100    | Paling luar (terburuk)       |
 
 Semakin rendah burden = semakin baik. Guide line hijau radar untuk Fillers
 digambar di nilai 20 (setara count = 3).

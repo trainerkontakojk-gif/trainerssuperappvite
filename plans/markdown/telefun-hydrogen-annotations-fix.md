@@ -52,3 +52,7 @@ Lane D: Gemini provider request/response contract and AI usage evidence. Scope: 
 - Local Graphify update completed: 19929 nodes, 38014 edges, 1262 communities; cache is ignored. The process session was no longer available after continuation, so completion is evidenced by the final log, without inventing an observed exit status.
 
 - `pnpm build` — exit 0, all three build tasks successful. Final format/diff checks run before staging; no additional provider calls were needed after the single successful annotation recheck.
+
+## Authorized activation follow-up — 2026-11-15
+
+The user subsequently authorized [enabling Hydrogen audio and safe database errors](telefun-hydrogen-enable.md). That follow-up enables the canonical registry capability and replaces the remaining raw database error responses on all four annotation operations. Earlier limits/results above describe the historical annotation-only repair.
