@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- docs(agents): move the auto-updated session learnings block out of AGENTS.md into the gitignored handoff notes
+
 - perf(sidak): share one cached year of temuan rows across the dashboard, trend, and agent directory so repeated reads within 60 seconds stop rescanning qa_temuan, with scope applied per request and the existing write hooks clearing it
 
 - fix(deps): patch Hono and its Node adapter across production paths
